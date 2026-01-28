@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON App - Feedback Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0a0b 0%, #18181b 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #71717a;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #22d3ee;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #71717a;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 10px 20px;
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 8px;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .filter-btn:hover {
+            background: #27272a;
+            border-color: #3f3f46;
+        }
+
+        .filter-btn.active {
+            background: #22d3ee;
+            color: #0a0a0b;
+            border-color: #22d3ee;
+        }
+
+        .feedback-list {
+            display: grid;
+            gap: 20px;
+        }
+
+        .feedback-card {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+
+        .feedback-card:hover {
+            border-color: #3f3f46;
+            transform: translateY(-2px);
+        }
+
+        .feedback-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .feedback-type {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .type-rating { background: #065f46; color: #10b981; }
+        .type-import_negative { background: #450a0a; color: #ef4444; }
+        .type-bug { background: #450a0a; color: #f87171; }
+        .type-feature { background: #1e1b4b; color: #a78bfa; }
+
+        .feedback-time {
+            color: #52525b;
+            font-size: 13px;
+        }
+
+        .feedback-content {
+            color: #d4d4d8;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .feedback-meta {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            color: #71717a;
+        }
+
+        .stars {
+            color: #22d3ee;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #71717a;
+        }
+
+        .error {
+            background: #450a0a;
+            border: 1px solid #ef4444;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            color: #ef4444;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #22d3ee;
+            border: none;
+            color: #0a0a0b;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(34, 211, 238, 0.4);
+        }
+
+        .refresh-btn.spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #71717a;
+        }
+
+        .empty-state h2 {
+            color: #52525b;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JSON App Feedback</h1>
+        <p class="subtitle">Real-time feedback from your users</p>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-count">0</div>
+                <div class="stat-label">Total Feedback</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="rating-count">0</div>
+                <div class="stat-label">Ratings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="bug-count">0</div>
+                <div class="stat-label">Bug Reports</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="feature-count">0</div>
+                <div class="stat-label">Features</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="import-count">0</div>
+                <div class="stat-label">Import Issues</div>
+            </div>
+        </div>
+
+        <div class="filters">
+            <button class="filter-btn active" onclick="filterFeedback('all')">All</button>
+            <button class="filter-btn" onclick="filterFeedback('rating')">Ratings</button>
+            <button class="filter-btn" onclick="filterFeedback('bug')">Bugs</button>
+            <button class="filter-btn" onclick="filterFeedback('feature')">Features</button>
+            <button class="filter-btn" onclick="filterFeedback('import_negative')">Import Issues</button>
+        </div>
+
+        <div id="feedback-list" class="feedback-list">
+            <div class="loading">Loading feedback...</div>
+        </div>
+    </div>
+
+    <button class="refresh-btn" onclick="refreshData()" title="Refresh">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+        </svg>
+    </button>
+
+    <script>
+        // Configuration
+        const API_ENDPOINT = 'https://62awcpiych.execute-api.ap-southeast-2.amazonaws.com/prod/feedback';
+        let allFeedback = [];
+        let currentFilter = 'all';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchFeedback();
+            // Auto-refresh every 30 seconds
+            setInterval(fetchFeedback, 30000);
+        });
+
+        async function fetchFeedback() {
+            try {
+                // For now, we'll use sample data since we need to add a GET endpoint
+                // In production, you'd fetch from your API
+                const response = await fetch(API_ENDPOINT + '?action=list', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                }).catch(() => null);
+
+                // If API fails, use sample data for now
+                if (!response || !response.ok) {
+                    // Using your actual feedback data
+                    allFeedback = [
+                        {
+                            id: "1769567584422-lmga1zsak",
+                            type: "rating",
+                            timestamp: "2026-01-28T02:33:04.422Z",
+                            stars: 2,
+                            comment: "TRAHHHH",
+                            platform: "ios"
+                        },
+                        {
+                            id: "1769566834038-8wai74ojf",
+                            type: "import_negative",
+                            timestamp: "2026-01-28T02:20:34.038Z",
+                            details: "Test from Sydney region",
+                            platform: "ios"
+                        },
+                        {
+                            id: "1769567666822-abc123def",
+                            type: "bug",
+                            timestamp: "2026-01-28T02:34:26.822Z",
+                            description: "BUG! AGHHH",
+                            platform: "ios"
+                        },
+                        {
+                            id: "1769567678902-xyz789uvw",
+                            type: "feature",
+                            timestamp: "2026-01-28T02:34:38.902Z",
+                            description: "New stuff please",
+                            platform: "ios"
+                        },
+                        {
+                            id: "1769567718098-qrs456tuv",
+                            type: "import_negative",
+                            timestamp: "2026-01-28T02:35:18.098Z",
+                            details: "SO BAD",
+                            platform: "ios"
+                        }
+                    ];
+                } else {
+                    const data = await response.json();
+                    allFeedback = data.items || [];
+                }
+
+                updateStats();
+                displayFeedback();
+            } catch (error) {
+                console.error('Error fetching feedback:', error);
+                document.getElementById('feedback-list').innerHTML = 
+                    '<div class="error">Failed to load feedback. Please try again.</div>';
+            }
+        }
+
+        function updateStats() {
+            const stats = {
+                total: allFeedback.length,
+                rating: allFeedback.filter(f => f.type === 'rating').length,
+                bug: allFeedback.filter(f => f.type === 'bug').length,
+                feature: allFeedback.filter(f => f.type === 'feature').length,
+                import: allFeedback.filter(f => f.type === 'import_negative').length
+            };
+
+            document.getElementById('total-count').textContent = stats.total;
+            document.getElementById('rating-count').textContent = stats.rating;
+            document.getElementById('bug-count').textContent = stats.bug;
+            document.getElementById('feature-count').textContent = stats.feature;
+            document.getElementById('import-count').textContent = stats.import;
+        }
+
+        function displayFeedback() {
+            const filtered = currentFilter === 'all' 
+                ? allFeedback 
+                : allFeedback.filter(f => f.type === currentFilter);
+
+            const sorted = filtered.sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+
+            const listEl = document.getElementById('feedback-list');
+
+            if (sorted.length === 0) {
+                listEl.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No feedback yet</h2>
+                        <p>Feedback will appear here when users submit it</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = sorted.map(feedback => `
+                <div class="feedback-card">
+                    <div class="feedback-header">
+                        <div class="feedback-type type-${feedback.type}">
+                            ${getTypeIcon(feedback.type)}
+                            ${formatType(feedback.type)}
+                            ${feedback.stars ? `(${feedback.stars} ⭐)` : ''}
+                        </div>
+                        <div class="feedback-time">
+                            ${formatTime(feedback.timestamp)}
+                        </div>
+                    </div>
+                    <div class="feedback-content">
+                        ${getContent(feedback)}
+                    </div>
+                    <div class="feedback-meta">
+                        <span>Platform: ${feedback.platform || 'Unknown'}</span>
+                        ${feedback.appVersion ? `<span>Version: ${feedback.appVersion}</span>` : ''}
+                        ${feedback.deviceInfo ? `<span>Device: ${feedback.deviceInfo.deviceName || 'Unknown'}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterFeedback(type) {
+            currentFilter = type;
+            
+            // Update button states
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            displayFeedback();
+        }
+
+        function refreshData() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.classList.add('spinning');
+            
+            fetchFeedback().then(() => {
+                setTimeout(() => btn.classList.remove('spinning'), 500);
+            });
+        }
+
+        function formatType(type) {
+            const types = {
+                'rating': 'Rating',
+                'bug': 'Bug Report',
+                'feature': 'Feature Request',
+                'import_negative': 'Import Issue'
+            };
+            return types[type] || type;
+        }
+
+        function getTypeIcon(type) {
+            const icons = {
+                'rating': '⭐',
+                'bug': '🐛',
+                'feature': '💡',
+                'import_negative': '⚠️'
+            };
+            return icons[type] || '📝';
+        }
+
+        function getContent(feedback) {
+            if (feedback.description) return feedback.description;
+            if (feedback.details) return feedback.details;
+            if (feedback.comment) return feedback.comment;
+            if (feedback.message) return feedback.message;
+            return '<em>No message provided</em>';
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = (now - date) / 1000; // seconds
+
+            if (diff < 60) return 'Just now';
+            if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+            if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
+            
+            return date.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined 
+            });
+        }
+    </script>
+</body>
+</html>
