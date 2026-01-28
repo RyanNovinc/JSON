@@ -1,0 +1,141 @@
+{
+  "routine_name": "Push Pull Legs - Enhanced",
+  "description": "Complete 6-day training program with estimated workout durations",
+  "days_per_week": 6,
+  "blocks": [
+    {
+      "block_name": "Foundation Phase", 
+      "weeks": "1-4",
+      "structure": "Push Pull Legs",
+      "days": [
+        {
+          "day_name": "Push Day A",
+          "estimated_duration": 45,
+          "exercises": [
+            {
+              "exercise": "Barbell Bench Press",
+              "sets": 4,
+              "reps": "Week 1: 12-15, Week 2: 10-12, Week 3: 8-10, Week 4: 6-8",
+              "rest": 180,
+              "restQuick": 90,
+              "alternatives": ["Dumbbell Bench Press", "Machine Chest Press"]
+            },
+            {
+              "exercise": "Overhead Press",
+              "sets": 3,
+              "reps": "10-12",
+              "rest": 150,
+              "restQuick": 75
+            },
+            {
+              "exercise": "Incline Dumbbell Press",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 120,
+              "restQuick": 60
+            },
+            {
+              "exercise": "Lateral Raise",
+              "sets": 3,
+              "reps": "15-20",
+              "rest": 90,
+              "restQuick": 45
+            },
+            {
+              "exercise": "Tricep Pushdown",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 90,
+              "restQuick": 45
+            }
+          ]
+        },
+        {
+          "day_name": "Pull Day A",
+          "estimated_duration": 50,
+          "exercises": [
+            {
+              "exercise": "Deadlift",
+              "sets": 4,
+              "reps": "5-8",
+              "rest": 240,
+              "restQuick": 120,
+              "notes": "Focus on perfect form"
+            },
+            {
+              "exercise": "Pull Up",
+              "sets": 3,
+              "reps": "8-12",
+              "rest": 180,
+              "restQuick": 90,
+              "alternatives": ["Lat Pulldown", "Assisted Pull Up"]
+            },
+            {
+              "exercise": "Barbell Row",
+              "sets": 3,
+              "reps": "10-12",
+              "rest": 150,
+              "restQuick": 75
+            },
+            {
+              "exercise": "Cable Row",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 120,
+              "restQuick": 60
+            },
+            {
+              "exercise": "Barbell Curl",
+              "sets": 3,
+              "reps": "10-12",
+              "rest": 90,
+              "restQuick": 45
+            }
+          ]
+        },
+        {
+          "day_name": "Legs Day A", 
+          "estimated_duration": 55,
+          "exercises": [
+            {
+              "exercise": "Barbell Back Squat",
+              "sets": 4,
+              "reps": "8-12",
+              "rest": 210,
+              "restQuick": 105
+            },
+            {
+              "exercise": "Romanian Deadlift",
+              "sets": 3,
+              "reps": "10-12",
+              "rest": 180,
+              "restQuick": 90
+            },
+            {
+              "exercise": "Bulgarian Split Squat",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 150,
+              "restQuick": 75,
+              "alternatives": ["Lunge", "Dumbbell Lunge"]
+            },
+            {
+              "exercise": "Leg Curl",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 120,
+              "restQuick": 60
+            },
+            {
+              "exercise": "Standing Calf Raise",
+              "sets": 4,
+              "reps": "15-20",
+              "rest": 90,
+              "restQuick": 45
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

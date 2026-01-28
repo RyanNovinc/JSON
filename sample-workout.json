@@ -1,0 +1,121 @@
+{
+  "routine_name": "Push Pull Legs",
+  "description": "Classic 6-day PPL split for muscle growth",
+  "days_per_week": 6,
+  "blocks": [
+    {
+      "block_name": "Foundation Phase",
+      "weeks": "1-4",
+      "structure": "Push Pull Legs",
+      "days": [
+        {
+          "day_name": "Push A",
+          "exercises": [
+            {
+              "exercise": "Barbell Bench Press",
+              "sets": 4,
+              "reps": "8-10",
+              "rest": 120,
+              "notes": "Control the descent"
+            },
+            {
+              "exercise": "Overhead Press",
+              "sets": 3,
+              "reps": "8-10",
+              "rest": 90
+            },
+            {
+              "exercise": "Incline Dumbbell Press",
+              "sets": 3,
+              "reps": "10-12",
+              "rest": 90
+            },
+            {
+              "exercise": "Lateral Raise",
+              "sets": 4,
+              "reps": "12-15",
+              "rest": 60
+            },
+            {
+              "exercise": "Rope Pushdown",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 60
+            }
+          ]
+        },
+        {
+          "day_name": "Pull A",
+          "exercises": [
+            {
+              "exercise": "Pull Up",
+              "sets": 4,
+              "reps": "6-10",
+              "rest": 120
+            },
+            {
+              "exercise": "Barbell Row",
+              "sets": 4,
+              "reps": "8-10",
+              "rest": 90
+            },
+            {
+              "exercise": "Cable Row",
+              "sets": 3,
+              "reps": "10-12",
+              "rest": 90
+            },
+            {
+              "exercise": "Face Pull",
+              "sets": 3,
+              "reps": "15-20",
+              "rest": 60
+            },
+            {
+              "exercise": "Barbell Curl",
+              "sets": 3,
+              "reps": "10-12",
+              "rest": 60
+            }
+          ]
+        },
+        {
+          "day_name": "Legs A",
+          "exercises": [
+            {
+              "exercise": "Barbell Back Squat",
+              "sets": 4,
+              "reps": "6-8",
+              "rest": 180,
+              "notes": "Full depth"
+            },
+            {
+              "exercise": "Romanian Deadlift",
+              "sets": 4,
+              "reps": "8-10",
+              "rest": 120
+            },
+            {
+              "exercise": "Leg Press",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 90
+            },
+            {
+              "exercise": "Lying Leg Curl",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 60
+            },
+            {
+              "exercise": "Standing Calf Raise",
+              "sets": 4,
+              "reps": "12-15",
+              "rest": 60
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

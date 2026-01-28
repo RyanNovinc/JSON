@@ -1,29 +1,41 @@
 {
   "expo": {
-    "name": "Clean-Expo-Starter-Template",
-    "slug": "Clean-Expo-Starter-Template",
+    "name": "JSON",
+    "slug": "json",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.RyanNovinc.JSON",
+      "buildNumber": "2",
+      "infoPlist": {
+        "CFBundleDisplayName": "JSON",
+        "CFBundleName": "JSON",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0f0f0f"
       },
+      "package": "com.RyanNovinc.JSON",
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "836fbcc1-7997-4d00-b9eb-5d259570a9a7"
+      }
+    },
+    "owner": "ryan_novinc"
   }
 }

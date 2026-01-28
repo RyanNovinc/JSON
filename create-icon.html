@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>App Icon Generator</title>
+</head>
+<body>
+    <canvas id="canvas" width="1024" height="1024" style="border: 1px solid #ccc;"></canvas>
+    <br><br>
+    <button onclick="downloadIcon()">Download Icon</button>
+    <button onclick="downloadSmallIcon()">Download Small Icon (512x512)</button>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        function drawIcon() {
+            // Clear canvas
+            ctx.clearRect(0, 0, 1024, 1024);
+            
+            // Black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 1024, 1024);
+            
+            // Dumbbell icon in cyan
+            ctx.fillStyle = '#22d3ee';
+            
+            const centerX = 512;
+            const centerY = 512;
+            const iconSize = 600; // 60% of 1024
+            
+            // Dumbbell dimensions
+            const barWidth = iconSize * 0.6;
+            const barHeight = iconSize * 0.08;
+            const weightRadius = iconSize * 0.12;
+            const weightWidth = iconSize * 0.15;
+            const weightHeight = iconSize * 0.25;
+            
+            // Draw center bar
+            ctx.fillRect(centerX - barWidth/2, centerY - barHeight/2, barWidth, barHeight);
+            
+            // Draw left weight plates
+            ctx.fillRect(centerX - barWidth/2 - weightWidth/2, centerY - weightHeight/2, weightWidth, weightHeight);
+            ctx.fillRect(centerX - barWidth/2 - weightWidth/3, centerY - weightHeight/3, weightWidth/1.5, weightHeight/1.5);
+            
+            // Draw right weight plates
+            ctx.fillRect(centerX + barWidth/2 - weightWidth/2, centerY - weightHeight/2, weightWidth, weightHeight);
+            ctx.fillRect(centerX + barWidth/2 - weightWidth/2, centerY - weightHeight/3, weightWidth/1.5, weightHeight/1.5);
+        }
+        
+        function downloadIcon() {
+            drawIcon();
+            const link = document.createElement('a');
+            link.download = 'app-icon-1024.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        function downloadSmallIcon() {
+            // Create a smaller canvas
+            const smallCanvas = document.createElement('canvas');
+            smallCanvas.width = 512;
+            smallCanvas.height = 512;
+            const smallCtx = smallCanvas.getContext('2d');
+            
+            // Black background
+            smallCtx.fillStyle = '#000000';
+            smallCtx.fillRect(0, 0, 512, 512);
+            
+            // Scale down the icon
+            smallCtx.fillStyle = '#22d3ee';
+            
+            const centerX = 256;
+            const centerY = 256;
+            const iconSize = 300; // 60% of 512
+            
+            const barWidth = iconSize * 0.6;
+            const barHeight = iconSize * 0.08;
+            const weightWidth = iconSize * 0.15;
+            const weightHeight = iconSize * 0.25;
+            
+            // Draw center bar
+            smallCtx.fillRect(centerX - barWidth/2, centerY - barHeight/2, barWidth, barHeight);
+            
+            // Draw left weight plates
+            smallCtx.fillRect(centerX - barWidth/2 - weightWidth/2, centerY - weightHeight/2, weightWidth, weightHeight);
+            smallCtx.fillRect(centerX - barWidth/2 - weightWidth/3, centerY - weightHeight/3, weightWidth/1.5, weightHeight/1.5);
+            
+            // Draw right weight plates
+            smallCtx.fillRect(centerX + barWidth/2 - weightWidth/2, centerY - weightHeight/2, weightWidth, weightHeight);
+            smallCtx.fillRect(centerX + barWidth/2 - weightWidth/2, centerY - weightHeight/3, weightWidth/1.5, weightHeight/1.5);
+            
+            const link = document.createElement('a');
+            link.download = 'app-icon-512.png';
+            link.href = smallCanvas.toDataURL();
+            link.click();
+        }
+        
+        // Draw the icon when page loads
+        drawIcon();
+    </script>
+</body>
+</html>
