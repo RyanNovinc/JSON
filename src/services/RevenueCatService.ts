@@ -16,6 +16,7 @@ interface PurchaseResult {
   userCancelled?: boolean;
   productIdentifier?: string;
   transaction?: any;
+  errorCode?: string;
 }
 
 interface RestoreResult {
@@ -30,6 +31,7 @@ class RevenueCatService {
   private isConfigured = false;
   private customerInfoUpdateCallbacks: Array<(customerInfo: CustomerInfo) => void> = [];
   private offerings: any = null;
+  private customerInfo: CustomerInfo | null = null;
 
   static getInstance(): RevenueCatService {
     if (!RevenueCatService.instance) {
@@ -71,6 +73,7 @@ class RevenueCatService {
       if (userId) {
         try {
           const { customerInfo } = await Purchases.logIn(userId);
+          this.customerInfo = customerInfo;
           // Update customer info through callbacks
           this.customerInfoUpdateCallbacks.forEach(callback => callback(customerInfo));
         } catch (loginError) {
@@ -85,6 +88,9 @@ class RevenueCatService {
           hasJSONPro: hasJSONProAccess(customerInfo),
           activeEntitlements: Object.keys(customerInfo.entitlements.active),
         });
+        
+        // Store customer info
+        this.customerInfo = customerInfo;
         
         // Notify all callbacks
         this.customerInfoUpdateCallbacks.forEach(callback => callback(customerInfo));
@@ -115,8 +121,8 @@ class RevenueCatService {
     try {
       if (!this.isConfigured || !Purchases) return;
       
-      const customerInfo = await Purchases.getCustomerInfo();
-      this.customerInfoUpdateCallbacks.forEach(callback => callback(customerInfo));
+      this.customerInfo = await Purchases.getCustomerInfo();
+      this.customerInfoUpdateCallbacks.forEach(callback => callback(this.customerInfo));
     } catch (error) {
       console.error('[RevenueCat] Failed to refresh customer info:', error);
     }
@@ -210,7 +216,7 @@ class RevenueCatService {
       console.log('[RevenueCat] Purchasing package:', `${offeringId}.${packageId}`);
       
       if (!this.isConfigured) {
-        throw new Error('RevenueCat not configured');
+        throw new Error('RevenueCat not configured. Please sign in with Apple ID first.');
       }
 
       if (!this.isConfigured || !Purchases) {
@@ -272,6 +278,7 @@ class RevenueCatService {
       console.log('✅ [RevenueCat] Purchase successful:', packageId);
       
       // Update stored customer info
+      this.customerInfo = purchaseResult.customerInfo;
       this.customerInfoUpdateCallbacks.forEach(callback => callback(purchaseResult.customerInfo));
 
       // CRITICAL FIX: Run post-purchase operations in background
@@ -297,19 +304,17 @@ class RevenueCatService {
       };
       
     } catch (error: any) {
-      console.error('[RevenueCat] Purchase failed:', error);
+      console.error('❌ [RevenueCat] Purchase failed:', error);
       
+      // Handle user cancelled purchase
       if (error.userCancelled) {
-        return {
-          success: false,
-          userCancelled: true,
-          error: 'User cancelled the purchase',
-        };
+        return { success: false, userCancelled: true };
       }
       
-      return {
-        success: false,
-        error: error.message || 'Purchase failed',
+      return { 
+        success: false, 
+        error: error.message,
+        errorCode: error.code 
       };
     }
   }

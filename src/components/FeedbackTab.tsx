@@ -18,61 +18,45 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigationState } from '@react-navigation/native';
+import { sendRatingFeedback, sendBugReport, sendFeatureRequest } from '../services/feedbackApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH * 0.9;
-const VELOCITY_THRESHOLD = 500; // Minimum velocity to trigger open
-const DISTANCE_THRESHOLD = 30; // Minimum distance to trigger open
 
 type TabType = 'rating' | 'bug' | 'feature';
 
 export function FeedbackTab() {
-  const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('rating');
   const [feedback, setFeedback] = useState('');
   const [rating, setRating] = useState(0);
-
-  const translateX = useRef(new Animated.Value(PANEL_WIDTH)).current;
-  const tabTranslateX = useRef(new Animated.Value(0)).current;
 
   // Hide feedback tab on payment screen
   const navigationState = useNavigationState(state => state);
   const currentRoute = navigationState?.routes?.[navigationState.index];
   const isPaymentScreen = currentRoute?.name === 'Payment';
 
+  // SIMPLE ANIMATION SYSTEM - ONE SET OF VALUES
+  const panelX = useRef(new Animated.Value(PANEL_WIDTH)).current; // Panel position
+  const tabX = useRef(new Animated.Value(0)).current; // Tab position
+
+  // SIMPLE STATE
+  const [isOpen, setIsOpen] = useState(false);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+
+  // SIMPLE OPEN/CLOSE FUNCTIONS
   const openPanel = () => {
     setIsOpen(true);
     Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 8,
-      }),
-      Animated.spring(tabTranslateX, {
-        toValue: -PANEL_WIDTH,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 8,
-      }),
+      Animated.spring(panelX, { toValue: 0, useNativeDriver: false, tension: 100, friction: 8 }),
+      Animated.spring(tabX, { toValue: -PANEL_WIDTH, useNativeDriver: false, tension: 100, friction: 8 }),
     ]).start();
   };
 
   const closePanel = () => {
     Keyboard.dismiss();
     Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: PANEL_WIDTH,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 8,
-      }),
-      Animated.spring(tabTranslateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 8,
-      }),
+      Animated.spring(panelX, { toValue: PANEL_WIDTH, useNativeDriver: false, tension: 100, friction: 8 }),
+      Animated.spring(tabX, { toValue: 0, useNativeDriver: false, tension: 100, friction: 8 }),
     ]).start(() => {
       setIsOpen(false);
       setFeedback('');
@@ -81,107 +65,66 @@ export function FeedbackTab() {
     });
   };
 
+  // PROVEN PANRESPONDER PATTERN FROM RESEARCH
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        const isDragging = Math.abs(gestureState.dx) > 5;
-        // For closing, be more sensitive to right swipes
-        if (isOpen && gestureState.dx > 3) {
-          return true;
+        // Only respond to horizontal swipes > 10px
+        const shouldRespond = Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 80;
+        if (shouldRespond) {
+          setScrollEnabled(false); // DISABLE SCROLL IMMEDIATELY
         }
-        // For opening, be sensitive to left swipes
-        if (!isOpen && gestureState.dx < -5) {
-          return true;
-        }
-        return isDragging;
+        return shouldRespond;
       },
-      
+
       onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dx < 0 && !isOpen) {
-          // Opening: Panel and tab follow finger continuously
-          const dragDistance = Math.abs(gestureState.dx);
-          const newTranslateX = Math.max(0, PANEL_WIDTH - dragDistance);
-          const newTabTranslateX = Math.min(0, -dragDistance);
-          translateX.setValue(newTranslateX);
-          tabTranslateX.setValue(newTabTranslateX);
-        } else if (gestureState.dx > 0 && isOpen) {
-          // Closing: Panel and tab follow finger smoothly - REAL TIME
-          console.log('CLOSING DRAG:', gestureState.dx, 'isOpen:', isOpen);
-          const dragDistance = gestureState.dx;
-          const newTranslateX = Math.min(PANEL_WIDTH, dragDistance);
-          const newTabTranslateX = Math.max(-PANEL_WIDTH, -PANEL_WIDTH + dragDistance);
-          translateX.setValue(newTranslateX);
-          tabTranslateX.setValue(newTabTranslateX);
+        const { dx } = gestureState;
+
+        if (!isOpen && dx < 0) {
+          // OPENING: Follow finger from right edge
+          const newPosition = PANEL_WIDTH + dx;
+          const clampedPosition = Math.max(0, newPosition);
+          panelX.setValue(clampedPosition);
+          tabX.setValue(dx);
+        } else if (isOpen && dx > 0) {
+          // CLOSING: Follow finger from left edge  
+          panelX.setValue(dx);
+          tabX.setValue(-PANEL_WIDTH + dx);
         }
       },
-      
+
       onPanResponderRelease: (_, gestureState) => {
+        setScrollEnabled(true); // RE-ENABLE SCROLL
         const { dx, vx } = gestureState;
         const velocity = Math.abs(vx);
         const distance = Math.abs(dx);
-        
-        // Handle tap (small movement)
-        if (distance < 5) {
-          if (isOpen) {
-            closePanel();
-          } else {
-            openPanel();
-          }
-          return;
-        }
-        
+
         if (!isOpen) {
-          // Opening logic
-          if ((velocity > VELOCITY_THRESHOLD && dx < 0) || (dx < 0 && distance > DISTANCE_THRESHOLD)) {
+          // OPENING LOGIC: Velocity > 0.5 OR distance > 1/3 panel width
+          if ((velocity > 0.5 && dx < 0) || distance > PANEL_WIDTH / 3) {
             openPanel();
           } else {
             // Snap back to closed
             Animated.parallel([
-              Animated.spring(translateX, {
-                toValue: PANEL_WIDTH,
-                useNativeDriver: true,
-                velocity: vx,
-                tension: 100,
-                friction: 8,
-              }),
-              Animated.spring(tabTranslateX, {
-                toValue: 0,
-                useNativeDriver: true,
-                velocity: vx,
-                tension: 100,
-                friction: 8,
-              }),
+              Animated.spring(panelX, { toValue: PANEL_WIDTH, useNativeDriver: false }),
+              Animated.spring(tabX, { toValue: 0, useNativeDriver: false }),
             ]).start();
           }
         } else {
-          // Closing logic
-          if ((velocity > VELOCITY_THRESHOLD && dx > 0) || (dx > 0 && distance > DISTANCE_THRESHOLD)) {
+          // CLOSING LOGIC: Velocity > 0.5 OR distance > 1/3 panel width
+          if ((velocity > 0.5 && dx > 0) || distance > PANEL_WIDTH / 3) {
             closePanel();
           } else {
             // Snap back to open
             Animated.parallel([
-              Animated.spring(translateX, {
-                toValue: 0,
-                useNativeDriver: true,
-                velocity: -vx,
-                tension: 100,
-                friction: 8,
-              }),
-              Animated.spring(tabTranslateX, {
-                toValue: -PANEL_WIDTH,
-                useNativeDriver: true,
-                velocity: -vx,
-                tension: 100,
-                friction: 8,
-              }),
+              Animated.spring(panelX, { toValue: 0, useNativeDriver: false }),
+              Animated.spring(tabX, { toValue: -PANEL_WIDTH, useNativeDriver: false }),
             ]).start();
           }
         }
       },
     })
   ).current;
-
 
   const handleRatingSubmit = async () => {
     if (rating === 5) {
@@ -203,10 +146,16 @@ export function FeedbackTab() {
       };
 
       try {
+        // Save locally
         const existingFeedback = await AsyncStorage.getItem('userFeedback');
         const feedbackArray = existingFeedback ? JSON.parse(existingFeedback) : [];
         feedbackArray.push(feedbackEntry);
         await AsyncStorage.setItem('userFeedback', JSON.stringify(feedbackArray));
+        
+        // Send to AWS (non-blocking)
+        sendRatingFeedback(rating, feedback).catch(error => {
+          console.log('Failed to send rating to server:', error);
+        });
         
         Alert.alert(
           'Thank you!',
@@ -234,10 +183,22 @@ export function FeedbackTab() {
     };
 
     try {
+      // Save locally
       const existingFeedback = await AsyncStorage.getItem('userFeedback');
       const feedbackArray = existingFeedback ? JSON.parse(existingFeedback) : [];
       feedbackArray.push(feedbackEntry);
       await AsyncStorage.setItem('userFeedback', JSON.stringify(feedbackArray));
+      
+      // Send to AWS (non-blocking)
+      if (activeTab === 'bug') {
+        sendBugReport(feedback, 'medium').catch(error => {
+          console.log('Failed to send bug report to server:', error);
+        });
+      } else if (activeTab === 'feature') {
+        sendFeatureRequest(feedback, 'medium').catch(error => {
+          console.log('Failed to send feature request to server:', error);
+        });
+      }
       
       Alert.alert(
         'Thank you!',
@@ -257,41 +218,28 @@ export function FeedbackTab() {
 
   return (
     <>
-      {/* Tab - always visible, moves with panel */}
+      {/* BLUE TAB - ALWAYS VISIBLE */}
       <Animated.View 
-        style={[
-          styles.floatingTab, 
-          { transform: [{ translateX: tabTranslateX }] }
-        ]} 
+        style={[styles.floatingTab, { transform: [{ translateX: tabX }] }]} 
         {...panResponder.panHandlers}
       >
-        <View style={styles.tabTouchArea}>
+        <TouchableOpacity style={styles.tabTouchArea} onPress={openPanel}>
           <View style={styles.tabIndicator} />
-        </View>
+        </TouchableOpacity>
       </Animated.View>
 
-
-      {/* Panel */}
+      {/* FEEDBACK PANEL */}
       <Animated.View
-        style={[
-          styles.panel,
-          {
-            transform: [{ translateX }],
-          },
-        ]}
+        style={[styles.panel, { transform: [{ translateX: panelX }] }]}
         pointerEvents={isOpen ? 'auto' : 'none'}
-        {...(isOpen ? panResponder.panHandlers : {})}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-        >
-          <ScrollView
-            style={styles.scrollView}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+          <ScrollView 
+            style={styles.scrollView} 
             contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            scrollEnabled={scrollEnabled}
           >
+            
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>Feedback</Text>
@@ -309,27 +257,15 @@ export function FeedbackTab() {
               ].map((tab) => (
                 <TouchableOpacity
                   key={tab.key}
-                  style={[
-                    styles.tabButton,
-                    activeTab === tab.key && styles.tabButtonActive
-                  ]}
+                  style={[styles.tabButton, activeTab === tab.key && styles.tabButtonActive]}
                   onPress={() => {
                     setActiveTab(tab.key as TabType);
                     setFeedback('');
                     setRating(0);
                   }}
                 >
-                  <Ionicons
-                    name={tab.icon as any}
-                    size={16}
-                    color={activeTab === tab.key ? '#ffffff' : '#71717a'}
-                  />
-                  <Text style={[
-                    styles.tabLabel,
-                    activeTab === tab.key && styles.tabLabelActive
-                  ]}>
-                    {tab.label}
-                  </Text>
+                  <Ionicons name={tab.icon as any} size={16} color={activeTab === tab.key ? '#ffffff' : '#71717a'} />
+                  <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>{tab.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -342,11 +278,7 @@ export function FeedbackTab() {
                   
                   <View style={styles.stars}>
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity
-                        key={star}
-                        onPress={() => setRating(star)}
-                        style={styles.star}
-                      >
+                      <TouchableOpacity key={star} onPress={() => setRating(star)} style={styles.star}>
                         <Ionicons
                           name={star <= rating ? 'star' : 'star-outline'}
                           size={32}
@@ -379,10 +311,7 @@ export function FeedbackTab() {
                   )}
 
                   <TouchableOpacity
-                    style={[
-                      styles.button,
-                      rating === 0 && styles.buttonDisabled
-                    ]}
+                    style={[styles.button, rating === 0 && styles.buttonDisabled]}
                     onPress={handleRatingSubmit}
                     disabled={rating === 0}
                   >
@@ -418,10 +347,7 @@ export function FeedbackTab() {
                   <Text style={styles.charCount}>{feedback.length} / 500</Text>
 
                   <TouchableOpacity
-                    style={[
-                      styles.button,
-                      !feedback.trim() && styles.buttonDisabled
-                    ]}
+                    style={[styles.button, !feedback.trim() && styles.buttonDisabled]}
                     onPress={handleFeedbackSubmit}
                     disabled={!feedback.trim()}
                   >
@@ -447,7 +373,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   tabTouchArea: {
-    padding: 5, // Add some padding for better touch area
+    padding: 5,
   },
   tabIndicator: {
     width: 12,
@@ -460,15 +386,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 3,
     elevation: 5,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    zIndex: 2000,
   },
   panel: {
     position: 'absolute',

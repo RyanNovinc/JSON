@@ -1,4 +1,4 @@
-# AI Workout Generation Prompts
+# JSON Workout Generation Prompts
 
 ## System Prompt for Workout Program Generation
 

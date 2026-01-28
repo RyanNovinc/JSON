@@ -116,7 +116,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           >
             <Section title="1. Data Collection Overview">
               <Text style={styles.sectionText}>
-                AI Workout Generator prioritizes your privacy by storing all personal data locally on your device. We do NOT collect, store, or transmit your workout routines, progress, or personal information to external servers.
+                JSON prioritizes your privacy by storing all personal data locally on your device. We do NOT collect, store, or transmit your workout routines, progress, or personal information to external servers.
               </Text>
               
               <InfoBox>

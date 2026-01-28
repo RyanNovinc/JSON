@@ -29,7 +29,7 @@ export const CustomerCenter: React.FC<CustomerCenterProps> = ({ onClose }) => {
   const handleContactSupport = () => {
     Alert.alert(
       'Contact Support',
-      'For support, please email us at support@aiworkoutgenerator.com',
+      'For support, please email us at Ryan.Novinc@gmail.com',
       [
         { text: 'Copy Email', onPress: () => {
           // In a real app, you'd copy to clipboard here

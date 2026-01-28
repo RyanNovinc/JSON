@@ -289,7 +289,7 @@ const glossary = {
 export const exerciseGlossary = glossary.exercises;
 
 export const getAIPrompt = () => {
-  return `# AI Workout Program Generator
+  return `# JSON Workout Program Generator
 
 You are generating a workout program from the PROGRAM SPECS provided. Output valid JSON that can be imported into a fitness app.
 

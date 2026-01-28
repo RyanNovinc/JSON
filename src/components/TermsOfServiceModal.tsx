@@ -107,7 +107,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           >
             <Section title="1. Application Services">
               <Text style={styles.sectionText}>
-                AI Workout Generator is a fitness application that helps you import, manage, and track workout routines. All your data is stored locally on your device.
+                JSON is a fitness application that helps you import, manage, and track workout routines. All your data is stored locally on your device.
               </Text>
             </Section>
 

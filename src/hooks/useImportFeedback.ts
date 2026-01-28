@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { WorkoutStorage, FeedbackEntry } from '../utils/storage';
+import { sendImportFeedback } from '../services/feedbackApi';
 // import * as Crypto from 'expo-crypto';
 
 export interface UseImportFeedbackReturn {
@@ -24,7 +25,15 @@ export function useImportFeedback(): UseImportFeedbackReturn {
       details,
     };
     
+    // Save feedback locally
     await WorkoutStorage.saveFeedback(feedbackEntry);
+    
+    // Send feedback to AWS (only negative feedback)
+    // This runs async but we don't await it to avoid blocking the UI
+    sendImportFeedback(feedback, details, currentProgramId).catch(error => {
+      console.log('Failed to send feedback to server:', error);
+      // Feedback is already saved locally, so we can retry later
+    });
     
     // TODO: Future enhancement - route to follow-up based on feedback type
     // if (feedback === 'negative') {
@@ -37,7 +46,7 @@ export function useImportFeedback(): UseImportFeedbackReturn {
     
     setShowFeedbackModal(false);
     setCurrentProgramId(null);
-  }, []);
+  }, [currentProgramId]);
 
   const skipFeedback = useCallback(() => {
     setShowFeedbackModal(false);

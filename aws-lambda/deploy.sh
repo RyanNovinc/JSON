@@ -2,7 +2,7 @@
 
 # Configuration
 FUNCTION_NAME="json-app-feedback-handler"
-REGION="us-east-1"  # Change this to your preferred region
+REGION="ap-southeast-2"  # Sydney region for Australian users
 RUNTIME="nodejs18.x"
 HANDLER="feedback-handler.handler"
 TABLE_NAME="JsonAppFeedback"

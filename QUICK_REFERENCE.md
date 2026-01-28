@@ -1,4 +1,4 @@
-# Quick Reference for AI Workout Generation
+# Quick Reference for JSON Workout Generation
 
 ## Copy-Paste Prompt Template
 

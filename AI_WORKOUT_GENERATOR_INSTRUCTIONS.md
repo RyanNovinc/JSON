@@ -1,4 +1,4 @@
-# AI Workout Program Generator Instructions
+# JSON Workout Program Generator Instructions
 
 **Copy and paste this entire message into Claude or ChatGPT along with your program request**
 
