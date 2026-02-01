@@ -18,14 +18,19 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigationState } from '@react-navigation/native';
+import { useTheme } from '../contexts/ThemeContext';
 import { sendRatingFeedback, sendBugReport, sendFeatureRequest } from '../services/feedbackApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PANEL_WIDTH = SCREEN_WIDTH * 0.9;
+const VELOCITY_THRESHOLD = 500;
+const DISTANCE_THRESHOLD = 50;
 
 type TabType = 'rating' | 'bug' | 'feature';
 
 export function FeedbackTab() {
+  const { themeColor } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('rating');
   const [feedback, setFeedback] = useState('');
   const [rating, setRating] = useState(0);
@@ -35,29 +40,46 @@ export function FeedbackTab() {
   const currentRoute = navigationState?.routes?.[navigationState.index];
   const isPaymentScreen = currentRoute?.name === 'Payment';
 
-  // SIMPLE ANIMATION SYSTEM - ONE SET OF VALUES
-  const panelX = useRef(new Animated.Value(PANEL_WIDTH)).current; // Panel position
-  const tabX = useRef(new Animated.Value(0)).current; // Tab position
+  // SINGLE ANIMATION SYSTEM
+  const translateX = useRef(new Animated.Value(PANEL_WIDTH)).current;
+  const tabTranslateX = useRef(new Animated.Value(0)).current;
 
-  // SIMPLE STATE
-  const [isOpen, setIsOpen] = useState(false);
-  const [scrollEnabled, setScrollEnabled] = useState(true);
-
-  // SIMPLE OPEN/CLOSE FUNCTIONS
   const openPanel = () => {
     setIsOpen(true);
     Animated.parallel([
-      Animated.spring(panelX, { toValue: 0, useNativeDriver: false, tension: 100, friction: 8 }),
-      Animated.spring(tabX, { toValue: -PANEL_WIDTH, useNativeDriver: false, tension: 100, friction: 8 }),
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 8,
+      }),
+      Animated.spring(tabTranslateX, {
+        toValue: -PANEL_WIDTH,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 8,
+      }),
     ]).start();
   };
 
   const closePanel = () => {
     Keyboard.dismiss();
     Animated.parallel([
-      Animated.spring(panelX, { toValue: PANEL_WIDTH, useNativeDriver: false, tension: 100, friction: 8 }),
-      Animated.spring(tabX, { toValue: 0, useNativeDriver: false, tension: 100, friction: 8 }),
+      Animated.spring(translateX, {
+        toValue: PANEL_WIDTH,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 8,
+      }),
+      Animated.spring(tabTranslateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 8,
+      }),
     ]).start(() => {
+      // Force tab to final position to fix iOS production build bug
+      tabTranslateX.setValue(0);
       setIsOpen(false);
       setFeedback('');
       setRating(0);
@@ -65,61 +87,99 @@ export function FeedbackTab() {
     });
   };
 
-  // PROVEN PANRESPONDER PATTERN FROM RESEARCH
+  // WORKING PANRESPONDER - EXACTLY LIKE ORIGINAL
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to horizontal swipes > 10px
-        const shouldRespond = Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 80;
-        if (shouldRespond) {
-          setScrollEnabled(false); // DISABLE SCROLL IMMEDIATELY
-        }
-        return shouldRespond;
-      },
-
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => 
+        Math.abs(gestureState.dx) > 5,
+      
       onPanResponderMove: (_, gestureState) => {
-        const { dx } = gestureState;
-
-        if (!isOpen && dx < 0) {
-          // OPENING: Follow finger from right edge
-          const newPosition = PANEL_WIDTH + dx;
-          const clampedPosition = Math.max(0, newPosition);
-          panelX.setValue(clampedPosition);
-          tabX.setValue(dx);
-        } else if (isOpen && dx > 0) {
-          // CLOSING: Follow finger from left edge  
-          panelX.setValue(dx);
-          tabX.setValue(-PANEL_WIDTH + dx);
+        if (gestureState.dx < 0 && !isOpen) {
+          // Opening: Panel and tab follow finger continuously
+          const dragDistance = Math.abs(gestureState.dx);
+          const newTranslateX = PANEL_WIDTH - dragDistance;
+          const newTabTranslateX = -dragDistance;
+          translateX.setValue(newTranslateX);
+          tabTranslateX.setValue(newTabTranslateX);
+        } else if (gestureState.dx > 0 && isOpen) {
+          // Closing: Panel and tab follow finger as it closes
+          const dragDistance = gestureState.dx;
+          const newTranslateX = dragDistance;
+          const newTabTranslateX = -PANEL_WIDTH + dragDistance;
+          translateX.setValue(newTranslateX);
+          tabTranslateX.setValue(newTabTranslateX);
         }
       },
-
+      
       onPanResponderRelease: (_, gestureState) => {
-        setScrollEnabled(true); // RE-ENABLE SCROLL
         const { dx, vx } = gestureState;
         const velocity = Math.abs(vx);
         const distance = Math.abs(dx);
-
+        
+        // Handle tap (small movement)
+        if (distance < 5) {
+          if (isOpen) {
+            closePanel();
+          } else if (Platform.OS === 'android') {
+            // Android: Allow tap to open
+            openPanel();
+          }
+          // iOS: Don't open on tap - only swipe
+          return;
+        }
+        
         if (!isOpen) {
-          // OPENING LOGIC: Velocity > 0.5 OR distance > 1/3 panel width
-          if ((velocity > 0.5 && dx < 0) || distance > PANEL_WIDTH / 3) {
+          // Opening logic
+          if ((velocity > VELOCITY_THRESHOLD && dx < 0) || (dx < 0 && distance > DISTANCE_THRESHOLD)) {
             openPanel();
           } else {
             // Snap back to closed
             Animated.parallel([
-              Animated.spring(panelX, { toValue: PANEL_WIDTH, useNativeDriver: false }),
-              Animated.spring(tabX, { toValue: 0, useNativeDriver: false }),
-            ]).start();
+              Animated.spring(translateX, {
+                toValue: PANEL_WIDTH,
+                useNativeDriver: true,
+                velocity: vx,
+                tension: 100,
+                friction: 8,
+              }),
+              Animated.spring(tabTranslateX, {
+                toValue: 0,
+                useNativeDriver: true,
+                velocity: vx,
+                tension: 100,
+                friction: 8,
+              }),
+            ]).start(() => {
+              // Force tab to final position to fix iOS production build bug
+              tabTranslateX.setValue(0);
+            });
           }
         } else {
-          // CLOSING LOGIC: Velocity > 0.5 OR distance > 1/3 panel width
-          if ((velocity > 0.5 && dx > 0) || distance > PANEL_WIDTH / 3) {
+          // Closing logic
+          if ((velocity > VELOCITY_THRESHOLD && dx > 0) || (dx > 0 && distance > DISTANCE_THRESHOLD)) {
             closePanel();
           } else {
             // Snap back to open
             Animated.parallel([
-              Animated.spring(panelX, { toValue: 0, useNativeDriver: false }),
-              Animated.spring(tabX, { toValue: -PANEL_WIDTH, useNativeDriver: false }),
-            ]).start();
+              Animated.spring(translateX, {
+                toValue: 0,
+                useNativeDriver: true,
+                velocity: -vx,
+                tension: 100,
+                friction: 8,
+              }),
+              Animated.spring(tabTranslateX, {
+                toValue: -PANEL_WIDTH,
+                useNativeDriver: true,
+                velocity: -vx,
+                tension: 100,
+                friction: 8,
+              }),
+            ]).start(() => {
+              // Force tab to final position to fix iOS production build bug
+              tabTranslateX.setValue(-PANEL_WIDTH);
+            });
           }
         }
       },
@@ -129,7 +189,7 @@ export function FeedbackTab() {
   const handleRatingSubmit = async () => {
     if (rating === 5) {
       const appStoreUrl = Platform.OS === 'ios' 
-        ? 'https://apps.apple.com/app/idYOUR_APP_ID'
+        ? 'https://apps.apple.com/au/app/json-09d4ce/id6758357834?action=write-review'
         : 'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_ID';
       
       Linking.openURL(appStoreUrl).catch(err => 
@@ -146,13 +206,11 @@ export function FeedbackTab() {
       };
 
       try {
-        // Save locally
         const existingFeedback = await AsyncStorage.getItem('userFeedback');
         const feedbackArray = existingFeedback ? JSON.parse(existingFeedback) : [];
         feedbackArray.push(feedbackEntry);
         await AsyncStorage.setItem('userFeedback', JSON.stringify(feedbackArray));
         
-        // Send to AWS (non-blocking)
         sendRatingFeedback(rating, feedback).catch(error => {
           console.log('Failed to send rating to server:', error);
         });
@@ -183,13 +241,11 @@ export function FeedbackTab() {
     };
 
     try {
-      // Save locally
       const existingFeedback = await AsyncStorage.getItem('userFeedback');
       const feedbackArray = existingFeedback ? JSON.parse(existingFeedback) : [];
       feedbackArray.push(feedbackEntry);
       await AsyncStorage.setItem('userFeedback', JSON.stringify(feedbackArray));
       
-      // Send to AWS (non-blocking)
       if (activeTab === 'bug') {
         sendBugReport(feedback, 'medium').catch(error => {
           console.log('Failed to send bug report to server:', error);
@@ -218,28 +274,48 @@ export function FeedbackTab() {
 
   return (
     <>
-      {/* BLUE TAB - ALWAYS VISIBLE */}
+      {/* Tab - always visible, moves with panel */}
       <Animated.View 
-        style={[styles.floatingTab, { transform: [{ translateX: tabX }] }]} 
+        style={[
+          styles.floatingTab, 
+          { transform: [{ translateX: tabTranslateX }] }
+        ]} 
         {...panResponder.panHandlers}
       >
-        <TouchableOpacity style={styles.tabTouchArea} onPress={openPanel}>
-          <View style={styles.tabIndicator} />
-        </TouchableOpacity>
+        <View style={styles.tabTouchArea}>
+          <View style={[styles.tabIndicator, { backgroundColor: themeColor }]} />
+        </View>
       </Animated.View>
 
-      {/* FEEDBACK PANEL */}
+      {/* Background overlay - tap to close */}
+      {isOpen && (
+        <TouchableOpacity
+          style={styles.overlay}
+          onPress={closePanel}
+          activeOpacity={1}
+        />
+      )}
+
+      {/* Panel */}
       <Animated.View
-        style={[styles.panel, { transform: [{ translateX: panelX }] }]}
+        style={[
+          styles.panel,
+          {
+            transform: [{ translateX }],
+          },
+        ]}
         pointerEvents={isOpen ? 'auto' : 'none'}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-          <ScrollView 
-            style={styles.scrollView} 
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+        >
+          <ScrollView
+            style={styles.scrollView}
             contentContainerStyle={styles.content}
-            scrollEnabled={scrollEnabled}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>Feedback</Text>
@@ -257,15 +333,27 @@ export function FeedbackTab() {
               ].map((tab) => (
                 <TouchableOpacity
                   key={tab.key}
-                  style={[styles.tabButton, activeTab === tab.key && styles.tabButtonActive]}
+                  style={[
+                    styles.tabButton,
+                    activeTab === tab.key && { ...styles.tabButtonActive, backgroundColor: themeColor }
+                  ]}
                   onPress={() => {
                     setActiveTab(tab.key as TabType);
                     setFeedback('');
                     setRating(0);
                   }}
                 >
-                  <Ionicons name={tab.icon as any} size={16} color={activeTab === tab.key ? '#ffffff' : '#71717a'} />
-                  <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>{tab.label}</Text>
+                  <Ionicons
+                    name={tab.icon as any}
+                    size={16}
+                    color={activeTab === tab.key ? '#ffffff' : '#71717a'}
+                  />
+                  <Text style={[
+                    styles.tabLabel,
+                    activeTab === tab.key && styles.tabLabelActive
+                  ]}>
+                    {tab.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -278,11 +366,15 @@ export function FeedbackTab() {
                   
                   <View style={styles.stars}>
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity key={star} onPress={() => setRating(star)} style={styles.star}>
+                      <TouchableOpacity
+                        key={star}
+                        onPress={() => setRating(star)}
+                        style={styles.star}
+                      >
                         <Ionicons
                           name={star <= rating ? 'star' : 'star-outline'}
                           size={32}
-                          color={star <= rating ? '#22d3ee' : '#3f3f46'}
+                          color={star <= rating ? themeColor : '#3f3f46'}
                         />
                       </TouchableOpacity>
                     ))}
@@ -305,13 +397,16 @@ export function FeedbackTab() {
                   )}
 
                   {rating === 5 && (
-                    <Text style={styles.appStoreText}>
+                    <Text style={[styles.appStoreText, { color: themeColor }]}>
                       Glad you love it! Tap below to rate us on the App Store.
                     </Text>
                   )}
 
                   <TouchableOpacity
-                    style={[styles.button, rating === 0 && styles.buttonDisabled]}
+                    style={[
+                      styles.button,
+                      rating === 0 ? styles.buttonDisabled : { backgroundColor: themeColor }
+                    ]}
                     onPress={handleRatingSubmit}
                     disabled={rating === 0}
                   >
@@ -347,7 +442,10 @@ export function FeedbackTab() {
                   <Text style={styles.charCount}>{feedback.length} / 500</Text>
 
                   <TouchableOpacity
-                    style={[styles.button, !feedback.trim() && styles.buttonDisabled]}
+                    style={[
+                      styles.button,
+                      !feedback.trim() ? styles.buttonDisabled : { backgroundColor: themeColor }
+                    ]}
                     onPress={handleFeedbackSubmit}
                     disabled={!feedback.trim()}
                   >
@@ -378,7 +476,6 @@ const styles = StyleSheet.create({
   tabIndicator: {
     width: 12,
     height: 60,
-    backgroundColor: '#22d3ee',
     borderTopLeftRadius: 6,
     borderBottomLeftRadius: 6,
     shadowColor: '#000',
@@ -448,7 +545,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tabButtonActive: {
-    backgroundColor: '#22d3ee',
+    // backgroundColor set inline
   },
   tabLabel: {
     fontSize: 14,
@@ -505,12 +602,10 @@ const styles = StyleSheet.create({
   },
   appStoreText: {
     fontSize: 15,
-    color: '#22d3ee',
     textAlign: 'center',
     marginVertical: 20,
   },
   button: {
-    backgroundColor: '#22d3ee',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -524,5 +619,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 2000,
   },
 });
