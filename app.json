@@ -9,8 +9,6 @@
     "newArchEnabled": false,
     "scheme": "json-app",
     "splash": {
-      "image": "./assets/icon.png",
-      "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
     "ios": {
