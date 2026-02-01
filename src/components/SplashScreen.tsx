@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Text } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SplashScreenProps {
   onFinish: () => void;
 }
 
 function SplashScreen({ onFinish }: SplashScreenProps) {
+  const { themeColor } = useTheme();
   const iconOpacity = useRef(new Animated.Value(0)).current;
   const iconScale = useRef(new Animated.Value(0.8)).current;
   const [displayedText, setDisplayedText] = useState('');
@@ -32,7 +34,7 @@ function SplashScreen({ onFinish }: SplashScreenProps) {
   }, []);
 
   const startTypingAnimation = () => {
-    const text = 'JSON';
+    const text = 'JSON.fit';
     setShowCursor(true);
     
     // Type each letter with delay
@@ -67,9 +69,9 @@ function SplashScreen({ onFinish }: SplashScreenProps) {
         ]}
       >
         <View style={styles.dumbbellContainer}>
-          <View style={styles.dumbbellBar} />
-          <View style={[styles.dumbbellWeight, styles.leftWeight]} />
-          <View style={[styles.dumbbellWeight, styles.rightWeight]} />
+          <View style={[styles.dumbbellBar, { backgroundColor: themeColor, shadowColor: themeColor }]} />
+          <View style={[styles.dumbbellWeight, styles.leftWeight, { backgroundColor: themeColor, shadowColor: themeColor }]} />
+          <View style={[styles.dumbbellWeight, styles.rightWeight, { backgroundColor: themeColor, shadowColor: themeColor }]} />
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.appName}>
@@ -102,9 +104,7 @@ const styles = StyleSheet.create({
   dumbbellBar: {
     width: 60,
     height: 8,
-    backgroundColor: '#00f5ff',
     borderRadius: 4,
-    shadowColor: '#00f5ff',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 8,
@@ -114,9 +114,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 24,
     height: 24,
-    backgroundColor: '#00f5ff',
     borderRadius: 12,
-    shadowColor: '#00f5ff',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 6,

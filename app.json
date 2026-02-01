@@ -1,13 +1,16 @@
 {
   "expo": {
-    "name": "JSON",
+    "name": "JSON.fit",
     "slug": "json",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+    "scheme": "json-app",
     "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
     "ios": {
@@ -15,8 +18,8 @@
       "bundleIdentifier": "com.RyanNovinc.JSON",
       "buildNumber": "2",
       "infoPlist": {
-        "CFBundleDisplayName": "JSON",
-        "CFBundleName": "JSON",
+        "CFBundleDisplayName": "JSON.fit",
+        "CFBundleName": "JSON.fit",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -26,7 +29,10 @@
         "backgroundColor": "#0f0f0f"
       },
       "package": "com.RyanNovinc.JSON",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "permissions": []
     },
     "web": {
       "favicon": "./assets/icon.png"
@@ -38,7 +44,32 @@
     },
     "owner": "ryan_novinc",
     "plugins": [
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": [
+            {
+              "action": "android.intent.action.SEND",
+              "category": ["android.intent.category.DEFAULT"],
+              "data": {
+                "mimeType": "text/*"
+              }
+            },
+            {
+              "action": "android.intent.action.SEND",
+              "category": ["android.intent.category.DEFAULT"],
+              "data": {
+                "mimeType": "video/*"
+              }
+            }
+          ]
+        }
+      ]
     ]
   }
 }
