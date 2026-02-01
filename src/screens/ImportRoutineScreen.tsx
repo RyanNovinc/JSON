@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,18 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Animated,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
+import * as DocumentPicker from 'expo-document-picker';
 import { getAIPrompt, exerciseGlossary } from '../data/workoutPrompt';
 // import * as Crypto from 'expo-crypto';
+import { useTheme } from '../contexts/ThemeContext';
 
 type ImportScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ImportRoutine'>;
 
@@ -47,6 +51,7 @@ interface WorkoutProgram {
 
 export default function ImportRoutineScreen() {
   const navigation = useNavigation<ImportScreenNavigationProp>();
+  const { themeColor } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [parsedProgram, setParsedProgram] = useState<WorkoutProgram | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -55,9 +60,15 @@ export default function ImportRoutineScreen() {
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sampleCopied, setSampleCopied] = useState(false);
+  const [modalScale] = useState(new Animated.Value(0));
+  const [modalOpacity] = useState(new Animated.Value(0));
+  const [successScale] = useState(new Animated.Value(0));
+  const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
+  const [generationTime, setGenerationTime] = useState<number | null>(null);
+  const [uploadMode, setUploadMode] = useState(false);
 
   const sampleWorkout = {
-    "routine_name": "Quick Start PPL",
+    "routine_name": "Quick Start - Push Pull Legs",
     "description": "3-day Push Pull Legs sample to try the app",
     "days_per_week": 3,
     "blocks": [
@@ -175,8 +186,89 @@ export default function ImportRoutineScreen() {
   };
 
   const validateAndParseJSON = (input: string): WorkoutProgram | null => {
+    let parsed: any;
+    
+    // Normalize smart quotes to straight quotes before parsing
+    let text = input;
+    text = text.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');  // curly double quotes
+    text = text.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");  // curly single quotes
+    
+    // Enhanced JSON parsing with detailed error reporting
     try {
-      const parsed = JSON.parse(input);
+      parsed = JSON.parse(text);
+    } catch (jsonError) {
+      const error = jsonError as Error;
+      let detailedError = 'JSON Parse Error:\n\n';
+      
+      // Extract position information from error message
+      const positionMatch = error.message.match(/position (\d+)/i) || 
+                           error.message.match(/at position (\d+)/i) ||
+                           error.message.match(/column (\d+)/i);
+      
+      const lineMatch = error.message.match(/line (\d+)/i);
+      
+      if (positionMatch || lineMatch) {
+        const position = positionMatch ? parseInt(positionMatch[1]) : null;
+        const line = lineMatch ? parseInt(lineMatch[1]) : null;
+        
+        if (position !== null) {
+          detailedError += `Error at position ${position}`;
+          if (line) detailedError += ` (line ${line})`;
+          detailedError += '\n\n';
+          
+          // Show snippet around error position
+          const start = Math.max(0, position - 50);
+          const end = Math.min(text.length, position + 50);
+          const snippet = text.slice(start, end);
+          const errorPos = position - start;
+          
+          detailedError += 'Context:\n';
+          detailedError += `...${snippet.slice(0, errorPos)}⚠️${snippet.slice(errorPos)}...\n\n`;
+        }
+      }
+      
+      // Detect specific common issues
+      const rawError = error.message.toLowerCase();
+      
+      if (rawError.includes('unexpected end') || rawError.includes('unterminated')) {
+        detailedError += '🔍 Issue: JSON appears truncated or incomplete\n';
+        detailedError += '💡 Solution: File may be too large for mobile clipboard. Try:\n';
+        detailedError += '• Use a smaller program file\n';
+        detailedError += '• Import via computer/simulator\n';
+        detailedError += '• Copy in smaller chunks\n';
+      } else if (input.includes('\u201c') || input.includes('\u201d') || input.includes('\u2018') || input.includes('\u2019')) {
+        detailedError += '🔍 Issue: Smart/curly quotes were detected and auto-fixed\n';
+        detailedError += '💡 Note: Quotes were normalized, but there may be other syntax issues\n';
+      } else if (rawError.includes('unexpected token')) {
+        const tokenMatch = error.message.match(/unexpected token '(.*)'/i) || 
+                          error.message.match(/unexpected token (.*) in/i);
+        if (tokenMatch) {
+          detailedError += `🔍 Issue: Unexpected character "${tokenMatch[1]}"\n`;
+          detailedError += '💡 Solution: Remove invalid characters or fix JSON syntax\n';
+        }
+      } else if (text.trim().startsWith('```')) {
+        detailedError += '🔍 Issue: Code block markers found\n';
+        detailedError += '💡 Solution: Copy only the JSON content, not the ```json markers\n';
+      } else if (!text.trim().startsWith('{')) {
+        detailedError += '🔍 Issue: JSON must start with {\n';
+        detailedError += '💡 Solution: Copy the complete JSON object\n';
+      } else {
+        detailedError += '🔍 Issue: JSON syntax error\n';
+        detailedError += '💡 Common fixes:\n';
+        detailedError += '• Check for missing commas between items\n';
+        detailedError += '• Remove trailing commas\n';
+        detailedError += '• Ensure all brackets are properly closed\n';
+        detailedError += '• Use straight quotes, not curly quotes\n';
+      }
+      
+      detailedError += '\n📋 Raw error: ' + error.message;
+      
+      setErrorMessage(detailedError);
+      return null;
+    }
+    
+    // Continue with existing validation logic
+    try {
       
       // Basic validation
       if (!parsed.routine_name || typeof parsed.routine_name !== 'string') {
@@ -274,27 +366,11 @@ export default function ImportRoutineScreen() {
       });
       
       return parsed as WorkoutProgram;
-    } catch (error) {
-      let errorDetail = '';
+    } catch (validationError) {
+      const error = validationError as Error;
+      const detailedError = `⚠️ Validation Error:\n\n${error.message}\n\n💡 This means your JSON was parsed successfully, but the workout program structure has issues. Please check that all required fields are present and correctly formatted.`;
       
-      if (error instanceof SyntaxError) {
-        // Common JSON errors
-        if (input.includes('...')) {
-          errorDetail = 'Your JSON contains "..." which is not valid. Make sure to copy the COMPLETE workout, not an abbreviated version.';
-        } else if (input.trim().startsWith('```')) {
-          errorDetail = 'Remove the ```json and ``` markers. Copy only the JSON content between them.';
-        } else if (!input.trim().startsWith('{')) {
-          errorDetail = 'JSON should start with {. Make sure you copied the entire output.';
-        } else if (!input.trim().endsWith('}')) {
-          errorDetail = 'JSON appears incomplete. Make sure you copied everything including the final }.';
-        } else {
-          errorDetail = 'Invalid JSON format. Common issues:\n• Missing commas between items\n• Extra commas at the end\n• Unclosed brackets or quotes\n• Text before or after the JSON';
-        }
-      } else if (error instanceof Error) {
-        errorDetail = `Validation issue: ${error.message}`;
-      }
-      
-      setErrorMessage(errorDetail);
+      setErrorMessage(detailedError);
       return null;
     }
   };
@@ -306,11 +382,42 @@ export default function ImportRoutineScreen() {
       return;
     }
 
+    processWorkoutData(text);
+  };
+
+  const handleFileUpload = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', 'text/plain'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const file = result.assets[0];
+        
+        // Read file content
+        const response = await fetch(file.uri);
+        const text = await response.text();
+        
+        processWorkoutData(text);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to read file. Please try again.', [{ text: 'OK' }]);
+      console.error('File upload error:', error);
+    }
+  };
+
+  const processWorkoutData = async (text: string) => {
     setIsLoading(true);
+    const startTime = Date.now();
+    setGenerationStartTime(startTime);
     
     // Simulate processing time for better UX
     setTimeout(() => {
       const program = validateAndParseJSON(text);
+      const endTime = Date.now();
+      const totalTime = (endTime - startTime) / 1000; // Convert to seconds
+      setGenerationTime(totalTime);
       setIsLoading(false);
       
       if (program) {
@@ -319,19 +426,86 @@ export default function ImportRoutineScreen() {
         program.id = programId;
         setParsedProgram(program);
         setShowConfirmation(true);
+        
+        // Animate modal entrance with futuristic easing
+        Animated.parallel([
+          Animated.timing(modalScale, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(modalOpacity, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]).start();
       }
     }, 800);
   };
 
   const handleConfirmImport = async () => {
     if (parsedProgram) {
-      setShowConfirmation(false);
-      
-      navigation.navigate('Main', { 
-        screen: 'Home',
-        params: { importedProgram: parsedProgram }
-      } as any);
+      // Success animation
+      Animated.sequence([
+        Animated.spring(successScale, {
+          toValue: 1.2,
+          useNativeDriver: true,
+          duration: 200,
+        }),
+        Animated.spring(successScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          duration: 150,
+        }),
+      ]).start();
+
+      setTimeout(() => {
+        // Animate modal exit
+        Animated.parallel([
+          Animated.timing(modalScale, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(modalOpacity, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setShowConfirmation(false);
+          modalScale.setValue(0);
+          modalOpacity.setValue(0);
+          successScale.setValue(0);
+          
+          navigation.navigate('Main', { 
+            screen: 'Home',
+            params: { importedProgram: parsedProgram }
+          } as any);
+        });
+      }, 500);
     }
+  };
+
+  const handleModalCancel = () => {
+    Animated.parallel([
+      Animated.timing(modalScale, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowConfirmation(false);
+      setParsedProgram(null);
+      modalScale.setValue(0);
+      modalOpacity.setValue(0);
+    });
   };
 
   const handleCancel = () => {
@@ -341,7 +515,7 @@ export default function ImportRoutineScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#22d3ee" />
+        <ActivityIndicator size="large" color={themeColor} />
         <Text style={styles.loadingText}>Processing routine...</Text>
       </View>
     );
@@ -353,31 +527,35 @@ export default function ImportRoutineScreen() {
         <View style={styles.header}>
           <View style={styles.infoButton} />
           <Text style={styles.instructionsTitle}>How It Works</Text>
-          <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.closeButton}>
-            <Ionicons name="close" size={28} color="#71717a" />
-          </TouchableOpacity>
+          <View style={styles.closeButtonWrapper}>
+            <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.closeButton}>
+              <Ionicons name="close" size={28} color="#71717a" />
+            </TouchableOpacity>
+          </View>
         </View>
         
-        <ScrollView 
-          style={styles.instructionsContainer}
-          contentContainerStyle={styles.instructionsContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.stepsContainer}>
-            <View style={styles.stepCard}>
-              <View style={styles.stepCardHeader}>
-                <View style={styles.stepBadge}>
-                  <Text style={styles.stepBadgeText}>1</Text>
+        <View style={styles.instructionsContainer}>
+          <ScrollView 
+            style={styles.instructionsScrollView}
+            contentContainerStyle={styles.instructionsContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ height: 60 }} />
+            <View style={styles.stepsContainer}>
+              <View style={styles.stepCard}>
+                <View style={styles.stepCardHeader}>
+                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
+                    <Text style={styles.stepBadgeText}>1</Text>
+                  </View>
+                  <Text style={styles.stepCardTitle}>Plan Your Program</Text>
                 </View>
-                <Text style={styles.stepCardTitle}>Plan Your Program</Text>
-              </View>
-              <Text style={styles.stepCardDescription}>
-                Send this prompt to your AI of choice
-              </Text>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={async () => {
-                  const planningPrompt = `You are a fitness coach helping users design a workout program for a fitness app called 'JSON'.
+                <Text style={styles.stepCardDescription}>
+                  Send this prompt to your AI of choice
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: themeColor }]}
+                  onPress={async () => {
+                    const planningPrompt = `You are a fitness coach helping users design a workout program for a fitness app called 'JSON'.
 
 # Workout Program Planning
 
@@ -420,82 +598,82 @@ Once you have all the information, output this EXACT format:
 ---
 
 Confirm these specs are correct. Once the user approves, await further instructions for generating the program.`;
-                  
-                  await Clipboard.setStringAsync(planningPrompt);
-                  setPlanningPromptCopied(true);
-                  setTimeout(() => {
-                    setPlanningPromptCopied(false);
-                  }, 2000);
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="copy-outline" size={18} color="#0a0a0b" />
-                <Text style={styles.actionButtonText}>
-                  {planningPromptCopied ? 'Copied!' : 'Copy Planning Prompt'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.stepCard}>
-              <View style={styles.stepCardHeader}>
-                <View style={styles.stepBadge}>
-                  <Text style={styles.stepBadgeText}>2</Text>
-                </View>
-                <Text style={styles.stepCardTitle}>Generate Workout</Text>
+                    
+                    await Clipboard.setStringAsync(planningPrompt);
+                    setPlanningPromptCopied(true);
+                    setTimeout(() => {
+                      setPlanningPromptCopied(false);
+                    }, 2000);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="copy-outline" size={18} color="#0a0a0b" />
+                  <Text style={styles.actionButtonText}>
+                    {planningPromptCopied ? 'Copied!' : 'Copy Planning Prompt'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.stepCardDescription}>
-                Send this prompt to convert your plan to a JSON format
-              </Text>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={async () => {
-                  const prompt = getAIPrompt();
-                  await Clipboard.setStringAsync(prompt);
-                  setAiPromptCopied(true);
-                  setTimeout(() => {
-                    setAiPromptCopied(false);
-                  }, 2000);
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="sparkles" size={18} color="#0a0a0b" />
-                <Text style={styles.actionButtonText}>
-                  {aiPromptCopied ? 'Copied!' : 'Copy AI Prompt'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.stepCard}>
-              <View style={styles.stepCardHeader}>
-                <View style={styles.stepBadge}>
-                  <Text style={styles.stepBadgeText}>3</Text>
+              
+              <View style={styles.stepCard}>
+                <View style={styles.stepCardHeader}>
+                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
+                    <Text style={styles.stepBadgeText}>2</Text>
+                  </View>
+                  <Text style={styles.stepCardTitle}>Generate Workout</Text>
                 </View>
-                <Text style={styles.stepCardTitle}>Import & Train</Text>
+                <Text style={styles.stepCardDescription}>
+                  Send this prompt to convert your plan to a JSON format
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: themeColor }]}
+                  onPress={async () => {
+                    const prompt = getAIPrompt();
+                    await Clipboard.setStringAsync(prompt);
+                    setAiPromptCopied(true);
+                    setTimeout(() => {
+                      setAiPromptCopied(false);
+                    }, 2000);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="sparkles" size={18} color="#0a0a0b" />
+                  <Text style={styles.actionButtonText}>
+                    {aiPromptCopied ? 'Copied!' : 'Copy AI Prompt'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.stepCardDescription}>
-                Copy the JSON file your AI created and paste it in
-              </Text>
+              
+              <View style={styles.stepCard}>
+                <View style={styles.stepCardHeader}>
+                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
+                    <Text style={styles.stepBadgeText}>3</Text>
+                  </View>
+                  <Text style={styles.stepCardTitle}>Import & Train</Text>
+                </View>
+                <Text style={styles.stepCardDescription}>
+                  Copy the JSON file your AI created and paste it in
+                </Text>
+              </View>
             </View>
-          </View>
-          
-          <View style={styles.divider} />
+          </ScrollView>
           
           <View style={styles.tutorialSection}>
             <Text style={styles.tutorialSectionTitle}>Need Help?</Text>
             <TouchableOpacity 
-              style={styles.tutorialButton}
+              style={[styles.tutorialButton, { backgroundColor: themeColor }]}
               onPress={() => {
-                // TODO: Open YouTube video
-                console.log('Open YouTube tutorial');
+                // Open YouTube tutorial
+                const url = 'https://youtube.com/shorts/_l6E9sX-9QQ';
+                Linking.openURL(url);
               }}
               activeOpacity={0.8}
             >
               <Ionicons name="play" size={18} color="#ffffff" />
               <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
-              <Text style={styles.tutorialButtonSubtext}>60 seconds</Text>
+              <Text style={styles.tutorialButtonSubtext}>30 seconds</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </View>
       </View>
     );
   }
@@ -520,7 +698,7 @@ Confirm these specs are correct. Once the user approves, await further instructi
           <Text style={styles.errorText}>{errorMessage}</Text>
           
           <TouchableOpacity
-            style={styles.copyErrorButton}
+            style={[styles.copyErrorButton, { backgroundColor: themeColor }]}
             onPress={async () => {
               const debugMessage = `I got this error when trying to import my workout: "${errorMessage}". Please fix the JSON and make sure it follows the exact format.`;
               await Clipboard.setStringAsync(debugMessage);
@@ -541,82 +719,163 @@ Confirm these specs are correct. Once the user approves, await further instructi
   return (
     <>
       <View style={styles.container}>
-        <TouchableOpacity 
-          style={styles.infoButton}
-          onPress={() => setShowInstructions(true)}
-        >
-          <Ionicons name="information-circle-outline" size={24} color="#71717a" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleCancel} style={styles.closeButton}>
-          <Ionicons name="close" size={28} color="#71717a" />
-        </TouchableOpacity>
-        
-        <View style={styles.centerContainer}>
-          <TouchableOpacity 
-            style={styles.pasteButton}
-            onPress={handlePasteAndImport}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="clipboard" size={32} color="#0a0a0b" />
-            <Text style={styles.pasteButtonText}>Paste & Import</Text>
-            <Text style={styles.pasteButtonSubtext}>Tap to paste your workout</Text>
+        <View style={styles.closeButtonWrapper}>
+          <TouchableOpacity onPress={handleCancel} style={styles.closeButton}>
+            <Ionicons name="close" size={28} color="#71717a" />
           </TouchableOpacity>
         </View>
-        
-        <View style={styles.testSection}>
-          <Text style={styles.testSectionTitle}>Want to try it first?</Text>
+
+        <View style={styles.content}>
+          {/* Mode toggle - positioned above the main button */}
           <TouchableOpacity 
-            style={styles.testButton}
-            onPress={handleCopySample}
+            style={[styles.modeToggle, { borderColor: themeColor }]}
+            onPress={() => setUploadMode(!uploadMode)}
             activeOpacity={0.8}
           >
-            <Ionicons name="flash" size={18} color="#71717a" />
-            <Text style={styles.testButtonText}>
-              {sampleCopied ? 'Sample Copied!' : 'Copy Sample Workout'}
+            <Ionicons 
+              name={uploadMode ? "clipboard-outline" : "cloud-upload-outline"} 
+              size={20} 
+              color={themeColor} 
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.mainButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
+            onPress={uploadMode ? handleFileUpload : handlePasteAndImport}
+            activeOpacity={0.9}
+          >
+            <Ionicons 
+              name={uploadMode ? "cloud-upload" : "clipboard"} 
+              size={40} 
+              color="#0a0a0b" 
+            />
+            <Text style={styles.mainButtonText}>
+              {uploadMode ? "Upload File" : "Paste & Import"}
+            </Text>
+            <Text style={styles.mainButtonSubtext}>
+              {uploadMode ? "Choose JSON file from device" : "Paste your workout JSON"}
             </Text>
           </TouchableOpacity>
-          <Text style={styles.testInstructions}>
-            Copy sample → tap Paste & Import above → see it work!
-          </Text>
+
+          <View style={styles.orSection}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.orLine} />
+          </View>
+
+          <TouchableOpacity 
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate('SampleWorkouts')}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.secondaryButtonText}>Try Sample Programs</Text>
+          </TouchableOpacity>
+
         </View>
+
+        {/* Move help link to bottom of screen */}
+        <TouchableOpacity 
+          style={styles.helpLink}
+          onPress={() => setShowInstructions(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom program with AI?</Text>
+        </TouchableOpacity>
       </View>
 
       <Modal
         visible={showConfirmation}
         transparent
-        animationType="fade"
+        animationType="none"
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create Routine?</Text>
-            <Text style={styles.routineName}>{parsedProgram?.routine_name}</Text>
-            <Text style={styles.routineDetails}>
-              {parsedProgram?.days_per_week} days • {parsedProgram?.blocks.length} blocks
-            </Text>
-            {parsedProgram?.description && (
-              <Text style={styles.routineDescription}>{parsedProgram.description}</Text>
-            )}
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowConfirmation(false);
-                  setParsedProgram(null);
-                }}
+        <Animated.View 
+          style={[
+            styles.modalOverlay,
+            { opacity: modalOpacity }
+          ]}
+        >
+          <Animated.View 
+            style={[
+              styles.modalContent,
+              { 
+                transform: [{ scale: modalScale }],
+                opacity: modalOpacity,
+                borderColor: themeColor,
+                shadowColor: themeColor,
+              }
+            ]}
+          >
+            {/* Close Button */}
+            <View style={styles.closeButtonWrapper}>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={handleModalCancel}
+                activeOpacity={0.8}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleConfirmImport}
-              >
-                <Text style={styles.confirmButtonText}>Create</Text>
+                <Text style={styles.closeButtonText}>×</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+
+            {/* Header Badge */}
+            {generationTime && (
+              <View style={[styles.headerBadge, { backgroundColor: themeColor + '1A', borderColor: themeColor }]}>
+                <Text style={[styles.badgeText, { color: themeColor }]}>Generated in {generationTime.toFixed(2)}s</Text>
+              </View>
+            )}
+
+            {/* Main Content */}
+            <View style={styles.mainContent}>
+              <Text style={styles.title}>Workout Ready</Text>
+              <Text style={styles.routineName}>{parsedProgram?.routine_name}</Text>
+              
+              {/* Program Summary */}
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Training Days</Text>
+                  <Text style={[styles.summaryValue, { color: themeColor }]}>{parsedProgram?.days_per_week} per week</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Total Duration</Text>
+                  <Text style={[styles.summaryValue, { color: themeColor }]}>
+                    {parsedProgram?.blocks.reduce((total, block) => {
+                      const weeks = block.weeks.includes('-') 
+                        ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1
+                        : parseInt(block.weeks);
+                      return total + weeks;
+                    }, 0)} weeks
+                  </Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Unique Movements</Text>
+                  <Text style={[styles.summaryValue, { color: themeColor }]}>
+                    {(() => {
+                      const uniqueExercises = new Set();
+                      parsedProgram?.blocks.forEach(block => 
+                        block.days.forEach(day => 
+                          day.exercises.forEach(exercise => uniqueExercises.add(exercise.exercise))
+                        )
+                      );
+                      return uniqueExercises.size;
+                    })()} movements
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
+            {/* Action Button */}
+            <View style={styles.actionSection}>
+              <TouchableOpacity
+                style={[styles.createButton, { backgroundColor: themeColor }]}
+                onPress={handleConfirmImport}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.createButtonText}>Start Training</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -627,59 +886,121 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a0b',
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoButton: {
+  closeButtonWrapper: {
     position: 'absolute',
-    top: 50,
-    left: 16,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    top: 20,
+    right: 20,
     zIndex: 1,
   },
   closeButton: {
-    position: 'absolute',
-    top: 50,
-    right: 16,
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.1)',
   },
-  centerContainer: {
+  content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    paddingVertical: 60,
   },
-  pasteButton: {
-    backgroundColor: '#22d3ee',
-    borderRadius: 4,
-    padding: 32,
+  modeToggle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    backgroundColor: '#18181b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    marginBottom: 20,
+    alignSelf: 'center',
+  },
+  mainButton: {
+    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 48,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 280,
+    maxWidth: 320,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 20,
   },
-  pasteButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
+  mainButtonText: {
+    fontSize: 24,
+    fontWeight: '800',
     color: '#0a0a0b',
-    marginTop: 12,
+    marginTop: 16,
+    letterSpacing: 0.5,
   },
-  pasteButtonSubtext: {
+  mainButtonSubtext: {
+    fontSize: 16,
+    color: '#0a0a0b',
+    opacity: 0.8,
+    marginTop: 8,
+  },
+  orSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 48,
+    width: '100%',
+    maxWidth: 200,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#27272a',
+  },
+  orText: {
     fontSize: 14,
-    color: '#0a0a0b',
-    opacity: 0.7,
-    marginTop: 4,
+    color: '#71717a',
+    fontWeight: '500',
+    paddingHorizontal: 20,
+    letterSpacing: 1,
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#27272a',
+    borderRadius: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    marginBottom: 32,
+    minWidth: 240,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#e4e4e7',
+    letterSpacing: 0.3,
+  },
+  helpLink: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  helpLinkText: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   loadingContainer: {
     flex: 1,
@@ -694,68 +1015,123 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.98)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 12,
   },
   modalContent: {
-    backgroundColor: '#18181b',
-    borderRadius: 4,
+    backgroundColor: '#0a0a0b',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 24,
-    width: '85%',
-    maxWidth: 340,
+    padding: 0,
+    width: '100%',
+    maxWidth: 420,
+    overflow: 'hidden',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
   },
-  modalTitle: {
+  closeButtonText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 16,
+    color: '#a1a1aa',
+    fontWeight: '400',
+    lineHeight: 18,
   },
-  routineName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#22d3ee',
-    marginBottom: 8,
-  },
-  routineDetails: {
-    fontSize: 16,
-    color: '#71717a',
-    marginBottom: 8,
-  },
-  routineDescription: {
-    fontSize: 14,
-    color: '#52525b',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
+  headerBadge: {
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     marginTop: 24,
+    marginBottom: 8,
   },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 4,
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  mainContent: {
+    paddingHorizontal: 28,
+    paddingVertical: 20,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#27272a',
+  title: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#a1a1aa',
+    marginBottom: 8,
+    letterSpacing: 0.5,
   },
-  confirmButton: {
-    backgroundColor: '#22d3ee',
+  routineName: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 38,
   },
-  cancelButtonText: {
-    color: '#71717a',
+  summaryCard: {
+    backgroundColor: 'rgba(39, 39, 42, 0.4)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(113, 113, 122, 0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    width: '100%',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: 'rgba(113, 113, 122, 0.2)',
+    marginVertical: 4,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#a1a1aa',
+  },
+  summaryValue: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  confirmButtonText: {
+  actionSection: {
+    paddingHorizontal: 28,
+    paddingBottom: 28,
+    paddingTop: 8,
+  },
+  createButton: {
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#0a0a0b',
-    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   instructionsContainer: {
+    flex: 1,
+  },
+  instructionsScrollView: {
     flex: 1,
   },
   instructionsContent: {
@@ -770,7 +1146,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepsContainer: {
-    flex: 1,
     gap: 16,
   },
   stepCard: {
@@ -789,7 +1164,6 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#22d3ee',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -813,7 +1187,6 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#22d3ee',
     borderRadius: 6,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -831,7 +1204,11 @@ const styles = StyleSheet.create({
   },
   tutorialSection: {
     alignItems: 'center',
-    paddingBottom: 8,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    backgroundColor: '#18181b',
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
   },
   tutorialSectionTitle: {
     fontSize: 16,
@@ -843,7 +1220,6 @@ const styles = StyleSheet.create({
   tutorialButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#22d3ee',
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -851,13 +1227,13 @@ const styles = StyleSheet.create({
   },
   tutorialButtonText: {
     fontSize: 16,
-    color: '#ffffff',
+    color: '#0a0a0b',
     fontWeight: '600',
   },
   tutorialButtonSubtext: {
     fontSize: 12,
-    color: '#ffffff',
-    opacity: 0.8,
+    color: '#0a0a0b',
+    opacity: 0.7,
     marginLeft: 4,
   },
   errorContainer: {
@@ -894,7 +1270,6 @@ const styles = StyleSheet.create({
   },
   copyErrorButton: {
     flexDirection: 'row',
-    backgroundColor: '#22d3ee',
     borderRadius: 4,
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -905,41 +1280,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
-  },
-  testSection: {
-    position: 'absolute',
-    bottom: 40,
-    left: 32,
-    right: 32,
-    alignItems: 'center',
-  },
-  testSectionTitle: {
-    fontSize: 14,
-    color: '#52525b',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  testButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#18181b',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 8,
-  },
-  testButtonText: {
-    fontSize: 14,
-    color: '#71717a',
-    fontWeight: '500',
-  },
-  testInstructions: {
-    fontSize: 11,
-    color: '#3f3f46',
-    textAlign: 'center',
-    opacity: 0.8,
   },
 });
