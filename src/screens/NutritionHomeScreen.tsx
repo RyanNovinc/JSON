@@ -365,6 +365,14 @@ export default function NutritionHomeScreen({ route }: any) {
                   <View style={styles.dualVerticalActions}>
                     <TouchableOpacity
                       style={styles.dualVerticalShareButton}
+                      onPress={() => handleExport(plan)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="share-outline" size={24} color={themeColor} />
+                      <Text style={[styles.dualVerticalShareText, { color: themeColor }]}>Share</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.dualVerticalSecondaryButton}
                       onPress={() => handleJumpToToday(plan)}
                       activeOpacity={0.7}
                     >
@@ -381,7 +389,7 @@ export default function NutritionHomeScreen({ route }: any) {
     }
 
     if (mealPlans.length === 3) {
-      // Three plans - compact grid layout
+      // Three plans - compact grid layout (matching workout screen)
       return (
         <View style={styles.tripleContainer}>
           {mealPlans.map((plan, index) => (
@@ -422,7 +430,7 @@ export default function NutritionHomeScreen({ route }: any) {
     }
 
     if (mealPlans.length === 4) {
-      // Four plans - vertical stack layout
+      // Four plans - vertical stack layout (matching workout screen)
       return (
         <View style={styles.quadContainer}>
           {mealPlans.map((plan, index) => (
@@ -446,9 +454,16 @@ export default function NutritionHomeScreen({ route }: any) {
                   </Text>
                 </View>
                 
-                <View style={styles.quadActions}>
+                <View style={styles.quadButtonsContainer}>
                   <TouchableOpacity
-                    style={styles.quadActionButton}
+                    style={styles.quadShareButton}
+                    onPress={() => handleExport(plan)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="share-outline" size={18} color={themeColor} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.quadShareButton}
                     onPress={() => handleJumpToToday(plan)}
                     activeOpacity={0.7}
                   >
@@ -865,86 +880,130 @@ const styles = StyleSheet.create({
   },
   dualVerticalContainer: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 80,
+    paddingBottom: 100,
+    paddingHorizontal: 16,
+    gap: 16,
+    justifyContent: 'space-evenly',
   },
   dualVerticalHeroContainer: {
-    flex: 1,
-    marginBottom: 10,
+    height: '45%',
+    width: '100%',
   },
   dualVerticalCard: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#18181b',
     borderRadius: 16,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 4 },
+    borderWidth: 2,
+    borderColor: '#22d3ee',
+    padding: 32,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#22d3ee',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-    overflow: 'hidden',
   },
   dualVerticalContent: {
     flex: 1,
-    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    textAlign: 'center',
   },
   dualVerticalTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-    marginBottom: 6,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 12,
+    textAlign: 'center',
+    textShadowColor: '#22d3ee',
+    textShadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    textShadowOpacity: 0.5,
+    textShadowRadius: 2,
   },
   dualVerticalSubtitle: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 6,
+    fontSize: 16,
+    color: '#a1a1aa',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   dualVerticalDescription: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 12,
+    fontSize: 14,
+    color: '#22d3ee',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   dualVerticalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   dualVerticalShareButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
+    gap: 8,
+    padding: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+  },
+  dualVerticalShareText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dualVerticalSecondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+    marginTop: 8,
   },
   dualVerticalSecondaryText: {
-    color: '#71717a',
     fontSize: 12,
-    marginLeft: 3,
     fontWeight: '500',
+    color: '#71717a',
   },
   tripleContainer: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 80,
+    paddingBottom: 100,
+    paddingHorizontal: 16,
+    gap: 12,
+    justifyContent: 'space-evenly',
   },
   tripleCardContainer: {
+    height: '30%',
     width: '100%',
-    marginBottom: 16,
   },
   tripleCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-    padding: 16,
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#22d3ee',
+    padding: 20,
+    width: '100%',
+    height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#22d3ee',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   tripleContent: {
     flex: 1,
@@ -974,24 +1033,35 @@ const styles = StyleSheet.create({
   },
   quadContainer: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 80,
+    paddingBottom: 100,
+    paddingHorizontal: 16,
+    gap: 10,
+    justifyContent: 'space-evenly',
   },
   quadCardContainer: {
-    marginBottom: 12,
+    height: '22%',
+    width: '100%',
   },
   quadCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-    padding: 14,
+    backgroundColor: '#18181b',
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#22d3ee',
+    padding: 16,
+    width: '100%',
+    height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#22d3ee',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   quadContent: {
     flex: 1,
@@ -1013,11 +1083,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
   },
-  quadActions: {
-    marginLeft: 10,
+  quadButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  quadActionButton: {
-    padding: 6,
+  quadShareButton: {
+    padding: 8,
   },
   floatingImportButton: {
     position: 'absolute',
