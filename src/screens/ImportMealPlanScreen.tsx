@@ -18,7 +18,10 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { getMealPlanPrompt } from '../data/mealPlanPrompt';
+import { generateUserMealPlanPrompt } from '../data/generateUserMealPrompt';
+import { generateJsonConversionPrompt } from '../data/generateJsonConversionPrompt';
 import { useTheme } from '../contexts/ThemeContext';
+import { WorkoutStorage } from '../utils/storage';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
 
@@ -483,6 +486,22 @@ export default function ImportMealPlanScreen() {
         }),
       ]).start();
 
+      // Save the meal plan to storage
+      try {
+        // Transform the parsed meal plan to match the MealPlan interface
+        const transformedMealPlan = {
+          id: parsedMealPlan.id,
+          name: parsedMealPlan.plan_name,
+          duration: parsedMealPlan.duration_days,
+          meals: parsedMealPlan.total_meals,
+          data: parsedMealPlan,  // Store the complete JSON data
+        };
+        
+        await WorkoutStorage.addMealPlan(transformedMealPlan);
+      } catch (error) {
+        console.error('Failed to save meal plan:', error);
+      }
+
       setTimeout(() => {
         // Animate modal exit
         Animated.parallel([
@@ -503,7 +522,7 @@ export default function ImportMealPlanScreen() {
           successScale.setValue(0);
           
           navigation.navigate('NutritionHome', { 
-            importedMealPlan: parsedMealPlan 
+            refresh: true
           } as any);
         });
       }, 500);
@@ -546,9 +565,11 @@ export default function ImportMealPlanScreen() {
   if (showInstructions) {
     return (
       <View style={styles.container}>
-        <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.closeButton}>
-          <Ionicons name="close" size={28} color="#71717a" />
-        </TouchableOpacity>
+        <View style={styles.closeButtonWrapper}>
+          <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.closeButtonInner}>
+            <Ionicons name="close" size={28} color="#71717a" />
+          </TouchableOpacity>
+        </View>
         
         <View style={styles.instructionsContainer}>
           <ScrollView 
@@ -571,59 +592,20 @@ export default function ImportMealPlanScreen() {
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const planningPrompt = `You are a nutrition coach helping users design a meal plan for a nutrition app.
-
-# Meal Plan Planning
-
-Help me design a meal plan by asking about:
-
-- Duration (days/weeks I want the plan for)
-- Primary goal (weight loss, muscle gain, maintenance, performance)
-- Dietary preferences (vegetarian, vegan, keto, paleo, Mediterranean, etc.)
-- Food allergies or restrictions
-- Cooking skill level (beginner, intermediate, advanced)
-- Cooking time preference (quick meals vs elaborate cooking)
-- Budget constraints (tight budget, moderate, no restrictions)
-- Meal prep preferences (batch cooking, fresh daily, mix)
-- Family size or serving requirements
-- Kitchen equipment available
-- Foods I love or want included
-- Foods I hate or want to avoid
-- Macro targets (if known)
-
-Once you have all the information, output this EXACT format:
-
----
-**MEAL PLAN SPECS**
-- Duration: [X days/weeks]
-- Goal: [goal]
-- Diet style: [dietary preference]
-- Restrictions: [allergies/restrictions or "none"]
-- Cooking level: [beginner/intermediate/advanced]
-- Cooking time: [quick/moderate/elaborate]
-- Budget: [tight/moderate/flexible]
-- Meal prep: [batch/fresh/mix]
-- Servings: [number of people]
-- Equipment: [basic/full kitchen/specific items]
-- Include foods: [list or "no preference"]
-- Exclude foods: [list or "none"]
-- Macro targets: [if specified or "balanced"]
-
-**RECOMMENDED APPROACH**
-- Meal structure: [e.g., "3 meals + 2 snacks", "Intermittent fasting 16:8"]
-- Prep strategy: [e.g., "Sunday batch prep with fresh daily additions"]
-- Variety level: [e.g., "High variety with 21 unique meals" or "Moderate with meal rotations"]
-- Shopping approach: [e.g., "Weekly grocery runs with pantry staples"]
-- Nutrition notes: [e.g., "High protein focus with complex carbs" or "Calorie deficit with nutrient density"]
----
-
-Confirm these specs are correct. Once the user approves, await further instructions for generating the meal plan.`;
-                    
-                    await Clipboard.setStringAsync(planningPrompt);
-                    setPlanningPromptCopied(true);
-                    setTimeout(() => {
-                      setPlanningPromptCopied(false);
-                    }, 2000);
+                    try {
+                      const planningPrompt = await generateUserMealPlanPrompt();
+                      await Clipboard.setStringAsync(planningPrompt);
+                      setPlanningPromptCopied(true);
+                      setTimeout(() => {
+                        setPlanningPromptCopied(false);
+                      }, 2000);
+                    } catch (error) {
+                      Alert.alert(
+                        'Missing Data',
+                        error instanceof Error ? error.message : 'Please complete the required questionnaires first.',
+                        [{ text: 'OK' }]
+                      );
+                    }
                   }}
                   activeOpacity={0.8}
                 >
@@ -647,7 +629,7 @@ Confirm these specs are correct. Once the user approves, await further instructi
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const prompt = getMealPlanPrompt();
+                    const prompt = generateJsonConversionPrompt();
                     await Clipboard.setStringAsync(prompt);
                     setAiPromptCopied(true);
                     setTimeout(() => {
@@ -701,12 +683,14 @@ Confirm these specs are correct. Once the user approves, await further instructi
   if (errorMessage) {
     return (
       <View style={styles.errorContainer}>
-        <TouchableOpacity 
-          onPress={() => setErrorMessage(null)} 
-          style={styles.closeButton}
-        >
-          <Ionicons name="close" size={28} color="#71717a" />
-        </TouchableOpacity>
+        <View style={styles.closeButtonWrapper}>
+          <TouchableOpacity 
+            onPress={() => setErrorMessage(null)} 
+            style={styles.closeButtonInner}
+          >
+            <Ionicons name="close" size={28} color="#71717a" />
+          </TouchableOpacity>
+        </View>
         
         <View style={styles.errorContent}>
           <Ionicons name="alert-circle" size={64} color="#ef4444" />
@@ -734,9 +718,11 @@ Confirm these specs are correct. Once the user approves, await further instructi
   return (
     <>
       <View style={styles.container}>
-        <TouchableOpacity onPress={handleCancel} style={styles.closeButton}>
-          <Ionicons name="close" size={28} color="#71717a" />
-        </TouchableOpacity>
+        <View style={styles.closeButtonWrapper}>
+          <TouchableOpacity onPress={handleCancel} style={styles.closeButtonInner}>
+            <Ionicons name="close" size={28} color="#71717a" />
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.content}>
           {/* Mode toggle - positioned above the main button */}
@@ -770,6 +756,7 @@ Confirm these specs are correct. Once the user approves, await further instructi
             </Text>
           </TouchableOpacity>
 
+
           <View style={styles.orSection}>
             <View style={styles.orLine} />
             <Text style={styles.orText}>OR</Text>
@@ -787,13 +774,15 @@ Confirm these specs are correct. Once the user approves, await further instructi
         </View>
 
         {/* Move help link to bottom of screen */}
-        <TouchableOpacity 
-          style={styles.helpLink}
-          onPress={() => setShowInstructions(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom meal plan with AI?</Text>
-        </TouchableOpacity>
+        <View style={styles.helpLinkWrapper}>
+          <TouchableOpacity 
+            style={styles.helpLink}
+            onPress={() => setShowInstructions(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom meal plan with AI?</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Modal
@@ -819,13 +808,15 @@ Confirm these specs are correct. Once the user approves, await further instructi
             ]}
           >
             {/* Close Button */}
-            <TouchableOpacity 
-              style={styles.closeButton} 
-              onPress={handleModalCancel}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
+            <View style={styles.closeButtonWrapper}>
+              <TouchableOpacity 
+                style={styles.closeButtonInner} 
+                onPress={handleModalCancel}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.closeButtonText}>×</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Header Badge */}
             {generationTime && (
@@ -847,8 +838,8 @@ Confirm these specs are correct. Once the user approves, await further instructi
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Total Meals</Text>
-                  <Text style={[styles.summaryValue, { color: themeColor }]}>{parsedMealPlan?.total_meals} meals</Text>
+                  <Text style={styles.summaryLabel}>Macro Split</Text>
+                  <Text style={[styles.summaryValue, { color: themeColor }]}>{parsedMealPlan?.macro_targets?.protein_pct}P/{parsedMealPlan?.macro_targets?.carbs_pct}C/{parsedMealPlan?.macro_targets?.fat_pct}F</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
@@ -875,7 +866,7 @@ Confirm these specs are correct. Once the user approves, await further instructi
                 onPress={handleConfirmImport}
                 activeOpacity={0.9}
               >
-                <Text style={styles.createButtonText}>Start Meal Planning</Text>
+                <Text style={styles.createButtonText}>Create Meal Plan</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -902,15 +893,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
   },
-  closeButton: {
+  closeButtonWrapper: {
     position: 'absolute',
     top: 20,
     right: 20,
     width: 40,
     height: 40,
+    zIndex: 1,
+  },
+  closeButtonInner: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1,
   },
   content: {
     flex: 1,
@@ -999,11 +994,13 @@ const styles = StyleSheet.create({
     color: '#e4e4e7',
     letterSpacing: 0.3,
   },
-  helpLink: {
+  helpLinkWrapper: {
     position: 'absolute',
     bottom: 40,
     left: 0,
     right: 0,
+  },
+  helpLink: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',

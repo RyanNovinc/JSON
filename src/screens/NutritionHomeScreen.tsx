@@ -22,6 +22,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAppMode } from '../contexts/AppModeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { WorkoutStorage, NutritionCompletionStatus, MealPlan } from '../utils/storage';
+import { generateUserMealPlanPrompt } from '../data/generateUserMealPrompt';
 
 type NutritionNavigationProp = StackNavigationProp<RootStackParamList, 'NutritionHome'>;
 
@@ -80,6 +81,7 @@ export default function NutritionHomeScreen({ route }: any) {
   });
   const [preferencesModal, setPreferencesModal] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -146,7 +148,7 @@ export default function NutritionHomeScreen({ route }: any) {
       navigation.navigate('MealPlanDays' as any, {
         week,
         mealPlanName: plan.name,
-        mealPrepSession: week.meal_prep_session,
+        mealPrepSession: plan.data.meal_prep_session,
       });
       return;
     }
@@ -284,15 +286,85 @@ export default function NutritionHomeScreen({ route }: any) {
 
   const renderContent = () => {
     if (mealPlans.length === 0) {
-      return (
-        <View style={styles.emptyState}>
-          <Ionicons name="restaurant-outline" size={64} color="#3f3f46" />
-          <Text style={styles.emptyTitle}>No Meal Plans Yet</Text>
-          <Text style={styles.emptyDescription}>
-            Generate your first AI-powered meal plan or import a custom JSON meal plan.
-          </Text>
-        </View>
-      );
+      // Check if both critical questionnaires are completed
+      const canGenerateAIPrompt = completionStatus.nutritionGoals && completionStatus.budgetCooking;
+      
+      if (canGenerateAIPrompt) {
+        return (
+          <View style={styles.emptyState}>
+            <Ionicons name="sparkles" size={64} color={themeColor} />
+            <Text style={styles.emptyTitle}>Ready to Generate AI Meal Plan</Text>
+            <Text style={styles.emptyDescription}>
+              You've completed the questionnaires! Generate your personalized AI prompt to create your meal plan.
+            </Text>
+            <TouchableOpacity
+              style={[styles.aiPromptButton, { backgroundColor: themeColor }]}
+              onPress={async () => {
+                try {
+                  const prompt = await generateUserMealPlanPrompt();
+                  await Clipboard.setStringAsync(prompt);
+                  setAiPromptCopied(true);
+                  setTimeout(() => {
+                    setAiPromptCopied(false);
+                  }, 3000);
+                } catch (error) {
+                  console.error('Error generating AI prompt:', error);
+                  Alert.alert('Error', error.message || 'Failed to generate AI prompt');
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="copy-outline" size={20} color="#0a0a0b" />
+              <Text style={styles.aiPromptButtonText}>
+                {aiPromptCopied ? 'AI Prompt Copied!' : 'Generate AI Prompt'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.aiPromptHelp}>
+              Paste this prompt into ChatGPT or Claude to generate your meal plan
+            </Text>
+          </View>
+        );
+      } else {
+        return (
+          <View style={styles.emptyState}>
+            <Ionicons name="restaurant-outline" size={64} color="#3f3f46" />
+            <Text style={styles.emptyTitle}>No Meal Plans Yet</Text>
+            <Text style={styles.emptyDescription}>
+              Complete the questionnaires to generate your first AI-powered meal plan or import a custom JSON meal plan.
+            </Text>
+            <View style={styles.questionnaireTasks}>
+              <TouchableOpacity
+                style={[styles.taskButton, completionStatus.nutritionGoals && styles.taskButtonCompleted]}
+                onPress={() => navigation.navigate('NutritionQuestionnaire' as any)}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={completionStatus.nutritionGoals ? "checkmark-circle" : "circle-outline"} 
+                  size={20} 
+                  color={completionStatus.nutritionGoals ? themeColor : "#71717a"} 
+                />
+                <Text style={[styles.taskButtonText, completionStatus.nutritionGoals && { color: themeColor }]}>
+                  Nutrition Goals
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.taskButton, completionStatus.budgetCooking && styles.taskButtonCompleted]}
+                onPress={() => navigation.navigate('BudgetCookingQuestionnaire' as any)}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={completionStatus.budgetCooking ? "checkmark-circle" : "circle-outline"} 
+                  size={20} 
+                  color={completionStatus.budgetCooking ? themeColor : "#71717a"} 
+                />
+                <Text style={[styles.taskButtonText, completionStatus.budgetCooking && { color: themeColor }]}>
+                  Budget & Cooking
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      }
     }
 
     if (mealPlans.length === 1) {
@@ -310,7 +382,7 @@ export default function NutritionHomeScreen({ route }: any) {
             <View style={styles.heroContent}>
               <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
               <Text style={styles.heroSubtitle}>
-                {plan.duration} days • {plan.macroSplit || `${plan.data?.macro_targets?.protein_pct || 0}P/${plan.data?.macro_targets?.carbs_pct || 0}C/${plan.data?.macro_targets?.fat_pct || 0}F`} planned
+                {plan.duration} days • {plan.macroSplit || `${parseInt(plan.data?.macro_targets?.protein_pct) || 0}P/${parseInt(plan.data?.macro_targets?.carbs_pct) || 0}C/${parseInt(plan.data?.macro_targets?.fat_pct) || 0}F`} planned
               </Text>
               <Text style={[styles.heroDescription, { color: themeColor }]}>
                 Tap to view your meal plan
@@ -356,7 +428,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 <View style={styles.dualVerticalContent}>
                   <Text style={[styles.dualVerticalTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
                   <Text style={styles.dualVerticalSubtitle}>
-                    {plan.duration} days • {plan.macroSplit || `${plan.data?.macro_targets?.protein_pct || 0}P/${plan.data?.macro_targets?.carbs_pct || 0}C/${plan.data?.macro_targets?.fat_pct || 0}F`} planned
+                    {plan.duration} days • {plan.macroSplit || `${parseInt(plan.data?.macro_targets?.protein_pct) || 0}P/${parseInt(plan.data?.macro_targets?.carbs_pct) || 0}C/${parseInt(plan.data?.macro_targets?.fat_pct) || 0}F`} planned
                   </Text>
                   <Text style={[styles.dualVerticalDescription, { color: themeColor }]}>
                     Tap to view your meal plan
@@ -496,7 +568,7 @@ export default function NutritionHomeScreen({ route }: any) {
               <View style={styles.heroContent}>
                 <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
                 <Text style={styles.heroSubtitle}>
-                  {plan.duration} days • {plan.macroSplit || `${plan.data?.macro_targets?.protein_pct || 0}P/${plan.data?.macro_targets?.carbs_pct || 0}C/${plan.data?.macro_targets?.fat_pct || 0}F`} planned
+                  {plan.duration} days • {plan.macroSplit || `${parseInt(plan.data?.macro_targets?.protein_pct) || 0}P/${parseInt(plan.data?.macro_targets?.carbs_pct) || 0}C/${parseInt(plan.data?.macro_targets?.fat_pct) || 0}F`} planned
                 </Text>
                 <Text style={[styles.heroDescription, { color: themeColor }]}>
                   Tap to view your meal plan
@@ -786,6 +858,52 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  aiPromptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 32,
+    marginBottom: 16,
+  },
+  aiPromptButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0a0a0b',
+    marginLeft: 8,
+  },
+  aiPromptHelp: {
+    fontSize: 14,
+    color: '#71717a',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  questionnaireTasks: {
+    marginTop: 32,
+    width: '100%',
+  },
+  taskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  taskButtonCompleted: {
+    backgroundColor: 'rgba(116, 222, 151, 0.1)',
+    borderColor: 'rgba(116, 222, 151, 0.3)',
+  },
+  taskButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginLeft: 12,
+  },
   heroContainer: {
     flex: 1,
     paddingHorizontal: 20,
@@ -926,7 +1044,6 @@ const styles = StyleSheet.create({
       width: 0,
       height: 1,
     },
-    textShadowOpacity: 0.5,
     textShadowRadius: 2,
   },
   dualVerticalSubtitle: {
