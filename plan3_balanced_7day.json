@@ -1,0 +1,1631 @@
+{
+  "plan_name": "7-Day Enhanced Balanced Nutrition Plan",
+  "description": "A 7-day balanced nutrition plan following Harvard Healthy Eating Plate principles: half plate vegetables/fruits, quarter whole grains, quarter healthy protein. Targets 30% protein, 40% carbohydrates, and 30% fat at 2000 calories. Includes 3 meals plus 1 snack daily with diverse whole foods. Based on 2024 Dietary Guidelines for Americans and Harvard T.H. Chan School of Public Health recommendations.",
+  "duration_days": 7,
+  "base_calories": 2000,
+  "macro_targets": {
+    "protein_pct": 30,
+    "carbs_pct": 40,
+    "fat_pct": 30,
+    "protein_g": 150,
+    "carbs_g": 200,
+    "fat_g": 67
+  },
+  "scaling_notes": "Scale all 'scalable: true' ingredients proportionally. Maintain balanced plate ratio: increase protein, carb, and fat sources evenly. Fixed items (seasonings) stay constant.",
+  "weeks": [
+    {
+      "week_number": 1,
+      "days": [
+        {
+          "day_name": "Monday",
+          "day_number": 1,
+          "daily_totals": {
+            "calories": 2001,
+            "protein": 170.7,
+            "carbs": 183.0,
+            "fat": 68.2,
+            "fiber": 34.2
+          },
+          "meals": [
+            {
+              "meal_name": "Overnight Oats with Egg Whites",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 0,
+              "calories": 514,
+              "macros": {
+                "protein": 36.7,
+                "carbs": 68.6,
+                "fat": 11.8,
+                "fiber": 10.1
+              },
+              "ingredients": [
+                {
+                  "item": "Oats",
+                  "amount": "61",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Greek yogurt (nonfat)",
+                  "amount": "132",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Blueberries",
+                  "amount": "88",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Almonds",
+                  "amount": "13",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Honey",
+                  "amount": "9",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Egg whites (boiled)",
+                  "amount": "88",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Mix oats, yogurt overnight. Top with berries, almonds, honey.",
+                "Serve with boiled egg whites."
+              ]
+            },
+            {
+              "meal_name": "Chicken Quinoa Bowl",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 20,
+              "calories": 632,
+              "macros": {
+                "protein": 58.4,
+                "carbs": 45.2,
+                "fat": 24.3,
+                "fiber": 9.9
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken breast",
+                  "amount": "154",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Quinoa",
+                  "amount": "165",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Broccoli",
+                  "amount": "88",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "44",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "9",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Grill chicken, cook quinoa.",
+                "Steam broccoli.",
+                "Assemble bowl, drizzle oil."
+              ]
+            },
+            {
+              "meal_name": "Herb Chicken Quinoa & Roast Veg",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 30,
+              "calories": 619,
+              "macros": {
+                "protein": 64.2,
+                "carbs": 43.3,
+                "fat": 20.5,
+                "fiber": 8.7
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken breast",
+                  "amount": "176",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Quinoa",
+                  "amount": "143",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Asparagus",
+                  "amount": "110",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Carrot",
+                  "amount": "88",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "11",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Roast chicken 200\u00b0C 22 min.",
+                "Cook quinoa, roast asparagus and carrots.",
+                "Serve together."
+              ]
+            },
+            {
+              "meal_name": "Apple & Almond Butter",
+              "meal_type": "snack",
+              "prep_time": 5,
+              "cook_time": 0,
+              "calories": 236,
+              "macros": {
+                "protein": 11.4,
+                "carbs": 25.9,
+                "fat": 11.6,
+                "fiber": 5.5
+              },
+              "ingredients": [
+                {
+                  "item": "Apple",
+                  "amount": "143",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Almond butter",
+                  "amount": "20",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Greek yogurt (nonfat)",
+                  "amount": "66",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Slice apple, serve with almond butter and yogurt."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Tuesday",
+          "day_number": 2,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 165.2,
+            "carbs": 187.9,
+            "fat": 67.2,
+            "fiber": 34.9
+          },
+          "meals": [
+            {
+              "meal_name": "Egg Scramble & Banana Toast",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 10,
+              "calories": 585,
+              "macros": {
+                "protein": 42.4,
+                "carbs": 61.4,
+                "fat": 19.3,
+                "fiber": 10.0
+              },
+              "ingredients": [
+                {
+                  "item": "Egg whites",
+                  "amount": "197",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Whole egg",
+                  "amount": "62",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "WW bread",
+                  "amount": "74",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bell pepper",
+                  "amount": "74",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "62",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Banana",
+                  "amount": "99",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Saut\u00e9 veg in oil, scramble eggs.",
+                "Toast bread, serve with banana."
+              ]
+            },
+            {
+              "meal_name": "Turkey Hummus Wrap",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 0,
+              "calories": 509,
+              "macros": {
+                "protein": 57.5,
+                "carbs": 56.6,
+                "fat": 5.4,
+                "fiber": 12.3
+              },
+              "ingredients": [
+                {
+                  "item": "Turkey breast",
+                  "amount": "136",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "WW bread (tortilla)",
+                  "amount": "74",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Chickpeas (hummus)",
+                  "amount": "62",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Romaine",
+                  "amount": "49",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Tomato",
+                  "amount": "74",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Carrot",
+                  "amount": "49",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Spread hummus on wrap. Layer turkey, veg. Roll."
+              ]
+            },
+            {
+              "meal_name": "Salmon Sweet Potato & Broccoli",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 25,
+              "calories": 683,
+              "macros": {
+                "protein": 44.4,
+                "carbs": 48.3,
+                "fat": 35.4,
+                "fiber": 9.1
+              },
+              "ingredients": [
+                {
+                  "item": "Salmon",
+                  "amount": "185",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Sweet potato",
+                  "amount": "197",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Broccoli",
+                  "amount": "123",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Bake salmon and sweet potato 200\u00b0C 20 min.",
+                "Steam broccoli. Drizzle oil."
+              ]
+            },
+            {
+              "meal_name": "Greek Yogurt & Berries",
+              "meal_type": "snack",
+              "prep_time": 3,
+              "cook_time": 0,
+              "calories": 223,
+              "macros": {
+                "protein": 20.9,
+                "carbs": 21.6,
+                "fat": 7.1,
+                "fiber": 3.5
+              },
+              "ingredients": [
+                {
+                  "item": "Greek yogurt (nonfat)",
+                  "amount": "173",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Strawberries",
+                  "amount": "99",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Honey",
+                  "amount": "6",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Almonds",
+                  "amount": "12",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Yogurt in bowl, top with berries, almonds, honey."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Wednesday",
+          "day_number": 3,
+          "daily_totals": {
+            "calories": 1999,
+            "protein": 140.6,
+            "carbs": 196.4,
+            "fat": 75.7,
+            "fiber": 31.7
+          },
+          "meals": [
+            {
+              "meal_name": "Yogurt Parfait & Egg Whites",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 0,
+              "calories": 483,
+              "macros": {
+                "protein": 39.7,
+                "carbs": 57.0,
+                "fat": 12.1,
+                "fiber": 7.6
+              },
+              "ingredients": [
+                {
+                  "item": "Greek yogurt (nonfat)",
+                  "amount": "187",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Oats",
+                  "amount": "47",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Strawberries",
+                  "amount": "94",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Honey",
+                  "amount": "12",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Walnuts",
+                  "amount": "12",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Egg whites (boiled)",
+                  "amount": "94",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Layer yogurt, oats, berries, walnuts. Drizzle honey.",
+                "Serve with boiled egg whites."
+              ]
+            },
+            {
+              "meal_name": "Salmon Brown Rice Bowl",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 20,
+              "calories": 639,
+              "macros": {
+                "protein": 39.3,
+                "carbs": 55.5,
+                "fat": 29.4,
+                "fiber": 8.4
+              },
+              "ingredients": [
+                {
+                  "item": "Salmon",
+                  "amount": "152",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Brown rice",
+                  "amount": "176",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Broccoli",
+                  "amount": "94",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "47",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Bake salmon, cook rice.",
+                "Steam broccoli. Assemble bowl."
+              ]
+            },
+            {
+              "meal_name": "Turkey Meatball Pasta",
+              "meal_type": "dinner",
+              "prep_time": 15,
+              "cook_time": 20,
+              "calories": 655,
+              "macros": {
+                "protein": 51.1,
+                "carbs": 43.4,
+                "fat": 31.2,
+                "fiber": 6.0
+              },
+              "ingredients": [
+                {
+                  "item": "Ground turkey",
+                  "amount": "176",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "WW pasta",
+                  "amount": "164",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Tomato",
+                  "amount": "117",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "9",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Parmesan",
+                  "amount": "12",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Form meatballs, bake 190\u00b0C 18 min.",
+                "Cook pasta, heat sauce.",
+                "Serve with parmesan."
+              ]
+            },
+            {
+              "meal_name": "Hummus & Veggie Sticks",
+              "meal_type": "snack",
+              "prep_time": 5,
+              "cook_time": 0,
+              "calories": 222,
+              "macros": {
+                "protein": 10.5,
+                "carbs": 40.5,
+                "fat": 3.0,
+                "fiber": 9.7
+              },
+              "ingredients": [
+                {
+                  "item": "Chickpeas (hummus)",
+                  "amount": "70",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Carrot sticks",
+                  "amount": "94",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cucumber",
+                  "amount": "70",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "WW bread (pita)",
+                  "amount": "23",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Cut veg into sticks, serve with hummus and pita."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Thursday",
+          "day_number": 4,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 130.6,
+            "carbs": 177.6,
+            "fat": 93.5,
+            "fiber": 43.3
+          },
+          "meals": [
+            {
+              "meal_name": "Avocado Egg Toast",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 10,
+              "calories": 529,
+              "macros": {
+                "protein": 34.3,
+                "carbs": 41.7,
+                "fat": 25.7,
+                "fiber": 9.3
+              },
+              "ingredients": [
+                {
+                  "item": "WW bread",
+                  "amount": "74",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "64",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Eggs",
+                  "amount": "106",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Tomato",
+                  "amount": "53",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cottage cheese",
+                  "amount": "85",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Toast bread, spread avocado. Poach eggs.",
+                "Serve with tomato and cottage cheese."
+              ]
+            },
+            {
+              "meal_name": "Lentil Vegetable Soup & Bread",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 25,
+              "calories": 522,
+              "macros": {
+                "protein": 42.0,
+                "carbs": 59.7,
+                "fat": 13.6,
+                "fiber": 17.9
+              },
+              "ingredients": [
+                {
+                  "item": "Lentils",
+                  "amount": "148",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Carrot",
+                  "amount": "64",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "53",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "WW bread",
+                  "amount": "53",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "8",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Chicken breast",
+                  "amount": "64",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Saut\u00e9 carrot in oil, add lentils, chicken, broth.",
+                "Simmer 20 min, add spinach.",
+                "Serve with bread."
+              ]
+            },
+            {
+              "meal_name": "Tofu Stir-Fry Brown Rice",
+              "meal_type": "dinner",
+              "prep_time": 15,
+              "cook_time": 15,
+              "calories": 614,
+              "macros": {
+                "protein": 44.3,
+                "carbs": 53.2,
+                "fat": 29.0,
+                "fiber": 9.7
+              },
+              "ingredients": [
+                {
+                  "item": "Tofu",
+                  "amount": "212",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Brown rice",
+                  "amount": "159",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bell pepper",
+                  "amount": "64",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Mushrooms",
+                  "amount": "85",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "8",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Press and cube tofu, fry in oil until golden.",
+                "Add veg, stir-fry 4 min.",
+                "Serve over rice."
+              ]
+            },
+            {
+              "meal_name": "Trail Mix",
+              "meal_type": "snack",
+              "prep_time": 2,
+              "cook_time": 0,
+              "calories": 335,
+              "macros": {
+                "protein": 10.0,
+                "carbs": 23.0,
+                "fat": 25.2,
+                "fiber": 6.4
+              },
+              "ingredients": [
+                {
+                  "item": "Almonds",
+                  "amount": "19",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Walnuts",
+                  "amount": "11",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Pumpkin seeds",
+                  "amount": "8",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Dark chocolate 85%",
+                  "amount": "8",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Banana",
+                  "amount": "64",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Mix nuts, seeds, chocolate. Serve with banana."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Friday",
+          "day_number": 5,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 164.8,
+            "carbs": 219.8,
+            "fat": 53.8,
+            "fiber": 31.3
+          },
+          "meals": [
+            {
+              "meal_name": "Banana Oat Protein Pancakes",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 10,
+              "calories": 599,
+              "macros": {
+                "protein": 45.5,
+                "carbs": 81.6,
+                "fat": 11.2,
+                "fiber": 11.1
+              },
+              "ingredients": [
+                {
+                  "item": "Oats",
+                  "amount": "61",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Banana",
+                  "amount": "122",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Egg whites",
+                  "amount": "146",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Whole egg",
+                  "amount": "61",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Blueberries",
+                  "amount": "61",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Greek yogurt (nonfat)",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Blend oats, banana, eggs. Cook pancakes.",
+                "Top with berries and yogurt."
+              ]
+            },
+            {
+              "meal_name": "Chicken Stir-Fry Brown Rice",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 15,
+              "calories": 647,
+              "macros": {
+                "protein": 61.2,
+                "carbs": 57.9,
+                "fat": 18.2,
+                "fiber": 7.1
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken breast",
+                  "amount": "170",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Brown rice",
+                  "amount": "182",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bell pepper",
+                  "amount": "73",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Broccoli",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Stir-fry chicken in oil 5 min. Add veg 4 min.",
+                "Serve over rice."
+              ]
+            },
+            {
+              "meal_name": "Grilled Cod with Roast Veg",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 20,
+              "calories": 495,
+              "macros": {
+                "protein": 44.7,
+                "carbs": 46.3,
+                "fat": 14.6,
+                "fiber": 8.8
+              },
+              "ingredients": [
+                {
+                  "item": "Cod",
+                  "amount": "219",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Sweet potato",
+                  "amount": "182",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bell pepper",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Zucchini",
+                  "amount": "122",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "12",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Roast veg with oil 200\u00b0C 15 min.",
+                "Add cod last 10 min.",
+                "Serve together."
+              ]
+            },
+            {
+              "meal_name": "Banana & Peanut Butter",
+              "meal_type": "snack",
+              "prep_time": 3,
+              "cook_time": 0,
+              "calories": 259,
+              "macros": {
+                "protein": 13.4,
+                "carbs": 34.0,
+                "fat": 9.8,
+                "fiber": 4.3
+              },
+              "ingredients": [
+                {
+                  "item": "Banana",
+                  "amount": "122",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Peanut butter",
+                  "amount": "18",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Greek yogurt (nonfat)",
+                  "amount": "73",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Slice banana, spread PB. Yogurt on side."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Saturday",
+          "day_number": 6,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 187.9,
+            "carbs": 159.5,
+            "fat": 69.2,
+            "fiber": 33.1
+          },
+          "meals": [
+            {
+              "meal_name": "Mushroom Omelette & Toast",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 10,
+              "calories": 456,
+              "macros": {
+                "protein": 40.7,
+                "carbs": 32.5,
+                "fat": 18.5,
+                "fiber": 6.2
+              },
+              "ingredients": [
+                {
+                  "item": "Egg whites",
+                  "amount": "183",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Whole egg",
+                  "amount": "61",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Mushrooms",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "73",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "WW bread",
+                  "amount": "61",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Saut\u00e9 mushrooms and spinach in oil.",
+                "Make omelette, fill with veg. Toast bread."
+              ]
+            },
+            {
+              "meal_name": "Tuna White Bean Salad",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 0,
+              "calories": 494,
+              "macros": {
+                "protein": 53.9,
+                "carbs": 34.8,
+                "fat": 16.6,
+                "fiber": 10.1
+              },
+              "ingredients": [
+                {
+                  "item": "Tuna",
+                  "amount": "146",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Chickpeas",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Tomato",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cucumber",
+                  "amount": "73",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "12",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "49",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Flake tuna, add beans, veg.",
+                "Arrange over spinach, drizzle oil."
+              ]
+            },
+            {
+              "meal_name": "Chicken Black Bean Burrito Bowl",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 15,
+              "calories": 755,
+              "macros": {
+                "protein": 70.7,
+                "carbs": 67.4,
+                "fat": 21.9,
+                "fiber": 15.0
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken breast",
+                  "amount": "183",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Brown rice",
+                  "amount": "146",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Black beans",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "49",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Tomato",
+                  "amount": "73",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "6",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Cook chicken in oil. Slice.",
+                "Bowl: rice, beans, chicken, tomato, avocado."
+              ]
+            },
+            {
+              "meal_name": "Cottage Cheese & Cucumber",
+              "meal_type": "snack",
+              "prep_time": 5,
+              "cook_time": 0,
+              "calories": 295,
+              "macros": {
+                "protein": 22.6,
+                "carbs": 24.8,
+                "fat": 12.2,
+                "fiber": 1.8
+              },
+              "ingredients": [
+                {
+                  "item": "Cottage cheese",
+                  "amount": "158",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cucumber",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Pumpkin seeds",
+                  "amount": "10",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Rice cakes",
+                  "amount": "18",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Cottage cheese in bowl with cucumber and seeds. Rice cakes on side."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Sunday",
+          "day_number": 7,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 131.2,
+            "carbs": 219.7,
+            "fat": 69.6,
+            "fiber": 39.3
+          },
+          "meals": [
+            {
+              "meal_name": "Tropical Smoothie Bowl",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 0,
+              "calories": 469,
+              "macros": {
+                "protein": 35.7,
+                "carbs": 63.2,
+                "fat": 10.0,
+                "fiber": 8.0
+              },
+              "ingredients": [
+                {
+                  "item": "Banana (frozen)",
+                  "amount": "109",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Greek yogurt (nonfat)",
+                  "amount": "164",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Oats",
+                  "amount": "33",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Almonds",
+                  "amount": "13",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Honey",
+                  "amount": "9",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Egg whites (boiled)",
+                  "amount": "87",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Blend banana and yogurt. Pour in bowl.",
+                "Top with oats, almonds, honey. Egg whites on side."
+              ]
+            },
+            {
+              "meal_name": "Black Bean Sweet Potato Bowl",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 20,
+              "calories": 675,
+              "macros": {
+                "protein": 36.5,
+                "carbs": 90.5,
+                "fat": 19.4,
+                "fiber": 19.1
+              },
+              "ingredients": [
+                {
+                  "item": "Sweet potato",
+                  "amount": "164",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Black beans",
+                  "amount": "109",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Brown rice",
+                  "amount": "109",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "44",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "9",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Chicken breast",
+                  "amount": "66",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Roast sweet potato, warm beans.",
+                "Grill chicken. Bowl: rice, potato, beans, chicken, avocado."
+              ]
+            },
+            {
+              "meal_name": "Lemon Herb Chicken with Quinoa",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 30,
+              "calories": 614,
+              "macros": {
+                "protein": 48.5,
+                "carbs": 40.2,
+                "fat": 28.6,
+                "fiber": 7.2
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken thigh (boneless)",
+                  "amount": "153",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Quinoa",
+                  "amount": "153",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Green beans",
+                  "amount": "109",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "9",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Marinate chicken, bake 200\u00b0C 22 min.",
+                "Cook quinoa, steam green beans.",
+                "Serve together."
+              ]
+            },
+            {
+              "meal_name": "Rice Cakes with Avocado",
+              "meal_type": "snack",
+              "prep_time": 5,
+              "cook_time": 0,
+              "calories": 242,
+              "macros": {
+                "protein": 10.5,
+                "carbs": 25.8,
+                "fat": 11.6,
+                "fiber": 5.0
+              },
+              "ingredients": [
+                {
+                  "item": "Rice cakes",
+                  "amount": "22",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "55",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Tomato",
+                  "amount": "33",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cottage cheese",
+                  "amount": "66",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Mash avocado on rice cakes. Add tomato. Cottage cheese on side."
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

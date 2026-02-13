@@ -3,13 +3,14 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../hooks/useAuth';

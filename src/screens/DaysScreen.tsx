@@ -4,17 +4,18 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   SafeAreaView,
   ScrollView,
   Dimensions,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useTheme } from '../contexts/ThemeContext';
 
 type DaysScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Days'>;
 type DaysScreenRouteProp = RouteProp<RootStackParamList, 'Days'>;
@@ -40,6 +41,7 @@ interface DayCardProps {
   onPress: () => void;
   isCompleted?: boolean;
   currentWeek: number;
+  themeColor: string;
   completionStats?: {
     duration: number; // minutes
     totalVolume: number; // kg
@@ -47,7 +49,7 @@ interface DayCardProps {
   };
 }
 
-function DayCard({ day, onPress, isCompleted, currentWeek, completionStats }: DayCardProps) {
+function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, themeColor }: DayCardProps) {
   const exerciseCount = day.exercises.length;
   
   // Use duration from JSON if available, otherwise calculate estimate
@@ -104,7 +106,7 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats }: Da
     if (name.includes('push') || name.includes('chest') || name.includes('shoulder')) return '#f59e0b';
     if (name.includes('pull') || name.includes('back') || name.includes('bicep')) return '#10b981';
     if (name.includes('legs') || name.includes('lower') || name.includes('glute')) return '#a855f7';
-    if (name.includes('upper')) return '#22d3ee';
+    if (name.includes('upper')) return themeColor;
     if (name.includes('full') || name.includes('total')) return '#ef4444';
     return '#6b7280'; // default
   };
@@ -125,9 +127,11 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats }: Da
       >
         <View style={styles.completedCardContent}>
           <View style={styles.completedHeader}>
-            <Text style={styles.dayNameCompleted}>
-              {day.day_name}
-            </Text>
+            <View style={styles.completedTitleContainer}>
+              <Text style={styles.dayNameCompleted} numberOfLines={2}>
+                {day.day_name}
+              </Text>
+            </View>
             <View style={styles.completedBadge}>
               <Ionicons name="checkmark" size={12} color="#0a0a0b" />
               <Text style={styles.completedBadgeText}>DONE</Text>
@@ -168,9 +172,9 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats }: Da
             </Text>
           </View>
         </View>
-        <View style={styles.startButton}>
-          <Ionicons name="play" size={16} color="#22d3ee" />
-          <Text style={styles.startButtonText}>START</Text>
+        <View style={[styles.startButton, { backgroundColor: themeColor + '20' }]}>
+          <Ionicons name="play" size={16} color={themeColor} />
+          <Text style={[styles.startButtonText, { color: themeColor }]}>START</Text>
         </View>
       </View>
       
@@ -192,7 +196,7 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats }: Da
               <Text style={styles.exerciseChipText} numberOfLines={1}>
                 {exercise.exercise}
               </Text>
-              <Text style={styles.exerciseChipSets}>{exercise.sets}×{exercise.reps}</Text>
+              <Text style={[styles.exerciseChipSets, { color: themeColor }]}>{exercise.sets}×{exercise.reps}</Text>
             </View>
           ))}
           {exerciseCount > 6 && (
@@ -209,7 +213,8 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats }: Da
 export default function DaysScreen() {
   const navigation = useNavigation<DaysScreenNavigationProp>();
   const route = useRoute<DaysScreenRouteProp>();
-  const { block, routineName } = route.params;
+  const { themeColor } = useTheme();
+  const { block, routineName, initialWeek } = route.params;
   
   const [currentWeek, setCurrentWeek] = useState(1);
   const [completedWorkouts, setCompletedWorkouts] = useState<Set<string>>(new Set());
@@ -254,6 +259,21 @@ export default function DaysScreen() {
   
   // Initial load - determine which week to show
   const initializeWeek = async () => {
+    // If initialWeek is passed from "Today" button, use that and skip other logic
+    if (initialWeek) {
+      setCurrentWeek(initialWeek);
+      
+      // Check if there's a bookmark for this block
+      const bookmarkKey = `bookmark_${block.block_name}`;
+      const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
+      if (savedBookmark) {
+        const { week, isBookmarked: bookmarked } = JSON.parse(savedBookmark);
+        setIsBookmarked(bookmarked);
+        setBookmarkedWeek(bookmarked ? week : null);
+      }
+      return;
+    }
+
     const bookmarkKey = `bookmark_${block.block_name}`;
     const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
     
@@ -415,7 +435,9 @@ export default function DaysScreen() {
       navigation.navigate('WorkoutLog' as any, { 
         day: dayWithPrevious, 
         blockName: block.block_name,
-        currentWeek: currentWeek  // Pass the current week
+        currentWeek: currentWeek,  // Pass the current week
+        block: block,  // Pass the full block data for completion detection
+        routineName: routineName  // Pass routine name for exercise preferences
       });
     }
   };
@@ -477,14 +499,17 @@ export default function DaysScreen() {
                   </TouchableOpacity>
                 </View>
                 <View style={styles.weekNumberContainer}>
-                  <Text style={styles.weekNumber}>{currentWeek}</Text>
-                  <Text style={styles.weekTotal}>/ {totalWeeks}</Text>
+                  <Text style={[styles.weekNumber, { color: themeColor }]}>{currentWeek}</Text>
+                  <Text style={[styles.weekTotal, { color: themeColor }]}>/ {totalWeeks}</Text>
                 </View>
                 <View style={styles.weekProgress}>
                   <View 
                     style={[
                       styles.weekProgressFill, 
-                      { width: `${(currentWeek / totalWeeks) * 100}%` }
+                      { 
+                        width: `${(currentWeek / totalWeeks) * 100}%`,
+                        backgroundColor: themeColor 
+                      }
                     ]} 
                   />
                 </View>
@@ -517,6 +542,7 @@ export default function DaysScreen() {
             isCompleted={isWorkoutCompleted(item.day_name)}
             currentWeek={currentWeek}
             completionStats={getCompletionStats(item.day_name)}
+            themeColor={themeColor}
           />
         )}
         contentContainerStyle={styles.listContent}
@@ -588,10 +614,14 @@ const styles = StyleSheet.create({
   },
   completedHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: 12,
     gap: 10,
+  },
+  completedTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
   completedBadge: {
     flexDirection: 'row',
@@ -664,10 +694,11 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   dayNameCompleted: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
     color: '#ffffff',
-    lineHeight: 26,
+    lineHeight: 22,
+    textAlign: 'center',
   },
   checkIcon: {
     marginLeft: 8,
@@ -700,7 +731,6 @@ const styles = StyleSheet.create({
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#22d3ee20',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -709,7 +739,6 @@ const styles = StyleSheet.create({
   startButtonText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#22d3ee',
     letterSpacing: 0.5,
   },
   completedButton: {
@@ -787,7 +816,6 @@ const styles = StyleSheet.create({
   weekNumber: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#22d3ee',
   },
   weekTotal: {
     fontSize: 16,
@@ -803,7 +831,6 @@ const styles = StyleSheet.create({
   },
   weekProgressFill: {
     height: '100%',
-    backgroundColor: '#22d3ee',
     borderRadius: 2,
   },
   completionStats: {
@@ -886,7 +913,6 @@ const styles = StyleSheet.create({
   },
   exerciseChipSets: {
     fontSize: 10,
-    color: '#22d3ee',
     fontWeight: '600',
   },
   moreChip: {

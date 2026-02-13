@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Animated,
   TextInput,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import {
   ScrollView,
   PanResponder,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigationState } from '@react-navigation/native';
@@ -345,8 +345,8 @@ export function FeedbackTab() {
                 >
                   <Ionicons
                     name={tab.icon as any}
-                    size={16}
-                    color={activeTab === tab.key ? '#ffffff' : '#71717a'}
+                    size={20}
+                    color={activeTab === tab.key ? '#ffffff' : '#d4d4d8'}
                   />
                   <Text style={[
                     styles.tabLabel,
@@ -410,7 +410,10 @@ export function FeedbackTab() {
                     onPress={handleRatingSubmit}
                     disabled={rating === 0}
                   >
-                    <Text style={styles.buttonText}>
+                    <Text style={[
+                      styles.buttonText,
+                      rating === 0 && styles.buttonTextDisabled
+                    ]}>
                       {rating === 5 ? 'Rate on App Store' : 'Submit Feedback'}
                     </Text>
                   </TouchableOpacity>
@@ -449,7 +452,10 @@ export function FeedbackTab() {
                     onPress={handleFeedbackSubmit}
                     disabled={!feedback.trim()}
                   >
-                    <Text style={styles.buttonText}>
+                    <Text style={[
+                      styles.buttonText,
+                      !feedback.trim() && styles.buttonTextDisabled
+                    ]}>
                       Submit {activeTab === 'bug' ? 'Bug Report' : 'Feature Request'}
                     </Text>
                   </TouchableOpacity>
@@ -539,18 +545,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    backgroundColor: '#18181b',
-    borderRadius: 8,
+    gap: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
   },
   tabButtonActive: {
-    // backgroundColor set inline
+    borderColor: 'transparent',
   },
   tabLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#71717a',
+    color: '#d4d4d8',
   },
   tabLabelActive: {
     color: '#ffffff',
@@ -613,12 +622,15 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: '#18181b',
-    opacity: 0.5,
+    opacity: 0.3,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  buttonTextDisabled: {
+    color: '#52525b',
   },
   overlay: {
     position: 'absolute',

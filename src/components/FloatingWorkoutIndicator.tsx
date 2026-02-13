@@ -3,14 +3,16 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { navigate, getCurrentRoute } from '../utils/navigationRef';
+import { useTheme } from '../contexts/ThemeContext';
 
 export function FloatingWorkoutIndicator() {
+  const { themeColor } = useTheme();
   const { activeWorkout } = useActiveWorkout();
   const [liveDuration, setLiveDuration] = useState(0);
 
@@ -55,13 +57,13 @@ export function FloatingWorkoutIndicator() {
       >
         <View style={styles.content}>
           <View style={styles.leftContent}>
-            <Ionicons name="fitness" size={16} color="#22d3ee" />
+            <Ionicons name="fitness" size={16} color={themeColor} />
             <Text style={styles.workoutName} numberOfLines={1}>
               {activeWorkout.dayName}
             </Text>
           </View>
           <View style={styles.rightContent}>
-            <Text style={styles.duration}>{formatDuration(liveDuration)}</Text>
+            <Text style={[styles.duration, { color: themeColor }]}>{formatDuration(liveDuration)}</Text>
             <Ionicons name="chevron-forward" size={16} color="#71717a" />
           </View>
         </View>
@@ -122,6 +124,5 @@ const styles = StyleSheet.create({
   duration: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#22d3ee',
   },
 });

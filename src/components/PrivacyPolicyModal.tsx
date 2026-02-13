@@ -3,13 +3,15 @@ import {
   Modal,
   View,
   Text,
-  TouchableOpacity,
+  
   ScrollView,
   StyleSheet,
   Animated,
   Dimensions,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,6 +24,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
   visible, 
   onClose 
 }) => {
+  const { themeColor } = useTheme();
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
@@ -70,8 +73,8 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
   );
 
   const InfoBox: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <View style={styles.infoBox}>
-      <Ionicons name="shield-checkmark" size={20} color="#22d3ee" />
+    <View style={[styles.infoBox, { backgroundColor: themeColor + '10', borderColor: themeColor + '20' }]}>
+      <Ionicons name="shield-checkmark" size={20} color={themeColor} />
       <View style={styles.infoBoxText}>
         {children}
       </View>
@@ -100,7 +103,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Ionicons name="shield-checkmark" size={24} color="#22d3ee" />
+              <Ionicons name="shield-checkmark" size={24} color={themeColor} />
               <Text style={styles.headerTitle}>Privacy Policy</Text>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -121,7 +124,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               
               <InfoBox>
                 <Text style={styles.infoBoxText}>
-                  <Text style={styles.emphasis}>Local Storage Only:</Text> All your workouts, progress tracking, and personal data remain on your device and never leave it.
+                  <Text style={[styles.emphasis, { color: themeColor }]}>Local Storage Only:</Text> All your workouts, progress tracking, and personal data remain on your device and never leave it.
                 </Text>
               </InfoBox>
             </Section>
@@ -197,7 +200,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               <Text style={styles.footerText}>
                 Last Updated: {new Date().toLocaleDateString()}
               </Text>
-              <Text style={styles.footerSubtext}>
+              <Text style={[styles.footerSubtext, { color: themeColor }]}>
                 Your data stays on your device. Always.
               </Text>
             </View>
@@ -283,11 +286,9 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: 'row',
-    backgroundColor: '#22d3ee10',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#22d3ee20',
     marginTop: 12,
   },
   infoBoxText: {
@@ -296,7 +297,6 @@ const styles = StyleSheet.create({
   },
   emphasis: {
     fontWeight: '700',
-    color: '#22d3ee',
   },
   footer: {
     marginTop: 32,
@@ -312,7 +312,6 @@ const styles = StyleSheet.create({
   },
   footerSubtext: {
     fontSize: 12,
-    color: '#22d3ee',
     fontWeight: '600',
   },
 });

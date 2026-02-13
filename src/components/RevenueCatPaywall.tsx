@@ -3,14 +3,16 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { PurchasesPackage } from 'react-native-purchases';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { PRODUCT_CONFIG } from '../config/revenueCatConfig';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface RevenueCatPaywallProps {
   onClose?: () => void;
@@ -23,10 +25,12 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
   onPurchaseSuccess,
   onRestoreSuccess,
 }) => {
+  const { themeColor } = useTheme();
   const {
     currentOffering,
     isLoading,
     hasJSONPro,
+    isConfigured,
     purchasePackage,
     restorePurchases,
     grantFreeAccess,
@@ -110,7 +114,7 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#22d3ee" />
+        <ActivityIndicator size="large" color={themeColor} />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -136,13 +140,13 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
   if (hasJSONPro) {
     return (
       <View style={styles.purchasedContainer}>
-        <Ionicons name="checkmark-circle" size={64} color="#22d3ee" />
+        <Ionicons name="checkmark-circle" size={64} color={themeColor} />
         <Text style={styles.purchasedTitle}>You're all set!</Text>
         <Text style={styles.purchasedText}>
           You already have lifetime access to all premium features.
         </Text>
         {onClose && (
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <TouchableOpacity style={[styles.closeButton, { backgroundColor: themeColor }]} onPress={onClose}>
             <Text style={styles.closeButtonText}>Continue</Text>
           </TouchableOpacity>
         )}
@@ -150,19 +154,20 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
     );
   }
 
+
   // Always show paywall - we'll handle package lookup in the purchase method
 
   return (
     <View style={styles.container}>
       {/* Hero Section */}
       <View style={styles.heroSection}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="rocket" size={32} color="#22d3ee" />
+        <View style={[styles.iconContainer, { backgroundColor: themeColor + '1A', borderColor: themeColor + '4D' }]}>
+          <Ionicons name="rocket" size={32} color={themeColor} />
         </View>
         <Text style={styles.heroTitle}>Unlock Pro Features</Text>
         <Text style={styles.heroSubtitle}>
           Get unlimited access to all premium features{' '}
-          <Text style={styles.foreverText}>forever</Text>
+          <Text style={[styles.foreverText, { color: themeColor }]}>forever</Text>
         </Text>
       </View>
 
@@ -170,7 +175,7 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
       <View style={styles.pricingSection}>
         <View style={styles.priceContainer}>
           <Text style={styles.priceStrike}>$19.99</Text>
-          <Text style={styles.priceMain}>FREE</Text>
+          <Text style={[styles.priceMain, { color: themeColor, textShadowColor: themeColor + '4D' }]}>FREE</Text>
           <Text style={styles.priceSubtext}>Limited time offer</Text>
         </View>
       </View>
@@ -179,11 +184,11 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
       <View style={styles.featuresSection}>
         <Text style={styles.featuresTitle}>What's included:</Text>
         <View style={styles.feature}>
-          <Ionicons name="checkmark-circle" size={20} color="#22d3ee" />
+          <Ionicons name="checkmark-circle" size={20} color={themeColor} />
           <Text style={styles.featureText}>Unlimited workout routines</Text>
         </View>
         <View style={styles.feature}>
-          <Ionicons name="checkmark-circle" size={20} color="#22d3ee" />
+          <Ionicons name="checkmark-circle" size={20} color={themeColor} />
           <Text style={styles.featureText}>Lifetime updates</Text>
         </View>
       </View>
@@ -191,7 +196,7 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
       {/* Action Section */}
       <View style={styles.actionSection}>
         <TouchableOpacity
-          style={[styles.primaryButton, purchasing && styles.primaryButtonDisabled]}
+          style={[styles.primaryButton, { backgroundColor: themeColor, shadowColor: themeColor }, purchasing && styles.primaryButtonDisabled]}
           onPress={handlePurchase}
           disabled={purchasing}
         >
@@ -265,7 +270,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#22d3ee',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 32,
@@ -296,7 +300,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   closeButton: {
-    backgroundColor: '#22d3ee',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 32,
@@ -314,12 +317,10 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(34, 211, 238, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.3)',
   },
   heroTitle: {
     fontSize: 32,
@@ -337,7 +338,6 @@ const styles = StyleSheet.create({
   },
   foreverText: {
     textDecorationLine: 'underline',
-    color: '#22d3ee',
     fontWeight: '600',
   },
   pricingSection: {
@@ -357,10 +357,8 @@ const styles = StyleSheet.create({
   priceMain: {
     fontSize: 64,
     fontWeight: '900',
-    color: '#22d3ee',
     marginBottom: 8,
     letterSpacing: -2,
-    textShadowColor: 'rgba(34, 211, 238, 0.3)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 20,
   },
@@ -395,12 +393,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   primaryButton: {
-    backgroundColor: '#22d3ee',
     borderRadius: 16,
     paddingVertical: 20,
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#22d3ee',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -436,7 +432,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   freeAccessButton: {
-    backgroundColor: '#22d3ee',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 24,

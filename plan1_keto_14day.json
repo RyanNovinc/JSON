@@ -1,0 +1,2406 @@
+{
+  "plan_name": "14-Day Ketogenic Meal Plan",
+  "description": "A comprehensive 14-day ketogenic meal plan targeting approximately 75% fat, 20% protein, and 5% carbohydrates at a 2000-calorie base. Built around whole-food fat sources: avocados, olive oil, butter, nuts, fatty fish, and cheese. All scalable ingredients use precise gram measurements for proportional calorie adjustment. Based on evidence from systematic reviews (Bueno et al., 2013; Paoli et al., 2023) and current ketogenic nutrition guidelines.",
+  "duration_days": 14,
+  "base_calories": 2000,
+  "macro_targets": {
+    "protein_pct": 20,
+    "carbs_pct": 5,
+    "fat_pct": 75,
+    "protein_g": 100,
+    "carbs_g": 25,
+    "fat_g": 167
+  },
+  "scaling_notes": "Scale all 'scalable: true' ingredients proportionally. For 2500cal, multiply by 1.25. Primary scaling levers: fat sources (olive oil, butter, nuts, avocado). Fixed items (spices, garnishes) stay constant.",
+  "weeks": [
+    {
+      "week_number": 1,
+      "days": [
+        {
+          "day_name": "Monday",
+          "day_number": 1,
+          "daily_totals": {
+            "calories": 2001,
+            "protein": 141.3,
+            "carbs": 15.0,
+            "fat": 152.0,
+            "fiber": 5.5
+          },
+          "meals": [
+            {
+              "meal_name": "Bacon & Cheese Scrambled Eggs",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 10,
+              "calories": 710,
+              "macros": {
+                "protein": 45.2,
+                "carbs": 3.2,
+                "fat": 56.6,
+                "fiber": 0.7
+              },
+              "ingredients": [
+                {
+                  "item": "Large eggs",
+                  "amount": "148",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bacon",
+                  "amount": "49",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cheddar cheese",
+                  "amount": "30",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "15",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "30",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Fry bacon until crispy, set aside.",
+                "Melt butter, scramble eggs with spinach.",
+                "Top with cheddar and crumbled bacon."
+              ]
+            },
+            {
+              "meal_name": "Chicken Caesar (No Croutons)",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 15,
+              "calories": 582,
+              "macros": {
+                "protein": 56.3,
+                "carbs": 3.5,
+                "fat": 37.3,
+                "fiber": 1.7
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken breast",
+                  "amount": "148",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Romaine",
+                  "amount": "79",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Parmesan",
+                  "amount": "25",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "25",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Grill seasoned chicken 6-7 min per side.",
+                "Chop romaine, toss with olive oil.",
+                "Slice chicken over salad, top with parmesan."
+              ]
+            },
+            {
+              "meal_name": "Pan-Seared Salmon with Buttered Broccoli",
+              "meal_type": "dinner",
+              "prep_time": 5,
+              "cook_time": 15,
+              "calories": 709,
+              "macros": {
+                "protein": 39.8,
+                "carbs": 8.3,
+                "fat": 58.1,
+                "fiber": 3.1
+              },
+              "ingredients": [
+                {
+                  "item": "Salmon fillet",
+                  "amount": "177",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Broccoli",
+                  "amount": "118",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "30",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Sear salmon in oil 4 min per side.",
+                "Steam broccoli, toss in melted butter.",
+                "Serve together."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Tuesday",
+          "day_number": 2,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 131.0,
+            "carbs": 33.9,
+            "fat": 152.8,
+            "fiber": 22.5
+          },
+          "meals": [
+            {
+              "meal_name": "Smoked Salmon Avocado Plate",
+              "meal_type": "breakfast",
+              "prep_time": 8,
+              "cook_time": 0,
+              "calories": 627,
+              "macros": {
+                "protein": 25.6,
+                "carbs": 12.7,
+                "fat": 54.5,
+                "fiber": 9.0
+              },
+              "ingredients": [
+                {
+                  "item": "Smoked salmon",
+                  "amount": "103",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "134",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cream cheese",
+                  "amount": "31",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Slice avocado and arrange with salmon.",
+                "Add cream cheese dollops.",
+                "Drizzle olive oil, season with pepper."
+              ]
+            },
+            {
+              "meal_name": "Tuna Stuffed Avocados",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 0,
+              "calories": 565,
+              "macros": {
+                "protein": 39.5,
+                "carbs": 15.2,
+                "fat": 40.8,
+                "fiber": 11.2
+              },
+              "ingredients": [
+                {
+                  "item": "Tuna (canned in oil)",
+                  "amount": "124",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "165",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "15",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Celery",
+                  "amount": "31",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Mix tuna with olive oil and diced celery.",
+                "Halve avocados, remove pits.",
+                "Fill generously with tuna mixture."
+              ]
+            },
+            {
+              "meal_name": "Creamy Spinach Chicken Thighs",
+              "meal_type": "dinner",
+              "prep_time": 5,
+              "cook_time": 25,
+              "calories": 808,
+              "macros": {
+                "protein": 65.9,
+                "carbs": 6.0,
+                "fat": 57.5,
+                "fiber": 2.3
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken thighs",
+                  "amount": "207",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "103",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "52",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Parmesan",
+                  "amount": "21",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "12",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Sear chicken in butter 5 min per side.",
+                "Wilt spinach in same pan.",
+                "Add cream and parmesan, simmer until thickened."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Wednesday",
+          "day_number": 3,
+          "daily_totals": {
+            "calories": 1999,
+            "protein": 121.2,
+            "carbs": 20.1,
+            "fat": 159.4,
+            "fiber": 8.9
+          },
+          "meals": [
+            {
+              "meal_name": "Mushroom & Mozzarella Omelette",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 8,
+              "calories": 479,
+              "macros": {
+                "protein": 33.2,
+                "carbs": 4.9,
+                "fat": 36.3,
+                "fiber": 0.8
+              },
+              "ingredients": [
+                {
+                  "item": "Large eggs",
+                  "amount": "152",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Mushrooms",
+                  "amount": "81",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Mozzarella",
+                  "amount": "41",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "18",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Saut\u00e9 mushrooms in half the butter.",
+                "Cook eggs as omelette in remaining butter.",
+                "Fill with mushrooms and mozzarella, fold."
+              ]
+            },
+            {
+              "meal_name": "Bacon Cheeseburger Bowl",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 15,
+              "calories": 807,
+              "macros": {
+                "protein": 48.7,
+                "carbs": 8.1,
+                "fat": 64.4,
+                "fiber": 5.4
+              },
+              "ingredients": [
+                {
+                  "item": "Ground beef 80/20",
+                  "amount": "152",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bacon",
+                  "amount": "35",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cheddar",
+                  "amount": "30",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Romaine",
+                  "amount": "61",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "61",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Brown ground beef, drain.",
+                "Cook bacon crispy.",
+                "Bowl: romaine, beef, bacon, avocado, cheddar."
+              ]
+            },
+            {
+              "meal_name": "Grilled Lamb with Green Beans",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 15,
+              "calories": 713,
+              "macros": {
+                "protein": 39.3,
+                "carbs": 7.1,
+                "fat": 58.7,
+                "fiber": 2.7
+              },
+              "ingredients": [
+                {
+                  "item": "Lamb chops",
+                  "amount": "152",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Green beans",
+                  "amount": "101",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "20",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "12",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Rub lamb with oil and herbs, grill 3-4 min per side.",
+                "Saut\u00e9 green beans in butter.",
+                "Rest lamb, serve together."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Thursday",
+          "day_number": 4,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 95.5,
+            "carbs": 34.4,
+            "fat": 171.6,
+            "fiber": 18.3
+          },
+          "meals": [
+            {
+              "meal_name": "Coconut Chia Pudding",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 0,
+              "calories": 825,
+              "macros": {
+                "protein": 11.9,
+                "carbs": 21.6,
+                "fat": 82.1,
+                "fiber": 12.9
+              },
+              "ingredients": [
+                {
+                  "item": "Coconut milk (canned)",
+                  "amount": "157",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Chia seeds",
+                  "amount": "29",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Pecans",
+                  "amount": "29",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "29",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "10",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Mix coconut milk with chia seeds, refrigerate overnight.",
+                "Stir in melted butter.",
+                "Top with cream and pecans."
+              ]
+            },
+            {
+              "meal_name": "Salmon with Buttered Asparagus",
+              "meal_type": "lunch",
+              "prep_time": 5,
+              "cook_time": 15,
+              "calories": 574,
+              "macros": {
+                "protein": 32.7,
+                "carbs": 4.6,
+                "fat": 47.5,
+                "fiber": 2.4
+              },
+              "ingredients": [
+                {
+                  "item": "Salmon fillet",
+                  "amount": "147",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Asparagus",
+                  "amount": "118",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "24",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "8",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Sear salmon skin-down in oil 4 min, flip 3 min.",
+                "Steam asparagus, toss in melted butter.",
+                "Serve together."
+              ]
+            },
+            {
+              "meal_name": "Beef & Broccoli Stir-Fry",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 12,
+              "calories": 601,
+              "macros": {
+                "protein": 50.9,
+                "carbs": 8.2,
+                "fat": 42.0,
+                "fiber": 3.0
+              },
+              "ingredients": [
+                {
+                  "item": "Sirloin, sliced",
+                  "amount": "176",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Broccoli",
+                  "amount": "118",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Coconut oil",
+                  "amount": "18",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil (sesame)",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Stir-fry beef strips in coconut oil 3 min.",
+                "Add broccoli, cook 5 min.",
+                "Finish with sesame oil."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Friday",
+          "day_number": 5,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 143.8,
+            "carbs": 24.4,
+            "fat": 148.1,
+            "fiber": 8.0
+          },
+          "meals": [
+            {
+              "meal_name": "Sausage Egg Cups",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 20,
+              "calories": 700,
+              "macros": {
+                "protein": 42.7,
+                "carbs": 3.3,
+                "fat": 56.2,
+                "fiber": 0.7
+              },
+              "ingredients": [
+                {
+                  "item": "Ground pork sausage",
+                  "amount": "114",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Large eggs",
+                  "amount": "114",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cheddar",
+                  "amount": "34",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bell pepper",
+                  "amount": "34",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "11",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Press sausage into greased muffin tins.",
+                "Add pepper, crack egg in each.",
+                "Top with cheddar, bake 180\u00b0C for 18 min."
+              ]
+            },
+            {
+              "meal_name": "Chicken Thigh Stir-Fry",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 12,
+              "calories": 606,
+              "macros": {
+                "protein": 48.6,
+                "carbs": 10.8,
+                "fat": 42.0,
+                "fiber": 3.9
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken thigh",
+                  "amount": "170",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Broccoli",
+                  "amount": "114",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Zucchini",
+                  "amount": "91",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Coconut oil",
+                  "amount": "23",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Stir-fry sliced chicken in coconut oil 5 min.",
+                "Add broccoli and zucchini 4-5 min.",
+                "Season with salt, pepper, soy sauce."
+              ]
+            },
+            {
+              "meal_name": "Baked Cod with Cheesy Cauliflower",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 20,
+              "calories": 694,
+              "macros": {
+                "protein": 52.5,
+                "carbs": 10.3,
+                "fat": 49.9,
+                "fiber": 3.4
+              },
+              "ingredients": [
+                {
+                  "item": "Cod fillet",
+                  "amount": "204",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cauliflower",
+                  "amount": "170",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cheddar",
+                  "amount": "45",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "45",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "20",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Bake cod at 190\u00b0C for 15 min.",
+                "Boil cauliflower, drain.",
+                "Melt butter+cream+cheddar, pour over cauliflower."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Saturday",
+          "day_number": 6,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 144.6,
+            "carbs": 19.1,
+            "fat": 150.1,
+            "fiber": 10.2
+          },
+          "meals": [
+            {
+              "meal_name": "Bulletproof Egg Muffins",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 15,
+              "calories": 556,
+              "macros": {
+                "protein": 18.5,
+                "carbs": 3.1,
+                "fat": 52.9,
+                "fiber": 1.0
+              },
+              "ingredients": [
+                {
+                  "item": "Large eggs",
+                  "amount": "131",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "22",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Coconut oil",
+                  "amount": "13",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "26",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "44",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Whisk eggs with spinach, bake in muffin tins at 180\u00b0C for 12 min.",
+                "Blend butter, coconut oil, cream into coffee.",
+                "Serve muffins with bulletproof coffee."
+              ]
+            },
+            {
+              "meal_name": "Keto Cobb Salad",
+              "meal_type": "lunch",
+              "prep_time": 15,
+              "cook_time": 10,
+              "calories": 739,
+              "macros": {
+                "protein": 56.8,
+                "carbs": 8.7,
+                "fat": 52.9,
+                "fiber": 5.9
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken breast",
+                  "amount": "105",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bacon",
+                  "amount": "31",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Eggs (boiled)",
+                  "amount": "87",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "70",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "17",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Romaine",
+                  "amount": "52",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Grill chicken, fry bacon, boil eggs.",
+                "Arrange in rows over romaine.",
+                "Drizzle olive oil."
+              ]
+            },
+            {
+              "meal_name": "Almond-Crusted Chicken Parmesan",
+              "meal_type": "dinner",
+              "prep_time": 15,
+              "cook_time": 20,
+              "calories": 705,
+              "macros": {
+                "protein": 69.3,
+                "carbs": 7.3,
+                "fat": 44.3,
+                "fiber": 3.3
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken breast",
+                  "amount": "157",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Almonds (flour)",
+                  "amount": "26",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Mozzarella",
+                  "amount": "35",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "16",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Parmesan",
+                  "amount": "13",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Coat chicken in almond flour + parmesan.",
+                "Pan-fry in olive oil 5 min per side.",
+                "Top with mozzarella, melt under broiler."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Sunday",
+          "day_number": 7,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 130.6,
+            "carbs": 31.1,
+            "fat": 153.4,
+            "fiber": 17.9
+          },
+          "meals": [
+            {
+              "meal_name": "Salmon Cream Cheese Rolls",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 0,
+              "calories": 691,
+              "macros": {
+                "protein": 31.3,
+                "carbs": 9.8,
+                "fat": 59.6,
+                "fiber": 5.7
+              },
+              "ingredients": [
+                {
+                  "item": "Smoked salmon",
+                  "amount": "127",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cream cheese",
+                  "amount": "63",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "85",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "8",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Spread cream cheese on salmon slices.",
+                "Add avocado strips.",
+                "Roll up, drizzle with olive oil."
+              ]
+            },
+            {
+              "meal_name": "Pork with Cauliflower Mash",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 20,
+              "calories": 638,
+              "macros": {
+                "protein": 45.0,
+                "carbs": 8.8,
+                "fat": 47.2,
+                "fiber": 3.2
+              },
+              "ingredients": [
+                {
+                  "item": "Pork loin",
+                  "amount": "158",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cauliflower",
+                  "amount": "158",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "26",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "32",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "8",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Sear pork in oil 4 min per side.",
+                "Boil cauliflower, mash with butter and cream.",
+                "Serve pork sliced over mash."
+              ]
+            },
+            {
+              "meal_name": "Grilled Steak with Avocado Salsa",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 12,
+              "calories": 671,
+              "macros": {
+                "protein": 54.3,
+                "carbs": 12.5,
+                "fat": 46.6,
+                "fiber": 9.0
+              },
+              "ingredients": [
+                {
+                  "item": "Sirloin steak",
+                  "amount": "190",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "127",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "13",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Tomato",
+                  "amount": "42",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Grill steak 3-4 min per side.",
+                "Mix diced avocado and tomato for salsa.",
+                "Rest steak, slice, top with salsa."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "week_number": 2,
+      "days": [
+        {
+          "day_name": "Monday",
+          "day_number": 8,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 117.9,
+            "carbs": 31.6,
+            "fat": 159.7,
+            "fiber": 19.8
+          },
+          "meals": [
+            {
+              "meal_name": "Bacon Avocado Bowl",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 10,
+              "calories": 703,
+              "macros": {
+                "protein": 34.4,
+                "carbs": 11.6,
+                "fat": 58.7,
+                "fiber": 8.0
+              },
+              "ingredients": [
+                {
+                  "item": "Bacon",
+                  "amount": "55",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "120",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Large eggs (fried)",
+                  "amount": "92",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "9",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Fry bacon until crispy.",
+                "Fry eggs in bacon fat.",
+                "Arrange in bowl with sliced avocado, drizzle oil."
+              ]
+            },
+            {
+              "meal_name": "Shrimp Avocado Salad",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 8,
+              "calories": 542,
+              "macros": {
+                "protein": 36.8,
+                "carbs": 12.1,
+                "fat": 41.1,
+                "fiber": 9.0
+              },
+              "ingredients": [
+                {
+                  "item": "Shrimp",
+                  "amount": "138",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "120",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "23",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "46",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Saut\u00e9 shrimp in half the oil 2-3 min per side.",
+                "Arrange spinach, sliced avocado.",
+                "Top with shrimp, drizzle remaining oil."
+              ]
+            },
+            {
+              "meal_name": "Butter Chicken with Cauliflower Rice",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 25,
+              "calories": 755,
+              "macros": {
+                "protein": 46.7,
+                "carbs": 7.9,
+                "fat": 59.9,
+                "fiber": 2.8
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken thigh",
+                  "amount": "166",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cauliflower (riced)",
+                  "amount": "138",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "26",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "37",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Coconut oil",
+                  "amount": "7",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Cook spiced chicken in coconut oil 8 min.",
+                "Add butter, cream, tomato paste. Simmer 10 min.",
+                "Saut\u00e9 riced cauliflower 5 min. Serve."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Tuesday",
+          "day_number": 9,
+          "daily_totals": {
+            "calories": 2001,
+            "protein": 125.4,
+            "carbs": 28.2,
+            "fat": 156.1,
+            "fiber": 10.4
+          },
+          "meals": [
+            {
+              "meal_name": "Almond Butter Fat Bombs & Eggs",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 8,
+              "calories": 683,
+              "macros": {
+                "protein": 26.6,
+                "carbs": 7.7,
+                "fat": 62.5,
+                "fiber": 3.7
+              },
+              "ingredients": [
+                {
+                  "item": "Almond butter",
+                  "amount": "35",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Coconut oil",
+                  "amount": "20",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Eggs (scrambled)",
+                  "amount": "152",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "10",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Mix almond butter with melted coconut oil, freeze in moulds.",
+                "Scramble eggs in butter.",
+                "Serve with 2-3 fat bombs."
+              ]
+            },
+            {
+              "meal_name": "Zucchini Beef Lasagna",
+              "meal_type": "lunch",
+              "prep_time": 15,
+              "cook_time": 25,
+              "calories": 661,
+              "macros": {
+                "protein": 39.3,
+                "carbs": 9.1,
+                "fat": 52.2,
+                "fiber": 2.0
+              },
+              "ingredients": [
+                {
+                  "item": "Zucchini",
+                  "amount": "203",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Ground beef",
+                  "amount": "122",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Mozzarella",
+                  "amount": "51",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cream cheese",
+                  "amount": "30",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "8",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Slice zucchini thin, salt and dry.",
+                "Brown beef in oil.",
+                "Layer zucchini, beef, cream cheese, mozzarella. Bake 190\u00b0C 20 min."
+              ]
+            },
+            {
+              "meal_name": "Pork with Bacon Brussels Sprouts",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 25,
+              "calories": 657,
+              "macros": {
+                "protein": 59.5,
+                "carbs": 11.4,
+                "fat": 41.4,
+                "fiber": 4.7
+              },
+              "ingredients": [
+                {
+                  "item": "Pork loin",
+                  "amount": "162",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Brussels sprouts",
+                  "amount": "122",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bacon",
+                  "amount": "35",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "15",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "8",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Sear pork in oil, finish in oven 190\u00b0C 15 min.",
+                "Fry bacon, saut\u00e9 sprouts in bacon fat.",
+                "Add butter, serve with sliced pork."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Wednesday",
+          "day_number": 10,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 142.1,
+            "carbs": 21.6,
+            "fat": 152.3,
+            "fiber": 7.2
+          },
+          "meals": [
+            {
+              "meal_name": "Greek-Style Baked Eggs",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 12,
+              "calories": 623,
+              "macros": {
+                "protein": 33.7,
+                "carbs": 4.1,
+                "fat": 52.4,
+                "fiber": 1.4
+              },
+              "ingredients": [
+                {
+                  "item": "Large eggs",
+                  "amount": "165",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "22",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "66",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Feta/cheddar",
+                  "amount": "44",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Heat oil, wilt spinach in an oven-safe pan.",
+                "Make wells, crack in eggs.",
+                "Top with cheese, bake at 190\u00b0C until set."
+              ]
+            },
+            {
+              "meal_name": "Chicken Walnut Lettuce Wraps",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 10,
+              "calories": 751,
+              "macros": {
+                "protein": 49.5,
+                "carbs": 8.3,
+                "fat": 59.4,
+                "fiber": 3.6
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken thigh",
+                  "amount": "165",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Walnuts",
+                  "amount": "33",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Romaine/butter lettuce",
+                  "amount": "66",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Coconut oil",
+                  "amount": "13",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Sour cream",
+                  "amount": "33",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Cook diced chicken in coconut oil 8 min.",
+                "Add walnuts, toss.",
+                "Spoon into lettuce cups, top with sour cream."
+              ]
+            },
+            {
+              "meal_name": "Garlic Shrimp Zucchini Noodles",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 12,
+              "calories": 626,
+              "macros": {
+                "protein": 58.9,
+                "carbs": 9.2,
+                "fat": 40.5,
+                "fiber": 2.2
+              },
+              "ingredients": [
+                {
+                  "item": "Shrimp",
+                  "amount": "198",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Zucchini (spiralized)",
+                  "amount": "220",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "44",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "22",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Parmesan",
+                  "amount": "20",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Saut\u00e9 shrimp in butter 2 min per side.",
+                "Add cream + parmesan sauce.",
+                "Toss in zucchini noodles 2 min."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Thursday",
+          "day_number": 11,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 116.6,
+            "carbs": 16.2,
+            "fat": 162.6,
+            "fiber": 7.9
+          },
+          "meals": [
+            {
+              "meal_name": "Ham Cheese Egg Wraps",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 8,
+              "calories": 588,
+              "macros": {
+                "protein": 40.5,
+                "carbs": 5.8,
+                "fat": 44.6,
+                "fiber": 3.5
+              },
+              "ingredients": [
+                {
+                  "item": "Large eggs",
+                  "amount": "133",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Ham",
+                  "amount": "53",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cheddar",
+                  "amount": "35",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "13",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "53",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Cook eggs as thin omelettes in butter.",
+                "Layer ham, cheese, avocado.",
+                "Roll up and slice."
+              ]
+            },
+            {
+              "meal_name": "Egg Salad with Bacon",
+              "meal_type": "lunch",
+              "prep_time": 15,
+              "cook_time": 12,
+              "calories": 670,
+              "macros": {
+                "protein": 38.1,
+                "carbs": 6.3,
+                "fat": 54.5,
+                "fiber": 3.5
+              },
+              "ingredients": [
+                {
+                  "item": "Eggs (boiled)",
+                  "amount": "177",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bacon",
+                  "amount": "40",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "13",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "53",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Chop boiled eggs, crumble bacon.",
+                "Mix with olive oil.",
+                "Serve over sliced avocado."
+              ]
+            },
+            {
+              "meal_name": "Keto Meatballs with Cheese Sauce",
+              "meal_type": "dinner",
+              "prep_time": 15,
+              "cook_time": 20,
+              "calories": 742,
+              "macros": {
+                "protein": 38.0,
+                "carbs": 4.1,
+                "fat": 63.5,
+                "fiber": 0.9
+              },
+              "ingredients": [
+                {
+                  "item": "Ground beef 80/20",
+                  "amount": "159",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cheddar",
+                  "amount": "35",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "31",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "11",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Zucchini",
+                  "amount": "88",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Form beef into meatballs, brown 10 min.",
+                "Make cheese sauce: butter + cream + cheddar.",
+                "Saut\u00e9 zucchini, serve with meatballs and sauce."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Friday",
+          "day_number": 12,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 142.0,
+            "carbs": 24.6,
+            "fat": 151.3,
+            "fiber": 13.6
+          },
+          "meals": [
+            {
+              "meal_name": "Keto Breakfast Platter",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 10,
+              "calories": 817,
+              "macros": {
+                "protein": 34.1,
+                "carbs": 13.0,
+                "fat": 72.0,
+                "fiber": 8.5
+              },
+              "ingredients": [
+                {
+                  "item": "Bacon",
+                  "amount": "49",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Soft-boiled eggs",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "97",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Macadamia nuts",
+                  "amount": "24",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Soft-boil eggs 6.5 min, peel.",
+                "Fry bacon crispy.",
+                "Arrange all on plate, drizzle oil over avocado."
+              ]
+            },
+            {
+              "meal_name": "Steak with Garlic Mushrooms",
+              "meal_type": "lunch",
+              "prep_time": 5,
+              "cook_time": 15,
+              "calories": 552,
+              "macros": {
+                "protein": 43.1,
+                "carbs": 3.9,
+                "fat": 41.5,
+                "fiber": 1.2
+              },
+              "ingredients": [
+                {
+                  "item": "Sirloin steak",
+                  "amount": "146",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Mushrooms",
+                  "amount": "117",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "24",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Sear steak in oil 3-4 min per side, rest.",
+                "Saut\u00e9 mushrooms in butter.",
+                "Slice steak, top with mushrooms."
+              ]
+            },
+            {
+              "meal_name": "Pesto Chicken with Asparagus",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 15,
+              "calories": 631,
+              "macros": {
+                "protein": 64.8,
+                "carbs": 7.7,
+                "fat": 37.8,
+                "fiber": 3.9
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken breast",
+                  "amount": "175",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Asparagus",
+                  "amount": "117",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "21",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Parmesan",
+                  "amount": "15",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Almonds (pine nuts)",
+                  "amount": "12",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Blend half oil + parmesan + nuts for pesto.",
+                "Grill pesto-coated chicken 6-7 min per side.",
+                "Grill asparagus, drizzle remaining oil."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Saturday",
+          "day_number": 13,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 110.3,
+            "carbs": 27.1,
+            "fat": 162.6,
+            "fiber": 12.4
+          },
+          "meals": [
+            {
+              "meal_name": "Spinach Feta Egg Bake",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 20,
+              "calories": 595,
+              "macros": {
+                "protein": 29.9,
+                "carbs": 5.1,
+                "fat": 50.6,
+                "fiber": 1.7
+              },
+              "ingredients": [
+                {
+                  "item": "Large eggs",
+                  "amount": "140",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "75",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Feta/cheddar",
+                  "amount": "37",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Heavy cream",
+                  "amount": "37",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "14",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Grease dish with butter, spread wilted spinach.",
+                "Whisk eggs with cream, pour over.",
+                "Top with cheese, bake 180\u00b0C for 18 min."
+              ]
+            },
+            {
+              "meal_name": "Keto Taco Bowl",
+              "meal_type": "lunch",
+              "prep_time": 10,
+              "cook_time": 12,
+              "calories": 669,
+              "macros": {
+                "protein": 34.0,
+                "carbs": 9.9,
+                "fat": 55.6,
+                "fiber": 6.1
+              },
+              "ingredients": [
+                {
+                  "item": "Ground beef 80/20",
+                  "amount": "140",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Sour cream",
+                  "amount": "37",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cheddar",
+                  "amount": "28",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "75",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Romaine",
+                  "amount": "47",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Brown beef with taco spices.",
+                "Bowl: romaine, beef, avocado, cheddar, sour cream."
+              ]
+            },
+            {
+              "meal_name": "Salmon Patties with Sour Cream",
+              "meal_type": "dinner",
+              "prep_time": 15,
+              "cook_time": 12,
+              "calories": 736,
+              "macros": {
+                "protein": 46.4,
+                "carbs": 12.1,
+                "fat": 56.4,
+                "fiber": 4.6
+              },
+              "ingredients": [
+                {
+                  "item": "Salmon (canned)",
+                  "amount": "168",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Almonds (flour)",
+                  "amount": "17",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Eggs",
+                  "amount": "47",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "17",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Sour cream",
+                  "amount": "37",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Green beans",
+                  "amount": "93",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Mix salmon, almond flour, egg. Form patties.",
+                "Fry in butter 3-4 min per side.",
+                "Steam green beans, serve with sour cream."
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Sunday",
+          "day_number": 14,
+          "daily_totals": {
+            "calories": 2000,
+            "protein": 112.4,
+            "carbs": 25.3,
+            "fat": 163.6,
+            "fiber": 9.6
+          },
+          "meals": [
+            {
+              "meal_name": "Keto Pancakes with Bacon",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 10,
+              "calories": 756,
+              "macros": {
+                "protein": 33.3,
+                "carbs": 6.6,
+                "fat": 66.9,
+                "fiber": 1.8
+              },
+              "ingredients": [
+                {
+                  "item": "Cream cheese",
+                  "amount": "51",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Large eggs",
+                  "amount": "85",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Almond butter",
+                  "amount": "17",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "17",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Bacon",
+                  "amount": "43",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Blend cream cheese, eggs, almond butter.",
+                "Cook small pancakes in butter.",
+                "Serve with crispy bacon."
+              ]
+            },
+            {
+              "meal_name": "Salmon Kale Macadamia Bowl",
+              "meal_type": "lunch",
+              "prep_time": 5,
+              "cook_time": 15,
+              "calories": 574,
+              "macros": {
+                "protein": 30.4,
+                "carbs": 8.4,
+                "fat": 47.8,
+                "fiber": 3.9
+              },
+              "ingredients": [
+                {
+                  "item": "Salmon fillet",
+                  "amount": "128",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Kale",
+                  "amount": "68",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "17",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Macadamia nuts",
+                  "amount": "17",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Grill salmon 4-5 min per side.",
+                "Massage kale with half the oil.",
+                "Top with salmon, macadamias, remaining oil."
+              ]
+            },
+            {
+              "meal_name": "Roast Chicken Thighs with Buttered Veg",
+              "meal_type": "dinner",
+              "prep_time": 10,
+              "cook_time": 30,
+              "calories": 670,
+              "macros": {
+                "protein": 48.7,
+                "carbs": 10.3,
+                "fat": 48.9,
+                "fiber": 3.9
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken thighs (bone-in)",
+                  "amount": "171",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Broccoli",
+                  "amount": "85",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Cauliflower",
+                  "amount": "85",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Butter",
+                  "amount": "24",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Olive oil",
+                  "amount": "10",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Rub chicken with oil, salt, pepper. Roast 200\u00b0C 25-30 min.",
+                "Steam broccoli and cauliflower.",
+                "Toss veg in melted butter, serve with chicken."
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

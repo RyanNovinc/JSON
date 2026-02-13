@@ -3,13 +3,15 @@ import {
   Modal,
   View,
   Text,
-  TouchableOpacity,
+  
   ScrollView,
   StyleSheet,
   Animated,
   Dimensions,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,6 +24,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
   visible, 
   onClose 
 }) => {
+  const { themeColor } = useTheme();
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(height)).current;
@@ -91,7 +94,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Ionicons name="document-text" size={24} color="#22d3ee" />
+              <Ionicons name="document-text" size={24} color={themeColor} />
               <Text style={styles.headerTitle}>Terms of Service</Text>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>

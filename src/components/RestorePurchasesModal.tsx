@@ -3,7 +3,7 @@ import {
   View,
   Text,
   Modal,
-  TouchableOpacity,
+  
   StyleSheet,
   Alert,
   ActivityIndicator,
@@ -11,7 +11,9 @@ import {
   Dimensions,
   Platform
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -24,6 +26,7 @@ const RestorePurchasesModal: React.FC<RestorePurchasesModalProps> = ({
   visible, 
   onClose 
 }) => {
+  const { themeColor } = useTheme();
   const [isRestoring, setIsRestoring] = useState(false);
   
   // Animation values
@@ -145,7 +148,7 @@ const RestorePurchasesModal: React.FC<RestorePurchasesModalProps> = ({
               {/* Header */}
               <View style={styles.header}>
                 <View style={styles.iconContainer}>
-                  <Ionicons name="refresh-circle" size={32} color="#22d3ee" />
+                  <Ionicons name="refresh-circle" size={32} color={themeColor} />
                 </View>
                 <Text style={styles.title}>Restore Purchases</Text>
                 <TouchableOpacity 
@@ -163,6 +166,7 @@ const RestorePurchasesModal: React.FC<RestorePurchasesModalProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.restoreButton,
+                    { backgroundColor: themeColor },
                     isRestoring && styles.restoreButtonDisabled
                   ]}
                   onPress={handleRestorePurchases}
@@ -265,16 +269,13 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: 'row',
-    backgroundColor: '#22d3ee10',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#22d3ee20',
   },
   infoText: {
     flex: 1,
     fontSize: 14,
-    color: '#22d3ee',
     marginLeft: 12,
     lineHeight: 18,
   },
@@ -284,7 +285,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   restoreButton: {
-    backgroundColor: '#22d3ee',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

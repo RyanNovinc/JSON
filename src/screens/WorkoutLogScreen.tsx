@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -13,14 +12,17 @@ import {
   Animated,
   Modal,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { WorkoutStorage, WorkoutHistory } from '../utils/storage';
+import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
 import { TimerNotifications, SOUND_OPTIONS, TimerSettings } from '../utils/timerNotifications';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useWeightUnit } from '../contexts/WeightUnitContext';
 
 // Parse rep scheme into structured format
 function parseRepScheme(reps: string): { type: 'weekly' | 'pyramid' | 'straight', values: string[] } {
@@ -84,6 +86,7 @@ interface DropSet {
   weight: string;
   reps: string;
   completed?: boolean;
+  unit?: 'kg' | 'lbs'; // Store unit for completed drop sets
 }
 
 interface SetData {
@@ -93,6 +96,7 @@ interface SetData {
   reps: string;
   completed: boolean;
   selectedExerciseIndex: number; // 0 = primary, 1+ = alternatives
+  unit?: 'kg' | 'lbs'; // Store unit for completed sets
   // Store data for each exercise variant separately
   exerciseData?: {
     [exerciseIndex: number]: {
@@ -124,9 +128,15 @@ interface ExerciseCardProps {
   onHistoryPress: (exerciseName: string) => void;
   onExerciseSelect: (exerciseIndex: number, selectedExerciseIndex: number) => void;
   onNotesPress: (exerciseIndex: number, exerciseName: string) => void;
+  onSetExercisePreference: (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => void;
+  exercisePreferences: { [exerciseName: string]: string };
   onInteractionAttempt?: () => void;
   isLinkedToNext?: boolean;
   isLinkedToPrev?: boolean;
+  themeColor: string;
+  getExerciseUnit: (exerciseIndex: number) => 'kg' | 'lbs';
+  setExerciseUnit: (exerciseIndex: number, unit: 'kg' | 'lbs') => void;
+  setGlobalUnit: (unit: 'kg' | 'lbs') => void;
 }
 
 function ExerciseCard({ 
@@ -142,13 +152,21 @@ function ExerciseCard({
   onHistoryPress,
   onExerciseSelect,
   onNotesPress,
+  onSetExercisePreference,
+  exercisePreferences,
   onInteractionAttempt,
   isLinkedToNext,
-  isLinkedToPrev
+  isLinkedToPrev,
+  themeColor,
+  getExerciseUnit,
+  setExerciseUnit,
+  setGlobalUnit
 }: ExerciseCardProps) {
   
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
   const [expandedDropSets, setExpandedDropSets] = useState<Set<number>>(new Set());
+  
+  const currentUnit = getExerciseUnit(exerciseIndex);
   
   // Use weekly reps if available, otherwise fall back to regular reps
   const targetReps = exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps;
@@ -273,38 +291,45 @@ function ExerciseCard({
   return (
     <View style={[
       styles.exerciseCard,
-      (isLinkedToNext || isLinkedToPrev) && styles.exerciseCardLinked
+      (isLinkedToNext || isLinkedToPrev) && [styles.exerciseCardLinked, { borderColor: themeColor, shadowColor: themeColor }]
     ]}>
       <View style={styles.exerciseHeader}>
-        <TouchableOpacity 
-          style={styles.exerciseNameContainer}
-          onPress={() => allExercises.length > 1 && setShowExerciseSelector(!showExerciseSelector)}
-          activeOpacity={allExercises.length > 1 ? 0.7 : 1}
-        >
-          <Text style={styles.exerciseName}>{currentExerciseName}</Text>
-          {allExercises.length > 1 && (
-            <Ionicons 
-              name={showExerciseSelector ? "chevron-up" : "chevron-down"} 
-              size={18} 
-              color="#22d3ee" 
-              style={styles.dropdownIcon}
-            />
-          )}
-        </TouchableOpacity>
+        {/* Left side - Exercise name and dropdown */}
+        <View style={styles.exerciseNameSection}>
+          <TouchableOpacity 
+            style={styles.exerciseNameButton}
+            onPress={() => allExercises.length > 1 && setShowExerciseSelector(!showExerciseSelector)}
+            activeOpacity={allExercises.length > 1 ? 0.7 : 1}
+          >
+            <Text style={styles.exerciseName} numberOfLines={2}>
+              {currentExerciseName}{allExercises.length > 1 && ' *'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Right side - Action buttons */}
         <View style={styles.headerButtons}>
           <TouchableOpacity 
-            style={styles.historyButton}
+            style={styles.unitToggleButton}
+            onPress={() => setExerciseUnit(exerciseIndex, currentUnit === 'kg' ? 'lbs' : 'kg')}
+            onLongPress={() => setGlobalUnit(currentUnit === 'kg' ? 'lbs' : 'kg')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.unitToggleText, { color: themeColor }]}>{currentUnit}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
             onPress={() => onNotesPress(exerciseIndex, currentExerciseName)}
             activeOpacity={0.7}
           >
-            <Ionicons name={notes ? "document-text" : "document-text-outline"} size={20} color="#22d3ee" />
+            <Ionicons name={notes ? "document-text" : "document-text-outline"} size={18} color={themeColor} />
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.historyButton}
+            style={styles.actionButton}
             onPress={() => onHistoryPress(currentExerciseName)}
             activeOpacity={0.7}
           >
-            <Ionicons name="time-outline" size={20} color="#22d3ee" />
+            <Ionicons name="time-outline" size={18} color={themeColor} />
           </TouchableOpacity>
         </View>
       </View>
@@ -316,38 +341,51 @@ function ExerciseCard({
               key={index}
               style={[
                 styles.exerciseOption,
-                index === selectedIndex && styles.exerciseOptionSelected,
+                index === selectedIndex && [styles.exerciseOptionSelected, { backgroundColor: themeColor + '20' }],
                 index === allExercises.length - 1 && styles.exerciseOptionLast
               ]}
               onPress={() => {
                 onExerciseSelect(exerciseIndex, index);
                 setShowExerciseSelector(false);
               }}
+              onLongPress={() => {
+                onSetExercisePreference(exerciseIndex, exercise.exercise, exercise.alternatives || [], exerciseName);
+                setShowExerciseSelector(false);
+              }}
               activeOpacity={0.7}
             >
               <View style={styles.exerciseOptionTextContainer}>
-                {index === 0 && (
-                  <Ionicons 
-                    name="star" 
-                    size={14} 
-                    color={index === selectedIndex ? "#22d3ee" : "#71717a"} 
-                    style={styles.primaryIcon}
-                  />
-                )}
+                {(() => {
+                  // Show star for preferred exercise if set, otherwise show for primary (index 0)
+                  const preferredExercise = exercisePreferences[exercise.exercise];
+                  const showStar = preferredExercise ? exerciseName === preferredExercise : index === 0;
+                  
+                  return showStar ? (
+                    <Ionicons 
+                      name="star" 
+                      size={14} 
+                      color={index === selectedIndex ? themeColor : "#71717a"} 
+                      style={styles.primaryIcon}
+                    />
+                  ) : null;
+                })()}
                 <Text style={[
                   styles.exerciseOptionText,
-                  index === selectedIndex && styles.exerciseOptionTextSelected
+                  index === selectedIndex && [styles.exerciseOptionTextSelected, { color: themeColor }]
                 ]}>
                   {exerciseName}
                 </Text>
               </View>
               {index === selectedIndex && (
-                <Ionicons name="checkmark" size={16} color="#22d3ee" />
+                <Ionicons name="checkmark" size={16} color={themeColor} />
               )}
             </TouchableOpacity>
           ))}
         </View>
       )}
+      
+      {/* Separator line */}
+      <View style={styles.headerSeparator} />
       
       <View style={styles.setsContainer}>
         {setsData.map((setData, setIndex) => (
@@ -360,30 +398,33 @@ function ExerciseCard({
             >
               <Text style={styles.setNumber}>{setIndex + 1}</Text>
               
-              <TextInput
-                style={[
-                  styles.input, 
-                  styles.weightInput,
-                  !workoutStarted && styles.inputDisabled
-                ]}
-                value={setData.weight}
-                onChangeText={(value) => {
-                  if (!workoutStarted) {
-                    onInteractionAttempt && onInteractionAttempt();
-                    return;
-                  }
-                  onSetUpdate(exerciseIndex, setIndex, 'weight', value);
-                }}
-                onFocus={() => {
-                  if (!workoutStarted) {
-                    onInteractionAttempt && onInteractionAttempt();
-                  }
-                }}
-                placeholder={exercise.previous?.weight.toString() || '0'}
-                placeholderTextColor="#52525b"
-                keyboardType="decimal-pad"
-                editable={!setData.completed}
-              />
+              <View style={styles.weightInputContainer}>
+                <TextInput
+                  style={[
+                    styles.input, 
+                    styles.weightInput,
+                    !workoutStarted && styles.inputDisabled
+                  ]}
+                  value={setData.weight}
+                  onChangeText={(value) => {
+                    if (!workoutStarted) {
+                      onInteractionAttempt && onInteractionAttempt();
+                      return;
+                    }
+                    onSetUpdate(exerciseIndex, setIndex, 'weight', value);
+                  }}
+                  onFocus={() => {
+                    if (!workoutStarted) {
+                      onInteractionAttempt && onInteractionAttempt();
+                    }
+                  }}
+                  placeholder={exercise.previous?.weight.toString() || '0'}
+                  placeholderTextColor="#52525b"
+                  keyboardType="decimal-pad"
+                  editable={!setData.completed}
+                />
+                <Text style={styles.unitLabel}>{setData.completed && setData.unit ? setData.unit : currentUnit}</Text>
+              </View>
               
               <Text style={styles.separator}>×</Text>
               
@@ -430,7 +471,7 @@ function ExerciseCard({
                 <Ionicons 
                   name={setData.completed ? "checkmark-circle" : "checkmark-circle-outline"} 
                   size={24} 
-                  color={setData.completed ? "#22c55e" : (!setData.weight || !setData.reps) ? "#52525b" : "#22d3ee"}
+                  color={setData.completed ? "#22c55e" : (!setData.weight || !setData.reps) ? "#52525b" : themeColor}
                 />
               </TouchableOpacity>
               
@@ -447,7 +488,7 @@ function ExerciseCard({
               >
                 <Text style={[
                   styles.dropSetButtonText,
-                  setData.isDropSet && styles.dropSetButtonActive
+                  setData.isDropSet && [styles.dropSetButtonActive, { color: themeColor }]
                 ]}>
                   DROP
                 </Text>
@@ -467,18 +508,21 @@ function ExerciseCard({
                         <Ionicons name="close-circle" size={18} color="#52525b" />
                       </TouchableOpacity>
                     )}
-                    <View style={styles.dropRow}>
+                    <View style={[styles.dropRow, { borderLeftColor: themeColor }]}>
                       <Text style={styles.dropLabel}>Drop {dropIndex + 1}</Text>
                       
-                      <TextInput
-                        style={[styles.input, styles.dropWeightInput]}
-                        value={drop.weight}
-                        onChangeText={(value) => updateDropSet(setIndex, dropIndex, 'weight', value)}
-                        placeholder={getDropSuggestion(setIndex, dropIndex, 'weight')}
-                        placeholderTextColor="#52525b"
-                        keyboardType="decimal-pad"
-                        editable={!drop.completed}
-                      />
+                      <View style={styles.dropWeightInputContainer}>
+                        <TextInput
+                          style={[styles.input, styles.dropWeightInput]}
+                          value={drop.weight}
+                          onChangeText={(value) => updateDropSet(setIndex, dropIndex, 'weight', value)}
+                          placeholder={getDropSuggestion(setIndex, dropIndex, 'weight')}
+                          placeholderTextColor="#52525b"
+                          keyboardType="decimal-pad"
+                          editable={!drop.completed}
+                        />
+                        <Text style={styles.unitLabel}>{drop.completed && drop.unit ? drop.unit : currentUnit}</Text>
+                      </View>
                       
                       <Text style={styles.separator}>×</Text>
                       
@@ -505,7 +549,7 @@ function ExerciseCard({
                           <Ionicons 
                             name={drop.completed ? "checkmark-circle" : "checkmark-circle-outline"} 
                             size={20} 
-                            color={drop.completed ? "#22c55e" : (!drop.weight || !drop.reps) ? "#52525b" : "#22d3ee"}
+                            color={drop.completed ? "#22c55e" : (!drop.weight || !drop.reps) ? "#52525b" : themeColor}
                           />
                         </TouchableOpacity>
                       ) : (
@@ -521,8 +565,8 @@ function ExerciseCard({
                     style={styles.addDropButton}
                     onPress={() => addDropSet(setIndex)}
                   >
-                    <Ionicons name="add-circle-outline" size={20} color="#22d3ee" />
-                    <Text style={styles.addDropText}>Add Drop</Text>
+                    <Ionicons name="add-circle-outline" size={20} color={themeColor} />
+                    <Text style={[styles.addDropText, { color: themeColor }]}>Add Drop</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -537,7 +581,9 @@ function ExerciseCard({
 export default function WorkoutLogScreen() {
   const navigation = useNavigation<WorkoutLogScreenNavigationProp>();
   const route = useRoute<WorkoutLogScreenRouteProp>();
-  const { day, blockName, currentWeek: passedWeek } = route.params;
+  const { themeColor } = useTheme();
+  const { globalUnit, getExerciseUnit, setExerciseUnit, setGlobalUnit, formatWeight, convertWeight } = useWeightUnit();
+  const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
   const { setActiveWorkout } = useActiveWorkout();
   
   // Calculate currentWeek - use passed week or get from storage
@@ -566,10 +612,20 @@ export default function WorkoutLogScreen() {
   const [timerSettings, setTimerSettings] = useState<TimerSettings>(TimerNotifications.defaultSettings);
   const [timerMinimized, setTimerMinimized] = useState(true); // Start minimized by default
   
+  // Exercise preference states
+  const [showPreferenceDialog, setShowPreferenceDialog] = useState<{
+    exerciseIndex: number;
+    primaryExercise: string;
+    alternatives: string[];
+    selectedAlternative: string;
+  } | null>(null);
+  const [exercisePreferences, setExercisePreferences] = useState<{ [exerciseName: string]: string }>({});
+  const [preferenceModalScale] = useState(new Animated.Value(0));
+  const [preferenceModalOpacity] = useState(new Animated.Value(0));
+  
   // Workout session timer
   const [workoutStartTime, setWorkoutStartTime] = useState<Date | null>(null);
   const [workoutDuration, setWorkoutDuration] = useState(0); // in seconds
-  const [workoutInterval, setWorkoutInterval] = useState<NodeJS.Timeout | null>(null);
   
   // Workout start requirement state
   const [interactionAttempts, setInteractionAttempts] = useState(0);
@@ -630,6 +686,56 @@ export default function WorkoutLogScreen() {
       setExerciseNotes(initialNotes);
     }
   }, [day]);
+
+  // Update exercise selections based on preferences
+  useEffect(() => {
+    if (Object.keys(exercisePreferences).length > 0 && allSetsData.length > 0) {
+      const updatedData = allSetsData.map((exerciseSets, exerciseIndex) => {
+        const exercise = day.exercises[exerciseIndex];
+        const preferredExercise = exercisePreferences[exercise.exercise];
+        
+        if (preferredExercise && exercise.alternatives) {
+          const allExercises = [exercise.exercise, ...exercise.alternatives];
+          const preferredIndex = allExercises.indexOf(preferredExercise);
+          
+          if (preferredIndex !== -1) {
+            // Update all sets for this exercise to use the preferred exercise
+            return exerciseSets.map(setData => ({
+              ...setData,
+              selectedExerciseIndex: preferredIndex
+            }));
+          }
+        }
+        return exerciseSets;
+      });
+      
+      setAllSetsData(updatedData);
+    }
+  }, [exercisePreferences, day.exercises]);
+  
+  // Workout duration timer - updates based on start time instead of setInterval
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (workoutStartTime) {
+      // Update duration every second based on elapsed time
+      const updateDuration = () => {
+        const now = Date.now();
+        const elapsed = Math.floor((now - workoutStartTime.getTime()) / 1000);
+        setWorkoutDuration(elapsed);
+      };
+      
+      // Update immediately
+      updateDuration();
+      
+      // Then update every second
+      interval = setInterval(updateDuration, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [workoutStartTime]);
   
   // Timer countdown effect - handles both countdown and stopwatch
   useEffect(() => {
@@ -728,8 +834,13 @@ export default function WorkoutLogScreen() {
     const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
     console.log('Saving set to history with date:', currentDate);
     
-    // Use the exercise name directly from setData since it's now properly updated
-    const currentExerciseName = setData.exercise;
+    // Get the current exercise name based on selected exercise index
+    const exercise = day.exercises[exerciseIndex];
+    const allExercises = [exercise.exercise, ...(exercise.alternatives || [])];
+    const selectedIndex = setData.selectedExerciseIndex || 0;
+    const currentExerciseName = allExercises[selectedIndex] || exercise.exercise;
+    
+    console.log('Saving set for exercise:', currentExerciseName, 'weight:', setData.weight, 'reps:', setData.reps, 'unit:', getExerciseUnit(exerciseIndex));
     
     // Load existing history
     const history = await WorkoutStorage.loadWorkoutHistory();
@@ -741,15 +852,18 @@ export default function WorkoutLogScreen() {
       entry.dayName === day.day_name
     );
     
+    const currentUnit = getExerciseUnit(exerciseIndex);
     const newSet = {
       setNumber: setData.setNumber,
       weight: setData.weight,
       reps: setData.reps,
       completed: setData.completed,
+      unit: currentUnit,
       drops: setData.isDropSet && setData.drops ? setData.drops.map(drop => ({
         weight: drop.weight,
         reps: drop.reps,
         completed: drop.completed || false,
+        unit: currentUnit,
       })) : undefined,
     };
     
@@ -783,16 +897,47 @@ export default function WorkoutLogScreen() {
     
     // Save updated history
     await WorkoutStorage.saveWorkoutHistory(history);
+    console.log('Set saved to history successfully:', {
+      exercise: currentExerciseName,
+      setNumber: setData.setNumber,
+      weight: setData.weight,
+      reps: setData.reps,
+      unit: currentUnit
+    });
   };
   
   const handleSetComplete = async (exerciseIndex: number, setIndex: number) => {
     const newData = [...allSetsData];
     const wasCompleted = newData[exerciseIndex][setIndex].completed;
     newData[exerciseIndex][setIndex].completed = !wasCompleted;
+    
+    // When completing a set, store the current unit so it doesn't change later
+    if (!wasCompleted) {
+      newData[exerciseIndex][setIndex].unit = getExerciseUnit(exerciseIndex);
+    }
+    
     setAllSetsData(newData);
     
-    // Don't save to history here - it will be saved when workout is finished
-    // This prevents duplicate entries
+    console.log('Set completion toggled:', {
+      exerciseIndex,
+      setIndex,
+      wasCompleted,
+      nowCompleted: !wasCompleted,
+      weight: newData[exerciseIndex][setIndex].weight,
+      reps: newData[exerciseIndex][setIndex].reps
+    });
+    
+    // Save to history immediately when set is completed
+    if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
+      console.log('Attempting to save set to history...');
+      await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
+    } else {
+      console.log('Set not saved to history:', {
+        wasAlreadyCompleted: wasCompleted,
+        hasWeight: !!newData[exerciseIndex][setIndex].weight,
+        hasReps: !!newData[exerciseIndex][setIndex].reps
+      });
+    }
     
     // Start rest timer when completing a set (not when uncompleting)
     const isLinkedToNext = supersetLinks.has(exerciseIndex);
@@ -875,6 +1020,12 @@ export default function WorkoutLogScreen() {
     if (newData[exerciseIndex][setIndex].drops && newData[exerciseIndex][setIndex].drops[dropIndex]) {
       const wasCompleted = newData[exerciseIndex][setIndex].drops[dropIndex].completed;
       newData[exerciseIndex][setIndex].drops[dropIndex].completed = !wasCompleted;
+      
+      // When completing a drop set, store the current unit so it doesn't change later
+      if (!wasCompleted) {
+        newData[exerciseIndex][setIndex].drops[dropIndex].unit = getExerciseUnit(exerciseIndex);
+      }
+      
       setAllSetsData(newData);
       
       // No rest timer for drop sets - they're done immediately one after another
@@ -895,6 +1046,116 @@ export default function WorkoutLogScreen() {
       seconds: Math.abs(displayTime) % 60,
       isOvertime: false  // No overtime concept for stopwatch
     };
+  };
+
+  // Function to handle setting exercise preference
+  const handleSetExercisePreference = (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => {
+    setShowPreferenceDialog({
+      exerciseIndex,
+      primaryExercise,
+      alternatives,
+      selectedAlternative
+    });
+    
+    // Animate modal entrance
+    preferenceModalScale.setValue(0.7);
+    preferenceModalOpacity.setValue(0);
+    
+    Animated.parallel([
+      Animated.spring(preferenceModalScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+      Animated.timing(preferenceModalOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Function to load exercise preferences for this block
+  const loadExercisePreferences = async () => {
+    if (!routineName) return;
+    
+    const prefs: { [exerciseName: string]: string } = {};
+    
+    // Load preferences for each exercise in the day
+    for (const exercise of day.exercises) {
+      const preferredExercise = await WorkoutStorage.getExercisePreference(
+        routineName, 
+        blockName, 
+        exercise.exercise
+      );
+      if (preferredExercise) {
+        prefs[exercise.exercise] = preferredExercise;
+      }
+    }
+    
+    setExercisePreferences(prefs);
+  };
+
+  // Function to confirm exercise preference setting
+  const confirmExercisePreference = async () => {
+    if (!showPreferenceDialog || !routineName) return;
+
+    const preference: ExercisePreference = {
+      programId: routineName,
+      blockName,
+      primaryExercise: showPreferenceDialog.primaryExercise,
+      preferredExercise: showPreferenceDialog.selectedAlternative
+    };
+
+    await WorkoutStorage.saveExercisePreference(preference);
+
+    // Update local preferences state
+    setExercisePreferences(prev => ({
+      ...prev,
+      [showPreferenceDialog.primaryExercise]: showPreferenceDialog.selectedAlternative
+    }));
+
+    // Update the current exercise selection
+    const allExercises = [showPreferenceDialog.primaryExercise, ...showPreferenceDialog.alternatives];
+    const selectedIndex = allExercises.indexOf(showPreferenceDialog.selectedAlternative);
+    handleExerciseSelect(showPreferenceDialog.exerciseIndex, selectedIndex);
+
+    // Animate modal exit
+    Animated.parallel([
+      Animated.spring(preferenceModalScale, {
+        toValue: 0.7,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+      Animated.timing(preferenceModalOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowPreferenceDialog(null);
+    });
+  };
+
+  // Function to cancel preference dialog with animation
+  const cancelExercisePreference = () => {
+    Animated.parallel([
+      Animated.spring(preferenceModalScale, {
+        toValue: 0.7,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+      Animated.timing(preferenceModalOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowPreferenceDialog(null);
+    });
   };
   
   const handleExerciseSelect = (exerciseIndex: number, selectedExerciseIndex: number) => {
@@ -986,12 +1247,7 @@ export default function WorkoutLogScreen() {
     setWorkoutDuration(0);
     setInteractionAttempts(0); // Reset attempts
     
-    // Start the workout timer
-    const interval = setInterval(() => {
-      setWorkoutDuration(prev => prev + 1);
-    }, 1000);
-    setWorkoutInterval(interval);
-    
+    // Duration will be automatically calculated by the useEffect based on start time
     // Context will be updated by useEffect below
   };
 
@@ -1020,18 +1276,20 @@ export default function WorkoutLogScreen() {
         if (setData.completed && setData.weight && setData.reps) {
           completedSets++;
           exerciseHasCompletedSets = true;
-          // Calculate volume: weight × reps
+          // Calculate volume: weight × reps (convert all weights to kg for consistent volume calculation)
           const weight = parseFloat(setData.weight) || 0;
+          const weightInKg = convertWeight(weight, getExerciseUnit(exerciseIndex), 'kg');
           const reps = parseInt(setData.reps) || 0;
-          totalVolume += weight * reps;
+          totalVolume += weightInKg * reps;
           
           // Add drop sets to volume calculation (only completed ones)
           if (setData.isDropSet && setData.drops) {
             setData.drops.forEach(drop => {
               if (drop.completed && drop.weight && drop.reps) {
                 const dropWeight = parseFloat(drop.weight) || 0;
+                const dropWeightInKg = convertWeight(dropWeight, getExerciseUnit(exerciseIndex), 'kg');
                 const dropReps = parseInt(drop.reps) || 0;
-                totalVolume += dropWeight * dropReps;
+                totalVolume += dropWeightInKg * dropReps;
               }
             });
           }
@@ -1055,6 +1313,7 @@ export default function WorkoutLogScreen() {
     };
   };
   
+
   const handleFinishWorkout = () => {
     const stats = calculateWorkoutStats();
     setWorkoutStats(stats);
@@ -1067,11 +1326,8 @@ export default function WorkoutLogScreen() {
       console.log('blockName:', blockName);
       console.log('day.day_name:', day.day_name);
       
-      // Clear workout timer
-      if (workoutInterval) {
-        clearInterval(workoutInterval);
-        setWorkoutInterval(null);
-      }
+      // Clear workout timer by resetting start time
+      setWorkoutStartTime(null);
       
       // Clear active workout from context
       setActiveWorkout(null);
@@ -1104,7 +1360,7 @@ export default function WorkoutLogScreen() {
       await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
       console.log('Saved completion stats for key:', statsKey);
       
-      await saveWorkoutToHistory();
+      // Sets are now saved immediately when completed, so no need to save them again here
       await WorkoutStorage.clearCurrentWorkout(day.day_name, blockName); // Clear any saved progress
       
       console.log('Navigation back to DaysScreen...');
@@ -1215,18 +1471,14 @@ export default function WorkoutLogScreen() {
     }
   }, [allSetsData, exerciseNotes, workoutStartTime, workoutDuration]);
 
-  // Cleanup workout timer on unmount
-  useEffect(() => {
-    return () => {
-      if (workoutInterval) {
-        clearInterval(workoutInterval);
-      }
-    };
-  }, [workoutInterval]);
+  // No cleanup needed - timer is based on workoutStartTime
 
   // Load saved progress and timer settings on mount
   useEffect(() => {
     const loadSavedData = async () => {
+      // Load exercise preferences
+      await loadExercisePreferences();
+      
       // Load workout progress
       const savedWorkout = await WorkoutStorage.loadCurrentWorkout(day.day_name, blockName);
       if (savedWorkout && 
@@ -1242,23 +1494,7 @@ export default function WorkoutLogScreen() {
           const startTime = new Date(savedWorkout.workoutStartTime);
           setWorkoutStartTime(startTime);
           
-          // Calculate elapsed time since the workout was saved
-          const now = Date.now();
-          const savedAt = savedWorkout.savedAt || now;
-          const elapsedSinceSave = Math.floor((now - savedAt) / 1000);
-          const totalElapsed = savedWorkout.workoutDuration + elapsedSinceSave;
-          setWorkoutDuration(totalElapsed);
-          
-          // Start the timer again
-          const interval = setInterval(() => {
-            setWorkoutDuration(prev => {
-              const newDuration = prev + 1;
-              // Duration updates will be handled by the effect below
-              return newDuration;
-            });
-          }, 1000);
-          setWorkoutInterval(interval);
-          
+          // Duration will be automatically calculated by the useEffect based on start time
           // Context will be updated by useEffect below
         }
       }
@@ -1337,9 +1573,9 @@ export default function WorkoutLogScreen() {
                           {set.setNumber}
                         </Text>
                         <Text style={styles.historySetData}>
-                          {set.weight}kg × {set.reps}
+                          {set.weight}{set.unit || globalUnit} × {set.reps}
                           {set.drops && set.drops.length > 0 && (
-                            <Text style={styles.dropIndicator}> + {set.drops.length} drops</Text>
+                            <Text style={[styles.dropIndicator, { color: themeColor }]}> + {set.drops.length} drops</Text>
                           )}
                         </Text>
                       </View>
@@ -1351,7 +1587,7 @@ export default function WorkoutLogScreen() {
                                 Drop {dropIndex + 1}
                               </Text>
                               <Text style={styles.historyDropData}>
-                                {drop.weight}kg × {drop.reps}
+                                {drop.weight}{drop.unit || globalUnit} × {drop.reps}
                               </Text>
                             </View>
                           ))}
@@ -1405,6 +1641,34 @@ export default function WorkoutLogScreen() {
                 <Text style={styles.repSchemeLabel}>Target Rep Scheme</Text>
                 <View style={styles.repSchemeInfo}>
                   {(() => {
+                    const exercise = day.exercises[showNotes.exerciseIndex];
+                    const hasWeeklyReps = exercise.reps_weekly && Object.keys(exercise.reps_weekly).length > 0;
+                    
+                    // If exercise has weekly progression, show weekly format
+                    if (hasWeeklyReps) {
+                      return (
+                        <View style={styles.weeklyScheme}>
+                          {Object.entries(exercise.reps_weekly).map(([week, reps]) => (
+                            <View key={week} style={[
+                              styles.weekBlock,
+                              parseInt(week) === currentWeek && [styles.activeWeekBlock, { backgroundColor: themeColor }]
+                            ]}>
+                              <Text style={[
+                                styles.weekLabel,
+                                parseInt(week) === currentWeek && styles.activeWeekLabel
+                              ]}>Week {week}</Text>
+                              <Text style={[
+                                styles.weekReps,
+                                { color: themeColor },
+                                parseInt(week) === currentWeek && styles.activeWeekReps
+                              ]}>{reps}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      );
+                    }
+                    
+                    // Fallback to original parsing for non-weekly exercises
                     const scheme = parseRepScheme(targetReps);
                     
                     if (scheme.type === 'weekly') {
@@ -1413,7 +1677,7 @@ export default function WorkoutLogScreen() {
                           {scheme.values.map((reps, index) => (
                             <View key={index} style={styles.weekBlock}>
                               <Text style={styles.weekLabel}>Week {index + 1}</Text>
-                              <Text style={styles.weekReps}>{reps}</Text>
+                              <Text style={[styles.weekReps, { color: themeColor }]}>{reps}</Text>
                             </View>
                           ))}
                         </View>
@@ -1424,7 +1688,7 @@ export default function WorkoutLogScreen() {
                           {scheme.values.map((reps, index) => (
                             <View key={index} style={styles.setBlock}>
                               <Text style={styles.setLabel}>Set {index + 1}</Text>
-                              <Text style={styles.setReps}>{reps}</Text>
+                              <Text style={[styles.setReps, { color: themeColor }]}>{reps}</Text>
                             </View>
                           ))}
                         </View>
@@ -1432,7 +1696,7 @@ export default function WorkoutLogScreen() {
                     } else {
                       return (
                         <View style={styles.straightScheme}>
-                          <Text style={styles.repSchemeText}>{targetReps}</Text>
+                          <Text style={[styles.repSchemeText, { color: themeColor }]}>{targetReps}</Text>
                           <View style={styles.repeatIndicator}>
                             <Ionicons name="repeat" size={16} color="#71717a" />
                             <Text style={styles.repeatText}>× {targetSets} sets</Text>
@@ -1479,20 +1743,23 @@ export default function WorkoutLogScreen() {
         <View style={styles.titleContainer}>
           <Text style={styles.title}>{day.day_name}</Text>
           {workoutStartTime && (
-            <Text style={styles.workoutDuration}>{formatDuration(workoutDuration)}</Text>
+            <Text style={[styles.workoutDuration, { color: themeColor }]}>{formatDuration(workoutDuration)}</Text>
           )}
         </View>
-        <Animated.View style={{ transform: [{ translateX: shakeAnimation }] }}>
-          <TouchableOpacity 
-            style={styles.finishButton}
-            onPress={workoutStartTime ? handleFinishWorkout : handleStartWorkout}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.finishButtonText}>
-              {workoutStartTime ? 'Finish' : 'Start'}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
+        <View style={styles.headerButtons}>
+          
+          <Animated.View style={{ transform: [{ translateX: shakeAnimation }] }}>
+            <TouchableOpacity 
+              style={styles.finishButton}
+              onPress={workoutStartTime ? handleFinishWorkout : handleStartWorkout}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.finishButtonText, { color: themeColor }]}>
+                {workoutStartTime ? 'Finish' : 'Start'}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
       </View>
       
       <KeyboardAvoidingView 
@@ -1520,9 +1787,15 @@ export default function WorkoutLogScreen() {
                 onHistoryPress={handleHistoryPress}
                 onExerciseSelect={handleExerciseSelect}
                 onNotesPress={handleNotesPress}
+                onSetExercisePreference={handleSetExercisePreference}
+                exercisePreferences={exercisePreferences}
                 onInteractionAttempt={handleInteractionAttempt}
                 isLinkedToNext={supersetLinks.has(index)}
                 isLinkedToPrev={supersetLinks.has(index - 1)}
+                themeColor={themeColor}
+                getExerciseUnit={getExerciseUnit}
+                setExerciseUnit={setExerciseUnit}
+                setGlobalUnit={setGlobalUnit}
               />
               
               {/* Superset linking button between exercises */}
@@ -1531,18 +1804,18 @@ export default function WorkoutLogScreen() {
                   <TouchableOpacity
                     style={[
                       styles.supersetLinkButton,
-                      supersetLinks.has(index) && styles.supersetLinkButtonActive
+                      supersetLinks.has(index) && [styles.supersetLinkButtonActive, { borderColor: themeColor }]
                     ]}
                     onPress={() => toggleSupersetLink(index)}
                   >
                     <Ionicons 
                       name={supersetLinks.has(index) ? "link" : "add"} 
                       size={16} 
-                      color={supersetLinks.has(index) ? "#22d3ee" : "#71717a"} 
+                      color={supersetLinks.has(index) ? themeColor : "#71717a"} 
                     />
                   </TouchableOpacity>
                   {supersetLinks.has(index) && (
-                    <Text style={styles.supersetLabel}>SUPERSET</Text>
+                    <Text style={[styles.supersetLabel, { color: themeColor }]}>SUPERSET</Text>
                   )}
                 </View>
               )}
@@ -1554,7 +1827,11 @@ export default function WorkoutLogScreen() {
       </KeyboardAvoidingView>
       
       {activeTimer && !timerMinimized && (
-        <View style={styles.timerOverlay}>
+        <TouchableOpacity 
+          style={styles.timerOverlay}
+          activeOpacity={1}
+          onPress={() => setTimerMinimized(true)}
+        >
           <View style={styles.timerCard}>
             {/* Header */}
             <View style={styles.timerHeader}>
@@ -1585,7 +1862,7 @@ export default function WorkoutLogScreen() {
                   <View style={styles.settingRow}>
                     <Text style={styles.settingLabel}>Sound</Text>
                     <TouchableOpacity
-                      style={[styles.toggle, timerSettings.soundEnabled && styles.toggleOn]}
+                      style={[styles.toggle, timerSettings.soundEnabled && [styles.toggleOn, { backgroundColor: themeColor }]]}
                       onPress={async () => {
                         const newSettings = { ...timerSettings, soundEnabled: !timerSettings.soundEnabled };
                         setTimerSettings(newSettings);
@@ -1602,7 +1879,7 @@ export default function WorkoutLogScreen() {
                       {SOUND_OPTIONS.map((option) => (
                         <TouchableOpacity
                           key={option.id}
-                          style={[styles.optionButton, timerSettings.selectedSound === option.id && styles.optionSelected]}
+                          style={[styles.optionButton, timerSettings.selectedSound === option.id && [styles.optionSelected, { backgroundColor: themeColor + '20', borderColor: themeColor }]]}
                           onPress={async () => {
                             const newSettings = { ...timerSettings, selectedSound: option.id };
                             setTimerSettings(newSettings);
@@ -1612,7 +1889,7 @@ export default function WorkoutLogScreen() {
                             await TimerNotifications.playSound(option.id, timerSettings.volume);
                           }}
                         >
-                          <Text style={[styles.optionText, timerSettings.selectedSound === option.id && styles.optionTextSelected]}>
+                          <Text style={[styles.optionText, timerSettings.selectedSound === option.id && [styles.optionTextSelected, { color: themeColor }]]}>
                             {option.name}
                           </Text>
                         </TouchableOpacity>
@@ -1624,7 +1901,7 @@ export default function WorkoutLogScreen() {
                   <View style={styles.settingRow}>
                     <Text style={styles.settingLabel}>Haptic</Text>
                     <TouchableOpacity
-                      style={[styles.toggle, timerSettings.hapticEnabled && styles.toggleOn]}
+                      style={[styles.toggle, timerSettings.hapticEnabled && [styles.toggleOn, { backgroundColor: themeColor }]]}
                       onPress={async () => {
                         const newSettings = { ...timerSettings, hapticEnabled: !timerSettings.hapticEnabled };
                         setTimerSettings(newSettings);
@@ -1641,7 +1918,7 @@ export default function WorkoutLogScreen() {
                       {['light', 'medium', 'heavy'].map((pattern) => (
                         <TouchableOpacity
                           key={pattern}
-                          style={[styles.optionButton, timerSettings.hapticPattern === pattern && styles.optionSelected]}
+                          style={[styles.optionButton, timerSettings.hapticPattern === pattern && [styles.optionSelected, { backgroundColor: themeColor + '20', borderColor: themeColor }]]}
                           onPress={async () => {
                             const newSettings = { ...timerSettings, hapticPattern: pattern as any };
                             setTimerSettings(newSettings);
@@ -1651,7 +1928,7 @@ export default function WorkoutLogScreen() {
                             await TimerNotifications.triggerHaptic(pattern as any);
                           }}
                         >
-                          <Text style={[styles.optionText, timerSettings.hapticPattern === pattern && styles.optionTextSelected]}>
+                          <Text style={[styles.optionText, timerSettings.hapticPattern === pattern && [styles.optionTextSelected, { color: themeColor }]]}>
                             {pattern.charAt(0).toUpperCase() + pattern.slice(1)}
                           </Text>
                         </TouchableOpacity>
@@ -1663,14 +1940,14 @@ export default function WorkoutLogScreen() {
             ) : activeTimer.completed ? (
               <View style={styles.timerDisplay}>
                 {/* Timer Completed Screen */}
-                <Ionicons name="checkmark-circle" size={72} color="#22d3ee" />
-                <Text style={styles.completedTitle}>Rest Complete!</Text>
+                <Ionicons name="checkmark-circle" size={72} color={themeColor} />
+                <Text style={[styles.completedTitle, { color: themeColor }]}>Rest Complete!</Text>
                 <Text style={styles.completedSubtitle}>Ready for your next set</Text>
                 
                 {/* Completion Actions */}
                 <View style={styles.completionActions}>
                   <TouchableOpacity 
-                    style={styles.completionButton}
+                    style={[styles.completionButton, { backgroundColor: themeColor }]}
                     onPress={() => {
                       // Reset and start a new timer
                       const exercise = day.exercises[activeTimer.exerciseIndex];
@@ -1714,7 +1991,7 @@ export default function WorkoutLogScreen() {
                           } : null);
                         }}
                       >
-                        <Text style={styles.mainTimeAdjustText}>-15</Text>
+                        <Text style={[styles.mainTimeAdjustText, { color: themeColor }]}>-15</Text>
                       </TouchableOpacity>
                     )}
                     
@@ -1737,7 +2014,7 @@ export default function WorkoutLogScreen() {
                           } : null);
                         }}
                       >
-                        <Text style={styles.mainTimeAdjustText}>+15</Text>
+                        <Text style={[styles.mainTimeAdjustText, { color: themeColor }]}>+15</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1745,7 +2022,7 @@ export default function WorkoutLogScreen() {
 
                 {/* Primary Action - Play/Pause Button */}
                 <TouchableOpacity 
-                  style={styles.primaryActionButton}
+                  style={[styles.primaryActionButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
                   onPress={handleTimerToggle}
                 >
                   <Ionicons name={activeTimer.isRunning ? "pause" : "play"} size={28} color="#0a0a0b" />
@@ -1837,7 +2114,7 @@ export default function WorkoutLogScreen() {
               </View>
             )}
           </View>
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* Minimized Timer or Start Timer Button */}
@@ -1868,8 +2145,8 @@ export default function WorkoutLogScreen() {
             setTimerMinimized(false); // Open full screen instead of minimized
           }}
         >
-          <Ionicons name="timer-outline" size={20} color="#22d3ee" />
-          <Text style={styles.startTimerText}>Start Timer</Text>
+          <Ionicons name="timer-outline" size={20} color={themeColor} />
+          <Text style={[styles.startTimerText, { color: themeColor }]}>Start Timer</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -1882,7 +2159,7 @@ export default function WorkoutLogScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.confirmModalContainer}>
-            <Ionicons name="play-circle" size={48} color="#22d3ee" />
+            <Ionicons name="play-circle" size={48} color={themeColor} />
             <Text style={styles.confirmModalTitle}>Begin Workout?</Text>
             <Text style={styles.confirmModalMessage}>
               Start "{day.day_name}" workout session?
@@ -1898,7 +2175,7 @@ export default function WorkoutLogScreen() {
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.confirmModalButton, styles.confirmModalConfirmButton]}
+                style={[styles.confirmModalButton, styles.confirmModalConfirmButton, { backgroundColor: themeColor }]}
                 onPress={confirmStartWorkout}
                 activeOpacity={0.8}
               >
@@ -1918,18 +2195,29 @@ export default function WorkoutLogScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.reminderModalContainer}>
-            <Ionicons name="information-circle" size={48} color="#22d3ee" />
+            <Ionicons name="information-circle" size={48} color={themeColor} />
             <Text style={styles.reminderModalTitle}>Start Your Workout</Text>
             <Text style={styles.reminderModalMessage}>
-              Please tap "Start" to begin your workout session before logging exercises.
+              You need to start your workout session first to begin logging exercises.
             </Text>
             
             <TouchableOpacity
-              style={styles.reminderModalButton}
-              onPress={() => setShowStartReminderModal(false)}
+              style={[styles.reminderModalPrimaryButton, { backgroundColor: themeColor }]}
+              onPress={() => {
+                setShowStartReminderModal(false);
+                confirmStartWorkout();
+              }}
               activeOpacity={0.8}
             >
-              <Text style={styles.reminderModalButtonText}>Got it</Text>
+              <Text style={styles.reminderModalPrimaryButtonText}>Start Workout</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.reminderModalSecondaryLink}
+              onPress={() => setShowStartReminderModal(false)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.reminderModalSecondaryLinkText}>Maybe Later</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1944,8 +2232,8 @@ export default function WorkoutLogScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.completionModalContainer}>
-            <View style={styles.completionIconContainer}>
-              <Ionicons name="fitness" size={32} color="#22d3ee" />
+            <View style={[styles.completionIconContainer, { backgroundColor: themeColor + '1A' }]}>
+              <Ionicons name="fitness" size={32} color={themeColor} />
             </View>
             <Text style={styles.completionModalTitle}>Session Complete</Text>
             <Text style={styles.completionModalSubtitle}>{day.day_name}</Text>
@@ -1960,7 +2248,7 @@ export default function WorkoutLogScreen() {
                 <View style={styles.volumeCard}>
                   <Text style={styles.volumeLabel}>Total Volume</Text>
                   <Text style={styles.volumeValue}>{workoutStats.totalVolume}</Text>
-                  <Text style={styles.volumeUnit}>kg</Text>
+                  <Text style={[styles.volumeUnit, { color: themeColor }]}>{globalUnit}</Text>
                 </View>
               </View>
             )}
@@ -1975,7 +2263,7 @@ export default function WorkoutLogScreen() {
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.completionModalButton, styles.completionModalFinishButton]}
+                style={[styles.completionModalButton, styles.completionModalFinishButton, { backgroundColor: themeColor }]}
                 onPress={() => {
                   setShowCompletionModal(false);
                   confirmFinishWorkout();
@@ -1987,6 +2275,82 @@ export default function WorkoutLogScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Exercise Preference Dialog */}
+      <Modal
+        visible={!!showPreferenceDialog}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setShowPreferenceDialog(null)}
+      >
+        <Animated.View style={[styles.preferenceModalOverlay, { opacity: preferenceModalOpacity }]}>
+          <Animated.View style={[
+            styles.preferenceModalContainer, 
+            { 
+              shadowColor: themeColor,
+              transform: [{ scale: preferenceModalScale }]
+            }
+          ]}>
+            {/* Header */}
+            <View style={styles.preferenceModalHeader}>
+              <View style={[styles.preferenceModalIconContainer, { backgroundColor: themeColor + '15' }]}>
+                <Ionicons name="star" size={24} color={themeColor} />
+              </View>
+              <TouchableOpacity 
+                style={styles.preferenceModalClose}
+                onPress={cancelExercisePreference}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={20} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Content */}
+            <View style={styles.preferenceModalContent}>
+              <Text style={styles.preferenceModalTitle}>Set as Preferred</Text>
+              
+              <View style={styles.preferenceModalExerciseCard}>
+                <Text style={styles.preferenceModalExerciseName}>
+                  {showPreferenceDialog?.selectedAlternative}
+                </Text>
+                <View style={[styles.preferenceModalBadge, { backgroundColor: themeColor + '15' }]}>
+                  <Text style={[styles.preferenceModalBadgeText, { color: themeColor }]}>
+                    Block Default
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.preferenceModalDescription}>
+                This exercise will automatically be selected whenever 
+                <Text style={[styles.preferenceModalHighlight, { color: themeColor }]}>
+                  {' '}{showPreferenceDialog?.primaryExercise}{' '}
+                </Text>
+                appears in this block.
+              </Text>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.preferenceModalActions}>
+              <TouchableOpacity 
+                style={[styles.preferenceModalButton, styles.preferenceModalCancelButton]}
+                onPress={cancelExercisePreference}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.preferenceModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.preferenceModalButton, styles.preferenceModalConfirmButton, { backgroundColor: themeColor }]}
+                onPress={confirmExercisePreference}
+                activeOpacity={0.9}
+              >
+                <Ionicons name="star" size={16} color="#0a0a0b" style={{ marginRight: 6 }} />
+                <Text style={styles.preferenceModalConfirmText}>Set Preferred</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </SafeAreaView>
   );
@@ -2027,8 +2391,12 @@ const styles = StyleSheet.create({
   workoutDuration: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#22d3ee',
     marginTop: 2,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
   },
   finishButton: {
     paddingHorizontal: 12,
@@ -2037,7 +2405,6 @@ const styles = StyleSheet.create({
   finishButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#22d3ee',
   },
   scrollView: {
     flex: 1,
@@ -2057,23 +2424,31 @@ const styles = StyleSheet.create({
   exerciseHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
+    minHeight: 48,
   },
-  exerciseNameContainer: {
+  exerciseNameSection: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    marginRight: 12,
+    alignItems: 'flex-start',
+  },
+  exerciseNameButton: {
+    alignItems: 'flex-start',
+    alignSelf: 'flex-start',
   },
   exerciseName: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#ffffff',
-    flex: 1,
+    lineHeight: 26,
+    marginRight: 6,
+    letterSpacing: -0.3,
+    textAlign: 'left',
+    alignSelf: 'flex-start',
   },
   dropdownIcon: {
-    marginLeft: 8,
+    marginTop: 3,
   },
   exerciseSelector: {
     backgroundColor: '#27272a',
@@ -2092,7 +2467,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#3f3f46',
   },
   exerciseOptionSelected: {
-    backgroundColor: '#22d3ee20',
+    // backgroundColor will be set inline
   },
   exerciseOptionLast: {
     borderBottomWidth: 0,
@@ -2112,16 +2487,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   exerciseOptionTextSelected: {
-    color: '#22d3ee',
     fontWeight: '600',
   },
   historyButton: {
     padding: 4,
     marginLeft: 8,
   },
-  headerButtons: {
-    flexDirection: 'row',
+  actionButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: '#27272a',
+    minWidth: 32,
+    minHeight: 32,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   notesModalContainer: {
     flex: 1,
@@ -2146,7 +2525,6 @@ const styles = StyleSheet.create({
   repSchemeText: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#22d3ee',
   },
   repSchemeNotes: {
     fontSize: 14,
@@ -2166,16 +2544,24 @@ const styles = StyleSheet.create({
     minWidth: 80,
     alignItems: 'center',
   },
+  activeWeekBlock: {
+    // backgroundColor will be set inline
+  },
   weekLabel: {
     fontSize: 12,
     fontWeight: '600',
     color: '#71717a',
     marginBottom: 4,
   },
+  activeWeekLabel: {
+    color: '#000000',
+  },
   weekReps: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#22d3ee',
+  },
+  activeWeekReps: {
+    color: '#000000',
   },
   pyramidScheme: {
     flexDirection: 'row',
@@ -2198,7 +2584,6 @@ const styles = StyleSheet.create({
   setReps: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#22d3ee',
   },
   straightScheme: {
     alignItems: 'center',
@@ -2235,6 +2620,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     minHeight: 200,
   },
+  headerSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 12,
+  },
   setsContainer: {
     marginTop: 8,
   },
@@ -2269,8 +2659,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   weightInput: {
-    width: 70,
-    marginLeft: 12,
+    width: 60,
   },
   repsInput: {
     width: 50,
@@ -2286,7 +2675,9 @@ const styles = StyleSheet.create({
   },
   checkButton: {
     marginLeft: 12,
+    marginRight: 8,
     padding: 4,
+    minWidth: 32,
   },
   checkButtonCompleted: {
     opacity: 0.8,
@@ -2308,7 +2699,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   dropSetButtonActive: {
-    color: '#22d3ee',
+    // color will be set inline
   },
   dropSetsContainer: {
     marginTop: 4,
@@ -2330,7 +2721,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#0a0a0b',
     borderLeftWidth: 2,
-    borderLeftColor: '#22d3ee',
   },
   dropIndent: {
     width: 24,
@@ -2342,8 +2732,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   dropWeightInput: {
-    width: 60,
-    marginRight: 8,
+    width: 50,
   },
   dropRepsInput: {
     width: 60,
@@ -2376,7 +2765,6 @@ const styles = StyleSheet.create({
   addDropText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#22d3ee',
   },
   bottomSpacer: {
     height: 50,
@@ -2421,7 +2809,6 @@ const styles = StyleSheet.create({
   },
   dropIndicator: {
     fontSize: 12,
-    color: '#22d3ee',
     fontWeight: '600',
   },
   historyDropSets: {
@@ -2429,7 +2816,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingLeft: 8,
     borderLeftWidth: 2,
-    borderLeftColor: '#22d3ee',
   },
   historyDropSet: {
     flexDirection: 'row',
@@ -2467,10 +2853,12 @@ const styles = StyleSheet.create({
   // New Timer Overlay
   timerOverlay: {
     position: 'absolute',
+    top: 0,
     bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
     paddingHorizontal: 16,
     paddingBottom: 34,
   },
@@ -2529,7 +2917,6 @@ const styles = StyleSheet.create({
   mainTimeAdjustText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#22d3ee',
   },
   timerCountdown: {
     fontSize: 48,
@@ -2543,14 +2930,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   primaryActionButton: {
-    backgroundColor: '#22d3ee',
     width: 64,
     height: 64,
     borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#22d3ee',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -2616,7 +3001,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   toggleOn: {
-    backgroundColor: '#22d3ee',
+    // backgroundColor will be set inline
   },
   toggleKnob: {
     width: 24,
@@ -2644,8 +3029,7 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
   },
   optionSelected: {
-    backgroundColor: '#22d3ee20',
-    borderColor: '#22d3ee',
+    // backgroundColor and borderColor will be set inline
   },
   optionText: {
     fontSize: 14,
@@ -2653,7 +3037,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   optionTextSelected: {
-    color: '#22d3ee',
+    // color will be set inline
   },
   minimizedTimer: {
     position: 'absolute',
@@ -2709,12 +3093,10 @@ const styles = StyleSheet.create({
   startTimerText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#22d3ee',
   },
   completedTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#22d3ee',
     marginTop: 16,
     marginBottom: 8,
   },
@@ -2728,7 +3110,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   completionButton: {
-    backgroundColor: '#22d3ee',
     borderRadius: 4,
     paddingHorizontal: 20,
     paddingVertical: 12,
@@ -2802,7 +3183,7 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
   },
   confirmModalConfirmButton: {
-    backgroundColor: '#22d3ee',
+    // backgroundColor will be set inline
   },
   confirmModalCancelText: {
     fontSize: 16,
@@ -2812,6 +3193,156 @@ const styles = StyleSheet.create({
   confirmModalConfirmText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#0a0a0b',
+  },
+  confirmModalDescription: {
+    fontSize: 15,
+    color: '#e4e4e7',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  confirmModalNote: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  // New preference modal styles
+  preferenceModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  preferenceModalContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    width: '100%',
+    maxWidth: 380,
+    shadowOffset: {
+      width: 0,
+      height: 20,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 25,
+    elevation: 25,
+  },
+  preferenceModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+  },
+  preferenceModalIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preferenceModalClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#27272a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preferenceModalContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+  },
+  preferenceModalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 20,
+    textAlign: 'left',
+  },
+  preferenceModalExerciseCard: {
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  preferenceModalExerciseName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    flex: 1,
+  },
+  preferenceModalBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 12,
+  },
+  preferenceModalBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  preferenceModalDescription: {
+    fontSize: 15,
+    color: '#a1a1aa',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  preferenceModalHighlight: {
+    fontWeight: '600',
+  },
+  preferenceModalActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    paddingTop: 8,
+    gap: 12,
+  },
+  preferenceModalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  preferenceModalCancelButton: {
+    backgroundColor: '#27272a',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  preferenceModalConfirmButton: {
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  preferenceModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a1a1aa',
+  },
+  preferenceModalConfirmText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#0a0a0b',
   },
   reminderModalContainer: {
@@ -2838,17 +3369,35 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 20,
   },
-  reminderModalButton: {
-    backgroundColor: '#22d3ee',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    minWidth: 80,
+  reminderModalPrimaryButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    marginTop: 24,
+    marginBottom: 12,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  reminderModalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  reminderModalPrimaryButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
     color: '#0a0a0b',
+    textAlign: 'center',
+  },
+  reminderModalSecondaryLink: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  reminderModalSecondaryLinkText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#71717a',
     textAlign: 'center',
   },
   completionModalContainer: {
@@ -2865,7 +3414,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#22d3ee20',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
@@ -2933,7 +3481,6 @@ const styles = StyleSheet.create({
   volumeUnit: {
     fontSize: 18,
     fontWeight: '500',
-    color: '#22d3ee',
   },
   completionModalButtons: {
     flexDirection: 'column',
@@ -2953,7 +3500,7 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
   },
   completionModalFinishButton: {
-    backgroundColor: '#22d3ee',
+    // backgroundColor will be set inline
   },
   completionModalContinueText: {
     fontSize: 16,
@@ -2986,23 +3533,52 @@ const styles = StyleSheet.create({
   },
   supersetLinkButtonActive: {
     backgroundColor: '#164e63',
-    borderColor: '#22d3ee',
+    // borderColor will be set inline
   },
   supersetLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#22d3ee',
     marginTop: 4,
     letterSpacing: 0.5,
   },
   exerciseCardLinked: {
-    borderColor: '#22d3ee',
     borderWidth: 2,
-    shadowColor: '#22d3ee',
     shadowOpacity: 0.6,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 0 },
     elevation: 8,
     backgroundColor: '#1a1a1d',
+  },
+  weightInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  dropWeightInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  unitLabel: {
+    fontSize: 12,
+    color: '#52525b',
+    marginLeft: 2,
+    minWidth: 20,
+  },
+  unitToggleButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#27272a',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    minWidth: 40,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unitToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

@@ -3,11 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   Alert,
   Modal,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,8 +15,10 @@ import { settingsService } from '../services/api';
 import { useJSONPro } from '../hooks/useJSONPro';
 import { CustomerCenter } from '../components/CustomerCenter';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function SettingsScreen() {
+  const { themeColor } = useTheme();
   const { user, logout } = useAuth();
   const { hasAccess } = useJSONPro();
   const navigation = useNavigation();
@@ -82,7 +84,7 @@ export default function SettingsScreen() {
             <Ionicons 
               name={hasAccess ? "checkmark-circle" : "star-outline"} 
               size={24} 
-              color={hasAccess ? "#22d3ee" : "#FFD700"} 
+              color={hasAccess ? themeColor : "#FFD700"} 
             />
             <View>
               <Text style={styles.rowText}>

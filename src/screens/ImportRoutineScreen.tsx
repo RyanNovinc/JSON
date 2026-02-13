@@ -774,13 +774,15 @@ Confirm these specs are correct. Once the user approves, await further instructi
         </View>
 
         {/* Move help link to bottom of screen */}
-        <TouchableOpacity 
-          style={styles.helpLink}
-          onPress={() => setShowInstructions(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom program with AI?</Text>
-        </TouchableOpacity>
+        <View style={styles.helpLinkWrapper}>
+          <TouchableOpacity 
+            style={styles.helpLink}
+            onPress={() => setShowInstructions(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom program with AI?</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Modal
@@ -987,11 +989,13 @@ const styles = StyleSheet.create({
     color: '#e4e4e7',
     letterSpacing: 0.3,
   },
-  helpLink: {
+  helpLinkWrapper: {
     position: 'absolute',
     bottom: 40,
     left: 0,
     right: 0,
+  },
+  helpLink: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',

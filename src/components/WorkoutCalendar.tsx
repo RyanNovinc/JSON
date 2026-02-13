@@ -3,12 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   Modal,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { WorkoutStorage } from '../utils/storage';
+import { useTheme } from '../contexts/ThemeContext';
+import { useWeightUnit } from '../contexts/WeightUnitContext';
 
 interface WorkoutCalendarProps {
   visible: boolean;
@@ -21,6 +23,8 @@ interface WorkoutDay {
 }
 
 export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarProps) {
+  const { themeColor } = useTheme();
+  const { convertWeight } = useWeightUnit();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [workoutDays, setWorkoutDays] = useState<Map<string, any[]>>(new Map());
@@ -28,6 +32,8 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
   const [selectedDayWorkouts, setSelectedDayWorkouts] = useState<any[]>([]);
   const [totalWorkoutSessions, setTotalWorkoutSessions] = useState(0);
   const [allWorkoutSessions, setAllWorkoutSessions] = useState<string[]>([]);
+  const [totalVolumeLifted, setTotalVolumeLifted] = useState(0);
+  const [monthlyVolumeLifted, setMonthlyVolumeLifted] = useState(0);
 
   const isCurrentMonth = () => {
     const now = new Date();
@@ -75,6 +81,12 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
     // Track unique workout sessions (by dayName + date combination)
     const workoutSessions = new Set<string>();
     
+    // Track total volume lifted
+    let allTimeVolume = 0;
+    let currentMonthVolume = 0;
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
     history.forEach((workout: any) => {
       // Handle both timestamp and date formats
       let dateKey: string;
@@ -93,6 +105,62 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
       // Count unique workout sessions (dayName + date)
       const sessionKey = `${workout.dayName}_${dateKey}`;
       workoutSessions.add(sessionKey);
+      
+      // Calculate volume for this workout
+      const calculateWorkoutVolume = (workoutData: any) => {
+        let volume = 0;
+        
+        // If workout has sets (exercise-level data)
+        if (workoutData.sets && Array.isArray(workoutData.sets)) {
+          workoutData.sets.forEach((set: any) => {
+            const weight = parseFloat(set.weight) || 0;
+            const weightInKg = convertWeight(weight, set.unit || 'kg', 'kg');
+            const reps = parseInt(set.reps) || 0;
+            volume += weightInKg * reps;
+            
+            // Add drop set volume
+            if (set.drops && Array.isArray(set.drops)) {
+              set.drops.forEach((drop: any) => {
+                if (drop.completed !== false) {
+                  const dropWeight = parseFloat(drop.weight) || 0;
+                  const dropWeightInKg = convertWeight(dropWeight, drop.unit || 'kg', 'kg');
+                  const dropReps = parseInt(drop.reps) || 0;
+                  volume += dropWeightInKg * dropReps;
+                }
+              });
+            }
+          });
+        } else {
+          // Single set data
+          const weight = parseFloat(workoutData.weight) || 0;
+          const weightInKg = convertWeight(weight, workoutData.unit || 'kg', 'kg');
+          const reps = parseInt(workoutData.reps) || 0;
+          volume += weightInKg * reps;
+          
+          // Add drop set volume
+          if (workoutData.drops && Array.isArray(workoutData.drops)) {
+            workoutData.drops.forEach((drop: any) => {
+              if (drop.completed !== false) {
+                const dropWeight = parseFloat(drop.weight) || 0;
+                const dropWeightInKg = convertWeight(dropWeight, drop.unit || 'kg', 'kg');
+                const dropReps = parseInt(drop.reps) || 0;
+                volume += dropWeightInKg * dropReps;
+              }
+            });
+          }
+        }
+        
+        return volume;
+      };
+      
+      const workoutVolume = calculateWorkoutVolume(workout);
+      allTimeVolume += workoutVolume;
+      
+      // Check if workout is in current month
+      const workoutDate = workout.timestamp ? new Date(workout.timestamp) : new Date(workout.date);
+      if (workoutDate.getMonth() === currentMonth && workoutDate.getFullYear() === currentYear) {
+        currentMonthVolume += workoutVolume;
+      }
       
       // Debug: Log the first few entries to see structure
       if (history.indexOf(workout) < 3) {
@@ -138,6 +206,10 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
     // Store total workout sessions count
     setTotalWorkoutSessions(workoutSessions.size);
     setAllWorkoutSessions(Array.from(workoutSessions));
+    
+    // Store volume data
+    setTotalVolumeLifted(allTimeVolume);
+    setMonthlyVolumeLifted(currentMonthVolume);
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -185,16 +257,18 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
     const totalSets = workouts.reduce((sum, w) => sum + (w.setsCompleted || 1), 0);
     const totalVolume = workouts.reduce((sum, w) => {
       const weight = parseFloat(w.weight) || 0;
+      const weightInKg = convertWeight(weight, w.unit || 'kg', 'kg');
       const reps = parseInt(w.reps) || 0;
-      let volume = weight * reps;
+      let volume = weightInKg * reps;
       
       // Add drop set volume if it exists
       if (w.drops && Array.isArray(w.drops)) {
         w.drops.forEach((drop: any) => {
           if (drop.completed !== false) { // Include if completed is true or undefined (for backward compatibility)
             const dropWeight = parseFloat(drop.weight) || 0;
+            const dropWeightInKg = convertWeight(dropWeight, drop.unit || 'kg', 'kg');
             const dropReps = parseInt(drop.reps) || 0;
-            volume += dropWeight * dropReps;
+            volume += dropWeightInKg * dropReps;
           }
         });
       }
@@ -227,7 +301,7 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
           key={day}
           style={[
             styles.dayCell,
-            hasWorkout && styles.dayCellWithWorkout,
+            hasWorkout && [styles.dayCellWithWorkout, { backgroundColor: themeColor }],
             isToday && styles.dayCellToday,
           ]}
           onPress={() => handleDayPress(day)}
@@ -270,7 +344,7 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
                 style={styles.todayButton}
                 onPress={() => setCurrentDate(new Date())}
               >
-                <Text style={styles.todayButtonText}>Today</Text>
+                <Text style={[styles.todayButtonText, { color: themeColor }]}>Today</Text>
               </TouchableOpacity>
             ) : (
               <View />
@@ -280,57 +354,78 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
             </TouchableOpacity>
           </View>
 
-          {/* Month Navigation */}
-          <View style={styles.monthNav}>
-            <TouchableOpacity 
-              style={styles.navButton}
-              onPress={() => navigateMonth(-1)}
-            >
-              <Ionicons name="chevron-back" size={20} color="#ffffff" />
-            </TouchableOpacity>
-            <Text style={styles.monthTitle}>
-              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </Text>
-            <TouchableOpacity 
-              style={styles.navButton}
-              onPress={() => navigateMonth(1)}
-            >
-              <Ionicons name="chevron-forward" size={20} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Day Names */}
-          <View style={styles.dayNamesRow}>
-            {dayNames.map(day => (
-              <Text key={day} style={styles.dayName}>{day}</Text>
-            ))}
-          </View>
-
-          {/* Calendar Grid */}
-          <View style={styles.calendarGrid}>
-            {renderCalendarDays()}
-          </View>
-
-          {/* Stats Summary */}
-          <View style={styles.statsSummary}>
-            <View style={styles.statItem}>
-              <Ionicons name="flame" size={24} color="#22d3ee" style={{marginBottom: 8}} />
-              <Text style={styles.statValue}>{totalWorkoutSessions}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Ionicons name="calendar" size={24} color="#22d3ee" style={{marginBottom: 8}} />
-              <Text style={styles.statValue}>
-                {allWorkoutSessions.filter(sessionKey => {
-                  const dateString = sessionKey.split('_').slice(1).join('_'); // Remove dayName part
-                  const date = new Date(dateString);
-                  return date.getMonth() === currentDate.getMonth() && 
-                         date.getFullYear() === currentDate.getFullYear();
-                }).length}
+          <ScrollView 
+            style={styles.scrollContainer}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            {/* Month Navigation */}
+            <View style={styles.monthNav}>
+              <TouchableOpacity 
+                style={styles.navButton}
+                onPress={() => navigateMonth(-1)}
+              >
+                <Ionicons name="chevron-back" size={20} color="#ffffff" />
+              </TouchableOpacity>
+              <Text style={[styles.monthTitle, { color: themeColor }]}>
+                {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
               </Text>
-              <Text style={styles.statLabel}>This Month</Text>
+              <TouchableOpacity 
+                style={styles.navButton}
+                onPress={() => navigateMonth(1)}
+              >
+                <Ionicons name="chevron-forward" size={20} color="#ffffff" />
+              </TouchableOpacity>
             </View>
-          </View>
+
+            {/* Day Names */}
+            <View style={styles.dayNamesRow}>
+              {dayNames.map(day => (
+                <Text key={day} style={styles.dayName}>{day}</Text>
+              ))}
+            </View>
+
+            {/* Calendar Grid */}
+            <View style={styles.calendarGrid}>
+              {renderCalendarDays()}
+            </View>
+
+            {/* Stats Summary */}
+            <View style={styles.statsSummary}>
+              <View style={styles.statItem}>
+                <Ionicons name="flame" size={24} color={themeColor} style={{marginBottom: 8}} />
+                <Text style={[styles.statValue, { color: themeColor }]}>{totalWorkoutSessions}</Text>
+                <Text style={styles.statLabel}>Total</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Ionicons name="calendar" size={24} color={themeColor} style={{marginBottom: 8}} />
+                <Text style={[styles.statValue, { color: themeColor }]}>
+                  {allWorkoutSessions.filter(sessionKey => {
+                    const dateString = sessionKey.split('_').slice(1).join('_'); // Remove dayName part
+                    const date = new Date(dateString);
+                    return date.getMonth() === currentDate.getMonth() && 
+                           date.getFullYear() === currentDate.getFullYear();
+                  }).length}
+                </Text>
+                <Text style={styles.statLabel}>This Month</Text>
+              </View>
+            </View>
+            
+            {/* Volume Stats */}
+            <View style={styles.statsSummary}>
+              <View style={styles.statItem}>
+                <Ionicons name="barbell" size={24} color={themeColor} style={{marginBottom: 8}} />
+                <Text style={[styles.statValue, { color: themeColor }]}>{Math.round(totalVolumeLifted).toLocaleString()}</Text>
+                <Text style={styles.statLabel}>Total Volume (kg)</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Ionicons name="barbell" size={24} color={themeColor} style={{marginBottom: 8}} />
+                <Text style={[styles.statValue, { color: themeColor }]}>{Math.round(monthlyVolumeLifted).toLocaleString()}</Text>
+                <Text style={styles.statLabel}>This Month (kg)</Text>
+              </View>
+            </View>
+          </ScrollView>
         </View>
       </View>
 
@@ -360,7 +455,7 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
               {Array.from(groupWorkoutsByExercise(selectedDayWorkouts)).map(([exerciseName, sets]) => (
                 <View key={exerciseName} style={styles.workoutItem}>
                   <View style={styles.exerciseHeader}>
-                    <Text style={styles.workoutExercise}>{exerciseName}</Text>
+                    <Text style={[styles.workoutExercise, { color: themeColor }]}>{exerciseName}</Text>
                     <Text style={styles.setsCount}>{sets.length} sets</Text>
                   </View>
                   <View style={styles.setsContainer}>
@@ -371,12 +466,12 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
                           <Text style={styles.setDetails}>
                             {workout.weight}kg × {workout.reps} reps
                             {workout.drops && workout.drops.length > 0 && (
-                              <Text style={styles.dropIndicator}> + {workout.drops.length} drops</Text>
+                              <Text style={[styles.dropIndicator, { color: themeColor }]}> + {workout.drops.length} drops</Text>
                             )}
                           </Text>
                         </View>
                         {workout.drops && workout.drops.length > 0 && (
-                          <View style={styles.calendarDropSets}>
+                          <View style={[styles.calendarDropSets, { borderLeftColor: themeColor }]}>
                             {workout.drops.map((drop: any, dropIndex: number) => (
                               <View key={dropIndex} style={styles.calendarDropRow}>
                                 <Text style={styles.calendarDropLabel}>
@@ -424,9 +519,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0b',
   },
   modalContainer: {
-    flex: 1,
     backgroundColor: '#0a0a0b',
     paddingTop: 60,
+    height: '100%',
+  },
+  scrollContainer: {
+    maxHeight: '90%',
+  },
+  scrollContent: {
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
@@ -446,7 +547,6 @@ const styles = StyleSheet.create({
   todayButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#22d3ee',
   },
   closeButton: {
     width: 40,
@@ -473,7 +573,6 @@ const styles = StyleSheet.create({
   monthTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#22d3ee',
   },
   navButton: {
     width: 36,
@@ -515,7 +614,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dayCellWithWorkout: {
-    backgroundColor: '#22d3ee',
     borderRadius: 8,
   },
   dayCellToday: {
@@ -557,7 +655,6 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#22d3ee',
     marginBottom: 4,
   },
   statLabel: {
@@ -566,6 +663,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   
   // Day Detail Modal Styles
@@ -619,7 +717,6 @@ const styles = StyleSheet.create({
   workoutExercise: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#22d3ee',
   },
   setsCount: {
     fontSize: 13,
@@ -650,7 +747,6 @@ const styles = StyleSheet.create({
   },
   dropIndicator: {
     fontSize: 12,
-    color: '#22d3ee',
     fontWeight: '600',
   },
   calendarDropSets: {
@@ -658,7 +754,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingLeft: 8,
     borderLeftWidth: 2,
-    borderLeftColor: '#22d3ee',
   },
   calendarDropRow: {
     flexDirection: 'row',

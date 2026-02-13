@@ -1,14 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useJSONPro, useCustomerPurchaseInfo } from '../hooks/useJSONPro';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface CustomerCenterProps {
   onClose?: () => void;
 }
 
 export const CustomerCenter: React.FC<CustomerCenterProps> = ({ onClose }) => {
+  const { themeColor } = useTheme();
   const { hasAccess, isLoading, customerInfo } = useJSONPro();
   const { originalPurchaseDate, userId } = useCustomerPurchaseInfo();
   const { restorePurchases } = useRevenueCat();
@@ -68,7 +71,7 @@ export const CustomerCenter: React.FC<CustomerCenterProps> = ({ onClose }) => {
             <Ionicons 
               name={hasAccess ? "checkmark-circle" : "lock-closed"} 
               size={24} 
-              color={hasAccess ? "#22d3ee" : "#71717a"} 
+              color={hasAccess ? themeColor : "#71717a"} 
             />
             <Text style={styles.statusText}>
               {hasAccess ? "Pro Access" : "Free Plan"}
@@ -98,12 +101,12 @@ export const CustomerCenter: React.FC<CustomerCenterProps> = ({ onClose }) => {
         <Text style={styles.sectionTitle}>Actions</Text>
         
         <TouchableOpacity style={styles.actionButton} onPress={handleRestorePurchases}>
-          <Ionicons name="refresh-outline" size={20} color="#22d3ee" />
+          <Ionicons name="refresh-outline" size={20} color={themeColor} />
           <Text style={styles.actionText}>Restore Purchases</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionButton} onPress={handleContactSupport}>
-          <Ionicons name="mail-outline" size={20} color="#22d3ee" />
+          <Ionicons name="mail-outline" size={20} color={themeColor} />
           <Text style={styles.actionText}>Contact Support</Text>
         </TouchableOpacity>
       </View>

@@ -1,0 +1,906 @@
+{
+  "plan_name": "Muscle Gain Pro",
+  "description": "High-protein muscle building plan with optimal 30P/40C/30F macros",
+  "duration_days": 7,
+  "total_meals": 5,
+  "base_calories": 2500,
+  "macro_targets": {
+    "protein_pct": "30",
+    "carbs_pct": "40", 
+    "fat_pct": "30",
+    "protein_g": 188,
+    "carbs_g": 250,
+    "fat_g": 83
+  },
+  "meal_prep_session": {
+    "total_prep_time": 180,
+    "recipes": [
+      {
+        "name": "Recipe A: Chicken Curry Bowl",
+        "servings": 7,
+        "calories_per_serving": 700,
+        "macros_per_serving": {
+          "protein": 60,
+          "carbs": 58,
+          "fat": 30,
+          "fiber": 4
+        },
+        "ingredients": [
+          {"item": "Chicken breast", "amount": "1050", "unit": "g", "notes": "Boneless, skinless"},
+          {"item": "Jasmine rice", "amount": "525", "unit": "g", "notes": "Dry weight"},
+          {"item": "Coconut milk", "amount": "1050", "unit": "ml", "notes": "Light"},
+          {"item": "Onions", "amount": "350", "unit": "g", "notes": "Diced"},
+          {"item": "Bell peppers", "amount": "525", "unit": "g", "notes": "Mixed colors"},
+          {"item": "Curry powder", "amount": "35", "unit": "g", "notes": ""},
+          {"item": "Olive oil", "amount": "70", "unit": "ml", "notes": "For cooking"},
+          {"item": "Garlic", "amount": "35", "unit": "g", "notes": "Minced"},
+          {"item": "Ginger", "amount": "21", "unit": "g", "notes": "Fresh, grated"}
+        ],
+        "instructions": [
+          "Cook rice according to package instructions",
+          "Heat oil in large pan, sauté onions, garlic, ginger until fragrant",
+          "Add chicken, cook until browned",
+          "Add curry powder, bell peppers, cook 5 minutes", 
+          "Add coconut milk, simmer 15 minutes until chicken cooked through",
+          "Season with salt and pepper",
+          "Divide into 7 containers with rice"
+        ]
+      },
+      {
+        "name": "Recipe B: Mince Meat & Bean Wrap",
+        "servings": 7,
+        "calories_per_serving": 700,
+        "macros_per_serving": {
+          "protein": 45,
+          "carbs": 65,
+          "fat": 25,
+          "fiber": 12
+        },
+        "ingredients": [
+          {"item": "Lean ground beef", "amount": "875", "unit": "g", "notes": "90/10"},
+          {"item": "Large tortillas", "amount": "14", "unit": "whole", "notes": "Whole wheat"},
+          {"item": "Black beans", "amount": "875", "unit": "g", "notes": "Cooked/canned"},
+          {"item": "Brown rice", "amount": "350", "unit": "g", "notes": "Dry weight"},
+          {"item": "Cheddar cheese", "amount": "210", "unit": "g", "notes": "Grated"},
+          {"item": "Onions", "amount": "175", "unit": "g", "notes": "Diced"},
+          {"item": "Bell peppers", "amount": "175", "unit": "g", "notes": "Diced"},
+          {"item": "Olive oil", "amount": "35", "unit": "ml", "notes": "For cooking"},
+          {"item": "Taco seasoning", "amount": "21", "unit": "g", "notes": ""}
+        ],
+        "instructions": [
+          "Cook brown rice according to package instructions",
+          "Heat oil in large pan, sauté onions and peppers until soft",
+          "Add ground beef, cook until browned",
+          "Add taco seasoning and black beans, cook 5 minutes",
+          "Let mixture cool slightly",
+          "Fill each tortilla with meat mixture, rice, and cheese",
+          "Roll tightly and wrap in foil for storage"
+        ]
+      },
+      {
+        "name": "Recipe C: Turkey & Sweet Potato Bake",
+        "servings": 7,
+        "calories_per_serving": 800,
+        "macros_per_serving": {
+          "protein": 50,
+          "carbs": 70,
+          "fat": 25,
+          "fiber": 8
+        },
+        "ingredients": [
+          {"item": "Ground turkey", "amount": "1050", "unit": "g", "notes": "93/7 lean"},
+          {"item": "Sweet potatoes", "amount": "1750", "unit": "g", "notes": "Peeled, cubed"},
+          {"item": "Broccoli", "amount": "875", "unit": "g", "notes": "Fresh florets"},
+          {"item": "Olive oil", "amount": "105", "unit": "ml", "notes": "Extra virgin"},
+          {"item": "Onions", "amount": "350", "unit": "g", "notes": "Diced"},
+          {"item": "Garlic", "amount": "35", "unit": "g", "notes": "Minced"},
+          {"item": "Italian seasoning", "amount": "14", "unit": "g", "notes": ""},
+          {"item": "Mozzarella cheese", "amount": "175", "unit": "g", "notes": "Shredded"},
+          {"item": "Salt and pepper", "amount": "5", "unit": "g", "notes": "To taste"}
+        ],
+        "instructions": [
+          "Preheat oven to 400°F (200°C)",
+          "Toss sweet potatoes with half the olive oil, season with salt and pepper",
+          "Roast sweet potatoes for 25 minutes",
+          "Heat remaining oil in large pan, sauté onions and garlic",
+          "Add ground turkey, cook until browned",
+          "Add Italian seasoning, salt, and pepper",
+          "Steam broccoli until tender-crisp",
+          "Combine turkey, sweet potatoes, and broccoli in baking dish",
+          "Top with mozzarella, bake 15 minutes until cheese melted",
+          "Cool and divide into 7 portions"
+        ]
+      },
+      {
+        "name": "Recipe D: Beef & Vegetable Lasagna",
+        "servings": 7,
+        "calories_per_serving": 800,
+        "macros_per_serving": {
+          "protein": 55,
+          "carbs": 60,
+          "fat": 35,
+          "fiber": 6
+        },
+        "ingredients": [
+          {"item": "Lean ground beef", "amount": "875", "unit": "g", "notes": "90/10"},
+          {"item": "Lasagna sheets", "amount": "350", "unit": "g", "notes": "Whole wheat"},
+          {"item": "Ricotta cheese", "amount": "875", "unit": "g", "notes": "Part-skim"},
+          {"item": "Mozzarella cheese", "amount": "350", "unit": "g", "notes": "Shredded"},
+          {"item": "Parmesan cheese", "amount": "175", "unit": "g", "notes": "Grated"},
+          {"item": "Marinara sauce", "amount": "875", "unit": "ml", "notes": "Low sodium"},
+          {"item": "Spinach", "amount": "350", "unit": "g", "notes": "Fresh"},
+          {"item": "Zucchini", "amount": "350", "unit": "g", "notes": "Sliced"},
+          {"item": "Onions", "amount": "175", "unit": "g", "notes": "Diced"},
+          {"item": "Garlic", "amount": "21", "unit": "g", "notes": "Minced"},
+          {"item": "Olive oil", "amount": "35", "unit": "ml", "notes": "For cooking"},
+          {"item": "Italian herbs", "amount": "7", "unit": "g", "notes": "Dried"}
+        ],
+        "instructions": [
+          "Preheat oven to 375°F (190°C)",
+          "Cook lasagna sheets according to package directions",
+          "Heat oil in large pan, sauté onions and garlic until fragrant",
+          "Add ground beef, cook until browned",
+          "Add marinara sauce and Italian herbs, simmer 10 minutes",
+          "Sauté spinach until wilted, drain excess liquid",
+          "Mix ricotta with half the mozzarella and Parmesan",
+          "Layer in baking dish: sauce, pasta, ricotta mixture, spinach, zucchini",
+          "Repeat layers, top with remaining cheeses",
+          "Cover with foil, bake 45 minutes",
+          "Remove foil, bake 15 minutes until golden",
+          "Cool 10 minutes before cutting into 7 portions"
+        ]
+      }
+    ]
+  },
+  "weeks": [
+    {
+      "week_number": 1,
+      "days": [
+        {
+          "day_name": "Monday",
+          "day_number": 1,
+          "daily_totals": {
+            "calories": 2500,
+            "protein": 188,
+            "carbs": 250,
+            "fat": 83,
+            "fiber": 30
+          },
+          "meals": [
+            {
+              "meal_name": "High-Protein Scrambled Eggs + Toast",
+              "meal_type": "breakfast",
+              "prep_time": 8,
+              "cook_time": 8,
+              "calories": 600,
+              "macros": {
+                "protein": 26,
+                "carbs": 35,
+                "fat": 25,
+                "fiber": 10
+              },
+              "ingredients": [
+                {"item": "Large eggs", "amount": "3", "unit": "whole", "scalable": true},
+                {"item": "Whole grain bread", "amount": "2", "unit": "slices", "scalable": true},
+                {"item": "Avocado", "amount": "150", "unit": "g", "scalable": true, "notes": "1 medium"},
+                {"item": "Butter", "amount": "1", "unit": "tbsp", "scalable": true, "notes": "For cooking"},
+                {"item": "Spinach", "amount": "50", "unit": "g", "scalable": true, "notes": "Fresh"},
+                {"item": "Cherry tomatoes", "amount": "50", "unit": "g", "scalable": true, "notes": "Halved"}
+              ],
+              "instructions": [
+                "Toast bread slices until golden brown",
+                "Mash avocado with salt and pepper, spread on toast",
+                "Heat butter in non-stick pan over medium heat",
+                "Sauté spinach and tomatoes until spinach wilts",
+                "Scramble eggs until fluffy",
+                "Serve scrambled eggs with avocado toast"
+              ]
+            },
+            {
+              "meal_name": "Chicken Curry Bowl",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 700,
+              "macros": {
+                "protein": 60,
+                "carbs": 58,
+                "fat": 30,
+                "fiber": 4
+              },
+              "ingredients": [
+                {"item": "Chicken Curry Bowl", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 90 seconds",
+                "Stir and check temperature before eating"
+              ]
+            },
+            {
+              "meal_name": "Turkey & Sweet Potato Bake",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 800,
+              "macros": {
+                "protein": 50,
+                "carbs": 70,
+                "fat": 25,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Turkey & Sweet Potato Bake", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2-3 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Protein Shake",
+              "meal_type": "snack",
+              "prep_time": 3,
+              "cook_time": 0,
+              "calories": 400,
+              "macros": {
+                "protein": 35,
+                "carbs": 40,
+                "fat": 10,
+                "fiber": 5
+              },
+              "ingredients": [
+                {"item": "Whey protein powder", "amount": "30", "unit": "g", "scalable": true, "notes": "1 scoop"},
+                {"item": "Banana", "amount": "120", "unit": "g", "scalable": true, "notes": "1 medium"},
+                {"item": "Almond milk", "amount": "300", "unit": "ml", "scalable": true, "notes": "Unsweetened"},
+                {"item": "Almond butter", "amount": "15", "unit": "g", "scalable": true, "notes": "1 tbsp"},
+                {"item": "Spinach", "amount": "30", "unit": "g", "scalable": true, "notes": "Fresh baby spinach"}
+              ],
+              "instructions": [
+                "Add all ingredients to blender",
+                "Blend until smooth and creamy",
+                "Serve immediately"
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Tuesday",
+          "day_number": 2,
+          "daily_totals": {
+            "calories": 2500,
+            "protein": 188,
+            "carbs": 250,
+            "fat": 83,
+            "fiber": 30
+          },
+          "meals": [
+            {
+              "meal_name": "Protein Pancakes",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 12,
+              "calories": 600,
+              "macros": {
+                "protein": 46,
+                "carbs": 74,
+                "fat": 6,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Oat flour", "amount": "60", "unit": "g", "scalable": true},
+                {"item": "Whey protein powder", "amount": "30", "unit": "g", "scalable": true},
+                {"item": "Egg", "amount": "1", "unit": "whole", "scalable": true, "notes": "Large"},
+                {"item": "Milk", "amount": "150", "unit": "ml", "scalable": true},
+                {"item": "Banana", "amount": "105", "unit": "g", "scalable": true, "notes": "1 large, mashed"},
+                {"item": "Maple syrup", "amount": "15", "unit": "ml", "scalable": true}
+              ],
+              "instructions": [
+                "Mix oat flour and protein powder in bowl",
+                "Mash banana and combine with egg and milk",
+                "Fold wet ingredients into dry ingredients until just combined",
+                "Cook pancakes in non-stick pan 2-3 minutes per side",
+                "Serve with maple syrup"
+              ]
+            },
+            {
+              "meal_name": "Mince Meat & Bean Wrap",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 700,
+              "macros": {
+                "protein": 45,
+                "carbs": 65,
+                "fat": 25,
+                "fiber": 12
+              },
+              "ingredients": [
+                {"item": "Mince Meat & Bean Wrap", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge",
+                "Reheat in microwave for 60-90 seconds",
+                "Let cool for 30 seconds before eating"
+              ]
+            },
+            {
+              "meal_name": "Beef & Vegetable Lasagna",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 800,
+              "macros": {
+                "protein": 55,
+                "carbs": 60,
+                "fat": 35,
+                "fiber": 6
+              },
+              "ingredients": [
+                {"item": "Beef & Vegetable Lasagna", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2-3 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Greek Yogurt with Nuts",
+              "meal_type": "snack",
+              "prep_time": 2,
+              "cook_time": 0,
+              "calories": 400,
+              "macros": {
+                "protein": 25,
+                "carbs": 35,
+                "fat": 15,
+                "fiber": 4
+              },
+              "ingredients": [
+                {"item": "Greek yogurt (0% fat)", "amount": "200", "unit": "g", "scalable": true},
+                {"item": "Mixed nuts", "amount": "25", "unit": "g", "scalable": true, "notes": "Almonds, walnuts"},
+                {"item": "Honey", "amount": "20", "unit": "g", "scalable": true},
+                {"item": "Blueberries", "amount": "75", "unit": "g", "scalable": true}
+              ],
+              "instructions": [
+                "Add yogurt to bowl",
+                "Top with nuts, blueberries and drizzle with honey"
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Wednesday",
+          "day_number": 3,
+          "daily_totals": {
+            "calories": 2500,
+            "protein": 188,
+            "carbs": 250,
+            "fat": 83,
+            "fiber": 30
+          },
+          "meals": [
+            {
+              "meal_name": "Greek Yogurt Power Bowl",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 0,
+              "calories": 600,
+              "macros": {
+                "protein": 34,
+                "carbs": 59,
+                "fat": 21,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Greek yogurt (0% fat)", "amount": "200", "unit": "g", "scalable": true},
+                {"item": "Granola", "amount": "50", "unit": "g", "scalable": true},
+                {"item": "Mixed berries", "amount": "100", "unit": "g", "scalable": true},
+                {"item": "Mixed nuts", "amount": "25", "unit": "g", "scalable": true},
+                {"item": "Honey", "amount": "10", "unit": "g", "scalable": true}
+              ],
+              "instructions": [
+                "Add yogurt to bowl",
+                "Top with granola, berries, and nuts",
+                "Drizzle with honey"
+              ]
+            },
+            {
+              "meal_name": "Chicken Curry Bowl",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 700,
+              "macros": {
+                "protein": 60,
+                "carbs": 58,
+                "fat": 30,
+                "fiber": 4
+              },
+              "ingredients": [
+                {"item": "Chicken Curry Bowl", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 90 seconds",
+                "Stir and check temperature before eating"
+              ]
+            },
+            {
+              "meal_name": "Turkey & Sweet Potato Bake",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 800,
+              "macros": {
+                "protein": 50,
+                "carbs": 70,
+                "fat": 25,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Turkey & Sweet Potato Bake", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2-3 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Apple & Peanut Butter",
+              "meal_type": "snack",
+              "prep_time": 2,
+              "cook_time": 0,
+              "calories": 400,
+              "macros": {
+                "protein": 16,
+                "carbs": 40,
+                "fat": 20,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Apple", "amount": "200", "unit": "g", "scalable": true, "notes": "1 large apple"},
+                {"item": "Natural peanut butter", "amount": "32", "unit": "g", "scalable": true, "notes": "2 tbsp"},
+                {"item": "Cinnamon", "amount": "1", "unit": "g", "scalable": true, "notes": "Pinch"}
+              ],
+              "instructions": [
+                "Slice apple into wedges",
+                "Serve with peanut butter for dipping",
+                "Sprinkle with cinnamon"
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Thursday",
+          "day_number": 4,
+          "daily_totals": {
+            "calories": 2500,
+            "protein": 188,
+            "carbs": 250,
+            "fat": 83,
+            "fiber": 30
+          },
+          "meals": [
+            {
+              "meal_name": "High-Protein Scrambled Eggs + Toast",
+              "meal_type": "breakfast",
+              "prep_time": 8,
+              "cook_time": 8,
+              "calories": 600,
+              "macros": {
+                "protein": 26,
+                "carbs": 35,
+                "fat": 25,
+                "fiber": 10
+              },
+              "ingredients": [
+                {"item": "Large eggs", "amount": "3", "unit": "whole", "scalable": true},
+                {"item": "Whole grain bread", "amount": "2", "unit": "slices", "scalable": true},
+                {"item": "Avocado", "amount": "150", "unit": "g", "scalable": true, "notes": "1 medium"},
+                {"item": "Butter", "amount": "1", "unit": "tbsp", "scalable": true, "notes": "For cooking"},
+                {"item": "Spinach", "amount": "50", "unit": "g", "scalable": true, "notes": "Fresh"},
+                {"item": "Cherry tomatoes", "amount": "50", "unit": "g", "scalable": true, "notes": "Halved"}
+              ],
+              "instructions": [
+                "Toast bread slices until golden brown",
+                "Mash avocado with salt and pepper, spread on toast",
+                "Heat butter in non-stick pan over medium heat",
+                "Sauté spinach and tomatoes until spinach wilts",
+                "Scramble eggs until fluffy",
+                "Serve scrambled eggs with avocado toast"
+              ]
+            },
+            {
+              "meal_name": "Mince Meat & Bean Wrap",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 700,
+              "macros": {
+                "protein": 45,
+                "carbs": 65,
+                "fat": 25,
+                "fiber": 12
+              },
+              "ingredients": [
+                {"item": "Mince Meat & Bean Wrap", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge",
+                "Reheat in microwave for 60-90 seconds",
+                "Let cool for 30 seconds before eating"
+              ]
+            },
+            {
+              "meal_name": "Beef & Vegetable Lasagna",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 800,
+              "macros": {
+                "protein": 55,
+                "carbs": 60,
+                "fat": 35,
+                "fiber": 6
+              },
+              "ingredients": [
+                {"item": "Beef & Vegetable Lasagna", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2-3 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Cottage Cheese Bowl",
+              "meal_type": "snack",
+              "prep_time": 2,
+              "cook_time": 0,
+              "calories": 400,
+              "macros": {
+                "protein": 28,
+                "carbs": 30,
+                "fat": 16,
+                "fiber": 4
+              },
+              "ingredients": [
+                {"item": "Cottage cheese (low fat)", "amount": "200", "unit": "g", "scalable": true},
+                {"item": "Pineapple chunks", "amount": "100", "unit": "g", "scalable": true, "notes": "Fresh or canned in juice"},
+                {"item": "Almonds", "amount": "20", "unit": "g", "scalable": true, "notes": "Sliced"},
+                {"item": "Chia seeds", "amount": "10", "unit": "g", "scalable": true}
+              ],
+              "instructions": [
+                "Add cottage cheese to bowl",
+                "Top with pineapple chunks and sliced almonds",
+                "Sprinkle with chia seeds"
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Friday",
+          "day_number": 5,
+          "daily_totals": {
+            "calories": 2500,
+            "protein": 188,
+            "carbs": 250,
+            "fat": 83,
+            "fiber": 30
+          },
+          "meals": [
+            {
+              "meal_name": "Protein Pancakes",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 12,
+              "calories": 600,
+              "macros": {
+                "protein": 46,
+                "carbs": 74,
+                "fat": 6,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Oat flour", "amount": "60", "unit": "g", "scalable": true},
+                {"item": "Whey protein powder", "amount": "30", "unit": "g", "scalable": true},
+                {"item": "Egg", "amount": "1", "unit": "whole", "scalable": true, "notes": "Large"},
+                {"item": "Milk", "amount": "150", "unit": "ml", "scalable": true},
+                {"item": "Banana", "amount": "105", "unit": "g", "scalable": true, "notes": "1 large, mashed"},
+                {"item": "Maple syrup", "amount": "15", "unit": "ml", "scalable": true}
+              ],
+              "instructions": [
+                "Mix oat flour and protein powder in bowl",
+                "Mash banana and combine with egg and milk",
+                "Fold wet ingredients into dry ingredients until just combined",
+                "Cook pancakes in non-stick pan 2-3 minutes per side",
+                "Serve with maple syrup"
+              ]
+            },
+            {
+              "meal_name": "Chicken Curry Bowl",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 700,
+              "macros": {
+                "protein": 60,
+                "carbs": 58,
+                "fat": 30,
+                "fiber": 4
+              },
+              "ingredients": [
+                {"item": "Chicken Curry Bowl", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 90 seconds",
+                "Stir and check temperature before eating"
+              ]
+            },
+            {
+              "meal_name": "Turkey & Sweet Potato Bake",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 800,
+              "macros": {
+                "protein": 50,
+                "carbs": 70,
+                "fat": 25,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Turkey & Sweet Potato Bake", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2-3 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Protein Shake",
+              "meal_type": "snack",
+              "prep_time": 3,
+              "cook_time": 0,
+              "calories": 400,
+              "macros": {
+                "protein": 35,
+                "carbs": 40,
+                "fat": 10,
+                "fiber": 5
+              },
+              "ingredients": [
+                {"item": "Whey protein powder", "amount": "30", "unit": "g", "scalable": true, "notes": "1 scoop"},
+                {"item": "Banana", "amount": "120", "unit": "g", "scalable": true, "notes": "1 medium"},
+                {"item": "Almond milk", "amount": "300", "unit": "ml", "scalable": true, "notes": "Unsweetened"},
+                {"item": "Almond butter", "amount": "15", "unit": "g", "scalable": true, "notes": "1 tbsp"},
+                {"item": "Spinach", "amount": "30", "unit": "g", "scalable": true, "notes": "Fresh baby spinach"}
+              ],
+              "instructions": [
+                "Add all ingredients to blender",
+                "Blend until smooth and creamy",
+                "Serve immediately"
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Saturday",
+          "day_number": 6,
+          "daily_totals": {
+            "calories": 2500,
+            "protein": 188,
+            "carbs": 250,
+            "fat": 83,
+            "fiber": 30
+          },
+          "meals": [
+            {
+              "meal_name": "Greek Yogurt Power Bowl",
+              "meal_type": "breakfast",
+              "prep_time": 5,
+              "cook_time": 0,
+              "calories": 600,
+              "macros": {
+                "protein": 34,
+                "carbs": 59,
+                "fat": 21,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Greek yogurt (0% fat)", "amount": "200", "unit": "g", "scalable": true},
+                {"item": "Granola", "amount": "50", "unit": "g", "scalable": true},
+                {"item": "Mixed berries", "amount": "100", "unit": "g", "scalable": true},
+                {"item": "Mixed nuts", "amount": "25", "unit": "g", "scalable": true},
+                {"item": "Honey", "amount": "10", "unit": "g", "scalable": true}
+              ],
+              "instructions": [
+                "Add yogurt to bowl",
+                "Top with granola, berries, and nuts",
+                "Drizzle with honey"
+              ]
+            },
+            {
+              "meal_name": "Mince Meat & Bean Wrap",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 700,
+              "macros": {
+                "protein": 45,
+                "carbs": 65,
+                "fat": 25,
+                "fiber": 12
+              },
+              "ingredients": [
+                {"item": "Mince Meat & Bean Wrap", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge",
+                "Reheat in microwave for 60-90 seconds",
+                "Let cool for 30 seconds before eating"
+              ]
+            },
+            {
+              "meal_name": "Beef & Vegetable Lasagna",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 800,
+              "macros": {
+                "protein": 55,
+                "carbs": 60,
+                "fat": 35,
+                "fiber": 6
+              },
+              "ingredients": [
+                {"item": "Beef & Vegetable Lasagna", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2-3 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Greek Yogurt with Nuts",
+              "meal_type": "snack",
+              "prep_time": 2,
+              "cook_time": 0,
+              "calories": 400,
+              "macros": {
+                "protein": 25,
+                "carbs": 35,
+                "fat": 15,
+                "fiber": 4
+              },
+              "ingredients": [
+                {"item": "Greek yogurt (0% fat)", "amount": "200", "unit": "g", "scalable": true},
+                {"item": "Mixed nuts", "amount": "25", "unit": "g", "scalable": true, "notes": "Almonds, walnuts"},
+                {"item": "Honey", "amount": "20", "unit": "g", "scalable": true},
+                {"item": "Blueberries", "amount": "75", "unit": "g", "scalable": true}
+              ],
+              "instructions": [
+                "Add yogurt to bowl",
+                "Top with nuts, blueberries and drizzle with honey"
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Sunday",
+          "day_number": 7,
+          "daily_totals": {
+            "calories": 2500,
+            "protein": 188,
+            "carbs": 250,
+            "fat": 83,
+            "fiber": 30
+          },
+          "meals": [
+            {
+              "meal_name": "High-Protein Scrambled Eggs + Toast",
+              "meal_type": "breakfast",
+              "prep_time": 8,
+              "cook_time": 8,
+              "calories": 600,
+              "macros": {
+                "protein": 26,
+                "carbs": 35,
+                "fat": 25,
+                "fiber": 10
+              },
+              "ingredients": [
+                {"item": "Large eggs", "amount": "3", "unit": "whole", "scalable": true},
+                {"item": "Whole grain bread", "amount": "2", "unit": "slices", "scalable": true},
+                {"item": "Avocado", "amount": "150", "unit": "g", "scalable": true, "notes": "1 medium"},
+                {"item": "Butter", "amount": "1", "unit": "tbsp", "scalable": true, "notes": "For cooking"},
+                {"item": "Spinach", "amount": "50", "unit": "g", "scalable": true, "notes": "Fresh"},
+                {"item": "Cherry tomatoes", "amount": "50", "unit": "g", "scalable": true, "notes": "Halved"}
+              ],
+              "instructions": [
+                "Toast bread slices until golden brown",
+                "Mash avocado with salt and pepper, spread on toast",
+                "Heat butter in non-stick pan over medium heat",
+                "Sauté spinach and tomatoes until spinach wilts",
+                "Scramble eggs until fluffy",
+                "Serve scrambled eggs with avocado toast"
+              ]
+            },
+            {
+              "meal_name": "Chicken Curry Bowl",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 700,
+              "macros": {
+                "protein": 60,
+                "carbs": 58,
+                "fat": 30,
+                "fiber": 4
+              },
+              "ingredients": [
+                {"item": "Chicken Curry Bowl", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 90 seconds",
+                "Stir and check temperature before eating"
+              ]
+            },
+            {
+              "meal_name": "Turkey & Sweet Potato Bake",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 800,
+              "macros": {
+                "protein": 50,
+                "carbs": 70,
+                "fat": 25,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Turkey & Sweet Potato Bake", "amount": "1.0", "unit": "serving", "scalable": true, "notes": "From meal prep"}
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2-3 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Apple & Peanut Butter",
+              "meal_type": "snack",
+              "prep_time": 2,
+              "cook_time": 0,
+              "calories": 400,
+              "macros": {
+                "protein": 16,
+                "carbs": 40,
+                "fat": 20,
+                "fiber": 8
+              },
+              "ingredients": [
+                {"item": "Apple", "amount": "200", "unit": "g", "scalable": true, "notes": "1 large apple"},
+                {"item": "Natural peanut butter", "amount": "32", "unit": "g", "scalable": true, "notes": "2 tbsp"},
+                {"item": "Cinnamon", "amount": "1", "unit": "g", "scalable": true, "notes": "Pinch"}
+              ],
+              "instructions": [
+                "Slice apple into wedges",
+                "Serve with peanut butter for dipping",
+                "Sprinkle with cinnamon"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

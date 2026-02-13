@@ -3,18 +3,20 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   Alert,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import RevenueCatPaywall from '../components/RevenueCatPaywall';
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function PaymentScreen() {
   const navigation = useNavigation();
+  const { themeColor } = useTheme();
   const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
 

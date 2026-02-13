@@ -3,9 +3,12 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
 import AppNavigator from './src/navigation/AppNavigator';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ActiveWorkoutProvider } from './src/contexts/ActiveWorkoutContext';
 import { RevenueCatProvider } from './src/contexts/RevenueCatContext';
+import { ThemeProvider } from './src/contexts/ThemeContext';
+import { WeightUnitProvider } from './src/contexts/WeightUnitContext';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import SplashScreen from './src/components/SplashScreen';
 
@@ -47,13 +50,19 @@ function AppContent() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <RevenueCatProvider autoInitialize={true}>
-        <ActiveWorkoutProvider>
-          <AppContent />
-        </ActiveWorkoutProvider>
-      </RevenueCatProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <WeightUnitProvider>
+            <RevenueCatProvider autoInitialize={true}>
+              <ActiveWorkoutProvider>
+                <AppContent />
+              </ActiveWorkoutProvider>
+            </RevenueCatProvider>
+          </WeightUnitProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 

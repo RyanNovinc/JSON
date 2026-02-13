@@ -1,0 +1,10 @@
+{
+  "name": "async-video-processor",
+  "version": "1.0.0",
+  "description": "Async video recipe processor",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1500.0",
+    "uuid": "^9.0.0"
+  }
+}

@@ -1,0 +1,972 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ImageBackground,
+  Modal,
+} from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import * as Clipboard from 'expo-clipboard';
+import { useMealPlanning } from '../contexts/MealPlanningContext';
+import { useTheme } from '../contexts/ThemeContext';
+import ketoMealPlanData from '../data/plan1_keto_14day.json';
+import muscleGainMealPlanData from '../data/muscle_building_7day.json';
+import balancedNutritionMealPlanData from '../data/plan3_balanced_7day.json';
+
+type SampleMealPlansNavigationProp = StackNavigationProp<RootStackParamList, 'SampleMealPlans'>;
+
+interface SampleMealPlan {
+  id: string;
+  title: string;
+  description: string;
+  duration: string;
+  difficulty: string;
+  focus: string;
+  program: any;
+  uniqueRecipes?: number;
+  detailInfo: {
+    overview: string;
+    highlights: string[];
+    targetGoals: string;
+    mealTypes: string;
+    nutrition: string;
+    cookingLevel: string;
+  };
+  metrics?: {
+    variety: number;
+    cookingFrequency: number;
+    shoppingComplexity: number;
+    prepTime: number;
+    uniqueMealCount: number;
+  };
+}
+
+const calculateMealPlanStats = (mealPlan: any) => {
+  let totalMeals = 0;
+  let totalDays = 0;
+  let uniqueMeals = 0;
+
+  if (mealPlan.weeks) {
+    const uniqueMealNames = new Set();
+    
+    mealPlan.weeks.forEach((week: any) => {
+      if (week.days) {
+        totalDays += week.days.length;
+        week.days.forEach((day: any) => {
+          if (day.meals) {
+            totalMeals += day.meals.length;
+            day.meals.forEach((meal: any) => {
+              if (meal.meal_name) {
+                uniqueMealNames.add(meal.meal_name);
+              }
+            });
+          }
+        });
+      }
+    });
+    
+    uniqueMeals = uniqueMealNames.size;
+  }
+
+  return { totalDays, totalMeals, uniqueMeals };
+};
+
+// Calculate meal plan metrics for the info bars
+const calculateMealPlanMetrics = (stats: any) => {
+  const { totalDays, totalMeals, uniqueMeals } = stats;
+  
+  // Variety calculation: percentage of unique meals vs total meals
+  const variety = totalMeals > 0 ? Math.round((uniqueMeals / totalMeals) * 100) : 0;
+  
+  // Cooking frequency: based on unique meals per day
+  const uniqueMealsPerDay = uniqueMeals / totalDays;
+  let cookingFrequency = 0;
+  if (uniqueMealsPerDay >= 2.5) cookingFrequency = 90; // Daily cooking
+  else if (uniqueMealsPerDay >= 2) cookingFrequency = 70;
+  else if (uniqueMealsPerDay >= 1.5) cookingFrequency = 50;
+  else if (uniqueMealsPerDay >= 1) cookingFrequency = 30;
+  else cookingFrequency = 10; // Meal prep friendly
+  
+  // Shopping complexity: based on unique meals
+  let shoppingComplexity = 0;
+  if (uniqueMeals >= 40) shoppingComplexity = 95;
+  else if (uniqueMeals >= 30) shoppingComplexity = 80;
+  else if (uniqueMeals >= 20) shoppingComplexity = 60;
+  else if (uniqueMeals >= 10) shoppingComplexity = 40;
+  else shoppingComplexity = 20;
+  
+  // Prep time: based on variety and cooking frequency
+  const prepTime = Math.round((cookingFrequency + shoppingComplexity) / 2);
+  
+  return {
+    variety,
+    cookingFrequency,
+    shoppingComplexity,
+    prepTime,
+    uniqueMealCount: uniqueMeals
+  };
+};
+
+// Function to scale meal plan ingredients based on user's target calories
+const scaleMealPlan = (mealPlan: any, userCalories: number) => {
+  console.log('🔥 scaleMealPlan called with:', { userCalories, baseCal: mealPlan.base_calories });
+  
+  if (!mealPlan.base_calories || !userCalories) {
+    console.log('❌ Scaling skipped - missing base_calories or userCalories');
+    return mealPlan;
+  }
+  
+  const scalingFactor = userCalories / mealPlan.base_calories;
+  console.log('✅ Scaling factor:', scalingFactor);
+  
+  // Clone the meal plan to avoid mutating original
+  const scaledPlan = JSON.parse(JSON.stringify(mealPlan));
+  
+  // Update base calories and macro targets
+  scaledPlan.base_calories = userCalories;
+  if (scaledPlan.macro_targets) {
+    scaledPlan.macro_targets.protein_g = Math.round(scaledPlan.macro_targets.protein_g * scalingFactor);
+    scaledPlan.macro_targets.carbs_g = Math.round(scaledPlan.macro_targets.carbs_g * scalingFactor);
+    scaledPlan.macro_targets.fat_g = Math.round(scaledPlan.macro_targets.fat_g * scalingFactor);
+  }
+  
+  // Scale meal prep session ingredients
+  if (scaledPlan.meal_prep_session?.prep_meals) {
+    scaledPlan.meal_prep_session.prep_meals.forEach((meal: any) => {
+      if (meal.ingredients) {
+        meal.ingredients.forEach((ingredient: any) => {
+          if (ingredient.scalable) {
+            const originalAmount = parseFloat(ingredient.amount);
+            const scaledAmount = originalAmount * scalingFactor;
+            ingredient.amount = scaledAmount.toFixed(1);
+          }
+        });
+      }
+      // Scale meal prep meal calories and macros
+      if (meal.calories) meal.calories = Math.round(meal.calories * scalingFactor);
+      if (meal.macros) {
+        meal.macros.protein = Math.round(meal.macros.protein * scalingFactor);
+        meal.macros.carbs = Math.round(meal.macros.carbs * scalingFactor);
+        meal.macros.fat = Math.round(meal.macros.fat * scalingFactor);
+        if (meal.macros.fiber) meal.macros.fiber = Math.round(meal.macros.fiber * scalingFactor);
+      }
+    });
+  }
+
+  // Scale ingredients in meals
+  if (scaledPlan.weeks) {
+    scaledPlan.weeks.forEach((week: any) => {
+      if (week.days) {
+        week.days.forEach((day: any) => {
+          if (day.meals) {
+            day.meals.forEach((meal: any) => {
+              if (meal.ingredients) {
+                meal.ingredients.forEach((ingredient: any) => {
+                  if (ingredient.scalable) {
+                    const originalAmount = parseFloat(ingredient.amount);
+                    const scaledAmount = originalAmount * scalingFactor;
+                    ingredient.amount = scaledAmount.toFixed(1);
+                  }
+                });
+              }
+              // Scale meal calories and macros
+              if (meal.calories) meal.calories = Math.round(meal.calories * scalingFactor);
+              if (meal.macros) {
+                meal.macros.protein = Math.round(meal.macros.protein * scalingFactor);
+                meal.macros.carbs = Math.round(meal.macros.carbs * scalingFactor);
+                meal.macros.fat = Math.round(meal.macros.fat * scalingFactor);
+                if (meal.macros.fiber) meal.macros.fiber = Math.round(meal.macros.fiber * scalingFactor);
+              }
+            });
+          }
+          // Scale daily totals
+          if (day.daily_totals) {
+            day.daily_totals.calories = Math.round(day.daily_totals.calories * scalingFactor);
+            day.daily_totals.protein = Math.round(day.daily_totals.protein * scalingFactor);
+            day.daily_totals.carbs = Math.round(day.daily_totals.carbs * scalingFactor);
+            day.daily_totals.fat = Math.round(day.daily_totals.fat * scalingFactor);
+            if (day.daily_totals.fiber) day.daily_totals.fiber = Math.round(day.daily_totals.fiber * scalingFactor);
+          }
+        });
+      }
+    });
+  }
+  
+  return scaledPlan;
+};
+
+// Progress Bar Component for Meal Plan Metrics
+interface ProgressBarProps {
+  label: string;
+  value: number;
+  color: string;
+  icon: string;
+}
+
+const ProgressBar: React.FC<ProgressBarProps> = ({ label, value, color, icon }) => {
+  return (
+    <View style={styles.progressBarContainer}>
+      <View style={styles.progressBarHeader}>
+        <View style={styles.progressBarLabelContainer}>
+          <Ionicons name={icon as any} size={16} color={color} />
+          <Text style={styles.progressBarLabel}>{label}</Text>
+        </View>
+        <Text style={[styles.progressBarValue, { color }]}>{value}%</Text>
+      </View>
+      <View style={styles.progressBarTrack}>
+        <View 
+          style={[
+            styles.progressBarFill, 
+            { 
+              backgroundColor: color, 
+              width: `${value}%` 
+            }
+          ]} 
+        />
+      </View>
+    </View>
+  );
+};
+
+export default function SampleMealPlansScreen() {
+  const { themeColor } = useTheme();
+  const { userProfile } = useMealPlanning();
+  const navigation = useNavigation<SampleMealPlansNavigationProp>();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedMealPlan, setSelectedMealPlan] = useState<SampleMealPlan | null>(null);
+
+  // Get user's target calories for scaling
+  const userCalories = userProfile?.macros?.calories;
+  
+  // Debug: Log the user profile and calories
+  console.log('User profile:', userProfile);
+  console.log('User calories:', userCalories);
+  console.log('Profile macros:', userProfile?.macros);
+  console.log('Is userCalories truthy?', !!userCalories);
+  
+  // Scale meal plans based on user's calorie target
+  const quickStartMealPlan = userCalories ? scaleMealPlan(balancedNutritionMealPlanData, userCalories) : balancedNutritionMealPlanData;
+  const ketoMealPlan = userCalories ? scaleMealPlan(ketoMealPlanData, userCalories) : ketoMealPlanData;
+  const muscleGainMealPlan = userCalories ? scaleMealPlan(muscleGainMealPlanData, userCalories) : muscleGainMealPlanData;
+  const quickStartStats = calculateMealPlanStats(quickStartMealPlan);
+  const ketoStats = calculateMealPlanStats(ketoMealPlan);
+  const muscleGainStats = calculateMealPlanStats(muscleGainMealPlan);
+  
+  // Calculate metrics for each meal plan
+  const quickStartMetrics = calculateMealPlanMetrics(quickStartStats);
+  const ketoMetrics = calculateMealPlanMetrics(ketoStats);
+  const muscleGainMetrics = calculateMealPlanMetrics(muscleGainStats);
+
+  const sampleMealPlans: SampleMealPlan[] = [
+    {
+      id: 'quick-start',
+      title: 'Quick Start - Balanced Nutrition',
+      description: 'Perfect starter meal plan',
+      duration: `${quickStartStats.totalDays} days • ${balancedNutritionMealPlanData.macro_targets.protein_pct}P/${balancedNutritionMealPlanData.macro_targets.carbs_pct}C/${balancedNutritionMealPlanData.macro_targets.fat_pct}F`,
+      uniqueRecipes: quickStartMetrics.uniqueMealCount,
+      difficulty: 'Balanced',
+      focus: 'Balanced Nutrition',
+      program: quickStartMealPlan, // This is already the scaled version
+      metrics: quickStartMetrics,
+      detailInfo: {
+        overview: 'A comprehensive 7-day balanced nutrition plan with easy-to-prepare meals that cover all macronutrients and provide sustainable energy throughout the day.',
+        highlights: [
+          '7 days of balanced meal planning',
+          'Quick 15-minute meal prep times',
+          'Beginner-friendly cooking techniques',
+          'Grocery list optimization',
+          'Nutritional variety and balance',
+          'Alternative ingredient suggestions'
+        ],
+        targetGoals: 'Establishing healthy eating habits with balanced macronutrients, steady energy levels, and sustainable meal planning practices',
+        mealTypes: '3 main meals per day with optimal breakfast, lunch, and dinner combinations focusing on protein, complex carbs, and healthy fats',
+        nutrition: 'Balanced macro split: 25% protein, 45% carbs, 30% fat with 1800-2200 calories per day depending on activity level',
+        cookingLevel: 'Beginner-friendly with simple techniques: mixing, basic cooking, minimal prep time requirements'
+      }
+    },
+    {
+      id: 'keto-14',
+      title: '14-Day Keto Kickstart',
+      description: 'Low-carb fat burning plan',
+      duration: `${ketoStats.totalDays} days • ${ketoMealPlanData.macro_targets.protein_pct}P/${ketoMealPlanData.macro_targets.carbs_pct}C/${ketoMealPlanData.macro_targets.fat_pct}F`,
+      uniqueRecipes: ketoMetrics.uniqueMealCount,
+      difficulty: 'High Variety',
+      focus: 'Ketogenic & Fat Loss',
+      program: ketoMealPlan, // This is already the scaled version
+      metrics: ketoMetrics,
+      detailInfo: {
+        overview: 'A comprehensive 14-day ketogenic meal plan designed to kickstart fat burning through strategic carb restriction and increased healthy fat intake.',
+        highlights: [
+          '2-week ketogenic protocol',
+          'Under 20g net carbs per day',
+          'High-quality fat sources',
+          'Electrolyte balance guidance',
+          'Ketosis tracking tips',
+          'Restaurant and travel adaptations'
+        ],
+        targetGoals: 'Enter ketosis for fat burning, reduce inflammation, stabilize blood sugar, and establish sustainable low-carb eating patterns',
+        mealTypes: 'High-fat breakfast, moderate lunch, and satisfying dinner with optional intermittent fasting windows',
+        nutrition: 'Ketogenic macro split: 25% protein, 5% carbs, 70% fat with 1600-2000 calories optimized for ketosis',
+        cookingLevel: 'Intermediate with emphasis on fat cooking techniques, meal timing, and macro tracking requirements'
+      }
+    },
+    {
+      id: 'muscle-gain-28',
+      title: 'Muscle Gain Pro',
+      description: 'High-protein muscle building',
+      duration: `${muscleGainStats.totalDays} days • ${muscleGainMealPlanData.macro_targets.protein_pct}P/${muscleGainMealPlanData.macro_targets.carbs_pct}C/${muscleGainMealPlanData.macro_targets.fat_pct}F`,
+      uniqueRecipes: muscleGainMetrics.uniqueMealCount,
+      difficulty: 'Meal Prep',
+      focus: 'Muscle Building & Performance',
+      program: muscleGainMealPlan, // This is already the scaled version
+      metrics: muscleGainMetrics,
+      detailInfo: {
+        overview: 'A focused 7-day high-protein muscle building plan with optimal macro ratios, strategic nutrient timing, and efficient meal prep techniques.',
+        highlights: [
+          '7-day muscle building protocol',
+          'High protein intake (30% of calories)',
+          'Pre and post-workout nutrition',
+          'Optimal 30P/40C/30F macro split',
+          'Efficient meal prep strategies',
+          'Complete amino acid profiles'
+        ],
+        targetGoals: 'Maximize muscle protein synthesis, support training recovery, and build lean mass with optimal nutrient timing',
+        mealTypes: '5 meals per day with strategic pre-workout, post-workout, and bedtime nutrition timing',
+        nutrition: 'Muscle building split: 30% protein, 40% carbs, 30% fat with 2800+ calories optimized for muscle growth',
+        cookingLevel: 'Intermediate meal prep techniques with batch cooking and efficient weekly preparation strategies'
+      }
+    }
+  ];
+
+  const handleCopyMealPlan = async (mealPlan: SampleMealPlan) => {
+    console.log('🎯 MEAL PLAN CARD PRESSED:', mealPlan.title);
+    console.log('🔍 Checking what we\'re about to copy:');
+    console.log('Base calories in program:', mealPlan.program.base_calories);
+    if (mealPlan.program.weeks?.[0]?.days?.[0]?.daily_totals) {
+      console.log('First day calories:', mealPlan.program.weeks[0].days[0].daily_totals.calories);
+    }
+    
+    const mealPlanJson = JSON.stringify(mealPlan.program, null, 2);
+    await Clipboard.setStringAsync(mealPlanJson);
+    
+    setCopiedId(mealPlan.id);
+    setTimeout(() => {
+      setCopiedId(null);
+    }, 1500);
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Meal Prep':
+        return '#22c55e'; // Green - easy/efficient
+      case 'Balanced':
+        return '#f59e0b'; // Orange - moderate
+      case 'High Variety':
+        return '#8b5cf6'; // Purple - creative/diverse
+      default:
+        return '#71717a';
+    }
+  };
+
+  const handleShowDetails = (mealPlan: SampleMealPlan) => {
+    console.log('ℹ️ INFO BUTTON PRESSED:', mealPlan.title);
+    
+    setSelectedMealPlan(mealPlan);
+    setShowDetailModal(true);
+  };
+
+
+  return (
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.simpleHeader}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={28} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Meal Plans</Text>
+          <View style={styles.calorieDisplay} pointerEvents="none">
+            <Text style={[styles.calorieText, { color: themeColor }]}>
+              {userCalories ? userCalories.toLocaleString() : '3,204'}
+            </Text>
+            <Text style={styles.calorieLabel}>cal target</Text>
+          </View>
+        </View>
+
+        {/* Beautiful fixed meal plan cards */}
+        {sampleMealPlans.map((mealPlan, index) => {
+          const imageUrls = [
+            'https://images.unsplash.com/photo-1547496502-affa22d38842?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+            'https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+            'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80'
+          ];
+          
+          return (
+            <View key={mealPlan.id} style={styles.cardContainer}>
+              <View style={styles.mealPlanCard}>
+                {/* Main card TouchableOpacity */}
+                <TouchableOpacity 
+                  onPress={() => handleCopyMealPlan(mealPlan)}
+                  activeOpacity={0.8}
+                  style={styles.cardTouchable}
+                >
+                  <ImageBackground
+                    style={styles.cardBackground}
+                    imageStyle={styles.cardImage}
+                    source={{ uri: imageUrls[index] }}
+                  >
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
+                      style={styles.cardGradient}
+                    >
+                      <View style={styles.cardContent}>
+                        <View style={styles.cardHeader}>
+                          <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(mealPlan.difficulty) }]}>
+                            <Text style={styles.difficultyText}>{mealPlan.difficulty}</Text>
+                          </View>
+                          {mealPlan.uniqueRecipes && (
+                            <View style={[styles.recipeCountBadge, { backgroundColor: `${themeColor}E6` }]}>
+                              <Text style={styles.recipeCountText}>{mealPlan.uniqueRecipes} recipes</Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <View style={styles.cardContent}>
+                          <Text style={styles.mealPlanTitle}>{mealPlan.title}</Text>
+                          <Text style={styles.mealPlanDescription}>{mealPlan.description}</Text>
+                          
+                          <View style={styles.cardFooter}>
+                            <View style={styles.cardFooterLeft}>
+                              <Text style={styles.focusText}>{mealPlan.focus}</Text>
+                              <Text style={styles.durationText}>{mealPlan.duration}</Text>
+                            </View>
+                            <TouchableOpacity 
+                              style={styles.inlineInfoButton}
+                              onPress={() => handleShowDetails(mealPlan)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="information-circle" size={28} color="rgba(255,255,255,0.9)" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  </ImageBackground>
+                </TouchableOpacity>
+                
+                {/* Copied Overlay */}
+                {copiedId === mealPlan.id && (
+                  <View style={styles.copiedOverlay}>
+                    <LinearGradient
+                      colors={[`${themeColor}F2`, `${themeColor}D9`]}
+                      style={styles.copiedGradient}
+                    >
+                      <View style={styles.copiedContent}>
+                        <Ionicons name="checkmark-circle" size={60} color="#ffffff" />
+                        <Text style={styles.copiedTitle}>Copied!</Text>
+                        <Text style={styles.copiedSubtitle}>{mealPlan.title} is ready to import</Text>
+                      </View>
+                    </LinearGradient>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        })}
+        
+
+        <View style={styles.trendsSection}>
+          <Text style={styles.sectionTitle}>Getting Started</Text>
+          <View style={styles.infoCard}>
+            <LinearGradient
+              colors={['#2d3748', '#1a202c']}
+              style={styles.infoGradient}
+            >
+              <View style={styles.infoContent}>
+                <View style={styles.infoIcon}>
+                  <Ionicons name="download-outline" size={24} color={themeColor} />
+                </View>
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoTitle}>How to Import</Text>
+                  <Text style={styles.infoDescription}>
+                    Tap any meal plan card to copy it to your clipboard, then return and use "Paste & Import"
+                  </Text>
+                </View>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        <View style={styles.bottomSection}>
+          <Text style={styles.bottomText}>More meal plans coming soon</Text>
+        </View>
+      </ScrollView>
+
+      {/* Detail Modal */}
+      <Modal
+        visible={showDetailModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowDetailModal(false)}
+      >
+        {selectedMealPlan && (
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{selectedMealPlan.title}</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setShowDetailModal(false)}
+              >
+                <Ionicons name="close" size={28} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <Text style={styles.overviewText}>{selectedMealPlan.detailInfo.overview}</Text>
+              
+              <View style={styles.highlightsSection}>
+                <Text style={styles.sectionTitle}>Key Features</Text>
+                {selectedMealPlan.detailInfo.highlights.map((highlight, idx) => (
+                  <View key={idx} style={styles.highlightItem}>
+                    <Ionicons name="checkmark" size={16} color={themeColor} />
+                    <Text style={styles.highlightText}>{highlight}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Target Goals</Text>
+                <Text style={styles.detailText}>{selectedMealPlan.detailInfo.targetGoals}</Text>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Meal Structure</Text>
+                <Text style={styles.detailText}>{selectedMealPlan.detailInfo.mealTypes}</Text>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Nutrition</Text>
+                <Text style={styles.detailText}>{selectedMealPlan.detailInfo.nutrition}</Text>
+              </View>
+
+              {/* Meal Plan Metrics Section */}
+              {selectedMealPlan.metrics && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.sectionTitle}>Plan Characteristics</Text>
+                  <View style={styles.metricsContainer}>
+                    <ProgressBar 
+                      label="Recipe Variety" 
+                      value={selectedMealPlan.metrics.variety} 
+                      color={themeColor} 
+                      icon="restaurant-outline" 
+                    />
+                    <ProgressBar 
+                      label="Cooking Frequency" 
+                      value={selectedMealPlan.metrics.cookingFrequency} 
+                      color="#f59e0b" 
+                      icon="flame-outline" 
+                    />
+                    <ProgressBar 
+                      label="Shopping Complexity" 
+                      value={selectedMealPlan.metrics.shoppingComplexity} 
+                      color="#ef4444" 
+                      icon="bag-outline" 
+                    />
+                    <ProgressBar 
+                      label="Time Investment" 
+                      value={selectedMealPlan.metrics.prepTime} 
+                      color="#8b5cf6" 
+                      icon="time-outline" 
+                    />
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Cooking Level</Text>
+                <Text style={styles.detailText}>{selectedMealPlan.detailInfo.cookingLevel}</Text>
+              </View>
+            </ScrollView>
+          </View>
+        )}
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0d1117',
+  },
+  simpleHeader: {
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 22,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: -0.3,
+  },
+  placeholder: {
+    width: 44,
+    height: 44,
+  },
+  calorieDisplay: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  calorieText: {
+    fontSize: 18,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  calorieLabel: {
+    fontSize: 12,
+    color: '#888',
+    lineHeight: 14,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  cardContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  mealPlanCard: {
+    borderRadius: 16,
+    height: 200,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  cardTouchable: {
+    width: '100%',
+    height: '100%',
+  },
+  cardBackground: {
+    width: '100%',
+    height: '100%',
+  },
+  cardImage: {
+    borderRadius: 16,
+  },
+  cardGradient: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  difficultyBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  difficultyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  recipeCountBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  recipeCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  cardContent: {
+    alignItems: 'flex-start',
+  },
+  mealPlanTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  mealPlanDescription: {
+    fontSize: 16,
+    color: '#ffffff',
+    marginBottom: 12,
+    opacity: 0.9,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  cardFooter: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  cardFooterLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  inlineInfoButton: {
+    marginLeft: 12,
+    padding: 4,
+  },
+  focusText: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '600',
+    opacity: 0.9,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  durationText: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '500',
+    opacity: 0.8,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  overviewText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  highlightsSection: {
+    marginBottom: 16,
+  },
+  highlightItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  highlightText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    flex: 1,
+  },
+  detailSection: {
+    marginBottom: 16,
+  },
+  detailText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 18,
+  },
+  trendsSection: {
+    marginTop: 32,
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 16,
+    letterSpacing: -0.3,
+  },
+  infoCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  infoGradient: {
+    padding: 20,
+  },
+  infoContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoIcon: {
+    width: 48,
+    height: 48,
+    backgroundColor: 'rgba(66, 153, 225, 0.2)',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  infoDescription: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 20,
+  },
+  bottomSection: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  bottomText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    fontStyle: 'italic',
+  },
+  copiedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  copiedGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  copiedContent: {
+    alignItems: 'center',
+  },
+  copiedTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginTop: 12,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  copiedSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    opacity: 0.9,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#0d1117',
+  },
+  modalHeader: {
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    flex: 1,
+  },
+  modalCloseButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 22,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  metricsContainer: {
+    gap: 16,
+  },
+  progressBarContainer: {
+    marginBottom: 4,
+  },
+  progressBarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressBarLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  progressBarLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  progressBarValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  progressBarTrack: {
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+});

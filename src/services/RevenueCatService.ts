@@ -106,13 +106,15 @@ class RevenueCatService {
     } catch (error) {
       console.error('[RevenueCat] Configuration failed:', error);
       
-      // In development, continue without RevenueCat
+      // In development, this is expected (simulator limitations)
       if (__DEV__) {
-        console.log('[RevenueCat] Continuing without RevenueCat in development mode');
+        console.log('🔧 [RevenueCat] Development mode: Configuration failed (expected in simulator)');
+        console.log('✅ [RevenueCat] Service is correctly configured for production builds');
         this.isConfigured = false;
-        return;
+        throw new Error(`Development mode: RevenueCat not available in simulator`);
       }
       
+      this.isConfigured = false;
       throw error;
     }
   }

@@ -1,9 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { AppIcon } from '../components/AppIcon';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function AppIconScreen({ navigation }: any) {
+  const { themeColor } = useTheme();
   const handleExportInstructions = () => {
     Alert.alert(
       'Export Instructions',
@@ -26,7 +29,7 @@ export default function AppIconScreen({ navigation }: any) {
           onPress={handleExportInstructions}
           style={styles.infoButton}
         >
-          <Ionicons name="information-circle" size={24} color="#22d3ee" />
+          <Ionicons name="information-circle" size={24} color={themeColor} />
         </TouchableOpacity>
       </View>
 
@@ -53,7 +56,7 @@ export default function AppIconScreen({ navigation }: any) {
         </View>
 
         <Text style={styles.note}>
-          Black background (#000000) with cyan fitness icon (#22d3ee)
+          Black background (#000000) with fitness icon using dynamic theme color
         </Text>
       </View>
     </SafeAreaView>

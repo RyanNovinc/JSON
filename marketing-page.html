@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Workout Generator - Transform Your Fitness with AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0b 0%, #1a1a1b 100%);
+            color: #ffffff;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .floating-logo {
+            position: fixed;
+            top: 30px;
+            left: 30px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #0a0a0b;
+            z-index: 1000;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: radial-gradient(ellipse at center, rgba(34, 211, 238, 0.1) 0%, transparent 70%);
+        }
+
+        .hero-content {
+            max-width: 800px;
+        }
+
+        .hero-title {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 50%, #0891b2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-subtitle {
+            font-size: 1.5rem;
+            color: #94a3b8;
+            margin-bottom: 40px;
+            font-weight: 300;
+        }
+
+        .cta-button {
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+            color: #0a0a0b;
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(34, 211, 238, 0.3);
+        }
+
+        .features {
+            padding: 120px 0;
+            background: linear-gradient(180deg, transparent 0%, rgba(34, 211, 238, 0.05) 50%, transparent 100%);
+        }
+
+        .features-title {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 80px;
+            color: #ffffff;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #22d3ee, #06b6d4, #0891b2);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+            transform-origin: left;
+        }
+
+        .feature-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            background: rgba(34, 211, 238, 0.1);
+            border-color: rgba(34, 211, 238, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 24px;
+            display: block;
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+
+        .feature-description {
+            color: #94a3b8;
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .ecosystem {
+            padding: 120px 0;
+        }
+
+        .ecosystem-title {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 24px;
+            color: #ffffff;
+        }
+
+        .ecosystem-subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 80px;
+            font-size: 1.2rem;
+        }
+
+        .ecosystem-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .ecosystem-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 32px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .ecosystem-card.available {
+            background: rgba(34, 211, 238, 0.1);
+            border-color: rgba(34, 211, 238, 0.3);
+        }
+
+        .ecosystem-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .ecosystem-icon {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .ecosystem-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+
+        .ecosystem-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-available {
+            background: rgba(34, 211, 238, 0.2);
+            color: #22d3ee;
+        }
+
+        .status-coming {
+            background: rgba(156, 163, 175, 0.2);
+            color: #9ca3af;
+        }
+
+        .download {
+            padding: 120px 0;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, transparent 100%);
+        }
+
+        .download-title {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 24px;
+            color: #ffffff;
+        }
+
+        .download-subtitle {
+            color: #94a3b8;
+            margin-bottom: 50px;
+            font-size: 1.2rem;
+        }
+
+        .app-store-badge {
+            display: inline-block;
+            margin: 0 10px;
+        }
+
+        .app-store-badge img {
+            height: 60px;
+            transition: transform 0.3s ease;
+        }
+
+        .app-store-badge:hover img {
+            transform: scale(1.05);
+        }
+
+        .footer {
+            padding: 60px 0;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .footer-text {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .footer-links {
+            margin: 20px 0;
+        }
+
+        .footer-links a {
+            color: #22d3ee;
+            text-decoration: none;
+            margin: 0 20px;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: #06b6d4;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .hero-subtitle {
+                font-size: 1.2rem;
+            }
+
+            .features-title,
+            .ecosystem-title,
+            .download-title {
+                font-size: 2rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .floating-logo {
+                top: 20px;
+                left: 20px;
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            .feature-card {
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="floating-logo">JSON</div>
+    
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">Transform Your Fitness<br>Powered by AI</h1>
+                <p class="hero-subtitle">Create personalized workout programs with AI assistants like ChatGPT and Claude. Import sophisticated training plans directly into your fitness app.</p>
+                <a href="#download" class="cta-button">Download Now</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+            <h2 class="features-title">Revolutionize Your Training</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">🤖</span>
+                    <h3 class="feature-title">AI-Powered Program Design</h3>
+                    <p class="feature-description">Leverage the expertise of advanced AI assistants to create personalized workout programs tailored to your goals, experience level, and available equipment.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📋</span>
+                    <h3 class="feature-title">Structured JSON Import</h3>
+                    <p class="feature-description">Import sophisticated periodized programs with progressive overload, exercise alternatives, and detailed coaching notes through our validated JSON system.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">💪</span>
+                    <h3 class="feature-title">Comprehensive Exercise Library</h3>
+                    <p class="feature-description">Access 350+ validated exercises with proper form cues, alternatives, and rest recommendations. Every movement is optimized for results and safety.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3 class="feature-title">Intelligent Progress Tracking</h3>
+                    <p class="feature-description">Track your workouts with built-in timers, progressive overload tracking, and detailed session logs. Monitor your transformation over time.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
+                    <h3 class="feature-title">Adaptive Training Modes</h3>
+                    <p class="feature-description">Switch between normal and quick workout modes. Every program includes optimized rest periods for both time-efficient and maximum-results sessions.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🎯</span>
+                    <h3 class="feature-title">Block Periodization</h3>
+                    <p class="feature-description">Experience professional-level program structure with training blocks, planned deloads, and systematic progression just like elite athletes use.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="ecosystem">
+        <div class="container">
+            <h2 class="ecosystem-title">Fitness Ecosystem Preview</h2>
+            <p class="ecosystem-subtitle">AI Workout Generator is part of a comprehensive fitness technology suite designed to revolutionize how you approach health and wellness.</p>
+            <div class="ecosystem-grid">
+                <div class="ecosystem-card available">
+                    <span class="ecosystem-icon">💪</span>
+                    <div class="ecosystem-name">AI Workout Generator</div>
+                    <span class="ecosystem-status status-available">Available Now</span>
+                </div>
+                <div class="ecosystem-card">
+                    <span class="ecosystem-icon">🍎</span>
+                    <div class="ecosystem-name">AI Nutrition Planner</div>
+                    <span class="ecosystem-status status-coming">Coming 2026</span>
+                </div>
+                <div class="ecosystem-card">
+                    <span class="ecosystem-icon">😴</span>
+                    <div class="ecosystem-name">Sleep Optimization Hub</div>
+                    <span class="ecosystem-status status-coming">Coming 2026</span>
+                </div>
+                <div class="ecosystem-card">
+                    <span class="ecosystem-icon">🧘</span>
+                    <div class="ecosystem-name">Mindfulness Tracker</div>
+                    <span class="ecosystem-status status-coming">Coming 2026</span>
+                </div>
+                <div class="ecosystem-card">
+                    <span class="ecosystem-icon">📈</span>
+                    <div class="ecosystem-name">Health Analytics Dashboard</div>
+                    <span class="ecosystem-status status-coming">Coming 2026</span>
+                </div>
+                <div class="ecosystem-card">
+                    <span class="ecosystem-icon">👥</span>
+                    <div class="ecosystem-name">Community Challenges</div>
+                    <span class="ecosystem-status status-coming">Coming 2026</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="download" class="download">
+        <div class="container">
+            <h2 class="download-title">Start Your AI-Powered Fitness Journey</h2>
+            <p class="download-subtitle">Join thousands of users who are transforming their fitness with AI-generated workout programs.</p>
+            <div>
+                <a href="https://apps.apple.com/app/ai-workout-generator" class="app-store-badge">
+                    <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store">
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-links">
+                <a href="https://ryannovinc.github.io/ai-workout-generator-support/">Support</a>
+                <a href="mailto:support@aiworkoutgenerator.app">Contact</a>
+                <a href="#privacy">Privacy Policy</a>
+                <a href="#terms">Terms of Service</a>
+            </div>
+            <p class="footer-text">
+                © 2026 Ryan Novince. ABN 47 908 118 705. All rights reserved.<br>
+                Designed and developed in Australia 🇦🇺
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

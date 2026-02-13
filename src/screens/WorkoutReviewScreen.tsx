@@ -4,16 +4,17 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   SafeAreaView,
   Modal,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory } from '../utils/storage';
+import { useTheme } from '../contexts/ThemeContext';
 
 type WorkoutReviewScreenNavigationProp = StackNavigationProp<RootStackParamList, 'WorkoutReview'>;
 type WorkoutReviewScreenRouteProp = RouteProp<RootStackParamList, 'WorkoutReview'>;
@@ -39,6 +40,7 @@ interface CompletionStats {
 }
 
 export default function WorkoutReviewScreen() {
+  const { themeColor } = useTheme();
   const navigation = useNavigation<WorkoutReviewScreenNavigationProp>();
   const route = useRoute<WorkoutReviewScreenRouteProp>();
   const { day, blockName, completionStats, currentWeek } = route.params;
@@ -177,7 +179,7 @@ export default function WorkoutReviewScreen() {
                       <View key={setIndex} style={styles.setRow}>
                         <Text style={styles.setNumber}>Set {set.setNumber}</Text>
                         <View style={styles.setData}>
-                          <Text style={styles.setWeight}>{set.weight} kg</Text>
+                          <Text style={[styles.setWeight, { color: themeColor }]}>{set.weight} kg</Text>
                           <Text style={styles.setSeparator}>×</Text>
                           <Text style={styles.setReps}>{set.reps} reps</Text>
                         </View>
@@ -407,7 +409,6 @@ const styles = StyleSheet.create({
   setWeight: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#22d3ee',
   },
   setSeparator: {
     fontSize: 14,

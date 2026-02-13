@@ -90,6 +90,7 @@ export default function NutritionHomeScreen({ route }: any) {
     nutritionGoals: false,
     budgetCooking: false,
     sleepOptimization: false,
+    fridgePantry: false,
     favoriteMeals: false,
   });
 
@@ -286,85 +287,15 @@ export default function NutritionHomeScreen({ route }: any) {
 
   const renderContent = () => {
     if (mealPlans.length === 0) {
-      // Check if both critical questionnaires are completed
-      const canGenerateAIPrompt = completionStatus.nutritionGoals && completionStatus.budgetCooking;
-      
-      if (canGenerateAIPrompt) {
-        return (
-          <View style={styles.emptyState}>
-            <Ionicons name="sparkles" size={64} color={themeColor} />
-            <Text style={styles.emptyTitle}>Ready to Generate AI Meal Plan</Text>
-            <Text style={styles.emptyDescription}>
-              You've completed the questionnaires! Generate your personalized AI prompt to create your meal plan.
-            </Text>
-            <TouchableOpacity
-              style={[styles.aiPromptButton, { backgroundColor: themeColor }]}
-              onPress={async () => {
-                try {
-                  const prompt = await generateUserMealPlanPrompt();
-                  await Clipboard.setStringAsync(prompt);
-                  setAiPromptCopied(true);
-                  setTimeout(() => {
-                    setAiPromptCopied(false);
-                  }, 3000);
-                } catch (error) {
-                  console.error('Error generating AI prompt:', error);
-                  Alert.alert('Error', error.message || 'Failed to generate AI prompt');
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="copy-outline" size={20} color="#0a0a0b" />
-              <Text style={styles.aiPromptButtonText}>
-                {aiPromptCopied ? 'AI Prompt Copied!' : 'Generate AI Prompt'}
-              </Text>
-            </TouchableOpacity>
-            <Text style={styles.aiPromptHelp}>
-              Paste this prompt into ChatGPT or Claude to generate your meal plan
-            </Text>
-          </View>
-        );
-      } else {
-        return (
-          <View style={styles.emptyState}>
-            <Ionicons name="restaurant-outline" size={64} color="#3f3f46" />
-            <Text style={styles.emptyTitle}>No Meal Plans Yet</Text>
-            <Text style={styles.emptyDescription}>
-              Complete the questionnaires to generate your first AI-powered meal plan or import a custom JSON meal plan.
-            </Text>
-            <View style={styles.questionnaireTasks}>
-              <TouchableOpacity
-                style={[styles.taskButton, completionStatus.nutritionGoals && styles.taskButtonCompleted]}
-                onPress={() => navigation.navigate('NutritionQuestionnaire' as any)}
-                activeOpacity={0.8}
-              >
-                <Ionicons 
-                  name={completionStatus.nutritionGoals ? "checkmark-circle" : "circle-outline"} 
-                  size={20} 
-                  color={completionStatus.nutritionGoals ? themeColor : "#71717a"} 
-                />
-                <Text style={[styles.taskButtonText, completionStatus.nutritionGoals && { color: themeColor }]}>
-                  Nutrition Goals
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.taskButton, completionStatus.budgetCooking && styles.taskButtonCompleted]}
-                onPress={() => navigation.navigate('BudgetCookingQuestionnaire' as any)}
-                activeOpacity={0.8}
-              >
-                <Ionicons 
-                  name={completionStatus.budgetCooking ? "checkmark-circle" : "circle-outline"} 
-                  size={20} 
-                  color={completionStatus.budgetCooking ? themeColor : "#71717a"} 
-                />
-                <Text style={[styles.taskButtonText, completionStatus.budgetCooking && { color: themeColor }]}>
-                  Budget & Cooking
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
-      }
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="restaurant-outline" size={80} color="#3f3f46" />
+          <Text style={styles.emptyTitle}>No Meal Plans Yet</Text>
+          <Text style={styles.emptyDescription}>
+            Create your first meal plan to get started with your nutrition journey.
+          </Text>
+        </View>
+      );
     }
 
     if (mealPlans.length === 1) {
@@ -613,7 +544,7 @@ export default function NutritionHomeScreen({ route }: any) {
           onPress={() => navigation.navigate('NutritionDashboard' as any)}
           activeOpacity={0.9}
         >
-          <Ionicons name="calendar-outline" size={24} color="#0a0a0b" />
+          <Ionicons name="nutrition-outline" size={24} color="#0a0a0b" />
         </TouchableOpacity>
       </View>
 
@@ -1587,5 +1518,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0a0a0b',
     textAlign: 'center',
+  },
+  // Empty state styles
+  emptyActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 32,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  emptyActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+    flex: 1,
+    justifyContent: 'center',
+    maxWidth: 160,
+  },
+  emptyActionText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

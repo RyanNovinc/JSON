@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
 export function AppIcon({ size = 1024 }: { size?: number }) {
+  const { themeColor } = useTheme();
   const iconSize = size * 0.6; // Icon takes up 60% of the total size
 
   return (
@@ -10,7 +12,7 @@ export function AppIcon({ size = 1024 }: { size?: number }) {
       <Ionicons 
         name="fitness" 
         size={iconSize} 
-        color="#22d3ee" 
+        color={themeColor} 
       />
     </View>
   );

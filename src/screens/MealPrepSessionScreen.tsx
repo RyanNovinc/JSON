@@ -271,7 +271,7 @@ export default function MealPrepSessionScreen() {
                           </View>
                           <View style={styles.mealStat}>
                             <Ionicons name="calendar" size={12} color="#71717a" />
-                            <Text style={styles.mealStatText}>1 week</Text>
+                            <Text style={styles.mealStatText}>{meal.weekly_meal_coverage?.length || 0}x/week</Text>
                           </View>
                         </View>
                       </TouchableOpacity>

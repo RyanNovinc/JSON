@@ -1,0 +1,380 @@
+{
+  "plan_name": "Muscle Gain Pro",
+  "description": "High-protein muscle building plan with optimal 30P/40C/30F macros",
+  "duration_days": 7,
+  "total_meals": 5,
+  "base_calories": 2515,
+  "macro_targets": {
+    "protein_pct": "30",
+    "carbs_pct": "40",
+    "fat_pct": "30",
+    "protein_g": 189,
+    "carbs_g": 252,
+    "fat_g": 84
+  },
+  "weeks": [
+    {
+      "week_number": 1,
+      "days": [
+        {
+          "day_name": "Monday",
+          "day_number": 1,
+          "daily_totals": {
+            "calories": 2515,
+            "protein": 189,
+            "carbs": 252,
+            "fat": 84,
+            "fiber": 37
+          },
+          "meals": [
+            {
+              "meal_name": "High-Protein Scrambled Eggs + Toast",
+              "meal_type": "breakfast",
+              "prep_time": 8,
+              "cook_time": 8,
+              "calories": 799,
+              "macros": {
+                "protein": 40,
+                "carbs": 45,
+                "fat": 55,
+                "fiber": 12
+              },
+              "ingredients": [
+                {
+                  "item": "Large eggs",
+                  "amount": "3.8",
+                  "unit": "whole",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Whole grain bread",
+                  "amount": "1.9",
+                  "unit": "slices",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Avocado",
+                  "amount": "94.2",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "1 medium avocado"
+                },
+                {
+                  "item": "Butter",
+                  "amount": "0.9",
+                  "unit": "tbsp",
+                  "scalable": true,
+                  "notes": "For cooking"
+                },
+                {
+                  "item": "Spinach",
+                  "amount": "94.2",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "Fresh baby spinach"
+                },
+                {
+                  "item": "Cherry tomatoes",
+                  "amount": "47.1",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "Halved"
+                },
+                {
+                  "item": "Cheddar cheese",
+                  "amount": "28.2",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "Grated"
+                }
+              ],
+              "instructions": [
+                "Toast bread slices until golden brown",
+                "Mash avocado with salt and pepper, spread on toast",
+                "Heat butter in non-stick pan over medium heat",
+                "Sauté spinach and tomatoes until spinach wilts",
+                "Scramble eggs until fluffy, add cheese in last 30 seconds",
+                "Serve scrambled eggs with avocado toast"
+              ]
+            },
+            {
+              "meal_name": "Chicken Curry Bowl",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 752,
+              "macros": {
+                "protein": 61,
+                "carbs": 58,
+                "fat": 31,
+                "fiber": 4
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken Curry Bowl",
+                  "amount": "1.0",
+                  "unit": "serving",
+                  "scalable": true,
+                  "notes": "From meal prep"
+                }
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 90 seconds",
+                "Stir and check temperature before eating"
+              ]
+            },
+            {
+              "meal_name": "Chicken with Roasted Potatoes",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 650,
+              "macros": {
+                "protein": 43,
+                "carbs": 54,
+                "fat": 28,
+                "fiber": 7
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken with Roasted Potatoes",
+                  "amount": "1.0",
+                  "unit": "serving",
+                  "scalable": true,
+                  "notes": "From meal prep"
+                }
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Protein Shake",
+              "meal_type": "snack",
+              "prep_time": 3,
+              "cook_time": 0,
+              "calories": 301,
+              "macros": {
+                "protein": 28,
+                "carbs": 33,
+                "fat": 7,
+                "fiber": 4
+              },
+              "ingredients": [
+                {
+                  "item": "Whey protein powder",
+                  "amount": "28.2",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "1 scoop"
+                },
+                {
+                  "item": "Banana",
+                  "amount": "113.0",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "1 medium banana"
+                },
+                {
+                  "item": "Almond milk",
+                  "amount": "282.5",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": "Unsweetened"
+                },
+                {
+                  "item": "Almond butter",
+                  "amount": "9.4",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "1 tsp"
+                }
+              ],
+              "instructions": [
+                "Add all ingredients to blender",
+                "Blend until smooth and creamy",
+                "Serve immediately"
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Tuesday",
+          "day_number": 2,
+          "daily_totals": {
+            "calories": 2515,
+            "protein": 189,
+            "carbs": 252,
+            "fat": 84,
+            "fiber": 37
+          },
+          "meals": [
+            {
+              "meal_name": "Protein Pancakes",
+              "meal_type": "breakfast",
+              "prep_time": 10,
+              "cook_time": 12,
+              "calories": 818,
+              "macros": {
+                "protein": 53,
+                "carbs": 118,
+                "fat": 18,
+                "fiber": 7
+              },
+              "ingredients": [
+                {
+                  "item": "Oat flour",
+                  "amount": "75.2",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Whey protein powder",
+                  "amount": "33.0",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Egg",
+                  "amount": "0.9",
+                  "unit": "whole",
+                  "scalable": true,
+                  "notes": "Large"
+                },
+                {
+                  "item": "Milk",
+                  "amount": "188.2",
+                  "unit": "ml",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Banana",
+                  "amount": "141.2",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "1 large banana, mashed"
+                },
+                {
+                  "item": "Maple syrup",
+                  "amount": "1.9",
+                  "unit": "tbsp",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Mix oat flour and protein powder in bowl",
+                "Mash banana and combine with egg and milk",
+                "Fold wet ingredients into dry ingredients until just combined",
+                "Cook pancakes in non-stick pan 2-3 minutes per side",
+                "Serve with maple syrup"
+              ]
+            },
+            {
+              "meal_name": "Chicken Curry Bowl",
+              "meal_type": "lunch",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 752,
+              "macros": {
+                "protein": 61,
+                "carbs": 58,
+                "fat": 31,
+                "fiber": 4
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken Curry Bowl",
+                  "amount": "1.0",
+                  "unit": "serving",
+                  "scalable": true,
+                  "notes": "From meal prep"
+                }
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 90 seconds",
+                "Stir and check temperature before eating"
+              ]
+            },
+            {
+              "meal_name": "Chicken with Roasted Potatoes",
+              "meal_type": "dinner",
+              "prep_time": 2,
+              "cook_time": 2,
+              "calories": 650,
+              "macros": {
+                "protein": 43,
+                "carbs": 54,
+                "fat": 28,
+                "fiber": 7
+              },
+              "ingredients": [
+                {
+                  "item": "Chicken with Roasted Potatoes",
+                  "amount": "1.0",
+                  "unit": "serving",
+                  "scalable": true,
+                  "notes": "From meal prep"
+                }
+              ],
+              "instructions": [
+                "Remove from fridge or thaw if frozen overnight",
+                "Reheat in microwave for 2 minutes",
+                "Check internal temperature reaches 165°F before eating"
+              ]
+            },
+            {
+              "meal_name": "Greek Yogurt with Nuts",
+              "meal_type": "snack",
+              "prep_time": 2,
+              "cook_time": 0,
+              "calories": 263,
+              "macros": {
+                "protein": 19,
+                "carbs": 14,
+                "fat": 17,
+                "fiber": 4
+              },
+              "ingredients": [
+                {
+                  "item": "Greek yogurt (0% fat)",
+                  "amount": "141.2",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": ""
+                },
+                {
+                  "item": "Mixed nuts",
+                  "amount": "23.5",
+                  "unit": "g",
+                  "scalable": true,
+                  "notes": "Almonds, walnuts"
+                },
+                {
+                  "item": "Honey",
+                  "amount": "0.9",
+                  "unit": "tbsp",
+                  "scalable": true,
+                  "notes": ""
+                }
+              ],
+              "instructions": [
+                "Add yogurt to bowl",
+                "Top with nuts and drizzle with honey"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

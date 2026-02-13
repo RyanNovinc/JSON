@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Workout Generator Support</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0b 0%, #1a1a1b 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding: 40px 0;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+            border-radius: 20px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #0a0a0b;
+        }
+
+        .title {
+            font-size: 48px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #94a3b8;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #22d3ee;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .contact-item {
+            background: rgba(34, 211, 238, 0.1);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid rgba(34, 211, 238, 0.2);
+        }
+
+        .contact-label {
+            font-size: 14px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .contact-value {
+            font-size: 18px;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .contact-email {
+            color: #22d3ee;
+            text-decoration: none;
+        }
+
+        .contact-email:hover {
+            text-decoration: underline;
+        }
+
+        .topics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .topic-card {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .topic-card:hover {
+            background: rgba(34, 211, 238, 0.1);
+            border-color: rgba(34, 211, 238, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .topic-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 24px;
+        }
+
+        .topic-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .topic-description {
+            font-size: 14px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        .info-list {
+            list-style: none;
+        }
+
+        .info-list li {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .info-list li:last-child {
+            border-bottom: none;
+        }
+
+        .check-icon {
+            color: #22d3ee;
+            font-size: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .title {
+                font-size: 36px;
+            }
+
+            .section {
+                padding: 24px;
+            }
+
+            .contact-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .topics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">JSON</div>
+            <h1 class="title">AI Workout Generator Support</h1>
+            <p class="subtitle">Get help with your AI-powered fitness journey. Our support team is here to assist you with any questions about workout generation, app features, or technical issues.</p>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">
+                <span>📧</span>
+                Contact Information
+            </h2>
+            <div class="contact-grid">
+                <div class="contact-item">
+                    <div class="contact-label">Email Support</div>
+                    <div class="contact-value">
+                        <a href="mailto:support@aiworkoutgenerator.app" class="contact-email">support@aiworkoutgenerator.app</a>
+                    </div>
+                </div>
+                <div class="contact-item">
+                    <div class="contact-label">Business Entity</div>
+                    <div class="contact-value">Ryan Novince</div>
+                </div>
+                <div class="contact-item">
+                    <div class="contact-label">ABN</div>
+                    <div class="contact-value">47 908 118 705</div>
+                </div>
+                <div class="contact-item">
+                    <div class="contact-label">Response Time</div>
+                    <div class="contact-value">24-48 hours</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">
+                <span>💪</span>
+                Support Topics
+            </h2>
+            <div class="topics-grid">
+                <div class="topic-card">
+                    <div class="topic-icon">🔐</div>
+                    <div class="topic-title">Account & Authentication</div>
+                    <div class="topic-description">Issues with login, account creation, or password recovery</div>
+                </div>
+                <div class="topic-card">
+                    <div class="topic-icon">💳</div>
+                    <div class="topic-title">In-App Purchases</div>
+                    <div class="topic-description">JSON Pro subscription, billing questions, and refund requests</div>
+                </div>
+                <div class="topic-card">
+                    <div class="topic-icon">🤖</div>
+                    <div class="topic-title">AI Assistant Integration</div>
+                    <div class="topic-description">Help with AI prompt usage, workout generation, and import issues</div>
+                </div>
+                <div class="topic-card">
+                    <div class="topic-icon">☁️</div>
+                    <div class="topic-title">Data Synchronization</div>
+                    <div class="topic-description">Workout data sync, cloud backup, and data export</div>
+                </div>
+                <div class="topic-card">
+                    <div class="topic-icon">📊</div>
+                    <div class="topic-title">Workout Tracking</div>
+                    <div class="topic-description">Exercise logging, progress tracking, and calendar features</div>
+                </div>
+                <div class="topic-card">
+                    <div class="topic-icon">✨</div>
+                    <div class="topic-title">Feature Requests</div>
+                    <div class="topic-description">Suggestions for new features or improvements</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">
+                <span>📋</span>
+                Before Contacting Support
+            </h2>
+            <p style="margin-bottom: 24px; color: #94a3b8; line-height: 1.6;">
+                To help us resolve your issue quickly, please include the following information in your support request:
+            </p>
+            <ul class="info-list">
+                <li>
+                    <span class="check-icon">✓</span>
+                    <div>
+                        <strong>Device Information:</strong> iOS/Android version, device model, and AI Workout Generator app version
+                    </div>
+                </li>
+                <li>
+                    <span class="check-icon">✓</span>
+                    <div>
+                        <strong>Detailed Description:</strong> What were you trying to do when the issue occurred?
+                    </div>
+                </li>
+                <li>
+                    <span class="check-icon">✓</span>
+                    <div>
+                        <strong>Steps to Reproduce:</strong> What exact steps led to the problem?
+                    </div>
+                </li>
+                <li>
+                    <span class="check-icon">✓</span>
+                    <div>
+                        <strong>Error Messages:</strong> Any specific error messages or codes you encountered
+                    </div>
+                </li>
+                <li>
+                    <span class="check-icon">✓</span>
+                    <div>
+                        <strong>Screenshots/Videos:</strong> Visual documentation of the issue (optional but helpful)
+                    </div>
+                </li>
+                <li>
+                    <span class="check-icon">✓</span>
+                    <div>
+                        <strong>AI Integration:</strong> Which AI assistant you're using (ChatGPT, Claude, etc.) and any specific prompts that caused issues
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

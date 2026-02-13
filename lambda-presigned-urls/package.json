@@ -1,0 +1,14 @@
+{
+  "name": "presigned-urls-generator",
+  "version": "1.0.0",
+  "description": "AWS Lambda function to generate presigned URLs for secure S3 uploads",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1500.0"
+  },
+  "author": "Ryan_Novinc",
+  "license": "ISC"
+}

@@ -4,16 +4,17 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
   SafeAreaView,
   Modal,
   Alert,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useTheme } from '../contexts/ThemeContext';
 
 type BlocksScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Blocks'>;
 type BlocksScreenRouteProp = RouteProp<RootStackParamList, 'Blocks'>;
@@ -28,6 +29,7 @@ interface Block {
 interface BlockCardProps {
   block: Block;
   onPress: () => void;
+  themeColor: string;
   onLongPress: () => void;
   isActive?: boolean;
   weekProgress?: {
@@ -39,7 +41,7 @@ interface BlockCardProps {
   };
 }
 
-function BlockCard({ block, onPress, onLongPress, isActive, weekProgress }: BlockCardProps) {
+function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeColor }: BlockCardProps) {
   const dayCount = block.days.length;
   
   // Count unique exercises for stats
@@ -50,8 +52,8 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress }: Bloc
     });
   });
   
-  // Use blue color only for active block, gray for others
-  const phaseColor = isActive ? '#22d3ee' : '#6b7280';
+  // Use theme color only for active block, gray for others
+  const phaseColor = isActive ? themeColor : '#6b7280';
   
   return (
     <TouchableOpacity 
@@ -63,21 +65,26 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress }: Bloc
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardTitle}>
-          <View style={styles.titleRow}>
-            <Text style={styles.blockName}>{block.block_name}</Text>
-            {isActive && (
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>ACTIVE</Text>
-              </View>
-            )}
-          </View>
+          <Text style={styles.blockName}>{block.block_name}</Text>
           <View style={[styles.phaseBadge, { backgroundColor: phaseColor + '20' }]}>
             <Text style={[styles.phaseText, { color: phaseColor }]}>
               {block.weeks.includes('-') ? 'Weeks' : 'Week'} {block.weeks}
             </Text>
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={24} color={isActive ? "#22d3ee" : "#6b7280"} />
+        <View style={styles.headerRight}>
+          {isActive ? (
+            <View style={[styles.activeBadge, { backgroundColor: themeColor }]}>
+              <Text style={styles.activeBadgeText}>ACTIVE</Text>
+            </View>
+          ) : weekProgress?.isComplete ? (
+            <View style={styles.completedBadge}>
+              <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+              <Text style={styles.completedBadgeText}>COMPLETE</Text>
+            </View>
+          ) : null}
+          <Ionicons name="chevron-forward" size={24} color={isActive ? themeColor : "#6b7280"} />
+        </View>
       </View>
       
       <View style={styles.cardBody}>
@@ -103,39 +110,49 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress }: Bloc
 
         {isActive && weekProgress && (
           <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>
-                Week {weekProgress.current} of {weekProgress.total}
-              </Text>
-              <Text style={[
-                styles.progressStatus,
-                { 
-                  color: weekProgress.isComplete 
-                    ? '#f59e0b' 
-                    : weekProgress.remaining <= 1 
-                      ? '#fbbf24' 
-                      : '#22d3ee' 
-                }
-              ]}>
-                {weekProgress.isComplete 
-                  ? 'Ready to advance' 
-                  : weekProgress.remaining === 1 
-                    ? 'Final week' 
-                    : `${weekProgress.remaining} weeks left`
-                }
-              </Text>
-            </View>
-            <View style={styles.progressBarContainer}>
-              <View 
-                style={[
-                  styles.progressBar, 
-                  { 
-                    width: `${Math.min((weekProgress.current / weekProgress.total) * 100, 100)}%`,
-                    backgroundColor: weekProgress.isComplete ? '#f59e0b' : '#22d3ee'
-                  }
-                ]} 
-              />
-            </View>
+            {weekProgress.isComplete ? (
+              <View style={styles.completedSection}>
+                <View style={styles.completedHeader}>
+                  <Ionicons name="trophy" size={20} color={themeColor} />
+                  <Text style={[styles.completedTitle, { color: themeColor }]}>Block Complete!</Text>
+                </View>
+                <Text style={styles.completedSubtext}>
+                  All {weekProgress.total} weeks completed
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>
+                    Week {weekProgress.current} of {weekProgress.total}
+                  </Text>
+                  <Text style={[
+                    styles.progressStatus,
+                    { 
+                      color: weekProgress.remaining <= 1 
+                        ? '#fbbf24' 
+                        : themeColor 
+                    }
+                  ]}>
+                    {weekProgress.remaining === 1 
+                      ? 'Final week' 
+                      : `${weekProgress.remaining} weeks left`
+                    }
+                  </Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <View 
+                    style={[
+                      styles.progressBar, 
+                      { 
+                        width: `${Math.min((weekProgress.current / weekProgress.total) * 100, 100)}%`,
+                        backgroundColor: themeColor
+                      }
+                    ]} 
+                  />
+                </View>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -146,10 +163,13 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress }: Bloc
 export default function BlocksScreen() {
   const navigation = useNavigation<BlocksScreenNavigationProp>();
   const route = useRoute<BlocksScreenRouteProp>();
-  const { routine } = route.params;
+  const { routine, initialBlock, initialWeek } = route.params;
+  const { themeColor } = useTheme();
   const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0); // Default to first block
   const [currentWeek, setCurrentWeek] = useState<number>(1); // Current week within active block
   const [blockStartDate, setBlockStartDate] = useState<string | null>(null);
+  const [completionBasedWeek, setCompletionBasedWeek] = useState<number>(1);
+  const [completionStatus, setCompletionStatus] = useState<{[blockName: string]: boolean}>({});
   const [showModal, setShowModal] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<{ block: Block; index: number } | null>(null);
   
@@ -161,37 +181,40 @@ export default function BlocksScreen() {
   }, []);
 
   useEffect(() => {
-    // Check if current block is complete and suggest advancement
-    if (activeBlockIndex !== -1 && blockStartDate) {
-      const progress = getWeekProgress(activeBlockIndex);
-      if (progress.isComplete && activeBlockIndex < routine.data.blocks.length - 1) {
-        // Show advancement suggestion after a short delay
-        setTimeout(() => {
-          showAdvancementSuggestion();
-        }, 1000);
-      }
+    if (activeBlockIndex !== -1) {
+      calculateCompletionBasedWeek();
+      checkAllBlocksCompletion();
     }
-  }, [activeBlockIndex, blockStartDate]);
+  }, [activeBlockIndex, routine]);
 
-  const showAdvancementSuggestion = () => {
-    const currentBlock = routine.data.blocks[activeBlockIndex];
-    const nextBlock = routine.data.blocks[activeBlockIndex + 1];
-    
-    if (nextBlock) {
-      Alert.alert(
-        "Block Complete! 🎉",
-        `You've completed "${currentBlock.block_name}"!\n\nReady to advance to "${nextBlock.block_name}"?`,
-        [
-          { text: "Stay Here", style: "cancel" },
-          { 
-            text: "Advance", 
-            onPress: () => saveActiveBlock(activeBlockIndex + 1),
-            style: "default"
-          }
-        ]
-      );
+  // Recalculate week progress when screen comes into focus (handles bookmark changes)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (activeBlockIndex !== -1) {
+        calculateCompletionBasedWeek();
+      }
+      checkAllBlocksCompletion();
+    }, [activeBlockIndex])
+  );
+
+  // Handle auto-navigation when coming from "Today" button
+  useEffect(() => {
+    if (initialBlock !== undefined && initialWeek !== undefined && routine.data.blocks[initialBlock]) {
+      // Set the active block and navigate to today's workout
+      setActiveBlockIndex(initialBlock);
+      
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        const block = routine.data.blocks[initialBlock];
+        navigation.navigate('Days' as any, { 
+          block, 
+          routineName: routine.name,
+          initialWeek: initialWeek
+        });
+      }, 100);
     }
-  };
+  }, [initialBlock, initialWeek, routine, navigation]);
+
 
   const loadActiveBlock = async () => {
     try {
@@ -246,6 +269,104 @@ export default function BlocksScreen() {
     }
   };
 
+  const calculateCompletionBasedWeek = async () => {
+    if (activeBlockIndex === -1) return;
+    
+    const block = routine.data.blocks[activeBlockIndex];
+    const totalWeeks = getBlockWeekCount(block.weeks);
+    
+    try {
+      // Check if user has manually bookmarked a week (using same key as DaysScreen)
+      const bookmarkKey = `bookmark_${block.block_name}`;
+      const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
+      if (savedBookmark) {
+        const { week, isBookmarked } = JSON.parse(savedBookmark);
+        if (isBookmarked && week >= 1 && week <= totalWeeks) {
+          // If bookmarked to final week, check if that week is completed
+          if (week === totalWeeks) {
+            const weekKey = `completed_${block.block_name}_week${week}`;
+            const completed = await AsyncStorage.getItem(weekKey);
+            
+            if (completed) {
+              const completedSet = new Set(JSON.parse(completed));
+              const allDaysCompleted = block.days.every(day => 
+                completedSet.has(`${day.day_name}_week${week}`)
+              );
+              
+              if (allDaysCompleted) {
+                setCompletionBasedWeek(totalWeeks + 1); // Mark as complete
+                return;
+              }
+            }
+          }
+          
+          setCompletionBasedWeek(week);
+          return;
+        }
+      }
+      
+      // No bookmark found, calculate based on completed workouts
+      for (let week = 1; week <= totalWeeks; week++) {
+        const weekKey = `completed_${block.block_name}_week${week}`;
+        const completed = await AsyncStorage.getItem(weekKey);
+        
+        if (!completed) {
+          // No workouts completed in this week yet
+          setCompletionBasedWeek(week);
+          return;
+        }
+        
+        const completedSet = new Set(JSON.parse(completed));
+        
+        // Check if all days in this week are completed
+        const allDaysCompleted = block.days.every(day => 
+          completedSet.has(`${day.day_name}_week${week}`)
+        );
+        
+        if (!allDaysCompleted) {
+          // This week is not fully completed
+          setCompletionBasedWeek(week);
+          return;
+        }
+      }
+      
+      // All weeks are completed, set to the last week + 1 (or cap at totalWeeks)
+      setCompletionBasedWeek(totalWeeks + 1);
+    } catch (error) {
+      console.error('Failed to calculate completion-based week:', error);
+      setCompletionBasedWeek(1);
+    }
+  };
+
+  const checkAllWeeksCompleted = async (block: Block, totalWeeks: number) => {
+    try {
+      for (let week = 1; week <= totalWeeks; week++) {
+        const weekKey = `completed_${block.block_name}_week${week}`;
+        const completed = await AsyncStorage.getItem(weekKey);
+        
+        if (!completed) {
+          return false; // Week has no completed workouts
+        }
+        
+        const completedSet = new Set(JSON.parse(completed));
+        
+        // Check if all days in this week are completed
+        const allDaysCompleted = block.days.every(day => 
+          completedSet.has(`${day.day_name}_week${week}`)
+        );
+        
+        if (!allDaysCompleted) {
+          return false; // Week is not fully completed
+        }
+      }
+      
+      return true; // All weeks are completed
+    } catch (error) {
+      console.error('Error checking all weeks completed:', error);
+      return false;
+    }
+  };
+
   // Helper functions for week calculations
   const getBlockWeekCount = (weeksString: string): number => {
     if (weeksString.includes('-')) {
@@ -256,29 +377,52 @@ export default function BlocksScreen() {
   };
 
   const getWeekProgress = (blockIndex: number) => {
-    if (blockIndex !== activeBlockIndex || !blockStartDate) {
-      return { current: 1, total: 1, remaining: 0, isComplete: false, isOverdue: false };
-    }
-
     const block = routine.data.blocks[blockIndex];
     const totalWeeks = getBlockWeekCount(block.weeks);
-    const startDate = new Date(blockStartDate);
-    const now = new Date();
-    const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const weeksSinceStart = Math.floor(daysSinceStart / 7) + 1;
     
-    const currentWeekInBlock = Math.min(weeksSinceStart, totalWeeks + 1);
-    const remaining = Math.max(0, totalWeeks - currentWeekInBlock + 1);
-    const isComplete = currentWeekInBlock > totalWeeks;
-    const isOverdue = currentWeekInBlock > totalWeeks;
+    if (blockIndex === activeBlockIndex) {
+      // For active block, use completion-based week calculation
+      const currentWeekInBlock = completionBasedWeek;
+      const remaining = Math.max(0, totalWeeks - currentWeekInBlock + 1);
+      const isComplete = currentWeekInBlock > totalWeeks;
+      
+      return {
+        current: Math.min(currentWeekInBlock, totalWeeks),
+        total: totalWeeks,
+        remaining,
+        isComplete,
+        isOverdue: false
+      };
+    } else {
+      // For non-active blocks, check if they're completed
+      const isComplete = checkBlockCompletionSync(block, totalWeeks);
+      
+      return {
+        current: isComplete ? totalWeeks : 1,
+        total: totalWeeks,
+        remaining: isComplete ? 0 : totalWeeks,
+        isComplete,
+        isOverdue: false
+      };
+    }
+  };
 
-    return {
-      current: currentWeekInBlock,
-      total: totalWeeks,
-      remaining,
-      isComplete,
-      isOverdue
-    };
+  const checkBlockCompletionSync = (block: Block, totalWeeks: number) => {
+    // This will be updated by the async function, but we need a sync version for rendering
+    // We'll use state to track completion status for each block
+    return completionStatus[block.block_name] || false;
+  };
+
+  const checkAllBlocksCompletion = async () => {
+    const newCompletionStatus: {[blockName: string]: boolean} = {};
+    
+    for (const block of routine.data.blocks) {
+      const totalWeeks = getBlockWeekCount(block.weeks);
+      const isComplete = await checkAllWeeksCompleted(block, totalWeeks);
+      newCompletionStatus[block.block_name] = isComplete;
+    }
+    
+    setCompletionStatus(newCompletionStatus);
   };
 
   function calculateTotalWeeks(blocks: Block[]): number {
@@ -354,6 +498,7 @@ export default function BlocksScreen() {
             onLongPress={() => handleBlockLongPress(item, index)}
             isActive={index === activeBlockIndex}
             weekProgress={getWeekProgress(index)}
+            themeColor={themeColor}
           />
         )}
         contentContainerStyle={styles.listContent}
@@ -369,12 +514,12 @@ export default function BlocksScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Ionicons name="checkmark-circle-outline" size={32} color="#22d3ee" />
+              <Ionicons name="checkmark-circle-outline" size={32} color={themeColor} />
               <Text style={styles.modalTitle}>Set Active Block</Text>
             </View>
             
             <Text style={styles.modalMessage}>
-              Set <Text style={styles.blockNameHighlight}>"{selectedBlock?.block.block_name}"</Text> as your active training block?
+              Set <Text style={[styles.blockNameHighlight, { color: themeColor }]}>"{selectedBlock?.block.block_name}"</Text> as your active training block?
             </Text>
             
             <View style={styles.modalButtons}>
@@ -387,7 +532,7 @@ export default function BlocksScreen() {
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
+                style={[styles.modalButton, styles.confirmButton, { backgroundColor: themeColor }]}
                 onPress={handleSetActive}
                 activeOpacity={0.8}
               >
@@ -456,35 +601,48 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 16,
   },
   cardTitle: {
     flex: 1,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
   },
   blockName: {
     fontSize: 20,
     fontWeight: '700',
     color: '#ffffff',
     lineHeight: 24,
-    flex: 1,
+    marginBottom: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   activeBadge: {
-    backgroundColor: '#22d3ee',
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    marginLeft: 8,
   },
   activeBadgeText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#0a0a0b',
+    letterSpacing: 0.5,
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    gap: 4,
+  },
+  completedBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#22c55e',
     letterSpacing: 0.5,
   },
   phaseBadge: {
@@ -568,6 +726,25 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 2,
   },
+  completedSection: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  completedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  completedTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  completedSubtext: {
+    fontSize: 12,
+    color: '#71717a',
+    fontWeight: '500',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -604,7 +781,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   blockNameHighlight: {
-    color: '#22d3ee',
     fontWeight: '600',
   },
   modalButtons: {
@@ -622,7 +798,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#27272a',
   },
   confirmButton: {
-    backgroundColor: '#22d3ee',
+    // backgroundColor set inline
   },
   cancelButtonText: {
     fontSize: 16,

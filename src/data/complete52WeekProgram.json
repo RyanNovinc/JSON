@@ -1,0 +1,100 @@
+{
+  "routine_name": "52-Week Advanced Hypertrophy Program",
+  "description": "A comprehensive 52-week periodized muscle growth program using an Upper/Lower split. Structured in 4-week mesocycles alternating between Accumulation (high volume), Intensification (heavier loads), and Deload phases. Prioritizes leg and calf development while building balanced overall musculature. Designed for advanced lifters with full gym access.",
+  "days_per_week": 4,
+  "blocks": [
+    {
+      "block_name": "Block 1 - Foundation Volume (Accumulation)",
+      "weeks": "1-4",
+      "structure": "Upper Lower",
+      "days": [
+        {
+          "day_name": "Upper A - Push Emphasis",
+          "estimated_duration": 90,
+          "exercises": [
+            {
+              "exercise": "Barbell Bench Press",
+              "sets": 4,
+              "reps": "8-12",
+              "reps_weekly": {"1": "12", "2": "10", "3": "8", "4": "8"},
+              "rest": 180,
+              "restQuick": 120,
+              "notes": "Control the eccentric, drive through chest. RPE 7-8.",
+              "alternatives": ["Dumbbell Bench Press", "Machine Chest Press"]
+            },
+            {
+              "exercise": "Incline Dumbbell Press",
+              "sets": 3,
+              "reps": "10-12",
+              "reps_weekly": {"1": "12", "2": "12", "3": "10", "4": "10"},
+              "rest": 120,
+              "restQuick": 90,
+              "notes": "30-45 degree angle. Full stretch at bottom.",
+              "alternatives": ["Incline Barbell Bench Press", "Incline Machine Press"]
+            },
+            {
+              "exercise": "Cable Fly",
+              "sets": 3,
+              "reps": "12-15",
+              "reps_weekly": {"1": "15", "2": "15", "3": "12", "4": "12"},
+              "rest": 60,
+              "restQuick": 45,
+              "notes": "Squeeze at peak contraction. Constant tension.",
+              "alternatives": ["Pec Deck", "Dumbbell Fly"]
+            },
+            {
+              "exercise": "Overhead Press",
+              "sets": 4,
+              "reps": "8-10",
+              "reps_weekly": {"1": "10", "2": "10", "3": "8", "4": "8"},
+              "rest": 150,
+              "restQuick": 100,
+              "notes": "Brace core, press in slight arc. RPE 7-8.",
+              "alternatives": ["Seated Dumbbell Press", "Machine Shoulder Press"]
+            },
+            {
+              "exercise": "Lateral Raise",
+              "sets": 4,
+              "reps": "12-15",
+              "reps_weekly": {"1": "15", "2": "15", "3": "12", "4": "12"},
+              "rest": 60,
+              "restQuick": 45,
+              "notes": "Slight forward lean, lead with elbows.",
+              "alternatives": ["Cable Lateral Raise", "Machine Lateral Raise"]
+            },
+            {
+              "exercise": "Push Up",
+              "sets": 3,
+              "reps": "15-20",
+              "reps_weekly": {"1": "20", "2": "20", "3": "15", "4": "15"},
+              "rest": 60,
+              "restQuick": 45,
+              "notes": "Full ROM. Add weight vest if needed.",
+              "alternatives": ["Incline Push Up", "Decline Push Up"]
+            },
+            {
+              "exercise": "Tricep Pushdown",
+              "sets": 3,
+              "reps": "12-15",
+              "reps_weekly": {"1": "15", "2": "15", "3": "12", "4": "12"},
+              "rest": 60,
+              "restQuick": 45,
+              "notes": "Lock elbows at sides. Full extension.",
+              "alternatives": ["Rope Pushdown", "V-Bar Pushdown"]
+            },
+            {
+              "exercise": "Overhead Tricep Extension",
+              "sets": 3,
+              "reps": "12-15",
+              "reps_weekly": {"1": "15", "2": "15", "3": "12", "4": "12"},
+              "rest": 60,
+              "restQuick": 45,
+              "notes": "Deep stretch at bottom. Control the weight.",
+              "alternatives": ["Overhead Cable Extension", "French Press"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

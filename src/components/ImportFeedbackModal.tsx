@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Modal,
   TextInput,
   Linking,
@@ -11,7 +10,9 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ImportFeedbackModalProps {
   visible: boolean;
@@ -24,12 +25,13 @@ export default function ImportFeedbackModal({
   onFeedback, 
   onSkip 
 }: ImportFeedbackModalProps) {
+  const { themeColor } = useTheme();
   const [selectedFeedback, setSelectedFeedback] = useState<'positive' | 'negative' | null>(null);
   const [negativeDetails, setNegativeDetails] = useState('');
 
   const handleThumbsUp = () => {
     setSelectedFeedback('positive');
-    setNegativeDetails(''); // Clear negative feedback if switching
+    setNegativeDetails('');
   };
 
   const handleThumbsDown = () => {
@@ -37,7 +39,7 @@ export default function ImportFeedbackModal({
   };
 
   const handleAppStoreRate = async () => {
-    const appStoreUrl = 'https://apps.apple.com/app/idYOUR_APP_ID'; // TODO: Replace with actual App Store URL
+    const appStoreUrl = 'https://apps.apple.com/au/app/json-09d4ce/id6758357834?action=write-review';
     try {
       await Linking.openURL(appStoreUrl);
     } catch (error) {
@@ -76,108 +78,115 @@ export default function ImportFeedbackModal({
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.modalContent, selectedFeedback && styles.modalContentExpanded]}>
-            <TouchableOpacity 
-              onPress={handleModalClose}
-              style={styles.skipButton}
-            >
-              <Ionicons name="close" size={20} color="#71717a" />
-            </TouchableOpacity>
-            
-            <View style={styles.successIcon}>
-              <Ionicons name="checkmark-circle" size={32} color="#22d3ee" />
+            {/* Close button container - positioned relative to modal content */}
+            <View style={styles.closeButtonContainer}>
+              <TouchableOpacity 
+                onPress={handleModalClose}
+                style={styles.closeButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={20} color="#71717a" />
+              </TouchableOpacity>
             </View>
             
+            {/* Success icon */}
+            <View style={styles.successIcon}>
+              <Ionicons name="checkmark-circle" size={32} color={themeColor} />
+            </View>
+            
+            {/* Title and subtitle */}
             <Text style={styles.title}>Import successful</Text>
             <Text style={styles.subtitle}>How was the experience?</Text>
           
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.feedbackButton,
-                selectedFeedback === 'positive' && styles.selectedPositive
-              ]}
-              onPress={handleThumbsUp}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="thumbs-up-outline" size={24} color={selectedFeedback === 'positive' ? '#22d3ee' : '#71717a'} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.feedbackButton,
-                selectedFeedback === 'negative' && styles.selectedNegative
-              ]}
-              onPress={handleThumbsDown}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="thumbs-down-outline" size={24} color={selectedFeedback === 'negative' ? '#ef4444' : '#71717a'} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Positive Feedback Follow-up */}
-          {selectedFeedback === 'positive' && (
-            <View style={styles.followUpSection}>
-              <Text style={styles.followUpText}>Great to hear!</Text>
-              <Text style={styles.followUpSubtext}>Would you mind rating us?</Text>
+            {/* Feedback buttons */}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.feedbackButton,
+                  selectedFeedback === 'positive' && [styles.selectedPositive, { borderColor: themeColor }]
+                ]}
+                onPress={handleThumbsUp}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="thumbs-up-outline" size={24} color={selectedFeedback === 'positive' ? themeColor : '#71717a'} />
+              </TouchableOpacity>
               
-              <View style={styles.followUpButtons}>
-                <TouchableOpacity
-                  style={styles.primaryActionButton}
-                  onPress={handleAppStoreRate}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.primaryActionText}>Rate on App Store</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={styles.secondaryActionButton}
-                  onPress={handleSubmitPositive}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.secondaryActionText}>Not now</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[
+                  styles.feedbackButton,
+                  selectedFeedback === 'negative' && styles.selectedNegative
+                ]}
+                onPress={handleThumbsDown}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="thumbs-down-outline" size={24} color={selectedFeedback === 'negative' ? '#ef4444' : '#71717a'} />
+              </TouchableOpacity>
             </View>
-          )}
 
-          {/* Negative Feedback Follow-up */}
-          {selectedFeedback === 'negative' && (
-            <View style={styles.followUpSection}>
-              <Text style={styles.followUpText}>Help us improve</Text>
-              
-              <TextInput
-                style={styles.textInput}
-                placeholder="What could be better?"
-                placeholderTextColor="#52525b"
-                multiline
-                numberOfLines={3}
-                value={negativeDetails}
-                onChangeText={setNegativeDetails}
-                autoFocus
-                returnKeyType="done"
-                blurOnSubmit={true}
-                onSubmitEditing={handleSubmitNegative}
-              />
-              
-              <View style={styles.followUpButtons}>
-                <TouchableOpacity
-                  style={styles.primaryActionButton}
-                  onPress={handleSubmitNegative}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.primaryActionText}>Send feedback</Text>
-                </TouchableOpacity>
+            {/* Positive Feedback Follow-up */}
+            {selectedFeedback === 'positive' && (
+              <View style={styles.followUpSection}>
+                <Text style={styles.followUpText}>Great to hear!</Text>
+                <Text style={styles.followUpSubtext}>Would you mind rating us?</Text>
                 
-                <TouchableOpacity
-                  style={styles.secondaryActionButton}
-                  onPress={() => onFeedback('negative')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.secondaryActionText}>Skip</Text>
-                </TouchableOpacity>
+                <View style={styles.followUpButtons}>
+                  <TouchableOpacity
+                    style={[styles.primaryActionButton, { backgroundColor: themeColor }]}
+                    onPress={handleAppStoreRate}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.primaryActionText}>Rate on App Store</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.secondaryActionButton}
+                    onPress={handleSubmitPositive}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.secondaryActionText}>Not now</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
+            )}
+
+            {/* Negative Feedback Follow-up */}
+            {selectedFeedback === 'negative' && (
+              <View style={styles.followUpSection}>
+                <Text style={styles.followUpText}>Help us improve</Text>
+                
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="What could be better?"
+                  placeholderTextColor="#52525b"
+                  multiline
+                  numberOfLines={3}
+                  value={negativeDetails}
+                  onChangeText={setNegativeDetails}
+                  autoFocus
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                  onSubmitEditing={handleSubmitNegative}
+                />
+                
+                <View style={styles.followUpButtons}>
+                  <TouchableOpacity
+                    style={[styles.primaryActionButton, { backgroundColor: themeColor }]}
+                    onPress={handleSubmitNegative}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.primaryActionText}>Send feedback</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.secondaryActionButton}
+                    onPress={() => onFeedback('negative')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.secondaryActionText}>Skip</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -206,22 +215,32 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     alignItems: 'center',
     marginVertical: 20,
+    position: 'relative',
   },
   modalContentExpanded: {
     maxWidth: 340,
   },
-  skipButton: {
+  closeButtonContainer: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 44,
+    alignItems: 'flex-end',
+    paddingTop: 16,
+    paddingRight: 16,
+    zIndex: 20,
+  },
+  closeButton: {
     width: 28,
     height: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+    borderRadius: 14,
   },
   successIcon: {
     marginBottom: 16,
+    marginTop: 8,
   },
   title: {
     fontSize: 18,
@@ -252,7 +271,6 @@ const styles = StyleSheet.create({
   },
   selectedPositive: {
     backgroundColor: '#065f46',
-    borderColor: '#22d3ee',
   },
   selectedNegative: {
     backgroundColor: '#450a0a',
@@ -282,7 +300,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   primaryActionButton: {
-    backgroundColor: '#22d3ee',
     borderRadius: 4,
     paddingVertical: 12,
     alignItems: 'center',

@@ -95,8 +95,8 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({
       console.error('[RevenueCatContext] Failed to initialize RevenueCat:', err);
       setError(err.message || 'Failed to initialize RevenueCat');
       
-      // Set mock data so app doesn't hang
-      setIsConfigured(true);
+      // Don't set isConfigured=true when configuration failed
+      setIsConfigured(false);
       setCustomerInfo(null);
       setOfferings([]);
       setCurrentOffering(null);

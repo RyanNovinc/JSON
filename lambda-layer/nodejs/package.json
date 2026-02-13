@@ -1,0 +1,9 @@
+{
+  "name": "video-recipe-dependencies",
+  "version": "1.0.0",
+  "description": "Dependencies for video recipe processor Lambda",
+  "dependencies": {
+    "openai": "^4.20.1",
+    "aws-sdk": "^2.1500.0"
+  }
+}

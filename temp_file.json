@@ -1,0 +1,2894 @@
+{
+  "plan_name": "Muscle Building 7-Day Plan",
+  "description": "High-protein muscle building plan with optimal 30P/40C/30F macros",
+  "duration_days": 7,
+  "total_meals": 5,
+  "macro_targets": {
+    "protein_pct": "30",
+    "carbs_pct": "40", 
+    "fat_pct": "30",
+    "protein_g": 210,
+    "carbs_g": 280,
+    "fat_g": 93
+  },
+  "meal_prep_session": {
+    "session_name": "Weekly Muscle Building Prep",
+    "prep_time": 45,
+    "cook_time": 135,
+    "total_time": 180,
+    "covers": "10 meal prep recipes that save you time throughout the week",
+    "focus": "Batch-cook proteins and grains for easy weekday meals",
+    "prep_meals": [
+      {
+        "meal_name": "Mediterranean Chicken Bowl",
+        "meal_type": "lunch",
+        "prep_time": 15,
+        "cook_time": 25,
+        "total_time": 40,
+        "servings": 7,
+        "calories": 520,
+        "macros": {
+          "protein": 45,
+          "carbs": 52,
+          "fat": 18
+        },
+        "times_used": 7,
+        "ingredients": [
+          {
+            "item": "Chicken breast",
+            "amount": "1400",
+            "unit": "g",
+            "scalable": true,
+            "notes": "200g per serving (7 servings)"
+          },
+          {
+            "item": "Brown rice (uncooked)",
+            "amount": "420",
+            "unit": "g",
+            "scalable": true,
+            "notes": "60g per serving, yields 840g cooked rice"
+          },
+          {
+            "item": "Cherry tomatoes",
+            "amount": "420",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Halved and roasted"
+          },
+          {
+            "item": "Red bell pepper",
+            "amount": "280",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Diced and roasted"
+          },
+          {
+            "item": "Red onion",
+            "amount": "140",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Thinly sliced"
+          },
+          {
+            "item": "Cucumber",
+            "amount": "280",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Diced fresh"
+          },
+          {
+            "item": "Kalamata olives",
+            "amount": "105",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Pitted and halved"
+          },
+          {
+            "item": "Feta cheese",
+            "amount": "140",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Crumbled"
+          },
+          {
+            "item": "Fresh lemon",
+            "amount": "3",
+            "unit": "whole",
+            "scalable": true,
+            "notes": "For marinade and dressing"
+          },
+          {
+            "item": "Extra virgin olive oil",
+            "amount": "84",
+            "unit": "ml",
+            "scalable": true,
+            "notes": "For marinade and dressing"
+          },
+          {
+            "item": "Fresh oregano",
+            "amount": "21",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Or 1.5 tbsp dried"
+          },
+          {
+            "item": "Garlic",
+            "amount": "4",
+            "unit": "cloves",
+            "scalable": true,
+            "notes": "Minced"
+          }
+        ],
+        "instructions": [
+          "MARINADE: Mix lemon juice, olive oil, oregano, garlic, salt and pepper",
+          "CHICKEN: Marinate chicken 30min+, then bake at 375°F for 25-30 minutes to 165°F internal",
+          "RICE: Cook rice with chicken broth and a squeeze of lemon for Mediterranean flavor",
+          "VEGETABLES: Roast tomatoes and bell peppers at 400°F for 20 minutes until caramelized",
+          "ASSEMBLY: Slice chicken, portion rice, add roasted vegetables, fresh cucumber, olives, and feta",
+          "STORAGE: Keeps 3-4 days fresh, freeze portions up to 3 months"
+        ]
+      },
+      {
+        "meal_name": "Protein Power Smoothie",
+        "meal_type": "snack",
+        "prep_time": 15,
+        "cook_time": 0,
+        "total_time": 15,
+        "servings": 4,
+        "calories": 380,
+        "macros": {
+          "protein": 30,
+          "carbs": 35,
+          "fat": 12
+        },
+        "times_used": 4,
+        "ingredients": [
+          {
+            "item": "Frozen berries",
+            "amount": "600",
+            "unit": "g",
+            "scalable": true,
+            "notes": "150g per smoothie (4 smoothies)"
+          },
+          {
+            "item": "Banana",
+            "amount": "4",
+            "unit": "whole",
+            "scalable": true,
+            "notes": "Sliced and frozen"
+          },
+          {
+            "item": "Spinach",
+            "amount": "120",
+            "unit": "g",
+            "scalable": true,
+            "notes": "30g per smoothie"
+          },
+          {
+            "item": "Protein powder",
+            "amount": "120",
+            "unit": "g",
+            "scalable": true,
+            "notes": "30g per smoothie"
+          }
+        ],
+        "instructions": [
+          "PREP PACKS: Portion berries, banana, spinach into 4 freezer bags",
+          "FREEZE: Store smoothie packs in freezer for up to 3 months",
+          "BLEND: Add protein powder and liquid when ready to drink",
+          "SERVE: Blend until smooth, add liquid as needed for consistency",
+          "STORAGE: Pre-portioned frozen packs, just add protein and blend"
+        ]
+      },
+      {
+        "meal_name": "Greek Yogurt with Berries & Nuts",
+        "meal_type": "snack",
+        "prep_time": 10,
+        "cook_time": 0,
+        "total_time": 10,
+        "servings": 3,
+        "calories": 340,
+        "macros": {
+          "protein": 25,
+          "carbs": 28,
+          "fat": 15
+        },
+        "times_used": 3,
+        "ingredients": [
+          {
+            "item": "Greek yogurt (0% fat)",
+            "amount": "600",
+            "unit": "g",
+            "scalable": true,
+            "notes": "200g per serving"
+          },
+          {
+            "item": "Mixed berries",
+            "amount": "225",
+            "unit": "g",
+            "scalable": true,
+            "notes": "75g per serving"
+          },
+          {
+            "item": "Mixed nuts",
+            "amount": "90",
+            "unit": "g",
+            "scalable": true,
+            "notes": "30g per serving"
+          }
+        ],
+        "instructions": [
+          "PORTION YOGURT: Divide Greek yogurt into 3 containers",
+          "PREP TOPPINGS: Wash berries, portion nuts into small bags",
+          "ASSEMBLY: Keep toppings separate until serving",
+          "SERVE: Add berries and nuts just before eating",
+          "STORAGE: Yogurt keeps 5-7 days, assemble fresh daily"
+        ]
+      },
+      {
+        "meal_name": "Apple with Peanut Butter",
+        "meal_type": "snack",
+        "prep_time": 5,
+        "cook_time": 0,
+        "total_time": 5,
+        "servings": 3,
+        "calories": 280,
+        "macros": {
+          "protein": 8,
+          "carbs": 25,
+          "fat": 18
+        },
+        "times_used": 3,
+        "ingredients": [
+          {
+            "item": "Medium apples",
+            "amount": "3",
+            "unit": "whole",
+            "scalable": true,
+            "notes": "Choose crisp varieties like Honeycrisp"
+          },
+          {
+            "item": "Natural peanut butter",
+            "amount": "90",
+            "unit": "g",
+            "scalable": true,
+            "notes": "30g per serving (2 tbsp)"
+          }
+        ],
+        "instructions": [
+          "WASH: Clean apples thoroughly under cold water",
+          "PORTION: Pre-portion peanut butter into small containers",
+          "SLICE: Cut apples just before eating to prevent browning",
+          "SERVE: Dip apple slices in peanut butter",
+          "STORAGE: Whole apples keep 1 week, slice fresh daily"
+        ]
+      },
+      {
+        "meal_name": "Mixed Nuts",
+        "meal_type": "snack", 
+        "prep_time": 2,
+        "cook_time": 0,
+        "total_time": 2,
+        "servings": 3,
+        "calories": 180,
+        "macros": {
+          "protein": 6,
+          "carbs": 6,
+          "fat": 15
+        },
+        "times_used": 3,
+        "ingredients": [
+          {
+            "item": "Mixed nuts (almonds, walnuts, cashews)",
+            "amount": "90",
+            "unit": "g",
+            "scalable": true,
+            "notes": "30g per serving"
+          }
+        ],
+        "instructions": [
+          "PORTION: Divide nuts into 3 small containers or bags",
+          "STORE: Keep in airtight containers at room temperature",
+          "SERVE: Perfect grab-and-go snack",
+          "STORAGE: Keeps fresh for 2-3 weeks in sealed containers"
+        ]
+      },
+      {
+        "meal_name": "High-Protein Pancakes",
+        "meal_type": "breakfast",
+        "prep_time": 10,
+        "cook_time": 12,
+        "total_time": 22,
+        "servings": 2,
+        "calories": 520,
+        "macros": {
+          "protein": 39,
+          "carbs": 52,
+          "fat": 17
+        },
+        "times_used": 2,
+        "ingredients": [
+          {
+            "item": "Oat flour",
+            "amount": "120",
+            "unit": "g",
+            "scalable": true,
+            "notes": "60g per serving"
+          },
+          {
+            "item": "Whey protein powder",
+            "amount": "60",
+            "unit": "g",
+            "scalable": true,
+            "notes": "30g per serving"
+          },
+          {
+            "item": "Eggs",
+            "amount": "2",
+            "unit": "whole",
+            "scalable": true,
+            "notes": "1 per serving"
+          },
+          {
+            "item": "Greek yogurt",
+            "amount": "100",
+            "unit": "g",
+            "scalable": true,
+            "notes": "For batter"
+          }
+        ],
+        "instructions": [
+          "MIX DRY: Combine oat flour, protein powder, baking powder",
+          "MIX WET: Whisk eggs, Greek yogurt, and milk",
+          "COMBINE: Mix wet and dry ingredients until just combined",
+          "COOK: Pour batter on griddle, cook 2-3 minutes per side",
+          "STORAGE: Freeze cooked pancakes up to 3 months, reheat in toaster"
+        ]
+      },
+      {
+        "meal_name": "Beef & Sweet Potato Power Bowl",
+        "meal_type": "dinner", 
+        "prep_time": 10,
+        "cook_time": 25,
+        "total_time": 35,
+        "servings": 2,
+        "calories": 580,
+        "macros": {
+          "protein": 42,
+          "carbs": 55,
+          "fat": 19
+        },
+        "times_used": 2,
+        "ingredients": [
+          {
+            "item": "Ground beef (90/10)",
+            "amount": "400",
+            "unit": "g",
+            "scalable": true,
+            "notes": "200g per serving"
+          },
+          {
+            "item": "Sweet potato",
+            "amount": "400",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Cubed for roasting"
+          },
+          {
+            "item": "Black beans",
+            "amount": "240",
+            "unit": "g",
+            "scalable": true,
+            "notes": "1 can, drained"
+          },
+          {
+            "item": "Brown rice (uncooked)",
+            "amount": "160",
+            "unit": "g",
+            "scalable": true,
+            "notes": "80g per serving"
+          }
+        ],
+        "instructions": [
+          "SWEET POTATO: Cube and roast at 400°F for 25-30 minutes",
+          "BEEF: Brown ground beef with onions and seasonings",
+          "RICE: Cook brown rice separately",
+          "ASSEMBLY: Layer rice, beef, sweet potato, and black beans",
+          "STORAGE: Keeps 3-4 days refrigerated, freeze up to 3 months"
+        ]
+      },
+      {
+        "meal_name": "Salmon & Quinoa Plate",
+        "meal_type": "dinner",
+        "prep_time": 5,
+        "cook_time": 20,
+        "total_time": 25,
+        "servings": 2,
+        "calories": 510,
+        "macros": {
+          "protein": 38,
+          "carbs": 48,
+          "fat": 18
+        },
+        "times_used": 2,
+        "ingredients": [
+          {
+            "item": "Salmon fillets",
+            "amount": "400",
+            "unit": "g",
+            "scalable": true,
+            "notes": "200g per serving"
+          },
+          {
+            "item": "Quinoa (uncooked)",
+            "amount": "160",
+            "unit": "g",
+            "scalable": true,
+            "notes": "80g per serving"
+          },
+          {
+            "item": "Asparagus",
+            "amount": "200",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Trimmed"
+          }
+        ],
+        "instructions": [
+          "QUINOA: Cook quinoa with vegetable broth",
+          "SALMON: Season and bake at 400°F for 12-15 minutes",
+          "VEGETABLES: Steam or roast asparagus until tender",
+          "ASSEMBLY: Plate quinoa, top with salmon and vegetables",
+          "STORAGE: Best fresh, but keeps 2-3 days refrigerated"
+        ]
+      },
+      {
+        "meal_name": "Egg White Scramble",
+        "meal_type": "breakfast",
+        "prep_time": 5,
+        "cook_time": 8,
+        "total_time": 13,
+        "servings": 2,
+        "calories": 180,
+        "macros": {
+          "protein": 24,
+          "carbs": 8,
+          "fat": 6
+        },
+        "times_used": 2,
+        "ingredients": [
+          {
+            "item": "Large eggs",
+            "amount": "8",
+            "unit": "whole",
+            "scalable": true,
+            "notes": "Use whites only, save yolks for other recipes"
+          },
+          {
+            "item": "Spinach",
+            "amount": "100",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Fresh baby spinach"
+          },
+          {
+            "item": "Bell pepper",
+            "amount": "100",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Diced"
+          }
+        ],
+        "instructions": [
+          "PREP EGGS: Separate egg whites from yolks",
+          "VEGETABLES: Sauté bell pepper and spinach until tender",
+          "SCRAMBLE: Add egg whites, scramble until fluffy",
+          "SEASON: Add salt, pepper, and herbs to taste",
+          "STORAGE: Best made fresh, but can prep vegetables ahead"
+        ]
+      },
+      {
+        "meal_name": "Protein Ice Cream",
+        "meal_type": "snack",
+        "prep_time": 8,
+        "cook_time": 0,
+        "total_time": 8,
+        "servings": 2,
+        "calories": 220,
+        "macros": {
+          "protein": 25,
+          "carbs": 20,
+          "fat": 6
+        },
+        "times_used": 2,
+        "ingredients": [
+          {
+            "item": "Frozen banana",
+            "amount": "2",
+            "unit": "whole",
+            "scalable": true,
+            "notes": "Sliced and frozen"
+          },
+          {
+            "item": "Protein powder",
+            "amount": "60",
+            "unit": "g",
+            "scalable": true,
+            "notes": "30g per serving"
+          },
+          {
+            "item": "Almond milk",
+            "amount": "100",
+            "unit": "ml",
+            "scalable": true,
+            "notes": "Unsweetened"
+          }
+        ],
+        "instructions": [
+          "FREEZE BANANAS: Slice and freeze bananas ahead of time",
+          "BLEND: Combine frozen bananas, protein powder, and almond milk",
+          "PROCESS: Blend until smooth and creamy like ice cream",
+          "SERVE: Eat immediately for soft-serve texture",
+          "STORAGE: Can refreeze for firmer texture"
+        ]
+      }
+    ],    "ingredients": [
+      {
+        "item": "Chicken breast",
+        "amount": "1000",
+        "unit": "g",
+        "scalable": true,
+        "notes": "For Mediterranean bowls - used 5x throughout week"
+      },
+      {
+        "item": "Ground beef (90/10)",
+        "amount": "400",
+        "unit": "g",
+        "scalable": true,
+        "notes": "For power bowls - Tuesday & Saturday dinners"
+      },
+      {
+        "item": "Salmon fillets",
+        "amount": "400",
+        "unit": "g",
+        "scalable": true,
+        "notes": "For quinoa plates - Thursday & Sunday dinners"
+      },
+      {
+        "item": "Brown rice (uncooked)",
+        "amount": "300",
+        "unit": "g",
+        "scalable": true,
+        "notes": "For Mediterranean bowls"
+      },
+      {
+        "item": "Mediterranean vegetables",
+        "amount": "1000",
+        "unit": "g",
+        "scalable": true,
+        "notes": "Cherry tomatoes, bell peppers, cucumber, red onion"
+      },
+      {
+        "item": "Sweet potatoes",
+        "amount": "600",
+        "unit": "g",
+        "scalable": true,
+        "notes": "For beef power bowls"
+      },
+      {
+        "item": "Quinoa (uncooked)",
+        "amount": "150",
+        "unit": "g",
+        "scalable": true,
+        "notes": "High-protein grain for salmon plates"
+      },
+      {
+        "item": "Mediterranean pantry",
+        "amount": "1",
+        "unit": "set",
+        "scalable": true,
+        "notes": "Olive oil, lemons, oregano, garlic, feta, olives"
+      }
+    ],
+    "equipment_needed": [
+      "Large skillet for proteins",
+      "Baking sheets for roasting",
+      "Medium pots for rice and quinoa",
+      "Sharp knives and cutting boards",
+      "Glass meal prep containers (10-12)",
+      "Measuring cups and spoons"
+    ],
+    "instructions": [
+      "MARINADE PREP (10 min): Make Mediterranean marinade with lemon, olive oil, oregano, garlic",
+      "MARINATE CHICKEN (30 min): Season chicken with marinade while you prep other ingredients",
+      "START GRAINS (5 min): Begin brown rice and quinoa in separate pots - cook with lemon for flavor",
+      "ROAST VEGETABLES (25 min): Cherry tomatoes, bell peppers, and sweet potatoes at 400°F", 
+      "COOK PROTEINS (35 min): Bake marinated chicken, brown ground beef in skillet",
+      "COOL AND PORTION (45 min): Let everything cool, slice proteins, assemble Mediterranean bowls",
+      "STORAGE OPTIONS: Choose freeze strategy (5 bowls at once) OR mini-prep strategy (3 + 2)",
+      "FRESH COMPONENTS: Keep feta, cucumber, and olives separate for freshest taste"
+    ],
+    "storage_guidelines": {
+      "freeze_strategy": "Mediterranean bowls: 3 days fresh + 2 freeze well for 3 months. Thaw 24hrs before eating.",
+      "mini_prep_strategy": "Make 3 bowls Sunday, 2 more Wednesday. Always fresh, 3-4 days max.",
+      "fresh_components": "Store feta, cucumber, olives separately. Add after reheating.",
+      "food_safety": "Never leave at room temp >2hrs. Reheat to 165°F internal temperature."
+    },
+    "prep_meals": [
+      {
+        "meal_name": "Mediterranean Chicken Bowl",
+        "meal_type": "lunch",
+        "prep_time": 15,
+        "cook_time": 35,
+        "total_time": 50,
+        "servings": 5,
+        "calories": 650,
+        "macros": {
+          "protein": 48,
+          "carbs": 65,
+          "fat": 22,
+          "fiber": 4
+        },
+        "weekly_meal_coverage": [
+          {"day": "Monday", "meal_type": "lunch"},
+          {"day": "Tuesday", "meal_type": "lunch"},
+          {"day": "Wednesday", "meal_type": "lunch"},
+          {"day": "Thursday", "meal_type": "lunch"},
+          {"day": "Friday", "meal_type": "lunch"}
+        ],
+        "ingredients": [
+          {
+            "item": "Chicken breast",
+            "amount": "1000",
+            "unit": "g",
+            "scalable": true,
+            "notes": "200g per serving (5 servings)"
+          },
+          {
+            "item": "Brown rice (uncooked)",
+            "amount": "300",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Will yield 600g cooked rice"
+          },
+          {
+            "item": "Cherry tomatoes",
+            "amount": "300",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Halved and roasted"
+          },
+          {
+            "item": "Red bell pepper",
+            "amount": "200",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Diced and roasted"
+          },
+          {
+            "item": "Red onion",
+            "amount": "100",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Thinly sliced"
+          },
+          {
+            "item": "Cucumber",
+            "amount": "200",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Diced fresh"
+          },
+          {
+            "item": "Kalamata olives",
+            "amount": "75",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Pitted and halved"
+          },
+          {
+            "item": "Feta cheese",
+            "amount": "100",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Crumbled"
+          },
+          {
+            "item": "Fresh lemon",
+            "amount": "2",
+            "unit": "whole",
+            "scalable": true,
+            "notes": "For marinade and dressing"
+          },
+          {
+            "item": "Extra virgin olive oil",
+            "amount": "60",
+            "unit": "ml",
+            "scalable": true,
+            "notes": "For marinade and dressing"
+          },
+          {
+            "item": "Fresh oregano",
+            "amount": "15",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Or 1 tbsp dried"
+          },
+          {
+            "item": "Garlic",
+            "amount": "3",
+            "unit": "cloves",
+            "scalable": true,
+            "notes": "Minced"
+          }
+        ],
+        "instructions": [
+          "MARINADE: Mix lemon juice, olive oil, oregano, garlic, salt and pepper",
+          "CHICKEN: Marinate chicken 30min+, then bake at 375°F for 25-30 minutes to 165°F internal",
+          "RICE: Cook rice with chicken broth and a squeeze of lemon for Mediterranean flavor",
+          "VEGETABLES: Roast tomatoes and bell peppers at 400°F for 20 minutes until caramelized",
+          "ASSEMBLY: Slice chicken, portion rice, add roasted vegetables, fresh cucumber, olives, and feta",
+          "STORAGE: See storage options below for 3-day fresh vs freeze strategy"
+        ],
+        "storage_options": {
+          "option_a_freeze": {
+            "title": "Freeze Strategy (One Big Prep)",
+            "instructions": [
+              "Make all 5 bowls on prep day",
+              "Store 3 bowls in fridge (use Days 1-3)",
+              "Store 2 bowls in freezer immediately",
+              "Thaw frozen bowls in fridge 24hrs before eating",
+              "Add fresh feta and cucumber after reheating"
+            ],
+            "pros": "One prep session, done for the week",
+            "food_safety": "Safe for 3 days fresh, 3 months frozen"
+          },
+          "option_b_mini_prep": {
+            "title": "Mini-Prep Strategy (Always Fresh)",
+            "instructions": [
+              "Sunday: Make 3 bowls for Mon-Wed",
+              "Wednesday: Quick 15-min prep for 2 more bowls (Thu-Fri)",
+              "All bowls stay fresh in fridge",
+              "Reheat and add fresh feta/cucumber daily"
+            ],
+            "pros": "Always eating fresh, no freezer space needed",
+            "food_safety": "Maximum freshness, 3-4 days refrigerated"
+          }
+        },
+        "meal_prep_notes": "Mediterranean flavors make this much more exciting than plain chicken & rice. Choose storage method based on your schedule!",
+        "equipment_needed": ["Baking sheet", "Rice pot", "Mixing bowls", "5 containers", "Freezer bags (if using freeze option)"]
+      },
+      {
+        "meal_name": "Beef & Sweet Potato Power Bowl",
+        "meal_type": "dinner",
+        "prep_time": 8,
+        "cook_time": 25,
+        "total_time": 33,
+        "servings": 2,
+        "calories": 720,
+        "macros": {
+          "protein": 54,
+          "carbs": 72,
+          "fat": 24,
+          "fiber": 8
+        },
+        "weekly_meal_coverage": [
+          {"day": "Tuesday", "meal_type": "dinner"},
+          {"day": "Saturday", "meal_type": "dinner"}
+        ],
+        "ingredients": [
+          {
+            "item": "Ground beef (90/10)",
+            "amount": "400",
+            "unit": "g",
+            "scalable": true,
+            "notes": "200g per serving"
+          },
+          {
+            "item": "Sweet potatoes",
+            "amount": "600",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Cubed and roasted"
+          },
+          {
+            "item": "Bell peppers",
+            "amount": "200",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Mixed colors for nutrients"
+          }
+        ],
+        "instructions": [
+          "Cube sweet potatoes and roast at 400°F for 20-25 minutes",
+          "Brown ground beef with seasonings",
+          "Sauté bell peppers until tender",
+          "Combine in bowls with sweet potatoes as base"
+        ],
+        "meal_prep_notes": "High-protein, complex carbs perfect for muscle growth.",
+        "equipment_needed": ["Baking sheet", "Skillet", "2 containers"]
+      },
+      {
+        "meal_name": "Salmon & Quinoa Plate",
+        "meal_type": "dinner",
+        "prep_time": 5,
+        "cook_time": 20,
+        "total_time": 25,
+        "servings": 2,
+        "calories": 680,
+        "macros": {
+          "protein": 51,
+          "carbs": 54,
+          "fat": 23,
+          "fiber": 6
+        },
+        "weekly_meal_coverage": [
+          {"day": "Thursday", "meal_type": "dinner"},
+          {"day": "Sunday", "meal_type": "dinner"}
+        ],
+        "ingredients": [
+          {
+            "item": "Salmon fillets",
+            "amount": "400",
+            "unit": "g",
+            "scalable": true,
+            "notes": "200g per serving"
+          },
+          {
+            "item": "Quinoa (uncooked)",
+            "amount": "150",
+            "unit": "g",
+            "scalable": true,
+            "notes": "High-protein grain"
+          },
+          {
+            "item": "Asparagus",
+            "amount": "300",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Trim woody ends"
+          }
+        ],
+        "instructions": [
+          "Cook quinoa with vegetable broth for 15 minutes",
+          "Pan-sear salmon 4-5 minutes per side until flaky",
+          "Steam asparagus until crisp-tender",
+          "Portion quinoa, salmon, and asparagus into containers"
+        ],
+        "meal_prep_notes": "Omega-3 rich salmon with complete protein quinoa.",
+        "equipment_needed": ["Medium pot", "Skillet", "Steamer", "2 containers"]
+      }
+    ]
+  },
+  "weeks": [
+    {
+      "week_number": 1,
+      "meal_prep_session": {
+        "session_name": "Weekly Muscle Building Prep",
+        "prep_time": 30,
+        "cook_time": 90,
+        "total_time": 120,
+        "covers": "10 meal prep recipes that save you time throughout the week",
+        "focus": "Batch-cook proteins and grains for easy weekday meals",
+        "prep_meals": [
+          {
+            "meal_name": "Mediterranean Chicken Bowl",
+            "meal_type": "lunch",
+            "prep_time": 15,
+            "cook_time": 25,
+            "total_time": 40,
+            "servings": 5,
+            "calories": 520,
+            "macros": {
+              "protein": 45,
+              "carbs": 52,
+              "fat": 18
+            },
+            "times_used": 7,
+            "ingredients": [
+              {
+                "item": "Chicken breast",
+                "amount": "1400",
+                "unit": "g",
+                "scalable": true,
+                "notes": "200g per serving (7 servings)"
+              },
+              {
+                "item": "Brown rice (uncooked)",
+                "amount": "420",
+                "unit": "g",
+                "scalable": true,
+                "notes": "60g per serving, yields 840g cooked rice"
+              },
+              {
+                "item": "Cherry tomatoes",
+                "amount": "420",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Halved and roasted"
+              },
+              {
+                "item": "Red bell pepper",
+                "amount": "280",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Diced and roasted"
+              },
+              {
+                "item": "Red onion",
+                "amount": "100",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Thinly sliced"
+              },
+              {
+                "item": "Cucumber",
+                "amount": "200",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Diced fresh"
+              },
+              {
+                "item": "Kalamata olives",
+                "amount": "75",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Pitted and halved"
+              },
+              {
+                "item": "Feta cheese",
+                "amount": "100",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Crumbled"
+              },
+              {
+                "item": "Fresh lemon",
+                "amount": "2",
+                "unit": "whole",
+                "scalable": true,
+                "notes": "For marinade and dressing"
+              },
+              {
+                "item": "Extra virgin olive oil",
+                "amount": "60",
+                "unit": "ml",
+                "scalable": true,
+                "notes": "For marinade and dressing"
+              },
+              {
+                "item": "Fresh oregano",
+                "amount": "15",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Or 1 tbsp dried"
+              },
+              {
+                "item": "Garlic",
+                "amount": "3",
+                "unit": "cloves",
+                "scalable": true,
+                "notes": "Minced"
+              }
+            ],
+            "instructions": [
+              "MARINADE: Mix lemon juice, olive oil, oregano, garlic, salt and pepper",
+              "CHICKEN: Marinate chicken 30min+, then bake at 375°F for 25-30 minutes to 165°F internal",
+              "RICE: Cook rice with chicken broth and a squeeze of lemon for Mediterranean flavor",
+              "VEGETABLES: Roast tomatoes and bell peppers at 400°F for 20 minutes until caramelized",
+              "ASSEMBLY: Slice chicken, portion rice, add roasted vegetables, fresh cucumber, olives, and feta",
+              "STORAGE: See storage options below for 3-day fresh vs freeze strategy"
+            ]
+          },
+          {
+            "meal_name": "Beef Power Bowl",
+            "meal_type": "dinner", 
+            "prep_time": 10,
+            "cook_time": 20,
+            "total_time": 30,
+            "servings": 2,
+            "calories": 580,
+            "macros": {
+              "protein": 42,
+              "carbs": 55,
+              "fat": 19
+            },
+            "times_used": 2,
+            "ingredients": [
+              {
+                "item": "Ground beef (90/10)",
+                "amount": "400",
+                "unit": "g",
+                "scalable": true,
+                "notes": "200g per serving"
+              },
+              {
+                "item": "Sweet potato",
+                "amount": "400",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Cubed for roasting"
+              },
+              {
+                "item": "Black beans",
+                "amount": "240",
+                "unit": "g",
+                "scalable": true,
+                "notes": "1 can, drained"
+              },
+              {
+                "item": "Brown rice (uncooked)",
+                "amount": "160",
+                "unit": "g",
+                "scalable": true,
+                "notes": "80g per serving"
+              }
+            ],
+            "instructions": [
+              "SWEET POTATO: Cube and roast at 400°F for 25-30 minutes",
+              "BEEF: Brown ground beef with onions and seasonings",
+              "RICE: Cook brown rice separately",
+              "ASSEMBLY: Layer rice, beef, sweet potato, and black beans",
+              "STORAGE: Keeps 3-4 days refrigerated, freeze up to 3 months"
+            ]
+          },
+          {
+            "meal_name": "Salmon Quinoa Plate",
+            "meal_type": "dinner",
+            "prep_time": 5,
+            "cook_time": 20,
+            "total_time": 25,
+            "servings": 2,
+            "calories": 510,
+            "macros": {
+              "protein": 38,
+              "carbs": 48,
+              "fat": 18
+            },
+            "times_used": 2,
+            "ingredients": [
+              {
+                "item": "Salmon fillets",
+                "amount": "400",
+                "unit": "g",
+                "scalable": true,
+                "notes": "200g per serving"
+              },
+              {
+                "item": "Quinoa (uncooked)",
+                "amount": "160",
+                "unit": "g",
+                "scalable": true,
+                "notes": "80g per serving"
+              },
+              {
+                "item": "Asparagus",
+                "amount": "200",
+                "unit": "g",
+                "scalable": true,
+                "notes": "Trimmed"
+              }
+            ],
+            "instructions": [
+              "QUINOA: Cook quinoa with vegetable broth",
+              "SALMON: Season and bake at 400°F for 12-15 minutes",
+              "VEGETABLES: Steam or roast asparagus until tender",
+              "ASSEMBLY: Plate quinoa, top with salmon and vegetables",
+              "STORAGE: Best fresh, but keeps 2-3 days refrigerated"
+            ]
+          },
+          {
+            "meal_name": "High-Protein Pancakes",
+            "meal_type": "breakfast",
+            "prep_time": 10,
+            "cook_time": 12,
+            "total_time": 22,
+            "servings": 4,
+            "calories": 520,
+            "macros": {
+              "protein": 39,
+              "carbs": 52,
+              "fat": 17
+            },
+            "times_used": 2,
+            "ingredients": [
+              {
+                "item": "Oat flour",
+                "amount": "240",
+                "unit": "g",
+                "scalable": true,
+                "notes": "60g per serving (4 total)"
+              },
+              {
+                "item": "Whey protein powder",
+                "amount": "120",
+                "unit": "g",
+                "scalable": true,
+                "notes": "30g per serving"
+              },
+              {
+                "item": "Eggs",
+                "amount": "4",
+                "unit": "whole",
+                "scalable": true,
+                "notes": "1 per serving"
+              },
+              {
+                "item": "Greek yogurt",
+                "amount": "200",
+                "unit": "g",
+                "scalable": true,
+                "notes": "For batter"
+              }
+            ],
+            "instructions": [
+              "MIX DRY: Combine oat flour, protein powder, baking powder",
+              "MIX WET: Whisk eggs, Greek yogurt, and milk",
+              "COMBINE: Mix wet and dry ingredients until just combined",
+              "COOK: Pour batter on griddle, cook 2-3 minutes per side",
+              "STORAGE: Freeze cooked pancakes up to 3 months, reheat in toaster"
+            ]
+          },
+          {
+            "meal_name": "Quick Oats",
+            "meal_type": "breakfast",
+            "prep_time": 5,
+            "cook_time": 0,
+            "total_time": 5,
+            "servings": 7,
+            "calories": 450,
+            "macros": {
+              "protein": 25,
+              "carbs": 55,
+              "fat": 12
+            },
+            "times_used": 1,
+            "ingredients": [
+              {
+                "item": "Rolled oats",
+                "amount": "350",
+                "unit": "g",
+                "scalable": true,
+                "notes": "50g per jar (7 jars)"
+              },
+              {
+                "item": "Protein powder",
+                "amount": "210",
+                "unit": "g",
+                "scalable": true,
+                "notes": "30g per jar"
+              },
+              {
+                "item": "Chia seeds",
+                "amount": "70",
+                "unit": "g",
+                "scalable": true,
+                "notes": "10g per jar"
+              }
+            ],
+            "instructions": [
+              "PREP JARS: Mix oats, protein powder, chia seeds in 7 jars",
+              "ADD LIQUID: Pour milk into each jar, stir well",
+              "REFRIGERATE: Let sit overnight, minimum 4 hours",
+              "SERVE: Add fresh fruit and nuts before eating",
+              "STORAGE: Keeps 5 days refrigerated, prep Sunday for the week"
+            ]
+          },
+          {
+            "meal_name": "Protein Power Smoothie Packs",
+            "meal_type": "snack",
+            "prep_time": 15,
+            "cook_time": 0,
+            "total_time": 15,
+            "servings": 6,
+            "calories": 380,
+            "macros": {
+              "protein": 30,
+              "carbs": 35,
+              "fat": 12
+            },
+            "times_used": 3,
+            "ingredients": [
+              {
+                "item": "Frozen berries",
+                "amount": "900",
+                "unit": "g",
+                "scalable": true,
+                "notes": "150g per pack (6 packs)"
+              },
+              {
+                "item": "Banana",
+                "amount": "6",
+                "unit": "whole",
+                "scalable": true,
+                "notes": "Sliced and frozen"
+              },
+              {
+                "item": "Spinach",
+                "amount": "180",
+                "unit": "g",
+                "scalable": true,
+                "notes": "30g per pack"
+              }
+            ],
+            "instructions": [
+              "PREP FRUIT: Slice bananas, portion berries into freezer bags",
+              "ADD GREENS: Add spinach to each bag",
+              "FREEZE: Store in freezer for up to 3 months",
+              "BLEND: Add protein powder and liquid when ready to drink",
+              "STORAGE: Pre-portioned frozen packs, just add protein and blend"
+            ]
+          },
+          {
+            "meal_name": "Greek Yogurt Parfait Prep",
+            "meal_type": "snack",
+            "prep_time": 10,
+            "cook_time": 0,
+            "total_time": 10,
+            "servings": 6,
+            "calories": 340,
+            "macros": {
+              "protein": 25,
+              "carbs": 28,
+              "fat": 15
+            },
+            "times_used": 3,
+            "ingredients": [
+              {
+                "item": "Greek yogurt (0% fat)",
+                "amount": "1200",
+                "unit": "g",
+                "scalable": true,
+                "notes": "200g per serving"
+              },
+              {
+                "item": "Mixed berries",
+                "amount": "450",
+                "unit": "g",
+                "scalable": true,
+                "notes": "75g per serving"
+              },
+              {
+                "item": "Mixed nuts",
+                "amount": "180",
+                "unit": "g",
+                "scalable": true,
+                "notes": "30g per serving"
+              }
+            ],
+            "instructions": [
+              "PORTION YOGURT: Divide Greek yogurt into 6 containers",
+              "PREP TOPPINGS: Wash berries, portion nuts into small bags",
+              "ASSEMBLY: Keep toppings separate until serving",
+              "SERVE: Add berries and nuts just before eating",
+              "STORAGE: Yogurt keeps 5-7 days, assemble fresh daily"
+            ]
+          },
+          {
+            "meal_name": "Hard-Boiled Eggs (Egg White Prep)",
+            "meal_type": "breakfast",
+            "prep_time": 5,
+            "cook_time": 12,
+            "total_time": 17,
+            "servings": 12,
+            "calories": 70,
+            "macros": {
+              "protein": 6,
+              "carbs": 0,
+              "fat": 5
+            },
+            "times_used": 2,
+            "ingredients": [
+              {
+                "item": "Large eggs",
+                "amount": "12",
+                "unit": "whole",
+                "scalable": true,
+                "notes": "For easy egg white separation"
+              }
+            ],
+            "instructions": [
+              "BOIL: Bring water to boil, add eggs, cook 10-12 minutes",
+              "ICE BATH: Transfer to ice water to stop cooking",
+              "PEEL: Remove shells when completely cool",
+              "SEPARATE: Remove yolks for egg white scrambles",
+              "STORAGE: Keeps 1 week refrigerated, perfect for quick breakfasts"
+            ]
+          }
+        ],
+        "ingredients": [
+          {
+            "item": "Chicken breast",
+            "amount": "1000",
+            "unit": "g",
+            "scalable": true,
+            "notes": "For Mediterranean bowls - used 7x throughout week"
+          },
+          {
+            "item": "Ground beef (90/10)",
+            "amount": "400",
+            "unit": "g",
+            "scalable": true,
+            "notes": "For power bowls - Tuesday & Saturday dinners"
+          },
+          {
+            "item": "Salmon fillets",
+            "amount": "400",
+            "unit": "g",
+            "scalable": true,
+            "notes": "For quinoa plates - Thursday & Sunday dinners"
+          },
+          {
+            "item": "Mediterranean vegetables",
+            "amount": "1000",
+            "unit": "g",
+            "scalable": true,
+            "notes": "Cherry tomatoes, bell peppers, cucumber, red onion"
+          },
+          {
+            "item": "Mediterranean pantry",
+            "amount": "1",
+            "unit": "set",
+            "scalable": true,
+            "notes": "Olive oil, lemons, oregano, garlic, feta, olives"
+          }
+        ],
+        "equipment_needed": [
+          "Large skillet for proteins",
+          "Baking sheets for roasting",
+          "Medium pots for rice and quinoa",
+          "Sharp knives and cutting boards",
+          "Glass meal prep containers (10-12)",
+          "Measuring cups and spoons"
+        ],
+        "instructions": [
+          "MARINADE PREP (10 min): Make Mediterranean marinade with lemon, olive oil, oregano, garlic",
+          "MARINATE CHICKEN (30 min): Season chicken with marinade while you prep other ingredients",
+          "START GRAINS (5 min): Begin brown rice and quinoa in separate pots - cook with lemon for flavor",
+          "ROAST VEGETABLES (25 min): Cherry tomatoes, bell peppers, and sweet potatoes at 400°F", 
+          "COOK PROTEINS (35 min): Bake marinated chicken, brown ground beef in skillet",
+          "COOL AND PORTION (45 min): Let everything cool, slice proteins, assemble Mediterranean bowls",
+          "STORAGE OPTIONS: Choose freeze strategy (7 bowls at once) OR mini-prep strategy (3 + 4)",
+          "FRESH COMPONENTS: Keep feta, cucumber, and olives separate for freshest taste"
+        ],
+        "storage_guidelines": {
+          "freeze_strategy": "Mediterranean bowls: 3 days fresh + 4 freeze well for 3 months. Thaw 24hrs before eating.",
+          "mini_prep_strategy": "Make 3 bowls Sunday, 4 more Wednesday. Always fresh, 3-4 days max.",
+          "fresh_components": "Store feta, cucumber, olives separately. Add after reheating.",
+          "food_safety": "Never leave at room temp >2hrs. Reheat to 165°F internal temperature."
+        }
+      },
+      "days": [
+    {
+      "day_name": "Monday",
+      "day_number": 1,
+      "daily_totals": {
+        "calories": 2800,
+        "protein": 210,
+        "carbs": 280,
+        "fat": 93,
+        "fiber": 35
+      },
+      "meals": [
+        {
+          "meal_name": "High-Protein Pancakes",
+          "meal_type": "breakfast",
+          "prep_time": 10,
+          "cook_time": 12,
+          "calories": 520,
+          "macros": {
+            "protein": 39,
+            "carbs": 52,
+            "fat": 17,
+            "fiber": 6
+          },
+          "ingredients": [
+            {
+              "item": "Oat flour",
+              "amount": "60",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Whey protein powder",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Banana",
+              "amount": "120",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Egg whites",
+              "amount": "120",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond butter",
+              "amount": "15",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Mix oat flour and protein powder in bowl",
+            "Mash banana and combine with egg whites",
+            "Fold wet ingredients into dry ingredients",
+            "Cook pancakes in non-stick pan 2-3 minutes per side",
+            "Top with almond butter"
+          ]
+        },
+        {
+          "meal_name": "Mediterranean Chicken Bowl",
+          "meal_type": "lunch",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 650,
+          "macros": {
+            "protein": 48,
+            "carbs": 65,
+            "fat": 22,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Mediterranean Chicken Bowl",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 90 seconds",
+            "Add fresh feta and cucumber if stored separately"
+          ]
+        },
+        {
+          "meal_name": "Protein Power Smoothie",
+          "meal_type": "snack",
+          "prep_time": 5,
+          "cook_time": 0,
+          "calories": 380,
+          "macros": {
+            "protein": 28,
+            "carbs": 45,
+            "fat": 13,
+            "fiber": 8
+          },
+          "ingredients": [
+            {
+              "item": "Whey protein powder",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Banana",
+              "amount": "120",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Spinach",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond milk",
+              "amount": "300",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond butter",
+              "amount": "15",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Add all ingredients to blender",
+            "Blend until smooth",
+            "Serve immediately"
+          ]
+        },
+        {
+          "meal_name": "Grilled Steak with Sweet Potato & Vegetables",
+          "meal_type": "dinner",
+          "prep_time": 10,
+          "cook_time": 25,
+          "calories": 750,
+          "macros": {
+            "protein": 55,
+            "carbs": 68,
+            "fat": 25,
+            "fiber": 9
+          },
+          "ingredients": [
+            {
+              "item": "Sirloin steak",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Sweet potato",
+              "amount": "300",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Broccoli",
+              "amount": "150",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Olive oil",
+              "amount": "12",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Bake sweet potato at 400°F for 45 minutes",
+            "Season steak with salt and pepper",
+            "Grill steak 3-4 minutes per side for medium-rare",
+            "Steam broccoli until tender",
+            "Drizzle vegetables with olive oil"
+          ]
+        },
+        {
+          "meal_name": "Greek Yogurt with Berries & Nuts",
+          "meal_type": "snack",
+          "prep_time": 2,
+          "cook_time": 0,
+          "calories": 300,
+          "macros": {
+            "protein": 20,
+            "carbs": 25,
+            "fat": 16,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Greek yogurt (nonfat)",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Mixed berries",
+              "amount": "80",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almonds",
+              "amount": "20",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Honey",
+              "amount": "15",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Add yogurt to bowl",
+            "Top with berries and almonds",
+            "Drizzle with honey"
+          ]
+        }
+      ]
+    },
+    {
+      "day_name": "Tuesday",
+      "day_number": 2,
+      "daily_totals": {
+        "calories": 2800,
+        "protein": 210,
+        "carbs": 280,
+        "fat": 93,
+        "fiber": 35
+      },
+      "meals": [
+        {
+          "meal_name": "Protein Ice Cream",
+          "meal_type": "breakfast",
+          "prep_time": 8,
+          "cook_time": 0,
+          "calories": 540,
+          "macros": {
+            "protein": 42,
+            "carbs": 56,
+            "fat": 18,
+            "fiber": 7
+          },
+          "ingredients": [
+            {
+              "item": "Whey protein powder",
+              "amount": "35",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Frozen mixed berries",
+              "amount": "150",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Banana",
+              "amount": "120",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Greek yogurt (nonfat)",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Granola",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Blend protein powder, berries, banana, and yogurt until smooth",
+            "Pour into bowl and top with granola",
+            "Add extra berries if desired"
+          ]
+        },
+        {
+          "meal_name": "Mediterranean Chicken Bowl",
+          "meal_type": "lunch",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 650,
+          "macros": {
+            "protein": 48,
+            "carbs": 65,
+            "fat": 22,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Mediterranean Chicken Bowl",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 90 seconds"
+          ]
+        },
+        {
+          "meal_name": "Beef & Sweet Potato Power Bowl",
+          "meal_type": "dinner",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 720,
+          "macros": {
+            "protein": 54,
+            "carbs": 72,
+            "fat": 24,
+            "fiber": 8
+          },
+          "ingredients": [
+            {
+              "item": "Prepared beef & sweet potato bowl",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 2 minutes"
+          ]
+        },
+        {
+          "meal_name": "Greek Yogurt with Berries & Nuts",
+          "meal_type": "snack",
+          "prep_time": 3,
+          "cook_time": 0,
+          "calories": 320,
+          "macros": {
+            "protein": 28,
+            "carbs": 15,
+            "fat": 18,
+            "fiber": 3
+          },
+          "ingredients": [
+            {
+              "item": "Cottage cheese (low-fat)",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Walnuts",
+              "amount": "25",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Honey",
+              "amount": "10",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Add cottage cheese to bowl",
+            "Top with walnuts and drizzle with honey"
+          ]
+        },
+        {
+          "meal_name": "Mixed Nuts",
+          "meal_type": "snack",
+          "prep_time": 1,
+          "cook_time": 0,
+          "calories": 270,
+          "macros": {
+            "protein": 20,
+            "carbs": 25,
+            "fat": 12,
+            "fiber": 5
+          },
+          "ingredients": [
+            {
+              "item": "Mixed nuts",
+              "amount": "45",
+              "unit": "g",
+              "scalable": true,
+              "notes": "Almonds, walnuts, cashews"
+            }
+          ],
+          "instructions": [
+            "Portion nuts into small container",
+            "Perfect pre-workout or evening snack"
+          ]
+        }
+      ]
+    },
+    {
+      "day_name": "Wednesday",
+      "day_number": 3,
+      "daily_totals": {
+        "calories": 2800,
+        "protein": 210,
+        "carbs": 280,
+        "fat": 93,
+        "fiber": 35
+      },
+      "meals": [
+        {
+          "meal_name": "Quick Oats",
+          "meal_type": "breakfast",
+          "prep_time": 5,
+          "cook_time": 0,
+          "calories": 520,
+          "macros": {
+            "protein": 32,
+            "carbs": 68,
+            "fat": 16,
+            "fiber": 9
+          },
+          "ingredients": [
+            {
+              "item": "Rolled oats",
+              "amount": "80",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Whey protein powder",
+              "amount": "25",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Greek yogurt (nonfat)",
+              "amount": "150",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond butter",
+              "amount": "15",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Banana",
+              "amount": "100",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Mix oats, protein powder, yogurt, and almond butter",
+            "Add sliced banana on top",
+            "Refrigerate overnight (prepare night before)"
+          ]
+        },
+        {
+          "meal_name": "Mediterranean Chicken Bowl",
+          "meal_type": "lunch",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 650,
+          "macros": {
+            "protein": 48,
+            "carbs": 65,
+            "fat": 22,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Mediterranean Chicken Bowl",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 90 seconds"
+          ]
+        },
+        {
+          "meal_name": "Turkey and Quinoa Stuffed Bell Peppers",
+          "meal_type": "dinner",
+          "prep_time": 15,
+          "cook_time": 30,
+          "calories": 680,
+          "macros": {
+            "protein": 52,
+            "carbs": 58,
+            "fat": 22,
+            "fiber": 8
+          },
+          "ingredients": [
+            {
+              "item": "Ground turkey (93/7)",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Quinoa (cooked)",
+              "amount": "100",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Bell peppers (large)",
+              "amount": "2",
+              "unit": "whole",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Diced tomatoes",
+              "amount": "100",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Olive oil",
+              "amount": "10",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Brown turkey in pan with olive oil",
+            "Mix cooked turkey with quinoa and diced tomatoes",
+            "Stuff bell peppers with mixture",
+            "Bake at 375°F for 25-30 minutes"
+          ]
+        },
+        {
+          "meal_name": "Apple with Peanut Butter",
+          "meal_type": "snack",
+          "prep_time": 2,
+          "cook_time": 0,
+          "calories": 280,
+          "macros": {
+            "protein": 12,
+            "carbs": 32,
+            "fat": 16,
+            "fiber": 6
+          },
+          "ingredients": [
+            {
+              "item": "Apple (medium)",
+              "amount": "1",
+              "unit": "whole",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Natural peanut butter",
+              "amount": "25",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Slice apple",
+            "Serve with peanut butter for dipping"
+          ]
+        },
+        {
+          "meal_name": "Protein Power Smoothie",
+          "meal_type": "snack",
+          "prep_time": 3,
+          "cook_time": 0,
+          "calories": 290,
+          "macros": {
+            "protein": 25,
+            "carbs": 18,
+            "fat": 12,
+            "fiber": 2
+          },
+          "ingredients": [
+            {
+              "item": "Casein protein powder",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond milk",
+              "amount": "300",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond butter",
+              "amount": "10",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Blend all ingredients until smooth",
+            "Best consumed before bed"
+          ]
+        }
+      ]
+    },
+    {
+      "day_name": "Thursday",
+      "day_number": 4,
+      "daily_totals": {
+        "calories": 2800,
+        "protein": 210,
+        "carbs": 280,
+        "fat": 93,
+        "fiber": 35
+      },
+      "meals": [
+        {
+          "meal_name": "Egg White Scramble",
+          "meal_type": "breakfast",
+          "prep_time": 8,
+          "cook_time": 8,
+          "calories": 480,
+          "macros": {
+            "protein": 38,
+            "carbs": 52,
+            "fat": 14,
+            "fiber": 6
+          },
+          "ingredients": [
+            {
+              "item": "Egg whites",
+              "amount": "200",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Whole eggs",
+              "amount": "2",
+              "unit": "whole",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Spinach",
+              "amount": "100",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Whole grain toast",
+              "amount": "2",
+              "unit": "slices",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Avocado",
+              "amount": "50",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Scramble egg whites and whole eggs with spinach",
+            "Toast bread and top with avocado",
+            "Serve eggs with avocado toast"
+          ]
+        },
+        {
+          "meal_name": "Mediterranean Chicken Bowl",
+          "meal_type": "lunch",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 650,
+          "macros": {
+            "protein": 48,
+            "carbs": 65,
+            "fat": 22,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Mediterranean Chicken Bowl",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 90 seconds"
+          ]
+        },
+        {
+          "meal_name": "Salmon & Quinoa Plate",
+          "meal_type": "dinner",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 680,
+          "macros": {
+            "protein": 51,
+            "carbs": 54,
+            "fat": 23,
+            "fiber": 6
+          },
+          "ingredients": [
+            {
+              "item": "Prepared salmon & quinoa plate",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 2 minutes"
+          ]
+        },
+        {
+          "meal_name": "Apple with Peanut Butter",
+          "meal_type": "snack",
+          "prep_time": 1,
+          "cook_time": 0,
+          "calories": 350,
+          "macros": {
+            "protein": 15,
+            "carbs": 28,
+            "fat": 22,
+            "fiber": 5
+          },
+          "ingredients": [
+            {
+              "item": "Mixed nuts",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Dried fruit",
+              "amount": "25",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Dark chocolate chips",
+              "amount": "15",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Mix all ingredients together",
+            "Portion into small bags for convenient snacking"
+          ]
+        },
+        {
+          "meal_name": "Greek Yogurt with Berries & Nuts",
+          "meal_type": "snack",
+          "prep_time": 5,
+          "cook_time": 0,
+          "calories": 340,
+          "macros": {
+            "protein": 28,
+            "carbs": 35,
+            "fat": 12,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Greek yogurt (nonfat)",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Mixed berries",
+              "amount": "100",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Granola",
+              "amount": "25",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Honey",
+              "amount": "10",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Layer yogurt, berries, and granola",
+            "Drizzle with honey"
+          ]
+        }
+      ]
+    },
+    {
+      "day_name": "Friday",
+      "day_number": 5,
+      "daily_totals": {
+        "calories": 2800,
+        "protein": 210,
+        "carbs": 280,
+        "fat": 93,
+        "fiber": 35
+      },
+      "meals": [
+        {
+          "meal_name": "Egg White Scramble",
+          "meal_type": "breakfast",
+          "prep_time": 10,
+          "cook_time": 8,
+          "calories": 560,
+          "macros": {
+            "protein": 42,
+            "carbs": 58,
+            "fat": 18,
+            "fiber": 6
+          },
+          "ingredients": [
+            {
+              "item": "Whole grain bread",
+              "amount": "3",
+              "unit": "slices",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Whey protein powder",
+              "amount": "25",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Egg whites",
+              "amount": "120",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond milk",
+              "amount": "100",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Maple syrup",
+              "amount": "15",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Mix protein powder, egg whites, and almond milk",
+            "Dip bread in mixture and cook in non-stick pan",
+            "Serve with maple syrup"
+          ]
+        },
+        {
+          "meal_name": "Mediterranean Chicken Bowl",
+          "meal_type": "lunch",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 650,
+          "macros": {
+            "protein": 48,
+            "carbs": 65,
+            "fat": 22,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Mediterranean Chicken Bowl",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 90 seconds"
+          ]
+        },
+        {
+          "meal_name": "Lean Beef Stir-Fry",
+          "meal_type": "dinner",
+          "prep_time": 10,
+          "cook_time": 12,
+          "calories": 720,
+          "macros": {
+            "protein": 56,
+            "carbs": 62,
+            "fat": 24,
+            "fiber": 8
+          },
+          "ingredients": [
+            {
+              "item": "Lean beef strips",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Brown rice (cooked)",
+              "amount": "150",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Mixed stir-fry vegetables",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Sesame oil",
+              "amount": "10",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Stir-fry beef strips until cooked through",
+            "Add vegetables and cook until tender",
+            "Serve over brown rice with sesame oil"
+          ]
+        },
+        {
+          "meal_name": "Protein Power Smoothie",
+          "meal_type": "snack",
+          "prep_time": 5,
+          "cook_time": 0,
+          "calories": 320,
+          "macros": {
+            "protein": 28,
+            "carbs": 35,
+            "fat": 12,
+            "fiber": 8
+          },
+          "ingredients": [
+            {
+              "item": "Whey protein powder",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Banana",
+              "amount": "120",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Spinach",
+              "amount": "50",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond milk",
+              "amount": "300",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Blend all ingredients until smooth",
+            "Add ice if desired"
+          ]
+        },
+        {
+          "meal_name": "Apple with Peanut Butter",
+          "meal_type": "snack",
+          "prep_time": 5,
+          "cook_time": 0,
+          "calories": 350,
+          "macros": {
+            "protein": 32,
+            "carbs": 28,
+            "fat": 14,
+            "fiber": 3
+          },
+          "ingredients": [
+            {
+              "item": "Canned tuna in water",
+              "amount": "120",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Whole wheat tortilla",
+              "amount": "1",
+              "unit": "large",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Avocado",
+              "amount": "50",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Lettuce",
+              "amount": "50",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Mix tuna with mashed avocado",
+            "Add lettuce and wrap in tortilla"
+          ]
+        }
+      ]
+    },
+    {
+      "day_name": "Saturday",
+      "day_number": 6,
+      "daily_totals": {
+        "calories": 2800,
+        "protein": 210,
+        "carbs": 280,
+        "fat": 93,
+        "fiber": 35
+      },
+      "meals": [
+        {
+          "meal_name": "High-Protein Pancakes",
+          "meal_type": "breakfast",
+          "prep_time": 8,
+          "cook_time": 10,
+          "calories": 550,
+          "macros": {
+            "protein": 40,
+            "carbs": 62,
+            "fat": 16,
+            "fiber": 8
+          },
+          "ingredients": [
+            {
+              "item": "Oat flour",
+              "amount": "80",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Whey protein powder",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Banana",
+              "amount": "120",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Egg whites",
+              "amount": "150",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Blueberries",
+              "amount": "100",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Mix oat flour and protein powder",
+            "Mash banana and combine with egg whites",
+            "Make pancakes and top with blueberries"
+          ]
+        },
+        {
+          "meal_name": "Mediterranean Chicken Bowl",
+          "meal_type": "lunch",
+          "prep_time": 8,
+          "cook_time": 15,
+          "calories": 620,
+          "macros": {
+            "protein": 48,
+            "carbs": 32,
+            "fat": 28,
+            "fiber": 6
+          },
+          "ingredients": [
+            {
+              "item": "Chicken breast",
+              "amount": "200",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Romaine lettuce",
+              "amount": "150",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Croutons",
+              "amount": "30",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Caesar dressing",
+              "amount": "25",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Parmesan cheese",
+              "amount": "20",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Grill chicken breast and slice",
+            "Toss lettuce with dressing",
+            "Top with chicken, croutons, and parmesan"
+          ]
+        },
+        {
+          "meal_name": "Beef & Sweet Potato Power Bowl",
+          "meal_type": "dinner",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 720,
+          "macros": {
+            "protein": 54,
+            "carbs": 72,
+            "fat": 24,
+            "fiber": 8
+          },
+          "ingredients": [
+            {
+              "item": "Prepared beef & sweet potato bowl",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 2 minutes"
+          ]
+        },
+        {
+          "meal_name": "Protein Ice Cream",
+          "meal_type": "snack",
+          "prep_time": 5,
+          "cook_time": 0,
+          "calories": 280,
+          "macros": {
+            "protein": 25,
+            "carbs": 28,
+            "fat": 8,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Frozen banana",
+              "amount": "150",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Vanilla protein powder",
+              "amount": "25",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almond milk",
+              "amount": "100",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Dark chocolate chips",
+              "amount": "10",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Blend frozen banana, protein powder, and almond milk",
+            "Top with chocolate chips",
+            "Enjoy immediately for soft-serve texture"
+          ]
+        },
+        {
+          "meal_name": "Mixed Nuts",
+          "meal_type": "snack",
+          "prep_time": 1,
+          "cook_time": 0,
+          "calories": 330,
+          "macros": {
+            "protein": 12,
+            "carbs": 8,
+            "fat": 28,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Mixed nuts",
+              "amount": "45",
+              "unit": "g",
+              "scalable": true,
+              "notes": "Almonds, walnuts, cashews"
+            }
+          ],
+          "instructions": [
+            "Portion nuts into small container",
+            "Perfect pre-workout or evening snack"
+          ]
+        }
+      ]
+    },
+    {
+      "day_name": "Sunday",
+      "day_number": 7,
+      "daily_totals": {
+        "calories": 2800,
+        "protein": 210,
+        "carbs": 280,
+        "fat": 93,
+        "fiber": 35
+      },
+      "meals": [
+        {
+          "meal_name": "Weekend Protein Brunch",
+          "meal_type": "breakfast",
+          "prep_time": 15,
+          "cook_time": 20,
+          "calories": 580,
+          "macros": {
+            "protein": 45,
+            "carbs": 48,
+            "fat": 22,
+            "fiber": 6
+          },
+          "ingredients": [
+            {
+              "item": "Whole eggs",
+              "amount": "3",
+              "unit": "whole",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Egg whites",
+              "amount": "150",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Smoked salmon",
+              "amount": "80",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Whole grain bagel",
+              "amount": "1",
+              "unit": "small",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Avocado",
+              "amount": "80",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Make scrambled eggs with whole eggs and whites",
+            "Toast bagel and top with avocado",
+            "Serve with smoked salmon on the side"
+          ]
+        },
+        {
+          "meal_name": "Mediterranean Chicken Bowl",
+          "meal_type": "lunch",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 650,
+          "macros": {
+            "protein": 48,
+            "carbs": 65,
+            "fat": 22,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Mediterranean Chicken Bowl",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 90 seconds"
+          ]
+        },
+        {
+          "meal_name": "Salmon & Quinoa Plate",
+          "meal_type": "dinner",
+          "prep_time": 2,
+          "cook_time": 2,
+          "calories": 680,
+          "macros": {
+            "protein": 51,
+            "carbs": 54,
+            "fat": 23,
+            "fiber": 6
+          },
+          "ingredients": [
+            {
+              "item": "Prepared salmon & quinoa plate",
+              "amount": "1",
+              "unit": "serving",
+              "scalable": true,
+              "notes": "From meal prep"
+            }
+          ],
+          "instructions": [
+            "Reheat in microwave for 2 minutes"
+          ]
+        },
+        {
+          "meal_name": "Protein Power Smoothie",
+          "meal_type": "snack",
+          "prep_time": 5,
+          "cook_time": 0,
+          "calories": 380,
+          "macros": {
+            "protein": 32,
+            "carbs": 45,
+            "fat": 12,
+            "fiber": 8
+          },
+          "ingredients": [
+            {
+              "item": "Whey protein powder",
+              "amount": "35",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Mixed berries",
+              "amount": "150",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Spinach",
+              "amount": "50",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Coconut water",
+              "amount": "300",
+              "unit": "ml",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Chia seeds",
+              "amount": "10",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Blend all ingredients until smooth",
+            "Let sit 5 minutes for chia seeds to expand"
+          ]
+        },
+        {
+          "meal_name": "Mixed Nuts",
+          "meal_type": "snack",
+          "prep_time": 2,
+          "cook_time": 0,
+          "calories": 310,
+          "macros": {
+            "protein": 24,
+            "carbs": 28,
+            "fat": 12,
+            "fiber": 4
+          },
+          "ingredients": [
+            {
+              "item": "Beef jerky",
+              "amount": "40",
+              "unit": "g",
+              "scalable": true,
+              "notes": "Low sodium variety"
+            },
+            {
+              "item": "Apple",
+              "amount": "150",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            },
+            {
+              "item": "Almonds",
+              "amount": "15",
+              "unit": "g",
+              "scalable": true,
+              "notes": ""
+            }
+          ],
+          "instructions": [
+            "Slice apple",
+            "Enjoy with beef jerky and almonds"
+          ]
+        }
+      ]
+    }
+      ]
+    }
+  ]
+}
