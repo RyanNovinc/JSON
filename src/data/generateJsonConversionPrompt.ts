@@ -8,8 +8,8 @@ export const generateJsonConversionPrompt = () => {
 **You MUST:**
 1. Create a file (use Code Interpreter on ChatGPT, or computer tool on Claude)
 2. Write the complete JSON structure to the file
-3. If you reach output limits, STOP at the end of a complete week, then continue appending to the same file
-4. Never stop mid-week or mid-day
+3. If you reach output limits, STOP at the end of a complete day, then continue appending to the same file
+4. Never stop mid-day or mid-meal
 5. When finished, provide the download link
 
 # JSON Schema Required
@@ -20,19 +20,25 @@ export const generateJsonConversionPrompt = () => {
   "description": "string", 
   "duration_days": number,
   "total_meals": number,
-  "weekly_meal_prep": {
-    "total_prep_time": number,
-    "unique_recipes": number,
-    "batch_proteins": ["string array"],
-    "prep_session_guide": [
-      {
-        "step": number,
-        "title": "string",
-        "description": "string",
-        "time_required": number
-      }
-    ]
-  },
+  "meal_prep_sessions": [
+    {
+      "session_number": number,
+      "session_name": "string",
+      "prep_day": "string",
+      "total_time": number,
+      "unique_recipes": number,
+      "batch_proteins": ["string array"],
+      "covers_days": ["string array"],
+      "prep_session_guide": [
+        {
+          "step": number,
+          "title": "string", 
+          "description": "string",
+          "time_required": number
+        }
+      ]
+    }
+  ],
   "grocery_list": {
     "total_estimated_cost": number,
     "currency": "string",
@@ -52,39 +58,42 @@ export const generateJsonConversionPrompt = () => {
       }
     ]
   },
-  "weeks": [
+  "days": [
     {
-      "week_number": number,
-      "days": [
+      "day_name": "string",
+      "day_number": number,
+      "meals": [
         {
-          "day_name": "string",
-          "day_number": number,
-          "meals": [
+          "meal_name": "string",
+          "meal_type": "breakfast" | "lunch" | "dinner" | "snack",
+          "prep_time": number,
+          "cook_time": number,
+          "total_time": number,
+          "servings": number,
+          "calories": number,
+          "recommended_time": "string",
+          "timing_reason": "string",
+          "macros": {
+            "protein": number,
+            "carbs": number,
+            "fat": number,
+            "fiber": number
+          },
+          "ingredients": [
             {
-              "meal_name": "string",
-              "meal_type": "breakfast" | "lunch" | "dinner" | "snack",
-              "prep_time": number,
-              "cook_time": number,
-              "total_time": number,
-              "servings": number,
-              "calories": number,
-              "macros": {
-                "protein": number,
-                "carbs": number,
-                "fat": number,
-                "fiber": number
-              },
-              "ingredients": [
-                {
-                  "item": "string",
-                  "amount": "string",
-                  "unit": "string",
-                  "notes": "string"
-                }
-              ],
-              "instructions": ["string array"],
-              "notes": "string",
-              "tags": ["string array"]
+              "item": "string",
+              "amount": "string",
+              "unit": "string",
+              "notes": "string"
+            }
+          ],
+          "instructions": ["string array"],
+          "notes": "string",
+          "tags": ["string array"],
+          "weekly_meal_coverage": [
+            {
+              "day": "string",
+              "meal_type": "string"
             }
           ]
         }
@@ -102,10 +111,14 @@ export const generateJsonConversionPrompt = () => {
 | description | string | YES | Brief overview of the plan's focus/benefits |
 | duration_days | number | YES | Total number of days in the plan |
 | total_meals | number | YES | Total number of meals across all days |
-| total_prep_time | number | YES | Total minutes for weekly meal prep session |
-| unique_recipes | number | YES | Number of different meals in the plan |
-| batch_proteins | array | YES | List of proteins to be batch cooked |
-| step | number | YES | Prep session step number |
+| session_number | number | YES | Sequential numbering (1, 2, 3...) for meal prep sessions |
+| session_name | string | YES | Descriptive name (e.g. "Weekly Batch Prep", "Mid-Week Refresh") |
+| prep_day | string | YES | When to do this session (e.g. "Tuesday Evening", "Saturday") |
+| total_time | number | YES | Total minutes for this specific prep session |
+| unique_recipes | number | YES | Number of different meals prepared in this session |
+| batch_proteins | array | YES | List of proteins to be batch cooked in this session |
+| covers_days | array | YES | Days this prep session covers (e.g. ["Wednesday", "Thursday", "Friday"]) |
+| step | number | YES | Prep session step number within this session |
 | title | string | YES | Brief title for prep step |
 | description | string | YES | Detailed description of prep step |
 | time_required | number | NO | Minutes required for this prep step |
@@ -117,16 +130,17 @@ export const generateJsonConversionPrompt = () => {
 | unit | string | YES | Unit for grocery item |
 | estimated_price | number | YES | Estimated cost for this item |
 | is_purchased | boolean | YES | Whether item has been purchased (default: false) |
-| week_number | number | YES | Sequential week numbering starting from 1 |
 | day_name | string | YES | e.g. "Monday", "Day 1" |  
 | day_number | number | YES | Sequential day numbering starting from 1 |
 | meal_name | string | YES | Descriptive meal title |
 | meal_type | string | YES | EXACTLY: "breakfast", "lunch", "dinner", or "snack" |
-| prep_time | number | NO | Minutes for prep work |
-| cook_time | number | NO | Minutes for actual cooking |
-| total_time | number | NO | Minutes from start to finish |
+| prep_time | number | NO | Minutes for prep work (use ORIGINAL cooking time, not reheating) |
+| cook_time | number | NO | Minutes for actual cooking (use ORIGINAL cooking time, not reheating) |
+| total_time | number | NO | Minutes from start to finish (use ORIGINAL cooking time, not reheating) |
 | servings | number | NO | Number of servings recipe makes |
 | calories | number | NO | Total calories per serving |
+| recommended_time | string | YES | Exact meal time (e.g. "7:45 AM", "12:30 PM") based on user's sleep schedule |
+| timing_reason | string | YES | Brief explanation why this timing optimizes sleep/metabolism |
 | protein | number | NO | Grams of protein per serving |
 | carbs | number | NO | Grams of carbohydrates per serving |
 | fat | number | NO | Grams of fat per serving |
@@ -137,6 +151,7 @@ export const generateJsonConversionPrompt = () => {
 | instructions | array | YES | Step-by-step cooking instructions |
 | notes | string | NO | Tips, substitutions, storage notes |
 | tags | array | NO | e.g. ["vegetarian", "high-protein", "quick"] |
+| weekly_meal_coverage | array | YES | List of each day this meal appears in the plan |
 
 # Critical Instructions Format Rules
 
@@ -173,6 +188,19 @@ export const generateJsonConversionPrompt = () => {
 - Include preparation notes in the notes field of ingredients if needed
 - Use common, accessible ingredients
 
+# Timing Requirements - CRITICAL
+
+**Use ORIGINAL cooking times, NOT reheating times:**
+- If your meal plan shows "Reheat time: 3 min" for a pre-cooked meal, DO NOT use 3 minutes
+- Use the actual time it takes to cook the meal from scratch (e.g., rice = 15 min, pasta = 10-15 min, chicken = 20-25 min)
+- Meal prep plans often show quick reheating instructions, but the JSON needs original cooking times
+- Assembly-only meals (yogurt bowls, smoothies, toast) can be 2-5 minutes
+- Cooked meals should be 15-30+ minutes depending on complexity
+
+**Examples:**
+- ❌ WRONG: "Chicken & Rice Bowl: 3 minutes" (this is reheating time)
+- ✅ CORRECT: "Chicken & Rice Bowl: 20 minutes" (actual cooking time)
+
 # Quality Standards
 
 - Ensure nutritional values are realistic and add up properly
@@ -180,6 +208,86 @@ export const generateJsonConversionPrompt = () => {
 - Include prep efficiency considerations in notes
 - Make sure meal timing and complexity is practical
 - All numeric values should be reasonable (no impossible prep times, etc.)
+
+# Multiple Meal Prep Sessions Instructions
+
+**CRITICAL:** If your meal plan has multiple meal prep sessions (e.g. main prep + mid-week refresh), create separate session objects:
+
+**Example - Single Session Plan:**
+${'```'}json
+"meal_prep_sessions": [
+  {
+    "session_number": 1,
+    "session_name": "Weekly Batch Prep",
+    "prep_day": "Sunday Evening", 
+    "total_time": 90,
+    "unique_recipes": 5,
+    "batch_proteins": ["Chicken Breast", "Ground Turkey"],
+    "covers_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    "prep_session_guide": [/* All prep steps */]
+  }
+]
+${'```'}
+
+**Example - Multiple Session Plan:**
+${'```'}json  
+"meal_prep_sessions": [
+  {
+    "session_number": 1,
+    "session_name": "Weekly Batch Prep",
+    "prep_day": "Tuesday Evening",
+    "total_time": 115,
+    "unique_recipes": 4,
+    "batch_proteins": ["Chicken Breast", "Lean Beef Mince"],
+    "covers_days": ["Wednesday", "Thursday", "Friday", "Saturday"],
+    "prep_session_guide": [/* Steps 1-6 */]
+  },
+  {
+    "session_number": 2, 
+    "session_name": "Mid-Week Refresh",
+    "prep_day": "Saturday",
+    "total_time": 40,
+    "unique_recipes": 1,
+    "batch_proteins": ["Chicken Breast"],
+    "covers_days": ["Sunday", "Monday", "Tuesday"],
+    "prep_session_guide": [/* Step 7 */]
+  }
+]
+${'```'}
+
+**When to use multiple sessions:**
+- Plans longer than 5 days often need multiple sessions
+- Food safety (proteins shouldn't sit in fridge too long)
+- When the meal plan explicitly mentions "mid-week refresh", "Saturday prep", etc.
+- Different protein batches for different parts of the week
+
+# Weekly Meal Coverage Instructions
+
+For each meal, you MUST calculate and include the weekly_meal_coverage array that shows every day this specific meal appears in the plan:
+
+**Example 1:** If "Protein Oats" appears as breakfast on Monday, Tuesday, Wednesday:
+${'```'}json
+"weekly_meal_coverage": [
+  {"day": "Monday", "meal_type": "breakfast"},
+  {"day": "Tuesday", "meal_type": "breakfast"}, 
+  {"day": "Wednesday", "meal_type": "breakfast"}
+]
+${'```'}
+
+**Example 2:** If "Chicken Salad" appears as lunch on Monday, Wednesday, Friday:
+${'```'}json
+"weekly_meal_coverage": [
+  {"day": "Monday", "meal_type": "lunch"},
+  {"day": "Wednesday", "meal_type": "lunch"},
+  {"day": "Friday", "meal_type": "lunch"}
+]
+${'```'}
+
+**CRITICAL:** The length of this array determines how many "X times per week" the meal shows in the app. Count carefully!
+
+- If a meal appears 7 times → array length = 7 → displays "7x/week"
+- If a meal appears 3 times → array length = 3 → displays "3x/week" 
+- If a meal appears 1 time → array length = 1 → displays "1x/week"
 
 Convert the meal plan you created above into this exact JSON format and save it to a file for download.`;
 };

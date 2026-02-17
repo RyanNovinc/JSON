@@ -139,9 +139,76 @@ export default function NutritionHomeScreen({ route }: any) {
   };
 
   const handleMealPlanNavigation = (plan: MealPlan) => {
-    if (!plan.data?.weeks) return;
-
     console.log('🍽️ Navigating to meal plan (no scaling):', plan.name);
+
+    // Handle new days structure (JSON.fit format)
+    if (plan.data?.days) {
+      // Create a mock week object to maintain compatibility with existing navigation
+      const week = {
+        week_number: 1,
+        days: plan.data.days
+      };
+      
+      // For now, just create a basic single session from legacy data
+      let mealPrepSession = null;
+      if (plan.data.weekly_meal_prep) {
+        mealPrepSession = {
+          session_name: `${plan.name} - Weekly Meal Prep`,
+          session_number: 1,
+          prep_day: 'Sunday evening',
+          total_time: plan.data.weekly_meal_prep.total_prep_time || 90,
+          prep_time: Math.floor((plan.data.weekly_meal_prep.total_prep_time || 90) / 3),
+          cook_time: Math.floor((plan.data.weekly_meal_prep.total_prep_time || 90) * 2 / 3),
+          total_prep_time: plan.data.weekly_meal_prep.total_prep_time || 90,
+          covers: `${plan.duration} days`,
+          covers_days: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+          recommended_timing: 'Sunday evening',
+          instructions: plan.data.weekly_meal_prep.prep_session_guide?.map(step => 
+            `${step.title}: ${step.description}`
+          ) || [],
+          prep_meals: plan.data.days && plan.data.days[0]?.meals ? 
+            plan.data.days[0].meals.map(meal => ({
+              meal_name: meal.meal_name,
+              meal_type: meal.meal_type,
+              prep_time: meal.prep_time || 0,
+              cook_time: meal.cook_time || 0,
+              total_time: meal.total_time || 0,
+              servings: meal.servings || 1,
+              calories: meal.calories || 0,
+              macros: meal.macros || { protein: 0, carbs: 0, fat: 0, fiber: 0 },
+              ingredients: meal.ingredients?.map(ing => ({
+                item: ing.item,
+                amount: ing.amount,
+                unit: ing.unit,
+                scalable: true,
+                notes: ing.notes || ''
+              })) || [],
+              instructions: meal.instructions || [],
+              meal_prep_notes: meal.notes || '',
+              base_servings: meal.servings || 1,
+              weekly_meal_coverage: meal.weekly_meal_coverage || []
+            })) : [],
+          equipment_needed: ['Large pot', 'Baking tray', 'Microwave-safe containers'],
+          ingredients: [],
+          storage_guidelines: {
+            proteins: 'Refrigerate cooked proteins for up to 4 days, freeze for longer storage',
+            grains: 'Store cooked grains in airtight containers in refrigerator for up to 5 days',
+            vegetables: 'Store prepared vegetables in refrigerator, add frozen vegetables raw to containers'
+          }
+        };
+      }
+      
+      navigation.navigate('MealPlanDays' as any, {
+        week,
+        mealPlanName: plan.name,
+        mealPrepSession,
+        allMealPrepSessions: mealPrepSession ? [mealPrepSession] : [],
+      });
+      return;
+    }
+
+    // Handle old weeks structure (existing logic)
+    if (!plan.data?.weeks) return;
 
     // For 7-day meal plans (or single week), navigate directly to days
     if (plan.duration <= 7 || plan.data.weeks.length === 1) {

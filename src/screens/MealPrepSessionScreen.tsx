@@ -76,7 +76,11 @@ export default function MealPrepSessionScreen() {
   const route = useRoute<MealPrepSessionScreenRouteProp>();
   const { themeColor } = useTheme();
 
-  const { mealPrepSession } = route.params;
+  const { mealPrepSession, sessionIndex, allSessions } = route.params;
+  
+  console.log('🎯 MealPrepSessionScreen mounted');
+  console.log('🎯 mealPrepSession:', mealPrepSession);
+  console.log('🎯 prep_meals count:', mealPrepSession?.prep_meals?.length);
   
   // State for tracking completed prep meals
   const [completedMeals, setCompletedMeals] = useState<Set<string>>(new Set());
@@ -142,12 +146,62 @@ export default function MealPrepSessionScreen() {
             >
               <Ionicons name="chevron-back" size={28} color="#ffffff" />
             </TouchableOpacity>
+            
+            {/* Session Navigation */}
+            {allSessions && allSessions.length > 1 && (
+              <View style={styles.sessionNavigation}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    const prevIndex = (sessionIndex || 0) - 1;
+                    if (prevIndex >= 0) {
+                      navigation.navigate('MealPrepSession', {
+                        mealPrepSession: allSessions[prevIndex],
+                        sessionIndex: prevIndex,
+                        allSessions,
+                      });
+                    }
+                  }}
+                  disabled={!sessionIndex || sessionIndex <= 0}
+                  style={[styles.navButton, (!sessionIndex || sessionIndex <= 0) && styles.navButtonDisabled]}
+                >
+                  <Ionicons name="chevron-back-outline" size={20} color={(!sessionIndex || sessionIndex <= 0) ? "#71717a" : "#ffffff"} />
+                </TouchableOpacity>
+                
+                <Text style={styles.sessionCounter}>
+                  {(sessionIndex || 0) + 1} of {allSessions.length}
+                </Text>
+                
+                <TouchableOpacity 
+                  onPress={() => {
+                    const nextIndex = (sessionIndex || 0) + 1;
+                    if (nextIndex < allSessions.length) {
+                      navigation.navigate('MealPrepSession', {
+                        mealPrepSession: allSessions[nextIndex],
+                        sessionIndex: nextIndex,
+                        allSessions,
+                      });
+                    }
+                  }}
+                  disabled={(sessionIndex || 0) >= allSessions.length - 1}
+                  style={[styles.navButton, ((sessionIndex || 0) >= allSessions.length - 1) && styles.navButtonDisabled]}
+                >
+                  <Ionicons name="chevron-forward-outline" size={20} color={((sessionIndex || 0) >= allSessions.length - 1) ? "#71717a" : "#ffffff"} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
           
           {/* Centered Hero Content */}
           <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>Your Meal Prep Plan</Text>
-            <Text style={styles.heroSubtitle}>Ready to build your week?</Text>
+            <Text style={styles.heroTitle}>
+              {allSessions && allSessions.length > 1 
+                ? `Prep ${(sessionIndex || 0) + 1} of ${allSessions.length}`
+                : mealPrepSession.session_name || 'Your Meal Prep Plan'
+              }
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              {mealPrepSession.prep_day || 'Ready to build your week?'}
+            </Text>
             
             <View style={styles.heroStats}>
               <Text style={styles.heroTime}>{mealPrepSession.total_time}</Text>
@@ -309,6 +363,9 @@ const styles = StyleSheet.create({
   backButtonRow: {
     width: '100%',
     paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   backButton: {
     width: 44,
@@ -317,6 +374,31 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sessionNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  navButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navButtonDisabled: {
+    opacity: 0.3,
+  },
+  sessionCounter: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginHorizontal: 16,
   },
   heroContent: {
     alignItems: 'center',

@@ -27,6 +27,8 @@ interface Meal {
   total_time?: number;
   servings?: number;
   calories?: number;
+  recommended_time?: string; // e.g., "7:45 AM", "12:30 PM"
+  timing_reason?: string; // e.g., "Within your optimal morning window"
   macros?: {
     protein: number;
     carbs: number;
@@ -75,9 +77,17 @@ function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor,
           </View>
           <View style={styles.mealTitleContainer}>
             <Text style={styles.mealName}>{meal.meal_name}</Text>
-            <Text style={[styles.mealType, { color: mealColor }]}>
-              {meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1)}
-            </Text>
+            <View style={styles.mealSubInfo}>
+              <Text style={[styles.mealType, { color: mealColor }]}>
+                {meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1)}
+              </Text>
+              {meal.recommended_time && (
+                <Text style={styles.mealTime}> • {meal.recommended_time}</Text>
+              )}
+            </View>
+            {meal.timing_reason && (
+              <Text style={styles.timingReason}>{meal.timing_reason}</Text>
+            )}
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -99,8 +109,8 @@ function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor,
         )}
         {totalTime > 0 && (
           <View style={styles.statChip}>
-            <Ionicons name="time" size={14} color="#06b6d4" />
-            <Text style={styles.statText}>{totalTime}min</Text>
+            <Ionicons name="timer" size={14} color="#06b6d4" />
+            <Text style={styles.statText}>{totalTime}min cook</Text>
           </View>
         )}
         {meal.servings && (
@@ -293,16 +303,28 @@ export default function MealPlanDayScreen() {
     });
   };
 
-  const groupedMeals = meals.reduce((groups: Record<string, Meal[]>, meal) => {
-    if (!groups[meal.meal_type]) {
-      groups[meal.meal_type] = [];
+  // Helper function to convert time string to minutes for sorting
+  const timeToMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
+    try {
+      const [time, period] = timeStr.split(' ');
+      const [hours, minutes] = time.split(':').map(Number);
+      let totalMinutes = (hours % 12) * 60 + minutes;
+      if (period === 'PM' && hours !== 12) totalMinutes += 12 * 60;
+      if (period === 'AM' && hours === 12) totalMinutes = minutes;
+      return totalMinutes;
+    } catch {
+      return 0;
     }
-    groups[meal.meal_type].push(meal);
-    return groups;
-  }, {});
+  };
 
-  const mealOrder = ['breakfast', 'lunch', 'dinner', 'snack'];
-  const sortedMealTypes = mealOrder.filter(type => groupedMeals[type]);
+  // Sort meals chronologically by recommended_time, fallback to meal type order
+  const mealTypeOrder = { 'breakfast': 0, 'snack': 1, 'lunch': 2, 'dinner': 3 };
+  const sortedMeals = meals.sort((a, b) => {
+    const timeA = a.recommended_time ? timeToMinutes(a.recommended_time) : mealTypeOrder[a.meal_type] * 360; // 6-hour gaps as fallback
+    const timeB = b.recommended_time ? timeToMinutes(b.recommended_time) : mealTypeOrder[b.meal_type] * 360;
+    return timeA - timeB;
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -360,54 +382,32 @@ export default function MealPlanDayScreen() {
           </View>
         </View>
 
-        {/* Meals by Type */}
-        {sortedMealTypes.map((mealType) => {
-          let globalIndex = 0;
-          // Calculate the starting global index for this meal type
-          for (const prevType of mealOrder) {
-            if (prevType === mealType) break;
-            if (groupedMeals[prevType]) {
-              globalIndex += groupedMeals[prevType].length;
-            }
-          }
+        {/* Sequential Meals Timeline */}
+        <View style={styles.mealSection}>
+          <View style={styles.mealSectionHeader}>
+            <Ionicons name="time" size={20} color={themeColor} />
+            <Text style={[styles.mealSectionTitle, { color: themeColor }]}>Your Daily Timeline</Text>
+            <Text style={styles.mealCount}>{meals.length} meal{meals.length > 1 ? 's' : ''}</Text>
+          </View>
           
-          return (
-            <View key={mealType} style={styles.mealSection}>
-              <View style={styles.mealSectionHeader}>
-                <Ionicons 
-                  name={getMealIcon(mealType) as any} 
-                  size={20} 
-                  color={getMealColor(mealType)} 
-                />
-                <Text style={[styles.mealSectionTitle, { color: getMealColor(mealType) }]}>
-                  {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
-                </Text>
-                <Text style={styles.mealCount}>
-                  {groupedMeals[mealType].length} meal{groupedMeals[mealType].length > 1 ? 's' : ''}
-                </Text>
-              </View>
-              
-              {groupedMeals[mealType].map((meal, localIndex) => {
-                const currentGlobalIndex = globalIndex + localIndex;
-                const mealId = generateMealId(meal, currentGlobalIndex);
-                const isCompleted = isMealCompleted(mealId, dayDateString);
-                
-                return (
-                  <MealCard
-                    key={currentGlobalIndex}
-                    meal={meal}
-                    onPress={() => handleMealPress(meal)}
-                    onLongPress={() => handleMealLongPress(meal, currentGlobalIndex)}
-                    themeColor={themeColor}
-                    mealIcon={getMealIcon(mealType)}
-                    mealColor={getMealColor(mealType)}
-                    isCompleted={isCompleted}
-                  />
-                );
-              })}
-            </View>
-          );
-        })}
+          {sortedMeals.map((meal, index) => {
+            const mealId = generateMealId(meal, index);
+            const isCompleted = isMealCompleted(mealId, dayDateString);
+            
+            return (
+              <MealCard
+                key={index}
+                meal={meal}
+                onPress={() => handleMealPress(meal)}
+                onLongPress={() => handleMealLongPress(meal, index)}
+                themeColor={themeColor}
+                mealIcon={getMealIcon(meal.meal_type)}
+                mealColor={getMealColor(meal.meal_type)}
+                isCompleted={isCompleted}
+              />
+            );
+          })}
+        </View>
 
         {meals.length === 0 && (
           <View style={styles.emptyState}>
@@ -656,9 +656,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
+  mealSubInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   mealType: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  mealTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#71717a',
+  },
+  timingReason: {
+    fontSize: 11,
+    color: '#a1a1aa',
+    fontStyle: 'italic',
     marginTop: 2,
   },
   headerRight: {

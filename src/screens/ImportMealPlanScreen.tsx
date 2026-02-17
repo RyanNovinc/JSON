@@ -73,6 +73,7 @@ export default function ImportMealPlanScreen() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
+  const [auditPromptCopied, setAuditPromptCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sampleCopied, setSampleCopied] = useState(false);
   const [modalScale] = useState(new Animated.Value(0));
@@ -81,6 +82,8 @@ export default function ImportMealPlanScreen() {
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
+  const [instructionsCreationMode, setInstructionsCreationMode] = useState<'quick' | 'research'>('quick');
+  const [showModeInfo, setShowModeInfo] = useState(false);
 
   const sampleMealPlan = {
     "plan_name": "Quick Start - Balanced Meal Plan",
@@ -312,8 +315,8 @@ export default function ImportMealPlanScreen() {
         throw new Error('Invalid total meals count');
       }
       
-      if (!Array.isArray(parsed.weeks) || parsed.weeks.length === 0) {
-        throw new Error('No meal plan weeks found');
+      if (!Array.isArray(parsed.days) || parsed.days.length === 0) {
+        throw new Error('No meal plan days found');
       }
       
       // Validate plan-level optional fields
@@ -321,26 +324,17 @@ export default function ImportMealPlanScreen() {
         throw new Error('Description must be a string');
       }
 
-      // Validate weeks structure
-      parsed.weeks.forEach((week: any, weekIndex: number) => {
-        if (!week.week_number || typeof week.week_number !== 'number') {
-          throw new Error(`Week ${weekIndex + 1} is missing week_number`);
+      // Validate days structure
+      parsed.days.forEach((day: any, dayIndex: number) => {
+        if (!day.day_name || !day.day_number) {
+          throw new Error(`Day ${dayIndex + 1} needs day_name and day_number`);
         }
         
-        if (!Array.isArray(week.days) || week.days.length === 0) {
-          throw new Error(`Week ${week.week_number} has no days`);
+        if (!Array.isArray(day.meals) || day.meals.length === 0) {
+          throw new Error(`"${day.day_name}" has no meals`);
         }
         
-        week.days.forEach((day: any, dayIndex: number) => {
-          if (!day.day_name || !day.day_number) {
-            throw new Error(`Day ${dayIndex + 1} in week ${week.week_number} needs name and number`);
-          }
-          
-          if (!Array.isArray(day.meals) || day.meals.length === 0) {
-            throw new Error(`"${day.day_name}" has no meals`);
-          }
-          
-          day.meals.forEach((meal: any, mealIndex: number) => {
+        day.meals.forEach((meal: any, mealIndex: number) => {
             // Validate required fields
             if (!meal.meal_name || !meal.meal_type || 
                 !Array.isArray(meal.ingredients) || meal.ingredients.length === 0 ||
@@ -389,7 +383,29 @@ export default function ImportMealPlanScreen() {
             }
           });
         });
-      });
+      
+      // Validate optional grocery list if present
+      if (parsed.grocery_list) {
+        if (typeof parsed.grocery_list !== 'object') {
+          throw new Error('grocery_list must be an object');
+        }
+        
+        if (parsed.grocery_list.categories && !Array.isArray(parsed.grocery_list.categories)) {
+          throw new Error('grocery_list.categories must be an array');
+        }
+        
+        if (parsed.grocery_list.categories) {
+          parsed.grocery_list.categories.forEach((category: any, catIndex: number) => {
+            if (!category.category_name) {
+              throw new Error(`Grocery category ${catIndex + 1} missing category_name`);
+            }
+            
+            if (category.items && !Array.isArray(category.items)) {
+              throw new Error(`Grocery category "${category.category_name}" items must be an array`);
+            }
+          });
+        }
+      }
       
       return parsed as MealPlan;
     } catch (validationError) {
@@ -578,6 +594,69 @@ export default function ImportMealPlanScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={{ height: 60 }} />
+            
+            {/* Mode Selection Section */}
+            <View style={styles.modeSection}>
+              <View style={styles.simpleModeToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.simpleOption,
+                    instructionsCreationMode === 'quick' && [styles.simpleOptionActive, { backgroundColor: themeColor }]
+                  ]}
+                  onPress={() => setInstructionsCreationMode('quick')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[
+                    styles.simpleOptionText,
+                    instructionsCreationMode === 'quick' && { color: '#0a0a0b' }
+                  ]}>Quick</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.simpleOption,
+                    instructionsCreationMode === 'research' && [styles.simpleOptionActive, { backgroundColor: themeColor }]
+                  ]}
+                  onPress={() => setInstructionsCreationMode('research')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[
+                    styles.simpleOptionText,
+                    instructionsCreationMode === 'research' && { color: '#0a0a0b' }
+                  ]}>Research</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TouchableOpacity
+                style={styles.centeredInfoButton}
+                onPress={() => setShowModeInfo(!showModeInfo)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.infoButtonText, { color: themeColor }]}>What's the difference?</Text>
+                <Ionicons 
+                  name={showModeInfo ? "chevron-up" : "chevron-down"} 
+                  size={14} 
+                  color={themeColor} 
+                />
+              </TouchableOpacity>
+              
+              {showModeInfo && (
+                <View style={[styles.infoCard, { borderColor: themeColor + '20' }]}>
+                  <View style={styles.infoRow}>
+                    <View style={styles.infoColumn}>
+                      <Text style={[styles.infoTitle, { color: themeColor }]}>Quick</Text>
+                      <Text style={styles.infoDesc}>Faster but less accurate meal plan</Text>
+                    </View>
+                    <View style={styles.infoDivider} />
+                    <View style={styles.infoColumn}>
+                      <Text style={[styles.infoTitle, { color: themeColor }]}>Research</Text>
+                      <Text style={styles.infoDesc}>Longer but more accurate meal plan</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+            
             <View style={styles.stepsContainer}>
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
@@ -587,13 +666,24 @@ export default function ImportMealPlanScreen() {
                   <Text style={styles.stepCardTitle}>Plan Your Meals</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Send this prompt to your AI of choice
+                  {instructionsCreationMode === 'research' 
+                    ? 'Send this enhanced prompt for research-verified meal planning'
+                    : 'Send this prompt to your AI of choice for quick meal planning'
+                  }
                 </Text>
+                {instructionsCreationMode === 'research' && (
+                  <View style={[styles.researchNote, { borderColor: themeColor + '30', backgroundColor: themeColor + '10' }]}>
+                    <Ionicons name="information-circle" size={16} color={themeColor} />
+                    <Text style={[styles.researchNoteText, { color: themeColor }]}>
+                      Enable web search/research tools in your AI (Claude, ChatGPT, etc.)
+                    </Text>
+                  </View>
+                )}
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
-                      const planningPrompt = await generateUserMealPlanPrompt();
+                      const planningPrompt = await generateUserMealPlanPrompt(instructionsCreationMode === 'research');
                       await Clipboard.setStringAsync(planningPrompt);
                       setPlanningPromptCopied(true);
                       setTimeout(() => {
@@ -611,15 +701,63 @@ export default function ImportMealPlanScreen() {
                 >
                   <Ionicons name="copy-outline" size={18} color="#0a0a0b" />
                   <Text style={styles.actionButtonText}>
-                    {planningPromptCopied ? 'Copied!' : 'Copy Planning Prompt'}
+                    {planningPromptCopied ? 'Copied!' : `Copy ${instructionsCreationMode === 'research' ? 'Research' : 'Quick'} Planning Prompt`}
                   </Text>
                 </TouchableOpacity>
               </View>
               
+              {instructionsCreationMode === 'research' && (
+                <View style={styles.stepCard}>
+                  <View style={styles.stepCardHeader}>
+                    <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
+                      <Text style={styles.stepBadgeText}>2</Text>
+                    </View>
+                    <Text style={styles.stepCardTitle}>Critical Audit</Text>
+                  </View>
+                  <Text style={styles.stepCardDescription}>
+                    Challenge the AI to prove its research with this skeptical follow-up
+                  </Text>
+                  <TouchableOpacity 
+                    style={[styles.actionButton, { backgroundColor: themeColor }]}
+                    onPress={async () => {
+                      const auditPrompt = `I'm skeptical about the accuracy of your research and calculations. Can you prove the legitimacy of what you just presented? Specifically:
+
+1. Source Verification: Show me the actual URLs or direct links you used for pricing verification. Provide the specific links you accessed.
+
+2. Macro Math Audit: Walk me through the exact calculations for your protein/macro claims. Show the database entries you used and any conversions you applied.
+
+3. Pricing Reality Check: Prove your pricing claims are accurate for current market conditions. These need verification.
+
+4. Cross-Reference Claims: Pick 3 specific nutritional claims and show me how you verified them across multiple databases.
+
+5. Calculation Transparency: Your totals need to add up. Show your exact arithmetic for daily calories and macros.
+
+If you can't provide specific URLs, database entry numbers, or verifiable calculations, then admit which parts are estimates vs. actual research. Don't present confident claims without backing them up with real, accessible sources.
+
+Prove your research is real, not just confident-sounding assumptions.
+
+After you've completed this audit and made any necessary corrections, regenerate the complete meal plan using your verified data.`;
+                      
+                      await Clipboard.setStringAsync(auditPrompt);
+                      setAuditPromptCopied(true);
+                      setTimeout(() => {
+                        setAuditPromptCopied(false);
+                      }, 2000);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="shield-checkmark" size={18} color="#0a0a0b" />
+                    <Text style={styles.actionButtonText}>
+                      {auditPromptCopied ? 'Copied!' : 'Copy Audit Prompt'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>2</Text>
+                    <Text style={styles.stepBadgeText}>{instructionsCreationMode === 'research' ? '3' : '2'}</Text>
                   </View>
                   <Text style={styles.stepCardTitle}>Generate Meal Plan</Text>
                 </View>
@@ -648,7 +786,7 @@ export default function ImportMealPlanScreen() {
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>3</Text>
+                    <Text style={styles.stepBadgeText}>{instructionsCreationMode === 'research' ? '4' : '3'}</Text>
                   </View>
                   <Text style={styles.stepCardTitle}>Import & Enjoy</Text>
                 </View>
@@ -725,9 +863,9 @@ export default function ImportMealPlanScreen() {
         </View>
 
         <View style={styles.content}>
-          {/* Mode toggle - positioned above the main button */}
+          {/* Upload Mode toggle */}
           <TouchableOpacity 
-            style={[styles.modeToggle, { borderColor: themeColor }]}
+            style={[styles.uploadModeToggle, { borderColor: themeColor }]}
             onPress={() => setUploadMode(!uploadMode)}
             activeOpacity={0.8}
           >
@@ -838,19 +976,12 @@ export default function ImportMealPlanScreen() {
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Macro Split</Text>
-                  <Text style={[styles.summaryValue, { color: themeColor }]}>{parsedMealPlan?.macro_targets?.protein_pct}P/{parsedMealPlan?.macro_targets?.carbs_pct}C/{parsedMealPlan?.macro_targets?.fat_pct}F</Text>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Unique Recipes</Text>
                   <Text style={[styles.summaryValue, { color: themeColor }]}>
                     {(() => {
                       const uniqueMeals = new Set();
-                      parsedMealPlan?.weeks.forEach(week => 
-                        week.days.forEach(day => 
-                          day.meals.forEach(meal => uniqueMeals.add(meal.meal_name))
-                        )
+                      parsedMealPlan?.days.forEach(day => 
+                        day.meals.forEach(meal => uniqueMeals.add(meal.meal_name))
                       );
                       return uniqueMeals.size;
                     })()} recipes
@@ -914,7 +1045,86 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 60,
   },
-  modeToggle: {
+  modeSection: {
+    marginBottom: 32,
+    alignItems: 'center',
+  },
+  simpleModeToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#27272a',
+    borderRadius: 8,
+    padding: 2,
+    marginBottom: 12,
+  },
+  simpleOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  simpleOptionActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  simpleOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#a1a1aa',
+  },
+  centeredInfoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    gap: 4,
+  },
+  infoButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  infoCard: {
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    width: '100%',
+    maxWidth: 320,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  infoColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  infoDivider: {
+    width: 1,
+    backgroundColor: '#27272a',
+    marginHorizontal: 16,
+    alignSelf: 'stretch',
+  },
+  infoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  infoTime: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#a1a1aa',
+    marginBottom: 4,
+  },
+  infoDesc: {
+    fontSize: 12,
+    color: '#71717a',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  uploadModeToggle: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -1137,18 +1347,6 @@ const styles = StyleSheet.create({
     color: '#0a0a0b',
     letterSpacing: 0.5,
   },
-  header: {
-    paddingTop: 50,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoButton: {
-    width: 40,
-    height: 40,
-  },
   instructionsContainer: {
     flex: 1,
   },
@@ -1251,6 +1449,35 @@ const styles = StyleSheet.create({
     color: '#0a0a0b',
     opacity: 0.7,
     marginLeft: 4,
+  },
+  progressIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  researchNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 6,
+  },
+  researchNoteText: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
   },
   errorContainer: {
     flex: 1,

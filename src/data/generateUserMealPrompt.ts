@@ -1,12 +1,13 @@
 import { WorkoutStorage } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const generateUserMealPlanPrompt = async () => {
+export const generateUserMealPlanPrompt = async (researchMode: boolean = false) => {
   try {
     // Load all questionnaire data
     const nutritionResults = await WorkoutStorage.loadNutritionResults();
     const budgetCookingResults = await WorkoutStorage.loadBudgetCookingResults();
     const sleepResults = await WorkoutStorage.loadSleepOptimizationResults();
+    const fridgePantryResults = await WorkoutStorage.loadFridgePantryResults();
 
     console.log('Debug - nutritionResults:', JSON.stringify(nutritionResults, null, 2));
     console.log('Debug - budgetCookingResults:', JSON.stringify(budgetCookingResults, null, 2));
@@ -23,7 +24,8 @@ export const generateUserMealPlanPrompt = async () => {
 
     const nutritionData = nutritionResults;
     const budgetData = budgetCookingResults.formData;
-    const sleepData = sleepResults?.results;
+    const sleepData = sleepResults?.formData;
+    const fridgePantryData = fridgePantryResults?.formData;
 
     // Ensure formData exists - this might be the core issue
     if (!nutritionData.formData) {
@@ -137,23 +139,41 @@ export const generateUserMealPlanPrompt = async () => {
     };
 
     // Generate the prompt
-    const prompt = `I'm using a nutrition planning app called JSON.fit and need help creating a personalized meal plan.
+    const researchInstructions = researchMode ? `
+**CRITICAL RESEARCH INSTRUCTIONS (Research-Verified Mode):**
+1. **USE WEB SEARCH FOR VERIFICATION** - Before creating the meal plan, search the web to verify:
+   - Current pricing at ${budgetData.groceryStore} in ${budgetData.country} for all major ingredients
+   - Accurate nutritional data from USDA database or Cronometer for precise macro calculations
+   - Ingredient availability at ${budgetData.groceryStore} in ${budgetData.country}
+   - Current seasonal pricing for produce in ${budgetData.country} to optimize budget
+2. **VERIFY ALL NUTRITION DATA** - Use reliable sources like USDA database or Cronometer to verify calories and macros for each meal
+3. **CRITICAL AUDIT STEP** - After gathering information, perform a skeptical review of your research:
+   - Double-check pricing against multiple sources
+   - Verify nutritional claims against authoritative databases
+   - Flag any data that seems outdated or inconsistent
+   - Correct any errors found during this audit phase
+4. **SOURCE CITATIONS** - Provide sources for all pricing and nutritional data used` : `
+**QUICK CREATION INSTRUCTIONS:**
+1. **STANDARD KNOWLEDGE** - Use your existing knowledge base for common foods and recipes
+2. **ESTIMATED PRICING** - Use typical pricing patterns for ${budgetData.groceryStore} in ${budgetData.country}`;
 
-**CRITICAL INSTRUCTIONS:**
-1. **VERIFY ALL NUTRITION DATA** - Use reliable sources like USDA database or Cronometer to verify calories and macros for each meal
-2. **BUDGET CONSTRAINT** - ${budgetData.weeklyBudget === 'custom' ? 
-  `Stay within $${budgetData.customBudgetAmount || '0'}/week budget - choose cost-effective ingredients and avoid expensive items` :
+    const prompt = `I'm using a nutrition planning app called JSON.fit and need help creating a personalized meal plan.
+${researchInstructions}
+
+**MEAL PLAN REQUIREMENTS:**
+1. **BUDGET CONSTRAINT** - ${budgetData.weeklyBudget === 'custom' ? 
+  `Target weekly grocery budget: $${budgetData.customBudgetAmount || '0'}` :
   budgetData.weeklyBudget === 'very_tight' ? 
-  'Very tight budget - every dollar counts, prioritize the most affordable ingredients and avoid any expensive items' :
+  'Very tight budget category' :
   budgetData.weeklyBudget === 'budget_conscious' ?
-  'Budget conscious - value and cost-effectiveness are important, choose affordable options when possible' :
+  'Budget conscious category' :
   budgetData.weeklyBudget === 'moderate' ?
-  'Moderate budget - balanced approach to cost and quality, some flexibility but still cost-aware' :
+  'Moderate budget category' :
   budgetData.weeklyBudget === 'comfortable' ?
-  'Comfortable budget - quality valued over strict cost savings, can include some premium ingredients' :
-  'Generous budget - cost is not a constraint, focus on quality and variety'
+  'Comfortable budget category' :
+  'Generous budget category'
 }
-3. **MEAL PREP FOCUSED** - ${budgetData.planningStyle === 1 ? 
+2. **MEAL PREP FOCUSED** - ${budgetData.planningStyle === 1 ? 
   'I want to meal prep everything - batch cook all proteins, same meals multiple days, cook once per week' :
   budgetData.planningStyle === 2 ?
   'I want to meal prep as much as possible - batch cook proteins, repeat meals multiple days, minimize daily cooking - this means I want REPEATED meals and batch cooking, NOT 21 different meals' :
@@ -163,9 +183,9 @@ export const generateUserMealPlanPrompt = async () => {
   'I prefer mostly fresh cooking - minimal meal prep, enjoys cooking most meals daily' :
   'I prefer cooking fresh meals daily - no meal prep, enjoys daily cooking variety and spontaneous meal choices'
 }
-4. **INCLUDE DETAILED GROCERY LIST** - Organize by categories (Proteins, Dairy, Produce, etc.) with exact quantities, units, and estimated prices from ${budgetData.groceryStore}
-5. **SPECIFIC DATES** - Start the meal plan on ${formatDate(startDate)} and use actual calendar dates
-6. **SHOW CALCULATIONS** - For each meal, briefly explain how you arrived at the calorie/macro numbers
+3. **INCLUDE DETAILED GROCERY LIST** - Organize by categories (Proteins, Dairy, Produce, etc.) with exact quantities, units, and estimated prices from ${budgetData.groceryStore}
+4. **SPECIFIC DATES** - Start the meal plan on ${formatDate(startDate)} and use actual calendar dates
+5. **SHOW CALCULATIONS** - For each meal, briefly explain how you arrived at the calorie/macro numbers
 
 NUTRITION TARGETS:
 - Daily calories: ${nutritionData.macroResults.calories}
@@ -185,8 +205,44 @@ DIETARY REQUIREMENTS:
 - Allergies: ${budgetData.allergies?.length ? budgetData.allergies.join(', ') : 'None'}
 - Avoid foods: ${budgetData.avoidFoods?.length ? budgetData.avoidFoods.join(', ') : 'None'}
 - Eating challenges: ${budgetData.eatingChallenges?.length ? budgetData.eatingChallenges.join(', ') : 'None'}
-${sleepData ? `- Sleep schedule: ${sleepData.bedtime} - ${sleepData.wakeTime}` : ''}
-${sleepData ? `- Meal timing preferences: ${sleepData.mealTiming}` : ''}
+
+${sleepData ? `**SLEEP-OPTIMIZED MEAL TIMING REQUIREMENTS:**
+Based on my completed Sleep Optimization questionnaire:
+- Sleep schedule: ${sleepData.bedtime} - ${sleepData.wakeTime}
+- Optimization level: ${sleepData.optimizationLevel}
+- CRITICAL: Calculate and provide specific meal times for each day based on these sleep parameters:
+  ${sleepData.optimizationLevel === 'minimal' ? 
+    '• First meal: Within 2 hours of wake time\n  • Last meal: 2 hours before bedtime\n  • 12-hour eating window' :
+    sleepData.optimizationLevel === 'moderate' ?
+    '• First meal: 30-90 minutes after wake time\n  • Last meal: 3 hours before bedtime\n  • 8-10 hour eating window' :
+    '• First meal: 30-60 minutes after wake time\n  • Last meal: 4+ hours before bedtime\n  • 8-hour early eating window'
+  }
+- PROVIDE SPECIFIC TIMES: For each meal in your plan, specify the recommended time (e.g., "7:45 AM", "12:30 PM", "6:00 PM") and briefly explain why that timing supports better sleep and metabolism` : ''}
+
+FRIDGE & PANTRY INVENTORY:
+${fridgePantryData && fridgePantryData.wantToUseExistingIngredients && fridgePantryData.ingredients?.length ? `
+**IMPORTANT: I have ingredients at home that I want to use in my meal plan**
+- Usage preference: ${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
+  'MAXIMIZE MY INVENTORY - Plan meals specifically around what I already have' :
+  fridgePantryData.preferences?.primaryApproach === 'expiry' ? 
+  'EXPIRY FOCUSED - Prioritize using items before they expire' :
+  'AI-LED PLANNING - Create optimal meal plans first, naturally incorporate my items when they fit'
+}
+
+Available ingredients:
+${fridgePantryData.ingredients.map(item => {
+  const expiryInfo = item.expiryDate ? ` (expires ${new Date(item.expiryDate).toLocaleDateString()})` : '';
+  const quantity = item.quantity && item.unit ? ` - ${item.quantity} ${item.unit}` : '';
+  const notes = item.notes ? ` (${item.notes})` : '';
+  return `• ${item.name}${quantity}${expiryInfo}${notes} [${item.location}]`;
+}).join('\n')}
+
+**CRITICAL: ${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
+  'Build the meal plan around these ingredients as much as possible. These should be the foundation of your meal suggestions.' :
+  fridgePantryData.preferences?.primaryApproach === 'expiry' ? 
+  'Prioritize ingredients with expiry dates first, especially those expiring soon. Build meals around expiring items.' :
+  'Use these ingredients when they naturally fit into optimal meal plans, but don\'t force them if they don\'t work well.'
+}**` : '- No fridge/pantry inventory provided or user chose not to include existing ingredients'}
 
 MEAL PREFERENCES:
 ${budgetData.mealPreferences === 'include_favorites' ? 
@@ -290,15 +346,16 @@ Please create a detailed ${budgetData.planDuration}-day meal plan that:
 1. **STARTS on ${formatDate(startDate)}** and uses actual calendar dates
 2. **MATCHES my meal prep personality** - don't give me 21 meals if I'm a "Weekly Planner"
 3. **SHOWS NUTRITION CALCULATIONS** - briefly explain how you got the calories/macros for each meal
-4. **INCLUDES DETAILED RECIPES** - For each meal provide:
+4. **${sleepData ? 'INCLUDES SPECIFIC MEAL TIMES - For each meal, provide the exact recommended time (e.g., "Breakfast: 7:45 AM", "Dinner: 6:00 PM") based on my sleep schedule and optimization level' : 'INCLUDES GENERAL MEAL TIMING - Provide suggested meal times'}**
+5. **INCLUDES DETAILED RECIPES** - For each meal provide:
    - Complete ingredients list with exact quantities and units
    - Step-by-step cooking instructions (minimum 3-5 steps per recipe)
    - Prep time and cook time for each meal
    - Serving size information
-5. **INCLUDES STRUCTURED MEAL PREP PLAN** - exactly what to prep, how much, and what containers to use
-6. Uses ingredients available at ${budgetData.groceryStore} in ${budgetData.country}
-7. Accounts for my dietary restrictions and cooking skill level
-8. Hits macro targets within 5-10%
+6. **INCLUDES STRUCTURED MEAL PREP PLAN** - exactly what to prep, how much, and what containers to use
+7. Uses ingredients available at ${budgetData.groceryStore} in ${budgetData.country}
+8. Accounts for my dietary restrictions and cooking skill level
+9. Hits macro targets within 5-10%${sleepData ? '\n10. **PROVIDES MEAL TIMING RATIONALE** - Explain why each meal time optimizes sleep and circadian health' : ''}
 
 **FORMAT REQUIREMENTS:**
 - Create the plan as a text document (not a formatted document)

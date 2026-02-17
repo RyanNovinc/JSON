@@ -1,0 +1,70 @@
+{
+  "plan_name": "7-Day Bulk Meal Plan — Coles Canberra",
+  "description": "A budget-friendly, meal-prep-focused bulking plan hitting 3,065 calories and 230g protein daily using just 5 repeated meals. Designed for a beginner cook with a small appetite, all ingredients from Coles Australia. Nutrition data verified against USDA FoodData Central. Prices estimated from multiple Australian sources as of February 2026.",
+  "duration_days": 7,
+  "total_meals": 35,
+  "weekly_meal_prep": {
+    "total_prep_time": 90,
+    "unique_recipes": 5,
+    "batch_proteins": ["Chicken breast", "Beef mince (3-star)"],
+    "prep_session_guide": [
+      {
+        "step": 1,
+        "title": "Preheat oven and prep chicken",
+        "description": "Preheat oven to 200°C (fan-forced 180°C). Line a large baking tray with baking paper. Lay out all chicken breast fillets (the 500g from your fridge plus the 1.4kg purchased — total ~1.9kg raw). Drizzle with 1 tablespoon olive oil, season with salt, pepper, and garlic powder. Place in oven and set timer for 25 minutes.",
+        "time_required": 5
+      }
+    ]
+  },
+  "grocery_list": {
+    "total_estimated_cost": 132,
+    "currency": "AUD",
+    "categories": [
+      {
+        "category_name": "Meat & Seafood",
+        "items": [
+          {
+            "item_name": "Coles RSPCA Chicken Breast Fillets (Large Pack)",
+            "quantity": "1.4",
+            "unit": "kg",
+            "estimated_price": 16.80,
+            "notes": "Approx $12/kg. You also have 500g at home (cook immediately — expiring today). Total chicken for the week: ~1.9kg raw.",
+            "is_purchased": false
+          }
+        ]
+      }
+    ]
+  },
+  "days": [
+    {
+      "day_name": "Monday 16 Feb",
+      "day_number": 1,
+      "meals": [
+        {
+          "meal_name": "Protein Oats",
+          "meal_type": "breakfast",
+          "prep_time": 2,
+          "cook_time": 3,
+          "total_time": 5,
+          "servings": 1,
+          "calories": 766,
+          "macros": {
+            "protein": 45.5,
+            "carbs": 98.8,
+            "fat": 24.9,
+            "fiber": 6.5
+          },
+          "ingredients": [
+            { "item": "Rolled oats (dry)", "amount": "70", "unit": "g", "notes": "" }
+          ],
+          "instructions": [
+            "Combine 70g rolled oats and 250ml full cream milk in a large microwave-safe bowl.",
+            "Microwave on high for 2.5–3 minutes, stirring once halfway through to prevent overflow."
+          ],
+          "notes": "Small appetite tip: Blend all ingredients raw with 4–5 ice cubes for a 770-calorie drinkable shake instead.",
+          "tags": ["high-protein", "quick", "meal-prep-friendly", "microwave"]
+        }
+      ]
+    }
+  ]
+}

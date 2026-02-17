@@ -403,17 +403,22 @@ export function FeedbackTab() {
                   )}
 
                   <TouchableOpacity
-                    style={[
-                      styles.button,
-                      rating === 0 ? styles.buttonDisabled : { backgroundColor: themeColor }
-                    ]}
+                    style={{
+                      paddingVertical: 16,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      marginTop: 'auto',
+                      backgroundColor: rating === 0 ? '#18181b' : themeColor,
+                      opacity: rating === 0 ? 0.3 : 1,
+                    }}
                     onPress={handleRatingSubmit}
                     disabled={rating === 0}
                   >
-                    <Text style={[
-                      styles.buttonText,
-                      rating === 0 && styles.buttonTextDisabled
-                    ]}>
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: rating === 0 ? '#52525b' : '#ffffff',
+                    }}>
                       {rating === 5 ? 'Rate on App Store' : 'Submit Feedback'}
                     </Text>
                   </TouchableOpacity>
@@ -445,17 +450,22 @@ export function FeedbackTab() {
                   <Text style={styles.charCount}>{feedback.length} / 500</Text>
 
                   <TouchableOpacity
-                    style={[
-                      styles.button,
-                      !feedback.trim() ? styles.buttonDisabled : { backgroundColor: themeColor }
-                    ]}
+                    style={{
+                      paddingVertical: 16,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      marginTop: 'auto',
+                      backgroundColor: !feedback.trim() ? '#18181b' : themeColor,
+                      opacity: !feedback.trim() ? 0.3 : 1,
+                    }}
                     onPress={handleFeedbackSubmit}
                     disabled={!feedback.trim()}
                   >
-                    <Text style={[
-                      styles.buttonText,
-                      !feedback.trim() && styles.buttonTextDisabled
-                    ]}>
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: !feedback.trim() ? '#52525b' : '#ffffff',
+                    }}>
                       Submit {activeTab === 'bug' ? 'Bug Report' : 'Feature Request'}
                     </Text>
                   </TouchableOpacity>
@@ -624,10 +634,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181b',
     opacity: 0.3,
   },
+  buttonEnabled: {
+    opacity: 1,
+  },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0a0a0b',
+    color: '#ffffff',
   },
   buttonTextDisabled: {
     color: '#52525b',

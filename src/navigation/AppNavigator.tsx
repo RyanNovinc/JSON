@@ -81,6 +81,7 @@ export type RootStackParamList = {
     week: any;
     mealPlanName: string;
     mealPrepSession?: any;
+    allMealPrepSessions?: any[];
   };
   MealPlanDay: {
     day: any;
@@ -97,6 +98,8 @@ export type RootStackParamList = {
   };
   MealPrepSession: {
     mealPrepSession: any;
+    sessionIndex?: number; // Which session to display (0, 1, 2...)
+    allSessions?: any[]; // All meal prep sessions for navigation
   };
   Days: {
     block: any;

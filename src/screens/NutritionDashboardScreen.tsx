@@ -5,9 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  Switch,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -83,10 +85,23 @@ export default function NutritionDashboardScreen() {
     fridgePantry: false,
     favoriteMeals: false,
   });
+  const [fridgePantryCount, setFridgePantryCount] = useState<number>(0);
+  const [useFridgePantry, setUseFridgePantry] = useState<boolean>(false);
+  const [fridgePantryPreferences, setFridgePantryPreferences] = useState<any>(null);
 
   useEffect(() => {
     loadCompletionStatus();
+    loadFridgePantryCount();
+    loadUseFridgePantryToggle();
   }, []);
+
+  // Reload data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadFridgePantryCount();
+      loadUseFridgePantryToggle();
+    }, [])
+  );
 
   const loadCompletionStatus = async () => {
     try {
@@ -97,6 +112,75 @@ export default function NutritionDashboardScreen() {
     }
   };
 
+  const loadFridgePantryCount = async () => {
+    try {
+      const results = await WorkoutStorage.loadFridgePantryResults();
+      if (results && results.formData.ingredients) {
+        setFridgePantryCount(results.formData.ingredients.length);
+      }
+      if (results && results.formData.preferences) {
+        setFridgePantryPreferences(results.formData.preferences);
+      }
+    } catch (error) {
+      console.error('Failed to load fridge pantry count:', error);
+    }
+  };
+
+  const loadUseFridgePantryToggle = async () => {
+    try {
+      const results = await WorkoutStorage.loadFridgePantryResults();
+      if (results && results.formData) {
+        setUseFridgePantry(results.formData.wantToUseExistingIngredients || false);
+      }
+    } catch (error) {
+      console.error('Failed to load fridge pantry toggle:', error);
+    }
+  };
+
+  const handleToggleFridgePantry = async (value: boolean) => {
+    try {
+      setUseFridgePantry(value);
+      
+      const results = await WorkoutStorage.loadFridgePantryResults();
+      if (results) {
+        const updatedResults = {
+          ...results,
+          formData: {
+            ...results.formData,
+            wantToUseExistingIngredients: value,
+          },
+        };
+        await WorkoutStorage.saveFridgePantryResults(updatedResults);
+      }
+    } catch (error) {
+      console.error('Failed to save fridge pantry toggle:', error);
+    }
+  };
+
+  const handlePreferencesSave = async (newPreferences: any) => {
+    setFridgePantryPreferences(newPreferences);
+    // Reload data to ensure consistency
+    await loadFridgePantryCount();
+    await loadUseFridgePantryToggle();
+  };
+
+  const getFridgePantryDisplayText = () => {
+    if (!useFridgePantry) return 'Off';
+    
+    if (!fridgePantryPreferences) return 'Set up';
+    
+    switch (fridgePantryPreferences.primaryApproach) {
+      case 'maximize':
+        return 'Maximize inventory';
+      case 'expiry':
+        return 'Expiry focused';
+      case 'ai-led':
+        return 'AI-led planning';
+      default:
+        return 'Set up';
+    }
+  };
+
   const handleQuestionnairePress = (questionnaire: QuestionnairCard) => {
     navigation.navigate(questionnaire.navigationTarget as any);
   };
@@ -104,16 +188,20 @@ export default function NutritionDashboardScreen() {
   const renderQuestionnaireCard = (questionnaire: QuestionnairCard, index: number) => {
     const isCompleted = completionStatus[questionnaire.completionKey];
     const isFavorites = questionnaire.id === 'favorites';
+    const isFridgePantry = questionnaire.id === 'fridgePantry';
 
     return (
       <TouchableOpacity
         key={questionnaire.id}
-        style={[styles.card, { borderColor: themeColor, shadowColor: themeColor }]}
+        style={[styles.card, { 
+          borderColor: isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor, 
+          shadowColor: isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor 
+        }]}
         activeOpacity={0.8}
         onPress={() => handleQuestionnairePress(questionnaire)}
       >
-        {/* Completion Status Indicator - Hide for favorites */}
-        {!isFavorites && (
+        {/* Completion Status Indicator - Hide for favorites and fridgePantry */}
+        {!isFavorites && !isFridgePantry && (
           <View style={styles.statusContainer}>
             {isCompleted ? (
               <View style={[styles.statusBadge, { backgroundColor: themeColor }]}>
@@ -127,13 +215,20 @@ export default function NutritionDashboardScreen() {
           </View>
         )}
 
+        {/* Fridge Pantry Item Count */}
+        {isFridgePantry && fridgePantryCount > 0 && (
+          <View style={[styles.itemCountContainer, { backgroundColor: useFridgePantry ? themeColor : '#71717a' }]}>
+            <Text style={[styles.itemCountText, { color: useFridgePantry ? '#0a0a0b' : '#ffffff' }]}>{fridgePantryCount}</Text>
+          </View>
+        )}
+
         {/* Card Content */}
         <View style={styles.cardContent}>
           <View style={styles.iconContainer}>
             <Ionicons 
               name={questionnaire.icon as any} 
               size={32} 
-              color={isFavorites ? themeColor : (isCompleted ? themeColor : '#71717a')} 
+              color={isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor}
             />
           </View>
           
@@ -144,9 +239,23 @@ export default function NutritionDashboardScreen() {
             <Text style={styles.cardSubtitle}>
               {questionnaire.subtitle}
             </Text>
-            <Text style={[styles.cardDescription, { color: isFavorites ? themeColor : (isCompleted ? themeColor : '#71717a') }]}>
-              {isFavorites ? questionnaire.description : (isCompleted ? 'Completed' : questionnaire.description)}
+            <Text style={[styles.cardDescription, { color: isFavorites ? themeColor : (isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : isCompleted ? themeColor : '#71717a') }]}>
+              {isFavorites ? questionnaire.description : (isFridgePantry && isCompleted ? getFridgePantryDisplayText() : isCompleted ? 'Completed' : questionnaire.description)}
             </Text>
+            
+            {/* Toggle for Fridge & Pantry */}
+            {isFridgePantry && isCompleted && (
+              <View style={styles.toggleContainer}>
+                <Text style={styles.toggleLabel}>Include in meal planning</Text>
+                <Switch
+                  value={useFridgePantry}
+                  onValueChange={handleToggleFridgePantry}
+                  trackColor={{ false: '#27272a', true: themeColor + '40' }}
+                  thumbColor={useFridgePantry ? themeColor : '#71717a'}
+                  ios_backgroundColor="#27272a"
+                />
+              </View>
+            )}
           </View>
 
           {/* Chevron */}
@@ -154,7 +263,7 @@ export default function NutritionDashboardScreen() {
             <Ionicons 
               name="chevron-forward" 
               size={24} 
-              color={isCompleted ? themeColor : '#71717a'} 
+              color={isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : isCompleted ? themeColor : '#71717a'} 
             />
           </View>
         </View>
@@ -173,45 +282,52 @@ export default function NutritionDashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={themeColor} />
-        </TouchableOpacity>
-        
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Nutrition Setup</Text>
-          <Text style={styles.headerSubtitle}>
-            {completedCount}/{totalQuestionnaires} questionnaires completed
-          </Text>
+      {/* Scrollable Content */}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={themeColor} />
+          </TouchableOpacity>
+          
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Nutrition Setup</Text>
+            <Text style={styles.headerSubtitle}>
+              {completedCount}/{totalQuestionnaires} questionnaires completed
+            </Text>
+          </View>
         </View>
-      </View>
 
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View 
-            style={[
-              styles.progressFill, 
-              { 
-                backgroundColor: themeColor,
-                width: `${(completedCount / totalQuestionnaires) * 100}%`
-              }
-            ]} 
-          />
+        {/* Progress Bar */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { 
+                  backgroundColor: themeColor,
+                  width: `${(completedCount / totalQuestionnaires) * 100}%`
+                }
+              ]} 
+            />
+          </View>
         </View>
-      </View>
 
-      {/* Questionnaire Cards */}
-      <View style={styles.cardsContainer}>
-        {questionnaires.map((questionnaire, index) => 
-          renderQuestionnaireCard(questionnaire, index)
-        )}
-      </View>
+        {/* Questionnaire Cards */}
+        <View style={styles.cardsContainer}>
+          {questionnaires.map((questionnaire, index) => 
+            renderQuestionnaireCard(questionnaire, index)
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -266,8 +382,14 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 4,
   },
-  cardsContainer: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 32,
+  },
+  cardsContainer: {
     paddingHorizontal: 16,
     gap: 16,
   },
@@ -338,5 +460,37 @@ const styles = StyleSheet.create({
   },
   chevronContainer: {
     marginLeft: 12,
+  },
+  itemCountContainer: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#0a0a0b',
+    zIndex: 10,
+  },
+  itemCountText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0a0a0b',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+  },
+  toggleLabel: {
+    fontSize: 14,
+    color: '#a1a1aa',
+    flex: 1,
   },
 });

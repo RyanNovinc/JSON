@@ -28,6 +28,8 @@ interface Meal {
   total_time?: number;
   servings?: number;
   calories?: number;
+  recommended_time?: string; // e.g., "7:45 AM", "12:30 PM"
+  timing_reason?: string; // e.g., "Within your optimal morning window"
   macros?: {
     protein: number;
     carbs: number;
@@ -255,7 +257,68 @@ export default function MealPlanDaysScreen() {
   const { themeColor } = useTheme();
   const mealPlanning = useMealPlanning();
 
-  const { week, mealPlanName, mealPrepSession } = route.params;
+  const { week, mealPlanName, mealPrepSession, allMealPrepSessions } = route.params;
+  
+  // Helper function to group days by their prep session
+  const groupDaysByPrepSession = () => {
+    // For legacy format (single session) or when no allMealPrepSessions, show all days ungrouped
+    if (!allMealPrepSessions || allMealPrepSessions.length === 0) {
+      const allDays = (week.days || []).map((day, dayIndex) => ({ day, dayIndex }));
+      return [{ session: null, days: allDays }];
+    }
+
+    console.log('🔍 Grouping days by prep session');
+    console.log('allMealPrepSessions:', allMealPrepSessions);
+    console.log('week.days:', week.days);
+
+    const groups = [];
+    const usedDayIndices = new Set();
+    
+    allMealPrepSessions.forEach(session => {
+      console.log(`🔧 Processing session:`, session.session_name, 'covers_days:', session.covers_days);
+      
+      const sessionDays = [];
+      const sessionDayNames = session.covers_days || [];
+      
+      week.days?.forEach((day, dayIndex) => {
+        const dayName = day.day_name.split(' ')[0]; // Extract day name (e.g., "Monday" from "Monday 16 Feb")
+        console.log(`🔧 Checking day ${dayName} against session days:`, sessionDayNames);
+        
+        if (sessionDayNames.some(sessionDay => sessionDay.toLowerCase().includes(dayName.toLowerCase()))) {
+          sessionDays.push({ day, dayIndex });
+          usedDayIndices.add(dayIndex);
+          console.log(`✅ Day ${dayName} matched session ${session.session_name}`);
+        }
+      });
+      
+      if (sessionDays.length > 0) {
+        groups.push({
+          session,
+          days: sessionDays
+        });
+      }
+    });
+    
+    // Add any unmatched days to a general group
+    const unmatchedDays = [];
+    week.days?.forEach((day, dayIndex) => {
+      if (!usedDayIndices.has(dayIndex)) {
+        unmatchedDays.push({ day, dayIndex });
+      }
+    });
+    
+    if (unmatchedDays.length > 0) {
+      groups.push({
+        session: null,
+        days: unmatchedDays
+      });
+    }
+    
+    console.log('🔧 Final groups:', groups);
+    return groups;
+  };
+
+  const dayGroups = groupDaysByPrepSession();
   
   // State for tracking meal prep completion
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
@@ -263,10 +326,14 @@ export default function MealPlanDaysScreen() {
   // Debug: Log the meal prep session and calorie data
   console.log('🔍 MealPlanDaysScreen received data:');
   console.log('Week data:', week);
+  console.log('Week days count:', week?.days?.length);
   console.log('First day calories:', week?.days?.[0]?.daily_totals?.calories);
   console.log('First meal calories:', week?.days?.[0]?.meals?.[0]?.calories);
   console.log('DEBUG: mealPrepSession:', mealPrepSession);
-  console.log('DEBUG: week.meal_prep_session:', week?.meal_prep_session);
+  console.log('DEBUG: allMealPrepSessions:', allMealPrepSessions);
+  console.log('DEBUG: allMealPrepSessions length:', allMealPrepSessions?.length);
+  console.log('DEBUG: dayGroups:', dayGroups);
+  console.log('DEBUG: dayGroups length:', dayGroups?.length);
   
   // Load completed meals when component mounts
   useEffect(() => {
@@ -427,40 +494,110 @@ export default function MealPlanDaysScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={days}
-          renderItem={renderDay}
-          keyExtractor={(day, index) => `${week.week_number}-${index}`}
-          contentContainerStyle={styles.list}
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            mealPrepSession ? (
-              <View style={styles.mealPrepContainer}>
+        >
+          {/* Prep Sessions Section */}
+          {(allMealPrepSessions && allMealPrepSessions.length > 0) ? (
+            <View style={styles.prepSessionsSection}>
+              <Text style={styles.sectionTitle}>Meal Prep Sessions</Text>
+              <Text style={styles.sectionSubtitle}>Prepare these in chronological order</Text>
+              
+              {allMealPrepSessions.map((session, index) => (
                 <TouchableOpacity 
-                  style={[styles.mealPrepCard, { backgroundColor: `${themeColor}10` }]}
+                  key={session.session_number || index}
+                  style={[styles.mealPrepCard, { backgroundColor: `${themeColor}10`, marginBottom: 12 }]}
                   onPress={() => {
                     navigation.navigate('MealPrepSession', {
-                      mealPrepSession: mealPrepSession
+                      mealPrepSession: session,
+                      sessionIndex: index,
+                      allSessions: allMealPrepSessions,
                     });
                   }}
                 >
                   <View style={styles.mealPrepContent}>
                     <View style={[styles.mealPrepIcon, { backgroundColor: themeColor }]}>
-                      <Ionicons name="list" size={20} color="#ffffff" />
+                      <Ionicons name="restaurant" size={20} color="#ffffff" />
                     </View>
                     <View style={styles.mealPrepText}>
-                      <Text style={styles.mealPrepTitle}>Weekly Meal Prep</Text>
-                      <Text style={styles.mealPrepSubtitle}>
-                        {mealPrepSession.total_time} min • {mealPrepSession.prep_meals?.length || 0} recipes
+                      <Text style={styles.mealPrepTitle}>
+                        {allMealPrepSessions.length > 1 
+                          ? `🍳 Prep ${index + 1} of ${allMealPrepSessions.length}` 
+                          : session.session_name || 'Weekly Meal Prep'
+                        }
                       </Text>
+                      <Text style={styles.mealPrepSubtitle}>
+                        {session.prep_day} • {session.total_time} min • {session.unique_recipes || session.prep_meals?.length || 0} recipes
+                      </Text>
+                      {session.covers_days && session.covers_days.length > 0 && (
+                        <Text style={styles.mealPrepCoverage}>
+                          Covers: {session.covers_days.join(', ')}
+                        </Text>
+                      )}
                     </View>
                     <Ionicons name="chevron-forward" size={20} color={themeColor} />
                   </View>
                 </TouchableOpacity>
-              </View>
-            ) : null
-          }
-        />
+              ))}
+            </View>
+          ) : mealPrepSession ? (
+            <View style={styles.prepSessionsSection}>
+              <TouchableOpacity 
+                style={[styles.mealPrepCard, { backgroundColor: `${themeColor}10`, marginBottom: 24 }]}
+                onPress={() => {
+                  navigation.navigate('MealPrepSession', {
+                    mealPrepSession: mealPrepSession
+                  });
+                }}
+              >
+                <View style={styles.mealPrepContent}>
+                  <View style={[styles.mealPrepIcon, { backgroundColor: themeColor }]}>
+                    <Ionicons name="restaurant" size={20} color="#ffffff" />
+                  </View>
+                  <View style={styles.mealPrepText}>
+                    <Text style={styles.mealPrepTitle}>🍳 Weekly Meal Prep</Text>
+                    <Text style={styles.mealPrepSubtitle}>
+                      {mealPrepSession.total_time} min • {mealPrepSession.prep_meals?.length || 0} recipes
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={themeColor} />
+                </View>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {/* Days Grouped by Prep Session */}
+          {dayGroups.map((group, groupIndex) => (
+            <View key={groupIndex} style={styles.dayGroup}>
+              {/* Only show group header if there are multiple sessions */}
+              {group.session && allMealPrepSessions && allMealPrepSessions.length > 1 && (
+                <View style={styles.dayGroupHeader}>
+                  <View style={styles.dayGroupLine} />
+                  <Text style={styles.dayGroupTitle}>
+                    From Prep {allMealPrepSessions?.findIndex(s => s.session_number === group.session.session_number) + 1} ({group.session.prep_day})
+                  </Text>
+                  <View style={styles.dayGroupLine} />
+                </View>
+              )}
+              
+              {group.days.map(({ day, dayIndex }) => (
+                <DayCard
+                  key={`${week.week_number}-${dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day)}`}
+                  day={day}
+                  onPress={() => handleDayPress(day, dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
+                  themeColor={themeColor}
+                  isCompleted={false}
+                  dayDate={getDayDate(dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
+                  dayName={getDayName(dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
+                  isToday={isToday(dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
+                  mealPlanning={mealPlanning}
+                />
+              ))}
+            </View>
+          ))}
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -501,8 +638,50 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 2,
   },
-  list: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: 16,
+  },
+  prepSessionsSection: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#71717a',
+    marginBottom: 16,
+  },
+  dayGroup: {
+    marginBottom: 24,
+  },
+  dayGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  dayGroupLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#3f3f46',
+  },
+  dayGroupTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#a1a1aa',
+    marginHorizontal: 16,
+  },
+  mealPrepCoverage: {
+    fontSize: 12,
+    color: '#71717a',
+    marginTop: 2,
   },
   card: {
     backgroundColor: '#18181b',
