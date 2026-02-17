@@ -107,17 +107,7 @@ function DayCard({ day, onPress, themeColor, isCompleted, dayDate, dayName, isTo
     return totals;
   }, { protein: 0, carbs: 0, fat: 0, fiber: 0 });
 
-  // Calculate total prep time
-  const totalPrepTime = day.meals.reduce((total, meal) => {
-    return total + (meal.total_time || meal.prep_time || 0);
-  }, 0);
 
-  // Get meal type distribution
-  const mealTypes = day.meals.map(meal => meal.meal_type);
-  const hasBreakfast = mealTypes.includes('breakfast');
-  const hasLunch = mealTypes.includes('lunch');
-  const hasDinner = mealTypes.includes('dinner');
-  const snackCount = mealTypes.filter(type => type === 'snack').length;
 
   return (
     <TouchableOpacity 
@@ -161,50 +151,6 @@ function DayCard({ day, onPress, themeColor, isCompleted, dayDate, dayName, isTo
       </View>
       
       <View style={styles.cardBody}>
-        {/* Meal Types Row */}
-        <View style={styles.mealTypesRow}>
-          {hasBreakfast && (
-            <View style={styles.mealTypeChip}>
-              <Ionicons name="sunny" size={12} color="#f59e0b" />
-              <Text style={styles.mealTypeText}>Breakfast</Text>
-            </View>
-          )}
-          {hasLunch && (
-            <View style={styles.mealTypeChip}>
-              <Ionicons name="partly-sunny" size={12} color="#06b6d4" />
-              <Text style={styles.mealTypeText}>Lunch</Text>
-            </View>
-          )}
-          {hasDinner && (
-            <View style={styles.mealTypeChip}>
-              <Ionicons name="moon" size={12} color="#8b5cf6" />
-              <Text style={styles.mealTypeText}>Dinner</Text>
-            </View>
-          )}
-          {snackCount > 0 && (
-            <View style={styles.mealTypeChip}>
-              <Ionicons name="nutrition" size={12} color="#10b981" />
-              <Text style={styles.mealTypeText}>{snackCount} snack{snackCount > 1 ? 's' : ''}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Ionicons name="flash-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>{totalCalories} cal</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>{totalPrepTime}min prep</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="fitness-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>{Math.round(totalMacros.protein)}g protein</Text>
-          </View>
-        </View>
-
         {/* Progress Tracking */}
         {mealCount > 0 && (
           <View style={styles.progressSection}>
@@ -237,12 +183,10 @@ function DayCard({ day, onPress, themeColor, isCompleted, dayDate, dayName, isTo
                 <View style={[styles.macroDot, { backgroundColor: '#f59e0b' }]} />
                 <Text style={styles.macroText}>F: {Math.round(totalMacros.fat)}g</Text>
               </View>
-              {totalMacros.fiber > 0 && (
-                <View style={styles.macroItem}>
-                  <View style={[styles.macroDot, { backgroundColor: '#10b981' }]} />
-                  <Text style={styles.macroText}>Fiber: {Math.round(totalMacros.fiber)}g</Text>
-                </View>
-              )}
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDot, { backgroundColor: '#10b981' }]} />
+                <Text style={styles.macroText}>{Math.round(totalCalories)} cal</Text>
+              </View>
             </View>
           </View>
         )}
@@ -257,7 +201,7 @@ export default function MealPlanDaysScreen() {
   const { themeColor } = useTheme();
   const mealPlanning = useMealPlanning();
 
-  const { week, mealPlanName, mealPrepSession, allMealPrepSessions } = route.params;
+  const { week, mealPlanName, mealPrepSession, allMealPrepSessions, groceryList } = route.params;
   
   // Helper function to group days by their prep session
   const groupDaysByPrepSession = () => {
@@ -499,16 +443,40 @@ export default function MealPlanDaysScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Grocery List Section */}
+          {groceryList && (
+            <View style={styles.grocerySection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Shopping List</Text>
+              </View>
+              <TouchableOpacity 
+                style={[styles.groceryCardFriendly, { backgroundColor: `${themeColor}15` }]}
+                onPress={() => navigation.navigate('GroceryList', { groceryList })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.groceryFriendlyContent}>
+                  <Text style={styles.groceryFriendlyMain}>
+                    ${groceryList.total_estimated_cost} grocery trip
+                  </Text>
+                  <Text style={styles.groceryFriendlySubtext}>
+                    Tap to see your shopping list
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={themeColor} />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Prep Sessions Section */}
           {(allMealPrepSessions && allMealPrepSessions.length > 0) ? (
             <View style={styles.prepSessionsSection}>
-              <Text style={styles.sectionTitle}>Meal Prep Sessions</Text>
-              <Text style={styles.sectionSubtitle}>Prepare these in chronological order</Text>
+              <Text style={styles.sectionTitle}>Meal Prep</Text>
+              <Text style={styles.sectionSubtitle}>Your cooking schedule made simple</Text>
               
               {allMealPrepSessions.map((session, index) => (
                 <TouchableOpacity 
                   key={session.session_number || index}
-                  style={[styles.mealPrepCard, { backgroundColor: `${themeColor}10`, marginBottom: 12 }]}
+                  style={[styles.prepCardFriendly, { backgroundColor: `${themeColor}10` }]}
                   onPress={() => {
                     navigation.navigate('MealPrepSession', {
                       mealPrepSession: session,
@@ -517,28 +485,24 @@ export default function MealPlanDaysScreen() {
                     });
                   }}
                 >
-                  <View style={styles.mealPrepContent}>
-                    <View style={[styles.mealPrepIcon, { backgroundColor: themeColor }]}>
-                      <Ionicons name="restaurant" size={20} color="#ffffff" />
-                    </View>
-                    <View style={styles.mealPrepText}>
-                      <Text style={styles.mealPrepTitle}>
-                        {allMealPrepSessions.length > 1 
-                          ? `🍳 Prep ${index + 1} of ${allMealPrepSessions.length}` 
-                          : session.session_name || 'Weekly Meal Prep'
-                        }
+                  <View style={styles.prepFriendlyContent}>
+                    <View style={styles.prepFriendlyHeader}>
+                      <Text style={styles.prepFriendlyTitle}>
+                        {allMealPrepSessions.length > 1 ? `Prep ${index + 1}` : 'Meal Prep'}
                       </Text>
-                      <Text style={styles.mealPrepSubtitle}>
-                        {session.prep_day} • {session.total_time} min • {session.unique_recipes || session.prep_meals?.length || 0} recipes
+                      <Text style={styles.prepFriendlyTime}>
+                        {session.total_time} min
                       </Text>
-                      {session.covers_days && session.covers_days.length > 0 && (
-                        <Text style={styles.mealPrepCoverage}>
-                          Covers: {session.covers_days.join(', ')}
-                        </Text>
-                      )}
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={themeColor} />
+                    <Text style={styles.prepFriendlyWhen}>
+                      {session.prep_day}
+                    </Text>
+                    <Text style={styles.prepFriendlyDays}>
+                      For {session.covers_days?.slice(0, 2).join(' & ')} 
+                      {session.covers_days?.length > 2 ? ` +${session.covers_days.length - 2} more days` : ''}
+                    </Text>
                   </View>
+                  <Ionicons name="chevron-forward" size={20} color={themeColor} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -557,7 +521,7 @@ export default function MealPlanDaysScreen() {
                     <Ionicons name="restaurant" size={20} color="#ffffff" />
                   </View>
                   <View style={styles.mealPrepText}>
-                    <Text style={styles.mealPrepTitle}>🍳 Weekly Meal Prep</Text>
+                    <Text style={styles.mealPrepTitle}>Weekly Meal Prep</Text>
                     <Text style={styles.mealPrepSubtitle}>
                       {mealPrepSession.total_time} min • {mealPrepSession.prep_meals?.length || 0} recipes
                     </Text>
@@ -644,19 +608,110 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
+  grocerySection: {
+    marginBottom: 32,
+  },
+  sectionHeaderRow: {
+    marginBottom: 16,
+  },
+  groceryCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+  },
+  groceryCardFriendly: {
+    borderRadius: 20,
+    padding: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(24, 24, 27, 0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(63, 63, 70, 0.3)',
+  },
+  groceryFriendlyContent: {
+    flex: 1,
+  },
+  groceryFriendlyMain: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 6,
+    letterSpacing: -0.5,
+  },
+  groceryFriendlySubtext: {
+    fontSize: 15,
+    color: '#71717a',
+    fontWeight: '500',
+  },
+  groceryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  groceryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(113, 113, 122, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  groceryInfo: {
+    flex: 1,
+  },
+  groceryTotal: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  grocerySubtext: {
+    fontSize: 14,
+    color: '#a1a1aa',
+  },
+  groceryProgress: {
+    alignItems: 'flex-end',
+  },
+  groceryProgressText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#71717a',
+  },
+  groceryCategoryPreview: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+  },
+  groceryCategoryName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#ffffff',
+  },
+  groceryItemsCount: {
+    fontSize: 13,
+    color: '#71717a',
+  },
   prepSessionsSection: {
     marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '800',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: -0.8,
   },
   sectionSubtitle: {
-    fontSize: 14,
-    color: '#71717a',
-    marginBottom: 16,
+    fontSize: 16,
+    color: '#a1a1aa',
+    marginBottom: 20,
+    fontWeight: '500',
   },
   dayGroup: {
     marginBottom: 24,
@@ -744,41 +799,6 @@ const styles = StyleSheet.create({
   cardBody: {
     paddingHorizontal: 16,
     paddingBottom: 16,
-  },
-  mealTypesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
-  },
-  mealTypeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(113, 113, 122, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  mealTypeText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#d4d4d8',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  statText: {
-    fontSize: 12,
-    color: '#71717a',
-    marginLeft: 4,
   },
   macrosPreview: {
     backgroundColor: 'rgba(39, 39, 42, 0.5)',
@@ -901,8 +921,11 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   mealPrepCard: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
+    backgroundColor: 'rgba(24, 24, 27, 0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(63, 63, 70, 0.3)',
   },
   mealPrepContent: {
     flexDirection: 'row',
@@ -928,6 +951,52 @@ const styles = StyleSheet.create({
   mealPrepSubtitle: {
     fontSize: 14,
     color: '#a1a1aa',
+  },
+  prepCardFriendly: {
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  prepFriendlyContent: {
+    flex: 1,
+  },
+  prepFriendlyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  prepFriendlyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.5,
+  },
+  prepFriendlyTime: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  prepFriendlyWhen: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  prepFriendlyDays: {
+    fontSize: 14,
+    color: '#71717a',
+    fontWeight: '500',
+    lineHeight: 20,
   },
 });
 

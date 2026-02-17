@@ -11,7 +11,6 @@ import { NutritionStep3 } from '../components/nutrition/NutritionStep3';
 import { NutritionStep4 } from '../components/nutrition/NutritionStep4';
 import { NutritionStep5 } from '../components/nutrition/NutritionStep5';
 import { NutritionStep6 } from '../components/nutrition/NutritionStep6';
-import { NutritionStep7 } from '../components/nutrition/NutritionStep7';
 import { NutritionSummary } from '../components/nutrition/NutritionSummary';
 
 // Types
@@ -20,7 +19,8 @@ export interface NutritionFormData {
   goal: 'lose_weight' | 'gain_weight' | 'maintain' | null;
   
   // Step 2: Rate (only for lose/gain)
-  targetRate: number; // kg per week
+  targetRatePercentage: number; // percentage of body weight per week
+  targetRate: number; // kg per week (calculated from percentage * weight)
   
   // Step 3: Personal Details
   age: number | null;
@@ -44,17 +44,7 @@ export interface NutritionFormData {
   mealsPerDay: number;
   restrictions: string[];
   supplements: string[];
-  
-  // Step 7: Health & Lifestyle Assessment
-  pregnantBreastfeeding: 'none' | 'pregnant' | 'breastfeeding' | null;
-  medicalConditions: string[];
-  medications: string[];
-  smokingStatus: 'never' | 'former' | 'current' | null;
-  sunExposure: 'minimal' | 'moderate' | 'high' | null;
-  digestiveIssues: string[];
-  stressLevel: 'low' | 'moderate' | 'high' | null;
-  sleepQuality: 'poor' | 'fair' | 'good' | 'excellent' | null;
-  geographicRegion: 'north_america' | 'europe' | 'asia' | 'other' | null;
+  nutrientVariety: 'high' | 'moderate' | 'low' | null;
 }
 
 export interface MacroResults {
@@ -80,14 +70,15 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
   const { userProfile, saveUserProfile } = useMealPlanning();
   // Initialize step - only go to step 8 if we actually have saved data
   const [currentStep, setCurrentStep] = useState<number>(() => {
-    // Only start at step 8 if showResults is true AND we have a userProfile with data
+    // Only start at step 7 if showResults is true AND we have a userProfile with data
     if (route?.params?.showResults && userProfile && userProfile.age) {
-      return 8;
+      return 7;
     }
     return 1;
   });
   const [formData, setFormData] = useState<NutritionFormData>({
     goal: null,
+    targetRatePercentage: 0.5, // 0.5% of body weight per week
     targetRate: 0.5,
     age: null,
     gender: null,
@@ -99,31 +90,32 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
     mealsPerDay: 3,
     restrictions: [],
     supplements: [],
-    pregnantBreastfeeding: null,
-    medicalConditions: [],
-    medications: [],
-    smokingStatus: null,
-    sunExposure: null,
-    digestiveIssues: [],
-    stressLevel: null,
-    sleepQuality: null,
-    geographicRegion: null,
+    nutrientVariety: null,
   });
   
   const [macroResults, setMacroResults] = useState<MacroResults | null>(null);
   const [displayCalories, setDisplayCalories] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Load saved user data when showing results
+  // Calculate targetRate whenever weight or targetRatePercentage changes
   useEffect(() => {
-    if (!route?.params?.showResults || !userProfile) return;
+    if (formData.weight && formData.targetRatePercentage) {
+      const calculatedRate = (formData.weight * formData.targetRatePercentage) / 100;
+      setFormData(prev => ({ ...prev, targetRate: calculatedRate }));
+    }
+  }, [formData.weight, formData.targetRatePercentage]);
+
+  // Load saved user data when showing results OR when retaking questionnaire
+  useEffect(() => {
+    if (!userProfile) return;
     
     console.log('Loading saved user profile:', userProfile); // Debug log
     
     // Map the user profile back to form data format
     const savedData: Partial<NutritionFormData> = {
       goal: userProfile.goals?.primaryGoal || userProfile.goal,
-      targetRate: userProfile.targetRate || 0.5, // Restore the slider value
+      targetRatePercentage: userProfile.targetRatePercentage || 0.5, // Restore the percentage value
+      targetRate: userProfile.targetRate || 0.5, // Restore the kg value
       age: userProfile.age,
       gender: userProfile.gender,
       height: userProfile.height,
@@ -134,6 +126,7 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
       mealsPerDay: userProfile.mealsPerDay,
       restrictions: userProfile.dietaryRestrictions || [],
       supplements: userProfile.supplements || [],
+      nutrientVariety: userProfile.nutrientVariety || null,
     };
     
     setFormData(prev => ({ ...prev, ...savedData }));
@@ -292,7 +285,7 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
 
   // Navigation functions
   const nextStep = useCallback(() => {
-    if (currentStep < 7) {
+    if (currentStep < 6) {
       let nextStepNumber = currentStep + 1;
       // Skip Step 2 if goal is maintain
       if (nextStepNumber === 2 && formData.goal === 'maintain') {
@@ -322,6 +315,9 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
 
   // Calculate macro results
   const calculateMacros = useCallback(() => {
+    // Always go to summary step first
+    setCurrentStep(7);
+    
     if (!formData.age || !formData.gender || !formData.height || !formData.weight || !formData.activityLevel) {
       console.error('Missing required data for macro calculation');
       return;
@@ -391,7 +387,6 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
     };
 
     setMacroResults(results);
-    setCurrentStep(8); // Show summary
   }, [formData]);
 
   // Calculate calories from slider adjustment
@@ -478,13 +473,15 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
         currentWeight: formData.weight,
         weight: formData.weight,
         goal: formData.goal,
-        targetRate: formData.targetRate, // Save the slider value
+        targetRatePercentage: formData.targetRatePercentage, // Save the percentage value
+        targetRate: formData.targetRate, // Save the kg value
         activityLevel: formData.activityLevel,
         workoutFrequency: formData.workoutFrequency,
         dietType: formData.dietType,
         mealsPerDay: formData.mealsPerDay,
         dietaryRestrictions: formData.restrictions,
         supplements: formData.supplements,
+        nutrientVariety: formData.nutrientVariety,
         // Save macro targets
         macros: {
           calories: macroResults.targetCalories,
@@ -578,8 +575,6 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
       case 6:
         return <NutritionStep6 {...stepProps} />;
       case 7:
-        return <NutritionStep7 {...stepProps} />;
-      case 8:
         return (
           <NutritionSummary
             formData={formData}
@@ -587,7 +582,9 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
             displayCalories={displayCalories}
             setDisplayCalories={setDisplayCalories}
             targetRate={formData.targetRate}
+            targetRatePercentage={formData.targetRatePercentage}
             setTargetRate={(rate) => updateFormData({ targetRate: rate })}
+            setTargetRatePercentage={(percentage) => updateFormData({ targetRatePercentage: percentage })}
             calculateCaloriesFromSlider={calculateCaloriesFromSlider}
             recalculateMacrosWithNewCalories={recalculateMacrosWithNewCalories}
             setMacroResults={setMacroResults}

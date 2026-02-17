@@ -82,6 +82,7 @@ export type RootStackParamList = {
     mealPlanName: string;
     mealPrepSession?: any;
     allMealPrepSessions?: any[];
+    groceryList?: any;
   };
   MealPlanDay: {
     day: any;
@@ -130,7 +131,9 @@ export type RootStackParamList = {
   MealDetail: {
     meal: any;
   };
-  GroceryList: undefined;
+  GroceryList: {
+    groceryList?: any;
+  };
   MealRatings: undefined;
   FavoriteMeals: undefined;
   WeightTracker: undefined;

@@ -286,6 +286,8 @@ export default function MealPlanWeeksScreen() {
       week,
       mealPlanName: mealPlan.name,
       mealPrepSession: week.meal_prep_session,
+      allMealPrepSessions: mealPlan.data?.meal_prep_sessions || [],
+      groceryList: mealPlan.data?.grocery_list,
     });
   };
 

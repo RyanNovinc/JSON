@@ -8,6 +8,10 @@ export const generateUserMealPlanPrompt = async (researchMode: boolean = false) 
     const budgetCookingResults = await WorkoutStorage.loadBudgetCookingResults();
     const sleepResults = await WorkoutStorage.loadSleepOptimizationResults();
     const fridgePantryResults = await WorkoutStorage.loadFridgePantryResults();
+    
+    // Also load user profile for nutrient variety data
+    const userProfileData = await AsyncStorage.getItem('@nutrition_user_profile');
+    const userProfile = userProfileData ? JSON.parse(userProfileData) : null;
 
     console.log('Debug - nutritionResults:', JSON.stringify(nutritionResults, null, 2));
     console.log('Debug - budgetCookingResults:', JSON.stringify(budgetCookingResults, null, 2));
@@ -206,6 +210,16 @@ DIETARY REQUIREMENTS:
 - Avoid foods: ${budgetData.avoidFoods?.length ? budgetData.avoidFoods.join(', ') : 'None'}
 - Eating challenges: ${budgetData.eatingChallenges?.length ? budgetData.eatingChallenges.join(', ') : 'None'}
 
+NUTRIENT VARIETY PRIORITY:
+${userProfile?.nutrientVariety === 'high' ? 
+  '**VERY IMPORTANT** - I want maximum nutrient variety and diversity. Please:\n  • Include a wide range of different vegetables, fruits, protein sources, and whole grains\n  • Vary nutrients across meals (different vitamins, minerals, antioxidants)\n  • Use colorful ingredients (aim for different colors each day)\n  • Include both common and less common nutrient-dense foods\n  • Consider seasonal produce for peak nutrient content' :
+  userProfile?.nutrientVariety === 'moderate' ?
+  '**MODERATELY IMPORTANT** - I want some nutrient variety with convenience. Please:\n  • Include variety but balance with practicality and meal prep efficiency\n  • Focus on nutrient-dense staples with some diverse additions\n  • Vary protein sources and include different vegetables\n  • Don\'t sacrifice convenience for minor nutrient differences' :
+  userProfile?.nutrientVariety === 'low' ?
+  '**LESS IMPORTANT** - I prefer simple, consistent meals over nutrient variety. Please:\n  • Focus on nutritionally complete but simple ingredient combinations\n  • Repeat successful nutrient-dense staples frequently\n  • Prioritize convenience and familiarity over exotic variety\n  • Use proven combinations rather than experimenting with diverse ingredients' :
+  '**NOT SPECIFIED** - Use standard approach to nutrient variety balanced with other preferences'
+}
+
 ${sleepData ? `**SLEEP-OPTIMIZED MEAL TIMING REQUIREMENTS:**
 Based on my completed Sleep Optimization questionnaire:
 - Sleep schedule: ${sleepData.bedtime} - ${sleepData.wakeTime}
@@ -331,6 +345,7 @@ ${budgetData.planningStyle <= 2 ? `
 - I want to meal prep! Give me 3-4 repeated meals max, not 21 different ones
 - Focus on batch cooking 1-2 proteins for the week
 - Same breakfast for multiple days is fine
+- Think about what actually benefits from meal prep vs what should be made fresh daily
 - Provide a detailed meal prep session guide with exact quantities and containers needed
 ` : budgetData.planningStyle >= 4 ? `
 - I prefer fresh, different meals each day

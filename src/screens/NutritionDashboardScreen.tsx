@@ -182,7 +182,19 @@ export default function NutritionDashboardScreen() {
   };
 
   const handleQuestionnairePress = (questionnaire: QuestionnairCard) => {
-    navigation.navigate(questionnaire.navigationTarget as any);
+    if (questionnaire.id === 'nutrition') {
+      const isCompleted = completionStatus[questionnaire.completionKey];
+      navigation.navigate(questionnaire.navigationTarget as any, {
+        showResults: isCompleted
+      });
+    } else if (questionnaire.id === 'sleep') {
+      const isCompleted = completionStatus[questionnaire.completionKey];
+      navigation.navigate(questionnaire.navigationTarget as any, {
+        showResults: isCompleted
+      });
+    } else {
+      navigation.navigate(questionnaire.navigationTarget as any);
+    }
   };
 
   const renderQuestionnaireCard = (questionnaire: QuestionnairCard, index: number) => {

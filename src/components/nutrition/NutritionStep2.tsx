@@ -31,23 +31,35 @@ export const NutritionStep2: React.FC<Props> = ({
   // This component should not render for maintain goals - handled by navigation logic
 
   const isWeightLoss = formData.goal === 'lose_weight';
-  const minRate = isWeightLoss ? 0.25 : 0.25;
-  const maxRate = isWeightLoss ? 0.75 : 0.5;
+  const minRatePercentage = isWeightLoss ? 0.25 : 0.16; // 0.25% for weight loss, 0.16% for weight gain
+  const maxRatePercentage = isWeightLoss ? 1.0 : 0.5;   // 1.0% for weight loss, 0.5% for weight gain
   
-  const getRateDescription = (rate: number) => {
+  const getRateDescription = (ratePercentage: number) => {
     if (isWeightLoss) {
-      if (rate <= 0.3) return 'Conservative & Sustainable';
-      if (rate <= 0.5) return 'Moderate & Balanced';
+      if (ratePercentage <= 0.5) return 'Conservative & Sustainable';
+      if (ratePercentage <= 0.75) return 'Moderate & Balanced';
       return 'Aggressive & Fast';
     } else {
-      if (rate <= 0.3) return 'Lean Muscle Focus';
-      if (rate <= 0.4) return 'Balanced Growth';
+      if (ratePercentage <= 0.25) return 'Lean Muscle Focus';
+      if (ratePercentage <= 0.38) return 'Balanced Growth';
       return 'Maximum Muscle Gain';
     }
   };
 
+  const getDetailedInfo = (ratePercentage: number) => {
+    if (isWeightLoss) {
+      if (ratePercentage <= 0.5) return 'Preserves muscle, easier to maintain';
+      if (ratePercentage <= 0.75) return 'Balanced fat loss & muscle preservation';
+      return 'Faster results, higher muscle loss risk';
+    } else {
+      if (ratePercentage <= 0.25) return '85% muscle, 15% fat';
+      if (ratePercentage <= 0.38) return '75% muscle, 25% fat';
+      return '65% muscle, 35% fat';
+    }
+  };
+
   const handleNext = () => {
-    if (formData.targetRate > 0) {
+    if (formData.targetRatePercentage > 0) {
       nextStep();
     }
   };
@@ -80,61 +92,71 @@ export const NutritionStep2: React.FC<Props> = ({
 
         <Animatable.View animation="fadeInUp" delay={400} style={styles.sliderContainer}>
           <View style={styles.rateDisplay}>
-            <Text style={[styles.rateNumber, { color: colors.primary }]}>
-              {isWeightLoss ? '-' : '+'}{formData.targetRate.toFixed(2)} kg
-            </Text>
-            <Text style={styles.rateUnit}>per week</Text>
-            <Text style={styles.rateDescription}>
-              {getRateDescription(formData.targetRate)}
-            </Text>
+            <View style={[styles.rateCard, { borderColor: colors.primary + '20', backgroundColor: colors.primary + '08' }]}>
+              <Text style={[styles.rateNumber, { color: colors.primary }]}>
+                {formData.targetRatePercentage.toFixed(2)}%
+              </Text>
+              <Text style={styles.rateUnit}>per week</Text>
+              
+              <View style={styles.descriptionContainer}>
+                <Text style={styles.rateDescription}>
+                  {getRateDescription(formData.targetRatePercentage)}
+                </Text>
+                
+                <View style={styles.benefitTag}>
+                  <Text style={[styles.benefitText, { color: colors.primary }]}>
+                    {getDetailedInfo(formData.targetRatePercentage)}
+                  </Text>
+                </View>
+                
+              </View>
+            </View>
           </View>
 
           <View style={styles.sliderWrapper}>
-            <View style={styles.sliderLabels}>
-              <Text style={styles.sliderLabel}>Slow</Text>
-              <Text style={styles.sliderLabel}>Fast</Text>
-            </View>
-            
-            <Slider
-              style={styles.slider}
-              minimumValue={minRate}
-              maximumValue={maxRate}
-              value={formData.targetRate}
-              onValueChange={(value) => updateFormData({ targetRate: value })}
-              step={0.05}
-              minimumTrackTintColor={colors.primary}
-              maximumTrackTintColor="rgba(255, 255, 255, 0.2)"
-              thumbStyle={{
-                backgroundColor: colors.primary,
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-              }}
-              trackStyle={{
-                height: 8,
-                borderRadius: 4,
-              }}
-            />
-            
-            <View style={styles.sliderValues}>
-              <Text style={styles.sliderValue}>{minRate.toFixed(2)} kg</Text>
-              <Text style={styles.sliderValue}>{maxRate.toFixed(2)} kg</Text>
+            <View style={styles.sliderContainer}>
+              <Slider
+                style={styles.slider}
+                minimumValue={minRatePercentage}
+                maximumValue={maxRatePercentage}
+                value={formData.targetRatePercentage}
+                onValueChange={(value) => updateFormData({ targetRatePercentage: value })}
+                step={0.05}
+                minimumTrackTintColor={colors.primary}
+                maximumTrackTintColor="rgba(255, 255, 255, 0.1)"
+                thumbStyle={{
+                  backgroundColor: colors.primary,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  shadowColor: colors.primary,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 4,
+                }}
+                trackStyle={{
+                  height: 6,
+                  borderRadius: 3,
+                }}
+              />
+              
+              <View style={styles.sliderLabels}>
+                <Text style={styles.sliderLabel}>Conservative</Text>
+                <Text style={styles.sliderLabel}>Aggressive</Text>
+              </View>
             </View>
           </View>
 
-          <View style={styles.infoCard}>
-            <LinearGradient
-              colors={[colors.primary + '15', colors.primary + '05']}
-              style={styles.infoGradient}
-            >
-              <Ionicons name="information-circle" size={20} color={colors.primary} />
-              <Text style={styles.infoText}>
-                {isWeightLoss 
-                  ? 'Losing 0.5-0.75kg per week is generally recommended for sustainable fat loss while preserving muscle.'
-                  : 'Gaining 0.25-0.5kg per week helps maximize muscle growth while minimizing fat gain.'
-                }
-              </Text>
-            </LinearGradient>
+          <View style={styles.tipCard}>
+            <View style={styles.tipIcon}>
+              <Ionicons name="help-circle" size={18} color={colors.primary} />
+            </View>
+            <Text style={styles.tipText}>
+              {isWeightLoss 
+                ? 'Slower rates help you keep muscle while losing fat'
+                : 'Slower gains mean more muscle, less fat to cut later'
+              }
+            </Text>
           </View>
         </Animatable.View>
 
@@ -143,10 +165,10 @@ export const NutritionStep2: React.FC<Props> = ({
             style={[
               styles.nextButton,
               { backgroundColor: colors.primary },
-              formData.targetRate === 0 && styles.nextButtonDisabled,
+              formData.targetRatePercentage === 0 && styles.nextButtonDisabled,
             ]}
             onPress={handleNext}
-            disabled={formData.targetRate === 0}
+            disabled={formData.targetRatePercentage === 0}
             activeOpacity={0.8}
           >
             <Text style={styles.nextButtonText}>Continue</Text>
@@ -218,68 +240,101 @@ const styles = StyleSheet.create({
   },
   rateDisplay: {
     alignItems: 'center',
-    marginBottom: 60,
+    marginBottom: 40,
+  },
+  rateCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    width: '100%',
+    alignItems: 'center',
   },
   rateNumber: {
-    fontSize: 48,
+    fontSize: 56,
     fontWeight: '900',
-    marginBottom: 4,
+    marginBottom: 2,
+    letterSpacing: -2,
   },
   rateUnit: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#B0B0B0',
-    fontWeight: '600',
-    marginBottom: 12,
+    fontWeight: '500',
+    marginBottom: 16,
+    opacity: 0.8,
+  },
+  descriptionContainer: {
+    alignItems: 'center',
+    gap: 8,
   },
   rateDescription: {
     fontSize: 18,
     color: '#fff',
     fontWeight: '600',
     textAlign: 'center',
+    marginBottom: 4,
+  },
+  benefitTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  benefitText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  calculatedRate: {
+    fontSize: 13,
+    color: '#a1a1aa',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 4,
   },
   sliderWrapper: {
-    marginVertical: 40,
+    marginVertical: 32,
+  },
+  sliderContainer: {
+    paddingHorizontal: 8,
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginTop: 12,
+    paddingHorizontal: 4,
   },
   sliderLabel: {
-    fontSize: 14,
-    color: '#B0B0B0',
-    fontWeight: '600',
+    fontSize: 12,
+    color: '#71717a',
+    fontWeight: '500',
   },
   slider: {
     width: '100%',
-    height: 50,
+    height: 40,
   },
-  sliderValues: {
+  tipCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  sliderValue: {
-    fontSize: 12,
-    color: '#888',
-    fontWeight: '500',
-  },
-  infoCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: 20,
-  },
-  infoGradient: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 20,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
     gap: 12,
   },
-  infoText: {
+  tipIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tipText: {
     flex: 1,
     fontSize: 14,
     color: '#B0B0B0',
-    lineHeight: 20,
+    lineHeight: 18,
     fontWeight: '500',
   },
   nextButton: {

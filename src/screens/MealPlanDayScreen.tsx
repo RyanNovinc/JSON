@@ -85,9 +85,6 @@ function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor,
                 <Text style={styles.mealTime}> • {meal.recommended_time}</Text>
               )}
             </View>
-            {meal.timing_reason && (
-              <Text style={styles.timingReason}>{meal.timing_reason}</Text>
-            )}
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -100,64 +97,20 @@ function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor,
         </View>
       </View>
 
-      <View style={styles.mealStats}>
+      {/* Calories and Macros in one clean row */}
+      <View style={styles.nutritionRow}>
         {meal.calories && (
-          <View style={styles.statChip}>
-            <Ionicons name="flash" size={14} color="#f59e0b" />
-            <Text style={styles.statText}>{meal.calories} cal</Text>
-          </View>
+          <Text style={[styles.caloriesText, { color: mealColor }]}>{meal.calories} cal</Text>
         )}
-        {totalTime > 0 && (
-          <View style={styles.statChip}>
-            <Ionicons name="timer" size={14} color="#06b6d4" />
-            <Text style={styles.statText}>{totalTime}min cook</Text>
-          </View>
-        )}
-        {meal.servings && (
-          <View style={styles.statChip}>
-            <Ionicons name="people" size={14} color="#8b5cf6" />
-            <Text style={styles.statText}>{meal.servings} serving{meal.servings > 1 ? 's' : ''}</Text>
+        {meal.macros && (
+          <View style={styles.macrosInline}>
+            <Text style={styles.macroInlineText}>P: {Math.round(meal.macros.protein)}g</Text>
+            <Text style={styles.macroInlineText}>C: {Math.round(meal.macros.carbs)}g</Text>
+            <Text style={styles.macroInlineText}>F: {Math.round(meal.macros.fat)}g</Text>
           </View>
         )}
       </View>
 
-      {meal.macros && (
-        <View style={styles.macrosBar}>
-          <View style={styles.macrosRow}>
-            <View style={styles.macroChip}>
-              <View style={[styles.macroDot, { backgroundColor: '#ef4444' }]} />
-              <Text style={styles.macroText}>P: {Math.round(meal.macros.protein)}g</Text>
-            </View>
-            <View style={styles.macroChip}>
-              <View style={[styles.macroDot, { backgroundColor: '#3b82f6' }]} />
-              <Text style={styles.macroText}>C: {Math.round(meal.macros.carbs)}g</Text>
-            </View>
-            <View style={styles.macroChip}>
-              <View style={[styles.macroDot, { backgroundColor: '#f59e0b' }]} />
-              <Text style={styles.macroText}>F: {Math.round(meal.macros.fat)}g</Text>
-            </View>
-            {meal.macros.fiber && meal.macros.fiber > 0 && (
-              <View style={styles.macroChip}>
-                <View style={[styles.macroDot, { backgroundColor: '#10b981' }]} />
-                <Text style={styles.macroText}>Fiber: {Math.round(meal.macros.fiber)}g</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-
-      {meal.tags && meal.tags.length > 0 && (
-        <View style={styles.tagsRow}>
-          {meal.tags.slice(0, 3).map((tag, index) => (
-            <View key={index} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ))}
-          {meal.tags.length > 3 && (
-            <Text style={styles.moreTagsText}>+{meal.tags.length - 3} more</Text>
-          )}
-        </View>
-      )}
     </TouchableOpacity>
   );
 }
@@ -266,6 +219,22 @@ export default function MealPlanDayScreen() {
     return isCompleted;
   }).length;
   
+  // Calculate nutrition from completed meals only
+  const completedNutrition = meals.reduce((totals, meal, index) => {
+    const mealId = generateMealId(meal, index);
+    const isCompleted = isMealCompleted(mealId, dayDateString);
+    
+    if (isCompleted) {
+      return {
+        calories: totals.calories + (meal.calories || 0),
+        protein: totals.protein + (meal.macros?.protein || 0),
+        carbs: totals.carbs + (meal.macros?.carbs || 0),
+        fat: totals.fat + (meal.macros?.fat || 0),
+      };
+    }
+    return totals;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  
   const progressPercentage = meals.length > 0 ? (completedMealsCount / meals.length) * 100 : 0;
   
   console.log('Progress summary:', {
@@ -345,38 +314,59 @@ export default function MealPlanDayScreen() {
         </View>
         {/* Compact Progress Card */}
         <View style={styles.section}>
-          <View style={styles.compactProgressCard}>
-            {/* Progress with calories */}
-            <View style={styles.progressRow}>
-              <View style={styles.progressInfo}>
-                <Text style={styles.progressTitle}>Today's Progress</Text>
-                <Text style={styles.progressSubtitle}>
-                  {completedMealsCount}/{meals.length} completed • {Math.round(dailyTotals.calories)} cal
+          <View style={[styles.modernProgressCard, { borderColor: `${themeColor}20` }]}>
+            {/* Progress Header */}
+            <View style={styles.progressHeader}>
+              <View>
+                <Text style={styles.modernProgressTitle}>Today's Progress</Text>
+                <Text style={styles.modernProgressSubtitle}>
+                  {completedMealsCount} of {meals.length} meals completed
                 </Text>
               </View>
-              <Text style={styles.progressPercentage}>{Math.round(progressPercentage)}%</Text>
-            </View>
-            <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: `${progressPercentage}%`, backgroundColor: themeColor }]} />
+              <View style={[styles.percentageCircle, { borderColor: themeColor }]}>
+                <Text style={[styles.percentageText, { color: themeColor }]}>
+                  {Math.round(progressPercentage)}%
+                </Text>
+              </View>
             </View>
             
-            {/* Compact Macros Row */}
-            <View style={styles.compactMacrosRow}>
-              <View style={styles.compactMacro}>
-                <View style={[styles.macroDot, { backgroundColor: '#ef4444' }]} />
-                <Text style={styles.compactMacroText}>P: {Math.round(dailyTotals.protein)}g</Text>
+            {/* Modern Progress Bar */}
+            <View style={styles.modernProgressBarContainer}>
+              <View style={[
+                styles.modernProgressBar, 
+                { 
+                  width: `${progressPercentage}%`, 
+                  backgroundColor: themeColor,
+                  shadowColor: themeColor
+                }
+              ]} />
+            </View>
+            
+            {/* Remaining Nutrition Grid */}
+            <View style={styles.nutritionGrid}>
+              <View style={styles.nutritionItem}>
+                <Text style={[styles.nutritionValue, { color: '#ef4444' }]}>
+                  {Math.max(0, Math.round(dailyTotals.protein - completedNutrition.protein))}g
+                </Text>
+                <Text style={styles.nutritionLabel}>Protein</Text>
               </View>
-              <View style={styles.compactMacro}>
-                <View style={[styles.macroDot, { backgroundColor: '#3b82f6' }]} />
-                <Text style={styles.compactMacroText}>C: {Math.round(dailyTotals.carbs)}g</Text>
+              <View style={styles.nutritionItem}>
+                <Text style={[styles.nutritionValue, { color: '#3b82f6' }]}>
+                  {Math.max(0, Math.round(dailyTotals.carbs - completedNutrition.carbs))}g
+                </Text>
+                <Text style={styles.nutritionLabel}>Carbs</Text>
               </View>
-              <View style={styles.compactMacro}>
-                <View style={[styles.macroDot, { backgroundColor: '#f59e0b' }]} />
-                <Text style={styles.compactMacroText}>F: {Math.round(dailyTotals.fat)}g</Text>
+              <View style={styles.nutritionItem}>
+                <Text style={[styles.nutritionValue, { color: '#f59e0b' }]}>
+                  {Math.max(0, Math.round(dailyTotals.fat - completedNutrition.fat))}g
+                </Text>
+                <Text style={styles.nutritionLabel}>Fat</Text>
               </View>
-              <View style={styles.compactMacro}>
-                <View style={[styles.macroDot, { backgroundColor: '#22c55e' }]} />
-                <Text style={styles.compactMacroText}>{dailyTotals.prepTime}min</Text>
+              <View style={styles.nutritionItem}>
+                <Text style={[styles.nutritionValue, { color: '#22c55e' }]}>
+                  {Math.max(0, Math.round(dailyTotals.calories - completedNutrition.calories))}
+                </Text>
+                <Text style={styles.nutritionLabel}>Calories</Text>
               </View>
             </View>
           </View>
@@ -771,5 +761,104 @@ const styles = StyleSheet.create({
     color: '#71717a',
     textAlign: 'center',
     lineHeight: 20,
+  },
+
+  // New simplified nutrition styles
+  nutritionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  caloriesText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#f59e0b',
+  },
+  macrosInline: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  macroInlineText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#a1a1aa',
+  },
+
+  // Modern Progress Card Styles
+  modernProgressCard: {
+    backgroundColor: 'rgba(24, 24, 27, 0.8)',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  modernProgressTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  modernProgressSubtitle: {
+    fontSize: 15,
+    color: '#a1a1aa',
+    fontWeight: '500',
+  },
+  percentageCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  percentageText: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  modernProgressBarContainer: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 24,
+  },
+  modernProgressBar: {
+    height: '100%',
+    borderRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  nutritionGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  nutritionItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  nutritionValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  nutritionLabel: {
+    fontSize: 12,
+    color: '#71717a',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

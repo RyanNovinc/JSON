@@ -27,8 +27,6 @@ export const NutritionStep6: React.FC<Props> = ({
   previousStep,
   colors,
 }) => {
-  const mealOptions = [2, 3, 4, 5, 6];
-  
   const commonRestrictions = [
     { id: 'vegetarian', label: 'Vegetarian', icon: 'leaf' },
     { id: 'vegan', label: 'Vegan', icon: 'flower' },
@@ -47,10 +45,6 @@ export const NutritionStep6: React.FC<Props> = ({
     { id: 'magnesium', label: 'Magnesium', icon: 'moon' },
   ];
 
-  const handleMealsSelect = (meals: number) => {
-    updateFormData({ mealsPerDay: meals });
-  };
-
   const toggleRestriction = (restriction: string) => {
     const current = formData.restrictions || [];
     const updated = current.includes(restriction)
@@ -65,6 +59,10 @@ export const NutritionStep6: React.FC<Props> = ({
       ? current.filter(s => s !== supplement)
       : [...current, supplement];
     updateFormData({ supplements: updated });
+  };
+
+  const handleNutrientVarietySelect = (priority: 'high' | 'moderate' | 'low') => {
+    updateFormData({ nutrientVariety: priority });
   };
 
   const handleNext = () => {
@@ -91,44 +89,8 @@ export const NutritionStep6: React.FC<Props> = ({
           </View>
         </Animatable.View>
 
-        {/* Meals Per Day */}
-        <Animatable.View animation="fadeInUp" delay={400}>
-          <Text style={styles.sectionTitle}>Preferred Meals Per Day</Text>
-          <Text style={styles.sectionSubtitle}>How would you like to structure your daily eating?</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.mealsScrollContainer}
-            style={styles.mealsScrollView}
-          >
-            <View style={styles.mealsContainer}>
-              {mealOptions.map((meals) => (
-                <TouchableOpacity
-                  key={meals}
-                  style={[
-                    styles.mealOption,
-                    formData.mealsPerDay === meals && [
-                      styles.mealOptionSelected,
-                      { borderColor: colors.primary, backgroundColor: colors.primary + '20' }
-                    ],
-                  ]}
-                  onPress={() => handleMealsSelect(meals)}
-                >
-                  <Text style={[
-                    styles.mealNumber,
-                    formData.mealsPerDay === meals && { color: colors.primary }
-                  ]}>
-                    {meals}
-                  </Text>
-                  <Text style={styles.mealLabel}>meals</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        </Animatable.View>
-
         {/* Dietary Restrictions */}
-        <Animatable.View animation="fadeInUp" delay={500}>
+        <Animatable.View animation="fadeInUp" delay={400}>
           <Text style={styles.sectionTitle}>Dietary Restrictions</Text>
           <Text style={styles.sectionSubtitle}>Select any that apply to you</Text>
           <View style={styles.optionsGrid}>
@@ -166,7 +128,7 @@ export const NutritionStep6: React.FC<Props> = ({
         </Animatable.View>
 
         {/* Supplements */}
-        <Animatable.View animation="fadeInUp" delay={600}>
+        <Animatable.View animation="fadeInUp" delay={500}>
           <Text style={styles.sectionTitle}>Supplements</Text>
           <Text style={styles.sectionSubtitle}>Which supplements do you take?</Text>
           <View style={styles.optionsGrid}>
@@ -194,6 +156,49 @@ export const NutritionStep6: React.FC<Props> = ({
                   {supplement.label}
                 </Text>
                 {formData.supplements?.includes(supplement.id) && (
+                  <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
+                    <Ionicons name="checkmark" size={12} color="#000" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Animatable.View>
+
+        {/* Nutrient Variety Priority */}
+        <Animatable.View animation="fadeInUp" delay={600}>
+          <Text style={styles.sectionTitle}>Nutrient Variety Priority</Text>
+          <Text style={styles.sectionSubtitle}>How important is diverse nutrient intake to you?</Text>
+          
+          <View style={styles.varietyContainer}>
+            {[
+              { id: 'high', label: 'Very Important', description: 'I want maximum nutrient variety' },
+              { id: 'moderate', label: 'Moderately Important', description: 'I want some variety with convenience' },
+              { id: 'low', label: 'Less Important', description: 'I prefer simple, consistent meals' }
+            ].map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                style={[
+                  styles.varietyOption,
+                  formData.nutrientVariety === option.id && [
+                    styles.varietyOptionSelected,
+                    { borderColor: colors.primary, backgroundColor: colors.primary + '15' }
+                  ],
+                ]}
+                onPress={() => handleNutrientVarietySelect(option.id as 'high' | 'moderate' | 'low')}
+              >
+                <View style={styles.varietyContent}>
+                  <Text style={[
+                    styles.varietyLabel,
+                    formData.nutrientVariety === option.id && { color: colors.primary }
+                  ]}>
+                    {option.label}
+                  </Text>
+                  <Text style={styles.varietyDescription}>
+                    {option.description}
+                  </Text>
+                </View>
+                {formData.nutrientVariety === option.id && (
                   <View style={[styles.checkmark, { backgroundColor: colors.primary }]}>
                     <Ionicons name="checkmark" size={12} color="#000" />
                   </View>
@@ -286,42 +291,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontWeight: '500',
   },
-  mealsScrollView: {
-    marginHorizontal: -24, // Offset container padding to allow full width scroll
-  },
-  mealsScrollContainer: {
-    paddingHorizontal: 24, // Restore padding inside scroll
-    alignItems: 'center',
-    minWidth: '100%',
-  },
-  mealsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  mealOption: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 2,
-    borderColor: 'transparent',
-    width: 80,
-  },
-  mealOptionSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  mealNumber: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  mealLabel: {
-    fontSize: 12,
-    color: '#B0B0B0',
-    fontWeight: '600',
-  },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -400,5 +369,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#B0B0B0',
     fontWeight: '500',
+  },
+  varietyContainer: {
+    gap: 12,
+  },
+  varietyOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    position: 'relative',
+  },
+  varietyOptionSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  varietyContent: {
+    flex: 1,
+  },
+  varietyLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  varietyDescription: {
+    fontSize: 14,
+    color: '#B0B0B0',
+    fontWeight: '500',
+    lineHeight: 18,
   },
 });

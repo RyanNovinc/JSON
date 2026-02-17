@@ -1,6 +1,58 @@
 export const generateJsonConversionPrompt = () => {
   return `Please convert the meal plan you just created into a specific JSON format that can be imported into my nutrition app called JSON.fit.
 
+# MEAL PREP INTELLIGENCE RULES
+
+**WHAT TO ACTUALLY MEAL PREP (Include in meal_prep_sessions):**
+- Proteins: Chicken, beef, fish, eggs (cook in batches, max 4-day storage)
+- Grains: Rice, pasta, quinoa, oats (cook large batches, portion out)
+- Roasted/cooked vegetables (sweet potato, broccoli, etc.)
+- Cooked legumes/beans
+- Soups, stews, curries, casseroles
+- Hard-boiled eggs
+- Overnight oats, chia puddings
+- Any meal that takes >15 minutes to cook from scratch
+
+**WHAT NOT TO MEAL PREP (Keep as daily fresh items):**
+- Greek yogurt (just buy container, scoop 150g daily)
+- Smoothies (blend fresh daily - takes 2 minutes)
+- Fresh salads with leafy greens
+- Avocado (add fresh to prevent browning)
+- Toast, sandwiches (assemble fresh)
+- Fresh fruit as toppings/sides
+- Any item that takes <5 minutes to prepare fresh
+- Items that lose quality when stored (crispy foods, fresh herbs)
+
+**FOOD SAFETY & SESSION TIMING:**
+- Cooked proteins: Maximum 4 days refrigerated storage
+- For 7+ day plans: MUST create multiple prep sessions
+- Example: Tuesday prep (covers Wed-Sat), Saturday prep (covers Sun-Tue)
+- If user is "Dedicated Meal Prepper" (planningStyle 1): Can do 1 big session with freezing
+- If user is "Weekly Planner" (planningStyle 2): Split into 2 sessions, 4-day max storage
+
+**REALISTIC MEAL PREP PORTIONS:**
+❌ WRONG: "Meal prep Greek Yogurt Bowl x7" 
+✅ CORRECT: Make this a daily fresh item. Greek yogurt bowl takes 2 minutes to assemble.
+
+❌ WRONG: "Meal prep smoothie ingredients x7"
+✅ CORRECT: Daily fresh item. Smoothies take 2 minutes to blend fresh.
+
+✅ CORRECT: "Batch cook chicken breast x7 servings" - This actually benefits from meal prep.
+
+**PREP SESSION EFFICIENCY RULES:**
+- Start longest-cooking items first (rice 20min, roasted vegetables 30min)
+- Group by cooking method: All oven items together, all stovetop together
+- While proteins bake, prep quick items (wash vegetables, portion snacks)
+- Maximum 2 hours per session for home cooks
+- If prep takes >2 hours, split into multiple sessions
+- Include parallel cooking: "While chicken bakes (25min), cook rice and prep vegetables"
+
+**SESSION SPLITTING LOGIC:**
+- 7+ day plans: Always create 2+ sessions for food safety
+- Batch 1: Days 1-4 (e.g., Tuesday evening prep → covers Wed-Sat)  
+- Batch 2: Days 5-7+ (e.g., Saturday prep → covers Sun-Tue)
+- Each session should cover 3-4 eating days maximum
+
 # CRITICAL: File Output Instructions
 
 **DO NOT output JSON to chat** — it will hit token limits for plans longer than 7 days.

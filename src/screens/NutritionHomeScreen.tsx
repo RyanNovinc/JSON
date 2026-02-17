@@ -28,6 +28,67 @@ type NutritionNavigationProp = StackNavigationProp<RootStackParamList, 'Nutritio
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Helper function to get macro split display
+const getMacroSplitDisplay = (plan: MealPlan) => {
+  if (plan.macroSplit) return plan.macroSplit;
+  
+  // Try different data structures - plan level macro targets
+  const macroTargets = plan.data?.macro_targets;
+  if (macroTargets) {
+    const protein = macroTargets.protein_pct || macroTargets.protein || 0;
+    const carbs = macroTargets.carbs_pct || macroTargets.carbs || 0;
+    const fat = macroTargets.fat_pct || macroTargets.fat || 0;
+    return `${protein}P/${carbs}C/${fat}F`;
+  }
+  
+  // Calculate from daily meals if plan-level targets not available
+  if (plan.data?.days && plan.data.days.length > 0) {
+    // Get the first day's total macros as a representative sample
+    const firstDay = plan.data.days[0];
+    if (firstDay?.meals && firstDay.meals.length > 0) {
+      const totalMacros = firstDay.meals.reduce((total, meal) => ({
+        protein: total.protein + (meal.macros?.protein || 0),
+        carbs: total.carbs + (meal.macros?.carbs || 0),
+        fat: total.fat + (meal.macros?.fat || 0),
+        calories: total.calories + (meal.calories || 0)
+      }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+      
+      if (totalMacros.calories > 0) {
+        // Calculate percentages
+        const proteinPct = Math.round((totalMacros.protein * 4 / totalMacros.calories) * 100);
+        const carbsPct = Math.round((totalMacros.carbs * 4 / totalMacros.calories) * 100);
+        const fatPct = Math.round((totalMacros.fat * 9 / totalMacros.calories) * 100);
+        return `${proteinPct}P/${carbsPct}C/${fatPct}F`;
+      }
+    }
+  }
+  
+  // Try old weeks structure
+  if (plan.data?.weeks && plan.data.weeks.length > 0) {
+    const firstWeek = plan.data.weeks[0];
+    if (firstWeek?.days && firstWeek.days.length > 0) {
+      const firstDay = firstWeek.days[0];
+      if (firstDay?.meals && firstDay.meals.length > 0) {
+        const totalMacros = firstDay.meals.reduce((total, meal) => ({
+          protein: total.protein + (meal.macros?.protein || 0),
+          carbs: total.carbs + (meal.macros?.carbs || 0),
+          fat: total.fat + (meal.macros?.fat || 0),
+          calories: total.calories + (meal.calories || 0)
+        }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+        
+        if (totalMacros.calories > 0) {
+          const proteinPct = Math.round((totalMacros.protein * 4 / totalMacros.calories) * 100);
+          const carbsPct = Math.round((totalMacros.carbs * 4 / totalMacros.calories) * 100);
+          const fatPct = Math.round((totalMacros.fat * 9 / totalMacros.calories) * 100);
+          return `${proteinPct}P/${carbsPct}C/${fatPct}F`;
+        }
+      }
+    }
+  }
+  
+  return ''; // Return empty string instead of 'planned'
+};
+
 function MealPlanCard({ plan, onExport, onPress, onLongPress }: { 
   plan: MealPlan; 
   onExport: () => void;
@@ -48,7 +109,7 @@ function MealPlanCard({ plan, onExport, onPress, onLongPress }: {
         <View style={styles.cardTextContainer}>
           <Text style={styles.cardTitle}>{plan.name}</Text>
           <Text style={styles.cardSubtitle}>
-            {plan.duration} days • {plan.macroSplit || `${plan.data?.macro_targets?.protein_pct || 0}P/${plan.data?.macro_targets?.carbs_pct || 0}C/${plan.data?.macro_targets?.fat_pct || 0}F`}
+            {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''}
           </Text>
         </View>
         <TouchableOpacity onPress={onExport} style={styles.exportButton}>
@@ -202,7 +263,8 @@ export default function NutritionHomeScreen({ route }: any) {
         week,
         mealPlanName: plan.name,
         mealPrepSession,
-        allMealPrepSessions: mealPrepSession ? [mealPrepSession] : [],
+        allMealPrepSessions: plan.data?.meal_prep_sessions || (mealPrepSession ? [mealPrepSession] : []),
+        groceryList: plan.data?.grocery_list,
       });
       return;
     }
@@ -217,6 +279,8 @@ export default function NutritionHomeScreen({ route }: any) {
         week,
         mealPlanName: plan.name,
         mealPrepSession: plan.data.meal_prep_session,
+        allMealPrepSessions: plan.data?.meal_prep_sessions || [],
+        groceryList: plan.data?.grocery_list,
       });
       return;
     }
@@ -226,11 +290,120 @@ export default function NutritionHomeScreen({ route }: any) {
   };
 
   const handleJumpToToday = (plan: MealPlan) => {
+    const findTodayAndNavigate = (days: any[], weekNumber: number = 1) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Find today's day
+      let todayIndex = -1;
+      for (let i = 0; i < days.length; i++) {
+        const dayDate = new Date(today);
+        
+        if (weekNumber === 1) {
+          // Week 1: Start from today
+          dayDate.setDate(today.getDate() + i);
+        } else {
+          // Week 2+: Calculate based on week start offset
+          const currentDayOfWeek = today.getDay();
+          const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
+          
+          let weekStartOffset = week1Days; // Days after today that Week 2 starts
+          for (let j = 2; j < weekNumber; j++) {
+            weekStartOffset += 7; // Add 7 days for each full week
+          }
+          
+          dayDate.setDate(today.getDate() + weekStartOffset + i);
+        }
+        
+        if (today.toDateString() === dayDate.toDateString()) {
+          todayIndex = i;
+          break;
+        }
+      }
+      
+      if (todayIndex !== -1) {
+        // Navigate directly to today's day
+        const todayDay = days[todayIndex];
+        
+        // Calculate the actual day name based on today's date
+        const actualDayDate = new Date(today);
+        if (weekNumber === 1) {
+          actualDayDate.setDate(today.getDate() + todayIndex);
+        } else {
+          const currentDayOfWeek = today.getDay();
+          const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
+          let weekStartOffset = week1Days;
+          for (let j = 2; j < weekNumber; j++) {
+            weekStartOffset += 7;
+          }
+          actualDayDate.setDate(today.getDate() + weekStartOffset + todayIndex);
+        }
+        
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const actualDayName = dayNames[actualDayDate.getDay()];
+        
+        navigation.navigate('MealPlanDay' as any, {
+          day: todayDay,
+          weekNumber: weekNumber,
+          mealPlanName: plan.name,
+          dayIndex: todayIndex,
+          calculatedDayName: actualDayName || `Day ${todayIndex + 1}`,
+        });
+        return true;
+      }
+      return false;
+    };
+
+    // Handle new days structure (JSON.fit format)
+    if (plan.data?.days) {
+      const found = findTodayAndNavigate(plan.data.days, 1);
+      if (found) return;
+      
+      // If today not found, just navigate to the first day
+      if (plan.data.days.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const firstDayDate = new Date(today);
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const firstDayName = dayNames[firstDayDate.getDay()];
+        
+        navigation.navigate('MealPlanDay' as any, {
+          day: plan.data.days[0],
+          weekNumber: 1,
+          mealPlanName: plan.name,
+          dayIndex: 0,
+          calculatedDayName: firstDayName || 'Day 1',
+        });
+      }
+      return;
+    }
+
     if (!plan.data?.weeks) return;
 
-    // For 7-day meal plans, just navigate to the days view
+    // For 7-day meal plans, find today and navigate directly to it
     if (plan.duration <= 7 || plan.data.weeks.length === 1) {
-      handleMealPlanNavigation(plan);
+      const week = plan.data.weeks[0];
+      if (week?.days) {
+        const found = findTodayAndNavigate(week.days, week.week_number || 1);
+        if (found) return;
+        
+        // If today not found, navigate to the first day
+        if (week.days.length > 0) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const firstDayDate = new Date(today);
+          const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          const firstDayName = dayNames[firstDayDate.getDay()];
+          
+          navigation.navigate('MealPlanDay' as any, {
+            day: week.days[0],
+            weekNumber: week.week_number || 1,
+            mealPlanName: plan.name,
+            dayIndex: 0,
+            calculatedDayName: firstDayName || 'Day 1',
+          });
+        }
+      }
       return;
     }
 
@@ -380,7 +553,7 @@ export default function NutritionHomeScreen({ route }: any) {
             <View style={styles.heroContent}>
               <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
               <Text style={styles.heroSubtitle}>
-                {plan.duration} days • {plan.macroSplit || `${parseInt(plan.data?.macro_targets?.protein_pct) || 0}P/${parseInt(plan.data?.macro_targets?.carbs_pct) || 0}C/${parseInt(plan.data?.macro_targets?.fat_pct) || 0}F`} planned
+                {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
               </Text>
               <Text style={[styles.heroDescription, { color: themeColor }]}>
                 Tap to view your meal plan
@@ -426,7 +599,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 <View style={styles.dualVerticalContent}>
                   <Text style={[styles.dualVerticalTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
                   <Text style={styles.dualVerticalSubtitle}>
-                    {plan.duration} days • {plan.macroSplit || `${parseInt(plan.data?.macro_targets?.protein_pct) || 0}P/${parseInt(plan.data?.macro_targets?.carbs_pct) || 0}C/${parseInt(plan.data?.macro_targets?.fat_pct) || 0}F`} planned
+                    {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
                   </Text>
                   <Text style={[styles.dualVerticalDescription, { color: themeColor }]}>
                     Tap to view your meal plan
@@ -476,7 +649,7 @@ export default function NutritionHomeScreen({ route }: any) {
                     {plan.name}
                   </Text>
                   <Text style={styles.tripleSubtitle}>
-                    {plan.duration} days • {plan.macroSplit || `${plan.data?.macro_targets?.protein_pct || 0}P/${plan.data?.macro_targets?.carbs_pct || 0}C/${plan.data?.macro_targets?.fat_pct || 0}F`}
+                    {plan.duration} days • {getMacroSplitDisplay(plan)}
                   </Text>
                   <Text style={[styles.tripleDescription, { color: themeColor }]}>
                     Tap to view
@@ -517,7 +690,7 @@ export default function NutritionHomeScreen({ route }: any) {
                     {plan.name}
                   </Text>
                   <Text style={styles.quadSubtitle}>
-                    {plan.duration} days • {plan.macroSplit || `${plan.data?.macro_targets?.protein_pct || 0}P/${plan.data?.macro_targets?.carbs_pct || 0}C/${plan.data?.macro_targets?.fat_pct || 0}F`}
+                    {plan.duration} days • {getMacroSplitDisplay(plan)}
                   </Text>
                   <Text style={[styles.quadDescription, { color: themeColor }]}>
                     Tap to view
@@ -566,7 +739,7 @@ export default function NutritionHomeScreen({ route }: any) {
               <View style={styles.heroContent}>
                 <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
                 <Text style={styles.heroSubtitle}>
-                  {plan.duration} days • {plan.macroSplit || `${parseInt(plan.data?.macro_targets?.protein_pct) || 0}P/${parseInt(plan.data?.macro_targets?.carbs_pct) || 0}C/${parseInt(plan.data?.macro_targets?.fat_pct) || 0}F`} planned
+                  {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
                 </Text>
                 <Text style={[styles.heroDescription, { color: themeColor }]}>
                   Tap to view your meal plan
@@ -694,7 +867,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 {deleteModal.plan?.name}
               </Text>
               <Text style={styles.deletePlanDetails}>
-                {deleteModal.plan?.duration} days • {deleteModal.plan?.macroSplit || `${deleteModal.plan?.data?.macro_targets?.protein_pct || 0}P/${deleteModal.plan?.data?.macro_targets?.carbs_pct || 0}C/${deleteModal.plan?.data?.macro_targets?.fat_pct || 0}F`}
+                {deleteModal.plan?.duration} days{deleteModal.plan && getMacroSplitDisplay(deleteModal.plan) ? ` • ${getMacroSplitDisplay(deleteModal.plan)}` : ''}
               </Text>
             </View>
             

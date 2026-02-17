@@ -976,7 +976,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               
               <View style={styles.optionsGrid}>
                 {[
-                  'Love snacking', 'Occasional snacker', 'Hate snacking', 
+                  'Love snacking', 'Occasional snacker', 'I don\'t snack', 
                   'Need healthy snacks', 'Sweet tooth snacker', 'Savory snacker'
                 ].map((snackStyle) => (
                   <TouchableOpacity

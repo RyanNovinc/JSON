@@ -10,16 +10,18 @@ import {
   TextInput,
   Share,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { GroceryItem, FoodCategory } from '../types/nutrition';
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type NavigationProp = StackNavigationProp<RootStackParamList, 'GroceryList'>;
+type GroceryListRouteProp = RouteProp<RootStackParamList, 'GroceryList'>;
 
 const CATEGORY_ORDER: FoodCategory[] = [
   'protein',
@@ -57,22 +59,79 @@ const CATEGORY_NAMES: Record<FoodCategory, string> = {
   other: 'Other',
 };
 
+// Map meal plan category names to our internal categories
+const mapMealPlanCategory = (categoryName: string): FoodCategory => {
+  const name = categoryName.toLowerCase();
+  if (name.includes('protein') || name.includes('meat') || name.includes('seafood')) return 'protein';
+  if (name.includes('dairy') || name.includes('eggs')) return 'dairy';
+  if (name.includes('vegetable') || name.includes('produce')) return 'vegetables';
+  if (name.includes('fruit')) return 'fruits';
+  if (name.includes('grain') || name.includes('pasta') || name.includes('rice') || name.includes('cereal')) return 'grains';
+  if (name.includes('spice') || name.includes('herb') || name.includes('seasoning')) return 'spices';
+  if (name.includes('frozen')) return 'frozen';
+  if (name.includes('pantry') || name.includes('condiment') || name.includes('sauce')) return 'pantry';
+  return 'other';
+};
+
+// Convert meal plan grocery list format to internal format
+const convertMealPlanGroceryList = (mealPlanGroceryList: any) => {
+  if (!mealPlanGroceryList?.categories) return null;
+  
+  const items: GroceryItem[] = [];
+  
+  mealPlanGroceryList.categories.forEach((category: any) => {
+    const mappedCategory = mapMealPlanCategory(category.category_name);
+    
+    category.items?.forEach((item: any) => {
+      items.push({
+        id: `${category.category_name}-${item.item_name}`.replace(/[^a-zA-Z0-9]/g, '_'),
+        name: item.item_name,
+        amount: item.quantity,
+        unit: item.unit || '',
+        category: mappedCategory,
+        estimatedCost: item.estimated_price || 0,
+        isPurchased: item.is_purchased || false,
+        isFromInventory: false,
+        notes: item.notes || '',
+      });
+    });
+  });
+  
+  return {
+    items,
+    totalEstimatedCost: mealPlanGroceryList.total_estimated_cost || 0,
+    currency: mealPlanGroceryList.currency || 'USD',
+  };
+};
+
 export default function GroceryListScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<GroceryListRouteProp>();
   const { themeColor, themeColorLight } = useTheme();
   const { getGroceryList, updateGroceryItem } = useMealPlanning();
 
-  const groceryList = getGroceryList();
-  
+  // State declarations first
+  const [localGroceryState, setLocalGroceryState] = useState<any>(null);
+  const [purchasedItemsState, setPurchasedItemsState] = useState<Record<string, boolean>>({});
+  const [isLoadingPurchaseStates, setIsLoadingPurchaseStates] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<FoodCategory>('other');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<FoodCategory[]>(CATEGORY_ORDER);
+  const [sortBy, setSortBy] = useState<'category' | 'price'>('category');
 
-  const [sortBy, setSortBy] = useState<'category' | 'alphabetical' | 'price'>('category');
+  // Use passed grocery list data or fall back to context
+  const passedGroceryList = route.params?.groceryList;
+  const contextGroceryList = getGroceryList();
+  
+  // Convert meal plan grocery list format to expected format
+  const groceryList = localGroceryState || (passedGroceryList ? convertMealPlanGroceryList(passedGroceryList) : contextGroceryList);
 
-  if (!groceryList) {
+  // Show loading state only if we have passed grocery list but are still loading purchase states
+  const showLoadingState = passedGroceryList && isLoadingPurchaseStates && !localGroceryState;
+  
+  if (!groceryList && !showLoadingState) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -108,8 +167,6 @@ export default function GroceryListScreen() {
   Object.keys(groupedItems).forEach(category => {
     groupedItems[category as FoodCategory].sort((a, b) => {
       switch (sortBy) {
-        case 'alphabetical':
-          return a.name.localeCompare(b.name);
         case 'price':
           return b.estimatedCost - a.estimatedCost;
         default:
@@ -131,11 +188,86 @@ export default function GroceryListScreen() {
     .filter(item => !item.isPurchased)
     .reduce((sum, item) => sum + item.estimatedCost, 0);
 
+  // Generate a unique key for this grocery list (use simpler key)
+  const groceryListKey = passedGroceryList ? 
+    `grocery_purchases_${passedGroceryList.total_estimated_cost}_${passedGroceryList.categories?.length || 0}` : 
+    'grocery_purchases_context';
+
+  // Load purchase states from storage
+  useEffect(() => {
+    const loadPurchaseStates = async () => {
+      try {
+        console.log('Loading purchase states from key:', groceryListKey);
+        const stored = await AsyncStorage.getItem(groceryListKey);
+        console.log('Loaded raw data:', stored);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          console.log('Parsed purchase states:', parsed);
+          setPurchasedItemsState(parsed);
+        } else {
+          console.log('No stored purchase states found');
+          setPurchasedItemsState({});
+        }
+      } catch (error) {
+        console.error('Failed to load purchase states:', error);
+      } finally {
+        setIsLoadingPurchaseStates(false);
+      }
+    };
+
+    if (groceryListKey) {
+      loadPurchaseStates();
+    }
+  }, [groceryListKey]);
+
+  // Initialize local state if using passed grocery list
+  useEffect(() => {
+    if (passedGroceryList && !isLoadingPurchaseStates) {
+      const converted = convertMealPlanGroceryList(passedGroceryList);
+      // Apply stored purchase states
+      if (converted) {
+        converted.items = converted.items.map((item: any) => ({
+          ...item,
+          isPurchased: purchasedItemsState[item.id] || false
+        }));
+        console.log('Applied purchase states:', purchasedItemsState);
+        console.log('Items with purchase states:', converted.items.filter(i => i.isPurchased).length);
+      }
+      setLocalGroceryState(converted);
+    }
+  }, [passedGroceryList, purchasedItemsState, isLoadingPurchaseStates]);
+
   const toggleItemPurchased = async (item: GroceryItem) => {
     try {
-      await updateGroceryItem(item.id, !item.isPurchased);
+      const newPurchasedState = !item.isPurchased;
+      
+      if (passedGroceryList && localGroceryState) {
+        // Update local state for passed grocery list
+        setLocalGroceryState((prev: any) => ({
+          ...prev,
+          items: prev.items.map((i: GroceryItem) => 
+            i.id === item.id ? { ...i, isPurchased: newPurchasedState } : i
+          )
+        }));
+        
+        // Update purchase states record
+        const newPurchasedStates = {
+          ...purchasedItemsState,
+          [item.id]: newPurchasedState
+        };
+        setPurchasedItemsState(newPurchasedStates);
+        
+        // Save to storage
+        await AsyncStorage.setItem(groceryListKey, JSON.stringify(newPurchasedStates));
+        console.log('Saved purchase states to key:', groceryListKey);
+        console.log('Saved data:', newPurchasedStates);
+      } else {
+        // Use context method for grocery lists from meal planning
+        await updateGroceryItem(item.id, newPurchasedState);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to update item');
+      console.error('Toggle item error:', error);
     }
   };
 
@@ -285,77 +417,83 @@ export default function GroceryListScreen() {
         </View>
       </View>
 
-      {/* Summary Card */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: themeColor }]}>
-              ${totalCost.toFixed(2)}
-            </Text>
-            <Text style={styles.summaryLabel}>Total Cost</Text>
+      {showLoadingState ? (
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingText}>Loading your grocery list...</Text>
+        </View>
+      ) : (
+        /* Grocery List */
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Summary Card */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: themeColor }]}>
+                ${totalCost.toFixed(2)}
+              </Text>
+              <Text style={styles.summaryLabel}>Total Cost</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: '#22c55e' }]}>
+                {purchasedItems}/{totalItems}
+              </Text>
+              <Text style={styles.summaryLabel}>Purchased</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: '#f59e0b' }]}>
+                ${remainingCost.toFixed(2)}
+              </Text>
+              <Text style={styles.summaryLabel}>Remaining</Text>
+            </View>
           </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: '#22c55e' }]}>
-              {purchasedItems}/{totalItems}
+          
+          <View style={styles.progressBarContainer}>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${(purchasedItems / totalItems) * 100}%`,
+                    backgroundColor: '#22c55e'
+                  }
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {Math.round((purchasedItems / totalItems) * 100)}% complete
             </Text>
-            <Text style={styles.summaryLabel}>Purchased</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: '#f59e0b' }]}>
-              ${remainingCost.toFixed(2)}
-            </Text>
-            <Text style={styles.summaryLabel}>Remaining</Text>
           </View>
         </View>
-        
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBar}>
-            <View
+
+        {/* Sort Options */}
+        <View style={styles.sortContainer}>
+          <Text style={styles.sortLabel}>Sort by:</Text>
+          {(['category', 'price'] as const).map((option) => (
+            <TouchableOpacity
+              key={option}
               style={[
-                styles.progressFill,
-                {
-                  width: `${(purchasedItems / totalItems) * 100}%`,
-                  backgroundColor: '#22c55e'
-                }
+                styles.sortButton,
+                sortBy === option && { backgroundColor: themeColor }
               ]}
-            />
-          </View>
-          <Text style={styles.progressText}>
-            {Math.round((purchasedItems / totalItems) * 100)}% complete
-          </Text>
+              onPress={() => setSortBy(option)}
+            >
+              <Text style={[
+                styles.sortButtonText,
+                sortBy === option && { color: '#0a0a0b' }
+              ]}>
+                {option.charAt(0).toUpperCase() + option.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      </View>
 
-      {/* Sort Options */}
-      <View style={styles.sortContainer}>
-        <Text style={styles.sortLabel}>Sort by:</Text>
-        {(['category', 'alphabetical', 'price'] as const).map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[
-              styles.sortButton,
-              sortBy === option && { backgroundColor: themeColor }
-            ]}
-            onPress={() => setSortBy(option)}
-          >
-            <Text style={[
-              styles.sortButtonText,
-              sortBy === option && { color: '#0a0a0b' }
-            ]}>
-              {option === 'alphabetical' ? 'A-Z' : option.charAt(0).toUpperCase() + option.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Grocery List */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {filteredCategories.map((category) => (
           <CategorySection key={category} category={category} />
         ))}
         
         <View style={styles.bottomPadding} />
       </ScrollView>
+      )}
 
       {/* Category Filter Modal */}
       <Modal
@@ -611,15 +749,17 @@ const styles = StyleSheet.create({
   },
   itemHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     marginBottom: 4,
+    flex: 1,
   },
   itemName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
     flex: 1,
+    lineHeight: 20,
   },
   purchasedItemName: {
     textDecorationLine: 'line-through',
@@ -667,6 +807,17 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 40,
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#71717a',
+    textAlign: 'center',
   },
   emptyState: {
     flex: 1,

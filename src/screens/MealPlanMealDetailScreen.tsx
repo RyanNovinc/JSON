@@ -48,7 +48,7 @@ export default function MealPlanMealDetailScreen() {
   const route = useRoute<MealPlanMealDetailScreenRouteProp>();
   const { themeColor } = useTheme();
   const { addToFavorites, removeFromFavorites, getFavoriteMeals } = useMealPlanning();
-  const [activeTab, setActiveTab] = useState<'overview' | 'ingredients' | 'instructions'>('overview');
+  const [activeTab, setActiveTab] = useState<'macros' | 'ingredients' | 'instructions'>('macros');
   const [isFavorite, setIsFavorite] = useState(false);
 
   const { meal, dayName, weekNumber, mealPlanName } = route.params;
@@ -193,11 +193,11 @@ export default function MealPlanMealDetailScreen() {
       {/* Tab Bar */}
       <View style={styles.tabBar}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'overview' && { borderBottomColor: themeColor }]}
-          onPress={() => setActiveTab('overview')}
+          style={[styles.tab, activeTab === 'macros' && { borderBottomColor: themeColor }]}
+          onPress={() => setActiveTab('macros')}
         >
-          <Text style={[styles.tabText, activeTab === 'overview' && { color: themeColor }]}>
-            Overview
+          <Text style={[styles.tabText, activeTab === 'macros' && { color: themeColor }]}>
+            Macros
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -219,213 +219,42 @@ export default function MealPlanMealDetailScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {activeTab === 'overview' && (
+        {activeTab === 'macros' && meal.macros && (
           <>
-            {/* Meal Header */}
-            <LinearGradient
-              colors={[mealColor + '20', mealColor + '10']}
-              style={[styles.mealHeader, { borderColor: mealColor + '30' }]}
-            >
-              <View style={styles.mealHeaderContent}>
-                <View style={[styles.mealIconLarge, { backgroundColor: mealColor + '30' }]}>
-                  <Ionicons name={getMealIcon(meal.meal_type || 'breakfast') as any} size={32} color={mealColor} />
-                </View>
-                <View style={styles.mealHeaderText}>
-                  <Text style={styles.mealName}>{meal.meal_name}</Text>
-                  <Text style={[styles.mealTypeText, { color: mealColor }]}>
-                    {meal.meal_type ? meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1) : 'Meal'} Recipe
+            <View style={styles.modernNutritionCard}>
+              <View style={styles.modernMacrosGrid}>
+                <View style={styles.modernMacroItem}>
+                  <Text style={[styles.modernMacroValue, { color: '#ef4444' }]}>
+                    {Math.round(meal.macros.protein)}g
                   </Text>
+                  <Text style={styles.modernMacroLabel}>Protein</Text>
+                </View>
+                <View style={styles.modernMacroItem}>
+                  <Text style={[styles.modernMacroValue, { color: '#3b82f6' }]}>
+                    {Math.round(meal.macros.carbs)}g
+                  </Text>
+                  <Text style={styles.modernMacroLabel}>Carbs</Text>
+                </View>
+                <View style={styles.modernMacroItem}>
+                  <Text style={[styles.modernMacroValue, { color: '#10b981' }]}>
+                    {Math.round(meal.macros.fat)}g
+                  </Text>
+                  <Text style={styles.modernMacroLabel}>Fat</Text>
+                </View>
+                <View style={styles.modernMacroItem}>
+                  <Text style={[styles.modernMacroValue, { color: '#f59e0b' }]}>
+                    {meal.calories || 0}
+                  </Text>
+                  <Text style={styles.modernMacroLabel}>Calories</Text>
                 </View>
               </View>
+            </View>
 
-              {/* Quick Stats */}
-              <View style={styles.quickStats}>
-                {meal.calories && (
-                  <View style={styles.quickStat}>
-                    <Ionicons name="flash" size={20} color="#f59e0b" />
-                    <Text style={styles.quickStatValue}>{meal.calories}</Text>
-                    <Text style={styles.quickStatLabel}>calories</Text>
-                  </View>
-                )}
-                {totalTime > 0 && (
-                  <View style={styles.quickStat}>
-                    <Ionicons name="time" size={20} color="#06b6d4" />
-                    <Text style={styles.quickStatValue}>{totalTime}</Text>
-                    <Text style={styles.quickStatLabel}>minutes</Text>
-                  </View>
-                )}
-                {meal.servings && (
-                  <View style={styles.quickStat}>
-                    <Ionicons name="people" size={20} color="#8b5cf6" />
-                    <Text style={styles.quickStatValue}>{meal.servings}</Text>
-                    <Text style={styles.quickStatLabel}>serving{meal.servings > 1 ? 's' : ''}</Text>
-                  </View>
-                )}
-              </View>
-            </LinearGradient>
-
-            {/* Detailed Times */}
-            {(meal.prep_time > 0 || meal.cook_time > 0) && (
-              <View style={styles.timingCard}>
-                <Text style={styles.sectionTitle}>Timing</Text>
-                <View style={styles.timingRow}>
-                  {meal.prep_time > 0 && (
-                    <View style={styles.timingItem}>
-                      <Ionicons name="cut-outline" size={16} color="#06b6d4" />
-                      <Text style={styles.timingLabel}>Prep</Text>
-                      <Text style={styles.timingValue}>{meal.prep_time}min</Text>
-                    </View>
-                  )}
-                  {meal.cook_time > 0 && (
-                    <View style={styles.timingItem}>
-                      <Ionicons name="flame-outline" size={16} color="#f59e0b" />
-                      <Text style={styles.timingLabel}>Cook</Text>
-                      <Text style={styles.timingValue}>{meal.cook_time}min</Text>
-                    </View>
-                  )}
-                  {totalTime > 0 && (
-                    <View style={styles.timingItem}>
-                      <Ionicons name="time-outline" size={16} color="#8b5cf6" />
-                      <Text style={styles.timingLabel}>Total</Text>
-                      <Text style={styles.timingValue}>{totalTime}min</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* Meal Prep Features */}
-            {isMealPrepRecipe && (
-              <>
-                {/* Weekly Recommendation */}
-                {meal.weekly_meal_coverage && meal.weekly_meal_coverage.length > 0 && (
-                  <View style={styles.weeklyRecommendationCard}>
-                    <Text style={styles.sectionTitle}>Weekly Recommendation</Text>
-                    <View style={styles.recommendationContent}>
-                      <View style={styles.recommendationHeader}>
-                        <Ionicons name="calendar-outline" size={20} color={themeColor} />
-                        <Text style={styles.recommendationText}>
-                          This week you need this meal <Text style={[styles.recommendationCount, { color: themeColor }]}>{meal.weekly_meal_coverage.length} times</Text>
-                        </Text>
-                      </View>
-                      <Text style={styles.recommendationSubtext}>
-                        We recommend making {meal.base_servings || meal.servings} servings, but you can adjust below to meal prep extra for next week.
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                {/* Serving Adjuster */}
-                <View style={styles.servingCard}>
-                  <Text style={styles.sectionTitle}>Serving Size</Text>
-                  <View style={styles.servingAdjuster}>
-                    <Text style={styles.servingDescription}>
-                      {meal.times_used ? 
-                        `This meal appears ${meal.times_used} time${meal.times_used > 1 ? 's' : ''} in your meal plan. Recommended: ${recommendedServings} servings` :
-                        `Recipe makes ${meal.base_servings || meal.servings} servings. Adjust to make more or less:`
-                      }
-                    </Text>
-                    <View style={styles.servingControls}>
-                      <TouchableOpacity 
-                        style={[styles.servingButton, { borderColor: themeColor }]}
-                        onPress={() => setTargetServings(Math.max(1, targetServings - 1))}
-                      >
-                        <Ionicons name="remove" size={20} color={themeColor} />
-                      </TouchableOpacity>
-                      <View style={styles.servingDisplay}>
-                        <Text style={[styles.servingNumber, { color: themeColor }]}>
-                          {targetServings}
-                        </Text>
-                        <Text style={styles.servingLabel}>servings</Text>
-                      </View>
-                      <TouchableOpacity 
-                        style={[styles.servingButton, { borderColor: themeColor }]}
-                        onPress={() => setTargetServings(targetServings + 1)}
-                      >
-                        <Ionicons name="add" size={20} color={themeColor} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Weekly Coverage */}
-                {meal.weekly_meal_coverage && meal.weekly_meal_coverage.length > 0 && (
-                  <View style={styles.coverageCard}>
-                    <Text style={styles.sectionTitle}>Weekly Meal Coverage</Text>
-                    <Text style={styles.coverageDescription}>
-                      This recipe covers the following meals in your week:
-                    </Text>
-                    <View style={styles.coverageList}>
-                      {(meal.weekly_meal_coverage || []).map((coverage, index) => (
-                        <View key={index} style={styles.coverageItem}>
-                          <Ionicons name={getMealIcon(coverage.meal_type || 'breakfast') as any} size={16} color={mealColor} />
-                          <Text style={styles.coverageText}>
-                            {coverage.day} {coverage.meal_type ? coverage.meal_type.charAt(0).toUpperCase() + coverage.meal_type.slice(1) : 'Meal'}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                    {targetServings !== originalServings && (
-                      <Text style={styles.extraServingsNote}>
-                        {targetServings > originalServings ? 
-                          `Making ${targetServings - originalServings} extra servings for leftovers or next week!` :
-                          `Making ${originalServings - targetServings} fewer servings.`
-                        }
-                      </Text>
-                    )}
-                  </View>
-                )}
-              </>
-            )}
-
-            {/* Nutrition Information */}
-            {meal.macros && (
-              <View style={styles.nutritionCard}>
-                <Text style={styles.sectionTitle}>Nutrition per Serving</Text>
-                <View style={styles.macrosGrid}>
-                  <View style={[styles.macroCard, { borderLeftColor: '#ef4444' }]}>
-                    <Text style={[styles.macroValue, { color: '#ef4444' }]}>{Math.round(meal.macros.protein)}g</Text>
-                    <Text style={styles.macroLabel}>Protein</Text>
-                  </View>
-                  <View style={[styles.macroCard, { borderLeftColor: '#3b82f6' }]}>
-                    <Text style={[styles.macroValue, { color: '#3b82f6' }]}>{Math.round(meal.macros.carbs)}g</Text>
-                    <Text style={styles.macroLabel}>Carbs</Text>
-                  </View>
-                  <View style={[styles.macroCard, { borderLeftColor: '#f59e0b' }]}>
-                    <Text style={[styles.macroValue, { color: '#f59e0b' }]}>{Math.round(meal.macros.fat)}g</Text>
-                    <Text style={styles.macroLabel}>Fat</Text>
-                  </View>
-                  {meal.macros.fiber && meal.macros.fiber > 0 && (
-                    <View style={[styles.macroCard, { borderLeftColor: '#10b981' }]}>
-                      <Text style={[styles.macroValue, { color: '#10b981' }]}>{Math.round(meal.macros.fiber)}g</Text>
-                      <Text style={styles.macroLabel}>Fiber</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* Tags */}
-            {meal.tags && meal.tags.length > 0 && (
-              <View style={styles.tagsCard}>
-                <Text style={styles.sectionTitle}>Tags</Text>
-                <View style={styles.tagsContainer}>
-                  {(meal.tags || []).map((tag, index) => (
-                    <View key={index} style={[styles.tagChip, { borderColor: themeColor + '40' }]}>
-                      <Text style={[styles.tagText, { color: themeColor }]}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Notes */}
-            {meal.notes && (
-              <View style={styles.notesCard}>
-                <Text style={styles.sectionTitle}>Chef's Notes</Text>
-                <Text style={styles.notesText}>{meal.notes}</Text>
-              </View>
-            )}
+            {/* Estimated Time */}
+            <View style={styles.timeCard}>
+              <Text style={styles.timeValue}>{totalTime} minutes</Text>
+              <Text style={styles.timeLabel}>Estimated time to make</Text>
+            </View>
           </>
         )}
 
@@ -963,5 +792,129 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#a1a1aa',
     lineHeight: 18,
+  },
+
+  // Subtle Tags Styles
+  subtleTagChip: {
+    backgroundColor: 'rgba(113, 113, 122, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  subtleTagText: {
+    fontSize: 11,
+    color: '#a1a1aa',
+    fontWeight: '500',
+  },
+
+  // New Redesigned Overview Styles
+  statsCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#71717a',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#27272a',
+    marginHorizontal: 20,
+  },
+  integratedTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+  },
+  modernTagChip: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 6,
+  },
+  modernTagText: {
+    fontSize: 12,
+    color: '#f59e0b',
+    fontWeight: '500',
+  },
+  modernNutritionCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+  },
+  modernNutritionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 16,
+  },
+  modernMacrosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  modernMacroItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  modernMacroValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  modernMacroLabel: {
+    fontSize: 13,
+    color: '#71717a',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  timeCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  timeValue: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  timeLabel: {
+    fontSize: 14,
+    color: '#71717a',
   },
 });
