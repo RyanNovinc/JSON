@@ -184,109 +184,36 @@ export default function MealDetailScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Meal Info */}
-        <View style={styles.mealInfo}>
-          <View style={styles.mealHeader}>
-            <Text style={styles.mealName}>{meal.name || meal.meal_name}</Text>
-            <View style={styles.mealMeta}>
-              <Text style={styles.mealType}>
-                {(meal.type || meal.meal_type || 'meal')?.charAt(0).toUpperCase() + (meal.type || meal.meal_type || 'meal')?.slice(1)} {meal.time ? ` • ${meal.time}` : ''}
-              </Text>
-              <View style={styles.difficultyBadge}>
-                <Ionicons 
-                  name="star" 
-                  size={12} 
-                  color={getDifficultyColor(meal.difficulty)} 
-                />
-                <Text style={[styles.difficultyText, { color: getDifficultyColor(meal.difficulty || 'medium') }]}>
-                  {meal.difficulty || 'Medium'}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <Text style={styles.mealDescription}>
-            {meal.description || `A delicious ${meal.meal_type || meal.type || 'meal'} recipe with great nutritional value.`}
-          </Text>
-
-          {/* Tags */}
+        {/* Meal Header */}
+        <View style={styles.mealHeaderSection}>
+          <Text style={styles.mealName}>{meal.name || meal.meal_name}</Text>
           {meal.tags && meal.tags.length > 0 && (
-            <View style={styles.tagsContainer}>
+            <View style={styles.tagsRow}>
               {meal.tags.map((tag, index) => (
-              <View key={index} style={[styles.tag, { borderColor: themeColor }]}>
-                <Ionicons 
-                  name={getTagIcon(tag)} 
-                  size={12} 
-                  color={themeColor} 
-                />
-                <Text style={[styles.tagText, { color: themeColor }]}>
-                  {tag ? tag.replace('_', ' ') : 'Unknown'}
-                </Text>
-              </View>
-            ))}
+                <View key={index} style={[styles.tag, { backgroundColor: `${themeColor}20`, borderColor: themeColor }]}>
+                  <Text style={[styles.tagText, { color: themeColor }]}>{tag ? tag.replace('_', ' ') : 'Unknown'}</Text>
+                </View>
+              ))}
             </View>
           )}
         </View>
 
-        {/* Timing Info */}
-        <View style={styles.timingCard}>
-          <View style={styles.timingItem}>
-            <Ionicons name="time-outline" size={20} color={themeColor} />
-            <Text style={styles.timingLabel}>Prep</Text>
-            <Text style={styles.timingValue}>{meal.prepTime || meal.prep_time || 0} min</Text>
+        {/* Quick Stats */}
+        <View style={styles.quickStatsCard}>
+          <View style={styles.statItem}>
+            <Ionicons name="time-outline" size={16} color="#71717a" />
+            <Text style={styles.statLabel}>{(meal.prepTime || meal.prep_time || 0) + (meal.cookTime || meal.cook_time || 0)} min</Text>
           </View>
-          <View style={styles.timingItem}>
-            <Ionicons name="flame-outline" size={20} color={themeColor} />
-            <Text style={styles.timingLabel}>Cook</Text>
-            <Text style={styles.timingValue}>{meal.cookTime || meal.cook_time || 0} min</Text>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: themeColor }]}>{meal.nutritionInfo?.calories || meal.calories || 0}</Text>
+            <Text style={styles.statLabel}>cal</Text>
           </View>
-          <View style={styles.timingItem}>
-            <Ionicons name="people-outline" size={20} color={themeColor} />
-            <Text style={styles.timingLabel}>Serves</Text>
-            <Text style={styles.timingValue}>{meal.servings}</Text>
-          </View>
-        </View>
-
-        {/* Nutrition Info */}
-        <View style={styles.nutritionCard}>
-          <Text style={styles.cardTitle}>Nutrition (per serving)</Text>
-          <View style={styles.nutritionGrid}>
-            <View style={styles.nutritionItem}>
-              <Text style={[styles.nutritionValue, { color: themeColor }]}>
-                {meal.nutritionInfo?.calories || meal.calories || 0}
-              </Text>
-              <Text style={styles.nutritionLabel}>Calories</Text>
-            </View>
-            <View style={styles.nutritionItem}>
-              <Text style={[styles.nutritionValue, { color: '#22c55e' }]}>
-                {meal.nutritionInfo?.protein || meal.macros?.protein || 0}g
-              </Text>
-              <Text style={styles.nutritionLabel}>Protein</Text>
-            </View>
-            <View style={styles.nutritionItem}>
-              <Text style={[styles.nutritionValue, { color: '#f59e0b' }]}>
-                {meal.nutritionInfo?.carbs || meal.macros?.carbs || 0}g
-              </Text>
-              <Text style={styles.nutritionLabel}>Carbs</Text>
-            </View>
-            <View style={styles.nutritionItem}>
-              <Text style={[styles.nutritionValue, { color: '#ef4444' }]}>
-                {meal.nutritionInfo?.fat || meal.macros?.fat || 0}g
-              </Text>
-              <Text style={styles.nutritionLabel}>Fat</Text>
-            </View>
-            <View style={styles.nutritionItem}>
-              <Text style={styles.nutritionValue}>
-                {meal.nutritionInfo?.fiber || meal.macros?.fiber || 0}g
-              </Text>
-              <Text style={styles.nutritionLabel}>Fiber</Text>
-            </View>
-            <View style={styles.nutritionItem}>
-              <Text style={styles.nutritionValue}>
-                {meal.nutritionInfo?.sodium || 0}mg
-              </Text>
-              <Text style={styles.nutritionLabel}>Sodium</Text>
-            </View>
+          <View style={styles.statDivider} />
+          <View style={styles.macroRow}>
+            <Text style={styles.macroStat}>P: {meal.nutritionInfo?.protein || meal.macros?.protein || 0}g</Text>
+            <Text style={styles.macroStat}>C: {(meal.nutritionInfo?.carbs || meal.macros?.carbs || 0)}g</Text>
+            <Text style={styles.macroStat}>F: {(meal.nutritionInfo?.fat || meal.macros?.fat || 0)}g</Text>
           </View>
         </View>
 
@@ -294,25 +221,36 @@ export default function MealDetailScreen() {
         <View style={styles.ingredientsCard}>
           <Text style={styles.cardTitle}>Ingredients</Text>
           <View style={styles.ingredientsList}>
-            {meal.ingredients?.map((ingredient, index) => (
-              <View key={ingredient.id || index} style={styles.ingredientItem}>
-                <Text style={styles.ingredientAmount}>
-                  {ingredient.amount} {ingredient.unit}
-                </Text>
-                <Text style={styles.ingredientName}>{ingredient.name || ingredient.item}</Text>
-                {ingredient.estimatedCost && (
-                  <Text style={styles.ingredientCost}>
-                    ${ingredient.estimatedCost.toFixed(2)}
-                  </Text>
-                )}
-                {ingredient.isOptional && (
-                  <Text style={styles.optionalText}>optional</Text>
-                )}
-                {ingredient.notes && (
-                  <Text style={styles.ingredientNotes}>{ingredient.notes}</Text>
-                )}
-              </View>
-            )) || []}
+            {meal.ingredients?.map((ingredient, index) => {
+              let displayText = '';
+              
+              if (typeof ingredient === 'string') {
+                displayText = ingredient;
+              } else {
+                // For structured ingredients, format them nicely
+                const amount = ingredient.amount && ingredient.amount !== 1 ? ingredient.amount : '';
+                const unit = ingredient.unit && ingredient.unit !== 'item' ? ingredient.unit : '';
+                const name = ingredient.name || ingredient.item || '';
+                
+                // Clean formatting - only show amount/unit if they're meaningful
+                if (amount && unit && unit !== 'item') {
+                  displayText = `${amount} ${unit} ${name}`.trim();
+                } else if (amount && unit === 'item') {
+                  displayText = amount > 1 ? `${amount} ${name}` : name;
+                } else {
+                  displayText = name;
+                }
+              }
+              
+              return (
+                <View key={ingredient.id || index} style={styles.ingredientRow}>
+                  <View style={styles.ingredientBullet} />
+                  <View style={styles.ingredientContent}>
+                    <Text style={styles.ingredientText}>{displayText}</Text>
+                  </View>
+                </View>
+              );
+            }) || []}
           </View>
         </View>
 
@@ -320,166 +258,27 @@ export default function MealDetailScreen() {
         <View style={styles.instructionsCard}>
           <Text style={styles.cardTitle}>Instructions</Text>
           <View style={styles.instructionsList}>
-            {meal.instructions?.map((instruction, index) => (
-              <View key={instruction.step || index} style={styles.instructionItem}>
-                <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
-                  <Text style={styles.stepNumberText}>{instruction.step || (index + 1)}</Text>
+            {meal.instructions?.map((instruction, index) => {
+              const displayText = typeof instruction === 'string' 
+                ? instruction 
+                : instruction.instruction || instruction;
+              
+              return (
+                <View key={instruction.step || index} style={styles.instructionRow}>
+                  <View style={[styles.stepCircle, { backgroundColor: themeColor }]}>
+                    <Text style={styles.stepNumber}>{instruction.step || (index + 1)}</Text>
+                  </View>
+                  <View style={styles.instructionContent}>
+                    <Text style={styles.instructionText}>{displayText}</Text>
+                  </View>
                 </View>
-                <View style={styles.instructionContent}>
-                  <Text style={styles.instructionText}>
-                    {instruction.instruction || instruction}
-                  </Text>
-                  {(instruction.duration || instruction.temperature) && (
-                    <View style={styles.instructionMeta}>
-                      {instruction.duration && (
-                        <Text style={styles.instructionMetaText}>
-                          ⏱️ {instruction.duration} min
-                        </Text>
-                      )}
-                      {instruction.temperature && (
-                        <Text style={styles.instructionMetaText}>
-                          🌡️ {instruction.temperature}°C
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                </View>
-              </View>
-            )) || []}
+              );
+            }) || []}
           </View>
         </View>
 
-        {/* Actions */}
-        <View style={styles.actionsCard}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: themeColor }]}
-            onPress={searchYouTube}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="logo-youtube" size={20} color="#0a0a0b" />
-            <Text style={styles.actionButtonText}>Find Recipe Video</Text>
-          </TouchableOpacity>
-
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: themeColor }]}
-              onPress={() => setShowRatingModal(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="star-outline" size={20} color={themeColor} />
-              <Text style={[styles.secondaryButtonText, { color: themeColor }]}>
-                Rate Meal
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: themeColor }]}
-              onPress={() => setShowCookedModal(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="checkmark-outline" size={20} color={themeColor} />
-              <Text style={[styles.secondaryButtonText, { color: themeColor }]}>
-                I Made This
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
 
-      {/* Rating Modal */}
-      <Modal
-        visible={showRatingModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowRatingModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Rate this meal</Text>
-            
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setRating(star)}
-                  style={styles.starButton}
-                >
-                  <Ionicons
-                    name={star <= rating ? "star" : "star-outline"}
-                    size={32}
-                    color={star <= rating ? "#f59e0b" : "#71717a"}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TextInput
-              style={styles.feedbackInput}
-              placeholder="Share your thoughts (optional)"
-              placeholderTextColor="#71717a"
-              value={feedback}
-              onChangeText={setFeedback}
-              multiline
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowRatingModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSubmitButton, { backgroundColor: themeColor }]}
-                onPress={submitRating}
-              >
-                <Text style={styles.modalSubmitText}>Submit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Cooked Modal */}
-      <Modal
-        visible={showCookedModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowCookedModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Great job cooking!</Text>
-            <Text style={styles.modalSubtitle}>
-              Any modifications you made to the recipe?
-            </Text>
-            
-            <TextInput
-              style={styles.feedbackInput}
-              placeholder="e.g., Added extra spices, used different vegetables..."
-              placeholderTextColor="#71717a"
-              value={modifications}
-              onChangeText={setModifications}
-              multiline
-            />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowCookedModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSubmitButton, { backgroundColor: themeColor }]}
-                onPress={markAsCooked}
-              >
-                <Text style={styles.modalSubmitText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -534,32 +333,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 8,
     lineHeight: 34,
-  },
-  mealMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  mealType: {
-    fontSize: 14,
-    color: '#71717a',
-    textTransform: 'capitalize',
-  },
-  difficultyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  difficultyText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  mealDescription: {
-    fontSize: 16,
-    color: '#a1a1aa',
-    lineHeight: 24,
-    marginBottom: 16,
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -851,5 +624,120 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
     marginTop: 100,
+  },
+  mealHeaderSection: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    marginHorizontal: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  quickStatsCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#71717a',
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#27272a',
+  },
+  macroRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  macroStat: {
+    fontSize: 12,
+    color: '#a1a1aa',
+    fontWeight: '500',
+  },
+  ingredientRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    gap: 12,
+  },
+  ingredientBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#71717a',
+    marginTop: 6,
+  },
+  ingredientContent: {
+    flex: 1,
+  },
+  ingredientText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#ffffff',
+  },
+  ingredientAmount: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  ingredientName: {
+    color: '#ffffff',
+    fontWeight: '400',
+  },
+  optionalText: {
+    color: '#71717a',
+    fontStyle: 'italic',
+    fontSize: 13,
+  },
+  instructionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 12,
+    gap: 16,
+  },
+  stepCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  stepNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0a0a0b',
+  },
+  instructionContent: {
+    flex: 1,
+  },
+  instructionText: {
+    fontSize: 15,
+    color: '#ffffff',
+    lineHeight: 22,
+    fontWeight: '400',
   },
 });

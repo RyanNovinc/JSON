@@ -47,6 +47,9 @@ import MealDetailScreen from '../screens/MealDetailScreen';
 import GroceryListScreen from '../screens/GroceryListScreen';
 import MealRatingsScreen from '../screens/MealRatingsScreen';
 import FavoriteMealsScreen from '../screens/FavoriteMealsScreen';
+import AddMealScreen from '../screens/AddMealScreen';
+import ManualMealEntryScreen from '../screens/ManualMealEntryScreen';
+import MealPlanHelpScreen from '../screens/MealPlanHelpScreen';
 import WeightTrackerScreen from '../screens/WeightTrackerScreen';
 
 export type RootStackParamList = {
@@ -136,6 +139,9 @@ export type RootStackParamList = {
   };
   MealRatings: undefined;
   FavoriteMeals: undefined;
+  AddMeal: undefined;
+  ManualMealEntry: undefined;
+  MealPlanHelp: undefined;
   WeightTracker: undefined;
 };
 
@@ -421,6 +427,27 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen 
                 name="FavoriteMeals" 
                 component={FavoriteMealsScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
+                name="AddMeal" 
+                component={AddMealScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
+                name="ManualMealEntry" 
+                component={ManualMealEntryScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
+                name="MealPlanHelp" 
+                component={MealPlanHelpScreen}
                 options={{
                   headerShown: false,
                 }}

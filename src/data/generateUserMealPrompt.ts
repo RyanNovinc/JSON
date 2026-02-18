@@ -9,6 +9,10 @@ export const generateUserMealPlanPrompt = async (researchMode: boolean = false) 
     const sleepResults = await WorkoutStorage.loadSleepOptimizationResults();
     const fridgePantryResults = await WorkoutStorage.loadFridgePantryResults();
     
+    // Load favorite meals data for detailed meal information
+    const favoriteMealsData = await AsyncStorage.getItem('@nutrition_favorites');
+    const favoriteMeals = favoriteMealsData ? JSON.parse(favoriteMealsData) : [];
+    
     // Also load user profile for nutrient variety data
     const userProfileData = await AsyncStorage.getItem('@nutrition_user_profile');
     const userProfile = userProfileData ? JSON.parse(userProfileData) : null;
@@ -30,6 +34,26 @@ export const generateUserMealPlanPrompt = async (researchMode: boolean = false) 
     const budgetData = budgetCookingResults.formData;
     const sleepData = sleepResults?.formData;
     const fridgePantryData = fridgePantryResults?.formData;
+
+    // Helper function to format favorite meals details
+    const formatSelectedFavoriteMeals = (selectedFavoriteIds: string[], allFavoriteMeals: any[]) => {
+      if (!selectedFavoriteIds?.length || !allFavoriteMeals?.length) {
+        return '';
+      }
+
+      const selectedMealDetails = selectedFavoriteIds
+        .map(mealId => {
+          const favoriteMeal = allFavoriteMeals.find(fav => fav.mealId === mealId);
+          if (!favoriteMeal?.meal) return null;
+          
+          const meal = favoriteMeal.meal;
+          return `  • ${meal.name || 'Unnamed Meal'}${meal.ingredients?.length ? ` - ${meal.ingredients.slice(0, 5).map(ing => ing.name).join(', ')}${meal.ingredients.length > 5 ? '...' : ''}` : ''}`;
+        })
+        .filter(Boolean)
+        .join('\n\n');
+
+      return selectedMealDetails ? `\n- Selected favorite meals to include in the plan:\n${selectedMealDetails}` : '';
+    };
 
     // Ensure formData exists - this might be the core issue
     if (!nutritionData.formData) {
@@ -260,7 +284,7 @@ ${fridgePantryData.ingredients.map(item => {
 
 MEAL PREFERENCES:
 ${budgetData.mealPreferences === 'include_favorites' ? 
-  `- User wants to include their favorite meals in the plan${budgetData.selectedFavorites?.length ? `\n- Selected favorite meals: ${budgetData.selectedFavorites.join(', ')} (these are meal IDs - you can use these as inspiration for meal types/names to include)` : ''}${budgetData.customMealRequests ? `\n- Custom requests: ${budgetData.customMealRequests}` : ''}` :
+  `- User wants to include their favorite meals in the plan${formatSelectedFavoriteMeals(budgetData.selectedFavorites, favoriteMeals)}${budgetData.customMealRequests ? `\n- Custom requests: ${budgetData.customMealRequests}` : ''}` :
   '- User wants AI to suggest all meals based on their profile and preferences'
 }
 

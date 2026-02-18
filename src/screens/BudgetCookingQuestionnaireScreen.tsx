@@ -1542,11 +1542,107 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                 </Animatable.View>
               )}
             </Animatable.View>
+            
+            {/* Meal Preferences Section */}
+            <Animatable.View 
+              animation="slideInUp" 
+              delay={1850}
+              duration={300}
+              style={[styles.tronDataBlock, { borderColor: colors.primary }]}
+            >
+              <Animatable.Text 
+                style={[styles.tronBlockTitle, { color: colors.primary }]}
+                animation="zoomIn"
+                delay={1900}
+              >
+                Meal Preferences
+              </Animatable.Text>
+              
+              <Animatable.View 
+                style={styles.tronDataRow}
+                animation="fadeInLeft"
+                delay={1950}
+              >
+                <Text style={styles.tronDataLabel}>Selection Method</Text>
+                <Text style={[styles.tronDataValue, { color: colors.primary }]}>
+                  {formData.mealPreferences === 'ai_suggest' ? 'AI Suggestions' : 'Favorites & Custom'}
+                </Text>
+              </Animatable.View>
+              
+              {formData.mealPreferences === 'include_favorites' && formData.selectedFavorites && formData.selectedFavorites.length > 0 && (
+                <Animatable.View 
+                  style={styles.tronDataRow}
+                  animation="fadeInLeft"
+                  delay={2000}
+                >
+                  <Text style={styles.tronDataLabel}>Selected Favorites</Text>
+                  <Text style={[styles.tronDataValue, { color: colors.primary }]}>
+                    {formData.selectedFavorites.length} meal{formData.selectedFavorites.length !== 1 ? 's' : ''}
+                  </Text>
+                </Animatable.View>
+              )}
+              
+              {formData.mealPreferences === 'include_favorites' && formData.customMealRequests && formData.customMealRequests.trim() && (
+                <Animatable.View 
+                  style={styles.tronDataRow}
+                  animation="fadeInLeft"
+                  delay={2050}
+                >
+                  <Text style={styles.tronDataLabel}>Custom Requests</Text>
+                  <Text style={[styles.tronDataValue, { color: colors.primary }]}>
+                    {formData.customMealRequests.length > 30 
+                      ? formData.customMealRequests.substring(0, 30) + '...' 
+                      : formData.customMealRequests
+                    }
+                  </Text>
+                </Animatable.View>
+              )}
+            </Animatable.View>
+            
+            {/* Cooking Equipment Section */}
+            <Animatable.View 
+              animation="slideInUp" 
+              delay={2050}
+              duration={300}
+              style={[styles.tronDataBlock, { borderColor: colors.primary }]}
+            >
+              <Animatable.Text 
+                style={[styles.tronBlockTitle, { color: colors.primary }]}
+                animation="zoomIn"
+                delay={2100}
+              >
+                Available Equipment
+              </Animatable.Text>
+              
+              <Animatable.View 
+                style={styles.tronDataRow}
+                animation="fadeInLeft"
+                delay={2150}
+              >
+                <Text style={styles.tronDataLabel}>Equipment Count</Text>
+                <Text style={[styles.tronDataValue, { color: colors.primary }]}>
+                  {formData.cookingEquipment.length} item{formData.cookingEquipment.length !== 1 ? 's' : ''}
+                </Text>
+              </Animatable.View>
+              
+              {formData.cookingEquipment.length > 0 && (
+                <Animatable.View 
+                  style={styles.tronDataRow}
+                  animation="fadeInLeft"
+                  delay={2200}
+                >
+                  <Text style={styles.tronDataLabel}>Selected Items</Text>
+                  <Text style={[styles.tronDataValue, { color: colors.primary }]}>
+                    {formData.cookingEquipment.join(', ')}
+                  </Text>
+                </Animatable.View>
+              )}
+            </Animatable.View>
 
             {/* Tron-style Action Buttons */}
             <Animatable.View 
               animation="fadeInUp" 
-              delay={1900}
+              delay={2250}
               duration={300}
               style={styles.tronButtonsContainer}
             >
