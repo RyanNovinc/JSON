@@ -784,7 +784,7 @@ export default function NutritionHomeScreen({ route }: any) {
           onPress={() => navigation.navigate('NutritionDashboard' as any)}
           activeOpacity={0.9}
         >
-          <Ionicons name="nutrition-outline" size={24} color="#0a0a0b" />
+          <Ionicons name="clipboard-outline" size={24} color="#0a0a0b" />
         </TouchableOpacity>
       </View>
 

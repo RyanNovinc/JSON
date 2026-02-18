@@ -698,7 +698,7 @@ export default function HomeScreen({ route }: any) {
         </View>
       )}
 
-      {/* Shop Button - Bottom Center - Hidden if user has JSON Pro - DEV ONLY */}
+      {/* Shop Button - Top Right - Hidden if user has JSON Pro - DEV ONLY */}
       {!hasJSONPro && __DEV__ && (
         <View style={styles.shopButton}>
           <TouchableOpacity
@@ -710,6 +710,16 @@ export default function HomeScreen({ route }: any) {
           </TouchableOpacity>
         </View>
       )}
+      {/* Questionnaire Button - Bottom Center */}
+      <View style={styles.questionnaireButton}>
+        <TouchableOpacity
+          style={styles.buttonInner}
+          onPress={() => navigation.navigate('WorkoutDashboard' as any)}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="clipboard-outline" size={24} color="#0a0a0b" />
+        </TouchableOpacity>
+      </View>
 
       {/* App Mode Toggle - Top Right (Development Only) */}
       {__DEV__ && (
@@ -1638,8 +1648,9 @@ const styles = StyleSheet.create({
   // Calendar button styles
   calendarButton: {
     position: 'absolute',
-    left: 16,
+    left: '50%',
     bottom: 32,
+    marginLeft: -28, // Half of width to center
     width: 56,
     height: 56,
     borderRadius: 4,
@@ -1649,8 +1660,9 @@ const styles = StyleSheet.create({
   // Today button styles (positioned next to calendar button)
   todayButton: {
     position: 'absolute',
-    left: 84, // 16 + 56 + 12 (left margin + calendar width + gap)
-    bottom: 32,
+    left: '50%',
+    bottom: 96, // Above the calendar button
+    marginLeft: -28, // Half of width to center
     width: 56,
     height: 56,
     borderRadius: 4,
@@ -1660,13 +1672,23 @@ const styles = StyleSheet.create({
   // Shop button styles
   shopButton: {
     position: 'absolute',
-    left: '50%',
-    bottom: 32,
-    marginLeft: -28, // Half of width to center
+    right: 16,
+    top: 54, // Aligns with header padding
     width: 56,
     height: 56,
     borderRadius: 4,
     backgroundColor: '#a855f7',
+  },
+  
+  // Questionnaire button styles
+  questionnaireButton: {
+    position: 'absolute',
+    left: 16,
+    bottom: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 4,
+    backgroundColor: '#22d3ee',
   },
 
   // Share modal styles

@@ -42,6 +42,8 @@ import FridgePantryQuestionnaireScreen from '../screens/FridgePantryQuestionnair
 import SleepOptimizationScreen from '../screens/SleepOptimizationScreen';
 import NutritionHomeScreen from '../screens/NutritionHomeScreen';
 import NutritionDashboardScreen from '../screens/NutritionDashboardScreen';
+import WorkoutDashboardScreen from '../screens/WorkoutDashboardScreen';
+import FitnessGoalsQuestionnaireScreen from '../screens/FitnessGoalsQuestionnaireScreen';
 import MealCalendarScreen from '../screens/MealCalendarScreen';
 import MealDetailScreen from '../screens/MealDetailScreen';
 import GroceryListScreen from '../screens/GroceryListScreen';
@@ -130,6 +132,8 @@ export type RootStackParamList = {
   SleepOptimizationScreen: undefined;
   NutritionHome: undefined;
   NutritionDashboard: undefined;
+  WorkoutDashboard: undefined;
+  FitnessGoalsQuestionnaire: undefined;
   MealCalendar: undefined;
   MealDetail: {
     meal: any;
@@ -391,6 +395,22 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen 
                 name="NutritionDashboard" 
                 component={NutritionDashboardScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                }}
+              />
+              <RootStack.Screen 
+                name="WorkoutDashboard" 
+                component={WorkoutDashboardScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                }}
+              />
+              <RootStack.Screen 
+                name="FitnessGoalsQuestionnaire" 
+                component={FitnessGoalsQuestionnaireScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',
