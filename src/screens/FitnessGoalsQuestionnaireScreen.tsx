@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -132,10 +133,135 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [otherTrainingDays, setOtherTrainingDays] = useState<number>(0);
   const [customFrequency, setCustomFrequency] = useState<string>('');
   const [showCustomFrequency, setShowCustomFrequency] = useState<boolean>(false);
-  const [showFrequencyInfo, setShowFrequencyInfo] = useState<boolean>(false);
   const [customGoals, setCustomGoals] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load saved questionnaire data on component mount
+  useEffect(() => {
+    loadSavedData();
+  }, []);
+
+  const loadSavedData = async () => {
+    try {
+      const savedData = await AsyncStorage.getItem('fitnessGoalsData');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        
+        // Restore all form data
+        setSelectedPrimaryGoal(data.primaryGoal || '');
+        setSelectedSecondaryGoals(data.secondaryGoals || []);
+        setSpecificSport(data.specificSport || '');
+        setAthleticPerformanceDetails(data.athleticPerformanceDetails || '');
+        setFunSocialDetails(data.funSocialDetails || '');
+        setInjuryPreventionDetails(data.injuryPreventionDetails || '');
+        setFlexibilityDetails(data.flexibilityDetails || '');
+        setPriorityMuscleGroups(data.priorityMuscleGroups || []);
+        setCustomMuscleGroup(data.customMuscleGroup || '');
+        setMovementLimitations(data.movementLimitations || []);
+        setCustomLimitation(data.customLimitation || '');
+        setTrainingStylePreference(data.trainingStylePreference || '');
+        setCustomTrainingStyle(data.customTrainingStyle || '');
+        setTotalTrainingDays(data.totalTrainingDays || 0);
+        setGymTrainingDays(data.gymTrainingDays || 0);
+        setOtherTrainingDays(data.otherTrainingDays || 0);
+        setCustomFrequency(data.customFrequency || '');
+        setShowCustomFrequency(data.customFrequency !== '');
+        setCustomGoals(data.customGoals || '');
+        
+        // If questionnaire was completed, show summary directly
+        if (data.completedAt) {
+          setIsCompleted(true);
+          setShowResults(true);
+        } else {
+          // Restore current step for partial progress
+          setCurrentStep(data.currentStep || 0);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load saved questionnaire data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Auto-save progress (without completedAt to indicate it's not finished)
+  const saveProgress = async () => {
+    try {
+      const progressData = {
+        primaryGoal: selectedPrimaryGoal,
+        secondaryGoals: selectedSecondaryGoals,
+        specificSport: specificSport,
+        athleticPerformanceDetails: athleticPerformanceDetails,
+        funSocialDetails: funSocialDetails,
+        injuryPreventionDetails: injuryPreventionDetails,
+        flexibilityDetails: flexibilityDetails,
+        priorityMuscleGroups: priorityMuscleGroups,
+        customMuscleGroup: customMuscleGroup,
+        movementLimitations: movementLimitations,
+        customLimitation: customLimitation,
+        trainingStylePreference: trainingStylePreference,
+        customTrainingStyle: customTrainingStyle,
+        totalTrainingDays: totalTrainingDays,
+        customFrequency: customFrequency,
+        gymTrainingDays: gymTrainingDays,
+        otherTrainingDays: otherTrainingDays,
+        customGoals: customGoals,
+        currentStep: currentStep,
+        // Note: no completedAt field - this indicates it's in progress
+      };
+
+      await AsyncStorage.setItem('fitnessGoalsData', JSON.stringify(progressData));
+    } catch (error) {
+      console.error('Failed to save progress:', error);
+    }
+  };
+
+  // Auto-save progress when relevant state changes
+  useEffect(() => {
+    if (!isLoading && !isCompleted) {
+      saveProgress();
+    }
+  }, [selectedPrimaryGoal, selectedSecondaryGoals, specificSport, athleticPerformanceDetails, 
+      funSocialDetails, injuryPreventionDetails, flexibilityDetails, priorityMuscleGroups, 
+      customMuscleGroup, movementLimitations, customLimitation, trainingStylePreference, 
+      customTrainingStyle, totalTrainingDays, customFrequency, gymTrainingDays, 
+      otherTrainingDays, customGoals]);
+
+  const handleRetakeQuestions = async () => {
+    try {
+      // Clear saved data from AsyncStorage
+      await AsyncStorage.removeItem('fitnessGoalsData');
+      
+      // Reset all state variables
+      setSelectedPrimaryGoal('');
+      setSelectedSecondaryGoals([]);
+      setSpecificSport('');
+      setAthleticPerformanceDetails('');
+      setFunSocialDetails('');
+      setInjuryPreventionDetails('');
+      setFlexibilityDetails('');
+      setPriorityMuscleGroups([]);
+      setCustomMuscleGroup('');
+      setMovementLimitations([]);
+      setCustomLimitation('');
+      setTrainingStylePreference('');
+      setCustomTrainingStyle('');
+      setTotalTrainingDays(0);
+      setGymTrainingDays(0);
+      setOtherTrainingDays(0);
+      setCustomFrequency('');
+      setShowCustomFrequency(false);
+      setCustomGoals('');
+      setCurrentStep(0);
+      setShowResults(false);
+      setIsCompleted(false);
+    } catch (error) {
+      console.error('Failed to reset questionnaire:', error);
+    }
+  };
 
   const handlePrimaryGoalSelect = (goalId: string) => {
     setSelectedPrimaryGoal(goalId);
@@ -233,20 +359,15 @@ export default function FitnessGoalsQuestionnaireScreen() {
         completedAt: new Date().toISOString(),
       };
 
-      // Save to storage (implement this later)
-      console.log('Fitness Goals Data:', fitnessGoalsData);
+      // Save to AsyncStorage
+      await AsyncStorage.setItem('fitnessGoalsData', JSON.stringify(fitnessGoalsData));
+      console.log('Fitness Goals Data saved:', fitnessGoalsData);
+      
+      // Mark as completed
+      setIsCompleted(true);
 
-      // For now, just show success and navigate back
-      Alert.alert(
-        'Goals Saved!',
-        'Your fitness goals have been saved successfully.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('WorkoutDashboard' as any)
-          }
-        ]
-      );
+      // Navigate back to workout dashboard
+      navigation.navigate('WorkoutDashboard' as any);
     } catch (error) {
       console.error('Failed to save fitness goals:', error);
       Alert.alert('Error', 'Failed to save fitness goals. Please try again.');
@@ -576,73 +697,71 @@ export default function FitnessGoalsQuestionnaireScreen() {
           delay={50}
           style={styles.sectionContainer}
         >
-          <View style={styles.titleWithInfo}>
-            <Text style={[styles.sectionTitle, { color: themeColor }]}>
-              Training Frequency
-            </Text>
-            <TouchableOpacity 
-              onPress={() => setShowFrequencyInfo(true)}
-              style={styles.infoButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="information-circle-outline" size={20} color={themeColor} />
-            </TouchableOpacity>
-          </View>
+          <Text style={[styles.sectionTitle, { color: themeColor }]}>
+            Training Frequency
+          </Text>
           <Text style={styles.sectionSubtitle}>
-            How many days per week do you want to train?
+            Choose your weekly training schedule
           </Text>
           
-          <View style={styles.frequencyContainer}>
-            {[1, 2, 3, 4, 5, 6, 7].map((days) => (
-              <TouchableOpacity
-                key={days}
-                style={[
-                  styles.frequencyChip,
-                  !showCustomFrequency && totalTrainingDays === days && [
-                    styles.selectedFrequencyChip,
-                    { backgroundColor: themeColor, borderColor: themeColor }
-                  ]
-                ]}
-                onPress={() => {
-                  setTotalTrainingDays(days);
-                  setShowCustomFrequency(false);
-                  setCustomFrequency('');
-                  // Reset split when changing total days
-                  setGymTrainingDays(0);
-                  setOtherTrainingDays(0);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={[
-                  styles.frequencyText,
-                  !showCustomFrequency && totalTrainingDays === days && styles.selectedFrequencyText
-                ]}>
-                  {days}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* Modern Frequency Grid */}
+          <View style={styles.modernFrequencyGrid}>
+            {[1, 2, 3, 4, 5, 6, 7].map((days) => {
+              const isSelected = !showCustomFrequency && totalTrainingDays === days;
+              return (
+                <TouchableOpacity
+                  key={days}
+                  style={[
+                    styles.modernFrequencyCard,
+                    isSelected && [styles.selectedModernCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
+                  ]}
+                  onPress={() => {
+                    setTotalTrainingDays(days);
+                    setShowCustomFrequency(false);
+                    setCustomFrequency('');
+                    setGymTrainingDays(0);
+                    setOtherTrainingDays(0);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.modernFrequencyNumber,
+                    isSelected && { color: themeColor }
+                  ]}>
+                    {days}
+                  </Text>
+                  <Text style={[
+                    styles.modernFrequencyLabel,
+                    isSelected && { color: themeColor }
+                  ]}>
+                    {days === 1 ? 'day' : 'days'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
             
-            {/* Custom option */}
+            {/* Custom Card */}
             <TouchableOpacity
               style={[
-                styles.customFrequencyChip,
-                showCustomFrequency && [
-                  styles.selectedFrequencyChip,
-                  { backgroundColor: themeColor, borderColor: themeColor }
-                ]
+                styles.modernCustomCard,
+                showCustomFrequency && [styles.selectedModernCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
               ]}
               onPress={() => {
                 setShowCustomFrequency(true);
                 setTotalTrainingDays(0);
-                // Reset split when switching to custom
                 setGymTrainingDays(0);
                 setOtherTrainingDays(0);
               }}
-              activeOpacity={0.8}
+              activeOpacity={0.7}
             >
+              <Ionicons 
+                name="add-circle-outline" 
+                size={24} 
+                color={showCustomFrequency ? themeColor : '#71717a'} 
+              />
               <Text style={[
-                styles.customFrequencyText,
-                showCustomFrequency && styles.selectedFrequencyText
+                styles.modernCustomLabel,
+                showCustomFrequency && { color: themeColor }
               ]}>
                 Custom
               </Text>
@@ -656,31 +775,33 @@ export default function FitnessGoalsQuestionnaireScreen() {
               duration={300}
               style={styles.customInputContainer}
             >
-              <Text style={styles.customInputLabel}>
-                Enter number of training sessions per week (max 14):
-              </Text>
-              <TextInput
-                style={styles.customFrequencyInput}
-                placeholder="8 - 14"
-                placeholderTextColor="#71717a"
-                value={customFrequency}
-                onChangeText={(value) => {
-                  // Only allow numbers
-                  const numericValue = value.replace(/[^0-9]/g, '');
-                  setCustomFrequency(numericValue);
-                  
-                  const numValue = parseInt(numericValue);
-                  if (!isNaN(numValue) && numValue > 0 && numValue <= 14) {
-                    setTotalTrainingDays(numValue);
-                  } else if (numValue > 14) {
-                    setCustomFrequency('14');
-                    setTotalTrainingDays(14);
-                  } else {
-                    setTotalTrainingDays(0);
-                  }
-                }}
-                keyboardType="numeric"
-              />
+              <Text style={styles.modernCustomTitle}>Enter Custom Frequency</Text>
+              <View style={styles.customInputWrapper}>
+                <TextInput
+                  style={[styles.modernCustomTextInput, { borderColor: themeColor }]}
+                  placeholder="8-14"
+                  placeholderTextColor="#71717a"
+                  value={customFrequency}
+                  onChangeText={(value) => {
+                    const numericValue = value.replace(/[^0-9]/g, '');
+                    setCustomFrequency(numericValue);
+                    
+                    const numValue = parseInt(numericValue);
+                    if (!isNaN(numValue) && numValue > 0 && numValue <= 14) {
+                      setTotalTrainingDays(numValue);
+                    } else if (numValue > 14) {
+                      setCustomFrequency('14');
+                      setTotalTrainingDays(14);
+                    } else {
+                      setTotalTrainingDays(0);
+                    }
+                  }}
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+                <Text style={styles.daysPerWeekLabel}>days/week</Text>
+              </View>
+              <Text style={styles.customInputHint}>Maximum 14 sessions per week</Text>
             </Animatable.View>
           )}
         </Animatable.View>
@@ -696,63 +817,74 @@ export default function FitnessGoalsQuestionnaireScreen() {
               Training Split
             </Text>
             <Text style={styles.sectionSubtitle}>
-              How do you want to split your {totalTrainingDays} training days?
+              Divide your {totalTrainingDays} days between gym and other activities
             </Text>
             
-            <View style={styles.splitContainer}>
-              {/* Gym Training */}
-              <View style={styles.splitRow}>
-                <Text style={styles.splitLabel}>Gym/Strength Training:</Text>
-                <View style={styles.splitControls}>
-                  {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => (
-                    <TouchableOpacity
-                      key={`gym-${days}`}
-                      style={[
-                        styles.splitChip,
-                        gymTrainingDays === days && [
-                          styles.selectedSplitChip,
-                          { backgroundColor: themeColor, borderColor: themeColor }
-                        ]
-                      ]}
-                      onPress={() => setGymTrainingDays(days)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[
-                        styles.splitText,
-                        gymTrainingDays === days && styles.selectedSplitText
-                      ]}>
-                        {days}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+            {/* Modern Split Container */}
+            <View style={styles.modernSplitContainer}>
+              {/* Gym Training Section */}
+              <View style={styles.modernSplitSection}>
+                <View style={styles.modernSplitHeader}>
+                  <View style={[styles.splitIconContainer, { backgroundColor: `${themeColor}20` }]}>
+                    <Ionicons name="fitness" size={20} color={themeColor} />
+                  </View>
+                  <Text style={styles.modernSplitLabel}>Gym/Strength Training</Text>
+                </View>
+                <View style={styles.modernSplitGrid}>
+                  {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => {
+                    const isSelected = gymTrainingDays === days;
+                    return (
+                      <TouchableOpacity
+                        key={`gym-${days}`}
+                        style={[
+                          styles.modernSplitCard,
+                          isSelected && [styles.selectedModernSplitCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
+                        ]}
+                        onPress={() => setGymTrainingDays(days)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[
+                          styles.modernSplitNumber,
+                          isSelected && { color: themeColor }
+                        ]}>
+                          {days}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 
-              {/* Other Training */}
-              <View style={styles.splitRow}>
-                <Text style={styles.splitLabel}>Other Activities:</Text>
-                <View style={styles.splitControls}>
-                  {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => (
-                    <TouchableOpacity
-                      key={`other-${days}`}
-                      style={[
-                        styles.splitChip,
-                        otherTrainingDays === days && [
-                          styles.selectedSplitChip,
-                          { backgroundColor: '#10b981', borderColor: '#10b981' }
-                        ]
-                      ]}
-                      onPress={() => setOtherTrainingDays(days)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[
-                        styles.splitText,
-                        otherTrainingDays === days && styles.selectedSplitText
-                      ]}>
-                        {days}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+              {/* Other Activities Section */}
+              <View style={styles.modernSplitSection}>
+                <View style={styles.modernSplitHeader}>
+                  <View style={[styles.splitIconContainer, { backgroundColor: '#10b98120' }]}>
+                    <Ionicons name="walk" size={20} color="#10b981" />
+                  </View>
+                  <Text style={styles.modernSplitLabel}>Other Activities</Text>
+                </View>
+                <View style={styles.modernSplitGrid}>
+                  {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => {
+                    const isSelected = otherTrainingDays === days;
+                    return (
+                      <TouchableOpacity
+                        key={`other-${days}`}
+                        style={[
+                          styles.modernSplitCard,
+                          isSelected && [styles.selectedModernSplitCard, { borderColor: '#10b981', backgroundColor: '#10b98115' }]
+                        ]}
+                        onPress={() => setOtherTrainingDays(days)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[
+                          styles.modernSplitNumber,
+                          isSelected && { color: '#10b981' }
+                        ]}>
+                          {days}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             </View>
@@ -769,184 +901,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
           </Animatable.View>
         )}
       </ScrollView>
-
-      {/* Training Frequency Guide - Full Screen Modal */}
-      {showFrequencyInfo && (
-        <View style={styles.guideModal}>
-          <SafeAreaView style={styles.guideModalSafeArea}>
-            <View style={styles.guideHeader}>
-              <TouchableOpacity 
-                onPress={() => setShowFrequencyInfo(false)}
-                style={styles.guideBackButton}
-              >
-                <Ionicons name="arrow-back" size={24} color={themeColor} />
-              </TouchableOpacity>
-              <Text style={[styles.guideTitle, { color: themeColor }]}>
-                Training Frequency Guide
-              </Text>
-              <View style={styles.headerSpacer} />
-            </View>
-
-            <ScrollView 
-              style={styles.guideContent}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.guideScrollContent}
-            >
-              {/* Hero Stats */}
-              <View style={styles.heroStats}>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statNumber, { color: themeColor }]}>200+</Text>
-                  <Text style={styles.statLabel}>Studies Analyzed</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={[styles.statNumber, { color: themeColor }]}>2016-2025</Text>
-                  <Text style={styles.statLabel}>Latest Research</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={[styles.statNumber, { color: themeColor }]}>Meta</Text>
-                  <Text style={styles.statLabel}>Analysis Based</Text>
-                </View>
-              </View>
-
-              {/* Quick Decision Helper */}
-              <View style={styles.quickHelper}>
-                <View style={styles.helperHeader}>
-                  <Ionicons name="flash" size={20} color="#f59e0b" />
-                  <Text style={styles.helperTitle}>Quick Decision Helper</Text>
-                </View>
-                <View style={styles.helperGrid}>
-                  <View style={styles.helperCard}>
-                    <Text style={styles.helperGoal}>💪 Muscle Building</Text>
-                    <Text style={styles.helperFreq}>3-4 days/week</Text>
-                  </View>
-                  <View style={styles.helperCard}>
-                    <Text style={styles.helperGoal}>🏋️ Strength</Text>
-                    <Text style={styles.helperFreq}>4-5 days/week</Text>
-                  </View>
-                  <View style={styles.helperCard}>
-                    <Text style={styles.helperGoal}>🔥 Fat Loss</Text>
-                    <Text style={styles.helperFreq}>4-6 days/week</Text>
-                  </View>
-                  <View style={styles.helperCard}>
-                    <Text style={styles.helperGoal}>🎯 General Fitness</Text>
-                    <Text style={styles.helperFreq}>3-5 days/week</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Key Findings */}
-              <View style={styles.findingsSection}>
-                <Text style={[styles.sectionHeader, { color: themeColor }]}>
-                  Key Research Findings
-                </Text>
-                
-                <View style={styles.findingCard}>
-                  <View style={styles.findingIcon}>
-                    <Text style={styles.findingEmoji}>📊</Text>
-                  </View>
-                  <View style={styles.findingContent}>
-                    <Text style={styles.findingTitle}>Volume Beats Frequency</Text>
-                    <Text style={styles.findingText}>
-                      For muscle growth, total weekly sets matter more than how often you train. 
-                      10-20 sets per muscle per week is the sweet spot.
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.findingCard}>
-                  <View style={styles.findingIcon}>
-                    <Text style={styles.findingEmoji}>🧠</Text>
-                  </View>
-                  <View style={styles.findingContent}>
-                    <Text style={styles.findingTitle}>Strength Loves Practice</Text>
-                    <Text style={styles.findingText}>
-                      Unlike muscle building, strength gains improve with higher frequency. 
-                      Practice your lifts 3-4 times per week for best results.
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.findingCard}>
-                  <View style={styles.findingIcon}>
-                    <Text style={styles.findingEmoji}>❤️</Text>
-                  </View>
-                  <View style={styles.findingContent}>
-                    <Text style={styles.findingTitle}>Cardio Won't Hurt Gains</Text>
-                    <Text style={styles.findingText}>
-                      The "interference effect" is overblown. Cardio mainly affects explosive power, 
-                      not muscle growth or max strength.
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.findingCard}>
-                  <View style={styles.findingIcon}>
-                    <Text style={styles.findingEmoji}>😴</Text>
-                  </View>
-                  <View style={styles.findingContent}>
-                    <Text style={styles.findingTitle}>Recovery Sets the Limit</Text>
-                    <Text style={styles.findingText}>
-                      Less than 7 hours of sleep significantly hurts gains. 
-                      Recovery capacity, not training stimulus, usually limits frequency.
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Warning Signs */}
-              <View style={styles.warningSection}>
-                <View style={styles.warningHeader}>
-                  <Ionicons name="warning" size={20} color="#ef4444" />
-                  <Text style={[styles.sectionHeader, { color: '#ef4444', marginLeft: 8 }]}>
-                    Warning Signs
-                  </Text>
-                </View>
-                <View style={styles.warningList}>
-                  <Text style={styles.warningItem}>
-                    🔴 Performance declining for 2+ weeks straight
-                  </Text>
-                  <Text style={styles.warningItem}>
-                    🔴 Persistent fatigue despite adequate sleep
-                  </Text>
-                  <Text style={styles.warningItem}>
-                    🔴 Chronic DOMS interfering with daily life
-                  </Text>
-                  <Text style={styles.warningItem}>
-                    🔴 Mood changes or sleep disruption
-                  </Text>
-                </View>
-              </View>
-
-              {/* Evidence Base */}
-              <View style={styles.evidenceSection}>
-                <Text style={[styles.sectionHeader, { color: themeColor }]}>
-                  Evidence Base
-                </Text>
-                <View style={styles.evidenceGrid}>
-                  <View style={styles.evidenceItem}>
-                    <Text style={styles.evidenceJournal}>Sports Medicine</Text>
-                    <Text style={styles.evidenceStudy}>Schoenfeld et al. (2019)</Text>
-                  </View>
-                  <View style={styles.evidenceItem}>
-                    <Text style={styles.evidenceJournal}>Sports Medicine</Text>
-                    <Text style={styles.evidenceStudy}>Pelland et al. (2025)</Text>
-                  </View>
-                  <View style={styles.evidenceItem}>
-                    <Text style={styles.evidenceJournal}>J. Strength Cond. Res.</Text>
-                    <Text style={styles.evidenceStudy}>Wilson et al. (2012)</Text>
-                  </View>
-                  <View style={styles.evidenceItem}>
-                    <Text style={styles.evidenceJournal}>Sports Medicine</Text>
-                    <Text style={styles.evidenceStudy}>Grgic et al. (2018)</Text>
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
-          </SafeAreaView>
-        </View>
-      )}
     );
   };
 
@@ -1147,169 +1101,279 @@ export default function FitnessGoalsQuestionnaireScreen() {
     }
   };
 
+  // Show loading screen while data is loading
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (showResults) {
     const selectedPrimary = primaryGoals.find(g => g.id === selectedPrimaryGoal);
     const selectedSecondary = secondaryGoals.filter(g => selectedSecondaryGoals.includes(g.id));
 
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
+        {/* Single ScrollView for entire screen */}
         <ScrollView 
+          style={styles.summaryScrollView}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={styles.summaryScrollContainer}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => setShowResults(false)} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={themeColor} />
-            </TouchableOpacity>
-            <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Fitness Goals Summary</Text>
-              <Text style={styles.headerSubtitle}>Review your selections</Text>
-            </View>
-          </View>
+          {/* Hero Section - Now scrollable */}
+          <Animatable.View 
+            animation="slideInDown" 
+            duration={800}
+            easing="ease-out-quart"
+            style={[styles.scrollableHeroSection, { backgroundColor: themeColor }]}
+          >
+            <SafeAreaView>
+              {/* Header */}
+              <View style={styles.summaryHeader}>
+              </View>
 
-          {/* Results Content */}
-          <View style={styles.resultsContainer}>
-            <Animatable.View 
-              animation="fadeInUp" 
-              delay={200}
-              style={[styles.resultCard, { borderColor: themeColor }]}
-            >
-              <Text style={[styles.resultTitle, { color: themeColor }]}>
-                Primary Goal
-              </Text>
-              <Text style={styles.resultValue}>
-                {selectedPrimary?.title}
-              </Text>
-              <Text style={styles.resultDescription}>
-                {selectedPrimary?.description}
-              </Text>
-            </Animatable.View>
-
-            {selectedSecondary.length > 0 && (
+              {/* Hero Content */}
               <Animatable.View 
                 animation="fadeInUp" 
                 delay={300}
-                style={[styles.resultCard, { borderColor: themeColor }]}
+                duration={600}
+                style={styles.heroContent}
               >
-                <Text style={[styles.resultTitle, { color: themeColor }]}>
-                  Additional Focus Areas
-                </Text>
-                {selectedSecondary.map((goal, index) => (
-                  <Text key={goal.id} style={styles.resultValue}>
-                    • {goal.title}
-                  </Text>
-                ))}
-              </Animatable.View>
-            )}
+                {/* Main Goal Display */}
+                <Animatable.View 
+                  animation="zoomIn" 
+                  delay={600}
+                  duration={500}
+                  style={styles.mainGoalDisplay}
+                >
+                  <Text style={styles.mainGoalText}>{selectedPrimary?.title}</Text>
+                  <Text style={styles.mainGoalSubtext}>Primary Focus</Text>
+                </Animatable.View>
 
-            {selectedPrimaryGoal === 'sport_specific' && specificSport && (
-              <Animatable.View 
-                animation="fadeInUp" 
-                delay={400}
-                style={[styles.resultCard, { borderColor: themeColor }]}
-              >
-                <Text style={[styles.resultTitle, { color: themeColor }]}>
-                  Specific Sport
-                </Text>
-                <Text style={styles.resultValue}>
-                  {specificSport}
-                </Text>
+                {/* Training Frequency Display */}
+                <Animatable.View 
+                  animation="bounceIn" 
+                  delay={900}
+                  duration={600}
+                  style={styles.frequencyDisplay}
+                >
+                  <View style={styles.frequencyBadge}>
+                    <Ionicons name="calendar" size={20} color={themeColor} />
+                    <Text style={[styles.frequencyText, { color: themeColor }]}>
+                      {totalTrainingDays} {totalTrainingDays === 1 ? 'day' : 'days'}/week
+                    </Text>
+                  </View>
+                </Animatable.View>
               </Animatable.View>
-            )}
+            </SafeAreaView>
+          </Animatable.View>
 
-            {selectedSecondaryGoals.includes('athletic_performance') && athleticPerformanceDetails && (
-              <Animatable.View 
-                animation="fadeInUp" 
-                delay={450}
-                style={[styles.resultCard, { borderColor: themeColor }]}
-              >
-                <Text style={[styles.resultTitle, { color: themeColor }]}>
-                  Athletic Performance Focus
-                </Text>
-                <Text style={styles.resultValue}>
-                  {athleticPerformanceDetails}
-                </Text>
-              </Animatable.View>
-            )}
+          {/* Content Cards */}
+          <View style={styles.summaryCardsContainer}>
 
-            {selectedSecondaryGoals.includes('fun_social') && funSocialDetails && (
-              <Animatable.View 
-                animation="fadeInUp" 
-                delay={500}
-                style={[styles.resultCard, { borderColor: themeColor }]}
-              >
-                <Text style={[styles.resultTitle, { color: themeColor }]}>
-                  Fun & Social Activities
-                </Text>
-                <Text style={styles.resultValue}>
-                  {funSocialDetails}
-                </Text>
-              </Animatable.View>
-            )}
-
-            {selectedSecondaryGoals.includes('injury_prevention') && injuryPreventionDetails && (
-              <Animatable.View 
-                animation="fadeInUp" 
-                delay={525}
-                style={[styles.resultCard, { borderColor: themeColor }]}
-              >
-                <Text style={[styles.resultTitle, { color: themeColor }]}>
-                  Injury Prevention Focus
-                </Text>
-                <Text style={styles.resultValue}>
-                  {injuryPreventionDetails}
-                </Text>
-              </Animatable.View>
-            )}
-
-            {selectedSecondaryGoals.includes('maintain_flexibility') && flexibilityDetails && (
-              <Animatable.View 
-                animation="fadeInUp" 
-                delay={550}
-                style={[styles.resultCard, { borderColor: themeColor }]}
-              >
-                <Text style={[styles.resultTitle, { color: themeColor }]}>
-                  Flexibility Focus Areas
-                </Text>
-                <Text style={styles.resultValue}>
-                  {flexibilityDetails}
-                </Text>
-              </Animatable.View>
-            )}
-
-            {customGoals && (
-              <Animatable.View 
-                animation="fadeInUp" 
-                delay={575}
-                style={[styles.resultCard, { borderColor: themeColor }]}
-              >
-                <Text style={[styles.resultTitle, { color: themeColor }]}>
-                  Additional Notes
-                </Text>
-                <Text style={styles.resultValue}>
-                  {customGoals}
-                </Text>
-              </Animatable.View>
-            )}
-          </View>
-
-          {/* Action Buttons */}
+          {/* Goal Summary - Always show */}
           <Animatable.View 
             animation="fadeInUp" 
-            delay={600}
-            style={styles.actionButtons}
+            delay={1200}
+            duration={500}
+            style={styles.summaryCard}
           >
-            <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: themeColor }]}
-              onPress={handleSaveAndContinue}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.saveButtonText}>Save & Continue</Text>
-            </TouchableOpacity>
+            <Text style={styles.summaryCardTitle}>Your Selection Summary</Text>
+            
+            {/* Primary Goal */}
+            <View style={styles.summaryItem}>
+              <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
+                <Ionicons name="trophy" size={18} color={themeColor} />
+              </View>
+              <View style={styles.summaryItemContent}>
+                <Text style={styles.summaryItemLabel}>Primary Goal</Text>
+                <Text style={styles.summaryItemValue}>{selectedPrimary?.title || 'Not selected'}</Text>
+              </View>
+            </View>
+
+
+            {/* Additional Goals */}
+            {selectedSecondary.length > 0 && (
+              <View style={styles.summaryItem}>
+                <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
+                  <Ionicons name="add-circle" size={18} color={themeColor} />
+                </View>
+                <View style={styles.summaryItemContent}>
+                  <Text style={styles.summaryItemLabel}>Additional Focus</Text>
+                  <Text style={styles.summaryItemValue}>{selectedSecondary.map(g => g.title).join(', ')}</Text>
+                </View>
+              </View>
+            )}
           </Animatable.View>
+
+          {/* Training Schedule */}
+          {totalTrainingDays > 0 && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={1400}
+              duration={500}
+              style={styles.summaryCard}
+            >
+              <Text style={styles.summaryCardTitle}>Training Schedule</Text>
+              
+              {/* Weekly Frequency */}
+              <View style={styles.scheduleItem}>
+                <View style={styles.scheduleHeader}>
+                  <Ionicons name="calendar-outline" size={20} color={themeColor} />
+                  <Text style={styles.scheduleHeaderText}>Weekly Training</Text>
+                </View>
+                <Text style={[styles.scheduleValue, { color: themeColor }]}>
+                  {totalTrainingDays} {totalTrainingDays === 1 ? 'day' : 'days'} per week
+                </Text>
+              </View>
+
+              {/* Training Split Breakdown */}
+              {(gymTrainingDays > 0 || otherTrainingDays > 0) && (
+                <View style={styles.scheduleBreakdown}>
+                  {gymTrainingDays > 0 && (
+                    <View style={styles.scheduleSubItem}>
+                      <View style={styles.scheduleSubIcon}>
+                        <Ionicons name="barbell" size={16} color="#22d3ee" />
+                      </View>
+                      <Text style={styles.scheduleSubLabel}>Gym Training</Text>
+                      <Text style={styles.scheduleSubValue}>{gymTrainingDays} {gymTrainingDays === 1 ? 'day' : 'days'}</Text>
+                    </View>
+                  )}
+                  {otherTrainingDays > 0 && (
+                    <View style={styles.scheduleSubItem}>
+                      <View style={styles.scheduleSubIcon}>
+                        <Ionicons name="walk" size={16} color="#10b981" />
+                      </View>
+                      <Text style={styles.scheduleSubLabel}>Other Activities</Text>
+                      <Text style={styles.scheduleSubValue}>{otherTrainingDays} {otherTrainingDays === 1 ? 'day' : 'days'}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Animatable.View>
+          )}
+
+          {/* Secondary Goals */}
+          {selectedSecondary.length > 0 && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={1600}
+              duration={500}
+              style={styles.summaryCard}
+            >
+              <Text style={styles.summaryCardTitle}>Additional Focus Areas</Text>
+              <View style={styles.secondaryGoalsList}>
+                {selectedSecondary.map((goal, index) => (
+                  <Animatable.View 
+                    key={goal.id} 
+                    animation="fadeInRight"
+                    delay={1800 + (index * 100)}
+                    style={styles.secondaryGoalItem}
+                  >
+                    <View style={[styles.goalDot, { backgroundColor: themeColor }]} />
+                    <Text style={styles.secondaryGoalText}>{goal.title}</Text>
+                  </Animatable.View>
+                ))}
+              </View>
+            </Animatable.View>
+          )}
+
+          {/* Specific Details */}
+          {(specificSport || athleticPerformanceDetails || funSocialDetails || injuryPreventionDetails || flexibilityDetails || customGoals) && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={1800}
+              duration={500}
+              style={styles.summaryCard}
+            >
+              <Text style={styles.summaryCardTitle}>Specific Focus</Text>
+              <View style={styles.specificDetails}>
+                {selectedPrimaryGoal === 'sport_specific' && specificSport && (
+                  <View style={styles.detailItem}>
+                    <Text style={[styles.detailLabel, { color: themeColor }]}>Sport:</Text>
+                    <Text style={styles.detailValue}>{specificSport}</Text>
+                  </View>
+                )}
+                {selectedSecondaryGoals.includes('athletic_performance') && athleticPerformanceDetails && (
+                  <View style={styles.detailItem}>
+                    <Text style={[styles.detailLabel, { color: themeColor }]}>Athletic Performance:</Text>
+                    <Text style={styles.detailValue}>{athleticPerformanceDetails}</Text>
+                  </View>
+                )}
+                {selectedSecondaryGoals.includes('fun_social') && funSocialDetails && (
+                  <View style={styles.detailItem}>
+                    <Text style={[styles.detailLabel, { color: themeColor }]}>Fun & Social:</Text>
+                    <Text style={styles.detailValue}>{funSocialDetails}</Text>
+                  </View>
+                )}
+                {selectedSecondaryGoals.includes('injury_prevention') && injuryPreventionDetails && (
+                  <View style={styles.detailItem}>
+                    <Text style={[styles.detailLabel, { color: themeColor }]}>Injury Prevention:</Text>
+                    <Text style={styles.detailValue}>{injuryPreventionDetails}</Text>
+                  </View>
+                )}
+                {selectedSecondaryGoals.includes('maintain_flexibility') && flexibilityDetails && (
+                  <View style={styles.detailItem}>
+                    <Text style={[styles.detailLabel, { color: themeColor }]}>Flexibility:</Text>
+                    <Text style={styles.detailValue}>{flexibilityDetails}</Text>
+                  </View>
+                )}
+                {customGoals && (
+                  <View style={styles.detailItem}>
+                    <Text style={[styles.detailLabel, { color: themeColor }]}>Custom Goals:</Text>
+                    <Text style={styles.detailValue}>{customGoals}</Text>
+                  </View>
+                )}
+              </View>
+            </Animatable.View>
+          )}
+
+          {/* Save Button */}
+          <Animatable.View 
+            animation="slideInUp" 
+            delay={2000}
+            duration={600}
+            style={styles.summaryFooter}
+          >
+            <Animatable.View
+              animation="pulse"
+              delay={2400}
+              duration={800}
+              iterationCount={2}
+            >
+              <TouchableOpacity
+                style={[styles.summarySaveButton, { backgroundColor: themeColor }]}
+                onPress={handleSaveAndContinue}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.summarySaveButtonText}>Save & Continue</Text>
+              </TouchableOpacity>
+            </Animatable.View>
+            
+            {/* Retake Questions Button */}
+            <Animatable.View
+              animation="fadeIn"
+              delay={2600}
+              duration={400}
+            >
+              <TouchableOpacity
+                style={styles.retakeQuestionsButton}
+                onPress={handleRetakeQuestions}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="refresh" size={18} color="#71717a" />
+                <Text style={styles.retakeQuestionsButtonText}>Retake Questions</Text>
+              </TouchableOpacity>
+            </Animatable.View>
+          </Animatable.View>
+
+          </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -1368,6 +1432,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
           )}
         </TouchableOpacity>
       </View>
+
     </SafeAreaView>
   );
 }
@@ -1376,6 +1441,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0b',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   header: {
     flexDirection: 'row',
@@ -1867,15 +1942,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  titleWithInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  infoButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
   // Guide Modal Styles
   guideModal: {
     position: 'absolute',
@@ -2096,4 +2162,439 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#a1a1aa',
   },
+
+  // Modern Training Frequency Styles
+  modernFrequencyGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  modernFrequencyCard: {
+    width: '22%',
+    aspectRatio: 1,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#333333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  selectedModernCard: {
+    borderWidth: 2,
+    shadowColor: '#22d3ee',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  modernFrequencyNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  modernFrequencyLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#71717a',
+  },
+  modernCustomCard: {
+    width: '22%',
+    aspectRatio: 1,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#333333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  modernCustomLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#71717a',
+    marginTop: 4,
+  },
+  modernCustomInput: {
+    marginTop: 16,
+  },
+  customInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  modernCustomTextInput: {
+    backgroundColor: '#1a1a1b',
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 16,
+    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    width: 80,
+    marginRight: 12,
+  },
+  daysPerWeekLabel: {
+    fontSize: 16,
+    color: '#71717a',
+    fontWeight: '500',
+  },
+  modernCustomTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  customInputHint: {
+    fontSize: 14,
+    color: '#71717a',
+    fontStyle: 'italic',
+  },
+
+  // Modern Split Styles
+  modernSplitContainer: {
+    gap: 24,
+  },
+  modernSplitSection: {
+    marginBottom: 8,
+  },
+  modernSplitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  splitIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  modernSplitLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  modernSplitGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  modernSplitCard: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#333333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  selectedModernSplitCard: {
+    borderWidth: 2,
+    shadowColor: '#22d3ee',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  modernSplitNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+
+  // Summary Page Styles
+  heroSection: {
+    paddingBottom: 40,
+  },
+  summaryScrollView: {
+    flex: 1,
+  },
+  summaryScrollContainer: {
+    flexGrow: 1,
+  },
+  scrollableHeroSection: {
+    paddingBottom: 40,
+  },
+  summaryCardsContainer: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  retakeQuestionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  retakeQuestionsButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#71717a',
+    marginLeft: 6,
+  },
+  heroContent: {
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 8,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    color: '#000000',
+    opacity: 0.7,
+    marginBottom: 32,
+  },
+  mainGoalDisplay: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  mainGoalText: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#000000',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  mainGoalSubtext: {
+    fontSize: 16,
+    color: '#000000',
+    opacity: 0.7,
+  },
+  frequencyDisplay: {
+    alignItems: 'center',
+  },
+  frequencyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  summaryContent: {
+    flex: 1,
+    backgroundColor: '#0a0a0b',
+  },
+  summaryScrollContent: {
+    padding: 20,
+    paddingBottom: 100,
+  },
+  summaryCard: {
+    backgroundColor: '#1a1a1b',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  summaryCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 16,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  summaryItemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  summaryItemContent: {
+    flex: 1,
+  },
+  summaryItemLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#71717a',
+    marginBottom: 2,
+  },
+  summaryItemValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    lineHeight: 22,
+  },
+  scheduleItem: {
+    marginBottom: 16,
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  scheduleHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginLeft: 8,
+  },
+  scheduleValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#2a2a2b',
+    borderRadius: 12,
+  },
+  scheduleBreakdown: {
+    marginTop: 12,
+    gap: 8,
+  },
+  scheduleSubItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#2a2a2b',
+    borderRadius: 8,
+  },
+  scheduleSubIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#1a1a1b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  scheduleSubLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#d1d5db',
+  },
+  scheduleSubValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  splitDisplay: {
+    gap: 16,
+  },
+  splitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2b',
+    borderRadius: 12,
+    padding: 16,
+  },
+  splitIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  splitValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  secondaryGoalsList: {
+    gap: 12,
+  },
+  secondaryGoalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  goalDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  secondaryGoalText: {
+    fontSize: 16,
+    color: '#d1d5db',
+  },
+  specificDetails: {
+    gap: 16,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  detailLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 12,
+    minWidth: 80,
+  },
+  detailValue: {
+    flex: 1,
+    fontSize: 16,
+    color: '#d1d5db',
+    lineHeight: 22,
+  },
+  summaryFooter: {
+    marginHorizontal: 20,
+    marginTop: 32,
+    marginBottom: 40,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#1a1a1b',
+  },
+  summarySaveButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  summarySaveButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
+
 });

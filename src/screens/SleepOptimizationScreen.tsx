@@ -46,11 +46,34 @@ export default function SleepOptimizationScreen() {
   // Handle showing results if user has already completed
   const showResults = route.params?.showResults;
   
+  // Load saved data on component mount
+  useEffect(() => {
+    loadSavedData();
+  }, []);
+
   useEffect(() => {
     if (showResults) {
       loadAndShowResults();
     }
   }, [showResults]);
+
+  const loadSavedData = async () => {
+    try {
+      const savedResults = await WorkoutStorage.loadSleepOptimizationResults();
+      if (savedResults) {
+        // Restore form data
+        setFormData(savedResults.formData);
+        
+        // If questionnaire was completed, show results directly
+        if (savedResults.completedAt) {
+          setCurrentStep(3); // Go to results
+        }
+        // If partial data exists, user stays on current step with restored data
+      }
+    } catch (error) {
+      console.error('Failed to load saved sleep optimization data:', error);
+    }
+  };
 
   const loadAndShowResults = async () => {
     try {
@@ -103,7 +126,15 @@ export default function SleepOptimizationScreen() {
   };
 
   const handleSaveAndContinue = () => {
-    navigation.navigate('NutritionHome' as any);
+    // Context-aware navigation - determine which dashboard called this screen
+    const routeState = navigation.getState();
+    const previousRoute = routeState?.routes?.[routeState.index - 1];
+    
+    if (previousRoute?.name === 'WorkoutDashboard') {
+      navigation.navigate('WorkoutDashboard' as any);
+    } else {
+      navigation.navigate('NutritionHome' as any);
+    }
   };
 
   const timeOptions = [
@@ -216,6 +247,74 @@ export default function SleepOptimizationScreen() {
     };
   };
 
+  const calculateWorkoutTimes = () => {
+    if (!formData.bedtime || !formData.wakeTime) return null;
+
+    // Convert time strings to minutes from midnight
+    const timeToMinutes = (timeStr: string) => {
+      const [time, period] = timeStr.split(' ');
+      const [hours, minutes] = time.split(':').map(Number);
+      let totalMinutes = (hours % 12) * 60 + minutes;
+      if (period === 'PM' && hours !== 12) totalMinutes += 12 * 60;
+      if (period === 'AM' && hours === 12) totalMinutes = minutes;
+      return totalMinutes;
+    };
+
+    const minutesToTime = (minutes: number) => {
+      // Handle negative minutes and overflow properly
+      let adjustedMinutes = minutes;
+      if (adjustedMinutes < 0) {
+        adjustedMinutes += 24 * 60; // Add a day if negative
+      }
+      adjustedMinutes = adjustedMinutes % (24 * 60); // Handle overflow
+      
+      const hours = Math.floor(adjustedMinutes / 60);
+      const mins = adjustedMinutes % 60;
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${mins.toString().padStart(2, '0')} ${period}`;
+    };
+
+    const wakeMinutes = timeToMinutes(formData.wakeTime);
+    let bedMinutes = timeToMinutes(formData.bedtime);
+    
+    // Handle bedtime being early next day (e.g., 1 AM bedtime after 6 AM wake)
+    if (bedMinutes < wakeMinutes) {
+      bedMinutes += 24 * 60; // Add 24 hours
+    }
+
+    let optimalStart, optimalEnd, lightExerciseCutoff, moderateCutoff, intenseCutoff;
+
+    // Based on research: Morning exercise (30min-3hrs after wake) is optimal for circadian rhythm
+    optimalStart = wakeMinutes + 30; // 30 minutes after wake for body to activate
+    optimalEnd = wakeMinutes + 180; // 3 hours after wake for peak benefits
+
+    switch (formData.optimizationLevel) {
+      case 'minimal':
+        lightExerciseCutoff = bedMinutes - 90; // 1.5 hours before bed
+        moderateCutoff = bedMinutes - 120; // 2 hours before bed
+        intenseCutoff = bedMinutes - 180; // 3 hours before bed
+        break;
+      case 'moderate':
+        lightExerciseCutoff = bedMinutes - 120; // 2 hours before bed
+        moderateCutoff = bedMinutes - 180; // 3 hours before bed
+        intenseCutoff = bedMinutes - 240; // 4 hours before bed
+        break;
+      case 'maximum':
+        lightExerciseCutoff = bedMinutes - 180; // 3 hours before bed
+        moderateCutoff = bedMinutes - 240; // 4 hours before bed
+        intenseCutoff = bedMinutes - 300; // 5 hours before bed
+        break;
+    }
+
+    return {
+      optimalWindow: `${minutesToTime(optimalStart)} - ${minutesToTime(optimalEnd)}`,
+      lightCutoff: minutesToTime(lightExerciseCutoff),
+      moderateCutoff: minutesToTime(moderateCutoff),
+      intenseCutoff: minutesToTime(intenseCutoff)
+    };
+  };
+
   const renderTimeSelector = (title: string, value: string, options: string[], onSelect: (value: string) => void) => (
     <View style={styles.inputSection}>
       <Text style={[styles.inputLabel, { color: themeColor }]}>{title}</Text>
@@ -241,14 +340,20 @@ export default function SleepOptimizationScreen() {
     </View>
   );
 
-  const renderStep1 = () => (
-    <Animatable.View animation="fadeInUp" duration={300} style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <Text style={[styles.stepTitle, { color: themeColor }]}>Sleep Schedule</Text>
-        <Text style={styles.stepDescription}>
-          When do you typically sleep and wake up? This helps us optimize your meal timing for better circadian health.
-        </Text>
-      </View>
+  const renderStep1 = () => {
+    // Determine which dashboard called this screen
+    const routeState = navigation.getState();
+    const previousRoute = routeState?.routes?.[routeState.index - 1];
+    const isFromWorkoutDashboard = previousRoute?.name === 'WorkoutDashboard';
+    
+    return (
+      <Animatable.View animation="fadeInUp" duration={300} style={styles.stepContainer}>
+        <View style={styles.stepHeader}>
+          <Text style={[styles.stepTitle, { color: themeColor }]}>Sleep Schedule</Text>
+          <Text style={styles.stepDescription}>
+            When do you typically sleep and wake up? This helps us optimize your {isFromWorkoutDashboard ? 'workout timing' : 'meal timing'} for better circadian health.
+          </Text>
+        </View>
 
       {renderTimeSelector(
         'Typical bedtime',
@@ -264,16 +369,23 @@ export default function SleepOptimizationScreen() {
         (value) => setFormData(prev => ({ ...prev, wakeTime: value }))
       )}
     </Animatable.View>
-  );
+    );
+  };
 
-  const renderStep2 = () => (
-    <Animatable.View animation="fadeInUp" duration={300} style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <Text style={[styles.stepTitle, { color: themeColor }]}>Optimization Level</Text>
-        <Text style={styles.stepDescription}>
-          Choose how strict you want to be with meal timing optimization.
-        </Text>
-      </View>
+  const renderStep2 = () => {
+    // Determine which dashboard called this screen
+    const routeState = navigation.getState();
+    const previousRoute = routeState?.routes?.[routeState.index - 1];
+    const isFromWorkoutDashboard = previousRoute?.name === 'WorkoutDashboard';
+    
+    return (
+      <Animatable.View animation="fadeInUp" duration={300} style={styles.stepContainer}>
+        <View style={styles.stepHeader}>
+          <Text style={[styles.stepTitle, { color: themeColor }]}>Optimization Level</Text>
+          <Text style={styles.stepDescription}>
+            Choose how strict you want to be with {isFromWorkoutDashboard ? 'workout timing' : 'meal timing'} optimization.
+          </Text>
+        </View>
 
       <View style={styles.optimizationContainer}>
         {optimizationOptions.map((option) => (
@@ -320,27 +432,55 @@ export default function SleepOptimizationScreen() {
 
       {/* Why This Matters Section */}
       <View style={styles.infoSection}>
-        <Text style={[styles.infoTitle, { color: themeColor }]}>Why Meal Timing Matters</Text>
+        <Text style={[styles.infoTitle, { color: themeColor }]}>
+          Why {isFromWorkoutDashboard ? 'Workout' : 'Meal'} Timing Matters
+        </Text>
         <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <Ionicons name="restaurant" size={20} color={themeColor} />
-            <Text style={styles.infoText}>Optimal morning meals ensure proper energy for the day</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Ionicons name="time" size={20} color={themeColor} />
-            <Text style={styles.infoText}>Proper meal spacing aligns with your body's natural rhythms</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Ionicons name="moon" size={20} color={themeColor} />
-            <Text style={styles.infoText}>Stopping eating 3-4 hours before bed improves sleep quality</Text>
-          </View>
+          {isFromWorkoutDashboard ? (
+            <>
+              <View style={styles.infoItem}>
+                <Ionicons name="sunny" size={20} color={themeColor} />
+                <Text style={styles.infoText}>Morning workouts advance your circadian rhythm and improve sleep</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="fitness" size={20} color={themeColor} />
+                <Text style={styles.infoText}>Exercise raises core body temperature - timing prevents sleep disruption</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="moon" size={20} color={themeColor} />
+                <Text style={styles.infoText}>Proper workout cutoffs allow body temperature to normalize before bed</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.infoItem}>
+                <Ionicons name="restaurant" size={20} color={themeColor} />
+                <Text style={styles.infoText}>Optimal morning meals ensure proper energy for the day</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="time" size={20} color={themeColor} />
+                <Text style={styles.infoText}>Proper meal spacing aligns with your body's natural rhythms</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="moon" size={20} color={themeColor} />
+                <Text style={styles.infoText}>Stopping eating 3-4 hours before bed improves sleep quality</Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
     </Animatable.View>
-  );
+    );
+  };
 
   const renderResults = () => {
     const mealTimes = calculateMealTimes();
+    const workoutTimes = calculateWorkoutTimes();
+    
+    // Determine which dashboard called this screen
+    const routeState = navigation.getState();
+    const previousRoute = routeState?.routes?.[routeState.index - 1];
+    const isFromWorkoutDashboard = previousRoute?.name === 'WorkoutDashboard';
     
     return (
       <Animatable.View 
@@ -362,12 +502,68 @@ export default function SleepOptimizationScreen() {
         </Animatable.View>
 
         <View style={styles.resultsContent}>
-          <Text style={styles.resultsTitle}>Your Optimized Meal Schedule</Text>
+          <Text style={styles.resultsTitle}>
+            {isFromWorkoutDashboard ? 'Your Optimized Workout Schedule' : 'Your Optimized Meal Schedule'}
+          </Text>
           <Text style={styles.resultsDescription}>
-            Based on your sleep schedule and optimization level, here's your personalized meal timing:
+            Based on your sleep schedule and optimization level, here's your personalized {isFromWorkoutDashboard ? 'workout' : 'meal'} timing:
           </Text>
 
-          {mealTimes && (
+          {isFromWorkoutDashboard && workoutTimes ? (
+            <View style={styles.mealTimingContainer}>
+              <View style={styles.timingItem}>
+                <Ionicons name="sunny" size={24} color={themeColor} />
+                <View style={styles.timingContent}>
+                  <Text style={styles.timingLabel}>Optimal Workout Window</Text>
+                  <Text style={[styles.timingValue, { color: themeColor }]}>
+                    {workoutTimes.optimalWindow}
+                  </Text>
+                  <Text style={styles.timingDescription}>
+                    Best for circadian rhythm and performance
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.timingItem}>
+                <Ionicons name="walk" size={24} color={themeColor} />
+                <View style={styles.timingContent}>
+                  <Text style={styles.timingLabel}>Light Exercise Cutoff</Text>
+                  <Text style={[styles.timingValue, { color: themeColor }]}>
+                    {workoutTimes.lightCutoff}
+                  </Text>
+                  <Text style={styles.timingDescription}>
+                    Yoga, walking, stretching
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.timingItem}>
+                <Ionicons name="fitness" size={24} color={themeColor} />
+                <View style={styles.timingContent}>
+                  <Text style={styles.timingLabel}>Moderate Exercise Cutoff</Text>
+                  <Text style={[styles.timingValue, { color: themeColor }]}>
+                    {workoutTimes.moderateCutoff}
+                  </Text>
+                  <Text style={styles.timingDescription}>
+                    Weight training, moderate cardio
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.timingItem}>
+                <Ionicons name="barbell" size={24} color={themeColor} />
+                <View style={styles.timingContent}>
+                  <Text style={styles.timingLabel}>Intense Exercise Cutoff</Text>
+                  <Text style={[styles.timingValue, { color: themeColor }]}>
+                    {workoutTimes.intenseCutoff}
+                  </Text>
+                  <Text style={styles.timingDescription}>
+                    HIIT, heavy lifting, intense cardio
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : mealTimes && (
             <View style={styles.mealTimingContainer}>
               <View style={styles.timingItem}>
                 <Ionicons name="sunny" size={24} color={themeColor} />
@@ -888,6 +1084,12 @@ const styles = StyleSheet.create({
   timingValue: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  timingDescription: {
+    fontSize: 12,
+    color: '#71717a',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   levelBadge: {
     backgroundColor: '#27272a',

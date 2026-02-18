@@ -13,15 +13,14 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 interface WorkoutCompletionStatus {
   fitnessGoals: boolean;
-  experienceLevel: boolean;
-  availableEquipment: boolean;
-  timeAvailability: boolean;
-  workoutPreferences: boolean;
+  equipmentPreferences: boolean;
+  sleepOptimization: boolean;
 }
 
 interface QuestionnaireCard {
@@ -31,7 +30,7 @@ interface QuestionnaireCard {
   description: string;
   icon: string;
   navigationTarget: string;
-  completionKey: keyof WorkoutCompletionStatus;
+  completionKey?: keyof WorkoutCompletionStatus; // Optional for management screens
 }
 
 const questionnaires: QuestionnaireCard[] = [
@@ -45,40 +44,31 @@ const questionnaires: QuestionnaireCard[] = [
     completionKey: 'fitnessGoals',
   },
   {
-    id: 'experienceLevel',
-    title: 'Experience Level',
-    subtitle: 'Your fitness background',
-    description: 'Beginner, intermediate, or advanced',
-    icon: 'school-outline',
-    navigationTarget: 'ExperienceLevelQuestionnaire',
-    completionKey: 'experienceLevel',
-  },
-  {
-    id: 'availableEquipment',
-    title: 'Available Equipment',
-    subtitle: 'What you have access to',
-    description: 'Home gym, commercial gym, bodyweight',
+    id: 'equipmentPreferences',
+    title: 'Equipment & Preferences',
+    subtitle: 'Setup & exercise preferences',
+    description: 'Equipment, time, exercise likes/dislikes',
     icon: 'barbell-outline',
-    navigationTarget: 'AvailableEquipmentQuestionnaire',
-    completionKey: 'availableEquipment',
+    navigationTarget: 'EquipmentPreferencesQuestionnaire',
+    completionKey: 'equipmentPreferences',
   },
   {
-    id: 'timeAvailability',
-    title: 'Time Availability',
-    subtitle: 'How long you can workout',
-    description: '30 mins, 45 mins, 60+ mins per session',
-    icon: 'time-outline',
-    navigationTarget: 'TimeAvailabilityQuestionnaire',
-    completionKey: 'timeAvailability',
+    id: 'sleepOptimization',
+    title: 'Sleep Optimization',
+    subtitle: 'Optimize your recovery',
+    description: 'Sleep schedule, workout timing, recovery',
+    icon: 'moon-outline',
+    navigationTarget: 'SleepOptimizationScreen',
+    completionKey: 'sleepOptimization',
   },
   {
-    id: 'workoutPreferences',
-    title: 'Workout Preferences',
-    subtitle: 'Training style & frequency',
-    description: 'Split type, workout frequency, etc.',
-    icon: 'calendar-outline',
-    navigationTarget: 'WorkoutPreferencesQuestionnaire',
-    completionKey: 'workoutPreferences',
+    id: 'favoriteExercises',
+    title: 'Favorite Exercises',
+    subtitle: 'Manage your exercise library',
+    description: 'Add and organize exercises you love',
+    icon: 'heart-outline',
+    navigationTarget: 'FavoriteExercises',
+    // No completionKey - this is a management screen, not completable
   },
 ];
 
@@ -87,10 +77,8 @@ export default function WorkoutDashboardScreen() {
   const { themeColor, themeColorLight } = useTheme();
   const [completionStatus, setCompletionStatus] = useState<WorkoutCompletionStatus>({
     fitnessGoals: false,
-    experienceLevel: false,
-    availableEquipment: false,
-    timeAvailability: false,
-    workoutPreferences: false,
+    equipmentPreferences: false,
+    sleepOptimization: false,
   });
 
   useEffect(() => {
@@ -106,32 +94,68 @@ export default function WorkoutDashboardScreen() {
 
   const loadCompletionStatus = async () => {
     try {
-      // For now, we'll use placeholder logic
-      // In the future, this would load from actual questionnaire completion data
-      const mockCompletionStatus: WorkoutCompletionStatus = {
-        fitnessGoals: false,
-        experienceLevel: false,
-        availableEquipment: false,
-        timeAvailability: false,
-        workoutPreferences: false,
+      // Check if fitness goals questionnaire is completed
+      const fitnessGoalsDataString = await AsyncStorage.getItem('fitnessGoalsData');
+      let fitnessGoalsCompleted = false;
+      
+      if (fitnessGoalsDataString) {
+        const fitnessGoalsData = JSON.parse(fitnessGoalsDataString);
+        fitnessGoalsCompleted = !!(fitnessGoalsData && fitnessGoalsData.completedAt);
+      }
+
+      // Check if equipment preferences questionnaire is completed
+      const equipmentPreferencesDataString = await AsyncStorage.getItem('equipmentPreferencesData');
+      let equipmentPreferencesCompleted = false;
+      
+      if (equipmentPreferencesDataString) {
+        const equipmentPreferencesData = JSON.parse(equipmentPreferencesDataString);
+        equipmentPreferencesCompleted = !!(equipmentPreferencesData && equipmentPreferencesData.completedAt);
+      }
+
+      // Check if sleep optimization is completed (shared with nutrition)
+      const sleepOptimizationDataString = await AsyncStorage.getItem('sleep_optimization_results');
+      let sleepOptimizationCompleted = false;
+      
+      if (sleepOptimizationDataString) {
+        const sleepOptimizationData = JSON.parse(sleepOptimizationDataString);
+        sleepOptimizationCompleted = !!(sleepOptimizationData && sleepOptimizationData.completedAt);
+      }
+      
+      const completionStatus: WorkoutCompletionStatus = {
+        fitnessGoals: fitnessGoalsCompleted,
+        equipmentPreferences: equipmentPreferencesCompleted,
+        sleepOptimization: sleepOptimizationCompleted,
       };
-      setCompletionStatus(mockCompletionStatus);
+      setCompletionStatus(completionStatus);
     } catch (error) {
       console.error('Failed to load workout completion status:', error);
+      // Set default values on error
+      setCompletionStatus({
+        fitnessGoals: false,
+        equipmentPreferences: false,
+        sleepOptimization: false,
+      });
     }
   };
 
   const handleQuestionnairePress = (questionnaire: QuestionnaireCard) => {
     if (questionnaire.id === 'fitnessGoals') {
       navigation.navigate('FitnessGoalsQuestionnaire' as any);
+    } else if (questionnaire.id === 'equipmentPreferences') {
+      navigation.navigate('EquipmentPreferencesQuestionnaire' as any);
+    } else if (questionnaire.id === 'favoriteExercises') {
+      navigation.navigate('FavoriteExercises' as any);
+    } else if (questionnaire.id === 'sleepOptimization') {
+      navigation.navigate('SleepOptimizationScreen' as any);
     } else {
-      // For other questionnaires, show coming soon alert
+      // Fallback for any future questionnaires
       alert(`${questionnaire.title} questionnaire coming soon!`);
     }
   };
 
   const renderQuestionnaireCard = (questionnaire: QuestionnaireCard, index: number) => {
-    const isCompleted = completionStatus[questionnaire.completionKey];
+    const isCompleted = questionnaire.completionKey ? completionStatus[questionnaire.completionKey] : false;
+    const isManagementScreen = !questionnaire.completionKey;
     
     return (
       <TouchableOpacity
@@ -145,7 +169,13 @@ export default function WorkoutDashboardScreen() {
       >
         {/* Completion Status Indicator */}
         <View style={styles.statusContainer}>
-          {isCompleted ? (
+          {isManagementScreen ? (
+            <Ionicons 
+              name="chevron-forward" 
+              size={24} 
+              color="#71717a"
+            />
+          ) : isCompleted ? (
             <Ionicons 
               name="checkmark-circle" 
               size={24} 
@@ -173,7 +203,8 @@ export default function WorkoutDashboardScreen() {
               {questionnaire.subtitle}
             </Text>
             <Text style={[styles.cardDescription, { color: isCompleted ? themeColor : '#71717a' }]}>
-              {isCompleted ? 'Completed' : questionnaire.description}
+              {isManagementScreen ? questionnaire.description : 
+               isCompleted ? 'Completed' : questionnaire.description}
             </Text>
           </View>
           
@@ -189,9 +220,9 @@ export default function WorkoutDashboardScreen() {
     );
   };
 
-  // Count completed questionnaires
+  // Count completed questionnaires (exclude management screens)
   const completedCount = Object.values(completionStatus).filter(Boolean).length;
-  const totalQuestionnaires = questionnaires.length;
+  const totalQuestionnaires = questionnaires.filter(q => q.completionKey).length;
 
   return (
     <SafeAreaView style={styles.container}>

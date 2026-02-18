@@ -44,6 +44,7 @@ import NutritionHomeScreen from '../screens/NutritionHomeScreen';
 import NutritionDashboardScreen from '../screens/NutritionDashboardScreen';
 import WorkoutDashboardScreen from '../screens/WorkoutDashboardScreen';
 import FitnessGoalsQuestionnaireScreen from '../screens/FitnessGoalsQuestionnaireScreen';
+import EquipmentPreferencesQuestionnaireScreen from '../screens/EquipmentPreferencesQuestionnaireScreen';
 import MealCalendarScreen from '../screens/MealCalendarScreen';
 import MealDetailScreen from '../screens/MealDetailScreen';
 import GroceryListScreen from '../screens/GroceryListScreen';
@@ -52,6 +53,8 @@ import FavoriteMealsScreen from '../screens/FavoriteMealsScreen';
 import AddMealScreen from '../screens/AddMealScreen';
 import ManualMealEntryScreen from '../screens/ManualMealEntryScreen';
 import MealPlanHelpScreen from '../screens/MealPlanHelpScreen';
+import FavoriteExercisesScreen from '../screens/FavoriteExercisesScreen';
+import AddExerciseScreen from '../screens/AddExerciseScreen';
 import WeightTrackerScreen from '../screens/WeightTrackerScreen';
 
 export type RootStackParamList = {
@@ -134,6 +137,7 @@ export type RootStackParamList = {
   NutritionDashboard: undefined;
   WorkoutDashboard: undefined;
   FitnessGoalsQuestionnaire: undefined;
+  EquipmentPreferencesQuestionnaire: undefined;
   MealCalendar: undefined;
   MealDetail: {
     meal: any;
@@ -146,6 +150,8 @@ export type RootStackParamList = {
   AddMeal: undefined;
   ManualMealEntry: undefined;
   MealPlanHelp: undefined;
+  FavoriteExercises: undefined;
+  AddExercise: undefined;
   WeightTracker: undefined;
 };
 
@@ -417,6 +423,14 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 }}
               />
               <RootStack.Screen 
+                name="EquipmentPreferencesQuestionnaire" 
+                component={EquipmentPreferencesQuestionnaireScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                }}
+              />
+              <RootStack.Screen 
                 name="MealCalendar" 
                 component={MealCalendarScreen}
                 options={{
@@ -470,6 +484,21 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={MealPlanHelpScreen}
                 options={{
                   headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
+                name="FavoriteExercises" 
+                component={FavoriteExercisesScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
+                name="AddExercise" 
+                component={AddExerciseScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
                 }}
               />
               <RootStack.Screen 
