@@ -16,20 +16,26 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { useMealPlanning } from '../contexts/MealPlanningContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-export default function AddMealScreen() {
+interface FavoriteExercise {
+  id: string;
+  name: string;
+  category: 'strength' | 'cardio' | 'flexibility' | 'sports';
+  muscleGroups: string[];
+  addedAt: string;
+}
+
+export default function AddExerciseSelectionScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { themeColor } = useTheme();
-  const { addToFavorites } = useMealPlanning();
   
   const [showJsonModal, setShowJsonModal] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [importedMealName, setImportedMealName] = useState('');
-  const [importedMealNutrition, setImportedMealNutrition] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [importedExerciseName, setImportedExerciseName] = useState('');
   const [uploadMode, setUploadMode] = useState(false);
   const [modalScale] = useState(new Animated.Value(0));
   const [modalOpacity] = useState(new Animated.Value(0));
@@ -37,7 +43,7 @@ export default function AddMealScreen() {
   const handleJsonImport = async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
-      Alert.alert('Clipboard Empty', 'Copy your meal JSON first', [{ text: 'OK' }]);
+      Alert.alert('Clipboard Empty', 'Copy your exercise JSON first', [{ text: 'OK' }]);
       return;
     }
 
@@ -63,85 +69,71 @@ export default function AddMealScreen() {
   };
 
   const handleManualAdd = () => {
-    navigation.navigate('ManualMealEntry' as any);
+    navigation.navigate('ManualExerciseEntry' as any);
   };
 
   const processJsonImport = async (text: string) => {
     try {
-      const mealData = JSON.parse(text.trim());
+      const exerciseData = JSON.parse(text.trim());
       
       // Basic validation
-      if (!mealData.name) {
-        Alert.alert('Invalid JSON', 'Please ensure the JSON contains a meal name');
+      if (!exerciseData.name) {
+        Alert.alert('Invalid JSON', 'Please ensure the JSON contains an exercise name');
         return;
       }
 
-      // Create a complete meal object matching our Meal interface
-      const completeMeal = {
+      // Create a complete exercise object
+      const completeExercise: FavoriteExercise = {
         id: 'imported_' + Date.now(),
-        type: mealData.type || 'breakfast',
-        name: mealData.name,
-        description: `Imported ${mealData.type || 'meal'} recipe`,
-        time: '12:00',
-        ingredients: (mealData.ingredients || []).map((ing: any, index: number) => ({
-          id: `ing_${index}_${Date.now()}`,
-          name: typeof ing === 'string' ? ing : ing.name || ing.item || '',
-          amount: typeof ing === 'string' ? 1 : (parseFloat(ing.amount) || 1),
-          unit: typeof ing === 'string' ? 'item' : (ing.unit || 'item'),
-          category: 'other' as const,
-          estimatedCost: 0,
-          isOptional: false,
-        })),
-        instructions: (mealData.instructions || []).map((inst: any, index: number) => ({
-          step: index + 1,
-          instruction: typeof inst === 'string' ? inst : inst.instruction || inst,
-        })),
-        nutritionInfo: {
-          calories: mealData.nutritionInfo?.calories || 0,
-          protein: mealData.nutritionInfo?.protein || 0,
-          carbs: mealData.nutritionInfo?.carbs || 0,
-          fat: mealData.nutritionInfo?.fat || 0,
-          fiber: 0,
-          sugar: 0,
-          sodium: 0,
-        },
-        difficulty: 'easy' as const,
-        prepTime: mealData.prepTime || 0,
-        cookTime: mealData.cookTime || 0,
-        servings: 1,
-        tags: ['imported'] as const,
-        isFavorite: false,
+        name: exerciseData.name,
+        category: exerciseData.category || 'strength',
+        muscleGroups: exerciseData.muscleGroups || ['Full Body'],
+        addedAt: new Date().toISOString(),
       };
 
-      // Add meal to favorites
-      await addToFavorites(completeMeal);
+      // Load existing favorites
+      const existingData = await AsyncStorage.getItem('favoriteExercises');
+      const existingExercises: FavoriteExercise[] = existingData ? JSON.parse(existingData) : [];
 
-      // Show success modal
-      setImportedMealName(completeMeal.name);
-      setImportedMealNutrition({
-        calories: completeMeal.nutritionInfo.calories,
-        protein: completeMeal.nutritionInfo.protein,
-        carbs: completeMeal.nutritionInfo.carbs,
-        fat: completeMeal.nutritionInfo.fat,
-      });
-      setShowSuccessModal(true);
+      // Check if exercise already exists
+      const exerciseExists = existingExercises.some(
+        exercise => exercise.name.toLowerCase().trim() === completeExercise.name.toLowerCase().trim()
+      );
+
+      if (exerciseExists) {
+        Alert.alert('Duplicate Exercise', 'This exercise is already in your favorites');
+        return;
+      }
+
+      // Add to favorites
+      const updatedExercises = [completeExercise, ...existingExercises];
+      await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
+
+      setImportedExerciseName(completeExercise.name);
+      setShowJsonModal(false);
+      showSuccessAnimation();
       
-      // Animate modal entrance
-      Animated.parallel([
-        Animated.timing(modalScale, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(modalOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]).start();
     } catch (error) {
       Alert.alert('Invalid JSON', 'Please check your JSON format and try again.');
     }
+  };
+
+  const showSuccessAnimation = () => {
+    setShowSuccessModal(true);
+    
+    // Animate modal entrance
+    Animated.parallel([
+      Animated.timing(modalScale, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalOpacity, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   const handleSuccessModalClose = () => {
@@ -193,7 +185,7 @@ export default function AddMealScreen() {
           activeOpacity={0.9}
         >
           <Ionicons 
-            name={uploadMode ? "cloud-upload" : "restaurant"} 
+            name={uploadMode ? "cloud-upload" : "barbell"} 
             size={40} 
             color="#0a0a0b" 
           />
@@ -201,7 +193,7 @@ export default function AddMealScreen() {
             {uploadMode ? "Upload File" : "Paste & Import"}
           </Text>
           <Text style={styles.mainButtonSubtext}>
-            {uploadMode ? "Choose JSON file from device" : "Paste your meal JSON"}
+            {uploadMode ? "Choose JSON file from device" : "Paste your exercise JSON"}
           </Text>
         </TouchableOpacity>
 
@@ -223,10 +215,10 @@ export default function AddMealScreen() {
         <View style={styles.helpLinkWrapper}>
           <TouchableOpacity 
             style={styles.helpLink}
-            onPress={() => navigation.navigate('MealPlanHelp' as any)}
+            onPress={() => navigation.navigate('ExerciseHelp' as any)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.helpLinkText, { color: themeColor }]}>How to add a custom meal to favorites with AI?</Text>
+            <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom exercise with AI?</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -240,14 +232,14 @@ export default function AddMealScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.jsonModalContainer}>
-            <Text style={styles.jsonModalTitle}>Import Recipe JSON</Text>
+            <Text style={styles.jsonModalTitle}>Import Exercise JSON</Text>
             <Text style={styles.jsonModalSubtitle}>
-              Paste JSON recipe data from ChatGPT, Claude, or other AI tools
+              Paste JSON exercise data from ChatGPT, Claude, or other AI tools
             </Text>
             
             <TextInput
               style={styles.jsonInput}
-              placeholder="Paste your JSON recipe data here..."
+              placeholder="Paste your JSON exercise data here..."
               placeholderTextColor="#71717a"
               value={jsonInput}
               onChangeText={setJsonInput}
@@ -267,10 +259,10 @@ export default function AddMealScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.jsonImportButton, { backgroundColor: themeColor }]}
-                onPress={processJsonImport}
+                onPress={() => processJsonImport(jsonInput)}
                 disabled={!jsonInput.trim()}
               >
-                <Text style={styles.jsonImportText}>Import Meal</Text>
+                <Text style={styles.jsonImportText}>Import Exercise</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -318,21 +310,16 @@ export default function AddMealScreen() {
 
             {/* Main Content */}
             <View style={styles.successMainContent}>
-              <Text style={styles.successTitle}>Meal Ready</Text>
-              <Text style={styles.successMealName}>{importedMealName}</Text>
+              <Text style={styles.successTitle}>Exercise Ready</Text>
+              <Text style={styles.successExerciseName}>{importedExerciseName}</Text>
               
               {/* Summary Card */}
               <View style={styles.successSummaryCard}>
                 <View style={styles.successSummaryRow}>
-                  <Text style={styles.successSummaryLabel}>Macros</Text>
+                  <Text style={styles.successSummaryLabel}>Status</Text>
                   <Text style={[styles.successSummaryValue, { color: themeColor }]}>
-                    P: {importedMealNutrition.protein}g  C: {importedMealNutrition.carbs}g  F: {importedMealNutrition.fat}g
+                    Added to Favorites
                   </Text>
-                </View>
-                <View style={styles.successSummaryDivider} />
-                <View style={styles.successSummaryRow}>
-                  <Text style={styles.successSummaryLabel}>Calories</Text>
-                  <Text style={[styles.successSummaryValue, { color: themeColor }]}>{importedMealNutrition.calories} cal</Text>
                 </View>
               </View>
             </View>
@@ -600,7 +587,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: 0.5,
   },
-  successMealName: {
+  successExerciseName: {
     fontSize: 32,
     fontWeight: '800',
     color: '#ffffff',
@@ -622,11 +609,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 8,
-  },
-  successSummaryDivider: {
-    height: 1,
-    backgroundColor: 'rgba(113, 113, 122, 0.2)',
-    marginVertical: 4,
   },
   successSummaryLabel: {
     fontSize: 14,

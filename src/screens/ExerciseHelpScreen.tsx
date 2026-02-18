@@ -16,7 +16,7 @@ import * as Clipboard from 'expo-clipboard';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-export default function MealPlanHelpScreen() {
+export default function ExerciseHelpScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { themeColor } = useTheme();
 
@@ -24,66 +24,42 @@ export default function MealPlanHelpScreen() {
     await Clipboard.setStringAsync(text);
   };
 
-  const mealCreationPrompt = `Create a detailed recipe with the following information:
+  const exerciseCreationPrompt = `Create a detailed workout exercise with the following information:
 
-Recipe Name: [Name of the dish]
-Type: [breakfast/lunch/dinner/snack]
-Prep Time: [Time in minutes]
-Cook Time: [Time in minutes]
-Servings: [Number of servings]
-Difficulty: [easy/medium/hard]
+Exercise Name: [Name of the exercise]
+Category: [strength/cardio/flexibility/sports]
+Muscle Groups: [List of primary muscle groups targeted]
+Equipment Needed: [List any equipment required, or "none" for bodyweight]
+Instructions: [Step-by-step instructions for performing the exercise]
+Form Cues: [Important form and safety tips]
+Modifications: [Easier and harder variations]
+Sets/Reps: [Recommended sets and repetitions]
+Rest Time: [Recommended rest between sets]
 
-Ingredients:
-- [Ingredient 1 with amount and unit]
-- [Ingredient 2 with amount and unit]
-- [Continue for all ingredients]
+Please provide a comprehensive exercise that is safe and effective for fitness enthusiasts.`;
 
-Instructions:
-1. [Step 1 instruction]
-2. [Step 2 instruction]
-3. [Continue for all steps]
-
-Nutrition Information:
-- Calories: [per serving]
-- Protein: [grams]
-- Carbohydrates: [grams]
-- Fat: [grams]
-- Fiber: [grams]
-
-Tags: [List relevant tags like "vegetarian", "quick", "healthy", etc.]
-
-Please provide a complete recipe that is delicious and nutritious.`;
-
-  const jsonConversionPrompt = `Convert the recipe information above to JSON format using this exact structure:
+  const jsonConversionPrompt = `Convert the exercise information above to JSON format using this exact structure:
 
 {
-  "name": "Recipe Name",
-  "type": "breakfast", // or "lunch", "dinner", "snack"
-  "prepTime": 15,
-  "cookTime": 20,
-  "servings": 4,
-  "difficulty": "easy", // or "medium", "hard"
-  "ingredients": [
-    {
-      "name": "Ingredient name",
-      "amount": 2,
-      "unit": "cups"
-    }
-  ],
+  "name": "Exercise Name",
+  "category": "strength", // or "cardio", "flexibility", "sports"
+  "muscleGroups": ["Muscle Group 1", "Muscle Group 2"],
+  "equipment": ["Equipment 1", "Equipment 2"],
   "instructions": [
-    {
-      "step": 1,
-      "instruction": "Step instruction"
-    }
+    "Step 1 instruction",
+    "Step 2 instruction",
+    "Step 3 instruction"
   ],
-  "nutritionInfo": {
-    "calories": 300,
-    "protein": 25,
-    "carbs": 30,
-    "fat": 12,
-    "fiber": 5
+  "formCues": [
+    "Form tip 1",
+    "Form tip 2"
+  ],
+  "modifications": {
+    "easier": "Easier variation description",
+    "harder": "Harder variation description"
   },
-  "tags": ["tag1", "tag2"]
+  "setsReps": "3 sets of 8-12 reps",
+  "restTime": "60-90 seconds"
 }
 
 Only return the JSON, nothing else.`;
@@ -96,8 +72,8 @@ Only return the JSON, nothing else.`;
           <Ionicons name="close" size={24} color="#ffffff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Create Meal with AI</Text>
-          <Text style={styles.headerSubtitle}>3 simple steps to add custom meals</Text>
+          <Text style={styles.headerTitle}>Create Exercise with AI</Text>
+          <Text style={styles.headerSubtitle}>3 simple steps to add custom exercises</Text>
         </View>
       </View>
 
@@ -108,20 +84,20 @@ Only return the JSON, nothing else.`;
             <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
               <Text style={styles.stepNumberText}>1</Text>
             </View>
-            <Text style={styles.stepTitle}>Create Your Meal</Text>
+            <Text style={styles.stepTitle}>Create Your Exercise</Text>
           </View>
           
           <Text style={styles.stepDescription}>
-            Send this prompt to get AI help creating your perfect meal
+            Send this prompt to get AI help creating your perfect exercise
           </Text>
           
           <TouchableOpacity 
             style={[styles.promptButton, { backgroundColor: themeColor }]}
-            onPress={() => copyToClipboard(mealCreationPrompt)}
+            onPress={() => copyToClipboard(exerciseCreationPrompt)}
             activeOpacity={0.8}
           >
             <Ionicons name="copy-outline" size={20} color="#000000" />
-            <Text style={styles.promptButtonText}>Copy Meal Creation Prompt</Text>
+            <Text style={styles.promptButtonText}>Copy Exercise Creation Prompt</Text>
           </TouchableOpacity>
         </View>
 
@@ -135,7 +111,7 @@ Only return the JSON, nothing else.`;
           </View>
           
           <Text style={styles.stepDescription}>
-            When ready, send this prompt to convert your meal to JSON format
+            When ready, send this prompt to convert your exercise to JSON format
           </Text>
           
           <TouchableOpacity 

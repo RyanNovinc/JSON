@@ -54,7 +54,9 @@ import AddMealScreen from '../screens/AddMealScreen';
 import ManualMealEntryScreen from '../screens/ManualMealEntryScreen';
 import MealPlanHelpScreen from '../screens/MealPlanHelpScreen';
 import FavoriteExercisesScreen from '../screens/FavoriteExercisesScreen';
-import AddExerciseScreen from '../screens/AddExerciseScreen';
+import AddExerciseSelectionScreen from '../screens/AddExerciseSelectionScreen';
+import ManualExerciseEntryScreen from '../screens/ManualExerciseEntryScreen';
+import ExerciseHelpScreen from '../screens/ExerciseHelpScreen';
 import WeightTrackerScreen from '../screens/WeightTrackerScreen';
 
 export type RootStackParamList = {
@@ -152,6 +154,8 @@ export type RootStackParamList = {
   MealPlanHelp: undefined;
   FavoriteExercises: undefined;
   AddExercise: undefined;
+  ManualExerciseEntry: undefined;
+  ExerciseHelp: undefined;
   WeightTracker: undefined;
 };
 
@@ -495,7 +499,23 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="AddExercise" 
-                component={AddExerciseScreen}
+                component={AddExerciseSelectionScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                }}
+              />
+              <RootStack.Screen 
+                name="ManualExerciseEntry" 
+                component={ManualExerciseEntryScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                }}
+              />
+              <RootStack.Screen 
+                name="ExerciseHelp" 
+                component={ExerciseHelpScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',

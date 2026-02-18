@@ -19,8 +19,11 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 interface FavoriteExercise {
   id: string;
   name: string;
-  category: 'strength' | 'cardio' | 'flexibility' | 'sports';
+  category: 'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom';
+  customCategory?: string;
   muscleGroups: string[];
+  instructions?: string;
+  notes?: string;
   addedAt: string;
 }
 
@@ -105,12 +108,13 @@ export default function FavoriteExercisesScreen() {
     return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
   });
 
-  const getCategoryIcon = (category: 'strength' | 'cardio' | 'flexibility' | 'sports') => {
+  const getCategoryIcon = (category: 'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom') => {
     switch (category) {
-      case 'strength': return 'barbell';
+      case 'gym': return 'barbell';
+      case 'bodyweight': return 'body';
+      case 'flexibility': return 'leaf';
       case 'cardio': return 'heart';
-      case 'flexibility': return 'body';
-      case 'sports': return 'football';
+      case 'custom': return 'add-circle';
     }
   };
 
@@ -120,7 +124,21 @@ export default function FavoriteExercisesScreen() {
       onPress={() => {
         // Navigate to exercise detail if we have one
         // For now just show info
-        Alert.alert(exercise.name, `Category: ${exercise.category}\nMuscle Groups: ${exercise.muscleGroups.join(', ')}`);
+        const categoryDisplay = exercise.category === 'custom' && exercise.customCategory 
+          ? exercise.customCategory 
+          : exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1);
+        
+        let alertMessage = `Category: ${categoryDisplay}\nMuscle Groups: ${exercise.muscleGroups.join(', ')}`;
+        
+        if (exercise.instructions) {
+          alertMessage += `\n\nInstructions:\n${exercise.instructions}`;
+        }
+        
+        if (exercise.notes) {
+          alertMessage += `\n\nNotes:\n${exercise.notes}`;
+        }
+        
+        Alert.alert(exercise.name, alertMessage);
       }}
       activeOpacity={0.8}
     >
@@ -145,7 +163,9 @@ export default function FavoriteExercisesScreen() {
           </View>
           
           <Text style={[styles.exerciseCategory, { color: themeColor }]}>
-            {exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1)}
+            {exercise.category === 'custom' && exercise.customCategory 
+              ? exercise.customCategory 
+              : exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1)}
           </Text>
           
           <View style={styles.muscleGroupsRow}>
