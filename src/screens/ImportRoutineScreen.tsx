@@ -9,6 +9,7 @@ import {
   Modal,
   Animated,
   Linking,
+  SafeAreaView,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
@@ -17,7 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
-import { getAIPrompt, exerciseGlossary } from '../data/workoutPrompt';
+import { getAIPrompt, exerciseGlossary, QuestionnaireData, generateProgramSpecs } from '../data/workoutPrompt';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // import * as Crypto from 'expo-crypto';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -508,6 +510,79 @@ export default function ImportRoutineScreen() {
     });
   };
 
+  const loadQuestionnaireData = async (): Promise<QuestionnaireData> => {
+    try {
+      // Load all questionnaire data from different AsyncStorage keys
+      const [
+        fitnessGoalsData,
+        equipmentPreferencesData,
+        favoriteExercisesData,
+      ] = await Promise.all([
+        AsyncStorage.getItem('fitnessGoalsData'),
+        AsyncStorage.getItem('equipmentPreferencesData'),
+        AsyncStorage.getItem('favoriteExercises'),
+      ]);
+
+      // Parse the JSON data
+      const fitnessGoals = fitnessGoalsData ? JSON.parse(fitnessGoalsData) : {};
+      const equipmentPrefs = equipmentPreferencesData ? JSON.parse(equipmentPreferencesData) : {};
+      const favoriteExercises = favoriteExercisesData ? JSON.parse(favoriteExercisesData) : [];
+
+      // Consolidate all data into the expected QuestionnaireData format
+      const consolidatedData: QuestionnaireData = {
+        // From fitnessGoalsData
+        primaryGoal: fitnessGoals.primaryGoal,
+        secondaryGoals: fitnessGoals.secondaryGoals,
+        specificSport: fitnessGoals.specificSport,
+        athleticPerformanceDetails: fitnessGoals.athleticPerformanceDetails,
+        funSocialDetails: fitnessGoals.funSocialDetails,
+        injuryPreventionDetails: fitnessGoals.injuryPreventionDetails,
+        flexibilityDetails: fitnessGoals.flexibilityDetails,
+        customGoals: fitnessGoals.customGoals,
+        totalTrainingDays: fitnessGoals.totalTrainingDays,
+        gymTrainingDays: fitnessGoals.gymTrainingDays,
+        otherTrainingDays: fitnessGoals.otherTrainingDays,
+        customFrequency: fitnessGoals.customFrequency,
+        priorityMuscleGroups: fitnessGoals.priorityMuscleGroups,
+        customMuscleGroup: fitnessGoals.customMuscleGroup,
+        movementLimitations: fitnessGoals.movementLimitations,
+        customLimitation: fitnessGoals.customLimitation,
+        trainingStylePreference: fitnessGoals.trainingStylePreference,
+        customTrainingStyle: fitnessGoals.customTrainingStyle,
+        trainingExperience: fitnessGoals.trainingExperience,
+        programDuration: fitnessGoals.programDuration,
+        customDuration: fitnessGoals.customDuration,
+        fitnessInfluencer: fitnessGoals.fitnessInfluencer,
+        customInfluencer: fitnessGoals.customInfluencer,
+
+        // From equipmentPreferencesData
+        selectedEquipment: equipmentPrefs.selectedEquipment,
+        specificEquipment: equipmentPrefs.specificEquipment,
+        unavailableEquipment: equipmentPrefs.unavailableEquipment,
+        workoutDuration: equipmentPrefs.workoutDuration,
+        restTimePreference: equipmentPrefs.restTimePreference,
+        likedExercises: equipmentPrefs.likedExercises,
+        dislikedExercises: equipmentPrefs.dislikedExercises,
+        selectedFavoriteExercises: equipmentPrefs.selectedFavoriteExercises,
+
+        // From favoriteExercises (this is an array of exercise objects)
+        // Note: This data is already handled in selectedFavoriteExercises above
+      };
+
+      // Filter out undefined/null values
+      const cleanedData = Object.fromEntries(
+        Object.entries(consolidatedData).filter(([key, value]) => value !== undefined && value !== null && value !== '')
+      );
+
+      console.log('Consolidated questionnaire data:', cleanedData);
+      return cleanedData;
+    } catch (error) {
+      console.error('Error loading questionnaire data:', error);
+      // Return empty object if loading fails
+      return {};
+    }
+  };
+
   const handleCancel = () => {
     navigation.goBack();
   };
@@ -523,24 +598,21 @@ export default function ImportRoutineScreen() {
 
   if (showInstructions) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.infoButton} />
-          <Text style={styles.instructionsTitle}>How It Works</Text>
-          <View style={styles.closeButtonWrapper}>
-            <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.closeButton}>
-              <Ionicons name="close" size={28} color="#71717a" />
+      <SafeAreaView style={styles.container}>
+        <ScrollView 
+          style={styles.instructionsScrollView}
+          contentContainerStyle={styles.instructionsContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.backButton}>
+              <Ionicons name="close" size={24} color="#ffffff" />
             </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>How It Works</Text>
+              <Text style={styles.headerSubtitle}>3 simple steps to create custom programs</Text>
+            </View>
           </View>
-        </View>
-        
-        <View style={styles.instructionsContainer}>
-          <ScrollView 
-            style={styles.instructionsScrollView}
-            contentContainerStyle={styles.instructionsContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={{ height: 60 }} />
             <View style={styles.stepsContainer}>
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
@@ -555,49 +627,69 @@ export default function ImportRoutineScreen() {
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const planningPrompt = `You are a fitness coach helping users design a workout program for a fitness app called 'JSON'.
+                    const questionnaireData = await loadQuestionnaireData();
+                    
+                    const planningPrompt = `I'm using a fitness training app called JSON.fit and need help creating a personalized workout program.
 
-# Workout Program Planning
+**QUICK CREATION INSTRUCTIONS:**
+1. **STANDARD KNOWLEDGE** - Use your existing knowledge base for exercises, training methods, and program design
+2. **EVIDENCE-BASED APPROACH** - Base recommendations on established training principles and scientific research
 
-Help me design a workout program by asking about:
+**PROGRAM REQUIREMENTS:**
+1. **GOAL OPTIMIZATION** - Design specifically for the stated primary goal with supporting methods
+2. **EXPERIENCE-APPROPRIATE** - Match complexity, volume, and progression to training experience level
+3. **EQUIPMENT CONSTRAINTS** - Only include exercises that can be performed with available equipment
+4. **REALISTIC SCHEDULING** - Fit within stated training frequency and time constraints
+5. **PROGRESSIVE STRUCTURE** - Include clear progression plan across the program duration
+6. **INCLUDE DETAILED STRUCTURE** - Provide complete weekly breakdown, exercise selection rationale, and progression scheme
 
-- Days per week I can commit to
-- Primary goal (muscle growth, strength, fat loss, athletic performance, general fitness)
-- Experience level (beginner, intermediate, advanced)
-- Equipment access (full gym, home gym, dumbbells only, bodyweight only)
-- Normal session length (when I have full time)
-- Quick session length (when I'm rushed)
-- Program duration (4 weeks, 8 weeks, 12 weeks, 52 weeks)
-- Any injuries or limitations
-- Priority muscle groups or weak points
-- Exercises I love or want included
-- Exercises I hate or want to avoid
+**USER QUESTIONNAIRE RESPONSES:**
+${generateProgramSpecs(questionnaireData)}
 
-Once you have all the information, output this EXACT format:
+**PROGRAM DESIGN REQUIREMENTS:**
+Please create a detailed workout program that:
+1. **MATCHES TRAINING GOAL** - Optimizes for the primary objective with appropriate methods
+2. **RESPECTS EXPERIENCE LEVEL** - Uses suitable complexity, volume, and exercise selection
+3. **WORKS WITH AVAILABLE EQUIPMENT** - Only includes exercises possible with stated equipment
+4. **FITS TIME CONSTRAINTS** - Stays within preferred session lengths and weekly frequency
+5. **INCLUDES CLEAR PROGRESSION** - Shows how intensity/volume/complexity advances over time
+6. **PROVIDES COMPLETE STRUCTURE** - Details each workout with sets, reps, rest periods, and notes
+7. **SPECIFY MUSCLE TARGETING** - For each exercise, clearly identify which muscles are PRIMARY targets (main movers, count for volume) and which are SECONDARY (assisting/stabilizing, don't count toward volume). This is critical for proper volume tracking.
 
----
-**PROGRAM SPECS**
-- Days/week: [number]
-- Goal: [goal]
-- Experience: [beginner/intermediate/advanced]
-- Equipment: [full gym/home gym/dumbbells only/bodyweight]
-- Normal session: [X minutes]
-- Quick session: [X minutes]
-- Program length: [X weeks]
-- Injuries/limitations: [list or "none"]
-- Priority areas: [muscle groups or "balanced"]
-- Include exercises: [list or "no preference"]
-- Exclude exercises: [list or "none"]
+**OUTPUT FORMAT REQUIREMENTS:**
+Create the program as a markdown document artifact structured with these sections:
+1. **PROGRAM OVERVIEW** - Brief summary of approach, training split, and key principles
+2. **WEEKLY STRUCTURE** - How many days, what type of sessions, rest days
+3. **EXERCISE SELECTION RATIONALE** - Why specific exercises were chosen for this person
+4. **PROGRESSION STRATEGY** - How the program advances week to week
+5. **DETAILED PROGRAM BREAKDOWN** - Week-by-week or block-by-block structure
+6. **IMPLEMENTATION NOTES** - Form cues, safety considerations, and modification options
 
-**RECOMMENDED APPROACH**
-- Split: [e.g., "Push Pull Legs", "Upper Lower", "Full Body"]
-- Block structure: [e.g., "4-week blocks alternating volume and intensity phases"]
-- Progression style: [e.g., "Weekly rep decrease with weight increase" or "Linear progression"]
-- Rest strategy: [e.g., "2-3 min compounds / 60-90 sec isolation, Quick mode: 60-90 sec all"]
-- Coaching notes: [e.g., "Detailed form cues for all exercises" or "Minimal notes for experienced lifter"]
----
+**FORMAT REQUIREMENTS:**
+- Output as a markdown artifact
+- Use simple markdown formatting (headers, bullet points, tables)
+- Ensure it's easy to read, copy, and edit
+- Include clear section breaks and organized workout structure
+- Structure each workout day with complete exercise details and instructions
+- **IMPORTANT**: For each exercise, include a note specifying "Primary: [muscle groups]" and "Secondary: [muscle groups]" to help with volume tracking
+- **EXAMPLE FORMAT**: "Barbell Bench Press - 4 sets x 8-10 reps, 2-3 min rest. Primary: Chest, Triceps. Secondary: Shoulders."
 
-Confirm these specs are correct. Once the user approves, await further instructions for generating the program.`;
+**IMPORTANT - FEEDBACK WORKFLOW:**
+After creating the initial program recommendation:
+1. Present the complete program with a brief summary
+2. Ask me to review the program and provide feedback on:
+   - Exercises I don't like or want to substitute
+   - Workouts that seem too complex or too simple for my level
+   - Any movements I want to avoid or swap out
+   - Training frequency or session length adjustments
+   - Progression speed or difficulty concerns
+3. **WAIT for my feedback before proceeding**
+4. Make any requested adjustments to the program
+5. Only after I'm satisfied with the program should you ask if I want the JSON conversion
+
+**Do NOT automatically convert to JSON** - I need to approve the program design first.
+
+Focus on creating an effective, personalized program that matches my specific goals, experience, and constraints.`;
                     
                     await Clipboard.setStringAsync(planningPrompt);
                     setPlanningPromptCopied(true);
@@ -627,7 +719,8 @@ Confirm these specs are correct. Once the user approves, await further instructi
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const prompt = getAIPrompt();
+                    const questionnaireData = await loadQuestionnaireData();
+                    const prompt = getAIPrompt(questionnaireData);
                     await Clipboard.setStringAsync(prompt);
                     setAiPromptCopied(true);
                     setTimeout(() => {
@@ -655,7 +748,9 @@ Confirm these specs are correct. Once the user approves, await further instructi
                 </Text>
               </View>
             </View>
-          </ScrollView>
+          
+          {/* Separator */}
+          <View style={styles.sectionSeparator} />
           
           <View style={styles.tutorialSection}>
             <Text style={styles.tutorialSectionTitle}>Need Help?</Text>
@@ -673,8 +768,8 @@ Confirm these specs are correct. Once the user approves, await further instructi
               <Text style={styles.tutorialButtonSubtext}>30 seconds</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -888,6 +983,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a0b',
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#71717a',
+  },
   closeButtonWrapper: {
     position: 'absolute',
     top: 20,
@@ -901,6 +1025,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 22,
     backgroundColor: 'rgba(0,0,0,0.1)',
+    zIndex: 3,
   },
   content: {
     flex: 1,
@@ -1142,13 +1267,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-  instructionsTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    flex: 1,
-  },
   stepsContainer: {
     gap: 16,
   },
@@ -1206,13 +1324,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#27272a',
     marginVertical: 24,
   },
+  sectionSeparator: {
+    height: 40,
+  },
   tutorialSection: {
     alignItems: 'center',
     paddingVertical: 32,
     paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginBottom: 40,
     backgroundColor: '#18181b',
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#27272a',
   },
   tutorialSectionTitle: {
     fontSize: 16,

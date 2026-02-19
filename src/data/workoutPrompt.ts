@@ -384,7 +384,253 @@ const glossary = {
 
 export const exerciseGlossary = glossary.exercises;
 
-export const getAIPrompt = () => {
+interface QuestionnaireData {
+  // Primary Goals
+  primaryGoal?: string;
+  secondaryGoals?: string[];
+  specificSport?: string;
+  athleticPerformanceDetails?: string;
+  funSocialDetails?: string;
+  injuryPreventionDetails?: string;
+  flexibilityDetails?: string;
+  customGoals?: string;
+  
+  // Training Frequency & Split
+  totalTrainingDays?: number;
+  gymTrainingDays?: number;
+  otherTrainingDays?: number;
+  customFrequency?: string;
+  
+  // Training Preferences
+  priorityMuscleGroups?: string[];
+  customMuscleGroup?: string;
+  movementLimitations?: string[];
+  customLimitation?: string;
+  trainingStylePreference?: string;
+  customTrainingStyle?: string;
+  
+  // Training Experience
+  trainingExperience?: string;
+  
+  // Program Preferences
+  programDuration?: string;
+  customDuration?: string;
+  fitnessInfluencer?: string;
+  customInfluencer?: string;
+
+  // Equipment & Session Preferences
+  selectedEquipment?: string[];
+  specificEquipment?: string;
+  unavailableEquipment?: string[];
+  workoutDuration?: number;
+  restTimePreference?: string;
+  
+  // Exercise Preferences
+  likedExercises?: string[];
+  dislikedExercises?: string[];
+  selectedFavoriteExercises?: any[];
+}
+
+export const generateProgramSpecs = (data?: QuestionnaireData): string => {
+  if (!data) {
+    return `**No questionnaire data provided.** Please have the user complete the fitness questionnaire first to generate a personalized program.`;
+  }
+
+  let specs = "";
+
+  // Primary Goal
+  if (data.primaryGoal) {
+    const goalMap: { [key: string]: string } = {
+      'muscle_gain': 'Muscle Growth/Hypertrophy',
+      'strength': 'Strength Building',
+      'weight_loss': 'Weight Loss/Fat Loss',
+      'endurance': 'Endurance/Conditioning',
+      'sport_specific': 'Sport-Specific Training',
+      'general_fitness': 'General Fitness & Health',
+      'flexibility': 'Flexibility & Mobility',
+      'rehabilitation': 'Rehabilitation/Injury Recovery',
+    };
+    specs += `**Primary Goal:** ${goalMap[data.primaryGoal] || data.primaryGoal}\n`;
+  }
+
+  // Secondary Goals
+  if (data.secondaryGoals && data.secondaryGoals.length > 0) {
+    const secondaryMap: { [key: string]: string } = {
+      'include_cardio': 'Include Cardiovascular Training',
+      'athletic_performance': 'Athletic Performance Enhancement',
+      'fun_social': 'Fun & Social Activities',
+      'injury_prevention': 'Injury Prevention',
+      'flexibility_mobility': 'Flexibility & Mobility',
+    };
+    const secondaryList = data.secondaryGoals.map(goal => secondaryMap[goal] || goal).join(', ');
+    specs += `**Secondary Goals:** ${secondaryList}\n`;
+  }
+
+  // Specific Details
+  if (data.specificSport) specs += `**Specific Sport:** ${data.specificSport}\n`;
+  if (data.athleticPerformanceDetails) specs += `**Athletic Performance Focus:** ${data.athleticPerformanceDetails}\n`;
+  if (data.funSocialDetails) specs += `**Fun/Social Activities:** ${data.funSocialDetails}\n`;
+  if (data.injuryPreventionDetails) specs += `**Injury Prevention Focus:** ${data.injuryPreventionDetails}\n`;
+  if (data.flexibilityDetails) specs += `**Flexibility Goals:** ${data.flexibilityDetails}\n`;
+  if (data.customGoals) specs += `**Additional Goals:** ${data.customGoals}\n`;
+
+  // Training Schedule
+  if (data.totalTrainingDays) {
+    specs += `\n**Training Schedule:**\n`;
+    specs += `- Total training days per week: ${data.totalTrainingDays}\n`;
+    
+    if (data.gymTrainingDays) {
+      // Get the primary goal title for gym days
+      const primaryGoalTitle = data.customPrimaryGoal || (() => {
+        const goalMap: { [key: string]: string } = {
+          'burn_fat': 'Fat Loss',
+          'build_muscle': 'Muscle Building',
+          'gain_strength': 'Strength Training',
+          'body_recomposition': 'Body Recomposition',
+          'sport_specific': 'Sport-Specific Training',
+          'general_fitness': 'General Fitness',
+          'custom_primary': 'Custom Goal'
+        };
+        return goalMap[data.primaryGoal] || 'Gym Training';
+      })();
+      specs += `- ${primaryGoalTitle} days: ${data.gymTrainingDays}\n`;
+    }
+    
+    if (data.otherTrainingDays && data.secondaryGoals && data.secondaryGoals.length > 0) {
+      // Build specific description of what "other activities" includes
+      const secondaryActivities: string[] = [];
+      
+      if (data.secondaryGoals.includes('include_cardio')) {
+        secondaryActivities.push('cardiovascular training');
+      }
+      if (data.secondaryGoals.includes('maintain_flexibility')) {
+        secondaryActivities.push('flexibility/mobility work');
+      }
+      if (data.secondaryGoals.includes('athletic_performance')) {
+        if (data.athleticPerformanceDetails) {
+          secondaryActivities.push(`athletic performance training (${data.athleticPerformanceDetails})`);
+        } else {
+          secondaryActivities.push('athletic performance training');
+        }
+      }
+      if (data.secondaryGoals.includes('injury_prevention')) {
+        if (data.injuryPreventionDetails) {
+          secondaryActivities.push(`injury prevention work (${data.injuryPreventionDetails})`);
+        } else {
+          secondaryActivities.push('injury prevention exercises');
+        }
+      }
+      if (data.secondaryGoals.includes('fun_social')) {
+        if (data.funSocialDetails) {
+          secondaryActivities.push(`recreational activities (${data.funSocialDetails})`);
+        } else {
+          secondaryActivities.push('fun & social activities');
+        }
+      }
+      if (data.secondaryGoals.includes('custom_secondary') && data.customSecondaryGoal) {
+        secondaryActivities.push(data.customSecondaryGoal.toLowerCase());
+      }
+      
+      const activitiesDescription = secondaryActivities.length > 0 
+        ? secondaryActivities.join(', ') 
+        : 'other activities';
+        
+      specs += `- Additional focus days (${activitiesDescription}): ${data.otherTrainingDays}\n`;
+    }
+    
+    if (data.customFrequency) specs += `- Custom frequency notes: ${data.customFrequency}\n`;
+  }
+
+  // Training Experience
+  if (data.trainingExperience) {
+    const expMap: { [key: string]: string } = {
+      'complete_beginner': 'Complete Beginner (new to gym or returning after 6+ months)',
+      'beginner': 'Beginner (6-12 months consistent training, learning form)',
+      'intermediate': 'Intermediate (1+ years training, good form, steady progress)',
+      'advanced': 'Advanced (2+ years, excellent technique, slow progression)',
+    };
+    specs += `\n**Training Experience:** ${expMap[data.trainingExperience] || data.trainingExperience}\n`;
+  }
+
+  // Program Duration
+  if (data.programDuration) {
+    const durationMap: { [key: string]: string } = {
+      '4_weeks': '4 weeks (quick trial program)',
+      '8_weeks': '8 weeks (focused short-term program)',
+      '12_weeks': '12 weeks (complete transformation cycle)',
+      '6_months': '6 months (comprehensive progression)',
+      '1_year': '1 year (long-term development plan)',
+      'custom': data.customDuration || 'Custom duration',
+    };
+    specs += `\n**Program Duration:** ${durationMap[data.programDuration] || data.programDuration}\n`;
+  }
+
+  // Training Style Preference
+  if (data.fitnessInfluencer) {
+    const styleMap: { [key: string]: string } = {
+      'science_based': 'Science-Based Training (evidence-driven, research-backed approach)',
+      'functional_fitness': 'Functional Training (real-world movement patterns, injury prevention)',
+      'powerlifting': 'Powerlifting Style (focus on squat, bench, deadlift strength)',
+      'bodybuilding': 'Bodybuilding Style (muscle isolation, hypertrophy focus)',
+      'athletic_performance': 'Athletic Performance (sport-specific training, power development)',
+      'custom': data.customInfluencer || 'Custom training style',
+      'no_preference': 'No specific preference (AI-optimized approach)',
+    };
+    specs += `**Training Style Preference:** ${styleMap[data.fitnessInfluencer] || data.fitnessInfluencer}\n`;
+  }
+
+  // Priority Muscle Groups
+  if (data.priorityMuscleGroups && data.priorityMuscleGroups.length > 0) {
+    specs += `\n**Priority Muscle Groups:** ${data.priorityMuscleGroups.join(', ')}\n`;
+    if (data.customMuscleGroup) specs += `**Custom Muscle Group:** ${data.customMuscleGroup}\n`;
+  }
+
+  // Movement Limitations
+  if (data.movementLimitations && data.movementLimitations.length > 0) {
+    specs += `\n**Movement Limitations/Restrictions:** ${data.movementLimitations.join(', ')}\n`;
+    if (data.customLimitation) specs += `**Custom Limitation:** ${data.customLimitation}\n`;
+  }
+
+  // Training Style Preference (from step 2)
+  if (data.trainingStylePreference && data.trainingStylePreference !== 'other') {
+    const styleMap: { [key: string]: string } = {
+      'compound_focused': 'Compound-Focused (multi-joint exercises like squats, deadlifts)',
+      'functional_fitness': 'Functional Fitness (real-world movement patterns)',
+      'bodybuilding': 'Bodybuilding Style (isolation exercises for muscle growth)',
+      'powerlifting': 'Powerlifting Style (focus on squat, bench, deadlift)',
+      'calisthenics': 'Calisthenics (bodyweight-focused training)',
+    };
+    specs += `\n**Training Approach:** ${styleMap[data.trainingStylePreference] || data.trainingStylePreference}\n`;
+  }
+  if (data.customTrainingStyle) specs += `**Custom Training Style:** ${data.customTrainingStyle}\n`;
+
+  // Equipment & Session Preferences
+  if (data.selectedEquipment && data.selectedEquipment.length > 0) {
+    specs += `\n**Available Equipment:** ${data.selectedEquipment.join(', ')}\n`;
+  }
+  if (data.specificEquipment) specs += `**Specific Equipment Notes:** ${data.specificEquipment}\n`;
+  if (data.unavailableEquipment && data.unavailableEquipment.length > 0) {
+    specs += `**Equipment to Avoid:** ${data.unavailableEquipment.join(', ')}\n`;
+  }
+  if (data.workoutDuration) specs += `**Preferred Session Length:** ${data.workoutDuration} minutes\n`;
+  if (data.restTimePreference) specs += `**Rest Time Preference:** ${data.restTimePreference}\n`;
+
+  // Exercise Preferences
+  if (data.likedExercises && data.likedExercises.length > 0) {
+    specs += `\n**Preferred Exercises:** ${data.likedExercises.join(', ')}\n`;
+  }
+  if (data.dislikedExercises && data.dislikedExercises.length > 0) {
+    specs += `**Exercises to Avoid:** ${data.dislikedExercises.join(', ')}\n`;
+  }
+  if (data.selectedFavoriteExercises && data.selectedFavoriteExercises.length > 0) {
+    const favoriteNames = data.selectedFavoriteExercises.map((ex: any) => ex.name || ex).join(', ');
+    specs += `**Favorite Exercises to Include:** ${favoriteNames}\n`;
+  }
+
+  return specs;
+};
+
+export const getAIPrompt = (questionnaireData?: QuestionnaireData) => {
   return `# JSON Workout Program Generator
 
 You are generating a workout program from the PROGRAM SPECS provided. Output valid JSON that can be imported into a fitness app.
@@ -486,7 +732,29 @@ You are generating a workout program from the PROGRAM SPECS provided. Output val
 You can ONLY use these exercises (exactly as written):
 ${JSON.stringify(glossary.exercises, null, 2)}
 
-## Output
+## PROGRAM SPECS
 
-Generate the program based on the PROGRAM SPECS provided. Write to a file and provide the download link when complete.`;
+${generateProgramSpecs(questionnaireData)}
+
+## Output Requirements
+
+**FORMAT REQUIREMENTS:**
+- Create the program as a text document
+- Use simple text formatting with headers, bullet points, and tables
+- Make it fast to generate and easy to copy/edit
+- Include clear section breaks and organized workout structure
+- Structure each workout day with complete exercise details and instructions
+
+**OUTPUT STRUCTURE:**
+Provide a comprehensive workout program that includes:
+
+1. **Program Overview** - Brief description and key programming details
+2. **Complete Training Blocks** - All workout days with exercises, sets, reps, rest periods
+3. **Exercise Specifications** - Form cues, alternatives, and coaching notes  
+4. **Progression Guidelines** - How to advance through the program
+5. **Implementation Notes** - Practical tips for following the program
+
+Focus on practical, effective programming that matches the specified goals, experience level, and constraints.
+
+Generate the complete workout program based on the PROGRAM SPECS provided.`;
 };

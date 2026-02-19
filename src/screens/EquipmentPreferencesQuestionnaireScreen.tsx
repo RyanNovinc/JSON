@@ -218,32 +218,12 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       restTimePreference, useAIRestTime, likedExercises, dislikedExercises, useFavoriteExercises, selectedFavoriteExercises]);
 
   const handleRetakeQuestions = async () => {
-    try {
-      // Clear saved data from AsyncStorage
-      await AsyncStorage.removeItem('equipmentPreferencesData');
-      
-      // Reset all state variables
-      setSelectedEquipment([]);
-      setSpecificEquipment('');
-      setUnavailableEquipment('');
-      setWorkoutDuration(0);
-      setCustomDuration('');
-      setShowCustomDuration(false);
-      setUseAISuggestion(false);
-      setShowDurationOptions(true);
-      setRestTimePreference('');
-      setUseAIRestTime(false);
-      setShowRestTimeOptions(true);
-      setLikedExercises('');
-      setDislikedExercises('');
-      setUseFavoriteExercises(false);
-      setSelectedFavoriteExercises([]);
-      setCurrentStep(0);
-      setShowResults(false);
-      setIsCompleted(false);
-    } catch (error) {
-      console.error('Failed to reset questionnaire:', error);
-    }
+    // Don't clear existing answers - just allow user to review and modify them
+    // This way if they accidentally clicked "Retake" they don't lose their progress
+    setCurrentStep(0);
+    setShowResults(false);
+    setIsCompleted(false);
+    // Keep all existing answers loaded so they can review and change if needed
   };
 
   const handleEquipmentToggle = (equipmentId: string) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   SafeAreaView,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,6 +79,13 @@ const primaryGoals: FitnessGoalOption[] = [
     description: 'Balanced approach to fitness, health, and longevity',
     icon: 'heart-outline',
   },
+  {
+    id: 'custom_primary',
+    title: 'Custom Goal',
+    subtitle: 'Create your own fitness objective',
+    description: 'Define a personalized goal that fits your unique needs',
+    icon: 'create-outline',
+  },
 ];
 
 const secondaryGoals: SecondaryGoal[] = [
@@ -110,6 +119,12 @@ const secondaryGoals: SecondaryGoal[] = [
     description: 'Include enjoyable group activities and recreational sports',
     icon: 'people-outline',
   },
+  {
+    id: 'custom_secondary',
+    title: 'Custom Focus Area',
+    description: 'Define your own additional training focus',
+    icon: 'create-outline',
+  },
 ];
 
 export default function FitnessGoalsQuestionnaireScreen() {
@@ -117,6 +132,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const { themeColor, themeColorLight } = useTheme();
   const [selectedPrimaryGoal, setSelectedPrimaryGoal] = useState<string>('');
   const [selectedSecondaryGoals, setSelectedSecondaryGoals] = useState<string[]>([]);
+  const [customPrimaryGoal, setCustomPrimaryGoal] = useState<string>('');
+  const [customSecondaryGoal, setCustomSecondaryGoal] = useState<string>('');
   const [specificSport, setSpecificSport] = useState<string>('');
   const [athleticPerformanceDetails, setAthleticPerformanceDetails] = useState<string>('');
   const [funSocialDetails, setFunSocialDetails] = useState<string>('');
@@ -134,15 +151,41 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [customFrequency, setCustomFrequency] = useState<string>('');
   const [showCustomFrequency, setShowCustomFrequency] = useState<boolean>(false);
   const [customGoals, setCustomGoals] = useState<string>('');
+  const [trainingExperience, setTrainingExperience] = useState<string>('');
+  const [programDuration, setProgramDuration] = useState<string>('');
+  const [customDuration, setCustomDuration] = useState<string>('');
+  const [fitnessInfluencer, setFitnessInfluencer] = useState<string>('');
+  const [customInfluencer, setCustomInfluencer] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ScrollView refs for auto-scroll to top
+  const step0ScrollRef = useRef<ScrollView>(null);
+  const step1ScrollRef = useRef<ScrollView>(null);
+  const step2ScrollRef = useRef<ScrollView>(null);
+  const step3ScrollRef = useRef<ScrollView>(null);
+
   // Load saved questionnaire data on component mount
   useEffect(() => {
     loadSavedData();
   }, []);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    const scrollToTop = () => {
+      const refs = [step0ScrollRef, step1ScrollRef, step2ScrollRef, step3ScrollRef];
+      const currentRef = refs[currentStep];
+      if (currentRef?.current) {
+        currentRef.current.scrollTo({ y: 0, animated: true });
+      }
+    };
+
+    // Small delay to ensure the new step content is rendered
+    const timeoutId = setTimeout(scrollToTop, 100);
+    return () => clearTimeout(timeoutId);
+  }, [currentStep]);
 
   const loadSavedData = async () => {
     try {
@@ -153,6 +196,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
         // Restore all form data
         setSelectedPrimaryGoal(data.primaryGoal || '');
         setSelectedSecondaryGoals(data.secondaryGoals || []);
+        setCustomPrimaryGoal(data.customPrimaryGoal || '');
+        setCustomSecondaryGoal(data.customSecondaryGoal || '');
         setSpecificSport(data.specificSport || '');
         setAthleticPerformanceDetails(data.athleticPerformanceDetails || '');
         setFunSocialDetails(data.funSocialDetails || '');
@@ -170,14 +215,30 @@ export default function FitnessGoalsQuestionnaireScreen() {
         setCustomFrequency(data.customFrequency || '');
         setShowCustomFrequency(data.customFrequency !== '');
         setCustomGoals(data.customGoals || '');
+        setTrainingExperience(data.trainingExperience || '');
+        setProgramDuration(data.programDuration || '');
+        setCustomDuration(data.customDuration || '');
+        setFitnessInfluencer(data.fitnessInfluencer || '');
+        setCustomInfluencer(data.customInfluencer || '');
         
         // If questionnaire was completed, show summary directly
-        if (data.completedAt) {
+        // Check multiple indicators of completion
+        const isQuestionnaireComplete = data.completedAt || 
+          (data.primaryGoal && 
+           data.totalTrainingDays > 0 && 
+           data.programDuration && 
+           (data.gymTrainingDays + (data.otherTrainingDays || 0)) === data.totalTrainingDays);
+        
+        if (isQuestionnaireComplete) {
           setIsCompleted(true);
           setShowResults(true);
         } else {
-          // Restore current step for partial progress
-          setCurrentStep(data.currentStep || 0);
+          // Restore current step for partial progress, but adjust for new navigation
+          let stepToLoad = data.currentStep || 0;
+          if (stepToLoad === 1) {
+            stepToLoad = 2; // Skip the old empty step 1
+          }
+          setCurrentStep(stepToLoad);
         }
       }
     } catch (error) {
@@ -193,6 +254,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
       const progressData = {
         primaryGoal: selectedPrimaryGoal,
         secondaryGoals: selectedSecondaryGoals,
+        customPrimaryGoal: customPrimaryGoal,
+        customSecondaryGoal: customSecondaryGoal,
         specificSport: specificSport,
         athleticPerformanceDetails: athleticPerformanceDetails,
         funSocialDetails: funSocialDetails,
@@ -209,6 +272,11 @@ export default function FitnessGoalsQuestionnaireScreen() {
         gymTrainingDays: gymTrainingDays,
         otherTrainingDays: otherTrainingDays,
         customGoals: customGoals,
+        trainingExperience: trainingExperience,
+        programDuration: programDuration,
+        customDuration: customDuration,
+        fitnessInfluencer: fitnessInfluencer,
+        customInfluencer: customInfluencer,
         currentStep: currentStep,
         // Note: no completedAt field - this indicates it's in progress
       };
@@ -228,39 +296,15 @@ export default function FitnessGoalsQuestionnaireScreen() {
       funSocialDetails, injuryPreventionDetails, flexibilityDetails, priorityMuscleGroups, 
       customMuscleGroup, movementLimitations, customLimitation, trainingStylePreference, 
       customTrainingStyle, totalTrainingDays, customFrequency, gymTrainingDays, 
-      otherTrainingDays, customGoals]);
+      otherTrainingDays, customGoals, trainingExperience, programDuration, customDuration, fitnessInfluencer, customInfluencer]);
 
   const handleRetakeQuestions = async () => {
-    try {
-      // Clear saved data from AsyncStorage
-      await AsyncStorage.removeItem('fitnessGoalsData');
-      
-      // Reset all state variables
-      setSelectedPrimaryGoal('');
-      setSelectedSecondaryGoals([]);
-      setSpecificSport('');
-      setAthleticPerformanceDetails('');
-      setFunSocialDetails('');
-      setInjuryPreventionDetails('');
-      setFlexibilityDetails('');
-      setPriorityMuscleGroups([]);
-      setCustomMuscleGroup('');
-      setMovementLimitations([]);
-      setCustomLimitation('');
-      setTrainingStylePreference('');
-      setCustomTrainingStyle('');
-      setTotalTrainingDays(0);
-      setGymTrainingDays(0);
-      setOtherTrainingDays(0);
-      setCustomFrequency('');
-      setShowCustomFrequency(false);
-      setCustomGoals('');
-      setCurrentStep(0);
-      setShowResults(false);
-      setIsCompleted(false);
-    } catch (error) {
-      console.error('Failed to reset questionnaire:', error);
-    }
+    // Don't clear existing answers - just allow user to review and modify them
+    // This way if they accidentally clicked "Retake" they don't lose their progress
+    setCurrentStep(0);
+    setShowResults(false);
+    setIsCompleted(false);
+    // Keep all existing answers loaded so they can review and change if needed
   };
 
   const handlePrimaryGoalSelect = (goalId: string) => {
@@ -297,12 +341,56 @@ export default function FitnessGoalsQuestionnaireScreen() {
     });
   };
 
+  // Helper functions to get display names
+  const getPrimaryGoalTitle = () => {
+    if (selectedPrimaryGoal === 'custom_primary') {
+      return customPrimaryGoal || 'Custom Goal';
+    }
+    const goal = primaryGoals.find(goal => goal.id === selectedPrimaryGoal);
+    return goal ? goal.title : 'Gym/Strength Training';
+  };
+
+  const getSecondaryGoalTitle = () => {
+    if (selectedSecondaryGoals.length === 0) return 'Other Activities';
+    if (selectedSecondaryGoals.length === 1) {
+      if (selectedSecondaryGoals[0] === 'custom_secondary') {
+        return customSecondaryGoal || 'Custom Focus Area';
+      }
+      const goal = secondaryGoals.find(goal => goal.id === selectedSecondaryGoals[0]);
+      return goal ? goal.title : 'Other Activities';
+    }
+    return 'Other Activities'; // Multiple goals - keep generic
+  };
+
   const isValid = () => {
     if (currentStep === 0) {
-      return selectedPrimaryGoal !== '';
+      if (selectedPrimaryGoal === '' || totalTrainingDays <= 0) {
+        return false;
+      }
+      
+      // Check if custom primary goal is filled when selected
+      if (selectedPrimaryGoal === 'custom_primary' && customPrimaryGoal.trim() === '') {
+        return false;
+      }
+      
+      // Check if custom secondary goal is filled when selected
+      if (selectedSecondaryGoals.includes('custom_secondary') && customSecondaryGoal.trim() === '') {
+        return false;
+      }
+      
+      // If no secondary goals selected, all days should go to gym
+      if (selectedSecondaryGoals.length === 0) {
+        return gymTrainingDays === totalTrainingDays;
+      }
+      
+      // If secondary goals are selected, split must add up to total
+      return (gymTrainingDays + otherTrainingDays) === totalTrainingDays;
     }
     if (currentStep === 1) {
-      return totalTrainingDays > 0;
+      return true; // Step 1 is now optional (was training frequency, now training preferences)
+    }
+    if (currentStep === 3) {
+      return programDuration !== '';
     }
     // Step 2 (Training Preferences) is completely optional
     return true;
@@ -311,25 +399,45 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const handleNext = () => {
     if (!isValid()) {
       if (currentStep === 0) {
-        Alert.alert('Required Selection', 'Please select a primary fitness goal.');
+        if (selectedPrimaryGoal === '') {
+          Alert.alert('Required Selection', 'Please select a primary fitness goal.');
+        } else if (selectedPrimaryGoal === 'custom_primary' && customPrimaryGoal.trim() === '') {
+          Alert.alert('Required Input', 'Please describe your custom fitness goal.');
+        } else if (selectedSecondaryGoals.includes('custom_secondary') && customSecondaryGoal.trim() === '') {
+          Alert.alert('Required Input', 'Please describe your custom focus area.');
+        } else if (totalTrainingDays <= 0) {
+          Alert.alert('Required Selection', 'Please select how many days per week you want to train.');
+        } else if (selectedSecondaryGoals.length === 0 && gymTrainingDays !== totalTrainingDays) {
+          Alert.alert('Required Selection', `Please set your ${getPrimaryGoalTitle()} days to ${totalTrainingDays} since you haven't selected any additional focus areas.`);
+        } else if (selectedSecondaryGoals.length > 0 && (gymTrainingDays + otherTrainingDays) !== totalTrainingDays) {
+          Alert.alert('Required Selection', 'Please complete your training split - the total must match your training days.');
+        }
       } else if (currentStep === 1) {
         Alert.alert('Required Selection', 'Please select how many days per week you want to train.');
+      } else if (currentStep === 3) {
+        Alert.alert('Required Selection', 'Please select a program duration.');
       }
       return;
     }
     
     if (currentStep === 0) {
-      setCurrentStep(1);
+      setCurrentStep(2); // Skip step 1 (now empty) and go directly to step 2
     } else if (currentStep === 1) {
       setCurrentStep(2);
     } else if (currentStep === 2) {
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
       setShowResults(true);
     }
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      if (currentStep === 2) {
+        setCurrentStep(0); // Skip empty step 1 when going back
+      } else {
+        setCurrentStep(currentStep - 1);
+      }
     } else {
       navigation.goBack();
     }
@@ -340,6 +448,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
       const fitnessGoalsData = {
         primaryGoal: selectedPrimaryGoal,
         secondaryGoals: selectedSecondaryGoals,
+        customPrimaryGoal: customPrimaryGoal,
+        customSecondaryGoal: customSecondaryGoal,
         specificSport: specificSport,
         athleticPerformanceDetails: athleticPerformanceDetails,
         funSocialDetails: funSocialDetails,
@@ -356,6 +466,11 @@ export default function FitnessGoalsQuestionnaireScreen() {
         gymTrainingDays: gymTrainingDays,
         otherTrainingDays: otherTrainingDays,
         customGoals: customGoals,
+        trainingExperience: trainingExperience,
+        programDuration: programDuration,
+        customDuration: customDuration,
+        fitnessInfluencer: fitnessInfluencer,
+        customInfluencer: customInfluencer,
         completedAt: new Date().toISOString(),
       };
 
@@ -588,6 +703,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   const renderFitnessGoalsStep = () => (
     <ScrollView 
+      ref={step0ScrollRef}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 120 }}
     >
@@ -633,6 +749,30 @@ export default function FitnessGoalsQuestionnaireScreen() {
         </Animatable.View>
       )}
 
+      {/* Custom Primary Goal Input */}
+      {selectedPrimaryGoal === 'custom_primary' && (
+        <Animatable.View
+          animation="fadeInUp"
+          delay={400}
+          style={styles.sectionContainer}
+        >
+          <Text style={[styles.sectionTitle, { color: themeColor }]}>
+            Custom Fitness Goal
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            Describe your specific fitness objective
+          </Text>
+          
+          <TextInput
+            style={styles.textInput}
+            placeholder="e.g., Improve endurance for hiking, Build core strength..."
+            placeholderTextColor="#71717a"
+            value={customPrimaryGoal}
+            onChangeText={setCustomPrimaryGoal}
+          />
+        </Animatable.View>
+      )}
+
       {/* Secondary Goals Section */}
       {selectedPrimaryGoal && (
         <Animatable.View
@@ -650,6 +790,30 @@ export default function FitnessGoalsQuestionnaireScreen() {
           <View style={styles.secondaryGoalsContainer}>
             {secondaryGoals.map((goal, index) => renderSecondaryGoalOption(goal, index))}
           </View>
+        </Animatable.View>
+      )}
+
+      {/* Custom Secondary Goal Input */}
+      {selectedSecondaryGoals.includes('custom_secondary') && (
+        <Animatable.View
+          animation="fadeInUp"
+          delay={525}
+          style={styles.sectionContainer}
+        >
+          <Text style={[styles.sectionTitle, { color: themeColor }]}>
+            Custom Focus Area
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            Describe your additional training focus
+          </Text>
+          
+          <TextInput
+            style={styles.textInput}
+            placeholder="e.g., Balance training, Flexibility for dance, Power for sports..."
+            placeholderTextColor="#71717a"
+            value={customSecondaryGoal}
+            onChangeText={setCustomSecondaryGoal}
+          />
         </Animatable.View>
       )}
 
@@ -678,23 +842,12 @@ export default function FitnessGoalsQuestionnaireScreen() {
           />
         </Animatable.View>
       )}
-    </ScrollView>
-  );
 
-  const renderTrainingFrequencyStep = () => {
-    // Determine what additional activities are selected
-    const hasCardio = selectedSecondaryGoals.includes('include_cardio');
-    const hasSport = selectedPrimaryGoal === 'sport_specific' || selectedSecondaryGoals.includes('fun_social');
-    
-    return (
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
-      >
-        {/* Training Frequency */}
+      {/* Training Frequency - moved from step 1 */}
+      {selectedPrimaryGoal && (
         <Animatable.View
           animation="fadeInUp"
-          delay={50}
+          delay={600}
           style={styles.sectionContainer}
         >
           <Text style={[styles.sectionTitle, { color: themeColor }]}>
@@ -705,75 +858,93 @@ export default function FitnessGoalsQuestionnaireScreen() {
           </Text>
           
           {/* Modern Frequency Grid */}
-          <View style={styles.modernFrequencyGrid}>
-            {[1, 2, 3, 4, 5, 6, 7].map((days) => {
-              const isSelected = !showCustomFrequency && totalTrainingDays === days;
-              return (
-                <TouchableOpacity
-                  key={days}
-                  style={[
-                    styles.modernFrequencyCard,
-                    isSelected && [styles.selectedModernCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
-                  ]}
-                  onPress={() => {
-                    setTotalTrainingDays(days);
-                    setShowCustomFrequency(false);
-                    setCustomFrequency('');
-                    setGymTrainingDays(0);
-                    setOtherTrainingDays(0);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.modernFrequencyNumber,
-                    isSelected && { color: themeColor }
-                  ]}>
-                    {days}
-                  </Text>
-                  <Text style={[
-                    styles.modernFrequencyLabel,
-                    isSelected && { color: themeColor }
-                  ]}>
-                    {days === 1 ? 'day' : 'days'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-            
-            {/* Custom Card */}
+          <View style={styles.modernFrequencyContainer}>
+            <View style={styles.modernFrequencyGrid}>
+              {[1, 2, 3, 4, 5, 6, 7].map((days) => {
+                const isSelected = !showCustomFrequency && totalTrainingDays === days;
+                return (
+                  <TouchableOpacity
+                    key={days}
+                    style={[
+                      styles.modernFrequencyCard,
+                      isSelected && [styles.selectedModernCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
+                    ]}
+                    onPress={() => {
+                      setTotalTrainingDays(days);
+                      setShowCustomFrequency(false);
+                      setCustomFrequency('');
+                      setGymTrainingDays(0);
+                      setOtherTrainingDays(0);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.modernFrequencyNumber,
+                      isSelected && { color: themeColor }
+                    ]}>
+                      {days}
+                    </Text>
+                    <Text style={[
+                      styles.modernFrequencyLabel,
+                      isSelected && { color: themeColor }
+                    ]}>
+                      {days === 1 ? 'day' : 'days'}
+                    </Text>
+                    <Text style={[
+                      styles.modernFrequencySubtext,
+                      isSelected && { color: themeColor }
+                    ]}>
+                      per week
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Custom Frequency Option - Now inside the container */}
             <TouchableOpacity
               style={[
-                styles.modernCustomCard,
+                styles.modernCustomFrequencyTrigger,
                 showCustomFrequency && [styles.selectedModernCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
               ]}
               onPress={() => {
-                setShowCustomFrequency(true);
-                setTotalTrainingDays(0);
-                setGymTrainingDays(0);
-                setOtherTrainingDays(0);
+                setShowCustomFrequency(!showCustomFrequency);
+                if (!showCustomFrequency) {
+                  setTotalTrainingDays(0);
+                  setCustomFrequency('');
+                  setGymTrainingDays(0);
+                  setOtherTrainingDays(0);
+                }
               }}
               activeOpacity={0.7}
             >
+              <View style={styles.customFrequencyContent}>
+                <Ionicons 
+                  name="create-outline" 
+                  size={20} 
+                  color={showCustomFrequency ? themeColor : '#71717a'} 
+                />
+                <Text style={[
+                  styles.customFrequencyText,
+                  showCustomFrequency && { color: themeColor }
+                ]}>
+                  Custom Frequency (8-14 days)
+                </Text>
+              </View>
               <Ionicons 
-                name="add-circle-outline" 
-                size={24} 
+                name={showCustomFrequency ? "chevron-up" : "chevron-down"} 
+                size={20} 
                 color={showCustomFrequency ? themeColor : '#71717a'} 
               />
-              <Text style={[
-                styles.modernCustomLabel,
-                showCustomFrequency && { color: themeColor }
-              ]}>
-                Custom
-              </Text>
             </TouchableOpacity>
           </View>
-          
-          {/* Custom input field */}
+
+          {/* Custom Input */}
           {showCustomFrequency && (
             <Animatable.View
               animation="slideInDown"
               duration={300}
-              style={styles.customInputContainer}
+              style={styles.modernCustomInputContainer}
             >
               <Text style={styles.modernCustomTitle}>Enter Custom Frequency</Text>
               <View style={styles.customInputWrapper}>
@@ -805,80 +976,94 @@ export default function FitnessGoalsQuestionnaireScreen() {
             </Animatable.View>
           )}
         </Animatable.View>
+      )}
 
-        {/* Training Split (show when total days selected) */}
-        {totalTrainingDays > 0 && (
-          <Animatable.View
-            animation="fadeInUp"
-            delay={75}
-            style={styles.sectionContainer}
-          >
-            <Text style={[styles.sectionTitle, { color: themeColor }]}>
-              Training Split
-            </Text>
-            <Text style={styles.sectionSubtitle}>
-              Divide your {totalTrainingDays} days between gym and other activities
-            </Text>
-            
-            {/* Modern Split Container */}
-            <View style={styles.modernSplitContainer}>
-              {/* Gym Training Section */}
-              <View style={styles.modernSplitSection}>
-                <View style={styles.modernSplitHeader}>
-                  <View style={[styles.splitIconContainer, { backgroundColor: `${themeColor}20` }]}>
-                    <Ionicons name="fitness" size={20} color={themeColor} />
-                  </View>
-                  <Text style={styles.modernSplitLabel}>Gym/Strength Training</Text>
+      {/* Training Split - moved from step 1 */}
+      {selectedPrimaryGoal && totalTrainingDays > 0 && (
+        <Animatable.View
+          animation="fadeInUp"
+          delay={650}
+          style={styles.sectionContainer}
+        >
+          <Text style={[styles.sectionTitle, { color: themeColor }]}>
+            Training Split
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            Divide your {totalTrainingDays} days between gym and other activities
+          </Text>
+          
+          {/* Modern Split Container */}
+          <View style={styles.modernSplitContainer}>
+            {/* Gym Training Section */}
+            <View style={styles.modernSplitSection}>
+              <View style={styles.modernSplitHeader}>
+                <View style={[styles.splitIconContainer, { backgroundColor: `${themeColor}20` }]}>
+                  <Ionicons name="fitness" size={20} color={themeColor} />
                 </View>
-                <View style={styles.modernSplitGrid}>
-                  {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => {
-                    const isSelected = gymTrainingDays === days;
-                    return (
-                      <TouchableOpacity
-                        key={`gym-${days}`}
-                        style={[
-                          styles.modernSplitCard,
-                          isSelected && [styles.selectedModernSplitCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
-                        ]}
-                        onPress={() => setGymTrainingDays(days)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[
-                          styles.modernSplitNumber,
-                          isSelected && { color: themeColor }
-                        ]}>
-                          {days}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <Text style={styles.modernSplitLabel}>{getPrimaryGoalTitle()}</Text>
               </View>
+              <View style={styles.modernSplitGrid}>
+                {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => {
+                  const isSelected = gymTrainingDays === days;
+                  const maxAllowed = totalTrainingDays - otherTrainingDays;
+                  const isDisabled = days > maxAllowed;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={`gym-${days}`}
+                      style={[
+                        styles.modernSplitCard,
+                        isSelected && [styles.selectedModernSplitCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }],
+                        isDisabled && styles.disabledSplitCard
+                      ]}
+                      onPress={() => !isDisabled && setGymTrainingDays(days)}
+                      activeOpacity={isDisabled ? 1 : 0.7}
+                      disabled={isDisabled}
+                    >
+                      <Text style={[
+                        styles.modernSplitNumber,
+                        isSelected && { color: themeColor },
+                        isDisabled && styles.disabledSplitText
+                      ]}>
+                        {days}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
 
-              {/* Other Activities Section */}
+            {/* Other Activities Section - Only show if user selected secondary goals */}
+            {selectedSecondaryGoals.length > 0 && (
               <View style={styles.modernSplitSection}>
                 <View style={styles.modernSplitHeader}>
                   <View style={[styles.splitIconContainer, { backgroundColor: '#10b98120' }]}>
                     <Ionicons name="walk" size={20} color="#10b981" />
                   </View>
-                  <Text style={styles.modernSplitLabel}>Other Activities</Text>
+                  <Text style={styles.modernSplitLabel}>{getSecondaryGoalTitle()}</Text>
                 </View>
                 <View style={styles.modernSplitGrid}>
                   {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => {
                     const isSelected = otherTrainingDays === days;
+                    const maxAllowed = totalTrainingDays - gymTrainingDays;
+                    const isDisabled = days > maxAllowed;
+                    
                     return (
                       <TouchableOpacity
                         key={`other-${days}`}
                         style={[
                           styles.modernSplitCard,
-                          isSelected && [styles.selectedModernSplitCard, { borderColor: '#10b981', backgroundColor: '#10b98115' }]
+                          isSelected && [styles.selectedModernSplitCard, { borderColor: '#10b981', backgroundColor: '#10b98115' }],
+                          isDisabled && styles.disabledSplitCard
                         ]}
-                        onPress={() => setOtherTrainingDays(days)}
-                        activeOpacity={0.7}
+                        onPress={() => !isDisabled && setOtherTrainingDays(days)}
+                        activeOpacity={isDisabled ? 1 : 0.7}
+                        disabled={isDisabled}
                       >
                         <Text style={[
                           styles.modernSplitNumber,
-                          isSelected && { color: '#10b981' }
+                          isSelected && { color: '#10b981' },
+                          isDisabled && styles.disabledSplitText
                         ]}>
                           {days}
                         </Text>
@@ -887,25 +1072,47 @@ export default function FitnessGoalsQuestionnaireScreen() {
                   })}
                 </View>
               </View>
-            </View>
-
-            {/* Split validation warning */}
-            {totalTrainingDays > 0 && (gymTrainingDays + otherTrainingDays) !== totalTrainingDays && (
-              <View style={styles.warningContainer}>
-                <Ionicons name="warning-outline" size={16} color="#f59e0b" />
-                <Text style={styles.warningText}>
-                  Your split ({gymTrainingDays + otherTrainingDays} days) doesn't match your total training days ({totalTrainingDays})
-                </Text>
-              </View>
             )}
-          </Animatable.View>
-        )}
-      </ScrollView>
-    );
-  };
+          </View>
+
+          {/* Split validation warning */}
+          {totalTrainingDays > 0 && (
+            (selectedSecondaryGoals.length === 0 && gymTrainingDays !== totalTrainingDays) ||
+            (selectedSecondaryGoals.length > 0 && (gymTrainingDays + otherTrainingDays) !== totalTrainingDays)
+          ) && (
+            <View style={styles.warningContainer}>
+              <Ionicons name="warning-outline" size={16} color="#f59e0b" />
+              <Text style={styles.warningText}>
+                {selectedSecondaryGoals.length === 0 
+                  ? `Set your ${getPrimaryGoalTitle()} days to ${totalTrainingDays}`
+                  : `Your split (${gymTrainingDays + otherTrainingDays} days) doesn't match your total training days (${totalTrainingDays})`
+                }
+              </Text>
+            </View>
+          )}
+        </Animatable.View>
+      )}
+    </ScrollView>
+  );
+
+  const renderTrainingFrequencyStep = () => (
+    <ScrollView 
+      ref={step1ScrollRef}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 120 }}
+    >
+      {/* Empty step - Training Experience moved to Step 4 */}
+      <View style={styles.emptyStepContainer}>
+        <Text style={styles.emptyStepText}>
+          All set! Continue to customize your training preferences.
+        </Text>
+      </View>
+    </ScrollView>
+  );
 
   const renderTrainingPreferencesStep = () => (
     <ScrollView 
+      ref={step2ScrollRef}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 120 }}
     >
@@ -1088,6 +1295,369 @@ export default function FitnessGoalsQuestionnaireScreen() {
     </ScrollView>
   );
 
+  const renderProgramPreferencesStep = () => (
+    <ScrollView 
+      ref={step3ScrollRef}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 350 }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Program Duration Section */}
+      <Animatable.View
+        animation="fadeInUp"
+        delay={50}
+        style={styles.sectionContainer}
+      >
+        <Text style={[styles.sectionTitle, { color: themeColor }]}>
+          Program Duration
+        </Text>
+        <Text style={styles.sectionSubtitle}>
+          How long would you like your workout program to run?
+        </Text>
+        
+        <View style={styles.programDurationContainer}>
+          {[
+            {
+              id: '4_weeks',
+              title: '4 Weeks',
+              description: 'Quick trial program',
+              icon: 'flash-outline',
+            },
+            {
+              id: '8_weeks',
+              title: '8 Weeks',
+              description: 'Focused short-term program',
+              icon: 'trending-up-outline',
+            },
+            {
+              id: '12_weeks',
+              title: '12 Weeks',
+              description: 'Complete transformation cycle',
+              icon: 'fitness-outline',
+            },
+            {
+              id: '6_months',
+              title: '6 Months',
+              description: 'Comprehensive progression',
+              icon: 'calendar-outline',
+            },
+            {
+              id: '1_year',
+              title: '1 Year',
+              description: 'Long-term development plan',
+              icon: 'trophy-outline',
+            },
+            {
+              id: 'custom',
+              title: 'Custom',
+              description: 'Specify your own timeframe',
+              icon: 'create-outline',
+            },
+          ].map((duration, index) => {
+            const isSelected = programDuration === duration.id;
+            return (
+              <Animatable.View
+                key={duration.id}
+                animation="fadeInUp"
+                delay={100 + (index * 50)}
+                style={styles.durationOptionWrapper}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.durationCard,
+                    isSelected && [
+                      styles.selectedDurationCard,
+                      { borderColor: themeColor, backgroundColor: `${themeColor}10` }
+                    ]
+                  ]}
+                  onPress={() => {
+                    // Allow deselection
+                    if (programDuration === duration.id) {
+                      setProgramDuration('');
+                      if (duration.id === 'custom') {
+                        setCustomDuration(''); // Clear custom input when deselecting
+                      }
+                    } else {
+                      setProgramDuration(duration.id);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.durationCardContent}>
+                    <View style={[styles.durationCardIcon, isSelected && { backgroundColor: themeColor }]}>
+                      <Ionicons
+                        name={duration.icon as any}
+                        size={20}
+                        color={isSelected ? '#000000' : themeColor}
+                      />
+                    </View>
+                    <View style={styles.durationCardText}>
+                      <Text style={[styles.durationCardTitle, isSelected && { color: themeColor }]}>
+                        {duration.title}
+                      </Text>
+                      <Text style={[styles.durationCardDescription, isSelected && { color: themeColor, opacity: 0.8 }]}>
+                        {duration.description}
+                      </Text>
+                    </View>
+                    <View style={styles.durationCardCheck}>
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={20} color={themeColor} />
+                      ) : (
+                        <View style={styles.unselectedCircle} />
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Custom duration input */}
+                {duration.id === 'custom' && isSelected && (
+                  <Animatable.View
+                    animation="slideInDown"
+                    duration={300}
+                    style={styles.customDurationContainer}
+                  >
+                    <TextInput
+                      style={styles.customDurationInput}
+                      placeholder="e.g., 16 weeks, 2 months, 18 months..."
+                      placeholderTextColor="#71717a"
+                      value={customDuration}
+                      onChangeText={setCustomDuration}
+                    />
+                  </Animatable.View>
+                )}
+              </Animatable.View>
+            );
+          })}
+        </View>
+      </Animatable.View>
+
+      {/* Training Experience Section */}
+      <Animatable.View
+        animation="fadeInUp"
+        delay={200}
+        style={styles.sectionContainer}
+      >
+        <Text style={[styles.sectionTitle, { color: themeColor }]}>
+          Training Experience
+        </Text>
+        <Text style={styles.sectionSubtitle}>
+          How familiar are you with gym workouts and exercise form?
+        </Text>
+        
+        <View style={styles.experienceContainer}>
+          {[
+            {
+              id: 'complete_beginner',
+              title: 'Complete Beginner',
+              description: 'New to gym or returning after 6+ months off',
+              icon: 'school-outline',
+            },
+            {
+              id: 'beginner',
+              title: 'Beginner',
+              description: '6-12 months consistent training, learning form',
+              icon: 'fitness-outline',
+            },
+            {
+              id: 'intermediate',
+              title: 'Intermediate',
+              description: '1+ years training, good form, steady progress',
+              icon: 'barbell-outline',
+            },
+            {
+              id: 'advanced',
+              title: 'Advanced',
+              description: '2+ years, excellent technique, slow progression',
+              icon: 'trophy-outline',
+            },
+          ].map((experience, index) => {
+            const isSelected = trainingExperience === experience.id;
+            return (
+              <Animatable.View
+                key={experience.id}
+                animation="fadeInUp"
+                delay={250 + (index * 50)}
+                style={styles.experienceOptionWrapper}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.experienceOption,
+                    isSelected && [
+                      styles.selectedExperienceOption,
+                      { borderColor: themeColor, backgroundColor: `${themeColor}10` }
+                    ]
+                  ]}
+                  onPress={() => setTrainingExperience(experience.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.experienceOptionContent}>
+                    <View style={[styles.experienceIconContainer, isSelected && { backgroundColor: themeColor }]}>
+                      <Ionicons
+                        name={experience.icon as any}
+                        size={20}
+                        color={isSelected ? '#000000' : themeColor}
+                      />
+                    </View>
+                    <View style={styles.experienceTextContainer}>
+                      <Text style={[styles.experienceTitle, isSelected && { color: themeColor }]}>
+                        {experience.title}
+                      </Text>
+                      <Text style={[styles.experienceDescription, isSelected && { color: themeColor, opacity: 0.8 }]}>
+                        {experience.description}
+                      </Text>
+                    </View>
+                    <View style={styles.experienceSelectionIndicator}>
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={20} color={themeColor} />
+                      ) : (
+                        <View style={styles.unselectedCircle} />
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </Animatable.View>
+            );
+          })}
+        </View>
+      </Animatable.View>
+
+      {/* Fitness Influencer Section */}
+      <Animatable.View
+        animation="fadeInUp"
+        delay={400}
+        style={styles.sectionContainer}
+      >
+        <Text style={[styles.sectionTitle, { color: themeColor }]}>
+          Training Style Inspiration
+        </Text>
+        <Text style={styles.sectionSubtitle}>
+          Any particular fitness influencer or training style you'd like to follow? (optional)
+        </Text>
+        
+        <View style={styles.influencerContainer}>
+          {[
+            {
+              id: 'science_based',
+              title: 'Science-Based Training',
+              description: 'Evidence-driven, research-backed approach',
+              icon: 'library-outline',
+            },
+            {
+              id: 'functional_fitness',
+              title: 'Functional Training',
+              description: 'Real-world movement patterns, injury prevention',
+              icon: 'shield-checkmark-outline',
+            },
+            {
+              id: 'powerlifting',
+              title: 'Powerlifting Style',
+              description: 'Focus on squat, bench, deadlift strength',
+              icon: 'barbell-outline',
+            },
+            {
+              id: 'bodybuilding',
+              title: 'Bodybuilding Style',
+              description: 'Muscle isolation, hypertrophy focus',
+              icon: 'analytics-outline',
+            },
+            {
+              id: 'athletic_performance',
+              title: 'Athletic Performance',
+              description: 'Sport-specific training, power development',
+              icon: 'fitness-outline',
+            },
+            {
+              id: 'custom',
+              title: 'Other',
+              description: 'Specify your own training style/influencer',
+              icon: 'create-outline',
+            },
+            {
+              id: 'no_preference',
+              title: 'No Preference',
+              description: 'AI will choose the best approach',
+              icon: 'sparkles-outline',
+            },
+          ].map((influencer, index) => {
+            const isSelected = fitnessInfluencer === influencer.id;
+            return (
+              <Animatable.View
+                key={influencer.id}
+                animation="fadeInUp"
+                delay={450 + (index * 50)}
+                style={styles.influencerOptionWrapper}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.influencerCard,
+                    isSelected && [
+                      styles.selectedInfluencerCard,
+                      { borderColor: themeColor, backgroundColor: `${themeColor}10` }
+                    ]
+                  ]}
+                  onPress={() => {
+                    // Allow deselection for optional field
+                    if (fitnessInfluencer === influencer.id) {
+                      setFitnessInfluencer('');
+                      if (influencer.id === 'custom') {
+                        setCustomInfluencer(''); // Clear custom input when deselecting
+                      }
+                    } else {
+                      setFitnessInfluencer(influencer.id);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.influencerCardContent}>
+                    <View style={[styles.influencerCardIcon, isSelected && { backgroundColor: themeColor }]}>
+                      <Ionicons
+                        name={influencer.icon as any}
+                        size={18}
+                        color={isSelected ? '#000000' : themeColor}
+                      />
+                    </View>
+                    <View style={styles.influencerCardText}>
+                      <Text style={[styles.influencerCardTitle, isSelected && { color: themeColor }]}>
+                        {influencer.title}
+                      </Text>
+                      <Text style={[styles.influencerCardDescription, isSelected && { color: themeColor, opacity: 0.8 }]}>
+                        {influencer.description}
+                      </Text>
+                    </View>
+                    <View style={styles.influencerCardCheck}>
+                      {isSelected ? (
+                        <Ionicons name="checkmark-circle" size={18} color={themeColor} />
+                      ) : (
+                        <View style={styles.unselectedCircle} />
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Custom influencer input */}
+                {influencer.id === 'custom' && isSelected && (
+                  <Animatable.View
+                    animation="slideInDown"
+                    duration={300}
+                    style={styles.customInfluencerContainer}
+                  >
+                    <TextInput
+                      style={styles.customInfluencerInput}
+                      placeholder="e.g., Jeff Nippard, Chris Bumstead, CrossFit style..."
+                      placeholderTextColor="#71717a"
+                      value={customInfluencer}
+                      onChangeText={setCustomInfluencer}
+                    />
+                  </Animatable.View>
+                )}
+              </Animatable.View>
+            );
+          })}
+        </View>
+      </Animatable.View>
+    </ScrollView>
+  );
+
   const renderStep = () => {
     switch (currentStep) {
       case 0:
@@ -1096,6 +1666,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
         return renderTrainingFrequencyStep();
       case 2:
         return renderTrainingPreferencesStep();
+      case 3:
+        return renderProgramPreferencesStep();
       default:
         return renderFitnessGoalsStep();
     }
@@ -1248,10 +1820,116 @@ export default function FitnessGoalsQuestionnaireScreen() {
                       <View style={styles.scheduleSubIcon}>
                         <Ionicons name="walk" size={16} color="#10b981" />
                       </View>
-                      <Text style={styles.scheduleSubLabel}>Other Activities</Text>
+                      <Text style={styles.scheduleSubLabel}>{getSecondaryGoalTitle()}</Text>
                       <Text style={styles.scheduleSubValue}>{otherTrainingDays} {otherTrainingDays === 1 ? 'day' : 'days'}</Text>
                     </View>
                   )}
+                </View>
+              )}
+            </Animatable.View>
+          )}
+
+          {/* Training Experience */}
+          {trainingExperience && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={1500}
+              duration={500}
+              style={styles.summaryCard}
+            >
+              <Text style={styles.summaryCardTitle}>Training Experience</Text>
+              
+              <View style={styles.summaryItem}>
+                <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
+                  <Ionicons 
+                    name={
+                      trainingExperience === 'complete_beginner' ? 'school' :
+                      trainingExperience === 'beginner' ? 'fitness' :
+                      trainingExperience === 'intermediate' ? 'barbell' : 'trophy'
+                    } 
+                    size={18} 
+                    color={themeColor} 
+                  />
+                </View>
+                <View style={styles.summaryItemContent}>
+                  <Text style={styles.summaryItemLabel}>Experience Level</Text>
+                  <Text style={styles.summaryItemValue}>
+                    {trainingExperience === 'complete_beginner' ? 'Complete Beginner' :
+                     trainingExperience === 'beginner' ? 'Beginner' :
+                     trainingExperience === 'intermediate' ? 'Intermediate' : 'Advanced'}
+                  </Text>
+                </View>
+              </View>
+            </Animatable.View>
+          )}
+
+          {/* Program Preferences */}
+          {(programDuration || fitnessInfluencer) && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={1600}
+              duration={500}
+              style={styles.summaryCard}
+            >
+              <Text style={styles.summaryCardTitle}>Program Preferences</Text>
+              
+              {programDuration && (
+                <View style={styles.summaryItem}>
+                  <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
+                    <Ionicons 
+                      name={
+                        programDuration === '4_weeks' ? 'flash' :
+                        programDuration === '8_weeks' ? 'trending-up' :
+                        programDuration === '12_weeks' ? 'fitness' :
+                        programDuration === '6_months' ? 'calendar' :
+                        programDuration === '1_year' ? 'trophy' : 'create'
+                      } 
+                      size={18} 
+                      color={themeColor} 
+                    />
+                  </View>
+                  <View style={styles.summaryItemContent}>
+                    <Text style={styles.summaryItemLabel}>Program Duration</Text>
+                    <Text style={styles.summaryItemValue}>
+                      {programDuration === '4_weeks' ? '4 Weeks' :
+                       programDuration === '8_weeks' ? '8 Weeks' :
+                       programDuration === '12_weeks' ? '12 Weeks' :
+                       programDuration === '6_months' ? '6 Months' :
+                       programDuration === '1_year' ? '1 Year' :
+                       programDuration === 'custom' ? (customDuration || 'Custom Duration') : 'Custom Duration'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {fitnessInfluencer && (
+                <View style={styles.summaryItem}>
+                  <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
+                    <Ionicons 
+                      name={
+                        fitnessInfluencer === 'science_based' ? 'library' :
+                        fitnessInfluencer === 'functional_fitness' ? 'shield-checkmark' :
+                        fitnessInfluencer === 'powerlifting' ? 'barbell' :
+                        fitnessInfluencer === 'bodybuilding' ? 'analytics' :
+                        fitnessInfluencer === 'athletic_performance' ? 'fitness' :
+                        fitnessInfluencer === 'custom' ? 'create' : 'sparkles'
+                      } 
+                      size={18} 
+                      color={themeColor} 
+                    />
+                  </View>
+                  <View style={styles.summaryItemContent}>
+                    <Text style={styles.summaryItemLabel}>Training Style</Text>
+                    <Text style={styles.summaryItemValue}>
+                      {fitnessInfluencer === 'science_based' ? 'Science-Based Training' :
+                       fitnessInfluencer === 'functional_fitness' ? 'Functional Training' :
+                       fitnessInfluencer === 'powerlifting' ? 'Powerlifting Style' :
+                       fitnessInfluencer === 'bodybuilding' ? 'Bodybuilding Style' :
+                       fitnessInfluencer === 'athletic_performance' ? 'Athletic Performance' :
+                       fitnessInfluencer === 'custom' ? (customInfluencer || 'Custom Style') :
+                       'No Preference (AI Optimized)'}
+                    </Text>
+                  </View>
                 </View>
               )}
             </Animatable.View>
@@ -1261,7 +1939,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
           {selectedSecondary.length > 0 && (
             <Animatable.View 
               animation="fadeInUp" 
-              delay={1600}
+              delay={1700}
               duration={500}
               style={styles.summaryCard}
             >
@@ -1271,7 +1949,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
                   <Animatable.View 
                     key={goal.id} 
                     animation="fadeInRight"
-                    delay={1800 + (index * 100)}
+                    delay={1900 + (index * 100)}
                     style={styles.secondaryGoalItem}
                   >
                     <View style={[styles.goalDot, { backgroundColor: themeColor }]} />
@@ -1286,7 +1964,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
           {(specificSport || athleticPerformanceDetails || funSocialDetails || injuryPreventionDetails || flexibilityDetails || customGoals) && (
             <Animatable.View 
               animation="fadeInUp" 
-              delay={1800}
+              delay={1900}
               duration={500}
               style={styles.summaryCard}
             >
@@ -1378,7 +2056,11 @@ export default function FitnessGoalsQuestionnaireScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -1386,12 +2068,13 @@ export default function FitnessGoalsQuestionnaireScreen() {
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>
-            {currentStep === 0 ? 'Fitness Goals' : 
-             currentStep === 1 ? 'Training Frequency' : 
-             'Training Preferences'}
+            {currentStep === 0 ? 'Goals & Schedule' : 
+             currentStep === 1 ? 'Training Preferences' : 
+             currentStep === 2 ? 'Additional Details' :
+             'Program Preferences'}
           </Text>
           <Text style={styles.headerSubtitle}>
-            Step {currentStep + 1} of 3
+            Step {currentStep === 0 ? 1 : currentStep === 2 ? 2 : currentStep === 3 ? 3 : currentStep + 1} of 3
           </Text>
         </View>
       </View>
@@ -1404,7 +2087,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
               styles.progressFill, 
               { 
                 backgroundColor: themeColor,
-                width: `${((currentStep + 1) / 3) * 100}%`
+                width: `${(currentStep === 0 ? 1 : currentStep === 2 ? 2 : currentStep === 3 ? 3 : currentStep + 1) / 3 * 100}%`
               }
             ]} 
           />
@@ -1416,24 +2099,38 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
       {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
-        <TouchableOpacity
-          style={[styles.navigationButton, { backgroundColor: themeColor }]}
-          onPress={handleNext}
-          activeOpacity={0.8}
-          disabled={!isValid()}
+        <Animatable.View
+          animation={isValid() ? 'pulse' : undefined}
+          duration={1000}
+          iterationCount={isValid() ? 2 : 1}
         >
-          <Text style={styles.navigationButtonText}>
-            {currentStep === 2 ? 'Complete' : 'Next'}
+          <TouchableOpacity
+            style={[
+              styles.navigationButton, 
+              { backgroundColor: isValid() ? themeColor : '#27272a' },
+              !isValid() && styles.disabledButton
+            ]}
+            onPress={handleNext}
+            activeOpacity={isValid() ? 0.8 : 1}
+            disabled={!isValid()}
+          >
+          <Text style={[
+            styles.navigationButtonText,
+            { color: isValid() ? '#000000' : '#71717a' }
+          ]}>
+            {currentStep === 3 ? 'Complete' : 'Next'}
           </Text>
-          {currentStep === 2 ? (
-            <Ionicons name="checkmark" size={20} color="#000000" />
+          {currentStep === 3 ? (
+            <Ionicons name="checkmark" size={20} color={isValid() ? '#000000' : '#71717a'} />
           ) : (
-            <Ionicons name="arrow-forward" size={20} color="#000000" />
+            <Ionicons name="arrow-forward" size={20} color={isValid() ? '#000000' : '#71717a'} />
           )}
         </TouchableOpacity>
+        </Animatable.View>
       </View>
 
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1729,6 +2426,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#000000',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   muscleGroupsContainer: {
     flexDirection: 'row',
@@ -2164,22 +2864,26 @@ const styles = StyleSheet.create({
   },
 
   // Modern Training Frequency Styles
+  modernFrequencyContainer: {
+    marginBottom: 24,
+  },
   modernFrequencyGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 16,
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   modernFrequencyCard: {
-    width: '22%',
-    aspectRatio: 1,
+    width: '30%',
+    aspectRatio: 0.9,
     backgroundColor: '#1a1a1b',
     borderRadius: 16,
     borderWidth: 2,
     borderColor: '#333333',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 12,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -2204,15 +2908,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#71717a',
   },
+  modernFrequencySubtext: {
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#71717a',
+    opacity: 0.8,
+  },
   modernCustomCard: {
-    width: '22%',
-    aspectRatio: 1,
+    width: '30%',
+    aspectRatio: 0.9,
     backgroundColor: '#1a1a1b',
     borderRadius: 16,
     borderWidth: 2,
     borderColor: '#333333',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 12,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -2261,6 +2972,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#71717a',
     fontStyle: 'italic',
+  },
+  modernCustomFrequencyTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a1b',
+    borderWidth: 2,
+    borderColor: '#333333',
+    borderRadius: 16,
+    padding: 16,
+  },
+  customFrequencyContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  customFrequencyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#71717a',
+  },
+  modernCustomInputContainer: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#111112',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
 
   // Modern Split Styles
@@ -2319,6 +3058,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  disabledSplitCard: {
+    backgroundColor: '#1a1a1b',
+    borderColor: '#2a2a2b',
+    opacity: 0.4,
+  },
+  disabledSplitText: {
+    color: '#4a4a4b',
   },
 
   // Summary Page Styles
@@ -2595,6 +3342,193 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000000',
+  },
+
+  // Training Experience Styles
+  experienceContainer: {
+    gap: 12,
+  },
+  experienceOptionWrapper: {
+    marginBottom: 4,
+  },
+  experienceOption: {
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#333333',
+    padding: 16,
+  },
+  selectedExperienceOption: {
+    borderWidth: 2,
+  },
+  experienceOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  experienceIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2a2a2b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  experienceTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  experienceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  experienceDescription: {
+    fontSize: 13,
+    color: '#a1a1aa',
+    lineHeight: 18,
+  },
+  experienceSelectionIndicator: {
+    alignItems: 'center',
+  },
+
+  // Empty Step Styles
+  emptyStepContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  emptyStepText: {
+    fontSize: 16,
+    color: '#71717a',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+
+  // Program Duration Styles
+  programDurationContainer: {
+    gap: 12,
+  },
+  durationOptionWrapper: {
+    marginBottom: 4,
+  },
+  durationCard: {
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#333333',
+    padding: 16,
+  },
+  selectedDurationCard: {
+    borderWidth: 2,
+  },
+  durationCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  durationCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2a2a2b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  durationCardText: {
+    flex: 1,
+    marginRight: 12,
+  },
+  durationCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  durationCardDescription: {
+    fontSize: 13,
+    color: '#a1a1aa',
+    lineHeight: 18,
+  },
+  durationCardCheck: {
+    alignItems: 'center',
+  },
+  customDurationContainer: {
+    marginTop: 12,
+    paddingHorizontal: 4,
+  },
+  customDurationInput: {
+    backgroundColor: '#27272a',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#3a3a3b',
+  },
+
+  // Fitness Influencer Styles
+  influencerContainer: {
+    gap: 10,
+  },
+  influencerOptionWrapper: {
+    marginBottom: 2,
+  },
+  influencerCard: {
+    backgroundColor: '#1a1a1b',
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#333333',
+    padding: 14,
+  },
+  selectedInfluencerCard: {
+    borderWidth: 2,
+  },
+  influencerCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  influencerCardIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#2a2a2b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  influencerCardText: {
+    flex: 1,
+    marginRight: 10,
+  },
+  influencerCardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 3,
+  },
+  influencerCardDescription: {
+    fontSize: 12,
+    color: '#a1a1aa',
+    lineHeight: 16,
+  },
+  influencerCardCheck: {
+    alignItems: 'center',
+  },
+  customInfluencerContainer: {
+    marginTop: 12,
+    paddingHorizontal: 4,
+  },
+  customInfluencerInput: {
+    backgroundColor: '#27272a',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#3a3a3b',
   },
 
 });
