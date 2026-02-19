@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,12 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 export default function MealPlanHelpScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { themeColor } = useTheme();
+  const [copiedButton, setCopiedButton] = useState<string | null>(null);
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, buttonId: string) => {
     await Clipboard.setStringAsync(text);
+    setCopiedButton(buttonId);
+    setTimeout(() => setCopiedButton(null), 1000);
   };
 
   const mealCreationPrompt = `Create a detailed recipe with the following information:
@@ -117,11 +120,17 @@ Only return the JSON, nothing else.`;
           
           <TouchableOpacity 
             style={[styles.promptButton, { backgroundColor: themeColor }]}
-            onPress={() => copyToClipboard(mealCreationPrompt)}
+            onPress={() => copyToClipboard(mealCreationPrompt, 'creation')}
             activeOpacity={0.8}
           >
-            <Ionicons name="copy-outline" size={20} color="#000000" />
-            <Text style={styles.promptButtonText}>Copy Meal Creation Prompt</Text>
+            <Ionicons 
+              name={copiedButton === 'creation' ? "checkmark" : "copy-outline"} 
+              size={20} 
+              color="#000000" 
+            />
+            <Text style={styles.promptButtonText}>
+              {copiedButton === 'creation' ? 'Copied!' : 'Copy Meal Creation Prompt'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -140,11 +149,17 @@ Only return the JSON, nothing else.`;
           
           <TouchableOpacity 
             style={[styles.promptButton, { backgroundColor: themeColor }]}
-            onPress={() => copyToClipboard(jsonConversionPrompt)}
+            onPress={() => copyToClipboard(jsonConversionPrompt, 'json')}
             activeOpacity={0.8}
           >
-            <Ionicons name="sparkles" size={20} color="#000000" />
-            <Text style={styles.promptButtonText}>Copy JSON Conversion Prompt</Text>
+            <Ionicons 
+              name={copiedButton === 'json' ? "checkmark" : "sparkles"} 
+              size={20} 
+              color="#000000" 
+            />
+            <Text style={styles.promptButtonText}>
+              {copiedButton === 'json' ? 'Copied!' : 'Copy JSON Conversion Prompt'}
+            </Text>
           </TouchableOpacity>
         </View>
 

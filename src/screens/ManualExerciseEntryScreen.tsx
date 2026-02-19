@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -25,10 +25,16 @@ interface FavoriteExercise {
   name: string;
   category: 'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom' | null;
   customCategory?: string;
-  muscleGroups: string[];
+  muscleGroups: string[]; // Legacy field for backward compatibility
+  primaryMuscles?: string[]; // New field for primary target muscles
+  secondaryMuscles?: string[]; // New field for secondary involvement
   instructions?: string;
   notes?: string;
   addedAt: string;
+  // Activity metrics to match meal format
+  estimatedCalories?: number;
+  duration?: number; // minutes
+  intensity?: 'low' | 'moderate' | 'high';
 }
 
 const categoryOptions = [
@@ -57,14 +63,46 @@ const getMuscleGroupOptions = (category: string | null) => {
 
 export default function ManualExerciseEntryScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
   const { themeColor } = useTheme();
   
-  const [exerciseName, setExerciseName] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom' | null>(null);
-  const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<string[]>([]);
-  const [customCategory, setCustomCategory] = useState('');
-  const [instructionSteps, setInstructionSteps] = useState<string[]>(['']);
-  const [notes, setNotes] = useState('');
+  // Check if we're editing an existing exercise
+  const editExercise = route.params?.editExercise as FavoriteExercise | undefined;
+  const isEditing = route.params?.isEditing as boolean | undefined;
+  
+  const [exerciseName, setExerciseName] = useState(editExercise?.name || '');
+  const [selectedCategory, setSelectedCategory] = useState<'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom' | null>(editExercise?.category || null);
+  
+  // Category-specific muscle selections - preserve selections when switching categories
+  const [categoryMuscleData, setCategoryMuscleData] = useState<{
+    [key: string]: {
+      muscleGroups: string[];
+      primaryMuscles: string[];
+      secondaryMuscles: string[];
+    }
+  }>(() => {
+    // Initialize with current exercise data if editing
+    if (editExercise && editExercise.category) {
+      return {
+        [editExercise.category]: {
+          muscleGroups: editExercise.muscleGroups || [],
+          primaryMuscles: editExercise.primaryMuscles || [],
+          secondaryMuscles: editExercise.secondaryMuscles || [],
+        }
+      };
+    }
+    return {};
+  });
+  
+  // Current active selections (computed from categoryMuscleData)
+  const selectedMuscleGroups = selectedCategory ? (categoryMuscleData[selectedCategory]?.muscleGroups || []) : [];
+  const selectedPrimaryMuscles = selectedCategory ? (categoryMuscleData[selectedCategory]?.primaryMuscles || []) : [];
+  const selectedSecondaryMuscles = selectedCategory ? (categoryMuscleData[selectedCategory]?.secondaryMuscles || []) : [];
+  
+  const [muscleSelectionMode, setMuscleSelectionMode] = useState<'primary' | 'secondary'>('primary');
+  const [customCategory, setCustomCategory] = useState(editExercise?.customCategory || '');
+  const [instructionSteps, setInstructionSteps] = useState<string[]>(editExercise?.instructions ? editExercise.instructions.split('\n').filter(step => step.trim()) : ['']);
+  const [notes, setNotes] = useState(editExercise?.notes || '');
   const [isLoading, setIsLoading] = useState(false);
   const [muscleGroupAnimation] = useState(new Animated.Value(0));
   const [showMuscleGroups, setShowMuscleGroups] = useState(false);
@@ -96,26 +134,72 @@ export default function ManualExerciseEntryScreen() {
     }
   }, [selectedCategory]);
 
+  const updateCategoryMuscleData = (category: string, field: 'muscleGroups' | 'primaryMuscles' | 'secondaryMuscles', updater: (prev: string[]) => string[]) => {
+    setCategoryMuscleData(prev => ({
+      ...prev,
+      [category]: {
+        muscleGroups: prev[category]?.muscleGroups || [],
+        primaryMuscles: prev[category]?.primaryMuscles || [],
+        secondaryMuscles: prev[category]?.secondaryMuscles || [],
+        ...prev[category],
+        [field]: updater(prev[category]?.[field] || [])
+      }
+    }));
+  };
+
   const handleMuscleGroupToggle = (muscleGroup: string) => {
+    if (!selectedCategory) return;
+    
     if (muscleGroup === 'Custom') {
       setShowCustomMuscleInput(true);
       return;
     }
     
-    setSelectedMuscleGroups(prev => {
-      if (prev.includes(muscleGroup)) {
-        return prev.filter(group => group !== muscleGroup);
+    // For gym and bodyweight, use primary/secondary selection
+    if (selectedCategory === 'gym' || selectedCategory === 'bodyweight') {
+      if (muscleSelectionMode === 'primary') {
+        updateCategoryMuscleData(selectedCategory, 'primaryMuscles', prev => {
+          if (prev.includes(muscleGroup)) {
+            return prev.filter(group => group !== muscleGroup);
+          } else {
+            return [...prev, muscleGroup];
+          }
+        });
       } else {
-        return [...prev, muscleGroup];
+        updateCategoryMuscleData(selectedCategory, 'secondaryMuscles', prev => {
+          if (prev.includes(muscleGroup)) {
+            return prev.filter(group => group !== muscleGroup);
+          } else {
+            return [...prev, muscleGroup];
+          }
+        });
       }
-    });
+    } else {
+      // For other categories, use legacy muscle groups
+      updateCategoryMuscleData(selectedCategory, 'muscleGroups', prev => {
+        if (prev.includes(muscleGroup)) {
+          return prev.filter(group => group !== muscleGroup);
+        } else {
+          return [...prev, muscleGroup];
+        }
+      });
+    }
   };
 
   const handleCustomMuscleGroupAdd = () => {
+    if (!selectedCategory) return;
+    
     const customGroup = customMuscleInput.trim();
     if (customGroup && !customMuscleGroups.includes(customGroup) && !selectedMuscleGroups.includes(customGroup)) {
       setCustomMuscleGroups(prev => [...prev, customGroup]);
-      setSelectedMuscleGroups(prev => [...prev, customGroup]);
+      
+      // Add to appropriate muscle group based on category
+      if (selectedCategory === 'gym' || selectedCategory === 'bodyweight') {
+        updateCategoryMuscleData(selectedCategory, muscleSelectionMode === 'primary' ? 'primaryMuscles' : 'secondaryMuscles', prev => [...prev, customGroup]);
+      } else {
+        updateCategoryMuscleData(selectedCategory, 'muscleGroups', prev => [...prev, customGroup]);
+      }
+      
       setCustomMuscleInput('');
       setShowCustomMuscleInput(false);
     }
@@ -141,6 +225,33 @@ export default function ManualExerciseEntryScreen() {
     setInstructionSteps(prev => prev.map((step, i) => i === index ? value : step));
   };
 
+  const estimateCalories = (category: string | null, muscleGroups: string[]) => {
+    // Realistic calorie estimation for 30-minute exercise sessions
+    let baseCalories = 200;
+    
+    switch (category) {
+      case 'cardio':
+        baseCalories = 350; // High intensity cardio burns a lot
+        break;
+      case 'gym':
+        baseCalories = 250; // Weight training
+        break;
+      case 'bodyweight':
+        baseCalories = 200; // Moderate intensity
+        break;
+      case 'flexibility':
+        baseCalories = 120; // Lower intensity but still burns calories
+        break;
+      default:
+        baseCalories = 200;
+    }
+    
+    // Add calories based on muscle groups involved (more muscle groups = higher intensity)
+    const muscleGroupBonus = muscleGroups.length * 20;
+    
+    return baseCalories + muscleGroupBonus;
+  };
+
   const handleSaveExercise = async () => {
     if (!exerciseName.trim()) {
       Alert.alert('Error', 'Please enter an exercise name');
@@ -157,9 +268,17 @@ export default function ManualExerciseEntryScreen() {
       return;
     }
 
-    if (selectedMuscleGroups.length === 0) {
-      Alert.alert('Error', 'Please select at least one muscle group');
-      return;
+    // Check muscle group selection based on category
+    if (selectedCategory === 'gym' || selectedCategory === 'bodyweight') {
+      if (selectedPrimaryMuscles.length === 0) {
+        Alert.alert('Error', 'Please select at least one primary target muscle');
+        return;
+      }
+    } else {
+      if (selectedMuscleGroups.length === 0) {
+        Alert.alert('Error', 'Please select at least one muscle group');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -169,35 +288,57 @@ export default function ManualExerciseEntryScreen() {
       const existingData = await AsyncStorage.getItem('favoriteExercises');
       const existingExercises: FavoriteExercise[] = existingData ? JSON.parse(existingData) : [];
 
-      // Check if exercise already exists
-      const exerciseExists = existingExercises.some(
-        exercise => exercise.name.toLowerCase().trim() === exerciseName.toLowerCase().trim()
-      );
+      // Check if exercise already exists (skip if we're editing the same exercise)
+      if (!isEditing) {
+        const exerciseExists = existingExercises.some(
+          exercise => exercise.name.toLowerCase().trim() === exerciseName.toLowerCase().trim()
+        );
 
-      if (exerciseExists) {
-        Alert.alert('Duplicate Exercise', 'This exercise is already in your favorites');
-        setIsLoading(false);
-        return;
+        if (exerciseExists) {
+          Alert.alert('Duplicate Exercise', 'This exercise is already in your favorites');
+          setIsLoading(false);
+          return;
+        }
       }
 
-      // Create new exercise
-      const newExercise: FavoriteExercise = {
-        id: Date.now().toString(),
+      // Create/update exercise with primary/secondary muscle support
+      const allMuscleGroups = selectedCategory === 'gym' || selectedCategory === 'bodyweight' ? 
+        [...selectedPrimaryMuscles, ...selectedSecondaryMuscles] : selectedMuscleGroups;
+        
+      const exerciseData: FavoriteExercise = {
+        id: isEditing ? editExercise!.id : Date.now().toString(),
         name: exerciseName.trim(),
         category: selectedCategory,
         customCategory: selectedCategory === 'custom' ? customCategory.trim() : undefined,
-        muscleGroups: selectedMuscleGroups,
+        muscleGroups: allMuscleGroups, // Legacy field - combined for backward compatibility
+        primaryMuscles: (selectedCategory === 'gym' || selectedCategory === 'bodyweight') ? selectedPrimaryMuscles : undefined,
+        secondaryMuscles: (selectedCategory === 'gym' || selectedCategory === 'bodyweight') ? selectedSecondaryMuscles : undefined,
         instructions: instructionSteps.filter(step => step.trim()).join('\n') || undefined,
         notes: notes.trim() || undefined,
-        addedAt: new Date().toISOString(),
+        addedAt: isEditing ? editExercise!.addedAt : new Date().toISOString(),
+        estimatedCalories: estimateCalories(selectedCategory, allMuscleGroups),
+        duration: isEditing ? editExercise!.duration : 30, // Preserve or default 30 minutes
+        intensity: isEditing ? editExercise!.intensity : (selectedCategory === 'cardio' ? 'high' : selectedCategory === 'flexibility' ? 'low' : 'moderate'),
       };
 
-      // Add to favorites
-      const updatedExercises = [newExercise, ...existingExercises];
+      let updatedExercises;
+      if (isEditing) {
+        // Update existing exercise in place
+        updatedExercises = existingExercises.map(ex => 
+          ex.id === editExercise!.id ? exerciseData : ex
+        );
+        console.log('Updated existing exercise:', exerciseData.name);
+      } else {
+        // Add new exercise
+        updatedExercises = [exerciseData, ...existingExercises];
+        console.log('Added new exercise:', exerciseData.name);
+      }
+      
       await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
 
-      // Navigate back
-      Alert.alert('Success', 'Exercise added to your favorites!', [
+      // Navigate back with success message
+      const successMessage = isEditing ? 'Exercise updated successfully!' : 'Exercise added to your favorites!';
+      Alert.alert('Success', successMessage, [
         {
           text: 'OK',
           onPress: () => navigation.goBack(),
@@ -218,7 +359,7 @@ export default function ManualExerciseEntryScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="close" size={24} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Exercise</Text>
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Exercise' : 'Add Exercise'}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -255,8 +396,10 @@ export default function ManualExerciseEntryScreen() {
                   onPress={() => {
                     const newCategory = selectedCategory === category.id ? null : category.id as any;
                     setSelectedCategory(newCategory);
-                    // Clear muscle groups when category changes
-                    setSelectedMuscleGroups([]);
+                    // Reset to primary selection mode when switching categories
+                    setMuscleSelectionMode('primary');
+                    console.log('Category changed to:', newCategory);
+                    console.log('Current muscle data:', categoryMuscleData);
                   }}
                   activeOpacity={0.8}
                 >
@@ -287,8 +430,8 @@ export default function ManualExerciseEntryScreen() {
             onPress={() => {
               const newCategory = selectedCategory === 'custom' ? null : 'custom';
               setSelectedCategory(newCategory);
-              // Clear muscle groups when category changes
-              setSelectedMuscleGroups([]);
+              // Reset to primary selection mode when switching categories
+              setMuscleSelectionMode('primary');
             }}
             activeOpacity={0.8}
           >
@@ -341,17 +484,99 @@ export default function ManualExerciseEntryScreen() {
               }
             ]}
           >
+            {/* Primary/Secondary Selection for Gym and Bodyweight */}
+            {(animatingCategory === 'gym' || animatingCategory === 'bodyweight') && (
+              <View style={styles.muscleSectionContainer}>
+                {/* Primary Section */}
+                <TouchableOpacity
+                  style={[
+                    styles.muscleSectionCard,
+                    muscleSelectionMode === 'primary' && [styles.activeMuscleSection, { borderColor: themeColor }]
+                  ]}
+                  onPress={() => setMuscleSelectionMode('primary')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.muscleSectionHeader}>
+                    <View style={[styles.muscleSectionIcon, { backgroundColor: themeColor }]}>
+                      <Ionicons name="flash" size={16} color="#000000" />
+                    </View>
+                    <View style={styles.muscleSectionContent}>
+                      <Text style={[styles.muscleSectionTitle, muscleSelectionMode === 'primary' && { color: themeColor }]}>
+                        Primary Target
+                      </Text>
+                      <Text style={styles.muscleSectionDescription}>
+                        Main muscles • Count for volume
+                      </Text>
+                    </View>
+                    <View style={styles.muscleSectionBadge}>
+                      <Text style={[styles.muscleSectionBadgeText, { color: themeColor }]}>
+                        {selectedPrimaryMuscles.length}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Secondary Section */}
+                <TouchableOpacity
+                  style={[
+                    styles.muscleSectionCard,
+                    muscleSelectionMode === 'secondary' && [styles.activeMuscleSection, { borderColor: '#71717a' }]
+                  ]}
+                  onPress={() => setMuscleSelectionMode('secondary')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.muscleSectionHeader}>
+                    <View style={[styles.muscleSectionIcon, { backgroundColor: '#71717a' }]}>
+                      <Ionicons name="add-circle-outline" size={16} color="#000000" />
+                    </View>
+                    <View style={styles.muscleSectionContent}>
+                      <Text style={[styles.muscleSectionTitle, muscleSelectionMode === 'secondary' && { color: '#71717a' }]}>
+                        Secondary
+                      </Text>
+                      <Text style={styles.muscleSectionDescription}>
+                        Assist & stabilize • Optional
+                      </Text>
+                    </View>
+                    <View style={styles.muscleSectionBadge}>
+                      <Text style={[styles.muscleSectionBadgeText, { color: '#71717a' }]}>
+                        {selectedSecondaryMuscles.length}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+            
             <Text style={styles.sectionTitle}>
-              {animatingCategory === 'cardio' ? 'Primary Focus' : 
+              {(animatingCategory === 'gym' || animatingCategory === 'bodyweight') ? 
+                (muscleSelectionMode === 'primary' ? 'Primary Target Muscles' : 'Secondary Involvement') :
+               animatingCategory === 'cardio' ? 'Primary Focus' : 
                animatingCategory === 'flexibility' ? 'Stretch Areas' : 
                animatingCategory === 'custom' ? 'Target Areas' :
                'Muscle Groups'}
             </Text>
-            <Text style={styles.sectionSubtitle}>Select all that apply</Text>
+            <Text style={styles.sectionSubtitle}>
+              {(animatingCategory === 'gym' || animatingCategory === 'bodyweight') ? 
+                (muscleSelectionMode === 'primary' ? 
+                  'Main muscles that do most of the work (count for volume tracking)' : 
+                  'Muscles that assist or stabilize (optional)') :
+                'Select all that apply'}
+            </Text>
             <View style={styles.muscleGroupGrid}>
               {getAllMuscleGroupOptions(animatingCategory).map((muscleGroup) => {
-                const isSelected = selectedMuscleGroups.includes(muscleGroup);
+                // Determine if muscle is selected based on category
+                let isSelected = false;
+                if (animatingCategory === 'gym' || animatingCategory === 'bodyweight') {
+                  isSelected = muscleSelectionMode === 'primary' ? 
+                    selectedPrimaryMuscles.includes(muscleGroup) :
+                    selectedSecondaryMuscles.includes(muscleGroup);
+                } else {
+                  isSelected = selectedMuscleGroups.includes(muscleGroup);
+                }
+                
                 const isCustomOption = muscleGroup === 'Custom';
+                const chipColor = (animatingCategory === 'gym' || animatingCategory === 'bodyweight') && muscleSelectionMode === 'secondary' ? '#71717a' : themeColor;
+                
                 return (
                   <TouchableOpacity
                     key={muscleGroup}
@@ -359,20 +584,20 @@ export default function ManualExerciseEntryScreen() {
                       styles.muscleGroupChip,
                       isCustomOption && styles.customMuscleGroupChip,
                       isSelected && [styles.selectedMuscleGroupChip, { 
-                        borderColor: themeColor, 
-                        backgroundColor: `${themeColor}20` 
+                        borderColor: chipColor, 
+                        backgroundColor: `${chipColor}20` 
                       }]
                     ]}
                     onPress={() => handleMuscleGroupToggle(muscleGroup)}
                     activeOpacity={0.8}
                   >
                     {isCustomOption && (
-                      <Ionicons name="add" size={14} color={isSelected ? themeColor : '#71717a'} style={{ marginRight: 4 }} />
+                      <Ionicons name="add" size={14} color={isSelected ? chipColor : '#71717a'} style={{ marginRight: 4 }} />
                     )}
                     <Text style={[
                       styles.muscleGroupText, 
                       isCustomOption && styles.customMuscleGroupText,
-                      isSelected && { color: themeColor }
+                      isSelected && { color: chipColor }
                     ]}>
                       {muscleGroup}
                     </Text>
@@ -385,48 +610,42 @@ export default function ManualExerciseEntryScreen() {
 
         {/* Instructions */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Instructions</Text>
-            <TouchableOpacity
-              onPress={addInstructionStep}
-              style={[styles.addButton, { borderColor: themeColor }]}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="add" size={14} color={themeColor} />
-              <Text style={[styles.addButtonText, { color: themeColor }]}>Add Step</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.sectionSubtitle}>Break down how to perform this exercise (optional)</Text>
+          <Text style={styles.sectionTitle}>Instructions</Text>
+          <Text style={styles.sectionSubtitle}>How to perform this exercise (optional)</Text>
           
-          <View style={styles.stepsContainer}>
-            {instructionSteps.map((step, index) => (
-              <View key={index} style={styles.stepItem}>
-                <Text style={styles.stepDot}>{index + 1}.</Text>
+          {instructionSteps.map((step, index) => (
+            <View key={index} style={styles.instructionRow}>
+              <View style={styles.numberContainer}>
+                <Text style={styles.stepNumber}>{index + 1}.</Text>
+              </View>
+              <View style={styles.inputContainer}>
                 <TextInput
-                  style={styles.stepTextInput}
-                  placeholder={
-                    index === 0 ? "Stand with feet shoulder-width apart..." :
-                    index === 1 ? "Lower into squat position..." :
-                    "Return to starting position..."
-                  }
+                  style={styles.instructionInput}
+                  placeholder="Enter step description..."
                   placeholderTextColor="#71717a"
                   value={step}
                   onChangeText={(text) => updateInstructionStep(index, text)}
-                  multiline={true}
-                  textAlignVertical="top"
+                  multiline={false}
                 />
                 {instructionSteps.length > 1 && (
                   <TouchableOpacity
                     onPress={() => removeInstructionStep(index)}
-                    style={styles.deleteButton}
-                    activeOpacity={0.7}
+                    style={styles.removeButton}
                   >
-                    <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                    <Ionicons name="close" size={20} color="#71717a" />
                   </TouchableOpacity>
                 )}
               </View>
-            ))}
-          </View>
+            </View>
+          ))}
+          
+          <TouchableOpacity
+            onPress={addInstructionStep}
+            style={[styles.addStepBtn, { borderColor: themeColor }]}
+          >
+            <Ionicons name="add" size={20} color={themeColor} />
+            <Text style={[styles.addStepText, { color: themeColor }]}>Add another step</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Additional Notes */}
@@ -457,7 +676,7 @@ export default function ManualExerciseEntryScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.saveButtonText}>
-            {isLoading ? 'Adding...' : 'Add to Favorites'}
+            {isLoading ? (isEditing ? 'Updating...' : 'Adding...') : (isEditing ? 'Update Exercise' : 'Add to Favorites')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -745,59 +964,106 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0a0a0b',
   },
-  instructionHeader: {
+  instructionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginBottom: 12,
     alignItems: 'center',
-    marginBottom: 8,
   },
-  addStepButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 4,
-  },
-  addStepText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  instructionStepContainer: {
-    marginBottom: 16,
-  },
-  stepRow: {
-    flexDirection: 'row',
+  numberContainer: {
+    width: 30,
     alignItems: 'flex-start',
-    gap: 12,
   },
   stepNumber: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
-    marginTop: 16,
-    minWidth: 20,
   },
-  removeStepButton: {
-    width: 24,
+  inputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instructionInput: {
+    flex: 1,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#ffffff',
+    minHeight: 44,
+  },
+  removeButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  addStepBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    gap: 8,
+  },
+  addStepText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  muscleSectionContainer: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  muscleSectionCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#27272a',
+    padding: 16,
+  },
+  activeMuscleSection: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
+  muscleSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  muscleSectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  muscleSectionContent: {
+    flex: 1,
+  },
+  muscleSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  muscleSectionDescription: {
+    fontSize: 12,
+    color: '#71717a',
+    fontWeight: '500',
+  },
+  muscleSectionBadge: {
+    minWidth: 24,
     height: 24,
     borderRadius: 12,
     backgroundColor: '#27272a',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 13,
   },
-  stepInput: {
-    flex: 1,
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    minHeight: 50,
-    textAlignVertical: 'top',
+  muscleSectionBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

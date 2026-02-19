@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,50 +19,86 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 export default function ExerciseHelpScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { themeColor } = useTheme();
+  const [copiedButton, setCopiedButton] = useState<string | null>(null);
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, buttonId: string) => {
     await Clipboard.setStringAsync(text);
+    setCopiedButton(buttonId);
+    setTimeout(() => setCopiedButton(null), 1000);
   };
 
-  const exerciseCreationPrompt = `Create a detailed workout exercise with the following information:
+  const exerciseCreationPrompt = `I want to create a custom exercise for my fitness app. Please ask me clarifying questions to understand exactly what exercise I want to create.
 
-Exercise Name: [Name of the exercise]
-Category: [strength/cardio/flexibility/sports]
-Muscle Groups: [List of primary muscle groups targeted]
-Equipment Needed: [List any equipment required, or "none" for bodyweight]
-Instructions: [Step-by-step instructions for performing the exercise]
-Form Cues: [Important form and safety tips]
-Modifications: [Easier and harder variations]
-Sets/Reps: [Recommended sets and repetitions]
-Rest Time: [Recommended rest between sets]
+Ask me about:
+- What specific exercise or movement I have in mind
+- What equipment I have available (or if it should be bodyweight)
+- What category it should be (gym/bodyweight/flexibility/cardio/custom)
+- Any specific variations or modifications I want included
 
-Please provide a comprehensive exercise that is safe and effective for fitness enthusiasts.`;
+Please ask these questions one by one and wait for my responses. Once you have all the information, create a detailed exercise with:
 
-  const jsonConversionPrompt = `Convert the exercise information above to JSON format using this exact structure:
+Exercise Name: [Based on my input]
+Category: [Based on my preference]
+Equipment: [What I have available]
+
+Primary Target Muscles: [The main muscles that do most of the work - these are the muscles this exercise directly trains and would count toward weekly volume targets]
+
+Secondary Involvement: [Muscles that assist, stabilize, or receive some stimulus but are not the primary movers - these help but require dedicated exercises for optimal development]
+
+Instructions:
+1. [Step-by-step movement based on my specifications]
+2. [Continue based on the exercise I described]
+
+Additional Notes: [Any helpful training tips or form cues]
+
+IMPORTANT: When categorizing muscles, think about which muscles are the PRIMARY MOVERS (doing most of the work) versus which are ASSISTERS/STABILIZERS. For example:
+- Push-ups: Primary = Chest, Triceps | Secondary = Shoulders, Core
+- Pull-ups: Primary = Lats, Rhomboids | Secondary = Biceps, Rear Delts
+- Squats: Primary = Quads, Glutes | Secondary = Calves, Core
+
+Start by asking me what specific exercise or movement I want to create.`;
+
+  const jsonConversionPrompt = `Convert the exercise information above to JSON format that can be imported into the fitness app. Use this EXACT structure:
 
 {
+  "id": "exercise_[generateRandomString]",
   "name": "Exercise Name",
-  "category": "strength", // or "cardio", "flexibility", "sports"
-  "muscleGroups": ["Muscle Group 1", "Muscle Group 2"],
-  "equipment": ["Equipment 1", "Equipment 2"],
-  "instructions": [
-    "Step 1 instruction",
-    "Step 2 instruction",
-    "Step 3 instruction"
-  ],
-  "formCues": [
-    "Form tip 1",
-    "Form tip 2"
-  ],
-  "modifications": {
-    "easier": "Easier variation description",
-    "harder": "Harder variation description"
-  },
-  "setsReps": "3 sets of 8-12 reps",
-  "restTime": "60-90 seconds"
+  "category": "gym",
+  "customCategory": "Custom Category Name (only include this field if category is 'custom')",
+  "primaryMuscles": ["Primary Muscle 1", "Primary Muscle 2"],
+  "secondaryMuscles": ["Secondary Muscle 1", "Secondary Muscle 2"],
+  "instructions": "Step 1: Starting position description\\n\\nStep 2: Movement execution\\n\\nStep 3: Return to starting position",
+  "notes": "Any additional helpful information",
+  "addedAt": "2026-02-19T12:00:00.000Z"
 }
 
-Only return the JSON, nothing else.`;
+CRITICAL MUSCLE CATEGORIZATION:
+Before creating the JSON, carefully analyze the exercise and categorize muscles correctly:
+
+PRIMARY MUSCLES (main movers - count for volume tracking):
+- The muscles doing most of the work and joint movement
+- Examples: Chest in push-ups, quads in squats, lats in pull-ups
+
+SECONDARY MUSCLES (assisters/stabilizers - provide stimulus but need dedicated work):
+- Muscles that help stabilize or assist but aren't the main drivers
+- Examples: Shoulders in push-ups, core in squats, biceps in pull-ups
+
+COMMON CATEGORIZATION EXAMPLES:
+- Push-ups: Primary=["Chest", "Triceps"] Secondary=["Shoulders", "Core"]
+- Squats: Primary=["Quadriceps", "Glutes"] Secondary=["Calves", "Core"]
+- Pull-ups: Primary=["Lats", "Rhomboids"] Secondary=["Biceps", "Rear Delts"]
+- Bench Press: Primary=["Chest", "Triceps"] Secondary=["Shoulders"]
+- Deadlifts: Primary=["Hamstrings", "Glutes", "Erector Spinae"] Secondary=["Traps", "Lats"]
+
+OTHER REQUIREMENTS:
+- Generate a unique ID starting with "exercise_" followed by random characters
+- Category must be EXACTLY one of: "gym", "bodyweight", "flexibility", "cardio", "custom"  
+- Only include "customCategory" field if category is "custom"
+- Use \\n for line breaks in instructions and notes
+- Use current date/time in ISO format for addedAt
+- Return ONLY valid JSON - no extra text, explanations, or markdown formatting
+
+The JSON must be ready to paste directly into the app import function.`;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -93,11 +129,17 @@ Only return the JSON, nothing else.`;
           
           <TouchableOpacity 
             style={[styles.promptButton, { backgroundColor: themeColor }]}
-            onPress={() => copyToClipboard(exerciseCreationPrompt)}
+            onPress={() => copyToClipboard(exerciseCreationPrompt, 'creation')}
             activeOpacity={0.8}
           >
-            <Ionicons name="copy-outline" size={20} color="#000000" />
-            <Text style={styles.promptButtonText}>Copy Exercise Creation Prompt</Text>
+            <Ionicons 
+              name={copiedButton === 'creation' ? "checkmark" : "copy-outline"} 
+              size={20} 
+              color="#000000" 
+            />
+            <Text style={styles.promptButtonText}>
+              {copiedButton === 'creation' ? 'Copied!' : 'Copy Exercise Creation Prompt'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -116,11 +158,17 @@ Only return the JSON, nothing else.`;
           
           <TouchableOpacity 
             style={[styles.promptButton, { backgroundColor: themeColor }]}
-            onPress={() => copyToClipboard(jsonConversionPrompt)}
+            onPress={() => copyToClipboard(jsonConversionPrompt, 'json')}
             activeOpacity={0.8}
           >
-            <Ionicons name="sparkles" size={20} color="#000000" />
-            <Text style={styles.promptButtonText}>Copy JSON Conversion Prompt</Text>
+            <Ionicons 
+              name={copiedButton === 'json' ? "checkmark" : "sparkles"} 
+              size={20} 
+              color="#000000" 
+            />
+            <Text style={styles.promptButtonText}>
+              {copiedButton === 'json' ? 'Copied!' : 'Copy JSON Conversion Prompt'}
+            </Text>
           </TouchableOpacity>
         </View>
 

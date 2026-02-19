@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -21,10 +21,16 @@ interface FavoriteExercise {
   name: string;
   category: 'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom';
   customCategory?: string;
-  muscleGroups: string[];
+  muscleGroups: string[]; // Legacy field for backward compatibility
+  primaryMuscles?: string[]; // New field for primary target muscles
+  secondaryMuscles?: string[]; // New field for secondary involvement
   instructions?: string;
   notes?: string;
   addedAt: string;
+  // Activity metrics to match meal format
+  estimatedCalories?: number;
+  duration?: number; // minutes
+  intensity?: 'low' | 'moderate' | 'high';
 }
 
 export default function FavoriteExercisesScreen() {
@@ -36,15 +42,88 @@ export default function FavoriteExercisesScreen() {
     loadFavoriteExercises();
   }, []);
 
+  // Reload data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadFavoriteExercises();
+    }, [])
+  );
+
   const loadFavoriteExercises = async () => {
     try {
+      console.log('=== FAVORITES SCREEN LOAD START ===');
+      console.log('Attempting to load favorite exercises...');
+      
       const savedData = await AsyncStorage.getItem('favoriteExercises');
+      console.log('Raw data from storage:', savedData);
+      console.log('Data type:', typeof savedData);
+      console.log('Data length:', savedData ? savedData.length : 'null');
+      
       if (savedData) {
-        const exercises = JSON.parse(savedData);
-        setFavoriteExercises(exercises);
+        try {
+          const exercises = JSON.parse(savedData);
+          console.log('Successfully parsed exercises:', JSON.stringify(exercises, null, 2));
+          console.log('Exercises is array?:', Array.isArray(exercises));
+          console.log('Number of exercises loaded:', exercises.length);
+          
+          // Fix any duplicate IDs
+          const exercisesWithUniqueIds = exercises.map((exercise, index) => {
+            const hasValidId = exercise.id && typeof exercise.id === 'string' && exercise.id.length > 0;
+            if (!hasValidId) {
+              const newId = 'exercise_' + Date.now() + '_' + index + '_' + Math.random().toString(36).substr(2, 9);
+              console.log(`Fixed missing/invalid ID for exercise "${exercise.name}": ${exercise.id} -> ${newId}`);
+              return { ...exercise, id: newId };
+            }
+            return exercise;
+          });
+          
+          // Check for and fix duplicates
+          const seenIds = new Set();
+          const uniqueExercises = exercisesWithUniqueIds.map((exercise, index) => {
+            if (seenIds.has(exercise.id)) {
+              const newId = 'exercise_' + Date.now() + '_' + index + '_' + Math.random().toString(36).substr(2, 9);
+              console.log(`Fixed duplicate ID for exercise "${exercise.name}": ${exercise.id} -> ${newId}`);
+              seenIds.add(newId);
+              return { ...exercise, id: newId };
+            }
+            seenIds.add(exercise.id);
+            return exercise;
+          });
+          
+          // Save cleaned data back if we made changes
+          if (JSON.stringify(exercises) !== JSON.stringify(uniqueExercises)) {
+            console.log('Saving cleaned exercise data back to storage');
+            await AsyncStorage.setItem('favoriteExercises', JSON.stringify(uniqueExercises));
+          }
+          
+          if (uniqueExercises.length > 0) {
+            console.log('Sample exercise structure:', uniqueExercises[0]);
+            uniqueExercises.forEach((exercise, index) => {
+              console.log(`Exercise ${index + 1}:`, {
+                id: exercise.id,
+                name: exercise.name,
+                category: exercise.category,
+                muscleGroups: exercise.muscleGroups
+              });
+            });
+          }
+          
+          setFavoriteExercises(uniqueExercises);
+          console.log('State updated with', uniqueExercises.length, 'exercises');
+        } catch (parseError) {
+          console.error('PARSE ERROR in favorites screen:', parseError);
+          console.log('Invalid JSON data:', savedData);
+          setFavoriteExercises([]);
+        }
+      } else {
+        console.log('No data found in storage (null/undefined)');
+        setFavoriteExercises([]);
       }
+      
+      console.log('=== FAVORITES SCREEN LOAD END ===');
     } catch (error) {
       console.error('Failed to load favorite exercises:', error);
+      setFavoriteExercises([]);
     }
   };
 
@@ -122,62 +201,49 @@ export default function FavoriteExercisesScreen() {
     <TouchableOpacity
       style={styles.exerciseCard}
       onPress={() => {
-        // Navigate to exercise detail if we have one
-        // For now just show info
-        const categoryDisplay = exercise.category === 'custom' && exercise.customCategory 
-          ? exercise.customCategory 
-          : exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1);
-        
-        let alertMessage = `Category: ${categoryDisplay}\nMuscle Groups: ${exercise.muscleGroups.join(', ')}`;
-        
-        if (exercise.instructions) {
-          alertMessage += `\n\nInstructions:\n${exercise.instructions}`;
-        }
-        
-        if (exercise.notes) {
-          alertMessage += `\n\nNotes:\n${exercise.notes}`;
-        }
-        
-        Alert.alert(exercise.name, alertMessage);
+        navigation.navigate('ExerciseDetail' as any, { exercise });
       }}
       activeOpacity={0.8}
     >
+      <View style={styles.cardHeader}>
+        <Text style={styles.exerciseName}>{exercise.name}</Text>
+        <TouchableOpacity
+          onPress={() => removeFavorite(exercise)}
+          style={styles.heartButton}
+        >
+          <Ionicons name="heart" size={20} color="#ef4444" />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.cardContent}>
-        <View style={styles.exerciseIconContainer}>
+        <View style={styles.iconContainer}>
           <Ionicons
             name={getCategoryIcon(exercise.category)}
-            size={24}
+            size={20}
             color={themeColor}
           />
         </View>
         
-        <View style={styles.exerciseInfo}>
-          <View style={styles.exerciseTitleRow}>
-            <Text style={styles.exerciseName}>{exercise.name}</Text>
-            <TouchableOpacity
-              onPress={() => removeFavorite(exercise)}
-              style={styles.removeButton}
-            >
-              <Ionicons name="heart" size={18} color="#ef4444" />
-            </TouchableOpacity>
-          </View>
-          
-          <Text style={[styles.exerciseCategory, { color: themeColor }]}>
+        <View style={styles.exerciseDetails}>
+          <Text style={[styles.categoryText, { color: themeColor }]}>
             {exercise.category === 'custom' && exercise.customCategory 
               ? exercise.customCategory 
               : exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1)}
           </Text>
           
-          <View style={styles.muscleGroupsRow}>
-            <Text style={styles.muscleGroupsText}>
-              {exercise.muscleGroups.join(', ')}
-            </Text>
-          </View>
+          <Text style={styles.muscleGroupsText}>
+            {(() => {
+              const displayMuscles = exercise.primaryMuscles || exercise.muscleGroups.filter(group => group !== 'Custom');
+              const visibleMuscles = displayMuscles.slice(0, 3);
+              const remainingCount = displayMuscles.length - 3;
+              return visibleMuscles.join(', ') + (remainingCount > 0 ? ` +${remainingCount}` : '');
+            })()}
+          </Text>
         </View>
         
-        <View style={styles.chevronContainer}>
+        <TouchableOpacity style={styles.chevronButton}>
           <Ionicons name="chevron-forward" size={20} color="#71717a" />
-        </View>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -270,55 +336,52 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#27272a',
-    padding: 16,
-    marginBottom: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  exerciseName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    flex: 1,
+  },
+  heartButton: {
+    padding: 4,
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
-  exerciseIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#27272a',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  exerciseInfo: {
+  exerciseDetails: {
     flex: 1,
-    gap: 4,
+    gap: 8,
   },
-  exerciseTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  exerciseName: {
-    fontSize: 18,
+  categoryText: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
-    flex: 1,
-  },
-  exerciseCategory: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  removeButton: {
-    padding: 4,
-  },
-  muscleGroupsRow: {
-    marginTop: 8,
   },
   muscleGroupsText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#a1a1aa',
     fontWeight: '500',
   },
-  chevronContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  chevronButton: {
+    padding: 4,
   },
   bottomPadding: {
     height: 40,

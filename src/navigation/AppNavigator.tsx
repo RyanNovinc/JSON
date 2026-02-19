@@ -54,6 +54,7 @@ import AddMealScreen from '../screens/AddMealScreen';
 import ManualMealEntryScreen from '../screens/ManualMealEntryScreen';
 import MealPlanHelpScreen from '../screens/MealPlanHelpScreen';
 import FavoriteExercisesScreen from '../screens/FavoriteExercisesScreen';
+import ExerciseDetailScreen from '../screens/ExerciseDetailScreen';
 import AddExerciseSelectionScreen from '../screens/AddExerciseSelectionScreen';
 import ManualExerciseEntryScreen from '../screens/ManualExerciseEntryScreen';
 import ExerciseHelpScreen from '../screens/ExerciseHelpScreen';
@@ -493,6 +494,13 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen 
                 name="FavoriteExercises" 
                 component={FavoriteExercisesScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
+                name="ExerciseDetail" 
+                component={ExerciseDetailScreen}
                 options={{
                   headerShown: false,
                 }}

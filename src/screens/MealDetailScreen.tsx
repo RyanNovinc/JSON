@@ -4,14 +4,15 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  
   Alert,
   Modal,
   TextInput,
   Linking,
   Share,
+  TouchableOpacity,
+  Pressable,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+import { TouchableOpacity as GestureHandlerTouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -136,6 +137,15 @@ export default function MealDetailScreen() {
     }
   };
 
+  const handleEdit = () => {
+    console.log('Edit button pressed for meal:', meal?.name);
+    // Navigate to edit screen with meal data
+    navigation.navigate('ManualMealEntry' as any, { 
+      editMeal: meal,
+      isEditing: true 
+    });
+  };
+
   const getTagIcon = (tag: MealTag): keyof typeof Ionicons.glyphMap => {
     switch (tag) {
       case 'easy': return 'checkmark-circle';
@@ -165,21 +175,21 @@ export default function MealDetailScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <GestureHandlerTouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
+        </GestureHandlerTouchableOpacity>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={shareMeal} style={styles.headerButton}>
+          <GestureHandlerTouchableOpacity onPress={shareMeal} style={styles.headerButton}>
             <Ionicons name="share-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={toggleFavorite} style={styles.headerButton}>
+          </GestureHandlerTouchableOpacity>
+          <GestureHandlerTouchableOpacity onPress={toggleFavorite} style={styles.headerButton}>
             <Ionicons 
               name={isFavorite ? "heart" : "heart-outline"} 
               size={24} 
               color={isFavorite ? "#ef4444" : "#ffffff"} 
             />
-          </TouchableOpacity>
+          </GestureHandlerTouchableOpacity>
         </View>
       </View>
 
@@ -279,6 +289,16 @@ export default function MealDetailScreen() {
 
       </ScrollView>
 
+      {/* Floating Edit Button */}
+      <View style={styles.fabContainer}>
+        <TouchableOpacity 
+          style={[styles.editFab, { backgroundColor: themeColor }]} 
+          onPress={handleEdit}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="pencil" size={20} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -739,5 +759,26 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     lineHeight: 22,
     fontWeight: '400',
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    zIndex: 999,
+  },
+  editFab: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
   },
 });

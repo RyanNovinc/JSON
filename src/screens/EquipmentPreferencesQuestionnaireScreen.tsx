@@ -19,6 +19,18 @@ import * as Animatable from 'react-native-animatable';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
+// FavoriteExercise interface
+interface FavoriteExercise {
+  id: string;
+  name: string;
+  category: 'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom';
+  customCategory?: string;
+  muscleGroups: string[];
+  instructions?: string;
+  notes?: string;
+  addedAt: string;
+}
+
 // Equipment Options
 interface EquipmentOption {
   id: string;
@@ -103,6 +115,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const [likedExercises, setLikedExercises] = useState<string>('');
   const [dislikedExercises, setDislikedExercises] = useState<string>('');
   const [useFavoriteExercises, setUseFavoriteExercises] = useState<boolean>(false);
+  const [selectedFavoriteExercises, setSelectedFavoriteExercises] = useState<string[]>([]);
+  const [favoriteExercisesList, setFavoriteExercisesList] = useState<FavoriteExercise[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -115,7 +129,20 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   // Load saved questionnaire data on component mount
   useEffect(() => {
     loadSavedData();
+    loadFavoriteExercises();
   }, []);
+
+  const loadFavoriteExercises = async () => {
+    try {
+      const savedData = await AsyncStorage.getItem('favoriteExercises');
+      if (savedData) {
+        const exercises = JSON.parse(savedData);
+        setFavoriteExercisesList(exercises);
+      }
+    } catch (error) {
+      console.error('Failed to load favorite exercises:', error);
+    }
+  };
 
   const loadSavedData = async () => {
     try {
@@ -138,6 +165,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         setLikedExercises(data.likedExercises || '');
         setDislikedExercises(data.dislikedExercises || '');
         setUseFavoriteExercises(data.useFavoriteExercises || false);
+        setSelectedFavoriteExercises(data.selectedFavoriteExercises || []);
         
         // If questionnaire was completed, show summary directly
         if (data.completedAt) {
@@ -170,6 +198,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         likedExercises,
         dislikedExercises,
         useFavoriteExercises,
+        selectedFavoriteExercises,
         currentStep,
         // Note: no completedAt field - this indicates it's in progress
       };
@@ -186,7 +215,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       saveProgress();
     }
   }, [selectedEquipment, specificEquipment, unavailableEquipment, workoutDuration, customDuration, useAISuggestion,
-      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, useFavoriteExercises]);
+      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, useFavoriteExercises, selectedFavoriteExercises]);
 
   const handleRetakeQuestions = async () => {
     try {
@@ -208,6 +237,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       setLikedExercises('');
       setDislikedExercises('');
       setUseFavoriteExercises(false);
+      setSelectedFavoriteExercises([]);
       setCurrentStep(0);
       setShowResults(false);
       setIsCompleted(false);
@@ -290,6 +320,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         likedExercises,
         dislikedExercises,
         useFavoriteExercises,
+        selectedFavoriteExercises,
         completedAt: new Date().toISOString(),
       };
 
@@ -420,6 +451,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               numberOfLines={3}
             />
           </Animatable.View>
+
         </Animatable.View>
       </ScrollView>
     );
@@ -833,63 +865,9 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             Exercise Preferences
           </Text>
           <Text style={styles.sectionSubtitle}>
-            Help us personalize your workouts
+            Help us personalize your workouts (all fields are optional)
           </Text>
 
-          {/* Favorite Exercises Toggle */}
-          <Animatable.View
-            animation="fadeInUp"
-            delay={50}
-            style={styles.favoriteToggleContainer}
-          >
-            <TouchableOpacity
-              style={[
-                styles.favoriteToggleCard,
-                useFavoriteExercises && [styles.selectedFavoriteToggle, { 
-                  borderColor: themeColor, 
-                  backgroundColor: `${themeColor}10`,
-                  shadowColor: themeColor,
-                  shadowOpacity: 0.3,
-                }]
-              ]}
-              onPress={() => setUseFavoriteExercises(!useFavoriteExercises)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.favoriteToggleContent}>
-                <View style={[styles.favoriteToggleIconContainer, useFavoriteExercises && { backgroundColor: themeColor }]}>
-                  <Ionicons 
-                    name="heart" 
-                    size={20} 
-                    color={useFavoriteExercises ? '#000000' : themeColor} 
-                  />
-                </View>
-                <View style={styles.favoriteToggleText}>
-                  <Text style={[styles.favoriteToggleTitle, useFavoriteExercises && { color: themeColor }]}>
-                    Include My Favorite Exercises
-                  </Text>
-                  <Text style={[styles.favoriteToggleSubtitle, useFavoriteExercises && { color: themeColor, opacity: 0.8 }]}>
-                    Use exercises from your favorites list
-                  </Text>
-                </View>
-                <View style={styles.favoriteToggleIndicator}>
-                  {useFavoriteExercises ? (
-                    <Ionicons name="checkmark-circle" size={20} color={themeColor} />
-                  ) : (
-                    <View style={styles.unselectedCircle} />
-                  )}
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.manageFavoritesButton}
-                onPress={() => navigation.navigate('FavoriteExercises' as any)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.manageFavoritesText, { color: themeColor }]}>
-                  Manage Favorites →
-                </Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </Animatable.View>
           
           {/* Liked Exercises */}
           <Animatable.View
@@ -898,11 +876,11 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             style={styles.inputContainer}
           >
             <Text style={styles.inputLabel}>
-              Exercises you love:
+              Exercises you love (optional):
             </Text>
             <TextInput
               style={styles.textInput}
-              placeholder="e.g., deadlifts, bench press, squats, pull-ups..."
+              placeholder="Optional: e.g., deadlifts, bench press, squats, pull-ups..."
               placeholderTextColor="#71717a"
               value={likedExercises}
               onChangeText={setLikedExercises}
@@ -918,11 +896,11 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             style={styles.inputContainer}
           >
             <Text style={styles.inputLabel}>
-              Exercises you want to avoid:
+              Exercises you want to avoid (optional):
             </Text>
             <TextInput
               style={styles.textInput}
-              placeholder="e.g., overhead press, leg extensions, bicep curls..."
+              placeholder="Optional: e.g., overhead press, leg extensions, bicep curls..."
               placeholderTextColor="#71717a"
               value={dislikedExercises}
               onChangeText={setDislikedExercises}
@@ -931,6 +909,110 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             />
           </Animatable.View>
 
+          {/* Favorite Exercises Section */}
+          <Animatable.View
+            animation="fadeInUp"
+            delay={300}
+            style={styles.favoriteExercisesSection}
+          >
+            <TouchableOpacity
+              style={[styles.favoriteExercisesToggle, useFavoriteExercises && { backgroundColor: `${themeColor}10` }]}
+              onPress={() => {
+                setUseFavoriteExercises(!useFavoriteExercises);
+                if (!useFavoriteExercises) {
+                  loadFavoriteExercises();
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.favoriteToggleRow}>
+                <View style={[styles.favoriteCheckbox, useFavoriteExercises && { backgroundColor: themeColor, borderColor: themeColor }]}>
+                  {useFavoriteExercises && (
+                    <Ionicons name="checkmark" size={14} color="#000000" />
+                  )}
+                </View>
+                <Text style={[styles.favoriteToggleLabel, useFavoriteExercises && { color: themeColor }]}>
+                  Include My Favorite Exercises
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.manageFavoritesLink}
+                onPress={() => navigation.navigate('FavoriteExercises' as any)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.manageFavoritesLinkText, { color: themeColor }]}>
+                  Manage →
+                </Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+
+            {useFavoriteExercises && (
+              <Animatable.View
+                animation="fadeInDown"
+                duration={300}
+                style={styles.favoriteExercisesList}
+              >
+                {favoriteExercisesList.length === 0 ? (
+                  <View style={styles.emptyFavoritesMessage}>
+                    <Ionicons name="heart-outline" size={24} color="#71717a" />
+                    <Text style={styles.emptyFavoritesText}>
+                      No favorites yet. Add some exercises to your favorites first.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.exercisesGrid}>
+                    {favoriteExercisesList.map((exercise) => {
+                      const isSelected = selectedFavoriteExercises.includes(exercise.id);
+                      return (
+                        <TouchableOpacity
+                          key={exercise.id}
+                          style={[
+                            styles.exerciseItem,
+                            isSelected && [styles.selectedExerciseItem, { 
+                              borderColor: themeColor, 
+                              backgroundColor: `${themeColor}15` 
+                            }]
+                          ]}
+                          onPress={() => {
+                            if (isSelected) {
+                              setSelectedFavoriteExercises(prev => prev.filter(id => id !== exercise.id));
+                            } else {
+                              setSelectedFavoriteExercises(prev => [...prev, exercise.id]);
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.exerciseItemContent}>
+                            <View style={[styles.exerciseItemIcon, isSelected && { backgroundColor: themeColor }]}>
+                              <Ionicons
+                                name={exercise.category === 'gym' ? 'barbell' : 
+                                      exercise.category === 'bodyweight' ? 'body' :
+                                      exercise.category === 'cardio' ? 'heart' :
+                                      exercise.category === 'flexibility' ? 'leaf' : 'add-circle'}
+                                size={16}
+                                color={isSelected ? '#000000' : themeColor}
+                              />
+                            </View>
+                            <Text 
+                              style={[styles.exerciseItemName, isSelected && { color: themeColor }]} 
+                              numberOfLines={2}
+                            >
+                              {exercise.name}
+                            </Text>
+                            <View style={[styles.exerciseItemCheckbox, isSelected && { backgroundColor: themeColor, borderColor: themeColor }]}>
+                              {isSelected && (
+                                <Ionicons name="checkmark" size={12} color="#000000" />
+                              )}
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </Animatable.View>
+            )}
+          </Animatable.View>
         </Animatable.View>
       </ScrollView>
     );
@@ -1049,7 +1131,10 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
                 </View>
                 <View style={styles.tronValueSection}>
                   {useFavoriteExercises && (
-                    <Text style={styles.tronValue}>✓ Using favorite exercises from your library</Text>
+                    <Text style={styles.tronValue}>
+                      ✓ Using favorite exercises from your library
+                      {selectedFavoriteExercises.length > 0 && ` (${selectedFavoriteExercises.length} selected)`}
+                    </Text>
                   )}
                   {likedExercises && (
                     <Text style={[styles.tronValue, { marginTop: useFavoriteExercises ? 8 : 0 }]}>
@@ -1924,5 +2009,253 @@ const styles = StyleSheet.create({
   manageFavoritesText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  favoriteActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectExercisesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 6,
+  },
+  selectExercisesText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#0a0a0b',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
+  },
+  modalBackButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  modalDoneButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalDoneText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  modalEmptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 80,
+  },
+  modalEmptyTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  modalEmptyDescription: {
+    fontSize: 16,
+    color: '#71717a',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  modalAddButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  modalAddButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  exerciseSelectionList: {
+    paddingTop: 20,
+    gap: 12,
+  },
+  exerciseSelectionCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 20,
+  },
+  selectedExerciseCard: {
+    borderWidth: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  exerciseSelectionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  exerciseSelectionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#27272a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseSelectionDetails: {
+    flex: 1,
+    gap: 6,
+  },
+  exerciseSelectionName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  exerciseSelectionCategory: {
+    fontSize: 14,
+    color: '#a1a1aa',
+    fontWeight: '500',
+  },
+  exerciseSelectionIndicator: {
+    marginLeft: 'auto',
+  },
+  unselectedExerciseCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#3f3f46',
+  },
+  modalBottomPadding: {
+    height: 40,
+  },
+  // New minimal favorite exercises styles
+  favoriteExercisesSection: {
+    marginTop: 24,
+  },
+  favoriteExercisesToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  favoriteToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  favoriteCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#3f3f46',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favoriteToggleLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  manageFavoritesLink: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  manageFavoritesLinkText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  favoriteExercisesList: {
+    marginTop: 8,
+  },
+  emptyFavoritesMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 12,
+  },
+  emptyFavoritesText: {
+    fontSize: 14,
+    color: '#71717a',
+    textAlign: 'center',
+    flex: 1,
+  },
+  exercisesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  exerciseItem: {
+    width: '48%',
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 16,
+  },
+  selectedExerciseItem: {
+    borderWidth: 2,
+  },
+  exerciseItemContent: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  exerciseItemIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#27272a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    minHeight: 36,
+  },
+  exerciseItemCheckbox: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    borderWidth: 1.5,
+    borderColor: '#3f3f46',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

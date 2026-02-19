@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -32,26 +33,49 @@ interface Instruction {
 
 export default function ManualMealEntryScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
   const { themeColor } = useTheme();
-  const { addToFavorites } = useMealPlanning();
+  const { addToFavorites, removeFromFavorites, getFavoriteMeals, refreshData } = useMealPlanning();
+  
+  // Check if we're editing an existing meal
+  const editMeal = route.params?.editMeal;
+  const isEditing = route.params?.isEditing;
+
+  // Initialize form data from edit meal if available
+  const initializeIngredients = (mealIngredients: any[] = []) => {
+    return mealIngredients.map((ing, index) => ({
+      id: ing.id || `ingredient_${index}`,
+      text: typeof ing === 'string' ? ing : 
+            ing.amount && ing.unit ? `${ing.amount} ${ing.unit} ${ing.name || ing.item}` : 
+            ing.name || ing.item || ''
+    }));
+  };
+
+  const initializeInstructions = (mealInstructions: any[] = []) => {
+    return mealInstructions.map((inst, index) => ({
+      id: inst.id || `instruction_${index}`,
+      step: inst.step || (index + 1),
+      instruction: typeof inst === 'string' ? inst : inst.instruction || ''
+    }));
+  };
 
   // Basic Info
-  const [mealName, setMealName] = useState('');
-  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | null>(null);
-  const [prepTime, setPrepTime] = useState('');
-  const [cookTime, setCookTime] = useState('');
+  const [mealName, setMealName] = useState(editMeal?.name || editMeal?.meal_name || '');
+  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | null>(editMeal?.type || editMeal?.meal_type || null);
+  const [prepTime, setPrepTime] = useState(editMeal?.prepTime?.toString() || editMeal?.prep_time?.toString() || '');
+  const [cookTime, setCookTime] = useState(editMeal?.cookTime?.toString() || editMeal?.cook_time?.toString() || '');
 
   // Nutrition
-  const [calories, setCalories] = useState('');
-  const [protein, setProtein] = useState('');
-  const [carbs, setCarbs] = useState('');
-  const [fat, setFat] = useState('');
+  const [calories, setCalories] = useState((editMeal?.nutritionInfo?.calories || editMeal?.calories)?.toString() || '');
+  const [protein, setProtein] = useState((editMeal?.nutritionInfo?.protein || editMeal?.macros?.protein)?.toString() || '');
+  const [carbs, setCarbs] = useState((editMeal?.nutritionInfo?.carbs || editMeal?.macros?.carbs)?.toString() || '');
+  const [fat, setFat] = useState((editMeal?.nutritionInfo?.fat || editMeal?.macros?.fat)?.toString() || '');
 
   // Optional sections
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [instructions, setInstructions] = useState<Instruction[]>([]);
-  const [showIngredients, setShowIngredients] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false);
+  const [ingredients, setIngredients] = useState<Ingredient[]>(initializeIngredients(editMeal?.ingredients));
+  const [instructions, setInstructions] = useState<Instruction[]>(initializeInstructions(editMeal?.instructions));
+  const [showIngredients, setShowIngredients] = useState(editMeal?.ingredients?.length > 0 || false);
+  const [showInstructions, setShowInstructions] = useState(editMeal?.instructions?.length > 0 || false);
 
   const addIngredient = () => {
     const newIngredient: Ingredient = {
@@ -102,11 +126,11 @@ export default function ManualMealEntryScreen() {
 
     try {
       const mealData = {
-        id: 'manual_' + Date.now(),
+        id: isEditing ? editMeal.id : 'manual_' + Date.now(),
         type: mealType || 'breakfast',
         name: mealName.trim(),
-        description: `A custom ${mealType || 'meal'} recipe`,
-        time: '12:00', // default time
+        description: editMeal?.description || `A custom ${mealType || 'meal'} recipe`,
+        time: editMeal?.time || '12:00', // preserve existing time or default
         ingredients: ingredients
           .filter(ing => ing.text.trim())
           .map((ing, index) => {
@@ -176,15 +200,47 @@ export default function ManualMealEntryScreen() {
         prepTime: parseInt(prepTime) || 0,
         cookTime: parseInt(cookTime) || 0,
         servings: 1,
-        tags: ['custom'] as const,
-        isFavorite: false,
+        tags: editMeal?.tags || ['custom'] as const,
+        isFavorite: editMeal?.isFavorite || false,
       };
 
-      await addToFavorites(mealData);
-
-      Alert.alert('Success', 'Meal added to favorites!', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      if (isEditing) {
+        // For editing, manually update the favorites array to avoid state timing issues
+        console.log('Editing meal with ID:', editMeal.id);
+        
+        const currentFavorites = getFavoriteMeals();
+        const updatedFavorites = currentFavorites.map(fav => {
+          if (fav.mealId === editMeal.id) {
+            // Update the existing favorite with new meal data
+            return {
+              ...fav,
+              meal: mealData,
+              // Keep original metadata
+              mealId: mealData.id,
+              addedAt: fav.addedAt,
+              timesCooked: fav.timesCooked,
+              lastCookedAt: fav.lastCookedAt
+            };
+          }
+          return fav;
+        });
+        
+        // Save to AsyncStorage and refresh context state
+        await AsyncStorage.setItem('favoriteMeals', JSON.stringify(updatedFavorites));
+        
+        // Refresh the context to pick up our AsyncStorage changes
+        await refreshData();
+        
+        Alert.alert('Success', 'Meal updated successfully!', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      } else {
+        await addToFavorites(mealData);
+        console.log('Added new meal:', mealData.name);
+        Alert.alert('Success', 'Meal added to favorites!', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to save meal. Please try again.');
     }
@@ -224,7 +280,7 @@ export default function ManualMealEntryScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add New Meal</Text>
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Meal' : 'Add New Meal'}</Text>
         <TouchableOpacity onPress={saveMeal} style={styles.saveButton}>
           <Text style={[styles.saveButtonText, { color: themeColor }]}>Save</Text>
         </TouchableOpacity>

@@ -23,8 +23,13 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 interface FavoriteExercise {
   id: string;
   name: string;
-  category: 'strength' | 'cardio' | 'flexibility' | 'sports';
-  muscleGroups: string[];
+  category: 'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom';
+  customCategory?: string;
+  muscleGroups: string[]; // Legacy field for backward compatibility
+  primaryMuscles?: string[]; // New field for primary target muscles
+  secondaryMuscles?: string[]; // New field for secondary involvement
+  instructions?: string;
+  notes?: string;
   addedAt: string;
 }
 
@@ -35,7 +40,7 @@ export default function AddExerciseSelectionScreen() {
   const [showJsonModal, setShowJsonModal] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [importedExerciseName, setImportedExerciseName] = useState('');
+  const [importedExercise, setImportedExercise] = useState<FavoriteExercise | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
   const [modalScale] = useState(new Animated.Value(0));
   const [modalOpacity] = useState(new Animated.Value(0));
@@ -72,48 +77,133 @@ export default function AddExerciseSelectionScreen() {
     navigation.navigate('ManualExerciseEntry' as any);
   };
 
+  const debugStorageData = async () => {
+    try {
+      console.log('--- STORAGE DEBUG START ---');
+      const savedData = await AsyncStorage.getItem('favoriteExercises');
+      console.log('Raw storage data:', savedData);
+      console.log('Data type:', typeof savedData);
+      console.log('Data length:', savedData ? savedData.length : 'null');
+      
+      if (savedData) {
+        try {
+          const exercises = JSON.parse(savedData);
+          console.log('Successfully parsed exercises:', exercises);
+          console.log('Exercises is array?:', Array.isArray(exercises));
+          console.log('Number of exercises:', exercises.length);
+          
+          if (exercises.length > 0) {
+            console.log('First exercise:', exercises[0]);
+            console.log('Last exercise:', exercises[exercises.length - 1]);
+          }
+        } catch (parseError) {
+          console.error('PARSE ERROR in debug:', parseError);
+          console.log('Invalid JSON in storage:', savedData);
+        }
+      } else {
+        console.log('No data found in storage (null/undefined)');
+      }
+      console.log('--- STORAGE DEBUG END ---');
+    } catch (error) {
+      console.error('Debug storage error:', error);
+    }
+  };
+
+  const clearCorruptedData = async () => {
+    Alert.alert(
+      'Clear Favorites Data',
+      'This will clear all saved exercises to fix data issues. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.removeItem('favoriteExercises');
+            Alert.alert('Cleared', 'Favorites data has been cleared. Try importing again.');
+          }
+        }
+      ]
+    );
+  };
+
   const processJsonImport = async (text: string) => {
     try {
+      console.log('=== IMPORT PROCESS START ===');
+      console.log('Raw text received:', text);
+      
       const exerciseData = JSON.parse(text.trim());
+      console.log('Parsed exercise data:', JSON.stringify(exerciseData, null, 2));
+      
+      // Show current storage state
+      console.log('--- BEFORE IMPORT ---');
+      await debugStorageData();
       
       // Basic validation
       if (!exerciseData.name) {
+        console.log('ERROR: No exercise name found');
         Alert.alert('Invalid JSON', 'Please ensure the JSON contains an exercise name');
         return;
       }
 
-      // Create a complete exercise object
+      // Create a complete exercise object with guaranteed unique ID
+      const uniqueId = 'exercise_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
       const completeExercise: FavoriteExercise = {
-        id: 'imported_' + Date.now(),
+        id: uniqueId, // Always generate a new unique ID
         name: exerciseData.name,
-        category: exerciseData.category || 'strength',
-        muscleGroups: exerciseData.muscleGroups || ['Full Body'],
-        addedAt: new Date().toISOString(),
+        category: exerciseData.category || 'gym',
+        customCategory: exerciseData.customCategory,
+        // Support both new and legacy formats
+        muscleGroups: exerciseData.muscleGroups || exerciseData.primaryMuscles || ['Full Body'],
+        primaryMuscles: exerciseData.primaryMuscles,
+        secondaryMuscles: exerciseData.secondaryMuscles,
+        instructions: exerciseData.instructions,
+        notes: exerciseData.notes,
+        addedAt: new Date().toISOString(), // Always use current timestamp
       };
+      
+      console.log('Complete exercise object created:', JSON.stringify(completeExercise, null, 2));
 
       // Load existing favorites
       const existingData = await AsyncStorage.getItem('favoriteExercises');
+      console.log('Existing data from storage:', existingData);
+      
       const existingExercises: FavoriteExercise[] = existingData ? JSON.parse(existingData) : [];
+      console.log('Existing exercises parsed:', existingExercises);
+      console.log('Number of existing exercises:', existingExercises.length);
 
-      // Check if exercise already exists
-      const exerciseExists = existingExercises.some(
-        exercise => exercise.name.toLowerCase().trim() === completeExercise.name.toLowerCase().trim()
-      );
-
-      if (exerciseExists) {
-        Alert.alert('Duplicate Exercise', 'This exercise is already in your favorites');
-        return;
-      }
+      // Allow duplicates - users may have modified exercises
+      console.log('Allowing exercise to be added (duplicates permitted)');
 
       // Add to favorites
       const updatedExercises = [completeExercise, ...existingExercises];
-      await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
+      console.log('Updated exercises array:', updatedExercises);
+      console.log('Number of exercises after adding:', updatedExercises.length);
+      
+      // Save to storage
+      const dataToSave = JSON.stringify(updatedExercises);
+      console.log('Data being saved to storage:', dataToSave);
+      
+      await AsyncStorage.setItem('favoriteExercises', dataToSave);
+      console.log('SUCCESS: Data saved to AsyncStorage');
+      
+      // Verify save worked immediately
+      console.log('--- AFTER IMPORT (immediate) ---');
+      await debugStorageData();
+      
+      // Also verify after a small delay to ensure persistence
+      setTimeout(async () => {
+        console.log('--- VERIFICATION AFTER 1 SECOND ---');
+        await debugStorageData();
+      }, 1000);
 
-      setImportedExerciseName(completeExercise.name);
+      setImportedExercise(completeExercise);
       setShowJsonModal(false);
       showSuccessAnimation();
+      console.log('=== IMPORT PROCESS END ===');
       
     } catch (error) {
+      console.error('IMPORT ERROR:', error);
       Alert.alert('Invalid JSON', 'Please check your JSON format and try again.');
     }
   };
@@ -136,7 +226,11 @@ export default function AddExerciseSelectionScreen() {
     ]).start();
   };
 
-  const handleSuccessModalClose = () => {
+  const handleSuccessModalClose = async () => {
+    // Verify data exists before navigation
+    console.log('=== PRE-NAVIGATION VERIFICATION ===');
+    await debugStorageData();
+    
     // Animate modal exit
     Animated.parallel([
       Animated.timing(modalScale, {
@@ -153,7 +247,10 @@ export default function AddExerciseSelectionScreen() {
       setShowSuccessModal(false);
       modalScale.setValue(0);
       modalOpacity.setValue(0);
-      navigation.goBack();
+      
+      console.log('Navigating to FavoriteExercises screen...');
+      // Navigate to favorites screen instead of going back
+      navigation.navigate('FavoriteExercises' as any);
     });
   };
 
@@ -210,6 +307,7 @@ export default function AddExerciseSelectionScreen() {
         >
           <Text style={styles.secondaryButtonText}>Manually Add</Text>
         </TouchableOpacity>
+
 
         {/* Move help link to bottom of screen */}
         <View style={styles.helpLinkWrapper}>
@@ -311,14 +409,25 @@ export default function AddExerciseSelectionScreen() {
             {/* Main Content */}
             <View style={styles.successMainContent}>
               <Text style={styles.successTitle}>Exercise Ready</Text>
-              <Text style={styles.successExerciseName}>{importedExerciseName}</Text>
+              <Text style={styles.successExerciseName}>{importedExercise?.name}</Text>
               
               {/* Summary Card */}
               <View style={styles.successSummaryCard}>
                 <View style={styles.successSummaryRow}>
-                  <Text style={styles.successSummaryLabel}>Status</Text>
+                  <Text style={styles.successSummaryLabel}>Category</Text>
                   <Text style={[styles.successSummaryValue, { color: themeColor }]}>
-                    Added to Favorites
+                    {importedExercise?.category === 'custom' && importedExercise?.customCategory 
+                      ? importedExercise.customCategory
+                      : importedExercise?.category?.charAt(0).toUpperCase() + importedExercise?.category?.slice(1)
+                    }
+                  </Text>
+                </View>
+                <View style={styles.successSummaryRow}>
+                  <Text style={styles.successSummaryLabel}>Primary Target</Text>
+                  <Text style={[styles.successSummaryValue, { color: themeColor }]}>
+                    {importedExercise?.primaryMuscles?.slice(0, 3).join(', ') || 
+                     importedExercise?.muscleGroups?.slice(0, 3).join(', ') || 
+                     'Full Body'}
                   </Text>
                 </View>
               </View>
