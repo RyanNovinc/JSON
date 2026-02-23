@@ -832,24 +832,60 @@ export default function ImportRoutineScreen() {
 
 ## INSTRUCTIONS
 
-**Step 1 — Review & Clarify**
-Before designing the program, review the full profile below. In MOST cases, the profile will contain everything you need — skip straight to Step 2 and build the program.
+**Step 1 — Plan**
+Review the profile and plan the training program. Work through split selection, volume distribution, exercise choices, and trade-offs however you need to — show your reasoning.
 
-Only ask a clarifying question if there is a genuine contradiction or critical ambiguity that would result in a fundamentally different program depending on the answer. Ask a maximum of 2 questions.
+You MUST verify your volume math before presenting the summary. For each training day, list every exercise with its set count and primary muscle tags, then total the weekly volume per muscle group. If any muscle group is below its target, revise the plan and recount. Do not present the clean summary until every non-exempt muscle group meets at least its minimum, and Push Hard targets are met or flagged as constrained with a clear reason.
 
-Do NOT ask questions:
-- To confirm choices the user already made (e.g., don't ask 'are you sure you want X frequency?')
-- To validate your programming decisions (e.g., don't ask 'is it okay if I include Y?')
-- About technical details the user expects you to handle (split type, exercise selection, periodization)
-- When you can make a reasonable assumption and note it in Quick Notes instead
+This planning step is about quality, not presentation. Take as long as you need to get the plan right. The user only reads the clean summary at the end.
 
-You are the coach. If the profile gives you enough to build a good program, just build it.
+When you're done planning, end your response with a clean summary using this format:
 
-**Step 2 — Design & Present**
-Design a complete training program based on the profile. Use established, evidence-based training principles. Create it as a markdown document artifact. After presenting, wait for feedback before making changes or converting to JSON.
+---
+## Your Program Plan
+
+**Split:** [split name] — [brief description]
+**Sessions:** [estimated session lengths]
+**Blocks:** [block structure and deload timing]
+
+| Day | Session | Focus |
+|-----|---------|-------|
+| 1   | ...     | ...   |
+| ... | ...     | ...   |
+
+### Volume Targets
+[Volume table using the same format defined in the Quality Check section — all muscle groups, sets/week, target ranges, status indicators]
+
+### Trade-offs (if any)
+- [1-3 bullets noting meaningful compromises]
+- If the profile includes secondary goals with dedicated training days (cardio, mobility, sport, etc.), briefly note how those days are structured and how activities rotate across the program. Secondary goals are part of the plan — include them in the summary, not just the lifting days.
+
+### Cardio Plan
+If the user's profile includes cardiovascular training, summarize the cardio structure: which activities, how they rotate across weeks, steady state vs intervals, duration, and intensity approach. Cardio is a stated goal — treat it as part of the plan, not an afterthought.
+
+### Recommendation (if applicable)
+If the plan has significant limitations, suggest a single clear change that would improve results. Keep it simple — the user may not have training knowledge. Do not use jargon or suggest complex split restructuring. Frame it as one easy-to-understand option.
+
+Good example: "I'd recommend 5 lifting days + 1 cardio day (6 total) instead of 4 lifting + 1 cardio. This would solve the Upper Back and Biceps volume constraints and let every session be shorter (~55 min vs ~70 min). Let me know if you'd like me to replan for that schedule."
+
+Bad example: "You could try a Push/Pull/Legs/Upper/Lower split with cardio finishers on 2 sessions, or convert the cardio day to an Arms + Back day with 15-20 min LISS at the end."
+
+Do not suggest tagging cardio onto the end of lifting sessions — this interferes with hypertrophy recovery. If the user needs more lifting days, recommend adding total training days rather than combining sessions.
+
+Do NOT ask the user specific questions about the plan. Do NOT ask for confirmation on individual decisions (e.g., "happy with the split?", "want to add core work?"). The user will tell you what they want to change.
+
+End with: "Let me know if you want any changes, or say **generate** to build the full program."
+---
+
+The profile represents the user's initial preferences, not hard constraints. This includes the total number of training days — if the user's goals would be significantly better served by training more days per week (e.g., 6 days instead of 5), recommend that. The user may not realize that adjusting their schedule would meaningfully improve their results. That's exactly the kind of insight they're relying on a coach for. Always respect their choices if they confirm them, but don't silently accept a suboptimal setup when a better option exists.
+
+Do NOT write the full program yet. Only plan. Wait for the user to say "generate" before building.
+
+**Step 2 — Build**
+Once the user confirms the plan (or after making requested changes), generate the complete program as a markdown document with all exercises, sets, reps, progressions, alternatives, and volume tables. Follow all formatting rules and quality checks below.
 
 **Step 3 — Recommendations (optional)**
-If the program has inherent limitations due to the user's choices (e.g., a muscle group can't reach optimal volume due to available training days), include a brief '### Recommendations' section after Quick Notes explaining what change would improve results. Keep it to 1-2 sentences maximum. Example: 'Side delts are at 8 sets/week — adding lateral raises as supersets on lower body days would bring these to 12+ sets for better growth.'
+If the program has inherent limitations due to the user's choices (e.g., a muscle group can't reach optimal volume due to available training days), include a brief '### Recommendations' section after Quick Notes explaining what change would improve results. Keep it to 1-2 sentences maximum.
 
 ## MY PROFILE
 
@@ -1020,6 +1056,8 @@ TRAINING APPROACH ADJUSTMENT: The user's training approach shifts where within t
 These targets combine with experience level — a beginner choosing Push Hard still stays within beginner-appropriate ranges, just at the higher end of those ranges.
 
 If the training approach is Push Hard, the volume summary should show most non-exempt muscle groups in the UPPER half of the optimal range, not clustered at their minimums. A Push Hard program where most muscles sit at minimum volume is underdelivering on the user's intent. If a muscle group cannot reach the Push Hard target due to split constraints (e.g., only 2 upper body days), note this in the Recommendations section and suggest how the user could address it (e.g., adding lateral raises as supersets on lower body days).
+
+After verifying all muscle groups meet their targets, review the overall distribution. If some muscle groups are at or near their ceiling (e.g., 20 sets for a major muscle) while others sit at the floor of their target range (e.g., 12 sets for a medium muscle targeting 12-16), look for opportunities to redistribute. Swapping one exercise, reducing sets on an over-served muscle, or adding a set to an underserved one can produce a more balanced program without increasing total training stress. The goal is an even spread across target ranges, not some muscles maxed out while others barely qualify.
 - **Rest periods:** Default to 1-2 minutes for compound exercises and 60-90 seconds for isolation exercises. Adjust based on the user's rest time preference if specified.
 - **Progressive overload:** Every program must include a clear overload mechanism (increasing load, reps, or sets week to week). Do not use vague instructions like "increase weight when ready."
 - **Frequency:** Each muscle group should ideally be trained 2x per week for hypertrophy. Once per week is suboptimal but acceptable if schedule constraints require it.
@@ -1054,11 +1092,8 @@ For each block (and deload weeks separately), show a table of sets per week per 
 
 - Do NOT include lengthy exercise selection rationale or training philosophy essays
 - Do NOT include nutrition advice or general health tips
-- Do NOT perform post-generation verification in the response. Complete all volume calculations and exercise planning BEFORE writing the program. Once the markdown document is created, your response is done — do not re-audit, re-count, or edit the program in a follow-up message.
-- Do NOT show your planning, volume calculations, or exercise selection reasoning in the chat. Work through all calculations internally. The user should only see a brief acknowledgment (1-2 sentences) followed by the markdown document artifact. No visible "let me plan..." or volume tallying in the response.
-- Do NOT convert to JSON — I need to review and approve the program first
-- After presenting the program, ask for my feedback on: exercise selection, volume, progression, and anything I want to change
-- Only after I confirm I'm happy should you offer JSON conversion`;
+- Do NOT convert to JSON — the user will handle JSON conversion separately
+- After building the program in Step 2, ask for feedback on: exercise selection, volume, progression, and anything the user wants to change`;
                     
                     await Clipboard.setStringAsync(planningPrompt);
                     setPlanningPromptCopied(true);
