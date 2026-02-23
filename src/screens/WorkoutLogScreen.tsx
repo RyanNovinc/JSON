@@ -79,6 +79,7 @@ interface Exercise {
   restQuick?: number;
   notes?: string;
   alternatives?: string[];
+  superset_group?: string;
   previous?: { weight: number; reps: number };
 }
 
@@ -656,6 +657,40 @@ export default function WorkoutLogScreen() {
 
   // Superset linking state
   const [supersetLinks, setSupersetLinks] = useState<Set<number>>(new Set());
+  
+  // Auto-detect supersets from superset_group field on component mount
+  useEffect(() => {
+    const detectSupersets = () => {
+      const links = new Set<number>();
+      const supersetGroups: { [group: string]: number[] } = {};
+      
+      // Group exercises by their superset_group
+      day.exercises.forEach((exercise, index) => {
+        if (exercise.superset_group) {
+          if (!supersetGroups[exercise.superset_group]) {
+            supersetGroups[exercise.superset_group] = [];
+          }
+          supersetGroups[exercise.superset_group].push(index);
+        }
+      });
+      
+      // Create links for consecutive exercises in the same superset group
+      Object.values(supersetGroups).forEach(group => {
+        if (group.length > 1) {
+          // Sort the group to ensure proper order
+          group.sort((a, b) => a - b);
+          // Link each exercise to the next one in the group (except the last)
+          for (let i = 0; i < group.length - 1; i++) {
+            links.add(group[i]);
+          }
+        }
+      });
+      
+      setSupersetLinks(links);
+    };
+    
+    detectSupersets();
+  }, [day.exercises]);
   
   // Rest timer state - now tracks both countdown and stopwatch separately
   const [activeTimer, setActiveTimer] = useState<{
@@ -1756,49 +1791,70 @@ export default function WorkoutLogScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={handleBack}
-          activeOpacity={0.7}
+      <KeyboardAvoidingView 
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{day.day_name}</Text>
-          {(() => {
-            // Parse the block weeks to get total week count
-            const weeksRange = block.weeks || '1-4';
-            const totalWeeks = weeksRange.includes('-') 
-              ? parseInt(weeksRange.split('-')[1]) - parseInt(weeksRange.split('-')[0]) + 1
-              : 1;
-            
-            // Check if current week is a deload week
-            const isDeloadWeek = block.deload_weeks?.includes(currentWeek) || false;
-            const weekDisplay = `WEEK ${currentWeek} / ${totalWeeks}`;
-            const deloadLabel = isDeloadWeek ? ' — DELOAD' : '';
-            
-            return (
-              <Text style={[styles.weekLabel, { color: themeColor }]}>
-                {weekDisplay}
-                {isDeloadWeek && <Text style={[styles.deloadLabel, { color: themeColor }]}>{deloadLabel}</Text>}
-              </Text>
-            );
-          })()}
-          {workoutStartTime && (
-            <Text style={[styles.workoutDuration, { color: themeColor }]}>{formatDuration(workoutDuration)}</Text>
-          )}
-        </View>
-        <View style={styles.headerButtons}>
-          {/* Deload Info Button */}
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={handleBack}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <Text style={styles.title}>{day.day_name}</Text>
+              {(() => {
+                // Parse the block weeks to get total week count
+                const weeksRange = block.weeks || '1-4';
+                const totalWeeks = weeksRange.includes('-') 
+                  ? parseInt(weeksRange.split('-')[1]) - parseInt(weeksRange.split('-')[0]) + 1
+                  : 1;
+                
+                // Check if current week is a deload week
+                const isDeloadWeek = block.deload_weeks?.includes(currentWeek) || false;
+                const weekDisplay = `WEEK ${currentWeek} / ${totalWeeks}`;
+                const deloadLabel = isDeloadWeek ? ' — DELOAD' : '';
+                
+                return (
+                  <Text style={[styles.weekLabel, { color: themeColor }]}>
+                    {weekDisplay}
+                    {isDeloadWeek && <Text style={[styles.deloadLabel, { color: themeColor }]}>{deloadLabel}</Text>}
+                  </Text>
+                );
+              })()}
+              {workoutStartTime && (
+                <Text style={[styles.workoutDuration, { color: themeColor }]}>{formatDuration(workoutDuration)}</Text>
+              )}
+            </View>
+            <View style={styles.headerButtons}>
+              {/* Deload Info Button */}
           {block.deload_weeks?.includes(currentWeek) && (
             <TouchableOpacity 
               style={[styles.deloadHeaderButton, { borderColor: themeColor }]}
               onPress={() => {
+                const deloadGuidance = block.deload_guidance;
                 const previousWeek = currentWeek - 1;
+                
+                let message = '';
+                if (deloadGuidance) {
+                  message = `Use ${deloadGuidance.weight_percentage}% of your Week ${previousWeek} weight.\n\nRep Range: ${deloadGuidance.rep_range}\n\n${deloadGuidance.notes}`;
+                } else {
+                  // Fallback to generic advice if no deload_guidance is provided
+                  message = `Use 40-60% of your Week ${previousWeek} weight (50% is most common).\n\nExample: If you used 100kg for ${previousWeek === 3 ? '6-8' : 'your'} reps in Week ${previousWeek}, use 50kg for 12 reps this week.`;
+                }
+                
                 Alert.alert(
                   'Deload Week Info',
-                  `Use 40-60% of your Week ${previousWeek} weight (50% is most common).\n\nExample: If you used 100kg for ${previousWeek === 3 ? '6-8' : 'your'} reps in Week ${previousWeek}, use 50kg for 12 reps this week.`,
+                  message,
                   [{ text: 'OK' }]
                 );
               }}
@@ -1821,17 +1877,8 @@ export default function WorkoutLogScreen() {
           </Animated.View>
         </View>
       </View>
-      
-      <KeyboardAvoidingView 
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+          
+          {/* Exercise content */}
           {day.exercises.map((exercise: Exercise, index: number) => (
             <React.Fragment key={index}>
               <ExerciseCard
@@ -1882,10 +1929,44 @@ export default function WorkoutLogScreen() {
             </React.Fragment>
           ))}
           
+
           <View style={styles.bottomSpacer} />
         </ScrollView>
       </KeyboardAvoidingView>
       
+      {/* Minimized Timer or Start Timer Button */}
+      {activeTimer && timerMinimized ? (
+        <TouchableOpacity 
+          style={styles.minimizedTimer}
+          onPress={() => setTimerMinimized(false)}
+        >
+          <Text style={styles.minimizedTimerText}>
+            {getDisplayTime(activeTimer).minutes}:{getDisplayTime(activeTimer).seconds.toString().padStart(2, '0')}
+          </Text>
+        </TouchableOpacity>
+      ) : !activeTimer ? (
+        <TouchableOpacity 
+          style={styles.startTimerButton}
+          onPress={() => {
+            // Start a manual timer
+            const defaultRest = 120; // Default 2 minutes
+            setActiveTimer({
+              exerciseIndex: 0,
+              setIndex: 0,
+              timeLeft: timerSettings.countUp ? 3600 : defaultRest,
+              originalDuration: timerSettings.countUp ? 0 : defaultRest,
+              isRunning: false,
+              isQuickMode: false,
+              completed: false,
+            });
+            setTimerMinimized(false); // Open full screen instead of minimized
+          }}
+        >
+          <Ionicons name="timer-outline" size={20} color={themeColor} />
+          <Text style={[styles.startTimerText, { color: themeColor }]}>Start Timer</Text>
+        </TouchableOpacity>
+      ) : null}
+
       {activeTimer && !timerMinimized && (
         <TouchableOpacity 
           style={styles.timerOverlay}
@@ -2177,38 +2258,6 @@ export default function WorkoutLogScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Minimized Timer or Start Timer Button */}
-      {activeTimer && timerMinimized ? (
-        <TouchableOpacity 
-          style={styles.minimizedTimer}
-          onPress={() => setTimerMinimized(false)}
-        >
-          <Text style={styles.minimizedTimerText}>
-            {getDisplayTime(activeTimer).minutes}:{getDisplayTime(activeTimer).seconds.toString().padStart(2, '0')}
-          </Text>
-        </TouchableOpacity>
-      ) : !activeTimer ? (
-        <TouchableOpacity 
-          style={styles.startTimerButton}
-          onPress={() => {
-            // Start a manual timer
-            const defaultRest = 120; // Default 2 minutes
-            setActiveTimer({
-              exerciseIndex: 0,
-              setIndex: 0,
-              timeLeft: timerSettings.countUp ? 3600 : defaultRest,
-              originalDuration: timerSettings.countUp ? 0 : defaultRest,
-              isRunning: false,
-              isQuickMode: false,
-              completed: false,
-            });
-            setTimerMinimized(false); // Open full screen instead of minimized
-          }}
-        >
-          <Ionicons name="timer-outline" size={20} color={themeColor} />
-          <Text style={[styles.startTimerText, { color: themeColor }]}>Start Timer</Text>
-        </TouchableOpacity>
-      ) : null}
 
       {/* Start Workout Confirmation Modal */}
       <Modal
@@ -2433,13 +2482,41 @@ export default function WorkoutLogScreen() {
               </TouchableOpacity>
             </View>
             
-            <Text style={styles.deloadInfoText}>
-              Use 40-60% of your Week 3 weight (50% is most common).
-            </Text>
-            
-            <Text style={styles.deloadInfoExample}>
-              Example: If you used 100kg for 6-8 reps in Week 3, use 50kg for 12 reps this week.
-            </Text>
+            {(() => {
+              const deloadGuidance = block.deload_guidance;
+              const previousWeek = currentWeek - 1;
+              
+              if (deloadGuidance) {
+                return (
+                  <>
+                    <Text style={styles.deloadInfoText}>
+                      Use {deloadGuidance.weight_percentage}% of your Week {previousWeek} weight.
+                    </Text>
+                    
+                    <Text style={styles.deloadInfoText}>
+                      Rep Range: {deloadGuidance.rep_range}
+                    </Text>
+                    
+                    <Text style={styles.deloadInfoExample}>
+                      {deloadGuidance.notes}
+                    </Text>
+                  </>
+                );
+              } else {
+                // Fallback to generic advice
+                return (
+                  <>
+                    <Text style={styles.deloadInfoText}>
+                      Use 40-60% of your Week {previousWeek} weight (50% is most common).
+                    </Text>
+                    
+                    <Text style={styles.deloadInfoExample}>
+                      Example: If you used 100kg for 6-8 reps in Week {previousWeek}, use 50kg for 12 reps this week.
+                    </Text>
+                  </>
+                );
+              }
+            })()}
           </Animated.View>
         </View>
       </Modal>
@@ -3223,10 +3300,7 @@ const styles = StyleSheet.create({
     gap: 8,
     zIndex: 1000,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
@@ -3251,10 +3325,7 @@ const styles = StyleSheet.create({
     gap: 8,
     zIndex: 1000,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,

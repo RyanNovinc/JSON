@@ -322,6 +322,11 @@ Convert the workout program above into valid JSON matching the schema below. Do 
       "weeks": "string (e.g. '1-4' — include deload week in the block)",
       "structure": "string (e.g. 'Push Pull Legs Upper Lower')",
       "deload_weeks": [number] (e.g. [4] — which weeks within this block are deload weeks),
+      "deload_guidance": {
+        "weight_percentage": number (e.g. 60 for 60% of previous week),
+        "rep_range": "string (e.g. '8-10' — typically Week 1 reps)",
+        "notes": "string (e.g. 'Use 60% of Week 3 weight. Focus on form and recovery.')"
+      },
       "days": [
         {
           "day_name": "string (e.g. 'Push', 'Lower', 'Cardio')",
@@ -347,6 +352,7 @@ Convert the workout program above into valid JSON matching the schema below. Do 
   "secondaryMuscles": ["from taxonomy"],
   "reps_weekly": { "1": "10-12", "2": "8-10", "3": "6-8", "4": "12" },
   "sets_weekly": { "1": 4, "2": 4, "3": 4, "4": 3 },
+  "superset_group": "string or omit (e.g. 'A' groups exercises together)",
   "notes": "string or omit if none",
   "alternatives": [
     { "exercise": "string", "primaryMuscles": ["..."], "secondaryMuscles": ["..."] }
@@ -416,13 +422,18 @@ Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Tri
 
 1. **Do not change anything** — use the exact exercise names, sets, reps, rest periods, muscles, alternatives, and notes from the program
 2. **Block structure** — each block includes its deload week. A program with "Block A Weeks 1-3 + Deload Week 4" becomes one block with weeks "1-4" and weekly progressions using keys "1" through "4"
-3. **Weekly progressions** — map the program's "Weekly progression: Wk1: 10-12, Wk2: 8-10, Wk3: 6-8, Wk4 (deload): 3x12" into reps_weekly and sets_weekly. Deload weeks get reduced sets via sets_weekly
-4. **Supersets** — place superset exercises adjacent in the exercises array. Add "Superset with [other exercise]" to both exercises' notes fields
+3. **Weekly progressions** — map the program's "Weekly progression: [show reps and load guidance for each week of the block, including deload if applicable]" into reps_weekly and sets_weekly. Deload weeks get reduced sets via sets_weekly
+4. **Supersets** — assign the same superset_group value (e.g. "A", "B", "C") to exercises that should be performed as supersets. Place superset exercises adjacent in the exercises array. Example: if "Barbell Bench Press" and "Incline Dumbbell Press" are a superset, both get "superset_group": "A"
 5. **Cardio rotation** — if cardio activities change week to week, use a single cardio entry with progression_weekly describing each week's activity, duration, mode, and intensity
 6. **restQuick** — calculate as roughly 60-70% of the rest value, rounded to a clean number (e.g. rest: 180 → restQuick: 120, rest: 90 → restQuick: 60)
 7. **Empty secondary muscles** — if an exercise has no secondary muscles, use an empty array \`[]\`
 8. **Deload days** — deload weeks use the same day structure but with reduced sets_weekly values. Do NOT create separate deload days — the weekly progression system handles it
 9. **Deload weeks** — for deload weeks, use the same rep numbers without additional weight guidance in reps_weekly. The app will automatically display "DELOAD" labels and provide weight guidance elsewhere in the UI. Keep reps_weekly values clean (e.g., just "12", not "12 (light)")
 10. **Block-relative keys** — weekly progression keys are always relative to the block, starting from "1". Block B (weeks 5-8) uses keys "1", "2", "3", "4" — not "5", "6", "7", "8". Each block is an independent cycle.
-11. **Deload week tagging** — add a deload_weeks array to each block indicating which week numbers (block-relative) are deload weeks. For a standard 4-week block with week 4 as deload, use "deload_weeks": [4]. This allows the app to display a "DELOAD" label and automatic 50% weight guidance in the UI.`;
+11. **Deload week tagging** — add a deload_weeks array to each block indicating which week numbers (block-relative) are deload weeks. For a standard 4-week block with week 4 as deload, use "deload_weeks": [4]. This allows the app to display a "DELOAD" label and automatic weight guidance in the UI.
+12. **Deload guidance** — for each block containing deload weeks, include a deload_guidance object with specific instructions:
+    - weight_percentage: The percentage of previous week's weight to use (typically 50-70%)
+    - rep_range: The rep range to use during deload (typically Week 1 rep ranges)
+    - notes: Specific guidance like "Use 60% of Week 3 weight. Focus on form and recovery."
+    Base these values on the program type: strength programs typically use 60-70% weight with 5-8 reps, hypertrophy programs typically use 40-60% weight with Week 1 rep ranges (10-15 reps).`;
 };

@@ -944,13 +944,14 @@ Barbell Bench Press
 - Alt 1: Dumbbell Bench Press (Primary: Chest, Triceps | Secondary: Front Delts)
 - Alt 2: Machine Chest Press (Primary: Chest, Triceps | Secondary: Front Delts)
 - Notes: Retract shoulder blades, maintain slight arch
-- Weekly progression: Wk1: 10-12, Wk2: 8-10, Wk3: 6-8, Wk4 (deload): 12 at lighter weight
+- Weekly progression: Wk1: 10-12, Wk2: 8-10, Wk3: 6-8, Wk4 (deload): 12 at 50% of Wk3 weight
 \`\`\`
 
 Rules for strength exercises:
 - Use full descriptive names with equipment prefix (e.g., "Barbell Back Squat", "Dumbbell Lateral Raise", "Cable Face Pull")
 - Always include 2 alternative exercises, each with their own Primary/Secondary muscles
 - Always show weekly rep progression across the block
+- For supersets, clearly label them (e.g., "Superset A1: Barbell Bench Press", "Superset A2: Incline Dumbbell Press")
 ${notesInstruction}
 
 ### CARDIO (for cardiovascular/endurance activities)
@@ -1004,7 +1005,7 @@ Basketball (Recreational)
 3. **Only use available equipment** — do not include exercises I cannot perform with my setup
 4. **Stay within my session duration** — each session must fit within my stated time limit
 5. **Show explicit weekly progression** — for every strength exercise, show what reps/sets look like each week of the block (not just "increase weight over time")
-6. **Include a deload** — if the program is 4+ weeks, include a deload week with explicitly reduced volume. Show the actual deload sets and reps, do not just say "reduce volume by 40%"
+6. **Deload weeks** — if a deload is appropriate, include one with evidence-based protocols. Show explicit sets, reps, and load guidance for every exercise — do not just write "reduce volume" or "deload week." Load guidance should be simple enough that the user knows exactly what weight to use without guesswork.
 7. **2 alternatives per strength exercise** — each with their own primary and secondary muscle tags from the taxonomy
 8. **Use the correct exercise type** — gym exercises use "strength" format, running/biking use "cardio" format, mobility work uses "stretch" format, etc. Do not format a cardio session as if it were a strength exercise
 9. **Prioritize selected cardio activities** — When programming cardio days, use the user's preferred cardio activities first. Rotate through different preferred activities week by week within each block rather than repeating the same activity every session. Every preferred activity should appear at least once in the program. Only introduce activities outside their preferences if needed for variety.
@@ -1085,7 +1086,7 @@ Create the program as a **markdown document artifact** (not in the chat). Presen
 Simple list showing each day (e.g., Day 1: Push, Day 2: Pull, Day 3: Cardio, Day 4: Rest, etc.)
 
 ### 3. Progression Strategy
-Concrete numbers showing what changes week to week. Example: "Weeks 1-3: reps decrease from 12 → 10 → 8 as load increases. Week 4: deload at 60% volume with higher reps."
+Concrete numbers showing what changes week to week. Example: "Weeks 1-3: reps decrease from 12 → 10 → 8 as load increases. Week 4: deload."
 
 ### 4. Complete Program
 Every training day, every exercise, fully detailed using the formats above. Organize by block if the program has multiple phases.

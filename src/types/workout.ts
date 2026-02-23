@@ -19,6 +19,7 @@ export interface StrengthExercise {
   }>;
   primaryMuscles: string[];        // REQUIRED — from the muscle taxonomy
   secondaryMuscles: string[];      // REQUIRED — from the muscle taxonomy
+  superset_group?: string;         // Optional — groups exercises for automatic superset linking
 }
 
 // Type 2: Cardio (progressive tracking with structured numeric fields)
@@ -76,6 +77,11 @@ export interface WorkoutProgram {
     weeks: string;                  // e.g., "1-4"
     structure?: string;             // e.g., "Push Pull Legs"
     deload_weeks?: number[];        // e.g., [4] means week 4 of this block is a deload
+    deload_guidance?: {
+      weight_percentage: number;    // e.g., 60 for 60% of previous week
+      rep_range: string;            // e.g., "8-10" — typically Week 1 reps
+      notes: string;                // e.g., "Use 60% of Week 3 weight. Focus on form and recovery."
+    };
     days: Array<{
       day_name: string;
       estimated_duration?: number;  // minutes
