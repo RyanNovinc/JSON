@@ -114,9 +114,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const [useAIRestTime, setUseAIRestTime] = useState<boolean>(false);
   const [likedExercises, setLikedExercises] = useState<string>('');
   const [dislikedExercises, setDislikedExercises] = useState<string>('');
-  const [useFavoriteExercises, setUseFavoriteExercises] = useState<boolean>(false);
-  const [selectedFavoriteExercises, setSelectedFavoriteExercises] = useState<string[]>([]);
-  const [favoriteExercisesList, setFavoriteExercisesList] = useState<FavoriteExercise[]>([]);
+  const [hasHeartRateMonitor, setHasHeartRateMonitor] = useState<boolean>(false);
+  const [exerciseNoteDetail, setExerciseNoteDetail] = useState<'detailed' | 'brief' | 'minimal'>('brief');
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -125,24 +124,15 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const [showRestTimeOptions, setShowRestTimeOptions] = useState(true);
   const durationOptionsRef = React.useRef<any>(null);
   const restTimeOptionsRef = React.useRef<any>(null);
+  const equipmentScrollRef = React.useRef<ScrollView>(null);
+  const timeScrollRef = React.useRef<ScrollView>(null);
+  const exerciseScrollRef = React.useRef<ScrollView>(null);
 
   // Load saved questionnaire data on component mount
   useEffect(() => {
     loadSavedData();
-    loadFavoriteExercises();
   }, []);
 
-  const loadFavoriteExercises = async () => {
-    try {
-      const savedData = await AsyncStorage.getItem('favoriteExercises');
-      if (savedData) {
-        const exercises = JSON.parse(savedData);
-        setFavoriteExercisesList(exercises);
-      }
-    } catch (error) {
-      console.error('Failed to load favorite exercises:', error);
-    }
-  };
 
   const loadSavedData = async () => {
     try {
@@ -164,8 +154,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         setShowRestTimeOptions(!(data.useAIRestTime || false));
         setLikedExercises(data.likedExercises || '');
         setDislikedExercises(data.dislikedExercises || '');
-        setUseFavoriteExercises(data.useFavoriteExercises || false);
-        setSelectedFavoriteExercises(data.selectedFavoriteExercises || []);
+        setHasHeartRateMonitor(data.hasHeartRateMonitor || false);
+        setExerciseNoteDetail(data.exerciseNoteDetail || 'brief');
         
         // If questionnaire was completed, show summary directly
         if (data.completedAt) {
@@ -197,8 +187,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         useAIRestTime,
         likedExercises,
         dislikedExercises,
-        useFavoriteExercises,
-        selectedFavoriteExercises,
+        hasHeartRateMonitor,
+        exerciseNoteDetail,
         currentStep,
         // Note: no completedAt field - this indicates it's in progress
       };
@@ -215,7 +205,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       saveProgress();
     }
   }, [selectedEquipment, specificEquipment, unavailableEquipment, workoutDuration, customDuration, useAISuggestion,
-      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, useFavoriteExercises, selectedFavoriteExercises]);
+      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, hasHeartRateMonitor, exerciseNoteDetail]);
 
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
@@ -224,6 +214,11 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
     setShowResults(false);
     setIsCompleted(false);
     // Keep all existing answers loaded so they can review and change if needed
+    
+    // Scroll to top when returning to step 0
+    setTimeout(() => {
+      equipmentScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
   };
 
   const handleEquipmentToggle = (equipmentId: string) => {
@@ -272,7 +267,16 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
     }
 
     if (currentStep < 2) {
-      setCurrentStep(currentStep + 1);
+      const newStep = currentStep + 1;
+      setCurrentStep(newStep);
+      // Scroll to top when moving to next step
+      setTimeout(() => {
+        if (newStep === 1) {
+          timeScrollRef.current?.scrollTo({ y: 0, animated: true });
+        } else if (newStep === 2) {
+          exerciseScrollRef.current?.scrollTo({ y: 0, animated: true });
+        }
+      }, 100);
     } else if (currentStep === 2) {
       setShowResults(true);
     }
@@ -280,7 +284,16 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
 
   const handleBack = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      const newStep = currentStep - 1;
+      setCurrentStep(newStep);
+      // Scroll to top when moving to previous step
+      setTimeout(() => {
+        if (newStep === 0) {
+          equipmentScrollRef.current?.scrollTo({ y: 0, animated: true });
+        } else if (newStep === 1) {
+          timeScrollRef.current?.scrollTo({ y: 0, animated: true });
+        }
+      }, 100);
     } else {
       navigation.goBack();
     }
@@ -299,8 +312,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         useAIRestTime,
         likedExercises,
         dislikedExercises,
-        useFavoriteExercises,
-        selectedFavoriteExercises,
+        hasHeartRateMonitor,
+        exerciseNoteDetail,
         completedAt: new Date().toISOString(),
       };
 
@@ -323,6 +336,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const renderEquipmentStep = () => {
     return (
       <ScrollView 
+        ref={equipmentScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -432,6 +446,42 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             />
           </Animatable.View>
 
+          {/* Heart Rate Monitor Section */}
+          <Animatable.View
+            animation="fadeInUp"
+            delay={700}
+            style={styles.heartRateSection}
+          >
+            <Text style={[styles.sectionTitle, { color: themeColor, fontSize: 18 }]}>
+              Heart Rate Monitor
+            </Text>
+            <Text style={styles.sectionSubtitle}>
+              Do you have access to a heart rate monitor?
+            </Text>
+            
+            <TouchableOpacity
+              style={[styles.heartRateToggle, hasHeartRateMonitor && { backgroundColor: `${themeColor}10` }]}
+              onPress={() => setHasHeartRateMonitor(!hasHeartRateMonitor)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.heartRateToggleContent}>
+                <View style={[styles.heartRateCheckbox, hasHeartRateMonitor && { backgroundColor: themeColor, borderColor: themeColor }]}>
+                  {hasHeartRateMonitor && (
+                    <Ionicons name="checkmark" size={14} color="#000000" />
+                  )}
+                </View>
+                <View style={styles.heartRateToggleText}>
+                  <Text style={[styles.heartRateToggleTitle, hasHeartRateMonitor && { color: themeColor }]}>
+                    Yes, I have a heart rate monitor
+                  </Text>
+                  <Text style={styles.heartRateToggleSubtitle}>
+                    Includes chest straps, wrist watches, or fitness trackers with HR
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </Animatable.View>
+
         </Animatable.View>
       </ScrollView>
     );
@@ -441,6 +491,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const renderTimeStep = () => {
     return (
       <ScrollView 
+        ref={timeScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -833,6 +884,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const renderExercisePreferencesStep = () => {
     return (
       <ScrollView 
+        ref={exerciseScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -889,110 +941,70 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             />
           </Animatable.View>
 
-          {/* Favorite Exercises Section */}
+          {/* Exercise Note Detail */}
           <Animatable.View
             animation="fadeInUp"
             delay={300}
-            style={styles.favoriteExercisesSection}
+            style={styles.inputContainer}
           >
-            <TouchableOpacity
-              style={[styles.favoriteExercisesToggle, useFavoriteExercises && { backgroundColor: `${themeColor}10` }]}
-              onPress={() => {
-                setUseFavoriteExercises(!useFavoriteExercises);
-                if (!useFavoriteExercises) {
-                  loadFavoriteExercises();
+            <Text style={styles.inputLabel}>
+              How detailed should exercise instructions be?
+            </Text>
+            
+            {/* Exercise Note Detail Options */}
+            <View style={styles.optionsList}>
+              {[
+                {
+                  id: 'detailed',
+                  title: 'Detailed instructions',
+                  subtitle: 'Step-by-step form guidance for every exercise (recommended for beginners — generates longer output)'
+                },
+                {
+                  id: 'brief',
+                  title: 'Brief coaching cues',
+                  subtitle: 'Short tips for compound lifts only (recommended for most users)'
+                },
+                {
+                  id: 'minimal',
+                  title: 'Minimal notes',
+                  subtitle: 'Only non-obvious setup tips (fastest generation, smallest file size)'
                 }
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.favoriteToggleRow}>
-                <View style={[styles.favoriteCheckbox, useFavoriteExercises && { backgroundColor: themeColor, borderColor: themeColor }]}>
-                  {useFavoriteExercises && (
-                    <Ionicons name="checkmark" size={14} color="#000000" />
-                  )}
-                </View>
-                <Text style={[styles.favoriteToggleLabel, useFavoriteExercises && { color: themeColor }]}>
-                  Include My Favorite Exercises
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.manageFavoritesLink}
-                onPress={() => navigation.navigate('FavoriteExercises' as any)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.manageFavoritesLinkText, { color: themeColor }]}>
-                  Manage →
-                </Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-
-            {useFavoriteExercises && (
-              <Animatable.View
-                animation="fadeInDown"
-                duration={300}
-                style={styles.favoriteExercisesList}
-              >
-                {favoriteExercisesList.length === 0 ? (
-                  <View style={styles.emptyFavoritesMessage}>
-                    <Ionicons name="heart-outline" size={24} color="#71717a" />
-                    <Text style={styles.emptyFavoritesText}>
-                      No favorites yet. Add some exercises to your favorites first.
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[
+                    styles.optionItem,
+                    exerciseNoteDetail === option.id && { backgroundColor: `${themeColor}10`, borderColor: themeColor }
+                  ]}
+                  onPress={() => setExerciseNoteDetail(option.id as 'detailed' | 'brief' | 'minimal')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.optionContent}>
+                    <View style={styles.optionHeader}>
+                      <Text style={[
+                        styles.optionTitle,
+                        exerciseNoteDetail === option.id && { color: themeColor }
+                      ]}>
+                        {option.title}
+                      </Text>
+                      <View style={[
+                        styles.radioCircle,
+                        exerciseNoteDetail === option.id && { borderColor: themeColor, backgroundColor: themeColor }
+                      ]}>
+                        {exerciseNoteDetail === option.id && (
+                          <View style={styles.radioInner} />
+                        )}
+                      </View>
+                    </View>
+                    <Text style={styles.optionSubtitle}>
+                      {option.subtitle}
                     </Text>
                   </View>
-                ) : (
-                  <View style={styles.exercisesGrid}>
-                    {favoriteExercisesList.map((exercise) => {
-                      const isSelected = selectedFavoriteExercises.includes(exercise.id);
-                      return (
-                        <TouchableOpacity
-                          key={exercise.id}
-                          style={[
-                            styles.exerciseItem,
-                            isSelected && [styles.selectedExerciseItem, { 
-                              borderColor: themeColor, 
-                              backgroundColor: `${themeColor}15` 
-                            }]
-                          ]}
-                          onPress={() => {
-                            if (isSelected) {
-                              setSelectedFavoriteExercises(prev => prev.filter(id => id !== exercise.id));
-                            } else {
-                              setSelectedFavoriteExercises(prev => [...prev, exercise.id]);
-                            }
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.exerciseItemContent}>
-                            <View style={[styles.exerciseItemIcon, isSelected && { backgroundColor: themeColor }]}>
-                              <Ionicons
-                                name={exercise.category === 'gym' ? 'barbell' : 
-                                      exercise.category === 'bodyweight' ? 'body' :
-                                      exercise.category === 'cardio' ? 'heart' :
-                                      exercise.category === 'flexibility' ? 'leaf' : 'add-circle'}
-                                size={16}
-                                color={isSelected ? '#000000' : themeColor}
-                              />
-                            </View>
-                            <Text 
-                              style={[styles.exerciseItemName, isSelected && { color: themeColor }]} 
-                              numberOfLines={2}
-                            >
-                              {exercise.name}
-                            </Text>
-                            <View style={[styles.exerciseItemCheckbox, isSelected && { backgroundColor: themeColor, borderColor: themeColor }]}>
-                              {isSelected && (
-                                <Ionicons name="checkmark" size={12} color="#000000" />
-                              )}
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </Animatable.View>
-            )}
+                </TouchableOpacity>
+              ))}
+            </View>
           </Animatable.View>
+
         </Animatable.View>
       </ScrollView>
     );
@@ -1102,27 +1114,34 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               </View>
             )}
 
+            {/* Heart Rate Monitor Row */}
+            <View style={[styles.tronDataRow, { borderBottomColor: `${themeColor}30` }]}>
+              <View style={styles.tronLabelSection}>
+                <View style={[styles.tronLabelIndicator, { backgroundColor: themeColor, shadowColor: themeColor }]} />
+                <Text style={[styles.tronLabel, { color: themeColor }]}>HEART RATE MONITOR</Text>
+              </View>
+              <View style={styles.tronValueSection}>
+                <Text style={styles.tronValue}>
+                  {hasHeartRateMonitor ? '✓ Available for cardio optimization' : '✗ Not available'}
+                </Text>
+              </View>
+            </View>
+
             {/* Exercise Preferences Row */}
-            {(likedExercises || dislikedExercises || useFavoriteExercises) && (
+            {(likedExercises || dislikedExercises) && (
               <View style={styles.tronDataRow}>
                 <View style={styles.tronLabelSection}>
                   <View style={[styles.tronLabelIndicator, { backgroundColor: themeColor, shadowColor: themeColor }]} />
                   <Text style={[styles.tronLabel, { color: themeColor }]}>PREFERENCES</Text>
                 </View>
                 <View style={styles.tronValueSection}>
-                  {useFavoriteExercises && (
-                    <Text style={styles.tronValue}>
-                      ✓ Using favorite exercises from your library
-                      {selectedFavoriteExercises.length > 0 && ` (${selectedFavoriteExercises.length} selected)`}
-                    </Text>
-                  )}
                   {likedExercises && (
-                    <Text style={[styles.tronValue, { marginTop: useFavoriteExercises ? 8 : 0 }]}>
+                    <Text style={styles.tronValue}>
                       LOVES: {likedExercises}
                     </Text>
                   )}
                   {dislikedExercises && (
-                    <Text style={[styles.tronValue, { marginTop: (useFavoriteExercises || likedExercises) ? 8 : 0 }]}>
+                    <Text style={[styles.tronValue, { marginTop: likedExercises ? 8 : 0 }]}>
                       AVOIDS: {dislikedExercises}
                     </Text>
                   )}
@@ -1930,58 +1949,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
   },
-  // Favorite Exercises Toggle Styles
-  favoriteToggleContainer: {
-    marginBottom: 24,
-  },
-  favoriteToggleCard: {
-    backgroundColor: '#1a1a1b',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: '#2a2a2b',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  selectedFavoriteToggle: {
-    borderWidth: 2,
-    elevation: 8,
-  },
-  favoriteToggleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  favoriteToggleIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2a2a2b',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  favoriteToggleText: {
-    flex: 1,
-    paddingRight: 16,
-  },
-  favoriteToggleTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  favoriteToggleSubtitle: {
-    fontSize: 14,
-    color: '#71717a',
-    lineHeight: 18,
-  },
-  favoriteToggleIndicator: {
-    marginLeft: 'auto',
-  },
   manageFavoritesButton: {
     alignSelf: 'flex-start',
     paddingVertical: 4,
@@ -2137,62 +2104,6 @@ const styles = StyleSheet.create({
   modalBottomPadding: {
     height: 40,
   },
-  // New minimal favorite exercises styles
-  favoriteExercisesSection: {
-    marginTop: 24,
-  },
-  favoriteExercisesToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 4,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  favoriteToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  favoriteCheckbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#3f3f46',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  favoriteToggleLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  manageFavoritesLink: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  manageFavoritesLinkText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  favoriteExercisesList: {
-    marginTop: 8,
-  },
-  emptyFavoritesMessage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    gap: 12,
-  },
-  emptyFavoritesText: {
-    fontSize: 14,
-    color: '#71717a',
-    textAlign: 'center',
-    flex: 1,
-  },
   exercisesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2237,5 +2148,95 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Heart Rate Monitor Styles
+  heartRateSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+  },
+  heartRateToggle: {
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    marginTop: 16,
+  },
+  heartRateToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heartRateCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#3f3f46',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  heartRateToggleText: {
+    flex: 1,
+  },
+  heartRateToggleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  heartRateToggleSubtitle: {
+    fontSize: 14,
+    color: '#71717a',
+    lineHeight: 18,
+  },
+  // Exercise Note Detail styles
+  optionsList: {
+    marginTop: 16,
+  },
+  optionItem: {
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2a2a2b',
+  },
+  optionContent: {
+    flex: 1,
+  },
+  optionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  optionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    flex: 1,
+  },
+  optionSubtitle: {
+    fontSize: 14,
+    color: '#71717a',
+    lineHeight: 20,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#71717a',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
   },
 });

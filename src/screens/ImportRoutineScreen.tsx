@@ -18,38 +18,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
-import { getAIPrompt, exerciseGlossary, QuestionnaireData, generateProgramSpecs } from '../data/workoutPrompt';
+import { getAIPrompt, MUSCLE_GROUPS, QuestionnaireData, generateProgramSpecs } from '../data/workoutPrompt';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import * as Crypto from 'expo-crypto';
 import { useTheme } from '../contexts/ThemeContext';
+import { WorkoutProgram, Exercise } from '../types/workout';
 
 type ImportScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ImportRoutine'>;
 
-interface WorkoutProgram {
-  routine_name: string;
-  description?: string;
-  days_per_week: number;
-  blocks: Array<{
-    block_name: string;
-    weeks: string;
-    structure?: string;
-    days: Array<{
-      day_name: string;
-      estimated_duration?: number;
-      exercises: Array<{
-        exercise: string;
-        sets: number;
-        reps: string;
-        reps_weekly?: { [week: string]: string };
-        rest: number;
-        restQuick?: number;
-        notes?: string;
-        alternatives?: string[];
-      }>;
-    }>;
-  }>;
-  id?: string; // Add optional id field for tracking
-}
+// Interface moved to types/workout.ts - importing from there
 
 export default function ImportRoutineScreen() {
   const navigation = useNavigation<ImportScreenNavigationProp>();
@@ -68,6 +45,89 @@ export default function ImportRoutineScreen() {
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
+
+  // Handle schema version migration on component mount
+  useEffect(() => {
+    handleSchemaMigration();
+  }, []);
+
+  // Handle schema version migration - clear old format data
+  const handleSchemaMigration = async () => {
+    try {
+      const schemaVersion = await AsyncStorage.getItem('schemaVersion');
+      if (!schemaVersion || schemaVersion !== '2.0') {
+        // Clear all potentially incompatible data
+        const keysToCheck = [
+          'savedWorkoutPrograms',
+          'currentWorkoutProgram', 
+          'completedWorkouts',
+          'workoutHistory',
+          'favoriteExercises'
+        ];
+        
+        // Only clear data that exists and might be in old format
+        const keysToDelete: string[] = [];
+        for (const key of keysToCheck) {
+          const data = await AsyncStorage.getItem(key);
+          if (data) {
+            try {
+              const parsed = JSON.parse(data);
+              // Check if it's using old exercise format (has alternatives as string array)
+              if (key === 'savedWorkoutPrograms' || key === 'currentWorkoutProgram') {
+                const hasOldFormat = checkForOldExerciseFormat(parsed);
+                if (hasOldFormat) {
+                  keysToDelete.push(key);
+                }
+              }
+            } catch {
+              // Invalid JSON, safe to delete
+              keysToDelete.push(key);
+            }
+          }
+        }
+        
+        if (keysToDelete.length > 0) {
+          await AsyncStorage.multiRemove(keysToDelete);
+          console.log('Schema migration: cleared old format data:', keysToDelete);
+        }
+        
+        // Set new schema version
+        await AsyncStorage.setItem('schemaVersion', '2.0');
+      }
+    } catch (error) {
+      console.error('Schema migration failed:', error);
+    }
+  };
+
+  // Check if workout data uses old exercise format
+  const checkForOldExerciseFormat = (data: any): boolean => {
+    if (!data) return false;
+    
+    try {
+      if (data.blocks) {
+        for (const block of data.blocks) {
+          if (block.days) {
+            for (const day of block.days) {
+              if (day.exercises) {
+                for (const exercise of day.exercises) {
+                  // Old format: alternatives is string array, no type field, no primaryMuscles
+                  if (!exercise.type || 
+                      (exercise.alternatives && Array.isArray(exercise.alternatives) && 
+                       exercise.alternatives.length > 0 && typeof exercise.alternatives[0] === 'string') ||
+                      !exercise.primaryMuscles) {
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      return false;
+    } catch {
+      return true; // If we can't parse it, assume it's old format
+    }
+  };
 
   const sampleWorkout = {
     "routine_name": "Quick Start - Push Pull Legs",
@@ -185,6 +245,155 @@ export default function ImportRoutineScreen() {
     setTimeout(() => {
       setSampleCopied(false);
     }, 2000);
+  };
+
+  // Exercise type validation functions
+  const validateMuscles = (muscles: string[], exerciseName: string, type: 'primary' | 'secondary') => {
+    if (!Array.isArray(muscles)) {
+      throw new Error(`Exercise "${exerciseName}" ${type}Muscles must be an array`);
+    }
+    muscles.forEach((muscle: any) => {
+      if (typeof muscle !== 'string' || !MUSCLE_GROUPS.includes(muscle)) {
+        throw new Error(`Exercise "${exerciseName}" has invalid ${type} muscle: "${muscle}". Must be one of: ${MUSCLE_GROUPS.join(', ')}`);
+      }
+    });
+  };
+
+  const validateStrengthExercise = (exercise: any, dayName: string) => {
+    if (!exercise.exercise || typeof exercise.exercise !== 'string') {
+      throw new Error(`Strength exercise in "${dayName}" missing exercise name`);
+    }
+    if (typeof exercise.sets !== 'number' || exercise.sets <= 0) {
+      throw new Error(`Exercise "${exercise.exercise}" has invalid sets`);
+    }
+    if (!exercise.reps || typeof exercise.reps !== 'string') {
+      throw new Error(`Exercise "${exercise.exercise}" has invalid reps`);
+    }
+    if (typeof exercise.rest !== 'number' || exercise.rest <= 0) {
+      throw new Error(`Exercise "${exercise.exercise}" has invalid rest`);
+    }
+    
+    // Validate required muscle groups
+    if (!exercise.primaryMuscles) {
+      throw new Error(`Exercise "${exercise.exercise}" missing primaryMuscles`);
+    }
+    if (!exercise.secondaryMuscles) {
+      throw new Error(`Exercise "${exercise.exercise}" missing secondaryMuscles`);
+    }
+    validateMuscles(exercise.primaryMuscles, exercise.exercise, 'primary');
+    validateMuscles(exercise.secondaryMuscles, exercise.exercise, 'secondary');
+
+    // Validate optional fields
+    if (exercise.restQuick && (typeof exercise.restQuick !== 'number' || exercise.restQuick <= 0)) {
+      throw new Error(`Exercise "${exercise.exercise}" has invalid restQuick`);
+    }
+    if (exercise.notes && typeof exercise.notes !== 'string') {
+      throw new Error(`Exercise "${exercise.exercise}" notes must be a string`);
+    }
+    if (exercise.reps_weekly) {
+      if (typeof exercise.reps_weekly !== 'object' || exercise.reps_weekly === null) {
+        throw new Error(`Exercise "${exercise.exercise}" has invalid reps_weekly format`);
+      }
+      Object.values(exercise.reps_weekly).forEach((reps: any) => {
+        if (typeof reps !== 'string') {
+          throw new Error(`Exercise "${exercise.exercise}" reps_weekly values must be strings`);
+        }
+      });
+    }
+    if (exercise.sets_weekly) {
+      if (typeof exercise.sets_weekly !== 'object' || exercise.sets_weekly === null) {
+        throw new Error(`Exercise "${exercise.exercise}" has invalid sets_weekly format`);
+      }
+      Object.values(exercise.sets_weekly).forEach((sets: any) => {
+        if (typeof sets !== 'number') {
+          throw new Error(`Exercise "${exercise.exercise}" sets_weekly values must be numbers`);
+        }
+      });
+    }
+    if (exercise.alternatives) {
+      if (!Array.isArray(exercise.alternatives)) {
+        throw new Error(`Exercise "${exercise.exercise}" alternatives must be an array`);
+      }
+      exercise.alternatives.forEach((alt: any, index: number) => {
+        if (!alt.exercise || typeof alt.exercise !== 'string') {
+          throw new Error(`Alternative ${index + 1} for "${exercise.exercise}" missing exercise name`);
+        }
+        if (!alt.primaryMuscles) {
+          throw new Error(`Alternative "${alt.exercise}" missing primaryMuscles`);
+        }
+        if (!alt.secondaryMuscles) {
+          throw new Error(`Alternative "${alt.exercise}" missing secondaryMuscles`);
+        }
+        validateMuscles(alt.primaryMuscles, alt.exercise, 'primary');
+        validateMuscles(alt.secondaryMuscles, alt.exercise, 'secondary');
+      });
+    }
+  };
+
+  const validateCardioExercise = (exercise: any, dayName: string) => {
+    if (!exercise.activity || typeof exercise.activity !== 'string') {
+      throw new Error(`Cardio exercise in "${dayName}" missing activity name`);
+    }
+    if (typeof exercise.duration_minutes !== 'number' || exercise.duration_minutes <= 0) {
+      throw new Error(`Cardio "${exercise.activity}" has invalid duration_minutes`);
+    }
+    if (exercise.distance_value && typeof exercise.distance_value !== 'number') {
+      throw new Error(`Cardio "${exercise.activity}" distance_value must be a number`);
+    }
+    if (exercise.distance_unit && !['km', 'miles'].includes(exercise.distance_unit)) {
+      throw new Error(`Cardio "${exercise.activity}" distance_unit must be 'km' or 'miles'`);
+    }
+  };
+
+  const validateStretchExercise = (exercise: any, dayName: string) => {
+    if (!exercise.exercise || typeof exercise.exercise !== 'string') {
+      throw new Error(`Stretch exercise in "${dayName}" missing exercise name`);
+    }
+    if (typeof exercise.hold_seconds !== 'number' || exercise.hold_seconds <= 0) {
+      throw new Error(`Stretch "${exercise.exercise}" has invalid hold_seconds`);
+    }
+    if (typeof exercise.sets !== 'number' || exercise.sets <= 0) {
+      throw new Error(`Stretch "${exercise.exercise}" has invalid sets`);
+    }
+    if (typeof exercise.per_side !== 'boolean') {
+      throw new Error(`Stretch "${exercise.exercise}" per_side must be true or false`);
+    }
+    if (!exercise.primaryMuscles) {
+      throw new Error(`Stretch "${exercise.exercise}" missing primaryMuscles`);
+    }
+    validateMuscles(exercise.primaryMuscles, exercise.exercise, 'primary');
+  };
+
+  const validateCircuitExercise = (exercise: any, dayName: string) => {
+    if (!exercise.circuit_name || typeof exercise.circuit_name !== 'string') {
+      throw new Error(`Circuit exercise in "${dayName}" missing circuit_name`);
+    }
+    if (typeof exercise.rounds !== 'number' || exercise.rounds <= 0) {
+      throw new Error(`Circuit "${exercise.circuit_name}" has invalid rounds`);
+    }
+    if (typeof exercise.work_seconds !== 'number' || exercise.work_seconds <= 0) {
+      throw new Error(`Circuit "${exercise.circuit_name}" has invalid work_seconds`);
+    }
+    if (typeof exercise.rest_seconds !== 'number' || exercise.rest_seconds < 0) {
+      throw new Error(`Circuit "${exercise.circuit_name}" has invalid rest_seconds`);
+    }
+    if (!Array.isArray(exercise.exercises) || exercise.exercises.length === 0) {
+      throw new Error(`Circuit "${exercise.circuit_name}" must have exercises array`);
+    }
+    exercise.exercises.forEach((ex: any, index: number) => {
+      if (!ex.exercise || typeof ex.exercise !== 'string') {
+        throw new Error(`Circuit "${exercise.circuit_name}" exercise ${index + 1} missing name`);
+      }
+    });
+  };
+
+  const validateSportExercise = (exercise: any, dayName: string) => {
+    if (!exercise.activity || typeof exercise.activity !== 'string') {
+      throw new Error(`Sport exercise in "${dayName}" missing activity name`);
+    }
+    if (exercise.duration_minutes && (typeof exercise.duration_minutes !== 'number' || exercise.duration_minutes <= 0)) {
+      throw new Error(`Sport "${exercise.activity}" has invalid duration_minutes`);
+    }
   };
 
   const validateAndParseJSON = (input: string): WorkoutProgram | null => {
@@ -320,48 +529,30 @@ export default function ImportRoutineScreen() {
           }
           
           day.exercises.forEach((exercise: any, exerciseIndex: number) => {
-            // Validate required fields
-            if (!exercise.exercise || typeof exercise.sets !== 'number' || 
-                !exercise.reps || typeof exercise.rest !== 'number') {
-              throw new Error(`Exercise ${exerciseIndex + 1} in "${day.day_name}" is missing required fields`);
+            // Validate exercise type is provided
+            if (!exercise.type || typeof exercise.type !== 'string') {
+              throw new Error(`Exercise ${exerciseIndex + 1} in "${day.day_name}" missing type field`);
             }
-            
-            // Validate exercise name is in glossary
-            if (!exerciseGlossary.includes(exercise.exercise)) {
-              throw new Error(`Exercise "${exercise.exercise}" in "${day.day_name}" not found in exercise glossary`);
-            }
-            
-            // Validate optional exercise fields
-            if (exercise.reps_weekly) {
-              if (typeof exercise.reps_weekly !== 'object' || exercise.reps_weekly === null) {
-                throw new Error(`Exercise "${exercise.exercise}" has invalid reps_weekly format`);
-              }
-              // Validate all values are strings
-              Object.values(exercise.reps_weekly).forEach((reps: any) => {
-                if (typeof reps !== 'string') {
-                  throw new Error(`Exercise "${exercise.exercise}" has invalid reps_weekly values (must be strings)`);
-                }
-              });
-            }
-            
-            if (exercise.restQuick && (typeof exercise.restQuick !== 'number' || exercise.restQuick <= 0)) {
-              throw new Error(`Exercise "${exercise.exercise}" has invalid restQuick value`);
-            }
-            
-            if (exercise.notes && typeof exercise.notes !== 'string') {
-              throw new Error(`Exercise "${exercise.exercise}" has invalid notes field`);
-            }
-            
-            if (exercise.alternatives) {
-              if (!Array.isArray(exercise.alternatives)) {
-                throw new Error(`Exercise "${exercise.exercise}" alternatives must be an array`);
-              }
-              // Validate all alternatives are in glossary
-              exercise.alternatives.forEach((alt: any) => {
-                if (typeof alt !== 'string' || !exerciseGlossary.includes(alt)) {
-                  throw new Error(`Alternative exercise "${alt}" for "${exercise.exercise}" not found in exercise glossary`);
-                }
-              });
+
+            // Validate based on exercise type
+            switch (exercise.type) {
+              case 'strength':
+                validateStrengthExercise(exercise, day.day_name);
+                break;
+              case 'cardio':
+                validateCardioExercise(exercise, day.day_name);
+                break;
+              case 'stretch':
+                validateStretchExercise(exercise, day.day_name);
+                break;
+              case 'circuit':
+                validateCircuitExercise(exercise, day.day_name);
+                break;
+              case 'sport':
+                validateSportExercise(exercise, day.day_name);
+                break;
+              default:
+                throw new Error(`Exercise "${exercise.exercise || exercise.activity || 'unknown'}" in "${day.day_name}" has invalid type: ${exercise.type}`);
             }
           });
         });
@@ -516,17 +707,14 @@ export default function ImportRoutineScreen() {
       const [
         fitnessGoalsData,
         equipmentPreferencesData,
-        favoriteExercisesData,
       ] = await Promise.all([
         AsyncStorage.getItem('fitnessGoalsData'),
         AsyncStorage.getItem('equipmentPreferencesData'),
-        AsyncStorage.getItem('favoriteExercises'),
       ]);
 
       // Parse the JSON data
       const fitnessGoals = fitnessGoalsData ? JSON.parse(fitnessGoalsData) : {};
       const equipmentPrefs = equipmentPreferencesData ? JSON.parse(equipmentPreferencesData) : {};
-      const favoriteExercises = favoriteExercisesData ? JSON.parse(favoriteExercisesData) : [];
 
       // Consolidate all data into the expected QuestionnaireData format
       const consolidatedData: QuestionnaireData = {
@@ -550,23 +738,23 @@ export default function ImportRoutineScreen() {
         trainingStylePreference: fitnessGoals.trainingStylePreference,
         customTrainingStyle: fitnessGoals.customTrainingStyle,
         trainingExperience: fitnessGoals.trainingExperience,
+        trainingApproach: fitnessGoals.trainingApproach,
         programDuration: fitnessGoals.programDuration,
         customDuration: fitnessGoals.customDuration,
-        fitnessInfluencer: fitnessGoals.fitnessInfluencer,
-        customInfluencer: fitnessGoals.customInfluencer,
+        cardioPreferences: fitnessGoals.cardioPreferences,
 
         // From equipmentPreferencesData
         selectedEquipment: equipmentPrefs.selectedEquipment,
         specificEquipment: equipmentPrefs.specificEquipment,
         unavailableEquipment: equipmentPrefs.unavailableEquipment,
         workoutDuration: equipmentPrefs.workoutDuration,
+        useAISuggestion: equipmentPrefs.useAISuggestion,
         restTimePreference: equipmentPrefs.restTimePreference,
+        useAIRestTime: equipmentPrefs.useAIRestTime,
+        hasHeartRateMonitor: equipmentPrefs.hasHeartRateMonitor,
         likedExercises: equipmentPrefs.likedExercises,
         dislikedExercises: equipmentPrefs.dislikedExercises,
-        selectedFavoriteExercises: equipmentPrefs.selectedFavoriteExercises,
-
-        // From favoriteExercises (this is an array of exercise objects)
-        // Note: This data is already handled in selectedFavoriteExercises above
+        exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
       };
 
       // Filter out undefined/null values
@@ -629,67 +817,248 @@ export default function ImportRoutineScreen() {
                   onPress={async () => {
                     const questionnaireData = await loadQuestionnaireData();
                     
-                    const planningPrompt = `I'm using a fitness training app called JSON.fit and need help creating a personalized workout program.
+                    const notesInstruction = (() => {
+                      const detail = questionnaireData?.exerciseNoteDetail || 'brief';
+                      if (detail === 'detailed') {
+                        return '- Include detailed step-by-step form instructions for EVERY exercise in the notes field';
+                      } else if (detail === 'brief') {
+                        return '- Include brief coaching cues in the notes field for compound lifts only';
+                      } else {
+                        return '- Keep notes minimal — only include non-obvious technique tips or specific setup instructions';
+                      }
+                    })();
+                    
+                    const planningPrompt = `I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help designing a personalized workout program.
 
-**QUICK CREATION INSTRUCTIONS:**
-1. **STANDARD KNOWLEDGE** - Use your existing knowledge base for exercises, training methods, and program design
-2. **EVIDENCE-BASED APPROACH** - Base recommendations on established training principles and scientific research
+## INSTRUCTIONS
 
-**PROGRAM REQUIREMENTS:**
-1. **GOAL OPTIMIZATION** - Design specifically for the stated primary goal with supporting methods
-2. **EXPERIENCE-APPROPRIATE** - Match complexity, volume, and progression to training experience level
-3. **EQUIPMENT CONSTRAINTS** - Only include exercises that can be performed with available equipment
-4. **REALISTIC SCHEDULING** - Fit within stated training frequency and time constraints
-5. **PROGRESSIVE STRUCTURE** - Include clear progression plan across the program duration
-6. **INCLUDE DETAILED STRUCTURE** - Provide complete weekly breakdown, exercise selection rationale, and progression scheme
+**Step 1 — Review & Clarify**
+Before designing the program, review the full profile below. In MOST cases, the profile will contain everything you need — skip straight to Step 2 and build the program.
 
-**USER QUESTIONNAIRE RESPONSES:**
+Only ask a clarifying question if there is a genuine contradiction or critical ambiguity that would result in a fundamentally different program depending on the answer. Ask a maximum of 2 questions.
+
+Do NOT ask questions:
+- To confirm choices the user already made (e.g., don't ask 'are you sure you want X frequency?')
+- To validate your programming decisions (e.g., don't ask 'is it okay if I include Y?')
+- About technical details the user expects you to handle (split type, exercise selection, periodization)
+- When you can make a reasonable assumption and note it in Quick Notes instead
+
+You are the coach. If the profile gives you enough to build a good program, just build it.
+
+**Step 2 — Design & Present**
+Design a complete training program based on the profile. Use established, evidence-based training principles. Create it as a markdown document artifact. After presenting, wait for feedback before making changes or converting to JSON.
+
+**Step 3 — Recommendations (optional)**
+If the program has inherent limitations due to the user's choices (e.g., a muscle group can't reach optimal volume due to available training days), include a brief '### Recommendations' section after Quick Notes explaining what change would improve results. Keep it to 1-2 sentences maximum. Example: 'Side delts are at 8 sets/week — adding lateral raises as supersets on lower body days would bring these to 12+ sets for better growth.'
+
+## MY PROFILE
+
 ${generateProgramSpecs(questionnaireData)}
 
-**PROGRAM DESIGN REQUIREMENTS:**
-Please create a detailed workout program that:
-1. **MATCHES TRAINING GOAL** - Optimizes for the primary objective with appropriate methods
-2. **RESPECTS EXPERIENCE LEVEL** - Uses suitable complexity, volume, and exercise selection
-3. **WORKS WITH AVAILABLE EQUIPMENT** - Only includes exercises possible with stated equipment
-4. **FITS TIME CONSTRAINTS** - Stays within preferred session lengths and weekly frequency
-5. **INCLUDES CLEAR PROGRESSION** - Shows how intensity/volume/complexity advances over time
-6. **PROVIDES COMPLETE STRUCTURE** - Details each workout with sets, reps, rest periods, and notes
-7. **SPECIFY MUSCLE TARGETING** - For each exercise, clearly identify which muscles are PRIMARY targets (main movers, count for volume) and which are SECONDARY (assisting/stabilizing, don't count toward volume). This is critical for proper volume tracking.
+## MUSCLE TAXONOMY
 
-**OUTPUT FORMAT REQUIREMENTS:**
-Create the program as a markdown document artifact structured with these sections:
-1. **PROGRAM OVERVIEW** - Brief summary of approach, training split, and key principles
-2. **WEEKLY STRUCTURE** - How many days, what type of sessions, rest days
-3. **EXERCISE SELECTION RATIONALE** - Why specific exercises were chosen for this person
-4. **PROGRESSION STRATEGY** - How the program advances week to week
-5. **DETAILED PROGRAM BREAKDOWN** - Week-by-week or block-by-block structure
-6. **IMPLEMENTATION NOTES** - Form cues, safety considerations, and modification options
+When listing primary and secondary muscles for exercises, you MUST use ONLY these exact names:
+Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
 
-**FORMAT REQUIREMENTS:**
-- Output as a markdown artifact
-- Use simple markdown formatting (headers, bullet points, tables)
-- Ensure it's easy to read, copy, and edit
-- Include clear section breaks and organized workout structure
-- Structure each workout day with complete exercise details and instructions
-- **IMPORTANT**: For each exercise, include a note specifying "Primary: [muscle groups]" and "Secondary: [muscle groups]" to help with volume tracking
-- **EXAMPLE FORMAT**: "Barbell Bench Press - 4 sets x 8-10 reps, 2-3 min rest. Primary: Chest, Triceps. Secondary: Shoulders."
+Do NOT use generic terms like "Shoulders", "Back", "Arms", or "Legs" — always use the specific muscle names above.
+Do NOT use "Lower Back" — use "Core" instead for any exercise involving spinal stabilization or erector engagement.
 
-**IMPORTANT - FEEDBACK WORKFLOW:**
-After creating the initial program recommendation:
-1. Present the complete program with a brief summary
-2. Ask me to review the program and provide feedback on:
-   - Exercises I don't like or want to substitute
-   - Workouts that seem too complex or too simple for my level
-   - Any movements I want to avoid or swap out
-   - Training frequency or session length adjustments
-   - Progression speed or difficulty concerns
-3. **WAIT for my feedback before proceeding**
-4. Make any requested adjustments to the program
-5. Only after I'm satisfied with the program should you ask if I want the JSON conversion
+### COMPOUND EXERCISE TAGGING GUIDE
 
-**Do NOT automatically convert to JSON** - I need to approve the program design first.
+When an exercise significantly loads a muscle through full range of motion, list it as Primary. When a muscle assists but is not the main driver, list it as Secondary. Use this reference for common compounds:
 
-Focus on creating an effective, personalized program that matches my specific goals, experience, and constraints.`;
+- Bench press variants: Primary Chest, Triceps
+- Incline press variants: Primary Chest, Front Delts | Secondary Triceps
+- Row variants: Primary Upper Back, Lats | Secondary Biceps, Rear Delts
+- Pull-up / Pulldown: Primary Lats | Secondary Biceps, Upper Back
+- Overhead press: Primary Front Delts, Triceps | Secondary Side Delts
+- Squat variants (back squat, front squat): Primary Quads, Glutes
+- Leg press: Primary Quads | Secondary Glutes
+- Hack squat: Primary Quads | Secondary Glutes
+- Lunge / Split squat: Primary Quads, Glutes
+- Hip hinge (RDL, good morning): Primary Hamstrings, Glutes
+- Hip thrust: Primary Glutes | Secondary Hamstrings
+- Dips: Primary Chest, Triceps
+- Calf raise variants: Primary Calves
+
+This guide ensures consistent volume counting. When in doubt, ask: "Is this muscle the main driver or just assisting?" Main driver = Primary, assisting = Secondary.
+
+## EXERCISE TYPES & FORMATTING
+
+My app handles five exercise types. Use the appropriate type for each activity and format exactly as shown:
+
+### STRENGTH (for gym/weight training exercises)
+\`\`\`
+Barbell Bench Press
+- Sets x Reps: 4 x 8-10
+- Rest: 120-180 sec
+- Primary: Chest, Triceps
+- Secondary: Front Delts
+- Alt 1: Dumbbell Bench Press (Primary: Chest, Triceps | Secondary: Front Delts)
+- Alt 2: Machine Chest Press (Primary: Chest, Triceps | Secondary: Front Delts)
+- Notes: Retract shoulder blades, maintain slight arch
+- Weekly progression: Wk1: 10-12, Wk2: 8-10, Wk3: 6-8, Wk4 (deload): 12 at lighter weight
+\`\`\`
+
+Rules for strength exercises:
+- Use full descriptive names with equipment prefix (e.g., "Barbell Back Squat", "Dumbbell Lateral Raise", "Cable Face Pull")
+- Always include 2 alternative exercises, each with their own Primary/Secondary muscles
+- Always show weekly rep progression across the block
+${notesInstruction}
+
+### CARDIO (for cardiovascular/endurance activities)
+\`\`\`
+Treadmill Run
+- Duration: 25 minutes
+- Intensity: Zone 2 / Conversational pace
+- Mode: Steady state
+- Weekly progression: Wk1: 20 min, Wk2: 25 min, Wk3: 30 min, Wk4: 20 min (deload)
+- Notes: Should be able to hold a conversation throughout
+\`\`\`
+
+Rules for cardio:
+- Include weekly progression showing how duration or intensity changes
+- Specify intensity in a way the user can follow (heart rate zone, conversational pace, or RPE)
+- If the user hasn't mentioned a heart rate monitor, use perceived effort descriptions instead of HR zones
+
+### STRETCH (for flexibility/mobility work)
+\`\`\`
+Pigeon Stretch
+- Hold: 45 seconds x 2 sets (each side)
+- Primary: Glutes
+- Notes: Keep hips square, ease into the stretch gradually
+\`\`\`
+
+Rules for stretching:
+- Specify whether the stretch is "each side" or bilateral
+- Include primary muscles from the taxonomy
+- Include brief form cue in notes
+
+### CIRCUIT (for conditioning/metabolic work)
+\`\`\`
+Core Finisher Circuit
+- Rounds: 3
+- Work: 40 sec on / 20 sec off
+- Exercises: Plank, Bicycle Crunches, Dead Bugs, Mountain Climbers
+- Notes: Focus on form over speed, rest 60 sec between rounds
+\`\`\`
+
+### SPORT (for recreational/social activities)
+\`\`\`
+Basketball (Recreational)
+- Duration: 60 minutes
+- Notes: Pickup game or shooting practice — counts as active recovery
+\`\`\`
+
+## PROGRAM DESIGN RULES
+
+1. **Match my primary goal** — structure the program to optimize for my stated objective
+2. **Respect my experience level** — appropriate complexity, volume, and exercise selection
+3. **Only use available equipment** — do not include exercises I cannot perform with my setup
+4. **Stay within my session duration** — each session must fit within my stated time limit
+5. **Show explicit weekly progression** — for every strength exercise, show what reps/sets look like each week of the block (not just "increase weight over time")
+6. **Include a deload** — if the program is 4+ weeks, include a deload week with explicitly reduced volume. Show the actual deload sets and reps, do not just say "reduce volume by 40%"
+7. **2 alternatives per strength exercise** — each with their own primary and secondary muscle tags from the taxonomy
+8. **Use the correct exercise type** — gym exercises use "strength" format, running/biking use "cardio" format, mobility work uses "stretch" format, etc. Do not format a cardio session as if it were a strength exercise
+9. **Prioritize selected cardio activities** — When programming cardio days, use the user's preferred cardio activities first. Rotate through different preferred activities week by week within each block rather than repeating the same activity every session. Every preferred activity should appear at least once in the program. Only introduce activities outside their preferences if needed for variety.
+10. **Rotate exercises between blocks** — For programs with multiple blocks (e.g., Block A and Block B), rotate at least some exercise variations between blocks to provide fresh stimulus. Keep the same movement patterns (e.g., horizontal press, vertical pull) but change the specific exercise (e.g., barbell bench → dumbbell bench). This is especially important for intermediate and advanced lifters.
+
+## QUALITY CHECK
+
+Before presenting the program, verify:
+- **Volume summary:** After the complete program, include a weekly volume summary table for each block showing sets per week per muscle group (counting only exercises where that muscle is listed as Primary). Group by block since exercises stay the same within a block. Show deload weeks separately since volume is intentionally reduced. Format as a simple table with status indicators:
+
+| Muscle Group | Sets/Week | Min | Target | Optimal | Status |
+|---|---|---|---|---|---|
+| Chest | 16 | 10 | 16-20 | 12-20 | ✅ |
+| Side Delts | 12 | 8 | 12-16 | 10-16 | ✅ |
+| Rear Delts | 6 | 0 | — | 10-18 | ✅ |
+| Front Delts | 0 | 0 | — | — | ✅ |
+| Calves | 18 | 8 | 16-22 | 12-22 (priority) | ✅ |
+| Forearms | 0 | 0 | — | — | ✅ |
+
+Status indicators:
+- ✅ = within target range
+- ⚠️ LOW = below minimum (needs more volume)
+- ⚠️ HIGH = above maximum (diminishing returns, consider reducing unless this is a priority muscle group)
+- ℹ️ CONSTRAINED = above minimum but below training approach target due to split/schedule limitations. Must be explained in Recommendations section.
+
+Priority muscle groups specified by the user get a wider acceptable range — being above the standard maximum is acceptable for priority groups. Mark priority muscle groups with "(priority)" next to their target range. The target column should reflect the user's goal (10-20 for hypertrophy, 6-12 for general fitness/maintenance).
+
+CRITICAL: If the volume summary shows any muscle group below the minimum target, you MUST revise the program to fix the gap BEFORE presenting it. Do not present a program with ⚠️ LOW flags and then explain why it's acceptable — instead, add sets or exercises to bring every muscle group into range. Muscles that can show 0 direct sets without being flagged: Front Delts, Traps, Rear Delts, Core, and Forearms (these receive sufficient indirect stimulus from compound pressing, pulling, rowing, stabilization, and gripping movements respectively). All other muscle groups must meet the minimum target for their experience level.
+
+If the training approach is Push Hard and a non-exempt muscle group is below its Push Hard target but a practical fix exists (e.g., adding an isolation movement as a superset on another training day, swapping a less effective exercise for one that hits the lagging group), implement the fix in the program rather than flagging it in Recommendations. Only use ℹ️ CONSTRAINED when there is genuinely no way to reach the target within session time and recovery constraints.
+
+EXPERIENCE-SCALED VOLUME MINIMUMS (natural lifters):
+
+BEGINNERS (complete_beginner, beginner):
+- Major muscles (Chest, Lats, Quads, Hamstrings, Glutes): 6-8 sets/week minimum
+- Medium muscles (Side Delts, Biceps, Triceps, Calves): 6 sets/week minimum
+- Small/indirect muscles (Front Delts, Rear Delts, Traps, Core, Forearms): 0 sets minimum (exempt — sufficient indirect stimulus from compounds)
+
+INTERMEDIATE:
+- Major muscles: 8-10 sets/week minimum
+- Medium muscles: 6-8 sets/week minimum
+- Small/indirect muscles: 0-6 sets/week
+
+ADVANCED:
+- Major muscles: 10-12 sets/week minimum
+- Medium muscles: 8-10 sets/week minimum
+- Small/indirect muscles: 0-6 sets/week
+
+OPTIMAL ranges for natural lifters (where most gains happen):
+- Major muscles: 12-20 sets/week
+- Medium muscles: 10-16 sets/week
+- Going above 20 sets/week for any muscle group has diminishing returns for natural lifters
+
+PRIORITY MUSCLE GROUPS: Increase priority muscles toward upper optimal range (16-22 sets/week). Reduce non-priority muscles toward their minimums to maintain recoverable total training stress. You cannot add volume everywhere — total weekly stress must be recoverable.
+
+TRAINING APPROACH ADJUSTMENT: The user's training approach shifts where within the optimal range (12-20 sets for major muscles) the AI should target:
+- Push Hard: target upper end (16-20 for major muscles, 12-16 for medium)
+- Balanced: target mid-range (12-16 for major muscles, 10-14 for medium)  
+- Conservative: target lower end (10-12 for major muscles, 8-10 for medium)
+These targets combine with experience level — a beginner choosing Push Hard still stays within beginner-appropriate ranges, just at the higher end of those ranges.
+
+If the training approach is Push Hard, the volume summary should show most non-exempt muscle groups in the UPPER half of the optimal range, not clustered at their minimums. A Push Hard program where most muscles sit at minimum volume is underdelivering on the user's intent. If a muscle group cannot reach the Push Hard target due to split constraints (e.g., only 2 upper body days), note this in the Recommendations section and suggest how the user could address it (e.g., adding lateral raises as supersets on lower body days).
+- **Rest periods:** Default to 1-2 minutes for compound exercises and 60-90 seconds for isolation exercises. Adjust based on the user's rest time preference if specified.
+- **Progressive overload:** Every program must include a clear overload mechanism (increasing load, reps, or sets week to week). Do not use vague instructions like "increase weight when ready."
+- **Frequency:** Each muscle group should ideally be trained 2x per week for hypertrophy. Once per week is suboptimal but acceptable if schedule constraints require it.
+- **Goal-specific adjustments:** Apply your knowledge of evidence-based training principles to adjust volume, intensity, and rest periods for the user's specific goal (e.g., strength goals use heavier loads with more rest, fat loss maintains volume with potential conditioning additions, recomposition follows hypertrophy guidelines).
+
+## OUTPUT FORMAT
+
+Create the program as a **markdown document artifact** (not in the chat). Present the program with these sections only:
+
+### 1. Program Overview
+3-4 sentences: training split, session types, overall approach.
+
+### 2. Weekly Structure
+Simple list showing each day (e.g., Day 1: Push, Day 2: Pull, Day 3: Cardio, Day 4: Rest, etc.)
+
+### 3. Progression Strategy
+Concrete numbers showing what changes week to week. Example: "Weeks 1-3: reps decrease from 12 → 10 → 8 as load increases. Week 4: deload at 60% volume with higher reps."
+
+### 4. Complete Program
+Every training day, every exercise, fully detailed using the formats above. Organize by block if the program has multiple phases.
+
+### 5. Quick Notes
+2-3 bullet points maximum with practical tips specific to this program. Do NOT include general fitness advice, nutrition recommendations, warm-up philosophy, or motivational text.
+
+### 6. Recommendations (optional)
+If the program has limitations due to the user's schedule or split, briefly note what change would improve results. 1-2 sentences maximum. Omit this section entirely if there are no meaningful recommendations.
+
+### 7. Weekly Volume Summary
+For each block (and deload weeks separately), show a table of sets per week per muscle group (counting only sets where that muscle is listed as Primary). Include Target range and Status columns. This verifies the program meets evidence-based volume targets before approving.
+
+## IMPORTANT
+
+- Do NOT include lengthy exercise selection rationale or training philosophy essays
+- Do NOT include nutrition advice or general health tips
+- Do NOT perform post-generation verification in the response. Complete all volume calculations and exercise planning BEFORE writing the program. Once the markdown document is created, your response is done — do not re-audit, re-count, or edit the program in a follow-up message.
+- Do NOT show your planning, volume calculations, or exercise selection reasoning in the chat. Work through all calculations internally. The user should only see a brief acknowledgment (1-2 sentences) followed by the markdown document artifact. No visible "let me plan..." or volume tallying in the response.
+- Do NOT convert to JSON — I need to review and approve the program first
+- After presenting the program, ask for my feedback on: exercise selection, volume, progression, and anything I want to change
+- Only after I confirm I'm happy should you offer JSON conversion`;
                     
                     await Clipboard.setStringAsync(planningPrompt);
                     setPlanningPromptCopied(true);
@@ -951,7 +1320,15 @@ Focus on creating an effective, personalized program that matches my specific go
                       const uniqueExercises = new Set();
                       parsedProgram?.blocks.forEach(block => 
                         block.days.forEach(day => 
-                          day.exercises.forEach(exercise => uniqueExercises.add(exercise.exercise))
+                          day.exercises.forEach(exercise => {
+                            // Get exercise name based on type
+                            const name = exercise.type === 'strength' ? exercise.exercise :
+                                        exercise.type === 'cardio' ? exercise.activity :
+                                        exercise.type === 'stretch' ? exercise.exercise :
+                                        exercise.type === 'circuit' ? exercise.circuit_name :
+                                        exercise.type === 'sport' ? exercise.activity : 'Unknown';
+                            uniqueExercises.add(name);
+                          })
                         )
                       );
                       return uniqueExercises.size;

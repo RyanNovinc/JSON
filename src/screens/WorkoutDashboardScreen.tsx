@@ -20,7 +20,6 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 interface WorkoutCompletionStatus {
   fitnessGoals: boolean;
   equipmentPreferences: boolean;
-  sleepOptimization: boolean;
 }
 
 interface QuestionnaireCard {
@@ -53,15 +52,6 @@ const questionnaires: QuestionnaireCard[] = [
     completionKey: 'equipmentPreferences',
   },
   {
-    id: 'sleepOptimization',
-    title: 'Sleep Optimization',
-    subtitle: 'Optimize your recovery',
-    description: 'Sleep schedule, workout timing, recovery',
-    icon: 'moon-outline',
-    navigationTarget: 'SleepOptimizationScreen',
-    completionKey: 'sleepOptimization',
-  },
-  {
     id: 'favoriteExercises',
     title: 'Favorite Exercises',
     subtitle: 'Manage your exercise library',
@@ -78,7 +68,6 @@ export default function WorkoutDashboardScreen() {
   const [completionStatus, setCompletionStatus] = useState<WorkoutCompletionStatus>({
     fitnessGoals: false,
     equipmentPreferences: false,
-    sleepOptimization: false,
   });
 
   useEffect(() => {
@@ -112,19 +101,9 @@ export default function WorkoutDashboardScreen() {
         equipmentPreferencesCompleted = !!(equipmentPreferencesData && equipmentPreferencesData.completedAt);
       }
 
-      // Check if sleep optimization is completed (shared with nutrition)
-      const sleepOptimizationDataString = await AsyncStorage.getItem('sleep_optimization_results');
-      let sleepOptimizationCompleted = false;
-      
-      if (sleepOptimizationDataString) {
-        const sleepOptimizationData = JSON.parse(sleepOptimizationDataString);
-        sleepOptimizationCompleted = !!(sleepOptimizationData && sleepOptimizationData.completedAt);
-      }
-      
       const completionStatus: WorkoutCompletionStatus = {
         fitnessGoals: fitnessGoalsCompleted,
         equipmentPreferences: equipmentPreferencesCompleted,
-        sleepOptimization: sleepOptimizationCompleted,
       };
       setCompletionStatus(completionStatus);
     } catch (error) {
@@ -133,7 +112,6 @@ export default function WorkoutDashboardScreen() {
       setCompletionStatus({
         fitnessGoals: false,
         equipmentPreferences: false,
-        sleepOptimization: false,
       });
     }
   };
@@ -145,8 +123,6 @@ export default function WorkoutDashboardScreen() {
       navigation.navigate('EquipmentPreferencesQuestionnaire' as any);
     } else if (questionnaire.id === 'favoriteExercises') {
       navigation.navigate('FavoriteExercises' as any);
-    } else if (questionnaire.id === 'sleepOptimization') {
-      navigation.navigate('SleepOptimizationScreen' as any);
     } else {
       // Fallback for any future questionnaires
       alert(`${questionnaire.title} questionnaire coming soon!`);

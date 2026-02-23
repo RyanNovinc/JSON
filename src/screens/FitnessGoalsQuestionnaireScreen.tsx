@@ -152,10 +152,10 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [showCustomFrequency, setShowCustomFrequency] = useState<boolean>(false);
   const [customGoals, setCustomGoals] = useState<string>('');
   const [trainingExperience, setTrainingExperience] = useState<string>('');
+  const [trainingApproach, setTrainingApproach] = useState<'push_hard' | 'balanced' | 'conservative'>('balanced');
   const [programDuration, setProgramDuration] = useState<string>('');
   const [customDuration, setCustomDuration] = useState<string>('');
-  const [fitnessInfluencer, setFitnessInfluencer] = useState<string>('');
-  const [customInfluencer, setCustomInfluencer] = useState<string>('');
+  const [cardioPreferences, setCardioPreferences] = useState<string[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -216,10 +216,10 @@ export default function FitnessGoalsQuestionnaireScreen() {
         setShowCustomFrequency(data.customFrequency !== '');
         setCustomGoals(data.customGoals || '');
         setTrainingExperience(data.trainingExperience || '');
+        setTrainingApproach(data.trainingApproach || 'balanced');
         setProgramDuration(data.programDuration || '');
         setCustomDuration(data.customDuration || '');
-        setFitnessInfluencer(data.fitnessInfluencer || '');
-        setCustomInfluencer(data.customInfluencer || '');
+        setCardioPreferences(data.cardioPreferences || []);
         
         // If questionnaire was completed, show summary directly
         // Check multiple indicators of completion
@@ -273,10 +273,10 @@ export default function FitnessGoalsQuestionnaireScreen() {
         otherTrainingDays: otherTrainingDays,
         customGoals: customGoals,
         trainingExperience: trainingExperience,
+        trainingApproach: trainingApproach,
         programDuration: programDuration,
         customDuration: customDuration,
-        fitnessInfluencer: fitnessInfluencer,
-        customInfluencer: customInfluencer,
+        cardioPreferences: cardioPreferences,
         currentStep: currentStep,
         // Note: no completedAt field - this indicates it's in progress
       };
@@ -296,7 +296,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       funSocialDetails, injuryPreventionDetails, flexibilityDetails, priorityMuscleGroups, 
       customMuscleGroup, movementLimitations, customLimitation, trainingStylePreference, 
       customTrainingStyle, totalTrainingDays, customFrequency, gymTrainingDays, 
-      otherTrainingDays, customGoals, trainingExperience, programDuration, customDuration, fitnessInfluencer, customInfluencer]);
+      otherTrainingDays, customGoals, trainingExperience, trainingApproach, programDuration, customDuration, cardioPreferences]);
 
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
@@ -327,6 +327,16 @@ export default function FitnessGoalsQuestionnaireScreen() {
         return prev.filter(group => group !== muscleGroup);
       } else {
         return [...prev, muscleGroup];
+      }
+    });
+  };
+
+  const handleCardioPreferenceToggle = (activity: string) => {
+    setCardioPreferences(prev => {
+      if (prev.includes(activity)) {
+        return prev.filter(a => a !== activity);
+      } else {
+        return [...prev, activity];
       }
     });
   };
@@ -467,10 +477,10 @@ export default function FitnessGoalsQuestionnaireScreen() {
         otherTrainingDays: otherTrainingDays,
         customGoals: customGoals,
         trainingExperience: trainingExperience,
+        trainingApproach: trainingApproach,
         programDuration: programDuration,
         customDuration: customDuration,
-        fitnessInfluencer: fitnessInfluencer,
-        customInfluencer: customInfluencer,
+        cardioPreferences: cardioPreferences,
         completedAt: new Date().toISOString(),
       };
 
@@ -684,7 +694,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   // Add data for Step 2
   const muscleGroups = [
-    'Arms', 'Shoulders', 'Chest', 'Back', 'Core', 'Legs', 'Glutes', 'Calves', 'Other'
+    'Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 
+    'Traps', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 
+    'Calves', 'Core'
   ];
 
   const limitations = [
@@ -1231,7 +1243,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
         )}
       </Animatable.View>
 
-      {/* Training Style Preference */}
+      {/* Training Style Preference - Only for ambiguous goals that need approach clarification */}
+      {(selectedPrimaryGoal === 'general_fitness' || selectedPrimaryGoal === 'body_recomposition' || selectedPrimaryGoal === 'custom_primary') && (
       <Animatable.View
         animation="fadeInUp"
         delay={300}
@@ -1292,6 +1305,115 @@ export default function FitnessGoalsQuestionnaireScreen() {
           </Animatable.View>
         )}
       </Animatable.View>
+      )}
+
+      {/* Cardio Preferences - Only for users who selected include_cardio */}
+      {selectedSecondaryGoals.includes('include_cardio') && (
+      <Animatable.View
+        animation="fadeInUp"
+        delay={400}
+        style={styles.sectionContainer}
+      >
+        <Text style={[styles.sectionTitle, { color: themeColor }]}>
+          Cardio Preferences
+        </Text>
+        <Text style={styles.sectionSubtitle}>
+          Which cardio activities would you prefer? Select all that apply. (optional)
+        </Text>
+        
+        <View style={styles.cardioPreferencesContainer}>
+          {[
+            {
+              id: 'treadmill',
+              title: 'Treadmill / Indoor Running',
+              icon: 'fitness-outline',
+            },
+            {
+              id: 'stationary_bike',
+              title: 'Stationary Bike / Cycling',
+              icon: 'bicycle-outline',
+            },
+            {
+              id: 'rowing_machine',
+              title: 'Rowing Machine',
+              icon: 'boat-outline',
+            },
+            {
+              id: 'swimming',
+              title: 'Swimming',
+              icon: 'water-outline',
+            },
+            {
+              id: 'stair_climber',
+              title: 'Stair Climber / StepMill',
+              icon: 'trending-up-outline',
+            },
+            {
+              id: 'elliptical',
+              title: 'Elliptical',
+              icon: 'ellipse-outline',
+            },
+            {
+              id: 'jump_rope',
+              title: 'Jump Rope',
+              icon: 'sync-outline',
+            },
+            {
+              id: 'outdoor_running',
+              title: 'Outdoor Running / Walking',
+              icon: 'walk-outline',
+            },
+            {
+              id: 'no_preference',
+              title: 'No Preference (AI chooses)',
+              icon: 'sparkles-outline',
+            },
+          ].map((cardio, index) => {
+            const isSelected = cardioPreferences.includes(cardio.id);
+            return (
+              <TouchableOpacity
+                key={cardio.id}
+                style={[
+                  styles.cardioPreferenceCard,
+                  isSelected && [
+                    styles.selectedCardioCard,
+                    { borderColor: themeColor, backgroundColor: `${themeColor}10` }
+                  ]
+                ]}
+                onPress={() => handleCardioPreferenceToggle(cardio.id)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.cardioPreferenceContent}>
+                  <View style={[styles.cardioPreferenceIcon, isSelected && { backgroundColor: themeColor }]}>
+                    <Ionicons
+                      name={cardio.icon as any}
+                      size={18}
+                      color={isSelected ? '#000000' : themeColor}
+                    />
+                  </View>
+                  <View style={styles.cardioPreferenceText}>
+                    <Text style={[
+                      styles.cardioPreferenceTitle,
+                      isSelected && { color: themeColor }
+                    ]}>
+                      {cardio.title}
+                    </Text>
+                  </View>
+                  <View style={styles.cardioPreferenceCheck}>
+                    {isSelected ? (
+                      <Ionicons name="checkmark-circle" size={18} color={themeColor} />
+                    ) : (
+                      <View style={styles.unselectedCircle} />
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Animatable.View>
+      )}
+      
     </ScrollView>
   );
 
@@ -1521,140 +1643,130 @@ export default function FitnessGoalsQuestionnaireScreen() {
         </View>
       </Animatable.View>
 
-      {/* Fitness Influencer Section */}
+      {/* Training Approach Section */}
       <Animatable.View
         animation="fadeInUp"
-        delay={400}
+        delay={300}
         style={styles.sectionContainer}
       >
         <Text style={[styles.sectionTitle, { color: themeColor }]}>
-          Training Style Inspiration
+          How hard do you want to train?
         </Text>
         <Text style={styles.sectionSubtitle}>
-          Any particular fitness influencer or training style you'd like to follow? (optional)
+          Choose your preferred training intensity and volume level
         </Text>
         
-        <View style={styles.influencerContainer}>
+        <View style={styles.experienceContainer}>
           {[
             {
-              id: 'science_based',
-              title: 'Science-Based Training',
-              description: 'Evidence-driven, research-backed approach',
-              icon: 'library-outline',
+              id: 'push_hard',
+              title: 'Push Hard',
+              icon: 'flame-outline',
+              getSubtitle: () => {
+                switch (trainingExperience) {
+                  case 'complete_beginner':
+                    return '~8-10 sets/week per major muscle · Longer sessions · Prioritize sleep and nutrition';
+                  case 'beginner':
+                    return '~8-10 sets/week per major muscle · Longer sessions · Prioritize sleep and nutrition';
+                  case 'intermediate':
+                    return '~12-16 sets/week per major muscle · Longer sessions · Good recovery habits needed';
+                  case 'advanced':
+                    return '~16-20 sets/week per major muscle · Longer sessions · Excellent recovery essential';
+                  default:
+                    return '~12-16 sets/week per major muscle · Longer sessions · Good recovery habits needed';
+                }
+              }
             },
             {
-              id: 'functional_fitness',
-              title: 'Functional Training',
-              description: 'Real-world movement patterns, injury prevention',
-              icon: 'shield-checkmark-outline',
+              id: 'balanced',
+              title: 'Balanced',
+              subtitle: '(Recommended)',
+              icon: 'speedometer-outline',
+              getSubtitle: () => {
+                switch (trainingExperience) {
+                  case 'complete_beginner':
+                    return '~6-8 sets/week per major muscle · Moderate sessions · Sustainable for most people';
+                  case 'beginner':
+                    return '~6-8 sets/week per major muscle · Moderate sessions · Sustainable for most people';
+                  case 'intermediate':
+                    return '~10-14 sets/week per major muscle · Moderate sessions · Best effort-to-results ratio';
+                  case 'advanced':
+                    return '~12-16 sets/week per major muscle · Moderate sessions · Solid gains without burnout';
+                  default:
+                    return '~10-14 sets/week per major muscle · Moderate sessions · Best effort-to-results ratio';
+                }
+              }
             },
             {
-              id: 'powerlifting',
-              title: 'Powerlifting Style',
-              description: 'Focus on squat, bench, deadlift strength',
-              icon: 'barbell-outline',
-            },
-            {
-              id: 'bodybuilding',
-              title: 'Bodybuilding Style',
-              description: 'Muscle isolation, hypertrophy focus',
-              icon: 'analytics-outline',
-            },
-            {
-              id: 'athletic_performance',
-              title: 'Athletic Performance',
-              description: 'Sport-specific training, power development',
-              icon: 'fitness-outline',
-            },
-            {
-              id: 'custom',
-              title: 'Other',
-              description: 'Specify your own training style/influencer',
-              icon: 'create-outline',
-            },
-            {
-              id: 'no_preference',
-              title: 'No Preference',
-              description: 'AI will choose the best approach',
-              icon: 'sparkles-outline',
-            },
-          ].map((influencer, index) => {
-            const isSelected = fitnessInfluencer === influencer.id;
+              id: 'conservative',
+              title: 'Conservative',
+              icon: 'leaf-outline',
+              getSubtitle: () => {
+                switch (trainingExperience) {
+                  case 'complete_beginner':
+                    return '~6 sets/week per major muscle · Shorter sessions · Great for busy schedules';
+                  case 'beginner':
+                    return '~6 sets/week per major muscle · Shorter sessions · Great for busy schedules';
+                  case 'intermediate':
+                    return '~8-10 sets/week per major muscle · Shorter sessions · Easy recovery';
+                  case 'advanced':
+                    return '~10-12 sets/week per major muscle · Shorter sessions · Sustainable long-term';
+                  default:
+                    return '~8-10 sets/week per major muscle · Shorter sessions · Easy recovery';
+                }
+              }
+            }
+          ].map((approach, index) => {
+            const isSelected = trainingApproach === approach.id;
             return (
               <Animatable.View
-                key={influencer.id}
+                key={approach.id}
                 animation="fadeInUp"
-                delay={450 + (index * 50)}
-                style={styles.influencerOptionWrapper}
+                delay={350 + (index * 50)}
+                style={styles.experienceOptionWrapper}
               >
                 <TouchableOpacity
                   style={[
-                    styles.influencerCard,
+                    styles.experienceOption,
                     isSelected && [
-                      styles.selectedInfluencerCard,
+                      styles.selectedExperienceOption,
                       { borderColor: themeColor, backgroundColor: `${themeColor}10` }
                     ]
                   ]}
-                  onPress={() => {
-                    // Allow deselection for optional field
-                    if (fitnessInfluencer === influencer.id) {
-                      setFitnessInfluencer('');
-                      if (influencer.id === 'custom') {
-                        setCustomInfluencer(''); // Clear custom input when deselecting
-                      }
-                    } else {
-                      setFitnessInfluencer(influencer.id);
-                    }
-                  }}
+                  onPress={() => setTrainingApproach(approach.id as 'push_hard' | 'balanced' | 'conservative')}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.influencerCardContent}>
-                    <View style={[styles.influencerCardIcon, isSelected && { backgroundColor: themeColor }]}>
+                  <View style={styles.experienceOptionContent}>
+                    <View style={[styles.experienceIconContainer, isSelected && { backgroundColor: themeColor }]}>
                       <Ionicons
-                        name={influencer.icon as any}
-                        size={18}
+                        name={approach.icon as any}
+                        size={20}
                         color={isSelected ? '#000000' : themeColor}
                       />
                     </View>
-                    <View style={styles.influencerCardText}>
-                      <Text style={[styles.influencerCardTitle, isSelected && { color: themeColor }]}>
-                        {influencer.title}
+                    <View style={styles.experienceTextContainer}>
+                      <Text style={[styles.experienceTitle, isSelected && { color: themeColor }]}>
+                        {approach.title} {approach.subtitle || ''}
                       </Text>
-                      <Text style={[styles.influencerCardDescription, isSelected && { color: themeColor, opacity: 0.8 }]}>
-                        {influencer.description}
+                      <Text style={[styles.experienceDescription, isSelected && { color: themeColor, opacity: 0.8 }]}>
+                        {approach.getSubtitle()}
                       </Text>
                     </View>
-                    <View style={styles.influencerCardCheck}>
+                    <View style={styles.experienceSelectionIndicator}>
                       {isSelected ? (
-                        <Ionicons name="checkmark-circle" size={18} color={themeColor} />
+                        <Ionicons name="checkmark-circle" size={20} color={themeColor} />
                       ) : (
                         <View style={styles.unselectedCircle} />
                       )}
                     </View>
                   </View>
                 </TouchableOpacity>
-
-                {/* Custom influencer input */}
-                {influencer.id === 'custom' && isSelected && (
-                  <Animatable.View
-                    animation="slideInDown"
-                    duration={300}
-                    style={styles.customInfluencerContainer}
-                  >
-                    <TextInput
-                      style={styles.customInfluencerInput}
-                      placeholder="e.g., Jeff Nippard, Chris Bumstead, CrossFit style..."
-                      placeholderTextColor="#71717a"
-                      value={customInfluencer}
-                      onChangeText={setCustomInfluencer}
-                    />
-                  </Animatable.View>
-                )}
               </Animatable.View>
             );
           })}
         </View>
       </Animatable.View>
+
     </ScrollView>
   );
 
@@ -1863,8 +1975,40 @@ export default function FitnessGoalsQuestionnaireScreen() {
             </Animatable.View>
           )}
 
+          {/* Training Approach */}
+          {trainingApproach && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={1550}
+              duration={500}
+              style={styles.summaryCard}
+            >
+              <Text style={styles.summaryCardTitle}>Training Approach</Text>
+              
+              <View style={styles.summaryItem}>
+                <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
+                  <Ionicons 
+                    name={
+                      trainingApproach === 'push_hard' ? 'flame' :
+                      trainingApproach === 'balanced' ? 'speedometer' : 'leaf'
+                    } 
+                    size={18} 
+                    color={themeColor} 
+                  />
+                </View>
+                <View style={styles.summaryItemContent}>
+                  <Text style={styles.summaryItemLabel}>Training Intensity</Text>
+                  <Text style={styles.summaryItemValue}>
+                    {trainingApproach === 'push_hard' ? 'Push Hard' :
+                     trainingApproach === 'balanced' ? 'Balanced (Recommended)' : 'Conservative'}
+                  </Text>
+                </View>
+              </View>
+            </Animatable.View>
+          )}
+
           {/* Program Preferences */}
-          {(programDuration || fitnessInfluencer) && (
+          {programDuration && (
             <Animatable.View 
               animation="fadeInUp" 
               delay={1600}
@@ -1901,42 +2045,11 @@ export default function FitnessGoalsQuestionnaireScreen() {
                   </View>
                 </View>
               )}
-              
-              {fitnessInfluencer && (
-                <View style={styles.summaryItem}>
-                  <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
-                    <Ionicons 
-                      name={
-                        fitnessInfluencer === 'science_based' ? 'library' :
-                        fitnessInfluencer === 'functional_fitness' ? 'shield-checkmark' :
-                        fitnessInfluencer === 'powerlifting' ? 'barbell' :
-                        fitnessInfluencer === 'bodybuilding' ? 'analytics' :
-                        fitnessInfluencer === 'athletic_performance' ? 'fitness' :
-                        fitnessInfluencer === 'custom' ? 'create' : 'sparkles'
-                      } 
-                      size={18} 
-                      color={themeColor} 
-                    />
-                  </View>
-                  <View style={styles.summaryItemContent}>
-                    <Text style={styles.summaryItemLabel}>Training Style</Text>
-                    <Text style={styles.summaryItemValue}>
-                      {fitnessInfluencer === 'science_based' ? 'Science-Based Training' :
-                       fitnessInfluencer === 'functional_fitness' ? 'Functional Training' :
-                       fitnessInfluencer === 'powerlifting' ? 'Powerlifting Style' :
-                       fitnessInfluencer === 'bodybuilding' ? 'Bodybuilding Style' :
-                       fitnessInfluencer === 'athletic_performance' ? 'Athletic Performance' :
-                       fitnessInfluencer === 'custom' ? (customInfluencer || 'Custom Style') :
-                       'No Preference (AI Optimized)'}
-                    </Text>
-                  </View>
-                </View>
-              )}
             </Animatable.View>
           )}
 
-          {/* Secondary Goals */}
-          {selectedSecondary.length > 0 && (
+          {/* Secondary Goals - Exclude cardio since it has its own dedicated section */}
+          {selectedSecondary.filter(goal => goal.id !== 'include_cardio').length > 0 && (
             <Animatable.View 
               animation="fadeInUp" 
               delay={1700}
@@ -1945,17 +2058,19 @@ export default function FitnessGoalsQuestionnaireScreen() {
             >
               <Text style={styles.summaryCardTitle}>Additional Focus Areas</Text>
               <View style={styles.secondaryGoalsList}>
-                {selectedSecondary.map((goal, index) => (
-                  <Animatable.View 
-                    key={goal.id} 
-                    animation="fadeInRight"
-                    delay={1900 + (index * 100)}
-                    style={styles.secondaryGoalItem}
-                  >
-                    <View style={[styles.goalDot, { backgroundColor: themeColor }]} />
-                    <Text style={styles.secondaryGoalText}>{goal.title}</Text>
-                  </Animatable.View>
-                ))}
+                {selectedSecondary
+                  .filter(goal => goal.id !== 'include_cardio')
+                  .map((goal, index) => (
+                    <Animatable.View 
+                      key={goal.id} 
+                      animation="fadeInRight"
+                      delay={1900 + (index * 100)}
+                      style={styles.secondaryGoalItem}
+                    >
+                      <View style={[styles.goalDot, { backgroundColor: themeColor }]} />
+                      <Text style={styles.secondaryGoalText}>{goal.title}</Text>
+                    </Animatable.View>
+                  ))}
               </View>
             </Animatable.View>
           )}
@@ -2004,6 +2119,27 @@ export default function FitnessGoalsQuestionnaireScreen() {
                   <View style={styles.detailItem}>
                     <Text style={[styles.detailLabel, { color: themeColor }]}>Custom Goals:</Text>
                     <Text style={styles.detailValue}>{customGoals}</Text>
+                  </View>
+                )}
+                {selectedSecondaryGoals.includes('include_cardio') && cardioPreferences.length > 0 && (
+                  <View style={styles.detailItem}>
+                    <Text style={[styles.detailLabel, { color: themeColor }]}>Cardio Activities:</Text>
+                    <Text style={styles.detailValue}>
+                      {cardioPreferences.map(activity => {
+                        const activityMap: { [key: string]: string } = {
+                          'treadmill': 'Treadmill / Indoor Running',
+                          'stationary_bike': 'Stationary Bike / Cycling',
+                          'rowing_machine': 'Rowing Machine',
+                          'swimming': 'Swimming',
+                          'stair_climber': 'Stair Climber / StepMill',
+                          'elliptical': 'Elliptical',
+                          'jump_rope': 'Jump Rope',
+                          'outdoor_running': 'Outdoor Running / Walking',
+                          'no_preference': 'No Preference (AI chooses)',
+                        };
+                        return activityMap[activity] || activity;
+                      }).join(', ')}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -3469,66 +3605,46 @@ const styles = StyleSheet.create({
     borderColor: '#3a3a3b',
   },
 
-  // Fitness Influencer Styles
-  influencerContainer: {
-    gap: 10,
+  // Cardio Preferences Styles
+  cardioPreferencesContainer: {
+    marginTop: 16,
   },
-  influencerOptionWrapper: {
-    marginBottom: 2,
-  },
-  influencerCard: {
+  cardioPreferenceCard: {
     backgroundColor: '#1a1a1b',
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#333333',
-    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    marginBottom: 12,
+    overflow: 'hidden',
   },
-  selectedInfluencerCard: {
+  selectedCardioCard: {
     borderWidth: 2,
   },
-  influencerCardContent: {
+  cardioPreferenceContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
   },
-  influencerCardIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#2a2a2b',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  influencerCardText: {
-    flex: 1,
-    marginRight: 10,
-  },
-  influencerCardTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 3,
-  },
-  influencerCardDescription: {
-    fontSize: 12,
-    color: '#a1a1aa',
-    lineHeight: 16,
-  },
-  influencerCardCheck: {
-    alignItems: 'center',
-  },
-  customInfluencerContainer: {
-    marginTop: 12,
-    paddingHorizontal: 4,
-  },
-  customInfluencerInput: {
+  cardioPreferenceIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#27272a',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  cardioPreferenceText: {
+    flex: 1,
+  },
+  cardioPreferenceTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#3a3a3b',
+    marginBottom: 2,
+  },
+  cardioPreferenceCheck: {
+    alignItems: 'center',
   },
 
 });

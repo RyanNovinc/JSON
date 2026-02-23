@@ -49,15 +49,15 @@ const getMuscleGroupOptions = (category: string | null) => {
   switch (category) {
     case 'gym':
     case 'bodyweight':
-      return ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Abs', 'Quadriceps', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Forearms', 'Full Body', 'Custom'];
+      return ['Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 'Traps', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Custom'];
     case 'cardio':
       return ['Lower Body', 'Upper Body', 'Full Body', 'Core', 'Custom'];
     case 'flexibility':
-      return ['Back/Spine', 'Hips/Pelvis', 'Shoulders/Arms', 'Hamstrings/Legs', 'Core/Abs', 'Neck', 'Chest', 'Glutes', 'Custom'];
+      return ['Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 'Traps', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Custom'];
     case 'custom':
       return ['Custom'];
     default:
-      return ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Abs', 'Quadriceps', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Forearms', 'Full Body', 'Custom'];
+      return ['Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 'Traps', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Custom'];
   }
 };
 

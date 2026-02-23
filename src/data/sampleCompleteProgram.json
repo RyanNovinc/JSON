@@ -1,0 +1,301 @@
+{
+  "routine_name": "Complete Training System - All Exercise Types",
+  "description": "A comprehensive 4-week program demonstrating all five exercise types: strength, cardio, stretch, circuit, and sport activities. Perfect for testing the new app schema.",
+  "days_per_week": 6,
+  "blocks": [
+    {
+      "block_name": "Week 1-2 - Foundation",
+      "weeks": "1-2",
+      "structure": "Mixed Training",
+      "days": [
+        {
+          "day_name": "Upper Body Strength",
+          "estimated_duration": 75,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Barbell Bench Press",
+              "sets": 4,
+              "reps": "8-10",
+              "reps_weekly": {"1": "10", "2": "8"},
+              "sets_weekly": {"1": 4, "2": 4},
+              "rest": 180,
+              "restQuick": 120,
+              "notes": "Control the eccentric, drive through chest.",
+              "primaryMuscles": ["Chest", "Triceps"],
+              "secondaryMuscles": ["Front Delts"],
+              "alternatives": [
+                {
+                  "exercise": "Dumbbell Bench Press",
+                  "primaryMuscles": ["Chest", "Triceps"],
+                  "secondaryMuscles": ["Front Delts"]
+                },
+                {
+                  "exercise": "Machine Chest Press",
+                  "primaryMuscles": ["Chest", "Triceps"],
+                  "secondaryMuscles": ["Front Delts"]
+                }
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Dumbbell Row",
+              "sets": 3,
+              "reps": "10-12",
+              "rest": 120,
+              "restQuick": 90,
+              "notes": "Keep core tight, pull to hip.",
+              "primaryMuscles": ["Lats", "Upper Back"],
+              "secondaryMuscles": ["Biceps", "Rear Delts"],
+              "alternatives": [
+                {
+                  "exercise": "Cable Seated Row",
+                  "primaryMuscles": ["Lats", "Upper Back"],
+                  "secondaryMuscles": ["Biceps", "Rear Delts"]
+                }
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Dumbbell Lateral Raise",
+              "sets": 3,
+              "reps": "12-15",
+              "rest": 60,
+              "restQuick": 45,
+              "notes": "Slight forward lean, control the negative.",
+              "primaryMuscles": ["Side Delts"],
+              "secondaryMuscles": ["Traps"],
+              "alternatives": [
+                {
+                  "exercise": "Cable Lateral Raise",
+                  "primaryMuscles": ["Side Delts"],
+                  "secondaryMuscles": ["Traps"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Lower Body Strength",
+          "estimated_duration": 70,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Barbell Back Squat",
+              "sets": 4,
+              "reps": "6-8",
+              "reps_weekly": {"1": "8", "2": "6"},
+              "rest": 210,
+              "restQuick": 150,
+              "notes": "Depth to parallel, drive through heels.",
+              "primaryMuscles": ["Quads", "Glutes"],
+              "secondaryMuscles": ["Core", "Calves"],
+              "alternatives": [
+                {
+                  "exercise": "Goblet Squat",
+                  "primaryMuscles": ["Quads", "Glutes"],
+                  "secondaryMuscles": ["Core"]
+                },
+                {
+                  "exercise": "Leg Press",
+                  "primaryMuscles": ["Quads", "Glutes"],
+                  "secondaryMuscles": ["Calves"]
+                }
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Romanian Deadlift",
+              "sets": 3,
+              "reps": "8-10",
+              "rest": 150,
+              "restQuick": 120,
+              "notes": "Hip hinge movement, feel the stretch in hamstrings.",
+              "primaryMuscles": ["Hamstrings", "Glutes"],
+              "secondaryMuscles": ["Upper Back", "Core"],
+              "alternatives": [
+                {
+                  "exercise": "Dumbbell Romanian Deadlift",
+                  "primaryMuscles": ["Hamstrings", "Glutes"],
+                  "secondaryMuscles": ["Upper Back", "Core"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Cardio & Conditioning",
+          "estimated_duration": 45,
+          "exercises": [
+            {
+              "type": "cardio",
+              "activity": "Treadmill Run",
+              "duration_minutes": 25,
+              "distance_value": 3,
+              "distance_unit": "km",
+              "target_intensity": "Zone 2 - Conversational pace",
+              "cardio_mode": "steady_state",
+              "progression_weekly": {
+                "1": "25 min easy pace",
+                "2": "30 min easy pace"
+              },
+              "notes": "Maintain steady breathing, should be able to hold conversation."
+            },
+            {
+              "type": "cardio",
+              "activity": "Rowing Machine",
+              "duration_minutes": 15,
+              "target_intensity": "Moderate intensity",
+              "cardio_mode": "intervals",
+              "notes": "2 min work, 1 min rest intervals. Focus on form over speed."
+            }
+          ]
+        },
+        {
+          "day_name": "Flexibility & Recovery",
+          "estimated_duration": 30,
+          "exercises": [
+            {
+              "type": "stretch",
+              "exercise": "Pigeon Stretch",
+              "hold_seconds": 45,
+              "sets": 2,
+              "per_side": true,
+              "primaryMuscles": ["Glutes"],
+              "notes": "Deep hip opener. Breathe into the stretch."
+            },
+            {
+              "type": "stretch",
+              "exercise": "Hamstring Stretch",
+              "hold_seconds": 30,
+              "sets": 2,
+              "per_side": true,
+              "primaryMuscles": ["Hamstrings"],
+              "notes": "Keep back straight, lean forward from hips."
+            },
+            {
+              "type": "stretch",
+              "exercise": "Chest Wall Stretch",
+              "hold_seconds": 30,
+              "sets": 2,
+              "per_side": false,
+              "primaryMuscles": ["Chest"],
+              "notes": "Use doorway or wall. Feel stretch across chest."
+            },
+            {
+              "type": "stretch",
+              "exercise": "Cat-Cow Stretch",
+              "hold_seconds": 60,
+              "sets": 1,
+              "per_side": false,
+              "primaryMuscles": ["Core"],
+              "notes": "Gentle spinal mobility. 10-15 reps, not timed hold."
+            }
+          ]
+        },
+        {
+          "day_name": "Circuit Training",
+          "estimated_duration": 35,
+          "exercises": [
+            {
+              "type": "circuit",
+              "circuit_name": "Core Finisher Circuit",
+              "rounds": 4,
+              "work_seconds": 40,
+              "rest_seconds": 20,
+              "exercises": [
+                {
+                  "exercise": "Plank Hold",
+                  "notes": "Keep straight line from head to heels"
+                },
+                {
+                  "exercise": "Mountain Climbers",
+                  "notes": "Quick feet, maintain plank position"
+                },
+                {
+                  "exercise": "Russian Twists",
+                  "notes": "Lean back slightly, control the movement"
+                },
+                {
+                  "exercise": "Dead Bug",
+                  "notes": "Press lower back into floor, slow and controlled"
+                }
+              ],
+              "notes": "Complete all exercises back-to-back, then rest 60s between rounds."
+            },
+            {
+              "type": "circuit",
+              "circuit_name": "Metabolic Finisher",
+              "rounds": 3,
+              "work_seconds": 30,
+              "rest_seconds": 30,
+              "exercises": [
+                {
+                  "exercise": "Burpees"
+                },
+                {
+                  "exercise": "Jump Squats"
+                },
+                {
+                  "exercise": "High Knees"
+                }
+              ],
+              "notes": "High intensity. Scale rounds if needed."
+            }
+          ]
+        },
+        {
+          "day_name": "Active Recovery & Sport",
+          "estimated_duration": 60,
+          "exercises": [
+            {
+              "type": "sport",
+              "activity": "Basketball",
+              "duration_minutes": 45,
+              "notes": "Pick-up games or shooting practice. Focus on movement quality."
+            },
+            {
+              "type": "sport",
+              "activity": "Swimming",
+              "duration_minutes": 30,
+              "notes": "Easy pace, any stroke. Focus on technique and relaxation."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "block_name": "Week 3-4 - Progression",
+      "weeks": "3-4",
+      "structure": "Mixed Training - Increased Intensity",
+      "days": [
+        {
+          "day_name": "Upper Body Strength",
+          "estimated_duration": 80,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Barbell Bench Press",
+              "sets": 5,
+              "reps": "5-6",
+              "reps_weekly": {"3": "6", "4": "5"},
+              "sets_weekly": {"3": 4, "4": 5},
+              "rest": 210,
+              "restQuick": 150,
+              "notes": "Heavier weight, focus on strength. Control the eccentric.",
+              "primaryMuscles": ["Chest", "Triceps"],
+              "secondaryMuscles": ["Front Delts"],
+              "alternatives": [
+                {
+                  "exercise": "Incline Dumbbell Press",
+                  "primaryMuscles": ["Chest", "Triceps"],
+                  "secondaryMuscles": ["Front Delts"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
