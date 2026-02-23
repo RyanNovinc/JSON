@@ -169,11 +169,17 @@ function ExerciseCard({
   const currentUnit = getExerciseUnit(exerciseIndex);
   
   // Use weekly reps if available, otherwise fall back to regular reps
-  const targetReps = exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps;
+  const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
+  
+  // Ensure targetReps is always a string
+  const targetRepsString = typeof targetReps === 'string' ? targetReps : String(targetReps);
   const selectedIndex = setsData.length > 0 ? setsData[0].selectedExerciseIndex : 0;
   
   // Create array of all available exercises (primary + alternatives)
-  const allExercises = [exercise.exercise, ...(exercise.alternatives || [])];
+  const alternativeNames = (exercise.alternatives || []).map(alt => 
+    typeof alt === 'string' ? alt : alt.exercise
+  );
+  const allExercises = [exercise.exercise, ...alternativeNames];
   const currentExerciseName = allExercises[selectedIndex] || exercise.exercise;
 
   const toggleDropSet = (setIndex: number) => {
@@ -349,7 +355,10 @@ function ExerciseCard({
                 setShowExerciseSelector(false);
               }}
               onLongPress={() => {
-                onSetExercisePreference(exerciseIndex, exercise.exercise, exercise.alternatives || [], exerciseName);
+                const alternativeNames = (exercise.alternatives || []).map(alt => 
+                  typeof alt === 'string' ? alt : alt.exercise
+                );
+                onSetExercisePreference(exerciseIndex, exercise.exercise, alternativeNames, exerciseName);
                 setShowExerciseSelector(false);
               }}
               activeOpacity={0.7}
@@ -447,7 +456,7 @@ function ExerciseCard({
                     onInteractionAttempt && onInteractionAttempt();
                   }
                 }}
-                placeholder={getCurrentWeekReps(targetReps).split('-')[0]}
+                placeholder={getCurrentWeekReps(targetRepsString).split('-')[0]}
                 placeholderTextColor="#52525b"
                 keyboardType="number-pad"
                 editable={!setData.completed}
@@ -608,6 +617,7 @@ export default function WorkoutLogScreen() {
   const [showHistory, setShowHistory] = useState<string | null>(null);
   const [exerciseHistory, setExerciseHistory] = useState<WorkoutHistory[]>([]);
   const [showNotes, setShowNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
+  const [showDeloadInfo, setShowDeloadInfo] = useState(false);
   const [showTimerSettings, setShowTimerSettings] = useState(false);
   const [timerSettings, setTimerSettings] = useState<TimerSettings>(TimerNotifications.defaultSettings);
   const [timerMinimized, setTimerMinimized] = useState(true); // Start minimized by default
@@ -663,7 +673,9 @@ export default function WorkoutLogScreen() {
   
   useEffect(() => {
     const initialData = day.exercises.map(exercise => {
-      return Array.from({ length: exercise.sets }, (_, index) => ({
+      // Use weekly sets if available, otherwise fall back to regular sets
+      const currentSets = exercise.sets_weekly?.[currentWeek.toString()] || exercise.sets;
+      return Array.from({ length: currentSets }, (_, index) => ({
         exercise: exercise.exercise, // This will be the primary exercise name
         setNumber: index + 1,
         weight: '',
@@ -685,7 +697,7 @@ export default function WorkoutLogScreen() {
     if (Object.keys(initialNotes).length > 0) {
       setExerciseNotes(initialNotes);
     }
-  }, [day]);
+  }, [day, currentWeek]);
 
   // Update exercise selections based on preferences
   useEffect(() => {
@@ -695,7 +707,10 @@ export default function WorkoutLogScreen() {
         const preferredExercise = exercisePreferences[exercise.exercise];
         
         if (preferredExercise && exercise.alternatives) {
-          const allExercises = [exercise.exercise, ...exercise.alternatives];
+          const alternativeNames = exercise.alternatives.map(alt => 
+            typeof alt === 'string' ? alt : alt.exercise
+          );
+          const allExercises = [exercise.exercise, ...alternativeNames];
           const preferredIndex = allExercises.indexOf(preferredExercise);
           
           if (preferredIndex !== -1) {
@@ -836,7 +851,10 @@ export default function WorkoutLogScreen() {
     
     // Get the current exercise name based on selected exercise index
     const exercise = day.exercises[exerciseIndex];
-    const allExercises = [exercise.exercise, ...(exercise.alternatives || [])];
+    const alternativeNames = (exercise.alternatives || []).map(alt => 
+      typeof alt === 'string' ? alt : alt.exercise
+    );
+    const allExercises = [exercise.exercise, ...alternativeNames];
     const selectedIndex = setData.selectedExerciseIndex || 0;
     const currentExerciseName = allExercises[selectedIndex] || exercise.exercise;
     
@@ -1165,7 +1183,10 @@ export default function WorkoutLogScreen() {
     // Only update if selection actually changed
     if (currentSelection !== selectedExerciseIndex) {
       const exercise = day.exercises[exerciseIndex];
-      const allExercises = [exercise.exercise, ...(exercise.alternatives || [])];
+      const alternativeNames = (exercise.alternatives || []).map(alt => 
+        typeof alt === 'string' ? alt : alt.exercise
+      );
+      const allExercises = [exercise.exercise, ...alternativeNames];
       const newExerciseName = allExercises[selectedExerciseIndex] || exercise.exercise;
       
       // Update exercise selection for all sets of this exercise
@@ -1391,7 +1412,10 @@ export default function WorkoutLogScreen() {
       if (completedSets.length > 0) {
         console.log(`Saving exercise ${exercise.exercise} with ${completedSets.length} completed sets`);
         // Get the current exercise name (primary or alternative)
-        const allExercises = [exercise.exercise, ...(exercise.alternatives || [])];
+        const alternativeNames = (exercise.alternatives || []).map(alt => 
+          typeof alt === 'string' ? alt : alt.exercise
+        );
+        const allExercises = [exercise.exercise, ...alternativeNames];
         const selectedIndex = setsData[0]?.selectedExerciseIndex || 0;
         const currentExerciseName = allExercises[selectedIndex] || exercise.exercise;
         
@@ -1608,8 +1632,8 @@ export default function WorkoutLogScreen() {
   if (showNotes) {
     const exerciseIndex = showNotes.exerciseIndex;
     const exercise = day.exercises[exerciseIndex];
-    const targetReps = exercise.reps;
-    const targetSets = exercise.sets;
+    const targetReps = exercise.reps || '';
+    const targetSets = exercise.sets || 0;
     
     return (
       <SafeAreaView style={styles.container}>
@@ -1661,7 +1685,7 @@ export default function WorkoutLogScreen() {
                                 styles.weekReps,
                                 { color: themeColor },
                                 parseInt(week) === currentWeek && styles.activeWeekReps
-                              ]}>{reps}</Text>
+                              ]}>{reps.replace(/\s*\(.*?\)/, '')}</Text>
                             </View>
                           ))}
                         </View>
@@ -1669,7 +1693,7 @@ export default function WorkoutLogScreen() {
                     }
                     
                     // Fallback to original parsing for non-weekly exercises
-                    const scheme = parseRepScheme(targetReps);
+                    const scheme = parseRepScheme(targetRepsString);
                     
                     if (scheme.type === 'weekly') {
                       return (
@@ -1696,7 +1720,7 @@ export default function WorkoutLogScreen() {
                     } else {
                       return (
                         <View style={styles.straightScheme}>
-                          <Text style={[styles.repSchemeText, { color: themeColor }]}>{targetReps}</Text>
+                          <Text style={[styles.repSchemeText, { color: themeColor }]}>{targetRepsString}</Text>
                           <View style={styles.repeatIndicator}>
                             <Ionicons name="repeat" size={16} color="#71717a" />
                             <Text style={styles.repeatText}>× {targetSets} sets</Text>
@@ -1742,6 +1766,25 @@ export default function WorkoutLogScreen() {
         </TouchableOpacity>
         <View style={styles.titleContainer}>
           <Text style={styles.title}>{day.day_name}</Text>
+          {(() => {
+            // Parse the block weeks to get total week count
+            const weeksRange = block.weeks || '1-4';
+            const totalWeeks = weeksRange.includes('-') 
+              ? parseInt(weeksRange.split('-')[1]) - parseInt(weeksRange.split('-')[0]) + 1
+              : 1;
+            
+            // Check if current week is a deload week
+            const isDeloadWeek = block.deload_weeks?.includes(currentWeek) || false;
+            const weekDisplay = `WEEK ${currentWeek} / ${totalWeeks}`;
+            const deloadLabel = isDeloadWeek ? ' — DELOAD' : '';
+            
+            return (
+              <Text style={[styles.weekLabel, { color: themeColor }]}>
+                {weekDisplay}
+                {isDeloadWeek && <Text style={[styles.deloadLabel, { color: themeColor }]}>{deloadLabel}</Text>}
+              </Text>
+            );
+          })()}
           {workoutStartTime && (
             <Text style={[styles.workoutDuration, { color: themeColor }]}>{formatDuration(workoutDuration)}</Text>
           )}
@@ -2352,6 +2395,38 @@ export default function WorkoutLogScreen() {
           </Animated.View>
         </Animated.View>
       </Modal>
+
+      {/* Deload Info Modal */}
+      <Modal
+        visible={showDeloadInfo}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeloadInfo(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View style={styles.deloadInfoModal}>
+            <View style={styles.deloadInfoHeader}>
+              <Text style={styles.deloadInfoTitle}>💡 Deload Week</Text>
+              <TouchableOpacity 
+                style={styles.deloadInfoClose}
+                onPress={() => setShowDeloadInfo(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={20} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.deloadInfoText}>
+              Use 40-60% of your Week 3 weight (50% is most common).
+            </Text>
+            
+            <Text style={styles.deloadInfoExample}>
+              Example: If you used 100kg for 6-8 reps in Week 3, use 50kg for 12 reps this week.
+            </Text>
+          </Animated.View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -2392,6 +2467,70 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginTop: 2,
+  },
+  weekLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  deloadLabel: {
+    fontWeight: '700',
+  },
+  deloadInfoButton: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    zIndex: 1000,
+  },
+  deloadInfoButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  deloadInfoModal: {
+    backgroundColor: '#1f1f23',
+    borderRadius: 16,
+    padding: 24,
+    margin: 20,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  deloadInfoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  deloadInfoTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#f9fafb',
+  },
+  deloadInfoClose: {
+    padding: 4,
+  },
+  deloadInfoText: {
+    fontSize: 16,
+    color: '#d1d5db',
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  deloadInfoExample: {
+    fontSize: 14,
+    color: '#9ca3af',
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
   headerButtons: {
     flexDirection: 'row',

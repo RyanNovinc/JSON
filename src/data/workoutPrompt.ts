@@ -298,116 +298,35 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
 };
 
 export const getAIPrompt = (questionnaireData?: QuestionnaireData) => {
-  return `# JSON Workout Program Generator
+  return `# Convert Workout Program to JSON
 
-You are generating a workout program from the PROGRAM SPECS provided. Output valid JSON that can be imported into a fitness app.
+Convert the workout program above into valid JSON matching the schema below. Do NOT redesign the program — translate it exactly as written.
 
-## CRITICAL: File Output Instructions
+## Output Instructions
 
-**DO NOT output JSON to chat** — it will hit token limits for programs longer than 4 weeks.
-
-**You MUST:**
-1. Create a file (use Code Interpreter on ChatGPT, or computer tool on Claude)
-2. Write the complete JSON structure to the file
-3. If you reach output limits, STOP at the end of a complete block, then continue appending to the same file
-4. Never stop mid-block or mid-day
-5. When finished, provide the download link
+**Write the JSON to a file** — do not output it to chat (it will hit token limits).
+1. Create a file and write the complete JSON
+2. If you hit output limits, stop at the end of a complete block, then continue appending
+3. Never stop mid-block or mid-day
+4. When finished, provide the download link
 
 ## JSON Schema
 \`\`\`json
 {
   "routine_name": "string",
-  "description": "string",
+  "description": "string (2-3 sentence overview from the program)",
   "days_per_week": number,
   "blocks": [
     {
-      "block_name": "string",
-      "weeks": "string (e.g. '1-4')",
-      "structure": "string (e.g. 'Push Pull Legs')",
+      "block_name": "string (e.g. 'Block A')",
+      "weeks": "string (e.g. '1-4' — include deload week in the block)",
+      "structure": "string (e.g. 'Push Pull Legs Upper Lower')",
+      "deload_weeks": [number] (e.g. [4] — which weeks within this block are deload weeks),
       "days": [
         {
-          "day_name": "string",
+          "day_name": "string (e.g. 'Push', 'Lower', 'Cardio')",
           "estimated_duration": number (minutes),
-          "exercises": [
-            // STRENGTH EXERCISE (most common)
-            {
-              "type": "strength",
-              "exercise": "string (e.g. 'Barbell Back Squat')",
-              "sets": number,
-              "reps": "string (e.g. '8-12')",
-              "rest": number (seconds - optimal rest),
-              "restQuick": number (seconds - quick mode rest),
-              "primaryMuscles": ["array from muscle taxonomy"],
-              "secondaryMuscles": ["array from muscle taxonomy"],
-              "reps_weekly": {
-                "1": "string",
-                "2": "string",
-                "3": "string",
-                "4": "string"
-              },
-              "sets_weekly": {
-                "1": number,
-                "2": number,
-                "3": number,
-                "4": number
-              },
-              "notes": "string (coaching cues)",
-              "alternatives": [
-                {
-                  "exercise": "string",
-                  "primaryMuscles": ["array"],
-                  "secondaryMuscles": ["array"]
-                }
-              ]
-            },
-            // CARDIO EXERCISE
-            {
-              "type": "cardio",
-              "activity": "string (e.g. 'Treadmill Run')",
-              "duration_minutes": number,
-              "distance_value": number (optional),
-              "distance_unit": "km" | "miles" (optional),
-              "target_intensity": "string (e.g. 'Zone 2')",
-              "cardio_mode": "steady_state" | "intervals" | "HIIT",
-              "progression_weekly": {
-                "1": "20 min easy",
-                "4": "30 min moderate"
-              },
-              "notes": "string"
-            },
-            // STRETCH EXERCISE
-            {
-              "type": "stretch",
-              "exercise": "string (e.g. 'Pigeon Stretch')",
-              "hold_seconds": number,
-              "sets": number,
-              "per_side": boolean,
-              "primaryMuscles": ["array from muscle taxonomy"],
-              "notes": "string"
-            },
-            // CIRCUIT EXERCISE
-            {
-              "type": "circuit",
-              "circuit_name": "string (e.g. 'Core Finisher')",
-              "rounds": number,
-              "work_seconds": number,
-              "rest_seconds": number,
-              "exercises": [
-                {
-                  "exercise": "string",
-                  "notes": "string (optional)"
-                }
-              ],
-              "notes": "string"
-            },
-            // SPORT EXERCISE
-            {
-              "type": "sport",
-              "activity": "string (e.g. 'Basketball')",
-              "duration_minutes": number (optional),
-              "notes": "string"
-            }
-          ]
+          "exercises": [Exercise]
         }
       ]
     }
@@ -415,113 +334,95 @@ You are generating a workout program from the PROGRAM SPECS provided. Output val
 }
 \`\`\`
 
-## Exercise Type Requirements
+### Strength Exercise
+\`\`\`json
+{
+  "type": "strength",
+  "exercise": "string (exact name from program)",
+  "sets": number,
+  "reps": "string (e.g. '8-10')",
+  "rest": number (seconds — from program's rest period),
+  "restQuick": number (seconds — 60-70% of rest value),
+  "primaryMuscles": ["from taxonomy"],
+  "secondaryMuscles": ["from taxonomy"],
+  "reps_weekly": { "1": "10-12", "2": "8-10", "3": "6-8", "4": "12" },
+  "sets_weekly": { "1": 4, "2": 4, "3": 4, "4": 3 },
+  "notes": "string or omit if none",
+  "alternatives": [
+    { "exercise": "string", "primaryMuscles": ["..."], "secondaryMuscles": ["..."] }
+  ]
+}
+\`\`\`
 
-**STRENGTH EXERCISES (most common):**
-- \`type\`: "strength"
-- \`exercise\`: Full descriptive name (e.g. "Barbell Back Squat")
-- \`sets\`: Integer
-- \`reps\`: String (e.g. "8-12", "5", "10-15")
-- \`rest\`: Seconds - optimal rest for muscle growth
-- \`restQuick\`: Seconds - shorter rest for time-crunched sessions
-- \`primaryMuscles\`: REQUIRED array from muscle taxonomy
-- \`secondaryMuscles\`: REQUIRED array from muscle taxonomy
-- \`reps_weekly\`: Optional progressive overload
-- \`sets_weekly\`: Optional progressive overload
-- \`notes\`: Optional form cues
-- \`alternatives\`: Optional array of objects with exercise/primaryMuscles/secondaryMuscles
+### Cardio Exercise
+For cardio days with rotating activities, use ONE cardio entry with progression_weekly describing each week:
+\`\`\`json
+{
+  "type": "cardio",
+  "activity": "Mixed Cardio Rotation",
+  "duration_minutes": number (average duration),
+  "target_intensity": "string (default intensity)",
+  "cardio_mode": "steady_state",
+  "progression_weekly": {
+    "1": "25 min treadmill — steady state, RPE 4-5",
+    "2": "30 min stationary bike — steady state, RPE 4-5",
+    "3": "35 min stair climber — intervals 30s hard/60s easy",
+    "4": "20 min treadmill — easy pace (deload)"
+  },
+  "notes": "string"
+}
+\`\`\`
 
-**CARDIO EXERCISES:**
-- \`type\`: "cardio"
-- \`activity\`: Activity name (e.g. "Treadmill Run")
-- \`duration_minutes\`: Required integer
-- \`distance_value\`: Optional number
-- \`distance_unit\`: Optional "km" or "miles"
-- \`target_intensity\`: Optional string (e.g. "Zone 2")
-- \`cardio_mode\`: Optional "steady_state", "intervals", or "HIIT"
-- \`progression_weekly\`: Optional weekly progression
-- \`notes\`: Optional
+### Stretch Exercise
+\`\`\`json
+{
+  "type": "stretch",
+  "exercise": "string",
+  "hold_seconds": number,
+  "sets": number,
+  "per_side": boolean,
+  "primaryMuscles": ["from taxonomy"],
+  "notes": "string or omit"
+}
+\`\`\`
 
-**STRETCH EXERCISES:**
-- \`type\`: "stretch"
-- \`exercise\`: Exercise name (e.g. "Pigeon Stretch")
-- \`hold_seconds\`: Required integer
-- \`sets\`: Required integer
-- \`per_side\`: Required boolean
-- \`primaryMuscles\`: REQUIRED array from muscle taxonomy
-- \`notes\`: Optional
+### Circuit Exercise
+\`\`\`json
+{
+  "type": "circuit",
+  "circuit_name": "string",
+  "rounds": number,
+  "work_seconds": number,
+  "rest_seconds": number,
+  "exercises": [{ "exercise": "string", "notes": "string" }],
+  "notes": "string or omit"
+}
+\`\`\`
 
-**CIRCUIT EXERCISES:**
-- \`type\`: "circuit"
-- \`circuit_name\`: Required string
-- \`rounds\`: Required integer
-- \`work_seconds\`: Required integer
-- \`rest_seconds\`: Required integer
-- \`exercises\`: Required array of objects with exercise name
-- \`notes\`: Optional
+### Sport Exercise
+\`\`\`json
+{
+  "type": "sport",
+  "activity": "string",
+  "duration_minutes": number,
+  "notes": "string or omit"
+}
+\`\`\`
 
-**SPORT EXERCISES:**
-- \`type\`: "sport"
-- \`activity\`: Required string (e.g. "Basketball")
-- \`duration_minutes\`: Optional integer
-- \`notes\`: Optional
+## Muscle Taxonomy (use EXACTLY these names)
+Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
 
-## Programming Guidelines
+## Translation Rules
 
-**Rest Periods (seconds):**
-- Heavy compounds (squat, deadlift, bench): rest 180-240, restQuick 120-150
-- Moderate compounds (rows, presses): rest 120-180, restQuick 90-120  
-- Isolation exercises: rest 60-90, restQuick 45-60
-
-**Progressive Overload (reps_weekly):**
-- For strength/hypertrophy blocks, decrease reps weekly as user increases weight
-- Example: {"1": "12", "2": "10", "3": "8", "4": "6"}
-- Keys must match number of weeks in block
-
-**Alternatives (for strength exercises only):**
-- Include 1-2 alternatives for exercises requiring specific equipment
-- Each alternative is an object with exercise, primaryMuscles, secondaryMuscles
-- All muscle groups must be from the approved taxonomy
-
-**Notes:**
-- Include form cues for complex lifts
-- Add tips for beginners/intermediates
-- Keep notes concise (1-2 sentences)
-
-## Exercise Glossary
-
-**Exercise Naming Convention:**
-Use full descriptive exercise names with equipment prefix where applicable:
-- Examples: "Barbell Back Squat", "Dumbbell Lateral Raise", "Cable Face Pull"
-- Use consistent naming throughout the program
-- No exercise glossary validation - freeform names accepted
-
-**Muscle Groups (use exactly as listed):**
-${JSON.stringify(MUSCLE_GROUPS, null, 2)}
-
-## PROGRAM SPECS
-
-${generateProgramSpecs(questionnaireData)}
-
-## Output Requirements
-
-**FORMAT REQUIREMENTS:**
-- Create the program as a text document
-- Use simple text formatting with headers, bullet points, and tables
-- Make it fast to generate and easy to copy/edit
-- Include clear section breaks and organized workout structure
-- Structure each workout day with complete exercise details and instructions
-
-**OUTPUT STRUCTURE:**
-Provide a comprehensive workout program that includes:
-
-1. **Program Overview** - Brief description and key programming details
-2. **Complete Training Blocks** - All workout days with exercises, sets, reps, rest periods
-3. **Exercise Specifications** - Form cues, alternatives, and coaching notes  
-4. **Progression Guidelines** - How to advance through the program
-5. **Implementation Notes** - Practical tips for following the program
-
-Focus on practical, effective programming that matches the specified goals, experience level, and constraints.
-
-Generate the complete workout program based on the PROGRAM SPECS provided.`;
+1. **Do not change anything** — use the exact exercise names, sets, reps, rest periods, muscles, alternatives, and notes from the program
+2. **Block structure** — each block includes its deload week. A program with "Block A Weeks 1-3 + Deload Week 4" becomes one block with weeks "1-4" and weekly progressions using keys "1" through "4"
+3. **Weekly progressions** — map the program's "Weekly progression: Wk1: 10-12, Wk2: 8-10, Wk3: 6-8, Wk4 (deload): 3x12" into reps_weekly and sets_weekly. Deload weeks get reduced sets via sets_weekly
+4. **Supersets** — place superset exercises adjacent in the exercises array. Add "Superset with [other exercise]" to both exercises' notes fields
+5. **Cardio rotation** — if cardio activities change week to week, use a single cardio entry with progression_weekly describing each week's activity, duration, mode, and intensity
+6. **restQuick** — calculate as roughly 60-70% of the rest value, rounded to a clean number (e.g. rest: 180 → restQuick: 120, rest: 90 → restQuick: 60)
+7. **Empty secondary muscles** — if an exercise has no secondary muscles, use an empty array \`[]\`
+8. **Deload days** — deload weeks use the same day structure but with reduced sets_weekly values. Do NOT create separate deload days — the weekly progression system handles it
+9. **Deload weeks** — for deload weeks, use the same rep numbers without additional weight guidance in reps_weekly. The app will automatically display "DELOAD" labels and provide weight guidance elsewhere in the UI. Keep reps_weekly values clean (e.g., just "12", not "12 (light)")
+10. **Block-relative keys** — weekly progression keys are always relative to the block, starting from "1". Block B (weeks 5-8) uses keys "1", "2", "3", "4" — not "5", "6", "7", "8". Each block is an independent cycle.
+11. **Deload week tagging** — add a deload_weeks array to each block indicating which week numbers (block-relative) are deload weeks. For a standard 4-week block with week 4 as deload, use "deload_weeks": [4]. This allows the app to display a "DELOAD" label and automatic 50% weight guidance in the UI.`;
 };

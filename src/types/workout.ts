@@ -75,6 +75,7 @@ export interface WorkoutProgram {
     block_name: string;
     weeks: string;                  // e.g., "1-4"
     structure?: string;             // e.g., "Push Pull Legs"
+    deload_weeks?: number[];        // e.g., [4] means week 4 of this block is a deload
     days: Array<{
       day_name: string;
       estimated_duration?: number;  // minutes

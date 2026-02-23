@@ -63,7 +63,7 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
     
     // Estimate exercise execution time (compound vs isolation)
     const executionTime = day.exercises.reduce((total, ex) => {
-      const name = ex.exercise.toLowerCase();
+      const name = (ex.exercise || '').toLowerCase();
       const isCompound = name.includes('squat') || name.includes('deadlift') || 
                         name.includes('press') || name.includes('row') || 
                         name.includes('pull up') || name.includes('chin up');
@@ -86,17 +86,17 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
   };
   
   day.exercises.forEach(ex => {
-    const name = ex.exercise.toLowerCase();
+    const name = (ex.exercise || '').toLowerCase();
     if (name.includes('squat') || name.includes('deadlift') || name.includes('press') || 
         name.includes('row') || name.includes('pull up') || name.includes('chin up')) {
-      exercisesByType.compound.push(ex.exercise);
+      exercisesByType.compound.push(ex.exercise || 'Unknown Exercise');
     } else if (name.includes('curl') || name.includes('extension') || name.includes('fly') || 
               name.includes('raise') || name.includes('isolation')) {
-      exercisesByType.isolation.push(ex.exercise);
+      exercisesByType.isolation.push(ex.exercise || 'Unknown Exercise');
     } else if (name.includes('cardio') || name.includes('run') || name.includes('bike')) {
-      exercisesByType.cardio.push(ex.exercise);
+      exercisesByType.cardio.push(ex.exercise || ex.activity || 'Unknown Cardio');
     } else {
-      exercisesByType.compound.push(ex.exercise); // default to compound
+      exercisesByType.compound.push(ex.exercise || 'Unknown Exercise'); // default to compound
     }
   });
   

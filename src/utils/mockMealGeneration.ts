@@ -251,7 +251,7 @@ export function generateMockMealPlan(request: MealPlanRequest): MealPlan {
         if (restriction.type === 'vegetarian') {
           // Remove meals with meat/fish
           const hasMeat = meal.ingredients.some(ing => 
-            ['chicken', 'salmon', 'beef', 'pork', 'fish'].some(meat => 
+            ing && ing.name && ['chicken', 'salmon', 'beef', 'pork', 'fish'].some(meat => 
               ing.name.toLowerCase().includes(meat)
             )
           );
@@ -261,7 +261,7 @@ export function generateMockMealPlan(request: MealPlanRequest): MealPlan {
         if (restriction.type === 'vegan') {
           // Remove meals with any animal products
           const hasAnimalProduct = meal.ingredients.some(ing => 
-            ['chicken', 'salmon', 'eggs', 'cheese', 'yogurt', 'milk', 'honey'].some(animal => 
+            ing && ing.name && ['chicken', 'salmon', 'eggs', 'cheese', 'yogurt', 'milk', 'honey'].some(animal => 
               ing.name.toLowerCase().includes(animal)
             )
           );
@@ -271,7 +271,7 @@ export function generateMockMealPlan(request: MealPlanRequest): MealPlan {
         if (restriction.type === 'gluten_free') {
           // Remove meals with gluten
           const hasGluten = meal.ingredients.some(ing => 
-            ['bread', 'pasta', 'flour', 'wheat'].some(gluten => 
+            ing && ing.name && ['bread', 'pasta', 'flour', 'wheat'].some(gluten => 
               ing.name.toLowerCase().includes(gluten)
             )
           );
@@ -398,6 +398,7 @@ export function generateMockMealPlan(request: MealPlanRequest): MealPlan {
   days.forEach(day => {
     day.meals.forEach((meal: Meal) => {
       meal.ingredients.forEach(ingredient => {
+        if (!ingredient || !ingredient.name) return;
         const key = ingredient.name.toLowerCase();
         
         if (ingredientMap.has(key)) {

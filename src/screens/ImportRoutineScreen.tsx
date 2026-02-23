@@ -510,6 +510,17 @@ export default function ImportRoutineScreen() {
           throw new Error(`Block "${block.block_name}" has invalid structure field`);
         }
         
+        if (block.deload_weeks) {
+          if (!Array.isArray(block.deload_weeks)) {
+            throw new Error(`Block "${block.block_name}" has invalid deload_weeks field - must be an array`);
+          }
+          block.deload_weeks.forEach((week: any) => {
+            if (typeof week !== 'number' || week <= 0) {
+              throw new Error(`Block "${block.block_name}" has invalid deload_weeks - must contain positive numbers`);
+            }
+          });
+        }
+        
         if (!Array.isArray(block.days) || block.days.length === 0) {
           throw new Error(`Block "${block.block_name}" has no training days`);
         }
