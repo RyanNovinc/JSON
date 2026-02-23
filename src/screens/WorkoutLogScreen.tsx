@@ -1790,6 +1790,23 @@ export default function WorkoutLogScreen() {
           )}
         </View>
         <View style={styles.headerButtons}>
+          {/* Deload Info Button */}
+          {block.deload_weeks?.includes(currentWeek) && (
+            <TouchableOpacity 
+              style={[styles.deloadHeaderButton, { borderColor: themeColor }]}
+              onPress={() => {
+                const previousWeek = currentWeek - 1;
+                Alert.alert(
+                  'Deload Week Info',
+                  `Use 40-60% of your Week ${previousWeek} weight (50% is most common).\n\nExample: If you used 100kg for ${previousWeek === 3 ? '6-8' : 'your'} reps in Week ${previousWeek}, use 50kg for 12 reps this week.`,
+                  [{ text: 'OK' }]
+                );
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="information-circle-outline" size={20} color={themeColor} />
+            </TouchableOpacity>
+          )}
           
           <Animated.View style={{ transform: [{ translateX: shakeAnimation }] }}>
             <TouchableOpacity 
@@ -2476,6 +2493,19 @@ const styles = StyleSheet.create({
   },
   deloadLabel: {
     fontWeight: '700',
+  },
+  deloadHeaderButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  deloadHeaderButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   deloadInfoButton: {
     position: 'absolute',
