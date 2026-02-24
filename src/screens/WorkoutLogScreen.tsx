@@ -2079,9 +2079,10 @@ export default function WorkoutLogScreen() {
           {/* Exercise content */}
           {day.exercises.map((exercise: Exercise, index: number) => (
             <React.Fragment key={index}>
-              <ExerciseCard
-                exercise={exercise}
-                exerciseIndex={index}
+              <View style={index === 0 ? { marginTop: 24 } : {}}>
+                <ExerciseCard
+                  exercise={exercise}
+                  exerciseIndex={index}
                 currentWeek={currentWeek}
                 setsData={allSetsData[index] || []}
                 notes={exerciseNotes[index] || ''}
@@ -2114,6 +2115,7 @@ export default function WorkoutLogScreen() {
                   <SupersetLabel isActive={supersetLinks.has(index)} themeColor={themeColor} />
                 </View>
               )}
+              </View>
             </React.Fragment>
           ))}
           
