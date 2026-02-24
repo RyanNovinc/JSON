@@ -23,6 +23,8 @@ import { TimerNotifications, SOUND_OPTIONS, TimerSettings } from '../utils/timer
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Parse rep scheme into structured format
 function parseRepScheme(reps: string): { type: 'weekly' | 'pyramid' | 'straight', values: string[] } {
@@ -167,6 +169,19 @@ function ExerciseCard({
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
   const [expandedDropSets, setExpandedDropSets] = useState<Set<number>>(new Set());
   
+  // Animation for smooth superset transitions
+  const supersetAnimation = React.useRef(new Animated.Value(0)).current;
+  
+  // Animate in/out when superset state changes
+  React.useEffect(() => {
+    const isSuperset = isLinkedToNext || isLinkedToPrev;
+    Animated.timing(supersetAnimation, {
+      toValue: isSuperset ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false, // We're animating opacity which requires non-native driver
+    }).start();
+  }, [isLinkedToNext, isLinkedToPrev, supersetAnimation]);
+  
   const currentUnit = getExerciseUnit(exerciseIndex);
   
   // Use weekly reps if available, otherwise fall back to regular reps
@@ -295,11 +310,95 @@ function ExerciseCard({
     onDropSetComplete(exerciseIndex, setIndex, dropIndex);
   };
   
+  // Create superset border style - base style only
+  const getBaseBorderStyle = () => {
+    return isLinkedToNext || isLinkedToPrev ? styles.exerciseCardSupersetBase : styles.exerciseCard;
+  };
+
+  // Render tapering gradient border overlay
+  const renderTaperingBorder = () => {
+    if (!isLinkedToNext && !isLinkedToPrev) return null;
+    
+    // Create tapering gradient based on connection state
+    const createBorderGradient = () => {
+      const fullColor = themeColor;
+      const transparentColor = themeColor + '00'; // Fully transparent
+      const fadeStart = themeColor + '80';       // 50% opacity
+      const fadeEnd = themeColor + '20';         // 12% opacity
+      
+      if (isLinkedToNext && isLinkedToPrev) {
+        // Connected on both sides: solid color all around
+        return {
+          colors: [fullColor, fullColor, fullColor, fullColor],
+          locations: [0, 0.25, 0.75, 1],
+          start: { x: 0, y: 0 },
+          end: { x: 0, y: 1 }
+        };
+      } else if (isLinkedToNext) {
+        // Connected to next: strong at bottom, fade to top
+        return {
+          colors: [transparentColor, fadeEnd, fadeStart, fullColor],
+          locations: [0, 0.2, 0.6, 1],
+          start: { x: 0, y: 0 },
+          end: { x: 0, y: 1 }
+        };
+      } else {
+        // Connected to previous: strong at top, fade to bottom  
+        return {
+          colors: [fullColor, fadeStart, fadeEnd, transparentColor],
+          locations: [0, 0.4, 0.8, 1],
+          start: { x: 0, y: 0 },
+          end: { x: 0, y: 1 }
+        };
+      }
+    };
+    
+    const gradientProps = createBorderGradient();
+    
+    return (
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            opacity: supersetAnimation,
+          }
+        ]}
+        pointerEvents="none"
+      >
+        <MaskedView
+          style={StyleSheet.absoluteFill}
+          maskElement={
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  backgroundColor: 'transparent',
+                }
+              ]}
+            />
+          }
+        >
+          <LinearGradient
+            style={StyleSheet.absoluteFill}
+            colors={gradientProps.colors}
+            locations={gradientProps.locations}
+            start={gradientProps.start}
+            end={gradientProps.end}
+          />
+        </MaskedView>
+      </Animated.View>
+    );
+  };
+
   return (
-    <View style={[
-      styles.exerciseCard,
-      (isLinkedToNext || isLinkedToPrev) && [styles.exerciseCardLinked, { borderColor: themeColor, shadowColor: themeColor }]
-    ]}>
+    <View style={getBaseBorderStyle()}>
+      {renderTaperingBorder()}
       <View style={styles.exerciseHeader}>
         {/* Left side - Exercise name and dropdown */}
         <View style={styles.exerciseNameSection}>
@@ -3782,12 +3881,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   exerciseCardLinked: {
-    borderWidth: 2,
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
+    borderWidth: 1,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
     backgroundColor: '#1a1a1d',
+  },
+  exerciseCardSupersetBase: {
+    backgroundColor: '#18181b',
+    borderRadius: 4,
+    borderWidth: 0, // No border - gradient overlay handles it
+    borderColor: 'transparent',
+    padding: 16,
+    marginBottom: 16,
+    shadowOpacity: 0, // No uniform shadow - gradient glow handles it
+    elevation: 0,
   },
   weightInputContainer: {
     flexDirection: 'row',
