@@ -169,18 +169,26 @@ function ExerciseCard({
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
   const [expandedDropSets, setExpandedDropSets] = useState<Set<number>>(new Set());
   
-  // Animation for smooth superset transitions
-  const supersetAnimation = React.useRef(new Animated.Value(0)).current;
+  // Separate animations for each connection type
+  const topConnection = React.useRef(new Animated.Value(0)).current;
+  const bottomConnection = React.useRef(new Animated.Value(0)).current;
   
-  // Animate in/out when superset state changes
+  // Animate each connection independently for smooth transitions
   React.useEffect(() => {
-    const isSuperset = isLinkedToNext || isLinkedToPrev;
-    Animated.timing(supersetAnimation, {
-      toValue: isSuperset ? 1 : 0,
+    Animated.timing(topConnection, {
+      toValue: isLinkedToPrev ? 1 : 0,
       duration: 300,
-      useNativeDriver: false, // We're animating opacity which requires non-native driver
+      useNativeDriver: false,
     }).start();
-  }, [isLinkedToNext, isLinkedToPrev, supersetAnimation]);
+  }, [isLinkedToPrev, topConnection]);
+
+  React.useEffect(() => {
+    Animated.timing(bottomConnection, {
+      toValue: isLinkedToNext ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isLinkedToNext, bottomConnection]);
   
   const currentUnit = getExerciseUnit(exerciseIndex);
   
@@ -315,45 +323,23 @@ function ExerciseCard({
     return isLinkedToNext || isLinkedToPrev ? styles.exerciseCardSupersetBase : styles.exerciseCard;
   };
 
-  // Render tapering gradient border overlay
+  // Track if we should show overlay (including during fade-out)
+  const [shouldShowOverlay, setShouldShowOverlay] = useState(false);
+  
+  React.useEffect(() => {
+    const hasConnection = isLinkedToNext || isLinkedToPrev;
+    if (hasConnection) {
+      setShouldShowOverlay(true);
+    } else {
+      // Delay hiding overlay to allow fade-out animation to complete
+      const timeout = setTimeout(() => setShouldShowOverlay(false), 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [isLinkedToNext, isLinkedToPrev]);
+
+  // Render smooth transitioning border overlay
   const renderTaperingBorder = () => {
-    if (!isLinkedToNext && !isLinkedToPrev) return null;
-    
-    // Create tapering gradient based on connection state
-    const createBorderGradient = () => {
-      const fullColor = themeColor;
-      const transparentColor = themeColor + '00'; // Fully transparent
-      const fadeStart = themeColor + '80';       // 50% opacity
-      const fadeEnd = themeColor + '20';         // 12% opacity
-      
-      if (isLinkedToNext && isLinkedToPrev) {
-        // Connected on both sides: solid color all around
-        return {
-          colors: [fullColor, fullColor, fullColor, fullColor],
-          locations: [0, 0.25, 0.75, 1],
-          start: { x: 0, y: 0 },
-          end: { x: 0, y: 1 }
-        };
-      } else if (isLinkedToNext) {
-        // Connected to next: strong at bottom, fade to top
-        return {
-          colors: [transparentColor, fadeEnd, fadeStart, fullColor],
-          locations: [0, 0.2, 0.6, 1],
-          start: { x: 0, y: 0 },
-          end: { x: 0, y: 1 }
-        };
-      } else {
-        // Connected to previous: strong at top, fade to bottom  
-        return {
-          colors: [fullColor, fadeStart, fadeEnd, transparentColor],
-          locations: [0, 0.4, 0.8, 1],
-          start: { x: 0, y: 0 },
-          end: { x: 0, y: 1 }
-        };
-      }
-    };
-    
-    const gradientProps = createBorderGradient();
+    if (!shouldShowOverlay) return null;
     
     return (
       <Animated.View
@@ -364,7 +350,6 @@ function ExerciseCard({
             left: 0,
             right: 0,
             bottom: 0,
-            opacity: supersetAnimation,
           }
         ]}
         pointerEvents="none"
@@ -384,13 +369,39 @@ function ExerciseCard({
             />
           }
         >
-          <LinearGradient
-            style={StyleSheet.absoluteFill}
-            colors={gradientProps.colors}
-            locations={gradientProps.locations}
-            start={gradientProps.start}
-            end={gradientProps.end}
-          />
+          <Animated.View style={StyleSheet.absoluteFill}>
+            {/* Top connection layer */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                { opacity: topConnection }
+              ]}
+            >
+              <LinearGradient
+                style={StyleSheet.absoluteFill}
+                colors={[themeColor, themeColor + '80', themeColor + '20', themeColor + '00']}
+                locations={[0, 0.4, 0.8, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+              />
+            </Animated.View>
+            
+            {/* Bottom connection layer */}
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                { opacity: bottomConnection }
+              ]}
+            >
+              <LinearGradient
+                style={StyleSheet.absoluteFill}
+                colors={[themeColor + '00', themeColor + '20', themeColor + '80', themeColor]}
+                locations={[0, 0.2, 0.6, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+              />
+            </Animated.View>
+          </Animated.View>
         </MaskedView>
       </Animated.View>
     );
@@ -684,6 +695,94 @@ function ExerciseCard({
         ))}
       </View>
     </View>
+  );
+}
+
+// Animated Superset Link Button Component
+interface SupersetLinkButtonProps {
+  isActive: boolean;
+  themeColor: string;
+  onPress: () => void;
+}
+
+function SupersetLinkButton({ isActive, themeColor, onPress }: SupersetLinkButtonProps) {
+  const animatedValue = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: isActive ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false, // Need to animate borderColor
+    }).start();
+  }, [isActive, animatedValue]);
+
+  const animatedBorderColor = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['transparent', themeColor]
+  });
+
+  const animatedScale = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.1]
+  });
+
+  // Use static color based on isActive instead of animated color for Ionicons
+  const iconColor = isActive ? themeColor : '#71717a';
+
+  return (
+    <Animated.View
+      style={[
+        styles.supersetLinkButton,
+        {
+          borderColor: animatedBorderColor,
+          transform: [{ scale: animatedScale }]
+        }
+      ]}
+    >
+      <TouchableOpacity onPress={onPress} style={styles.supersetLinkButtonTouchable}>
+        <Ionicons 
+          name="link" 
+          size={16} 
+          color={iconColor}
+        />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// Animated Superset Label Component
+interface SupersetLabelProps {
+  isActive: boolean;
+  themeColor: string;
+}
+
+function SupersetLabel({ isActive, themeColor }: SupersetLabelProps) {
+  const animatedValue = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: isActive ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [isActive, animatedValue]);
+
+  const animatedStyle = {
+    opacity: animatedValue,
+    transform: [
+      {
+        scale: animatedValue.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.8, 1],
+        }),
+      },
+    ],
+  };
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Text style={[styles.supersetLabel, { color: themeColor }]}>SUPERSET</Text>
+    </Animated.View>
   );
 }
 
@@ -2007,22 +2106,12 @@ export default function WorkoutLogScreen() {
               {/* Superset linking button between exercises */}
               {index < day.exercises.length - 1 && (
                 <View style={styles.supersetLinkContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.supersetLinkButton,
-                      supersetLinks.has(index) && [styles.supersetLinkButtonActive, { borderColor: themeColor }]
-                    ]}
+                  <SupersetLinkButton 
+                    isActive={supersetLinks.has(index)}
+                    themeColor={themeColor}
                     onPress={() => toggleSupersetLink(index)}
-                  >
-                    <Ionicons 
-                      name={supersetLinks.has(index) ? "link" : "add"} 
-                      size={16} 
-                      color={supersetLinks.has(index) ? themeColor : "#71717a"} 
-                    />
-                  </TouchableOpacity>
-                  {supersetLinks.has(index) && (
-                    <Text style={[styles.supersetLabel, { color: themeColor }]}>SUPERSET</Text>
-                  )}
+                  />
+                  <SupersetLabel isActive={supersetLinks.has(index)} themeColor={themeColor} />
                 </View>
               )}
             </React.Fragment>
@@ -3873,6 +3962,12 @@ const styles = StyleSheet.create({
   supersetLinkButtonActive: {
     backgroundColor: '#164e63',
     // borderColor will be set inline
+  },
+  supersetLinkButtonTouchable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   supersetLabel: {
     fontSize: 10,
