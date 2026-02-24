@@ -33,7 +33,9 @@ export default function ImportRoutineScreen() {
   const { themeColor } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [parsedProgram, setParsedProgram] = useState<WorkoutProgram | null>(null);
+  const [accumulatedPrograms, setAccumulatedPrograms] = useState<WorkoutProgram[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showAddMoreMode, setShowAddMoreMode] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
@@ -245,6 +247,68 @@ export default function ImportRoutineScreen() {
     setTimeout(() => {
       setSampleCopied(false);
     }, 2000);
+  };
+
+  // Merge multiple workout programs into one
+  const mergePrograms = (programs: WorkoutProgram[]): WorkoutProgram => {
+    if (programs.length === 0) {
+      throw new Error('No programs to merge');
+    }
+    
+    if (programs.length === 1) {
+      return programs[0];
+    }
+
+    // Check that all programs have the same days_per_week
+    const firstDaysPerWeek = programs[0].days_per_week;
+    const incompatibleProgram = programs.find(p => p.days_per_week !== firstDaysPerWeek);
+    if (incompatibleProgram) {
+      throw new Error(`Cannot combine programs with different training frequencies. Found ${firstDaysPerWeek} days/week and ${incompatibleProgram.days_per_week} days/week.`);
+    }
+
+    // Keep the original program name from the first program
+    const combinedName = programs[0].routine_name;
+    
+    // Keep the original description from the first program
+    const combinedDescription = programs[0].description || '';
+
+    // Merge all blocks with adjusted week numbers
+    const mergedBlocks = [];
+    let currentWeekOffset = 0;
+
+    for (const program of programs) {
+      for (const block of program.blocks) {
+        // Parse week range to understand the structure
+        const weekParts = block.weeks.split('-');
+        const startWeek = parseInt(weekParts[0]);
+        const endWeek = weekParts.length > 1 ? parseInt(weekParts[1]) : startWeek;
+        
+        // Adjust week numbers by adding the offset
+        const newStartWeek = startWeek + currentWeekOffset;
+        const newEndWeek = endWeek + currentWeekOffset;
+        const newWeeks = weekParts.length > 1 ? `${newStartWeek}-${newEndWeek}` : `${newStartWeek}`;
+        
+        // Create the merged block
+        const mergedBlock = {
+          ...block,
+          weeks: newWeeks,
+          block_name: programs.length > 1 ? `${block.block_name} (Part ${programs.indexOf(program) + 1})` : block.block_name
+        };
+        
+        mergedBlocks.push(mergedBlock);
+        
+        // Update week offset for next program
+        currentWeekOffset += (endWeek - startWeek + 1);
+      }
+    }
+
+    return {
+      id: Date.now().toString() + Math.random().toString(36),
+      routine_name: combinedName,
+      description: combinedDescription,
+      days_per_week: firstDaysPerWeek,
+      blocks: mergedBlocks
+    };
   };
 
   // Exercise type validation functions
@@ -628,22 +692,43 @@ export default function ImportRoutineScreen() {
         // Generate unique ID for this program import
         const programId = Date.now().toString() + Math.random().toString(36);
         program.id = programId;
-        setParsedProgram(program);
-        setShowConfirmation(true);
         
-        // Animate modal entrance with futuristic easing
-        Animated.parallel([
-          Animated.timing(modalScale, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(modalOpacity, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        // If we're in add more mode, add to existing programs
+        // If we're in main import mode, start fresh
+        const newAccumulated = showAddMoreMode ? [...accumulatedPrograms, program] : [program];
+        setAccumulatedPrograms(newAccumulated);
+        
+        // Create the merged program for display
+        try {
+          const mergedProgram = mergePrograms(newAccumulated);
+          setParsedProgram(mergedProgram);
+          
+          // If we're in add more mode, go back to confirmation view
+          if (showAddMoreMode) {
+            setShowAddMoreMode(false);
+          } else {
+            setShowConfirmation(true);
+            
+            // Animate modal entrance with futuristic easing
+            Animated.parallel([
+              Animated.timing(modalScale, {
+                toValue: 1,
+                duration: 400,
+                useNativeDriver: true,
+              }),
+              Animated.timing(modalOpacity, {
+                toValue: 1,
+                duration: 400,
+                useNativeDriver: true,
+              }),
+            ]).start();
+          }
+        } catch (mergeError) {
+          const error = mergeError as Error;
+          setErrorMessage(`Cannot combine programs: ${error.message}`);
+          // Reset accumulated programs on error
+          setAccumulatedPrograms([]);
+        }
       }
     }, 800);
   };
@@ -655,12 +740,10 @@ export default function ImportRoutineScreen() {
         Animated.spring(successScale, {
           toValue: 1.2,
           useNativeDriver: true,
-          duration: 200,
         }),
         Animated.spring(successScale, {
           toValue: 1,
           useNativeDriver: true,
-          duration: 150,
         }),
       ]).start();
 
@@ -683,6 +766,9 @@ export default function ImportRoutineScreen() {
           modalOpacity.setValue(0);
           successScale.setValue(0);
           
+          // Reset accumulated programs after successful import
+          setAccumulatedPrograms([]);
+          
           navigation.navigate('Main', { 
             screen: 'Home',
             params: { importedProgram: parsedProgram }
@@ -691,6 +777,17 @@ export default function ImportRoutineScreen() {
       }, 500);
     }
   };
+
+  const handleAddMoreFiles = () => {
+    // Switch to add more mode
+    setShowAddMoreMode(true);
+  };
+
+  const handleBackToConfirmation = () => {
+    // Go back to confirmation view
+    setShowAddMoreMode(false);
+  };
+
 
   const handleModalCancel = () => {
     Animated.parallel([
@@ -706,6 +803,7 @@ export default function ImportRoutineScreen() {
       }),
     ]).start(() => {
       setShowConfirmation(false);
+      setShowAddMoreMode(false);
       setParsedProgram(null);
       modalScale.setValue(0);
       modalOpacity.setValue(0);
@@ -843,14 +941,9 @@ export default function ImportRoutineScreen() {
 
 ## INSTRUCTIONS
 
-**Step 1 — Plan**
-Review the profile and plan the training program. Work through split selection, volume distribution, exercise choices, and trade-offs however you need to — show your reasoning.
+Review my profile and design a training plan. Show your reasoning — work through split selection, volume distribution, exercise choices, and trade-offs. Before presenting the summary, list every exercise per day with its set count and primary muscle tags, then total weekly volume per muscle group. If any muscle group is below target, revise and recount. Do not present the summary until all targets are met or flagged.
 
-You MUST verify your volume math before presenting the summary. For each training day, list every exercise with its set count and primary muscle tags, then total the weekly volume per muscle group. If any muscle group is below its target, revise the plan and recount. Do not present the clean summary until every non-exempt muscle group meets at least its minimum, and Push Hard targets are met or flagged as constrained with a clear reason.
-
-This planning step is about quality, not presentation. Take as long as you need to get the plan right. The user only reads the clean summary at the end.
-
-When you're done planning, end your response with a clean summary using this format:
+When done, end with a clean summary:
 
 ---
 ## Your Program Plan
@@ -865,247 +958,130 @@ When you're done planning, end your response with a clean summary using this for
 | ... | ...     | ...   |
 
 ### Volume Targets
-[Volume table using the same format defined in the Quality Check section — all muscle groups, sets/week, target ranges, status indicators]
+[Volume table — all muscle groups, sets/week, target ranges, status indicators as defined in Quality Check]
+
+### Exercise Selections
+For each training day, list every exercise with sets, primary/secondary muscles, and superset pairings. For programs with multiple exercise pools (rotations across blocks), list all pools.
+
+### Secondary Goal Summary
+If the profile includes secondary goals with dedicated training days, summarize how those days are structured: what activities, how they progress or rotate, and how they fit with the lifting days.
 
 ### Trade-offs (if any)
 - [1-3 bullets noting meaningful compromises]
-- If the profile includes secondary goals with dedicated training days (cardio, mobility, sport, etc.), briefly note how those days are structured and how activities rotate across the program. Secondary goals are part of the plan — include them in the summary, not just the lifting days.
-
-### Cardio Plan
-If the user's profile includes cardiovascular training, summarize the cardio structure: which activities, how they rotate across weeks, steady state vs intervals, duration, and intensity approach. Cardio is a stated goal — treat it as part of the plan, not an afterthought.
 
 ### Recommendation (if applicable)
-If the plan has significant limitations, suggest a single clear change that would improve results. Keep it simple — the user may not have training knowledge. Do not use jargon or suggest complex split restructuring. Frame it as one easy-to-understand option.
+If the plan has significant limitations, suggest one clear change. Keep it simple — no jargon. Example: "I'd recommend 5 lifting days + 1 cardio day instead of 4+1. This would solve the volume constraints and keep sessions shorter."
 
-Good example: "I'd recommend 5 lifting days + 1 cardio day (6 total) instead of 4 lifting + 1 cardio. This would solve the Upper Back and Biceps volume constraints and let every session be shorter (~55 min vs ~70 min). Let me know if you'd like me to replan for that schedule."
+Do not suggest combining cardio with lifting sessions. Do not ask the user questions about the plan — they'll tell you what to change.
 
-Bad example: "You could try a Push/Pull/Legs/Upper/Lower split with cardio finishers on 2 sessions, or convert the cardio day to an Arms + Back day with 15-20 min LISS at the end."
-
-Do not suggest tagging cardio onto the end of lifting sessions — this interferes with hypertrophy recovery. If the user needs more lifting days, recommend adding total training days rather than combining sessions.
-
-Do NOT ask the user specific questions about the plan. Do NOT ask for confirmation on individual decisions (e.g., "happy with the split?", "want to add core work?"). The user will tell you what they want to change.
-
-End with: "Let me know if you want any changes, or say **generate** to build the full program."
+End with: "Let me know if you want any changes. When you're happy with the plan, you can use it with your JSON import prompt to generate the program files."
 ---
 
-The profile represents the user's initial preferences, not hard constraints. This includes the total number of training days — if the user's goals would be significantly better served by training more days per week (e.g., 6 days instead of 5), recommend that. The user may not realize that adjusting their schedule would meaningfully improve their results. That's exactly the kind of insight they're relying on a coach for. Always respect their choices if they confirm them, but don't silently accept a suboptimal setup when a better option exists.
+The profile represents preferences, not hard constraints. If the user's goals would be significantly better served by a different setup (e.g., more training days), recommend that. Respect their choices if confirmed, but don't silently accept a suboptimal setup.
 
-Do NOT write the full program yet. Only plan. Wait for the user to say "generate" before building.
-
-**Step 2 — Build**
-Once the user confirms the plan (or after making requested changes), generate the complete program as a markdown document with all exercises, sets, reps, progressions, alternatives, and volume tables. Follow all formatting rules and quality checks below.
-
-**Step 3 — Recommendations (optional)**
-If the program has inherent limitations due to the user's choices (e.g., a muscle group can't reach optimal volume due to available training days), include a brief '### Recommendations' section after Quick Notes explaining what change would improve results. Keep it to 1-2 sentences maximum.
+Do NOT generate the full program. Only plan.
 
 ## MY PROFILE
 
-${generateProgramSpecs(questionnaireData)}
+**Primary Goal:** Muscle Building (gain lean mass and size)
+**Secondary Goals:** Include Cardiovascular Training
+
+**Training Schedule:**
+- Total training days per week: 6
+- Muscle Building days: 5
+- Additional focus days (cardiovascular training): 1
+
+**Training Experience:** Advanced (2+ years, excellent technique, slow progression)
+**Training Approach:** Push Hard — target upper end of optimal volume ranges.
+
+**Program Duration:** 1 year (long-term development plan)
+**Preferred Cardio Activities:** Treadmill / Indoor Running, Stationary Bike / Cycling, Swimming, Stair Climber / StepMill
+
+**Available Equipment:** Commercial Gym (full equipment access)
+**Session Length:** Not specified — use 60-75 minutes as typical for hypertrophy with an advanced lifter.
+**Heart Rate Monitor:** Not available
+**Rest Time Preference:** Not specified — use evidence-based defaults.
+**Exercise Note Detail:** Only non-obvious technique tips or specific setup instructions.
 
 ## MUSCLE TAXONOMY
 
-When listing primary and secondary muscles for exercises, you MUST use ONLY these exact names:
+Use ONLY these exact muscle names — no generic terms like "Shoulders", "Back", "Arms", or "Legs":
+
 Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
 
-Do NOT use generic terms like "Shoulders", "Back", "Arms", or "Legs" — always use the specific muscle names above.
-Do NOT use "Lower Back" — use "Core" instead for any exercise involving spinal stabilization or erector engagement.
+Use "Core" instead of "Lower Back" for spinal stabilization or erector engagement.
 
 ### COMPOUND EXERCISE TAGGING GUIDE
 
-When an exercise significantly loads a muscle through full range of motion, list it as Primary. When a muscle assists but is not the main driver, list it as Secondary. Use this reference for common compounds:
+Primary = main driver through full ROM. Secondary = assists but not the main driver.
 
 - Bench press variants: Primary Chest, Triceps
 - Incline press variants: Primary Chest, Front Delts | Secondary Triceps
 - Row variants: Primary Upper Back, Lats | Secondary Biceps, Rear Delts
 - Pull-up / Pulldown: Primary Lats | Secondary Biceps, Upper Back
 - Overhead press: Primary Front Delts, Triceps | Secondary Side Delts
-- Squat variants (back squat, front squat): Primary Quads, Glutes
-- Leg press: Primary Quads | Secondary Glutes
-- Hack squat: Primary Quads | Secondary Glutes
+- Squat variants: Primary Quads, Glutes
+- Leg press / Hack squat: Primary Quads | Secondary Glutes
 - Lunge / Split squat: Primary Quads, Glutes
 - Hip hinge (RDL, good morning): Primary Hamstrings, Glutes
 - Hip thrust: Primary Glutes | Secondary Hamstrings
 - Dips: Primary Chest, Triceps
 - Calf raise variants: Primary Calves
 
-This guide ensures consistent volume counting. When in doubt, ask: "Is this muscle the main driver or just assisting?" Main driver = Primary, assisting = Secondary.
+## PLANNING RULES
 
-## EXERCISE TYPES & FORMATTING
-
-My app handles five exercise types. Use the appropriate type for each activity and format exactly as shown:
-
-### STRENGTH (for gym/weight training exercises)
-\`\`\`
-Barbell Bench Press
-- Sets x Reps: 4 x 8-10
-- Rest: 120-180 sec
-- Primary: Chest, Triceps
-- Secondary: Front Delts
-- Alt 1: Dumbbell Bench Press (Primary: Chest, Triceps | Secondary: Front Delts)
-- Alt 2: Machine Chest Press (Primary: Chest, Triceps | Secondary: Front Delts)
-- Notes: Retract shoulder blades, maintain slight arch
-- Weekly progression: Wk1: 10-12, Wk2: 8-10, Wk3: 6-8, Wk4 (deload): 12 at 50% of Wk3 weight
-\`\`\`
-
-Rules for strength exercises:
-- Use full descriptive names with equipment prefix (e.g., "Barbell Back Squat", "Dumbbell Lateral Raise", "Cable Face Pull")
-- Always include 2 alternative exercises, each with their own Primary/Secondary muscles
-- Always show weekly rep progression across the block
-- For supersets, clearly label them (e.g., "Superset A1: Barbell Bench Press", "Superset A2: Incline Dumbbell Press")
-${notesInstruction}
-
-### CARDIO (for cardiovascular/endurance activities)
-\`\`\`
-Treadmill Run
-- Duration: 25 minutes
-- Intensity: Zone 2 / Conversational pace
-- Mode: Steady state
-- Weekly progression: Wk1: 20 min, Wk2: 25 min, Wk3: 30 min, Wk4: 20 min (deload)
-- Notes: Should be able to hold a conversation throughout
-\`\`\`
-
-Rules for cardio:
-- Include weekly progression showing how duration or intensity changes
-- Specify intensity in a way the user can follow (heart rate zone, conversational pace, or RPE)
-- If the user hasn't mentioned a heart rate monitor, use perceived effort descriptions instead of HR zones
-
-### STRETCH (for flexibility/mobility work)
-\`\`\`
-Pigeon Stretch
-- Hold: 45 seconds x 2 sets (each side)
-- Primary: Glutes
-- Notes: Keep hips square, ease into the stretch gradually
-\`\`\`
-
-Rules for stretching:
-- Specify whether the stretch is "each side" or bilateral
-- Include primary muscles from the taxonomy
-- Include brief form cue in notes
-
-### CIRCUIT (for conditioning/metabolic work)
-\`\`\`
-Core Finisher Circuit
-- Rounds: 3
-- Work: 40 sec on / 20 sec off
-- Exercises: Plank, Bicycle Crunches, Dead Bugs, Mountain Climbers
-- Notes: Focus on form over speed, rest 60 sec between rounds
-\`\`\`
-
-### SPORT (for recreational/social activities)
-\`\`\`
-Basketball (Recreational)
-- Duration: 60 minutes
-- Notes: Pickup game or shooting practice — counts as active recovery
-\`\`\`
-
-## PROGRAM DESIGN RULES
-
-1. **Match my primary goal** — structure the program to optimize for my stated objective
-2. **Respect my experience level** — appropriate complexity, volume, and exercise selection
-3. **Only use available equipment** — do not include exercises I cannot perform with my setup
-4. **Stay within my session duration** — each session must fit within my stated time limit
-5. **Show explicit weekly progression** — for every strength exercise, show what reps/sets look like each week of the block (not just "increase weight over time")
-6. **Deload weeks** — if a deload is appropriate, include one with evidence-based protocols. Show explicit sets, reps, and load guidance for every exercise — do not just write "reduce volume" or "deload week." Load guidance should be simple enough that the user knows exactly what weight to use without guesswork.
-7. **2 alternatives per strength exercise** — each with their own primary and secondary muscle tags from the taxonomy
-8. **Use the correct exercise type** — gym exercises use "strength" format, running/biking use "cardio" format, mobility work uses "stretch" format, etc. Do not format a cardio session as if it were a strength exercise
-9. **Prioritize selected cardio activities** — When programming cardio days, use the user's preferred cardio activities first. Rotate through different preferred activities week by week within each block rather than repeating the same activity every session. Every preferred activity should appear at least once in the program. Only introduce activities outside their preferences if needed for variety.
-10. **Rotate exercises between blocks** — For programs with multiple blocks (e.g., Block A and Block B), rotate at least some exercise variations between blocks to provide fresh stimulus. Keep the same movement patterns (e.g., horizontal press, vertical pull) but change the specific exercise (e.g., barbell bench → dumbbell bench). This is especially important for intermediate and advanced lifters.
+1. **Only use available equipment** — do not include exercises the user can't perform with their listed equipment
+2. **Stay within session duration** — each session must fit the stated time limit
+3. **Rotate secondary goal activities** — if the user has preferred activities (cardio, mobility, sport, etc.), rotate through them. Every preferred activity should appear at least once.
+4. **Rotate exercises between blocks** — change exercise variations while keeping movement patterns. Longer programs need more distinct exercise pools to prevent staleness.
+5. **Plateau management** — for programs longer than 8 weeks, include guidance for when the lifter stalls on a prescribed progression.
+6. **Complete block coverage** — the plan must explicitly cover every block in the program. For each block, specify which exercise pool it uses and list the exercises. Do not use "repeat" or "same as above" — each block must be independently clear so a separate AI can generate it without guessing.
+7. **Deload structure** — if appropriate, include deload weeks with a clear approach (e.g., reduced sets, higher rep ranges). The app does not track weight.
+8. **Long-term periodization** — for programs longer than 16 weeks, the plan should describe how training evolves across repeated cycles. Don't just rotate exercises — show how rep ranges, volume, or intensity shift over the course of the program.
 
 ## QUALITY CHECK
 
-Before presenting the program, verify:
-- **Volume summary:** After the complete program, include a weekly volume summary table for each block showing sets per week per muscle group (counting only exercises where that muscle is listed as Primary). Group by block since exercises stay the same within a block. Show deload weeks separately since volume is intentionally reduced. Format as a simple table with status indicators:
+Before presenting the plan, verify volume per muscle group. Count only Primary muscle tags. Format as:
 
 | Muscle Group | Sets/Week | Min | Target | Optimal | Status |
 |---|---|---|---|---|---|
 | Chest | 16 | 10 | 16-20 | 12-20 | ✅ |
-| Side Delts | 12 | 8 | 12-16 | 10-16 | ✅ |
-| Rear Delts | 6 | 0 | — | 10-18 | ✅ |
-| Front Delts | 0 | 0 | — | — | ✅ |
 | Calves | 18 | 8 | 16-22 | 12-22 (priority) | ✅ |
-| Forearms | 0 | 0 | — | — | ✅ |
 
-Status indicators:
+**Volume targets by training approach (natural lifters):**
+
+| Approach | Major Muscles | Medium Muscles |
+|----------|--------------|----------------|
+| Push Hard | 16-20 sets/week | 12-16 sets/week |
+| Balanced | 12-16 sets/week | 10-14 sets/week |
+| Conservative | 10-12 sets/week | 8-10 sets/week |
+
+Major = Chest, Lats, Upper Back, Quads, Hamstrings, Glutes
+Medium = Side Delts, Biceps, Triceps, Calves
+
+Going above 20 sets/week for any muscle group has diminishing returns for natural lifters.
+
+**Priority muscle groups:** Increase toward 16-22 sets/week. Reduce non-priority muscles toward minimums to keep total stress recoverable.
+
+**Exempt muscles (can show 0 direct sets):** Front Delts, Traps, Rear Delts, Forearms — these get sufficient indirect work from compounds. Core may be exempt for short programs but should be included in longer programs.
+
+**Experience-scaled minimums:**
+
+| Level | Major Muscles | Medium Muscles |
+|-------|--------------|----------------|
+| Beginner | 6-8 sets/week | 6 sets/week |
+| Intermediate | 8-10 sets/week | 6-8 sets/week |
+| Advanced | 10-12 sets/week | 8-10 sets/week |
+
+**Status indicators:**
 - ✅ = within target range
-- ⚠️ LOW = below minimum (needs more volume)
-- ⚠️ HIGH = above maximum (diminishing returns, consider reducing unless this is a priority muscle group)
-- ℹ️ CONSTRAINED = above minimum but below training approach target due to split/schedule limitations. Must be explained in Recommendations section.
+- ⚠️ LOW = below minimum — must fix before presenting
+- ⚠️ HIGH = above 20 sets — diminishing returns unless priority muscle
+- ℹ️ CONSTRAINED = above minimum but below target due to split/schedule. Must explain in Recommendations.
 
-Priority muscle groups specified by the user get a wider acceptable range — being above the standard maximum is acceptable for priority groups. Mark priority muscle groups with "(priority)" next to their target range. The target column should reflect the user's goal (10-20 for hypertrophy, 6-12 for general fitness/maintenance).
+If any non-exempt muscle is below minimum, revise the plan before presenting. If Push Hard targets aren't met and a practical fix exists (add a superset, swap an exercise), implement it rather than flagging. A Push Hard program where most muscles sit at the floor of their target range is underdelivering — aim for the upper half.
 
-CRITICAL: If the volume summary shows any muscle group below the minimum target, you MUST revise the program to fix the gap BEFORE presenting it. Do not present a program with ⚠️ LOW flags and then explain why it's acceptable — instead, add sets or exercises to bring every muscle group into range. Muscles that can show 0 direct sets without being flagged: Front Delts, Traps, Rear Delts, Core, and Forearms (these receive sufficient indirect stimulus from compound pressing, pulling, rowing, stabilization, and gripping movements respectively). All other muscle groups must meet the minimum target for their experience level.
-
-If the training approach is Push Hard and a non-exempt muscle group is below its Push Hard target but a practical fix exists (e.g., adding an isolation movement as a superset on another training day, swapping a less effective exercise for one that hits the lagging group), implement the fix in the program rather than flagging it in Recommendations. Only use ℹ️ CONSTRAINED when there is genuinely no way to reach the target within session time and recovery constraints.
-
-EXPERIENCE-SCALED VOLUME MINIMUMS (natural lifters):
-
-BEGINNERS (complete_beginner, beginner):
-- Major muscles (Chest, Lats, Quads, Hamstrings, Glutes): 6-8 sets/week minimum
-- Medium muscles (Side Delts, Biceps, Triceps, Calves): 6 sets/week minimum
-- Small/indirect muscles (Front Delts, Rear Delts, Traps, Core, Forearms): 0 sets minimum (exempt — sufficient indirect stimulus from compounds)
-
-INTERMEDIATE:
-- Major muscles: 8-10 sets/week minimum
-- Medium muscles: 6-8 sets/week minimum
-- Small/indirect muscles: 0-6 sets/week
-
-ADVANCED:
-- Major muscles: 10-12 sets/week minimum
-- Medium muscles: 8-10 sets/week minimum
-- Small/indirect muscles: 0-6 sets/week
-
-OPTIMAL ranges for natural lifters (where most gains happen):
-- Major muscles: 12-20 sets/week
-- Medium muscles: 10-16 sets/week
-- Going above 20 sets/week for any muscle group has diminishing returns for natural lifters
-
-PRIORITY MUSCLE GROUPS: Increase priority muscles toward upper optimal range (16-22 sets/week). Reduce non-priority muscles toward their minimums to maintain recoverable total training stress. You cannot add volume everywhere — total weekly stress must be recoverable.
-
-TRAINING APPROACH ADJUSTMENT: The user's training approach shifts where within the optimal range (12-20 sets for major muscles) the AI should target:
-- Push Hard: target upper end (16-20 for major muscles, 12-16 for medium)
-- Balanced: target mid-range (12-16 for major muscles, 10-14 for medium)  
-- Conservative: target lower end (10-12 for major muscles, 8-10 for medium)
-These targets combine with experience level — a beginner choosing Push Hard still stays within beginner-appropriate ranges, just at the higher end of those ranges.
-
-If the training approach is Push Hard, the volume summary should show most non-exempt muscle groups in the UPPER half of the optimal range, not clustered at their minimums. A Push Hard program where most muscles sit at minimum volume is underdelivering on the user's intent. If a muscle group cannot reach the Push Hard target due to split constraints (e.g., only 2 upper body days), note this in the Recommendations section and suggest how the user could address it (e.g., adding lateral raises as supersets on lower body days).
-
-After verifying all muscle groups meet their targets, review the overall distribution. If some muscle groups are at or near their ceiling (e.g., 20 sets for a major muscle) while others sit at the floor of their target range (e.g., 12 sets for a medium muscle targeting 12-16), look for opportunities to redistribute. Swapping one exercise, reducing sets on an over-served muscle, or adding a set to an underserved one can produce a more balanced program without increasing total training stress. The goal is an even spread across target ranges, not some muscles maxed out while others barely qualify.
-- **Rest periods:** Default to 1-2 minutes for compound exercises and 60-90 seconds for isolation exercises. Adjust based on the user's rest time preference if specified.
-- **Progressive overload:** Every program must include a clear overload mechanism (increasing load, reps, or sets week to week). Do not use vague instructions like "increase weight when ready."
-- **Frequency:** Each muscle group should ideally be trained 2x per week for hypertrophy. Once per week is suboptimal but acceptable if schedule constraints require it.
-- **Goal-specific adjustments:** Apply your knowledge of evidence-based training principles to adjust volume, intensity, and rest periods for the user's specific goal (e.g., strength goals use heavier loads with more rest, fat loss maintains volume with potential conditioning additions, recomposition follows hypertrophy guidelines).
-
-## OUTPUT FORMAT
-
-Create the program as a **markdown document artifact** (not in the chat). Present the program with these sections only:
-
-### 1. Program Overview
-3-4 sentences: training split, session types, overall approach.
-
-### 2. Weekly Structure
-Simple list showing each day (e.g., Day 1: Push, Day 2: Pull, Day 3: Cardio, Day 4: Rest, etc.)
-
-### 3. Progression Strategy
-Concrete numbers showing what changes week to week. Example: "Weeks 1-3: reps decrease from 12 → 10 → 8 as load increases. Week 4: deload."
-
-### 4. Complete Program
-Every training day, every exercise, fully detailed using the formats above. Organize by block if the program has multiple phases.
-
-### 5. Quick Notes
-2-3 bullet points maximum with practical tips specific to this program. Do NOT include general fitness advice, nutrition recommendations, warm-up philosophy, or motivational text.
-
-### 6. Recommendations (optional)
-If the program has limitations due to the user's schedule or split, briefly note what change would improve results. 1-2 sentences maximum. Omit this section entirely if there are no meaningful recommendations.
-
-### 7. Weekly Volume Summary
-For each block (and deload weeks separately), show a table of sets per week per muscle group (counting only sets where that muscle is listed as Primary). Include Target range and Status columns. This verifies the program meets evidence-based volume targets before approving.
-
-## IMPORTANT
-
-- Do NOT include lengthy exercise selection rationale or training philosophy essays
-- Do NOT include nutrition advice or general health tips
-- Do NOT convert to JSON — the user will handle JSON conversion separately
-- After building the program in Step 2, ask for feedback on: exercise selection, volume, progression, and anything the user wants to change`;
+After verifying ranges, check distribution balance — avoid some muscles maxed out while others sit at the floor.`;
                     
                     await Clipboard.setStringAsync(planningPrompt);
                     setPlanningPromptCopied(true);
@@ -1194,7 +1170,7 @@ For each block (and deload weeks separately), show a table of sets per week per 
     return (
       <View style={styles.errorContainer}>
         <View style={styles.errorHeader}>
-          <View style={styles.infoButton} />
+          <View style={{ width: 44 }} />
           <TouchableOpacity 
             onPress={() => setErrorMessage(null)} 
             style={styles.closeButton}
@@ -1318,83 +1294,156 @@ For each block (and deload weeks separately), show a table of sets per week per 
               }
             ]}
           >
-            {/* Close Button */}
-            <View style={styles.closeButtonWrapper}>
+            {/* Navigation Button */}
+            <View style={showAddMoreMode ? styles.backButtonWrapper : styles.closeButtonWrapper}>
               <TouchableOpacity 
                 style={styles.closeButton} 
-                onPress={handleModalCancel}
+                onPress={showAddMoreMode ? handleBackToConfirmation : handleModalCancel}
                 activeOpacity={0.8}
               >
-                <Text style={styles.closeButtonText}>×</Text>
+                <Ionicons name={showAddMoreMode ? "arrow-back" : "close"} size={24} color="#71717a" />
               </TouchableOpacity>
             </View>
 
-            {/* Header Badge */}
-            {generationTime && (
-              <View style={[styles.headerBadge, { backgroundColor: themeColor + '1A', borderColor: themeColor }]}>
-                <Text style={[styles.badgeText, { color: themeColor }]}>Generated in {generationTime.toFixed(2)}s</Text>
-              </View>
-            )}
+            {showAddMoreMode ? (
+                // Add More Files Interface
+                <>
+                  <View style={styles.addMoreHeader}>
+                    <Text style={styles.addMoreTitle}>Add More Files</Text>
+                    <View style={[styles.programPartsBadge, { backgroundColor: '#10b981' + '1A', borderColor: '#10b981' }]}>
+                      <Ionicons name="layers" size={16} color="#10b981" />
+                      <Text style={[styles.programPartsText, { color: '#10b981' }]}>
+                        {accumulatedPrograms.length} part{accumulatedPrograms.length !== 1 ? 's' : ''} combined
+                      </Text>
+                    </View>
+                  </View>
 
-            {/* Main Content */}
-            <View style={styles.mainContent}>
-              <Text style={styles.title}>Workout Ready</Text>
-              <Text style={styles.routineName}>{parsedProgram?.routine_name}</Text>
-              
-              {/* Program Summary */}
-              <View style={styles.summaryCard}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Training Days</Text>
-                  <Text style={[styles.summaryValue, { color: themeColor }]}>{parsedProgram?.days_per_week} per week</Text>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Total Duration</Text>
-                  <Text style={[styles.summaryValue, { color: themeColor }]}>
-                    {parsedProgram?.blocks.reduce((total, block) => {
-                      const weeks = block.weeks.includes('-') 
-                        ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1
-                        : parseInt(block.weeks);
-                      return total + weeks;
-                    }, 0)} weeks
-                  </Text>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Unique Movements</Text>
-                  <Text style={[styles.summaryValue, { color: themeColor }]}>
-                    {(() => {
-                      const uniqueExercises = new Set();
-                      parsedProgram?.blocks.forEach(block => 
-                        block.days.forEach(day => 
-                          day.exercises.forEach(exercise => {
-                            // Get exercise name based on type
-                            const name = exercise.type === 'strength' ? exercise.exercise :
-                                        exercise.type === 'cardio' ? exercise.activity :
-                                        exercise.type === 'stretch' ? exercise.exercise :
-                                        exercise.type === 'circuit' ? exercise.circuit_name :
-                                        exercise.type === 'sport' ? exercise.activity : 'Unknown';
-                            uniqueExercises.add(name);
-                          })
-                        )
-                      );
-                      return uniqueExercises.size;
-                    })()} movements
-                  </Text>
-                </View>
-              </View>
-            </View>
-            
-            {/* Action Button */}
-            <View style={styles.actionSection}>
-              <TouchableOpacity
-                style={[styles.createButton, { backgroundColor: themeColor }]}
-                onPress={handleConfirmImport}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.createButtonText}>Start Training</Text>
-              </TouchableOpacity>
-            </View>
+                  <View style={styles.addMoreContent}>
+                    {/* Mode Toggle - positioned above the main button */}
+                    <TouchableOpacity 
+                      style={[styles.modeToggleInModal, { borderColor: themeColor }]}
+                      onPress={() => setUploadMode(!uploadMode)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons 
+                        name={uploadMode ? "clipboard-outline" : "cloud-upload-outline"} 
+                        size={20} 
+                        color={themeColor} 
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.addMoreButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
+                      onPress={uploadMode ? handleFileUpload : handlePasteAndImport}
+                      activeOpacity={0.9}
+                    >
+                      <Ionicons 
+                        name={uploadMode ? "cloud-upload" : "clipboard"} 
+                        size={40} 
+                        color="#0a0a0b" 
+                      />
+                      <Text style={styles.addMoreButtonText}>
+                        {uploadMode ? "Upload File" : "Paste & Import"}
+                      </Text>
+                      <Text style={styles.addMoreButtonSubtext}>
+                        {uploadMode ? "Choose JSON file from device" : "Paste your next workout JSON"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.addMoreHint}>
+                      This will be combined with your existing program
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                // Confirmation Interface
+                <>
+                  {/* Header Badge */}
+                  <View style={styles.headerBadgeContainer}>
+                    {generationTime && (
+                      <View style={[styles.headerBadge, { backgroundColor: themeColor + '1A', borderColor: themeColor }]}>
+                        <Text style={[styles.badgeText, { color: themeColor }]}>Generated in {generationTime.toFixed(2)}s</Text>
+                      </View>
+                    )}
+                    {accumulatedPrograms.length > 1 && (
+                      <View style={[styles.headerBadge, { backgroundColor: '#10b981' + '1A', borderColor: '#10b981', marginTop: 8 }]}>
+                        <Text style={[styles.badgeText, { color: '#10b981' }]}>{accumulatedPrograms.length} programs combined</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Main Content */}
+                  <View style={styles.mainContent}>
+                    <Text style={styles.title}>Workout Ready</Text>
+                    <Text style={styles.routineName}>{parsedProgram?.routine_name}</Text>
+                    
+                    {/* Program Summary */}
+                    <View style={styles.summaryCard}>
+                      <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>Training Days</Text>
+                        <Text style={[styles.summaryValue, { color: themeColor }]}>{parsedProgram?.days_per_week} per week</Text>
+                      </View>
+                      <View style={styles.summaryDivider} />
+                      <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>Total Duration</Text>
+                        <Text style={[styles.summaryValue, { color: themeColor }]}>
+                          {parsedProgram?.blocks.reduce((total, block) => {
+                            const weeks = block.weeks.includes('-') 
+                              ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1
+                              : parseInt(block.weeks);
+                            return total + weeks;
+                          }, 0)} weeks
+                        </Text>
+                      </View>
+                      <View style={styles.summaryDivider} />
+                      <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>Unique Movements</Text>
+                        <Text style={[styles.summaryValue, { color: themeColor }]}>
+                          {(() => {
+                            const uniqueExercises = new Set();
+                            parsedProgram?.blocks.forEach(block => 
+                              block.days.forEach(day => 
+                                day.exercises.forEach(exercise => {
+                                  // Get exercise name based on type
+                                  const name = exercise.type === 'strength' ? exercise.exercise :
+                                              exercise.type === 'cardio' ? exercise.activity :
+                                              exercise.type === 'stretch' ? exercise.exercise :
+                                              exercise.type === 'circuit' ? exercise.circuit_name :
+                                              exercise.type === 'sport' ? exercise.activity : 'Unknown';
+                                  uniqueExercises.add(name);
+                                })
+                              )
+                            );
+                            return uniqueExercises.size;
+                          })()} movements
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  
+                  {/* Action Buttons */}
+                  <View style={styles.actionSection}>
+                    <TouchableOpacity
+                      style={[styles.createButton, { backgroundColor: themeColor }]}
+                      onPress={handleConfirmImport}
+                      activeOpacity={0.9}
+                    >
+                      <Text style={styles.createButtonText}>Start Training</Text>
+                    </TouchableOpacity>
+
+                    {accumulatedPrograms.length > 0 && (
+                      <TouchableOpacity
+                        style={[styles.secondaryActionButton, { borderColor: themeColor, marginTop: 12, marginBottom: 0 }]}
+                        onPress={handleAddMoreFiles}
+                        activeOpacity={0.9}
+                      >
+                        <Ionicons name="add-outline" size={20} color={themeColor} />
+                        <Text style={[styles.secondaryActionButtonText, { color: themeColor }]}>Add More Files</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              )}
           </Animated.View>
         </Animated.View>
       </Modal>
@@ -1440,6 +1489,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     right: 20,
+    zIndex: 1,
+  },
+  backButtonWrapper: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
     zIndex: 1,
   },
   closeButton: {
@@ -1595,14 +1650,17 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 18,
   },
+  headerBadgeContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+  },
   headerBadge: {
     alignSelf: 'center',
     borderWidth: 1,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    marginTop: 24,
-    marginBottom: 8,
   },
   badgeText: {
     fontSize: 12,
@@ -1680,6 +1738,107 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0a0a0b',
     letterSpacing: 0.5,
+  },
+  secondaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  secondaryActionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  addMoreHeader: {
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    paddingBottom: 20,
+  },
+  addMoreTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 16,
+    letterSpacing: 0.5,
+  },
+  programPartsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  programPartsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  addMoreContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 40,
+  },
+  modeToggleInModal: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    backgroundColor: '#18181b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    marginBottom: 20,
+  },
+  addMoreButton: {
+    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 48,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 20,
+    marginBottom: 20,
+  },
+  addMoreButtonText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0a0a0b',
+    marginTop: 16,
+    letterSpacing: 0.5,
+  },
+  addMoreButtonSubtext: {
+    fontSize: 16,
+    color: '#0a0a0b',
+    opacity: 0.8,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  addMoreHint: {
+    fontSize: 14,
+    color: '#71717a',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 8,
   },
   instructionsContainer: {
     flex: 1,

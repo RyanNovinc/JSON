@@ -298,38 +298,51 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
 };
 
 export const getAIPrompt = (questionnaireData?: QuestionnaireData) => {
-  return `# Convert Workout Program to JSON
+  return `# Generate Workout Program as JSON
 
-Convert the workout program above into valid JSON matching the schema below. Do NOT redesign the program — translate it exactly as written.
+You are given a training plan above. Generate the complete program as JSON files matching the schema below. Build directly to JSON — do not create markdown, documents, or any intermediate format.
 
 ## Output Instructions
 
-**Write the JSON to a file** — do not output it to chat (it will hit token limits).
+**JSON only** — do not reproduce the program in chat or create any text version. Only output JSON file(s).
+
+**Write JSON to a file** — do not output it to chat.
 1. Create a file and write the complete JSON
-2. If you hit output limits, stop at the end of a complete block, then continue appending
-3. Never stop mid-block or mid-day
-4. When finished, provide the download link
+2. When finished, provide the download link
+
+**Multi-block programs:**
+Generate one block at a time. After each block:
+1. Provide the download link for that block's JSON file
+2. Say: "Ready to import. Say **next** when you want the next block."
+
+Each block should be a complete, standalone JSON file with routine_name, description, days_per_week, and a single block in the blocks array. Keep routine_name and description consistent across all files.
+
+## Exercise Detail
+
+For each exercise in the plan, you must design:
+- **Sets and reps per week** across the block (reps_weekly, sets_weekly). Do not include weight/load guidance — the app doesn't track weight. reps_weekly values must be comma-separated rep targets per set (e.g., "10, 10, 10, 8"), not shorthand like "4x10".
+- **Rest periods** — evidence-based defaults (compounds: 120-180 sec, isolation: 60-90 sec)
+- **2 alternative exercises** — each with their own primary/secondary muscles from the taxonomy
+- **Superset pairings** — if the plan specifies supersets, note them in both exercises
+- **Notes** — only non-obvious technique tips or specific setup instructions
+- **Deload weeks** — express through reduced sets (sets_weekly) and/or higher rep ranges. Do not reference weight.
 
 ## JSON Schema
+
 \`\`\`json
 {
   "routine_name": "string",
-  "description": "string (2-3 sentence overview from the program)",
+  "description": "string",
   "days_per_week": number,
   "blocks": [
     {
-      "block_name": "string (e.g. 'Block A')",
-      "weeks": "string (e.g. '1-4' — include deload week in the block)",
+      "block_name": "string",
+      "weeks": "string (e.g. '1-4')",
       "structure": "string (e.g. 'Push Pull Legs Upper Lower')",
-      "deload_weeks": [number] (e.g. [4] — which weeks within this block are deload weeks),
-      "deload_guidance": {
-        "weight_percentage": number (e.g. 60 for 60% of previous week),
-        "rep_range": "string (e.g. '8-10' — typically Week 1 reps)",
-        "notes": "string (e.g. 'Use 60% of Week 3 weight. Focus on form and recovery.')"
-      },
+      "deload_weeks": [number] (optional — e.g. [4]),
       "days": [
         {
-          "day_name": "string (e.g. 'Push', 'Lower', 'Cardio')",
+          "day_name": "string",
           "estimated_duration": number (minutes),
           "exercises": [Exercise]
         }
@@ -343,39 +356,32 @@ Convert the workout program above into valid JSON matching the schema below. Do 
 \`\`\`json
 {
   "type": "strength",
-  "exercise": "string (exact name from program)",
+  "exercise": "string",
   "sets": number,
-  "reps": "string (e.g. '8-10')",
-  "rest": number (seconds — from program's rest period),
-  "restQuick": number (seconds — 60-70% of rest value),
+  "reps": "string",
+  "rest": number (seconds),
+  "restQuick": number (seconds — ~65% of rest, rounded),
   "primaryMuscles": ["from taxonomy"],
-  "secondaryMuscles": ["from taxonomy"],
-  "reps_weekly": { "1": "10-12", "2": "8-10", "3": "6-8", "4": "12" },
-  "sets_weekly": { "1": 4, "2": 4, "3": 4, "4": 3 },
-  "superset_group": "string or omit (e.g. 'A' groups exercises together)",
-  "notes": "string or omit if none",
+  "secondaryMuscles": ["from taxonomy, or empty array"],
+  "reps_weekly": { "1": "string", "2": "string", ... },
+  "sets_weekly": { "1": number, "2": number, ... },
+  "notes": "string (optional)",
   "alternatives": [
-    { "exercise": "string", "primaryMuscles": ["..."], "secondaryMuscles": ["..."] }
+    { "exercise": "string", "primaryMuscles": [...], "secondaryMuscles": [...] }
   ]
 }
 \`\`\`
 
 ### Cardio Exercise
-For cardio days with rotating activities, use ONE cardio entry with progression_weekly describing each week:
 \`\`\`json
 {
   "type": "cardio",
-  "activity": "Mixed Cardio Rotation",
-  "duration_minutes": number (average duration),
-  "target_intensity": "string (default intensity)",
-  "cardio_mode": "steady_state",
-  "progression_weekly": {
-    "1": "25 min treadmill — steady state, RPE 4-5",
-    "2": "30 min stationary bike — steady state, RPE 4-5",
-    "3": "35 min stair climber — intervals 30s hard/60s easy",
-    "4": "20 min treadmill — easy pace (deload)"
-  },
-  "notes": "string"
+  "activity": "string",
+  "duration_minutes": number,
+  "target_intensity": "string (optional)",
+  "cardio_mode": "string (optional)",
+  "progression_weekly": { "1": "string", "2": "string", ... },
+  "notes": "string (optional)"
 }
 \`\`\`
 
@@ -388,7 +394,7 @@ For cardio days with rotating activities, use ONE cardio entry with progression_
   "sets": number,
   "per_side": boolean,
   "primaryMuscles": ["from taxonomy"],
-  "notes": "string or omit"
+  "notes": "string (optional)"
 }
 \`\`\`
 
@@ -400,8 +406,8 @@ For cardio days with rotating activities, use ONE cardio entry with progression_
   "rounds": number,
   "work_seconds": number,
   "rest_seconds": number,
-  "exercises": [{ "exercise": "string", "notes": "string" }],
-  "notes": "string or omit"
+  "exercises": [{ "exercise": "string", "notes": "string (optional)" }],
+  "notes": "string (optional)"
 }
 \`\`\`
 
@@ -410,8 +416,8 @@ For cardio days with rotating activities, use ONE cardio entry with progression_
 {
   "type": "sport",
   "activity": "string",
-  "duration_minutes": number,
-  "notes": "string or omit"
+  "duration_minutes": number (optional),
+  "notes": "string (optional)"
 }
 \`\`\`
 
@@ -420,20 +426,13 @@ Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Tri
 
 ## Translation Rules
 
-1. **Do not change anything** — use the exact exercise names, sets, reps, rest periods, muscles, alternatives, and notes from the program
-2. **Block structure** — each block includes its deload week. A program with "Block A Weeks 1-3 + Deload Week 4" becomes one block with weeks "1-4" and weekly progressions using keys "1" through "4"
-3. **Weekly progressions** — map the program's "Weekly progression: [show reps and load guidance for each week of the block, including deload if applicable]" into reps_weekly and sets_weekly. Deload weeks get reduced sets via sets_weekly
-4. **Supersets** — assign the same superset_group value (e.g. "A", "B", "C") to exercises that should be performed as supersets. Place superset exercises adjacent in the exercises array. Example: if "Barbell Bench Press" and "Incline Dumbbell Press" are a superset, both get "superset_group": "A"
-5. **Cardio rotation** — if cardio activities change week to week, use a single cardio entry with progression_weekly describing each week's activity, duration, mode, and intensity
-6. **restQuick** — calculate as roughly 60-70% of the rest value, rounded to a clean number (e.g. rest: 180 → restQuick: 120, rest: 90 → restQuick: 60)
-7. **Empty secondary muscles** — if an exercise has no secondary muscles, use an empty array \`[]\`
-8. **Deload days** — deload weeks use the same day structure but with reduced sets_weekly values. Do NOT create separate deload days — the weekly progression system handles it
-9. **Deload weeks** — for deload weeks, use the same rep numbers without additional weight guidance in reps_weekly. The app will automatically display "DELOAD" labels and provide weight guidance elsewhere in the UI. Keep reps_weekly values clean (e.g., just "12", not "12 (light)")
-10. **Block-relative keys** — weekly progression keys are always relative to the block, starting from "1". Block B (weeks 5-8) uses keys "1", "2", "3", "4" — not "5", "6", "7", "8". Each block is an independent cycle.
-11. **Deload week tagging** — add a deload_weeks array to each block indicating which week numbers (block-relative) are deload weeks. For a standard 4-week block with week 4 as deload, use "deload_weeks": [4]. This allows the app to display a "DELOAD" label and automatic weight guidance in the UI.
-12. **Deload guidance** — for each block containing deload weeks, include a deload_guidance object with specific instructions:
-    - weight_percentage: The percentage of previous week's weight to use (typically 50-70%)
-    - rep_range: The rep range to use during deload (typically Week 1 rep ranges)
-    - notes: Specific guidance like "Use 60% of Week 3 weight. Focus on form and recovery."
-    Base these values on the program type: strength programs typically use 60-70% weight with 5-8 reps, hypertrophy programs typically use 40-60% weight with Week 1 rep ranges (10-15 reps).`;
+1. **Follow the plan** — use the exercise names, sets, muscles, and structure from the plan. Design rep progressions, rest periods, alternatives, and notes.
+2. **Block-relative keys** — weekly progression keys always start from "1" within each block. Block B (weeks 7-12) uses "1", "2", "3"... not "7", "8", "9".
+3. **Deload tagging** — if a block has deload weeks, add a deload_weeks array with the block-relative week numbers (e.g. [6] for a 6-week block).
+4. **Supersets** — place superset exercises adjacent in the exercises array. Include "Superset with [exercise name]" in both exercises' notes.
+5. **Cardio rotation** — if cardio activities change week to week, use a single cardio entry with progression_weekly describing each week.
+6. **restQuick** — calculate as ~65% of the rest value, rounded to a clean number.
+7. **Empty arrays** — if an exercise has no secondary muscles, use []. Do not omit the field.
+8. **Exercise name consistency** — use the exact same name for the same exercise across all blocks and days. Do not vary naming (e.g., always "Overhead Cable Extension", never "Cable Overhead Extension").
+9. **Self-review** — before presenting each block, review your output as an experienced coach would. Check: rep progression logic across weeks, superset exercises are adjacent in the array, exercise names are identical where they repeat, rest periods match exercise type, muscle tags are accurate, deload week reduces volume, and the plan's exercise selections/sets/structure were faithfully translated. Fix any issues silently. After the download link, briefly list what you verified.`;
 };
