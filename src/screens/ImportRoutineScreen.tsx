@@ -39,6 +39,7 @@ export default function ImportRoutineScreen() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
+  const [reviewPromptCopied, setReviewPromptCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sampleCopied, setSampleCopied] = useState(false);
   const [modalScale] = useState(new Animated.Value(0));
@@ -1133,10 +1134,45 @@ After verifying ranges, check distribution balance — avoid some muscles maxed 
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>3</Text>
                   </View>
+                  <Text style={styles.stepCardTitle}>Review & Verify</Text>
+                </View>
+                <Text style={styles.stepCardDescription}>
+                  Have your AI review each JSON block for quality
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: themeColor }]}
+                  onPress={async () => {
+                    const reviewPrompt = `Now review the block you just generated as an experienced coach would. Check rep progression logic, superset adjacency, exercise name consistency, rest periods, muscle tags, deload volume reduction, faithful translation of the plan, and anything else you find.
+
+If you find issues, output a corrected JSON file and briefly explain what you changed.
+
+If it passes, confirm: ✅ Reviewed — no issues found.
+
+Then say: "Say **next** to generate the next block. After each block, paste this review prompt again to verify it before moving on."`;
+                    await Clipboard.setStringAsync(reviewPrompt);
+                    setReviewPromptCopied(true);
+                    setTimeout(() => {
+                      setReviewPromptCopied(false);
+                    }, 2000);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
+                  <Text style={styles.actionButtonText}>
+                    {reviewPromptCopied ? 'Copied!' : 'Copy Review Prompt'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.stepCard}>
+                <View style={styles.stepCardHeader}>
+                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
+                    <Text style={styles.stepBadgeText}>4</Text>
+                  </View>
                   <Text style={styles.stepCardTitle}>Import & Train</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Copy the JSON file your AI created and paste it in
+                  Copy the verified JSON file and paste it in
                 </Text>
               </View>
             </View>
