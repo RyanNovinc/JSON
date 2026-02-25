@@ -78,29 +78,35 @@ export default function HomeScreen({ route }: any) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const colorFadeAnim = useRef(new Animated.Value(1)).current;
+  const colorTransition = useRef(new Animated.Value(1)).current;
   
   const { showFeedbackModal, submitFeedback, skipFeedback, triggerFeedbackModal } = useImportFeedback();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
 
-  // Animated theme switching function
-  const handleAnimatedThemeToggle = () => {
-    // Fade out all colored elements
-    Animated.timing(colorFadeAnim, {
+  // Smooth color transition function with simple opacity fade
+  const [isColorTransitioning, setIsColorTransitioning] = useState(false);
+
+  const handleThemeToggle = () => {
+    setIsColorTransitioning(true);
+    
+    // Quick fade out
+    Animated.timing(colorTransition, {
       toValue: 0,
-      duration: 200,
+      duration: 150,
       useNativeDriver: true,
     }).start(() => {
       // Switch theme
       setIsPinkTheme(!isPinkTheme);
       
-      // Fade colors back in with glow effect
-      Animated.timing(colorFadeAnim, {
+      // Fade back in
+      Animated.timing(colorTransition, {
         toValue: 1,
-        duration: 400,
+        duration: 300,
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        setIsColorTransitioning(false);
+      });
     });
   };
 
@@ -502,27 +508,25 @@ export default function HomeScreen({ route }: any) {
       const routine = routines[0];
       return (
         <View style={styles.heroContainer}>
-          <TouchableOpacity
-            style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('Blocks' as any, { routine })}
-            onLongPress={() => handleDeleteRequest(routine)}
-            delayLongPress={800}
-          >
-            <View style={styles.heroContent}>
-              <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{routine.name}</Text>
-              <Text style={styles.heroSubtitle}>
-                {routine.days} days per week • {routine.blocks} blocks
-              </Text>
-              <Animated.View style={{ opacity: colorFadeAnim }}>
+          <Animated.View style={{ opacity: colorTransition }}>
+            <TouchableOpacity
+              style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Blocks' as any, { routine })}
+              onLongPress={() => handleDeleteRequest(routine)}
+              delayLongPress={800}
+            >
+              <View style={styles.heroContent}>
+                <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{routine.name}</Text>
+                <Text style={styles.heroSubtitle}>
+                  {routine.days} days per week • {routine.blocks} blocks
+                </Text>
                 <Text style={[styles.heroDescription, { color: themeColor }]}>
                   Tap to start your workout
                 </Text>
-              </Animated.View>
-            </View>
-            
-            <View style={styles.heroActions}>
-              <Animated.View style={{ opacity: colorFadeAnim }}>
+              </View>
+              
+              <View style={styles.heroActions}>
                 <TouchableOpacity
                   style={styles.heroActionButton}
                   onPress={() => handleExport(routine)}
@@ -531,17 +535,17 @@ export default function HomeScreen({ route }: any) {
                   <Ionicons name="share-outline" size={24} color={themeColor} />
                   <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
                 </TouchableOpacity>
-              </Animated.View>
-              <TouchableOpacity
-                style={styles.heroSecondaryButton}
-                onPress={() => handleGoToTodayWorkout()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="today-outline" size={18} color="#71717a" />
-                <Text style={styles.heroSecondaryText}>Today</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.heroSecondaryButton}
+                  onPress={() => handleGoToTodayWorkout()}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="today-outline" size={18} color="#71717a" />
+                  <Text style={styles.heroSecondaryText}>Today</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
       );
     }
@@ -726,7 +730,7 @@ export default function HomeScreen({ route }: any) {
       </Animated.View>
 
       {/* Calendar Button - Bottom Left */}
-      <Animated.View style={[styles.calendarButton, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
+      <Animated.View style={[styles.calendarButton, { backgroundColor: themeColor, opacity: colorTransition }]}>
         <TouchableOpacity
           style={styles.buttonInner}
           onPress={() => setCalendarModal(true)}
@@ -738,7 +742,7 @@ export default function HomeScreen({ route }: any) {
 
       {/* Go to Today Button - Bottom Left (Nutrition Mode Only) */}
       {isNutritionMode && (
-        <Animated.View style={[styles.todayButton, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
+        <Animated.View style={[styles.todayButton, { backgroundColor: themeColor, opacity: colorTransition }]}>
           <TouchableOpacity
             style={styles.buttonInner}
             onPress={handleGoToToday}
@@ -750,7 +754,7 @@ export default function HomeScreen({ route }: any) {
       )}
 
       {/* Questionnaire Button - Bottom Center */}
-      <Animated.View style={[styles.questionnaireButton, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
+      <Animated.View style={[styles.questionnaireButton, { backgroundColor: themeColor, opacity: colorTransition }]}>
         <TouchableOpacity
           style={styles.buttonInner}
           onPress={() => navigation.navigate('WorkoutDashboard' as any)}
@@ -796,10 +800,10 @@ export default function HomeScreen({ route }: any) {
       )}
 
       {/* Gender Theme Toggle - Top Right */}
-      <Animated.View style={[styles.genderToggle, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
+      <Animated.View style={[styles.genderToggle, { backgroundColor: themeColor, opacity: colorTransition }]}>
         <TouchableOpacity
           style={styles.buttonInner}
-          onPress={handleAnimatedThemeToggle}
+          onPress={handleThemeToggle}
           activeOpacity={0.8}
         >
           <Ionicons 
@@ -811,7 +815,7 @@ export default function HomeScreen({ route }: any) {
       </Animated.View>
 
       {/* Add Routine FAB - Bottom Right */}
-      <Animated.View style={[styles.fab, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
+      <Animated.View style={[styles.fab, { backgroundColor: themeColor, opacity: colorTransition }]}>
         <TouchableOpacity
           style={styles.buttonInner}
           onPress={() => {
