@@ -78,10 +78,31 @@ export default function HomeScreen({ route }: any) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const colorFadeAnim = useRef(new Animated.Value(1)).current;
   
   const { showFeedbackModal, submitFeedback, skipFeedback, triggerFeedbackModal } = useImportFeedback();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
+
+  // Animated theme switching function
+  const handleAnimatedThemeToggle = () => {
+    // Fade out all colored elements
+    Animated.timing(colorFadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      // Switch theme
+      setIsPinkTheme(!isPinkTheme);
+      
+      // Fade colors back in with glow effect
+      Animated.timing(colorFadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
 
   // Load routines from storage on component mount
   useEffect(() => {
@@ -493,20 +514,24 @@ export default function HomeScreen({ route }: any) {
               <Text style={styles.heroSubtitle}>
                 {routine.days} days per week • {routine.blocks} blocks
               </Text>
-              <Text style={[styles.heroDescription, { color: themeColor }]}>
-                Tap to start your workout
-              </Text>
+              <Animated.View style={{ opacity: colorFadeAnim }}>
+                <Text style={[styles.heroDescription, { color: themeColor }]}>
+                  Tap to start your workout
+                </Text>
+              </Animated.View>
             </View>
             
             <View style={styles.heroActions}>
-              <TouchableOpacity
-                style={styles.heroActionButton}
-                onPress={() => handleExport(routine)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="share-outline" size={24} color={themeColor} />
-                <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
-              </TouchableOpacity>
+              <Animated.View style={{ opacity: colorFadeAnim }}>
+                <TouchableOpacity
+                  style={styles.heroActionButton}
+                  onPress={() => handleExport(routine)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="share-outline" size={24} color={themeColor} />
+                  <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
+                </TouchableOpacity>
+              </Animated.View>
               <TouchableOpacity
                 style={styles.heroSecondaryButton}
                 onPress={() => handleGoToTodayWorkout()}
@@ -701,7 +726,7 @@ export default function HomeScreen({ route }: any) {
       </Animated.View>
 
       {/* Calendar Button - Bottom Left */}
-      <View style={[styles.calendarButton, { backgroundColor: themeColor }]}>
+      <Animated.View style={[styles.calendarButton, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
         <TouchableOpacity
           style={styles.buttonInner}
           onPress={() => setCalendarModal(true)}
@@ -709,11 +734,11 @@ export default function HomeScreen({ route }: any) {
         >
           <Ionicons name="calendar-outline" size={24} color="#0a0a0b" />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Go to Today Button - Bottom Left (Nutrition Mode Only) */}
       {isNutritionMode && (
-        <View style={[styles.todayButton, { backgroundColor: themeColor }]}>
+        <Animated.View style={[styles.todayButton, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
           <TouchableOpacity
             style={styles.buttonInner}
             onPress={handleGoToToday}
@@ -721,11 +746,11 @@ export default function HomeScreen({ route }: any) {
           >
             <Ionicons name="today-outline" size={24} color="#0a0a0b" />
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       )}
 
       {/* Questionnaire Button - Bottom Center */}
-      <View style={[styles.questionnaireButton, { backgroundColor: themeColor }]}>
+      <Animated.View style={[styles.questionnaireButton, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
         <TouchableOpacity
           style={styles.buttonInner}
           onPress={() => navigation.navigate('WorkoutDashboard' as any)}
@@ -733,7 +758,7 @@ export default function HomeScreen({ route }: any) {
         >
           <Ionicons name="clipboard-outline" size={24} color="#0a0a0b" />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* App Mode Toggle - Top Right (Development Only) */}
       {__DEV__ && (
@@ -771,10 +796,10 @@ export default function HomeScreen({ route }: any) {
       )}
 
       {/* Gender Theme Toggle - Top Right */}
-      <View style={[styles.genderToggle, { backgroundColor: themeColor }]}>
+      <Animated.View style={[styles.genderToggle, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
         <TouchableOpacity
           style={styles.buttonInner}
-          onPress={() => setIsPinkTheme(!isPinkTheme)}
+          onPress={handleAnimatedThemeToggle}
           activeOpacity={0.8}
         >
           <Ionicons 
@@ -783,10 +808,10 @@ export default function HomeScreen({ route }: any) {
             color="#0a0a0b" 
           />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Add Routine FAB - Bottom Right */}
-      <View style={[styles.fab, { backgroundColor: themeColor }]}>
+      <Animated.View style={[styles.fab, { backgroundColor: themeColor, opacity: colorFadeAnim }]}>
         <TouchableOpacity
           style={styles.buttonInner}
           onPress={() => {
@@ -799,7 +824,7 @@ export default function HomeScreen({ route }: any) {
         >
           <Ionicons name="add" size={28} color="#0a0a0b" />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Custom Share Modal */}
       <Modal
@@ -1532,7 +1557,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
     borderColor: '#22d3ee',
-    padding: 40,
     alignItems: 'center',
     width: '100%',
     maxWidth: 340,
@@ -1547,6 +1571,13 @@ const styles = StyleSheet.create({
     elevation: 20,
     // Add a subtle inner glow effect with multiple shadows
     shadowColor: '#22d3ee',
+  },
+  heroCardTouchable: {
+    padding: 40,
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroContent: {
     alignItems: 'center',
