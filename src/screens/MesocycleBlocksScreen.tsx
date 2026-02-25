@@ -6,12 +6,15 @@ import {
   FlatList,
   SafeAreaView,
   Modal,
+  Alert,
+  Share,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -300,8 +303,6 @@ export default function MesocycleBlocksScreen() {
   };
 
   const handleBlockLongPress = (block: Block, localIndex: number) => {
-    if (localIndex === activeBlockIndex) return;
-    
     setSelectedBlock({ block, index: localIndex });
     setShowModal(true);
   };
@@ -317,6 +318,141 @@ export default function MesocycleBlocksScreen() {
   const handleCancel = () => {
     setShowModal(false);
     setSelectedBlock(null);
+  };
+
+  const handleShareBlock = async () => {
+    if (selectedBlock) {
+      const blockData = {
+        blockName: selectedBlock.block.block_name,
+        weeks: selectedBlock.block.weeks,
+        days: selectedBlock.block.days,
+        mesocycle: mesocycle.mesocycleNumber,
+        program: program.name || 'Mesocycle Program',
+        exportedAt: new Date().toISOString(),
+      };
+
+      const jsonString = JSON.stringify(blockData, null, 2);
+      
+      try {
+        await Share.share({
+          message: jsonString,
+          title: `${selectedBlock.block.block_name} Block Data`,
+        });
+        setShowModal(false);
+        setSelectedBlock(null);
+      } catch (error) {
+        console.error('Error sharing block:', error);
+        setShowModal(false);
+        setSelectedBlock(null);
+      }
+    }
+  };
+
+  const handleCopyBlock = async () => {
+    if (selectedBlock) {
+      const blockData = {
+        blockName: selectedBlock.block.block_name,
+        weeks: selectedBlock.block.weeks,
+        days: selectedBlock.block.days,
+        mesocycle: mesocycle.mesocycleNumber,
+        program: program.name || 'Mesocycle Program',
+        exportedAt: new Date().toISOString(),
+      };
+
+      const jsonString = JSON.stringify(blockData, null, 2);
+      
+      try {
+        await Clipboard.setStringAsync(jsonString);
+        setShowModal(false);
+        setSelectedBlock(null);
+      } catch (error) {
+        console.error('Error copying block:', error);
+      }
+    }
+  };
+
+  const handleDeleteBlock = () => {
+    if (selectedBlock) {
+      Alert.alert(
+        'Delete Block',
+        `Are you sure you want to delete "${selectedBlock.block.block_name}"? This action cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Delete', 
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                // TODO: Add actual delete functionality
+                // For now just show a message
+                Alert.alert('Feature Coming Soon', 'Block deletion will be available in a future update.');
+                setShowModal(false);
+                setSelectedBlock(null);
+              } catch (error) {
+                console.error('Error deleting block:', error);
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const handleToggleBlockCompletion = async () => {
+    if (selectedBlock) {
+      try {
+        const block = selectedBlock.block;
+        const totalWeeks = block.weeks.includes('-') 
+          ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1
+          : 1;
+
+        // Check if block is currently completed
+        let isCompleted = true;
+        for (let week = 1; week <= totalWeeks; week++) {
+          const weekKey = `completed_${block.block_name}_week${week}`;
+          const completedData = await AsyncStorage.getItem(weekKey);
+          if (!completedData) {
+            isCompleted = false;
+            break;
+          }
+          const completedWorkouts = JSON.parse(completedData);
+          if (completedWorkouts.length !== block.days.length) {
+            isCompleted = false;
+            break;
+          }
+        }
+
+        if (isCompleted) {
+          // Uncomplete the block - remove all completion data
+          for (let week = 1; week <= totalWeeks; week++) {
+            const weekKey = `completed_${block.block_name}_week${week}`;
+            await AsyncStorage.removeItem(weekKey);
+          }
+        } else {
+          // Complete the block - mark all days as completed
+          for (let week = 1; week <= totalWeeks; week++) {
+            const completedWorkouts = block.days.map(day => `${day.day_name}_week${week}`);
+            const weekKey = `completed_${block.block_name}_week${week}`;
+            await AsyncStorage.setItem(weekKey, JSON.stringify(completedWorkouts));
+          }
+        }
+
+        // Reload completion status to reflect changes
+        await checkAllBlocksCompletion();
+
+        // Close modal without success popup
+        setShowModal(false);
+        setSelectedBlock(null);
+        
+      } catch (error) {
+        console.error('Error toggling block completion:', error);
+        Alert.alert('Error', 'Failed to update block completion status. Please try again.');
+      }
+    }
+  };
+
+  const isBlockCompleted = (block: Block): boolean => {
+    return completionStatus[block.block_name] || false;
   };
 
   const handleBack = () => {
@@ -367,40 +503,182 @@ export default function MesocycleBlocksScreen() {
         showsVerticalScrollIndicator={false}
       />
 
+      {/* Block Actions Modal */}
       <Modal
         visible={showModal}
         transparent
         animationType="fade"
         onRequestClose={handleCancel}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="checkmark-circle-outline" size={32} color={themeColor} />
-              <Text style={styles.modalTitle}>Set Active Block</Text>
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 24,
+        }}>
+          <View style={{
+            backgroundColor: '#18181b',
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#27272a',
+            padding: 24,
+            width: '100%',
+            maxWidth: 360,
+            alignItems: 'center',
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: 24 }}>
+              <Ionicons name="options-outline" size={32} color={themeColor} />
+              <Text style={{
+                fontSize: 20,
+                fontWeight: '700',
+                color: '#ffffff',
+                marginTop: 12,
+                textAlign: 'center',
+              }}>{selectedBlock?.block.block_name}</Text>
+              <Text style={{
+                fontSize: 14,
+                color: '#71717a',
+                textAlign: 'center',
+                marginTop: 4,
+              }}>Weeks {selectedBlock?.block.weeks}</Text>
             </View>
             
-            <Text style={styles.modalMessage}>
-              Set <Text style={[styles.blockNameHighlight, { color: themeColor }]}>"{selectedBlock?.block.block_name}"</Text> as your active training block?
-            </Text>
-            
-            <View style={styles.modalButtons}>
+            <View style={{ width: '100%', gap: 12 }}>
+              {selectedBlock?.index !== activeBlockIndex && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: themeColor,
+                    borderRadius: 8,
+                    paddingVertical: 16,
+                    paddingHorizontal: 20,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 12,
+                  }}
+                  onPress={handleSetActive}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#0a0a0b" />
+                  <Text style={{
+                    fontSize: 16,
+                    fontWeight: '600',
+                    color: '#0a0a0b',
+                  }}>Set as Active</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={handleCancel}
+                style={{
+                  backgroundColor: selectedBlock && isBlockCompleted(selectedBlock.block) ? '#ef4444' : '#22c55e',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+                onPress={handleToggleBlockCompletion}
                 activeOpacity={0.8}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Ionicons 
+                  name={selectedBlock && isBlockCompleted(selectedBlock.block) ? "close-circle" : "checkmark-done"} 
+                  size={20} 
+                  color="#0a0a0b" 
+                />
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#0a0a0b',
+                }}>{selectedBlock && isBlockCompleted(selectedBlock.block) ? 'Mark Incomplete' : 'Mark Complete'}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton, { backgroundColor: themeColor }]}
-                onPress={handleSetActive}
+                style={{
+                  backgroundColor: '#27272a',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+                onPress={handleCopyBlock}
                 activeOpacity={0.8}
               >
-                <Text style={styles.confirmButtonText}>Set Active</Text>
+                <Ionicons name="copy-outline" size={20} color="#ffffff" />
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ffffff',
+                }}>Copy JSON</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#27272a',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+                onPress={handleShareBlock}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="share-outline" size={20} color="#ffffff" />
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ffffff',
+                }}>Share</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(239, 68, 68, 0.3)',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+                onPress={handleDeleteBlock}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ef4444',
+                }}>Delete</Text>
               </TouchableOpacity>
             </View>
+            
+            <TouchableOpacity
+              style={{
+                marginTop: 20,
+                paddingVertical: 12,
+                paddingHorizontal: 24,
+              }}
+              onPress={handleCancel}
+              activeOpacity={0.7}
+            >
+              <Text style={{
+                fontSize: 16,
+                fontWeight: '500',
+                color: '#71717a',
+              }}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

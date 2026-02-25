@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   Modal,
   Alert,
+  Share,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -57,10 +58,11 @@ interface BlockCardProps {
 interface MesocycleCardProps {
   mesocycle: MesocycleCard;
   onPress: () => void;
+  onLongPress: () => void;
   themeColor: string;
 }
 
-function MesocycleCard({ mesocycle, onPress, themeColor }: MesocycleCardProps) {
+function MesocycleCard({ mesocycle, onPress, onLongPress, themeColor }: MesocycleCardProps) {
   const progressPercentage = mesocycle.totalBlocks > 0 
     ? (mesocycle.completedBlocks / mesocycle.totalBlocks) * 100 
     : 0;
@@ -76,6 +78,8 @@ function MesocycleCard({ mesocycle, onPress, themeColor }: MesocycleCardProps) {
       style={[styles.card, { borderLeftColor: phaseColor }]} 
       activeOpacity={0.8}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={800}
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardTitle}>
@@ -301,6 +305,8 @@ export default function BlocksScreen() {
   const [completionStatus, setCompletionStatus] = useState<{[blockName: string]: boolean}>({});
   const [showModal, setShowModal] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<{ block: Block; index: number } | null>(null);
+  const [showMesocycleModal, setShowMesocycleModal] = useState(false);
+  const [selectedMesocycle, setSelectedMesocycle] = useState<MesocycleCard | null>(null);
   const [program, setProgram] = useState<Program | null>(null);
   const [mesocycleCards, setMesocycleCards] = useState<MesocycleCard[]>([]);
   
@@ -399,18 +405,14 @@ export default function BlocksScreen() {
       // Determine state based on mesocycle position
       if (mesocycleNumber === currentMesocycle) {
         isActive = true;
-      } else if (mesocycleNumber < currentMesocycle) {
-        isCompleted = true;
       }
       
-      // Check if mesocycle is completed
+      // Check if mesocycle is completed based on actual block completion
       if (mesocycleBlocks.length > 0) {
         const completedBlocks = mesocycleBlocks.filter(block => 
           completionStatus[block.block_name] || false
         ).length;
-        if (mesocycleNumber === currentMesocycle) {
-          isCompleted = completedBlocks === mesocycleBlocks.length;
-        }
+        isCompleted = completedBlocks === mesocycleBlocks.length;
       }
       
       // Calculate completion stats
@@ -431,7 +433,7 @@ export default function BlocksScreen() {
         completedBlocks,
         totalBlocks: mesocycleBlocks.length,
         isCompleted,
-        isActive: isActive || containsActiveBlock
+        isActive: isActive // Only use program's currentMesocycle, not active block
       });
     } else {
       // CASE 2: Full program import - distribute blocks across mesocycles
@@ -483,18 +485,14 @@ export default function BlocksScreen() {
         // Determine state based on mesocycle position
         if (mesocycleNumber === currentMesocycle) {
           isActive = true;
-        } else if (mesocycleNumber < currentMesocycle) {
-          isCompleted = true;
         }
         
-        // Check if mesocycle is completed
+        // Check if mesocycle is completed based on actual block completion
         const completedBlocks = mesocycleBlocks.filter(block => 
           completionStatus[block.block_name] || false
         ).length;
         
-        if (mesocycleNumber === currentMesocycle) {
-          isCompleted = completedBlocks === mesocycleBlocks.length;
-        }
+        isCompleted = completedBlocks === mesocycleBlocks.length;
         
         // Check if this mesocycle contains the active block
         const containsActiveBlock = mesocycleBlocks.some((block) => {
@@ -509,7 +507,7 @@ export default function BlocksScreen() {
           completedBlocks,
           totalBlocks: mesocycleBlocks.length,
           isCompleted,
-          isActive: isActive || containsActiveBlock
+          isActive: isActive // Only use program's currentMesocycle, not active block
         });
       }
     }
@@ -765,6 +763,153 @@ export default function BlocksScreen() {
     setSelectedBlock(null);
   };
 
+  const handleMesocycleLongPress = (mesocycle: MesocycleCard) => {
+    setSelectedMesocycle(mesocycle);
+    setShowMesocycleModal(true);
+  };
+
+  const handleSetActiveMesocycle = async () => {
+    if (selectedMesocycle && program) {
+      try {
+        // Update the program's current mesocycle using updateProgram
+        await ProgramStorage.updateProgram(program.id, { 
+          currentMesocycle: selectedMesocycle.mesocycleNumber 
+        });
+        
+        // Reload program data to reflect changes
+        await loadProgramData();
+        
+        setShowMesocycleModal(false);
+        setSelectedMesocycle(null);
+      } catch (error) {
+        console.error('Failed to set active mesocycle:', error);
+      }
+    }
+  };
+
+  const handleShareMesocycle = async () => {
+    if (selectedMesocycle) {
+      const mesocycleData = {
+        mesocycleNumber: selectedMesocycle.mesocycleNumber,
+        phase: selectedMesocycle.phase,
+        blocks: selectedMesocycle.blocksInMesocycle,
+        program: program?.name || 'Mesocycle Program',
+        exportedAt: new Date().toISOString(),
+      };
+
+      const jsonString = JSON.stringify(mesocycleData, null, 2);
+      
+      try {
+        await Share.share({
+          message: jsonString,
+          title: `Mesocycle ${selectedMesocycle.mesocycleNumber} Data`,
+        });
+        setShowMesocycleModal(false);
+        setSelectedMesocycle(null);
+      } catch (error) {
+        console.error('Error sharing mesocycle:', error);
+        setShowMesocycleModal(false);
+        setSelectedMesocycle(null);
+      }
+    }
+  };
+
+  const handleCopyMesocycle = async () => {
+    if (selectedMesocycle) {
+      const mesocycleData = {
+        mesocycleNumber: selectedMesocycle.mesocycleNumber,
+        phase: selectedMesocycle.phase,
+        blocks: selectedMesocycle.blocksInMesocycle,
+        program: program?.name || 'Mesocycle Program',
+        exportedAt: new Date().toISOString(),
+      };
+
+      const jsonString = JSON.stringify(mesocycleData, null, 2);
+      
+      try {
+        await Clipboard.setStringAsync(jsonString);
+        setShowMesocycleModal(false);
+        setSelectedMesocycle(null);
+      } catch (error) {
+        console.error('Error copying mesocycle:', error);
+      }
+    }
+  };
+
+  const handleDeleteMesocycle = () => {
+    if (selectedMesocycle) {
+      Alert.alert(
+        'Delete Mesocycle',
+        `Are you sure you want to delete Mesocycle ${selectedMesocycle.mesocycleNumber}? This action cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Delete', 
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                // TODO: Add actual delete functionality
+                // For now just show a message
+                Alert.alert('Feature Coming Soon', 'Mesocycle deletion will be available in a future update.');
+                setShowMesocycleModal(false);
+                setSelectedMesocycle(null);
+              } catch (error) {
+                console.error('Error deleting mesocycle:', error);
+              }
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const handleCancelMesocycle = () => {
+    setShowMesocycleModal(false);
+    setSelectedMesocycle(null);
+  };
+
+  const handleToggleMesocycleCompletion = async () => {
+    if (selectedMesocycle) {
+      try {
+        const blocksInMesocycle = selectedMesocycle.blocksInMesocycle;
+        
+        // Check if mesocycle is currently completed (all blocks completed)
+        const isCurrentlyCompleted = selectedMesocycle.isCompleted;
+        
+        for (const block of blocksInMesocycle) {
+          const totalWeeks = block.weeks.includes('-') 
+            ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1
+            : 1;
+
+          if (isCurrentlyCompleted) {
+            // Uncomplete the mesocycle - remove all completion data for all blocks
+            for (let week = 1; week <= totalWeeks; week++) {
+              const weekKey = `completed_${block.block_name}_week${week}`;
+              await AsyncStorage.removeItem(weekKey);
+            }
+          } else {
+            // Complete the mesocycle - mark all days in all blocks as completed
+            for (let week = 1; week <= totalWeeks; week++) {
+              const completedWorkouts = block.days.map((day: any) => `${day.day_name}_week${week}`);
+              const weekKey = `completed_${block.block_name}_week${week}`;
+              await AsyncStorage.setItem(weekKey, JSON.stringify(completedWorkouts));
+            }
+          }
+        }
+
+        // Reload completion status to reflect changes
+        await checkAllBlocksCompletion();
+
+        // Close modal without success popup
+        setShowMesocycleModal(false);
+        setSelectedMesocycle(null);
+        
+      } catch (error) {
+        console.error('Error toggling mesocycle completion:', error);
+        Alert.alert('Error', 'Failed to update mesocycle completion status. Please try again.');
+      }
+    }
+  };
 
   const handleBack = () => {
     navigation.goBack();
@@ -799,6 +944,7 @@ export default function BlocksScreen() {
             <MesocycleCard
               mesocycle={item}
               onPress={() => handleMesocyclePress(item)}
+              onLongPress={() => handleMesocycleLongPress(item)}
               themeColor={themeColor}
             />
           )}
@@ -830,34 +976,271 @@ export default function BlocksScreen() {
         animationType="fade"
         onRequestClose={handleCancel}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 32,
+        }}>
+          <View style={{
+            backgroundColor: '#18181b',
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#27272a',
+            padding: 24,
+            width: '100%',
+            maxWidth: 340,
+            alignItems: 'center',
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
               <Ionicons name="checkmark-circle-outline" size={32} color={themeColor} />
-              <Text style={styles.modalTitle}>Set Active Block</Text>
+              <Text style={{
+                fontSize: 20,
+                fontWeight: '700',
+                color: '#ffffff',
+                marginTop: 12,
+                textAlign: 'center',
+              }}>Set Active Block</Text>
             </View>
             
-            <Text style={styles.modalMessage}>
-              Set <Text style={[styles.blockNameHighlight, { color: themeColor }]}>"{selectedBlock?.block.block_name}"</Text> as your active training block?
+            <Text style={{
+              fontSize: 16,
+              color: '#71717a',
+              textAlign: 'center',
+              lineHeight: 24,
+              marginBottom: 24,
+            }}>
+              Set <Text style={{ fontWeight: '600', color: themeColor }}>"{selectedBlock?.block.block_name}"</Text> as your active training block?
             </Text>
             
-            <View style={styles.modalButtons}>
+            <View style={{
+              flexDirection: 'row',
+              width: '100%',
+              gap: 12,
+            }}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#27272a',
+                  borderRadius: 8,
+                  paddingVertical: 20,
+                  paddingHorizontal: 24,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 60,
+                }}
                 onPress={handleCancel}
                 activeOpacity={0.8}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ffffff',
+                }}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton, { backgroundColor: themeColor }]}
+                style={{
+                  flex: 1,
+                  backgroundColor: themeColor,
+                  borderRadius: 8,
+                  paddingVertical: 20,
+                  paddingHorizontal: 24,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 60,
+                }}
                 onPress={handleSetActive}
                 activeOpacity={0.8}
               >
-                <Text style={styles.confirmButtonText}>Set Active</Text>
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#0a0a0b',
+                }}>Set Active</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mesocycle Actions Modal */}
+      <Modal
+        visible={showMesocycleModal}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelMesocycle}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 24,
+        }}>
+          <View style={{
+            backgroundColor: '#18181b',
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#27272a',
+            padding: 24,
+            width: '100%',
+            maxWidth: 360,
+            alignItems: 'center',
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: 24 }}>
+              <Ionicons name="options-outline" size={32} color={themeColor} />
+              <Text style={{
+                fontSize: 20,
+                fontWeight: '700',
+                color: '#ffffff',
+                marginTop: 12,
+                textAlign: 'center',
+              }}>Mesocycle {selectedMesocycle?.mesocycleNumber}</Text>
+              <Text style={{
+                fontSize: 14,
+                color: '#71717a',
+                textAlign: 'center',
+                marginTop: 4,
+              }}>{selectedMesocycle?.phase?.phaseName || 'Training Phase'}</Text>
+            </View>
+            
+            <View style={{ width: '100%', gap: 12 }}>
+              {!selectedMesocycle?.isActive && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: themeColor,
+                    borderRadius: 8,
+                    paddingVertical: 16,
+                    paddingHorizontal: 20,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 12,
+                  }}
+                  onPress={handleSetActiveMesocycle}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#0a0a0b" />
+                  <Text style={{
+                    fontSize: 16,
+                    fontWeight: '600',
+                    color: '#0a0a0b',
+                  }}>Set as Active</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: selectedMesocycle?.isCompleted ? '#ef4444' : '#22c55e',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+                onPress={handleToggleMesocycleCompletion}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={selectedMesocycle?.isCompleted ? "close-circle" : "checkmark-done"} 
+                  size={20} 
+                  color="#0a0a0b" 
+                />
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#0a0a0b',
+                }}>{selectedMesocycle?.isCompleted ? 'Mark Incomplete' : 'Mark Complete'}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#27272a',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+                onPress={handleCopyMesocycle}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="copy-outline" size={20} color="#ffffff" />
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ffffff',
+                }}>Copy JSON</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#27272a',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+                onPress={handleShareMesocycle}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="share-outline" size={20} color="#ffffff" />
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ffffff',
+                }}>Share</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(239, 68, 68, 0.3)',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                }}
+                onPress={handleDeleteMesocycle}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ef4444',
+                }}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity
+              style={{
+                marginTop: 20,
+                paddingVertical: 12,
+                paddingHorizontal: 24,
+              }}
+              onPress={handleCancelMesocycle}
+              activeOpacity={0.7}
+            >
+              <Text style={{
+                fontSize: 16,
+                fontWeight: '500',
+                color: '#71717a',
+              }}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1104,20 +1487,27 @@ const styles = StyleSheet.create({
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 12,
     width: '100%',
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
+    gap: 12,
   },
   cancelButton: {
+    flex: 1,
     backgroundColor: '#27272a',
+    borderRadius: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
   },
   confirmButton: {
-    // backgroundColor set inline
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
   },
   cancelButtonText: {
     fontSize: 16,
