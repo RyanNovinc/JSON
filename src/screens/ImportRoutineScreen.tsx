@@ -284,39 +284,29 @@ export default function ImportRoutineScreen() {
       throw new Error(`Cannot combine programs with different training frequencies. Found ${firstDaysPerWeek} days/week and ${incompatibleProgram.days_per_week} days/week.`);
     }
 
-    // Keep the original program name from the first program
-    const combinedName = programs[0].routine_name;
+    // Keep the original program name from the first program, but strip mesocycle suffix when combining multiple mesocycles
+    let combinedName = programs[0].routine_name;
+    if (programs.length > 1) {
+      // Strip " — Mesocycle X" suffix for combined programs
+      combinedName = combinedName.replace(/\s*—\s*Mesocycle\s+\d+$/i, '');
+    }
     
     // Keep the original description from the first program
     const combinedDescription = programs[0].description || '';
 
-    // Merge all blocks with adjusted week numbers
+    // Merge all blocks preserving original week numbers
     const mergedBlocks = [];
-    let currentWeekOffset = 0;
 
     for (const program of programs) {
       for (const block of program.blocks) {
-        // Parse week range to understand the structure
-        const weekParts = block.weeks.split('-');
-        const startWeek = parseInt(weekParts[0]);
-        const endWeek = weekParts.length > 1 ? parseInt(weekParts[1]) : startWeek;
-        
-        // Adjust week numbers by adding the offset
-        const newStartWeek = startWeek + currentWeekOffset;
-        const newEndWeek = endWeek + currentWeekOffset;
-        const newWeeks = weekParts.length > 1 ? `${newStartWeek}-${newEndWeek}` : `${newStartWeek}`;
-        
-        // Create the merged block
+        // Keep original week numbers as designed by AI - don't recalculate
         const mergedBlock = {
           ...block,
-          weeks: newWeeks,
+          // Preserve original weeks field - AI designed these to be consecutive 
           block_name: programs.length > 1 ? `${block.block_name} (Part ${programs.indexOf(program) + 1})` : block.block_name
         };
         
         mergedBlocks.push(mergedBlock);
-        
-        // Update week offset for next program
-        currentWeekOffset += (endWeek - startWeek + 1);
       }
     }
 
@@ -1403,6 +1393,7 @@ export default function ImportRoutineScreen() {
     return lines.join('\n');
   };
 
+
   const handleCancel = () => {
     navigation.goBack();
   };
@@ -1625,6 +1616,8 @@ If ANY check fails:
 
 Then say: "Say **next** to generate the next block. After each block, say **review** to verify it before moving on."
 
+If this is the last block of a mesocycle (not the last mesocycle of the program), also say: "Mesocycle [X] complete. Paste your Planning Prompt in this conversation to plan Mesocycle [X+1]."
+
 ---
 
 **Remember this review process.** After each future block in this conversation, when the user says "review", run this same checklist. No need to paste these instructions again.`;
@@ -1780,9 +1773,7 @@ Then say: "Say **next** to generate the next block. After each block, say **revi
           <View style={styles.mesocycleContextWrapper}>
             <View style={styles.mesocycleContextCard}>
               <View style={styles.mesocycleHeader}>
-                <Text style={styles.mesocycleTitle}>
-                  Mesocycle {mesocycleContext.currentMesocycle} of {mesocycleContext.totalMesocycles}
-                </Text>
+                {/* Removed mesocycle indicator as requested */}
                 {currentProgram?.mesocycleRoadmap[mesocycleContext.currentMesocycle - 1] && (
                   <Text style={styles.mesocyclePhaseName}>
                     {currentProgram.mesocycleRoadmap[mesocycleContext.currentMesocycle - 1].phaseName}
@@ -1790,81 +1781,17 @@ Then say: "Say **next** to generate the next block. After each block, say **revi
                 )}
               </View>
               
-              {currentProgram && (
-                <View style={styles.mesocycleProgress}>
-                  <Text style={styles.progressLabel}>
-                    Blocks imported: {currentProgram.routineIds.length} / {mesocycleContext.mesocycleBlocks * mesocycleContext.currentMesocycle}
-                  </Text>
-                </View>
-              )}
             </View>
 
-            {/* Plan Input Section */}
-            {!showPlanInput ? (
-              <TouchableOpacity 
-                style={[styles.planInputButton, { borderColor: themeColor }]}
-                onPress={() => setShowPlanInput(true)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="document-text-outline" size={18} color={themeColor} />
-                <Text style={[styles.planInputButtonText, { color: themeColor }]}>
-                  Paste Your Plan
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.planInputSection}>
-                <Text style={styles.planInputLabel}>Paste your AI-generated plan text:</Text>
-                <View style={styles.planInputContainer}>
-                  <TouchableOpacity 
-                    style={[styles.planTextArea, { borderColor: themeColor }]}
-                    onPress={async () => {
-                      const clipboardText = await Clipboard.getStringAsync();
-                      setPlanText(clipboardText);
-                      setPlanInputCopied(true);
-                      setTimeout(() => setPlanInputCopied(false), 2000);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.planTextAreaPlaceholder}>
-                      {planText || 'Tap to paste from clipboard'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.planInputActions}>
-                  <TouchableOpacity 
-                    style={styles.planCancelButton}
-                    onPress={() => {
-                      setShowPlanInput(false);
-                      setPlanText('');
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.planCancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={[styles.planSubmitButton, { backgroundColor: themeColor }]}
-                    onPress={handlePlanTextSubmit}
-                    disabled={!planText.trim()}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.planSubmitButtonText}>
-                      {roadmapSaved ? 'Roadmap Saved ✓' : 'Save Roadmap'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
           </View>
         )}
 
-        {/* Move help link to bottom of screen */}
+        {/* Help link */}
         <View style={styles.helpLinkWrapper}>
           <TouchableOpacity 
             style={styles.helpLink}
             onPress={() => setShowInstructions(true)}
-            activeOpacity={0.8}
+            activeOpacity={1}
           >
             <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom program with AI?</Text>
           </TouchableOpacity>
@@ -2040,6 +1967,7 @@ Then say: "Say **next** to generate the next block. After each block, say **revi
                         <Text style={[styles.secondaryActionButtonText, { color: themeColor }]}>Add More Files</Text>
                       </TouchableOpacity>
                     )}
+
                   </View>
                 </>
               )}
@@ -2197,11 +2125,16 @@ const styles = StyleSheet.create({
     bottom: 40,
     left: 0,
     right: 0,
+    backgroundColor: 'transparent',
   },
   helpLink: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   helpLinkText: {
     fontSize: 16,
@@ -2626,79 +2559,5 @@ const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 14,
     color: '#a1a1aa',
-  },
-  planInputButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    borderWidth: 2,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'transparent',
-    gap: 8,
-  },
-  planInputButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  planInputSection: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 16,
-  },
-  planInputLabel: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    marginBottom: 8,
-  },
-  planInputContainer: {
-    marginBottom: 12,
-  },
-  planTextArea: {
-    borderWidth: 2,
-    borderRadius: 8,
-    padding: 12,
-    minHeight: 80,
-    backgroundColor: '#27272a',
-  },
-  planTextAreaPlaceholder: {
-    fontSize: 14,
-    color: '#71717a',
-    lineHeight: 20,
-  },
-  planInputActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  planCancelButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'transparent',
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#27272a',
-    alignItems: 'center',
-  },
-  planCancelButtonText: {
-    fontSize: 14,
-    color: '#71717a',
-    fontWeight: '600',
-  },
-  planSubmitButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  planSubmitButtonText: {
-    fontSize: 14,
-    color: '#0a0a0b',
-    fontWeight: '600',
   },
 });

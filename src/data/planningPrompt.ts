@@ -22,6 +22,8 @@ I'm using a fitness app called JSON.fit that supports multiple exercise types (s
 
 Review my profile and design a training plan. Show your reasoning — work through split selection, volume distribution, exercise choices, and trade-offs. Make definitive choices and explain your reasoning. The user will request changes if they disagree — do not ask questions or present alternatives to choose from.
 
+If this conversation contains a completed mesocycle summary and roadmap from a previous phase, use them as context: follow the roadmap's prescribed progression, rotate exercises from the previous phase, and build on the established volume baseline.
+
 Do NOT generate the full program. Only plan.
 
 Before presenting the summary, complete these verification steps:

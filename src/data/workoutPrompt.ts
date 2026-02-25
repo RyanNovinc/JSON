@@ -323,6 +323,19 @@ Each block should be a complete, standalone JSON file with routine_name, descrip
 
 **Long programs (5+ blocks):** After every 3rd block, suggest the user start a fresh chat to maintain output quality. Say: "For best results on long programs, I recommend starting a fresh chat for the next batch of blocks. Paste your plan + this generation prompt and say 'Generate Block [next letter].' The plan contains everything needed — no prior conversation context is required."
 
+**Mesocycle-based programs:** If the plan states this is Mesocycle [X] of [N], after generating and delivering the FINAL block of this mesocycle:
+
+If X < N:
+1. Output a Mesocycle [X] Summary:
+   - Phase name and training emphasis
+   - Split structure used
+   - Rep range focus
+   - Volume per muscle group (sets/week from your volume summaries)
+   - Key exercises used across all blocks
+2. Then say: "Mesocycle [X] complete. Paste your Planning Prompt to plan Mesocycle [X+1] — I'll use the summary above and the roadmap from your plan to design the next phase."
+
+If X equals N, say: "That completes your full program — all [N] mesocycles are done. Enjoy your training!"
+
 The plan is fully self-contained: it lists all exercise pools, block structures, and periodization details. You do not need conversation history from prior blocks to generate any block correctly. Always reference the plan — never rely on memory of prior blocks in the conversation.
 
 ---

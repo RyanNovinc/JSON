@@ -17,6 +17,7 @@ import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
 import SampleWorkoutsScreen from '../screens/SampleWorkoutsScreen';
 import SampleMealPlansScreen from '../screens/SampleMealPlansScreen';
 import BlocksScreen from '../screens/BlocksScreen';
+import MesocycleBlocksScreen from '../screens/MesocycleBlocksScreen';
 import MealPlanWeeksScreen from '../screens/MealPlanWeeksScreen';
 import MealPlanDaysScreen from '../screens/MealPlanDaysScreen';
 import MealPlanDayScreen from '../screens/MealPlanDayScreen';
@@ -77,7 +78,30 @@ export type RootStackParamList = {
       days: number;
       blocks: number;
       data: any;
+      programId?: string;
     };
+    initialBlock?: number;
+    initialWeek?: number;
+  };
+  MesocycleBlocks: {
+    mesocycle: {
+      mesocycleNumber: number;
+      phase?: any;
+      blocksInMesocycle: any[];
+      completedBlocks: number;
+      totalBlocks: number;
+      isCompleted: boolean;
+      isActive: boolean;
+    };
+    routine: {
+      id: string;
+      name: string;
+      days: number;
+      blocks: number;
+      data: any;
+      programId?: string;
+    };
+    program: any;
   };
   MealPlanWeeks: {
     mealPlan: {
@@ -303,6 +327,13 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen 
                 name="Blocks" 
                 component={BlocksScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
+                name="MesocycleBlocks" 
+                component={MesocycleBlocksScreen}
                 options={{
                   headerShown: false,
                 }}
