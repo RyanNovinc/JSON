@@ -19,6 +19,7 @@ import CountryPicker from 'react-native-country-picker-modal';
 import { useNavigation } from '@react-navigation/native';
 import { WorkoutStorage } from '../utils/storage';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface BudgetCookingQuestionnaireProps {
   onComplete?: (data: any) => void;
@@ -31,6 +32,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
 }) => {
   const navigation = useNavigation();
   const { getFavoriteMeals } = useMealPlanning();
+  const { themeColor, themeColorLight } = useTheme();
   const [currentStep, setCurrentStep] = useState(0);
   
   const handleComplete = async () => {
@@ -156,12 +158,12 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   }, []);
 
   const colors = {
-    primary: '#00D4FF',
-    primaryDark: '#0099CC',
-    primaryLight: '#66E5FF',
-    primaryAlpha10: '#00D4FF20',
-    primaryAlpha20: '#00D4FF40',
-    primaryAlpha30: '#00D4FF60',
+    primary: themeColor,
+    primaryDark: themeColor,
+    primaryLight: themeColorLight,
+    primaryAlpha10: themeColor + '20',
+    primaryAlpha20: themeColor + '40',
+    primaryAlpha30: themeColor + '60',
   };
 
   const totalSteps = 7;
@@ -1352,7 +1354,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
             easing="ease-out"
           >
             <Animatable.View 
-              style={[styles.tronBorder, { borderColor: colors.primary }]}
+              style={[styles.tronBorder, { borderColor: colors.primary, shadowColor: colors.primary }]}
               animation="pulse"
               iterationCount={1}
               delay={100}
@@ -1385,7 +1387,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               animation="slideInRight" 
               delay={500}
               duration={300}
-              style={[styles.tronDataBlock, { borderColor: colors.primary }]}
+              style={[styles.tronDataBlock, { borderColor: colors.primary, shadowColor: colors.primary }]}
             >
               <Animatable.Text 
                 style={[styles.tronBlockTitle, { color: colors.primary }]}
@@ -1440,7 +1442,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               animation="slideInLeft" 
               delay={900}
               duration={300}
-              style={[styles.tronDataBlock, { borderColor: colors.primary }]}
+              style={[styles.tronDataBlock, { borderColor: colors.primary, shadowColor: colors.primary }]}
             >
               <Animatable.Text 
                 style={[styles.tronBlockTitle, { color: colors.primary }]}
@@ -1470,7 +1472,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               animation="slideInRight" 
               delay={1400}
               duration={300}
-              style={[styles.tronDataBlock, { borderColor: colors.primary }]}
+              style={[styles.tronDataBlock, { borderColor: colors.primary, shadowColor: colors.primary }]}
             >
               <Animatable.Text 
                 style={[styles.tronBlockTitle, { color: colors.primary }]}
@@ -1548,7 +1550,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               animation="slideInUp" 
               delay={1850}
               duration={300}
-              style={[styles.tronDataBlock, { borderColor: colors.primary }]}
+              style={[styles.tronDataBlock, { borderColor: colors.primary, shadowColor: colors.primary }]}
             >
               <Animatable.Text 
                 style={[styles.tronBlockTitle, { color: colors.primary }]}
@@ -1604,7 +1606,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               animation="slideInUp" 
               delay={2050}
               duration={300}
-              style={[styles.tronDataBlock, { borderColor: colors.primary }]}
+              style={[styles.tronDataBlock, { borderColor: colors.primary, shadowColor: colors.primary }]}
             >
               <Animatable.Text 
                 style={[styles.tronBlockTitle, { color: colors.primary }]}
@@ -1728,7 +1730,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   styles.modernDurationCard,
                   formData.planDuration === 7 && [
                     styles.selectedModernCard,
-                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10 }
+                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10, shadowColor: colors.primary }
                   ]
                 ]}
                 onPress={() => setFormData({ ...formData, planDuration: 7 })}
@@ -1772,7 +1774,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   styles.modernDurationCard,
                   formData.planDuration === 14 && [
                     styles.selectedModernCard,
-                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10 }
+                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10, shadowColor: colors.primary }
                   ]
                 ]}
                 onPress={() => setFormData({ ...formData, planDuration: 14 })}
@@ -1858,7 +1860,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   styles.modernDurationCard,
                   formData.mealPreferences === 'ai_suggest' && [
                     styles.selectedModernCard,
-                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10 }
+                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10, shadowColor: colors.primary }
                   ]
                 ]}
                 onPress={() => setFormData({ 
@@ -1904,7 +1906,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   styles.modernDurationCard,
                   formData.mealPreferences === 'include_favorites' && [
                     styles.selectedModernCard,
-                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10 }
+                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10, shadowColor: colors.primary }
                   ]
                 ]}
                 onPress={() => setFormData({ 
@@ -2100,7 +2102,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                       styles.equipmentOption,
                       (formData.cookingEquipment || []).includes(equipment.id) && [
                         styles.selectedEquipmentOption,
-                        { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10 }
+                        { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10, shadowColor: colors.primary }
                       ]
                     ]}
                     onPress={() => toggleCookingEquipment(equipment.id)}

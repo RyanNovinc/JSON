@@ -148,6 +148,7 @@ export type RootStackParamList = {
     currentWeek?: number;
     block?: any;
     routineName?: string;
+    selectedExercise?: any;
   };
   WorkoutReview: {
     day: any;

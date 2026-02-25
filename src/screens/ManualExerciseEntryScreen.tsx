@@ -30,6 +30,7 @@ interface FavoriteExercise {
   secondaryMuscles?: string[]; // New field for secondary involvement
   instructions?: string;
   notes?: string;
+  alternatives?: string[]; // Alternative exercise names
   addedAt: string;
   // Activity metrics to match meal format
   estimatedCalories?: number;
@@ -103,6 +104,7 @@ export default function ManualExerciseEntryScreen() {
   const [customCategory, setCustomCategory] = useState(editExercise?.customCategory || '');
   const [instructionSteps, setInstructionSteps] = useState<string[]>(editExercise?.instructions ? editExercise.instructions.split('\n').filter(step => step.trim()) : ['']);
   const [notes, setNotes] = useState(editExercise?.notes || '');
+  const [alternativeExercises, setAlternativeExercises] = useState<string[]>(editExercise?.alternatives || []);
   const [isLoading, setIsLoading] = useState(false);
   const [muscleGroupAnimation] = useState(new Animated.Value(0));
   const [showMuscleGroups, setShowMuscleGroups] = useState(false);
@@ -225,6 +227,18 @@ export default function ManualExerciseEntryScreen() {
     setInstructionSteps(prev => prev.map((step, i) => i === index ? value : step));
   };
 
+  const addAlternativeExercise = () => {
+    setAlternativeExercises(prev => [...prev, '']);
+  };
+
+  const removeAlternativeExercise = (index: number) => {
+    setAlternativeExercises(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateAlternativeExercise = (index: number, value: string) => {
+    setAlternativeExercises(prev => prev.map((alt, i) => i === index ? value : alt));
+  };
+
   const estimateCalories = (category: string | null, muscleGroups: string[]) => {
     // Realistic calorie estimation for 30-minute exercise sessions
     let baseCalories = 200;
@@ -315,6 +329,7 @@ export default function ManualExerciseEntryScreen() {
         secondaryMuscles: (selectedCategory === 'gym' || selectedCategory === 'bodyweight') ? selectedSecondaryMuscles : undefined,
         instructions: instructionSteps.filter(step => step.trim()).join('\n') || undefined,
         notes: notes.trim() || undefined,
+        alternatives: alternativeExercises.filter(alt => alt.trim()).length > 0 ? alternativeExercises.filter(alt => alt.trim()) : undefined,
         addedAt: isEditing ? editExercise!.addedAt : new Date().toISOString(),
         estimatedCalories: estimateCalories(selectedCategory, allMuscleGroups),
         duration: isEditing ? editExercise!.duration : 30, // Preserve or default 30 minutes
@@ -336,14 +351,37 @@ export default function ManualExerciseEntryScreen() {
       
       await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
 
-      // Navigate back with success message
-      const successMessage = isEditing ? 'Exercise updated successfully!' : 'Exercise added to your favorites!';
-      Alert.alert('Success', successMessage, [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+      // Check if we came from WorkoutLog (for adding exercise to workout)
+      const cameFromWorkout = !!(route.params?.day && route.params?.blockName);
+      console.log('=== MANUAL EXERCISE SAVE ===');
+      console.log('Came from workout:', cameFromWorkout);
+      console.log('Is editing:', isEditing);
+      console.log('Route params:', route.params);
+      
+      if (cameFromWorkout && !isEditing) {
+        // Navigate back to WorkoutLog with the new exercise as selectedExercise
+        const successMessage = 'Exercise added to your favorites and workout!';
+        Alert.alert('Success', successMessage, [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.navigate('WorkoutLog' as any, {
+                ...route.params,
+                selectedExercise: exerciseData
+              });
+            },
+          },
+        ]);
+      } else {
+        // Normal navigation back with success message
+        const successMessage = isEditing ? 'Exercise updated successfully!' : 'Exercise added to your favorites!';
+        Alert.alert('Success', successMessage, [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]);
+      }
     } catch (error) {
       console.error('Failed to save exercise:', error);
       Alert.alert('Error', 'Failed to save exercise. Please try again.');
@@ -375,6 +413,56 @@ export default function ManualExerciseEntryScreen() {
             onChangeText={setExerciseName}
             maxLength={50}
           />
+        </View>
+
+        {/* Alternative Exercises */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Alternative Exercises</Text>
+          <Text style={styles.sectionSubtitle}>Backup exercises when your main choice isn't available (optional)</Text>
+          
+          {alternativeExercises.length === 0 ? (
+            <TouchableOpacity
+              onPress={addAlternativeExercise}
+              style={[styles.addAlternativeBtn, { borderColor: themeColor }]}
+            >
+              <Ionicons name="add" size={20} color={themeColor} />
+              <Text style={[styles.addAlternativeText, { color: themeColor }]}>Add alternative exercise</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              {alternativeExercises.map((alternative, index) => (
+                <View key={index} style={styles.alternativeRow}>
+                  <View style={styles.alternativeNumberContainer}>
+                    <Text style={styles.alternativeNumber}>{index + 1}.</Text>
+                  </View>
+                  <View style={styles.alternativeInputContainer}>
+                    <TextInput
+                      style={styles.alternativeInput}
+                      placeholder="e.g., Cable Pushdown (V-Bar)"
+                      placeholderTextColor="#71717a"
+                      value={alternative}
+                      onChangeText={(text) => updateAlternativeExercise(index, text)}
+                      maxLength={50}
+                    />
+                    <TouchableOpacity
+                      onPress={() => removeAlternativeExercise(index)}
+                      style={styles.removeAlternativeButton}
+                    >
+                      <Ionicons name="close" size={20} color="#71717a" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              
+              <TouchableOpacity
+                onPress={addAlternativeExercise}
+                style={[styles.addAlternativeBtn, { borderColor: themeColor }]}
+              >
+                <Ionicons name="add" size={20} color={themeColor} />
+                <Text style={[styles.addAlternativeText, { color: themeColor }]}>Add another alternative</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Category Selection */}
@@ -1065,5 +1153,55 @@ const styles = StyleSheet.create({
   muscleSectionBadgeText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  alternativeRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  alternativeNumberContainer: {
+    width: 30,
+    alignItems: 'flex-start',
+  },
+  alternativeNumber: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  alternativeInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  alternativeInput: {
+    flex: 1,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#ffffff',
+    minHeight: 44,
+  },
+  removeAlternativeButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  addAlternativeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    gap: 8,
+  },
+  addAlternativeText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

@@ -13,7 +13,7 @@ import {
   Modal,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -128,7 +128,14 @@ interface ExerciseCardProps {
   onSetUpdate: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => void;
   onSetComplete: (exerciseIndex: number, setIndex: number) => void;
   onDropSetComplete: (exerciseIndex: number, setIndex: number, dropIndex: number) => void;
+  onDeleteSet: (exerciseIndex: number, setIndex: number) => void;
+  onAddSet: (exerciseIndex: number) => void;
+  onDeleteExercise: (exerciseIndex: number) => void;
+  onExerciseSettings: (exerciseIndex: number) => void;
   onHistoryPress: (exerciseName: string) => void;
+  getExerciseUnit: (exerciseIndex: number) => 'kg' | 'lbs';
+  setExerciseUnit: (exerciseIndex: number, unit: 'kg' | 'lbs') => void;
+  isInSettings?: boolean;
   onExerciseSelect: (exerciseIndex: number, selectedExerciseIndex: number) => void;
   onNotesPress: (exerciseIndex: number, exerciseName: string) => void;
   onSetExercisePreference: (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => void;
@@ -152,7 +159,14 @@ function ExerciseCard({
   onSetUpdate, 
   onSetComplete,
   onDropSetComplete,
+  onDeleteSet,
+  onAddSet,
+  onDeleteExercise,
+  onExerciseSettings,
   onHistoryPress,
+  getExerciseUnit,
+  setExerciseUnit,
+  isInSettings,
   onExerciseSelect,
   onNotesPress,
   onSetExercisePreference,
@@ -160,10 +174,7 @@ function ExerciseCard({
   onInteractionAttempt,
   isLinkedToNext,
   isLinkedToPrev,
-  themeColor,
-  getExerciseUnit,
-  setExerciseUnit,
-  setGlobalUnit
+  themeColor
 }: ExerciseCardProps) {
   
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
@@ -407,6 +418,72 @@ function ExerciseCard({
     );
   };
 
+  // Settings view
+  if (isInSettings) {
+    return (
+      <View style={styles.exerciseCard}>
+        <View style={styles.exerciseSettingsView}>
+          <View style={styles.exerciseSettingsHeader}>
+            <Text style={styles.exerciseSettingsTitle}>Exercise Settings</Text>
+            <TouchableOpacity 
+              style={styles.exerciseSettingsClose}
+              onPress={() => onExerciseSettings(exerciseIndex)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={20} color="#71717a" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.exerciseSettingsContent}>
+            <Text style={styles.exerciseSettingsExerciseName}>
+              {currentExerciseName}
+            </Text>
+            
+            {/* Unit Toggle */}
+            <TouchableOpacity
+              style={styles.exerciseSettingsOption}
+              onPress={() => {
+                setExerciseUnit(exerciseIndex, currentUnit === 'kg' ? 'lbs' : 'kg');
+              }}
+            >
+              <Ionicons name="scale-outline" size={20} color={themeColor} />
+              <Text style={styles.exerciseSettingsOptionText}>
+                Switch to {currentUnit === 'kg' ? 'lbs' : 'kg'}
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Delete Exercise */}
+            <TouchableOpacity
+              style={styles.exerciseSettingsOption}
+              onPress={() => {
+                onExerciseSettings(exerciseIndex); // Close settings first
+                Alert.alert(
+                  'Delete Exercise',
+                  `Are you sure you want to delete "${currentExerciseName}" from this workout?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Delete', 
+                      style: 'destructive',
+                      onPress: () => {
+                        onDeleteExercise(exerciseIndex);
+                      }
+                    }
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              <Text style={[styles.exerciseSettingsOptionText, { color: '#ef4444' }]}>
+                Delete Exercise
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={getBaseBorderStyle()}>
       {renderTaperingBorder()}
@@ -419,7 +496,7 @@ function ExerciseCard({
             activeOpacity={allExercises.length > 1 ? 0.7 : 1}
           >
             <Text style={styles.exerciseName} numberOfLines={2}>
-              {currentExerciseName}{allExercises.length > 1 && ' *'}
+              {currentExerciseName}
             </Text>
           </TouchableOpacity>
         </View>
@@ -427,12 +504,11 @@ function ExerciseCard({
         {/* Right side - Action buttons */}
         <View style={styles.headerButtons}>
           <TouchableOpacity 
-            style={styles.unitToggleButton}
-            onPress={() => setExerciseUnit(exerciseIndex, currentUnit === 'kg' ? 'lbs' : 'kg')}
-            onLongPress={() => setGlobalUnit(currentUnit === 'kg' ? 'lbs' : 'kg')}
+            style={styles.actionButton}
+            onPress={() => onExerciseSettings(exerciseIndex)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.unitToggleText, { color: themeColor }]}>{currentUnit}</Text>
+            <Ionicons name="settings-outline" size={18} color={themeColor} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
@@ -510,11 +586,14 @@ function ExerciseCard({
       <View style={styles.setsContainer}>
         {setsData.map((setData, setIndex) => (
           <View key={setIndex}>
-            <View 
+            <TouchableOpacity
               style={[
                 styles.setRow,
                 setData.completed && styles.setRowCompleted
               ]}
+              onLongPress={() => onDeleteSet(exerciseIndex, setIndex)}
+              delayLongPress={500}
+              activeOpacity={0.95}
             >
               <Text style={styles.setNumber}>{setIndex + 1}</Text>
               
@@ -613,7 +692,7 @@ function ExerciseCard({
                   DROP
                 </Text>
               </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
             
             {/* Drop sets */}
             {setData.isDropSet && setData.drops && (
@@ -693,6 +772,14 @@ function ExerciseCard({
             )}
           </View>
         ))}
+        
+        {/* Add Set Button */}
+        <TouchableOpacity 
+          style={styles.addSetButton}
+          onPress={() => onAddSet(exerciseIndex)}
+        >
+          <Ionicons name="add-circle-outline" size={24} color={themeColor} />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -794,6 +881,28 @@ export default function WorkoutLogScreen() {
   const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
   const { setActiveWorkout } = useActiveWorkout();
   
+  // Debug logging
+  console.log('=== WORKOUT LOG SCREEN RENDER ===');
+  console.log('Route params:', route.params);
+  console.log('Day available:', !!day);
+  console.log('BlockName available:', !!blockName);
+  if (day) {
+    console.log('Day name:', day.day_name);
+    console.log('Day exercises count:', day.exercises?.length);
+  }
+  
+  // Early return if required data is not available
+  if (!day || !blockName) {
+    console.log('Missing required data - showing loading screen');
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Loading workout data...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
   // Calculate currentWeek - use passed week or get from storage
   const [currentWeek, setCurrentWeek] = useState<number>(passedWeek || 1);
   
@@ -832,6 +941,72 @@ export default function WorkoutLogScreen() {
   const [preferenceModalScale] = useState(new Animated.Value(0));
   const [preferenceModalOpacity] = useState(new Animated.Value(0));
   
+  // Exercise settings state - track which exercise is in settings mode
+  const [exerciseInSettings, setExerciseInSettings] = useState<number | null>(null);
+  
+  // Add exercise modal
+  const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
+  
+  // Dynamic exercises state to handle runtime additions
+  const [dynamicExercises, setDynamicExercises] = useState<Exercise[]>(day?.exercises || []);
+  
+  // Tab state for notes view - moved outside conditional to follow rules of hooks
+  const [activeTab, setActiveTab] = useState<'reps' | 'notes'>('reps');
+  const [currentNote, setCurrentNote] = useState('');
+  const [personalNotes, setPersonalNotes] = useState<string[]>([]);
+
+  // Initialize personal notes from existing notes when showNotes changes
+  useEffect(() => {
+    if (showNotes) {
+      const exerciseIndex = showNotes.exerciseIndex;
+      const existingNotes = exerciseNotes[exerciseIndex] || '';
+      const notesArray = existingNotes ? existingNotes.split('\n').filter(note => note.trim()) : [];
+      setPersonalNotes(notesArray);
+      setCurrentNote('');
+      setActiveTab('reps'); // Reset to reps tab
+    }
+  }, [showNotes]); // Removed exerciseNotes dependency to prevent infinite loop
+
+  // Sync personalNotes back to exerciseNotes format (with debouncing to prevent loops)
+  useEffect(() => {
+    if (showNotes && personalNotes.length >= 0) { // Only sync when we actually have notes data
+      const notesString = personalNotes.join('\n');
+      const currentNotes = exerciseNotes[showNotes.exerciseIndex] || '';
+      
+      // Only update if the notes actually changed to prevent infinite loops
+      if (notesString !== currentNotes) {
+        handleNotesUpdate(showNotes.exerciseIndex, notesString);
+      }
+    }
+  }, [personalNotes]); // Removed showNotes dependency and added comparison check
+  
+  // Update dynamicExercises when day.exercises becomes available and load any saved changes
+  useEffect(() => {
+    const loadDynamicExercises = async () => {
+      if (day?.exercises && blockName) {
+        // Try to load saved dynamic exercises first
+        const savedKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_exercises`;
+        try {
+          const savedData = await AsyncStorage.getItem(savedKey);
+          if (savedData) {
+            const savedExercises = JSON.parse(savedData);
+            console.log('Loaded saved dynamic exercises:', savedExercises.length, 'exercises');
+            setDynamicExercises(savedExercises);
+          } else {
+            // No saved data, use original exercises
+            console.log('No saved exercises, using original:', day.exercises.length, 'exercises');
+            setDynamicExercises(day.exercises);
+          }
+        } catch (error) {
+          console.error('Failed to load saved exercises:', error);
+          setDynamicExercises(day.exercises);
+        }
+      }
+    };
+    
+    loadDynamicExercises();
+  }, [day?.exercises, blockName, currentWeek]);
+  
   // Workout session timer
   const [workoutStartTime, setWorkoutStartTime] = useState<Date | null>(null);
   const [workoutDuration, setWorkoutDuration] = useState(0); // in seconds
@@ -863,7 +1038,7 @@ export default function WorkoutLogScreen() {
       const supersetGroups: { [group: string]: number[] } = {};
       
       // Group exercises by their superset_group
-      day.exercises.forEach((exercise, index) => {
+      dynamicExercises.forEach((exercise, index) => {
         if (exercise.superset_group) {
           if (!supersetGroups[exercise.superset_group]) {
             supersetGroups[exercise.superset_group] = [];
@@ -888,7 +1063,7 @@ export default function WorkoutLogScreen() {
     };
     
     detectSupersets();
-  }, [day.exercises]);
+  }, [dynamicExercises]);
   
   // Rest timer state - now tracks both countdown and stopwatch separately
   const [activeTimer, setActiveTimer] = useState<{
@@ -905,24 +1080,52 @@ export default function WorkoutLogScreen() {
   } | null>(null);
   
   useEffect(() => {
-    const initialData = day.exercises.map(exercise => {
-      // Use weekly sets if available, otherwise fall back to regular sets
-      const currentSets = exercise.sets_weekly?.[currentWeek.toString()] || exercise.sets;
-      return Array.from({ length: currentSets }, (_, index) => ({
-        exercise: exercise.exercise, // This will be the primary exercise name
-        setNumber: index + 1,
-        weight: '',
-        reps: '',
-        completed: false,
-        selectedExerciseIndex: 0, // Start with primary exercise
-        exerciseData: {}, // Initialize storage for each exercise variant
-      }));
-    });
-    setAllSetsData(initialData);
+    const loadSetsData = async () => {
+      if (dynamicExercises.length === 0) return;
+      
+      // Try to load saved sets data first
+      const savedKey = `workout_${blockName}_${day?.day_name}_week${currentWeek}_sets`;
+      try {
+        const savedData = await AsyncStorage.getItem(savedKey);
+        if (savedData) {
+          const savedSetsData = JSON.parse(savedData);
+          console.log('Loaded saved sets data:', savedSetsData.length, 'exercises');
+          
+          // Validate that saved data matches current exercise count
+          if (savedSetsData.length === dynamicExercises.length) {
+            setAllSetsData(savedSetsData);
+            return;
+          } else {
+            console.log('Saved sets data length mismatch, reinitializing');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load saved sets data:', error);
+      }
+      
+      // No saved data or mismatch, create initial data
+      const initialData = dynamicExercises.map(exercise => {
+        // Use weekly sets if available, otherwise fall back to regular sets
+        const currentSets = exercise.sets_weekly?.[currentWeek.toString()] || exercise.sets;
+        return Array.from({ length: currentSets }, (_, index) => ({
+          exercise: exercise.exercise, // This will be the primary exercise name
+          setNumber: index + 1,
+          weight: '',
+          reps: '',
+          completed: false,
+          selectedExerciseIndex: 0, // Start with primary exercise
+          exerciseData: {}, // Initialize storage for each exercise variant
+        }));
+      });
+      console.log('Created initial sets data:', initialData.length, 'exercises');
+      setAllSetsData(initialData);
+    };
+    
+    loadSetsData();
     
     // Initialize notes from JSON if they exist
     const initialNotes: ExerciseNotes = {};
-    day.exercises.forEach((exercise, index) => {
+    dynamicExercises.forEach((exercise, index) => {
       if (exercise.notes) {
         initialNotes[index] = exercise.notes;
       }
@@ -930,13 +1133,20 @@ export default function WorkoutLogScreen() {
     if (Object.keys(initialNotes).length > 0) {
       setExerciseNotes(initialNotes);
     }
-  }, [day, currentWeek]);
+  }, [dynamicExercises, currentWeek]);
+
+  // Save sets data whenever it changes
+  useEffect(() => {
+    if (allSetsData.length > 0) {
+      saveSetsData(allSetsData);
+    }
+  }, [allSetsData]);
 
   // Update exercise selections based on preferences
   useEffect(() => {
     if (Object.keys(exercisePreferences).length > 0 && allSetsData.length > 0) {
       const updatedData = allSetsData.map((exerciseSets, exerciseIndex) => {
-        const exercise = day.exercises[exerciseIndex];
+        const exercise = dynamicExercises[exerciseIndex];
         const preferredExercise = exercisePreferences[exercise.exercise];
         
         if (preferredExercise && exercise.alternatives) {
@@ -959,7 +1169,7 @@ export default function WorkoutLogScreen() {
       
       setAllSetsData(updatedData);
     }
-  }, [exercisePreferences, day.exercises]);
+  }, [exercisePreferences, dynamicExercises]);
   
   // Workout duration timer - updates based on start time instead of setInterval
   useEffect(() => {
@@ -1057,6 +1267,89 @@ export default function WorkoutLogScreen() {
     return () => clearInterval(interval);
   }, [activeTimer?.isRunning, activeTimer?.timeLeft, activeTimer?.countdownRunning, timerSettings.countUp]);
   
+  // Handle selected exercise from FavoriteExercisesScreen
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('=== WORKOUT LOG FOCUS EFFECT ===');
+      console.log('Route params in focus effect:', route.params);
+      console.log('Selected exercise present:', !!route.params?.selectedExercise);
+      
+      // Check if returning with a selected exercise
+      if (route.params?.selectedExercise) {
+        console.log('Adding selected exercise to workout:', route.params.selectedExercise.name);
+        handleAddSelectedExercise(route.params.selectedExercise);
+        
+        // Clear the parameter to prevent re-adding
+        navigation.setParams({ selectedExercise: undefined });
+      }
+    }, [route.params?.selectedExercise])
+  );
+  
+  // Function to save dynamic exercises to storage
+  const saveDynamicExercises = async (exercises: Exercise[]) => {
+    if (!blockName || !day?.day_name) return;
+    
+    const savedKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_exercises`;
+    try {
+      await AsyncStorage.setItem(savedKey, JSON.stringify(exercises));
+      console.log('Saved dynamic exercises:', exercises.length, 'exercises to key:', savedKey);
+    } catch (error) {
+      console.error('Failed to save dynamic exercises:', error);
+    }
+  };
+
+  // Function to save sets data to storage
+  const saveSetsData = async (setsData: SetData[][]) => {
+    if (!blockName || !day?.day_name) return;
+    
+    const savedKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_sets`;
+    try {
+      await AsyncStorage.setItem(savedKey, JSON.stringify(setsData));
+      console.log('Saved sets data:', setsData.length, 'exercises to key:', savedKey);
+    } catch (error) {
+      console.error('Failed to save sets data:', error);
+    }
+  };
+
+  // Function to add selected exercise from favorites to the current workout
+  const handleAddSelectedExercise = (favoriteExercise: any) => {
+    // Convert favorite exercise to Exercise interface format
+    const newExercise: Exercise = {
+      exercise: favoriteExercise.name,
+      sets: 3, // Default sets
+      reps: "8-12", // Default reps
+      rest: 120, // Default rest
+      restQuick: 60, // Default quick rest
+      alternatives: favoriteExercise.alternatives || [],
+      notes: favoriteExercise.notes || '',
+    };
+    
+    // Add to dynamic exercises
+    const updatedExercises = [...dynamicExercises, newExercise];
+    setDynamicExercises(updatedExercises);
+    saveDynamicExercises(updatedExercises);
+    
+    // Initialize sets data for the new exercise
+    const newExerciseIndex = dynamicExercises.length;
+    const newSetsData = Array.from({ length: newExercise.sets }, (_, index) => ({
+      exercise: newExercise.exercise,
+      setNumber: index + 1,
+      weight: '',
+      reps: '',
+      completed: false,
+      selectedExerciseIndex: 0, // Start with primary exercise
+      exerciseData: {}, // Initialize storage for each exercise variant
+    }));
+    
+    // Add the new sets data to allSetsData
+    setAllSetsData(prev => [...prev, newSetsData]);
+    
+    // Close the add exercise modal if it's open
+    setShowAddExerciseModal(false);
+    
+    console.log('Exercise added successfully:', newExercise.exercise);
+  };
+  
   const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
     // Validate input - only allow numbers and decimal point for weight
     let sanitizedValue = value;
@@ -1078,12 +1371,91 @@ export default function WorkoutLogScreen() {
     setAllSetsData(newData);
   };
 
+  const handleDeleteSet = (exerciseIndex: number, setIndex: number) => {
+    Alert.alert(
+      'Delete Set',
+      'Are you sure you want to delete this set?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: () => {
+            const newData = [...allSetsData];
+            newData[exerciseIndex].splice(setIndex, 1);
+            setAllSetsData(newData);
+          }
+        }
+      ]
+    );
+  };
+
+  const handleAddSet = (exerciseIndex: number) => {
+    const newData = [...allSetsData];
+    const exerciseSets = newData[exerciseIndex];
+    
+    // Create new set based on the last set or default values
+    const lastSet = exerciseSets[exerciseSets.length - 1];
+    const newSet = {
+      weight: lastSet?.weight || '',
+      reps: lastSet?.reps || '',
+      completed: false,
+      unit: lastSet?.unit || getExerciseUnit(exerciseIndex),
+      isDropSet: false
+    };
+    
+    newData[exerciseIndex].push(newSet);
+    setAllSetsData(newData);
+  };
+
+  const handleDeleteExercise = (exerciseIndex: number) => {
+    console.log('=== DELETE EXERCISE ===');
+    console.log('Exercise index to delete:', exerciseIndex);
+    console.log('Current dynamicExercises count:', dynamicExercises.length);
+    console.log('Current allSetsData count:', allSetsData.length);
+    console.log('Exercise to delete:', dynamicExercises[exerciseIndex]?.exercise);
+    
+    // Remove the exercise from dynamicExercises
+    const newExercises = [...dynamicExercises];
+    newExercises.splice(exerciseIndex, 1);
+    console.log('New exercises count after splice:', newExercises.length);
+    setDynamicExercises(newExercises);
+    saveDynamicExercises(newExercises);
+    
+    // Remove the corresponding sets data
+    const newSetsData = [...allSetsData];
+    newSetsData.splice(exerciseIndex, 1);
+    console.log('New sets data count after splice:', newSetsData.length);
+    setAllSetsData(newSetsData);
+    
+    // Remove any notes for this exercise and update indices for remaining exercises
+    const newNotes: { [exerciseIndex: number]: string } = {};
+    Object.entries(exerciseNotes).forEach(([index, note]) => {
+      const idx = parseInt(index);
+      if (idx < exerciseIndex) {
+        // Keep notes for exercises before the deleted one
+        newNotes[idx] = note;
+      } else if (idx > exerciseIndex) {
+        // Shift notes for exercises after the deleted one
+        newNotes[idx - 1] = note;
+      }
+      // Skip notes for the deleted exercise (idx === exerciseIndex)
+    });
+    setExerciseNotes(newNotes);
+    
+    console.log('Exercise deletion complete');
+  };
+
+  const handleExerciseSettings = (exerciseIndex: number) => {
+    setExerciseInSettings(exerciseInSettings === exerciseIndex ? null : exerciseIndex);
+  };
+
   const saveSetToHistory = async (exerciseIndex: number, setIndex: number, setData: SetData) => {
     const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
     console.log('Saving set to history with date:', currentDate);
     
     // Get the current exercise name based on selected exercise index
-    const exercise = day.exercises[exerciseIndex];
+    const exercise = dynamicExercises[exerciseIndex];
     const alternativeNames = (exercise.alternatives || []).map(alt => 
       typeof alt === 'string' ? alt : alt.exercise
     );
@@ -1100,7 +1472,7 @@ export default function WorkoutLogScreen() {
     const existingEntryIndex = history.findIndex(entry => 
       entry.exerciseName === currentExerciseName && 
       entry.date === currentDate &&
-      entry.dayName === day.day_name
+      entry.dayName === day?.day_name
     );
     
     const currentUnit = getExerciseUnit(exerciseIndex);
@@ -1138,7 +1510,7 @@ export default function WorkoutLogScreen() {
       const historyEntry: WorkoutHistory = {
         id: `${currentDate}-${currentExerciseName}-${Date.now()}`,
         routineName: `${blockName}`,
-        dayName: day.day_name,
+        dayName: day?.day_name || '',
         exerciseName: currentExerciseName,
         date: currentDate,
         sets: [newSet],
@@ -1194,7 +1566,7 @@ export default function WorkoutLogScreen() {
     const isLinkedToNext = supersetLinks.has(exerciseIndex);
     const isLinkedToPrev = supersetLinks.has(exerciseIndex - 1);
     
-    if (!wasCompleted && setIndex < day.exercises[exerciseIndex].sets - 1) {
+    if (!wasCompleted && setIndex < dynamicExercises[exerciseIndex].sets - 1) {
       if (isLinkedToNext) {
         // First exercise in superset - 3 second transition timer
         const initialTimeLeft = timerSettings.countUp ? 3600 : 3;
@@ -1211,7 +1583,7 @@ export default function WorkoutLogScreen() {
         });
       } else if (!isLinkedToNext || isLinkedToPrev) {
         // Regular exercise or last exercise in superset - normal rest
-        const exercise = day.exercises[exerciseIndex];
+        const exercise = dynamicExercises[exerciseIndex];
         const optimalRest = exercise.rest || 120;
         const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
         
@@ -1246,7 +1618,7 @@ export default function WorkoutLogScreen() {
     // Don't allow mode switching in count-up (stopwatch) mode
     if (timerSettings.countUp) return;
     
-    const exercise = day.exercises[activeTimer.exerciseIndex];
+    const exercise = dynamicExercises[activeTimer.exerciseIndex];
     const optimalRest = exercise.rest || 120;
     const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
     
@@ -1334,7 +1706,7 @@ export default function WorkoutLogScreen() {
     const prefs: { [exerciseName: string]: string } = {};
     
     // Load preferences for each exercise in the day
-    for (const exercise of day.exercises) {
+    for (const exercise of dynamicExercises) {
       const preferredExercise = await WorkoutStorage.getExercisePreference(
         routineName, 
         blockName, 
@@ -1415,7 +1787,7 @@ export default function WorkoutLogScreen() {
     
     // Only update if selection actually changed
     if (currentSelection !== selectedExerciseIndex) {
-      const exercise = day.exercises[exerciseIndex];
+      const exercise = dynamicExercises[exerciseIndex];
       const alternativeNames = (exercise.alternatives || []).map(alt => 
         typeof alt === 'string' ? alt : alt.exercise
       );
@@ -1563,7 +1935,7 @@ export default function WorkoutLogScreen() {
       completedSets,
       totalSets,
       exercisesCompleted,
-      totalExercises: day.exercises.length
+      totalExercises: dynamicExercises.length
     };
   };
   
@@ -1578,7 +1950,7 @@ export default function WorkoutLogScreen() {
     try {
       console.log('Starting confirmFinishWorkout...');
       console.log('blockName:', blockName);
-      console.log('day.day_name:', day.day_name);
+      console.log('day.day_name:', day?.day_name);
       
       // Clear workout timer by resetting start time
       setWorkoutStartTime(null);
@@ -1591,7 +1963,7 @@ export default function WorkoutLogScreen() {
       console.log('Calculated stats:', stats);
       
       const weekString = currentWeek.toString();
-      const workoutKey = `${day.day_name}_week${weekString}`;
+      const workoutKey = `${day?.day_name || 'unknown'}_week${weekString}`;
       console.log('Saving for workoutKey:', workoutKey, 'blockName:', blockName, 'currentWeek:', weekString);
       
       // Save that this workout is completed
@@ -1615,7 +1987,16 @@ export default function WorkoutLogScreen() {
       console.log('Saved completion stats for key:', statsKey);
       
       // Sets are now saved immediately when completed, so no need to save them again here
-      await WorkoutStorage.clearCurrentWorkout(day.day_name, blockName); // Clear any saved progress
+      await WorkoutStorage.clearCurrentWorkout(day?.day_name || '', blockName); // Clear any saved progress
+      
+      // Clear saved dynamic exercises and sets data since workout is complete
+      if (day?.day_name) {
+        const exerciseKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_exercises`;
+        const setsKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_sets`;
+        await AsyncStorage.removeItem(exerciseKey);
+        await AsyncStorage.removeItem(setsKey);
+        console.log('Cleared saved data for keys:', exerciseKey, setsKey);
+      }
       
       console.log('Navigation back to DaysScreen...');
       navigation.goBack();
@@ -1637,8 +2018,8 @@ export default function WorkoutLogScreen() {
     });
     
     // Save each exercise's completed sets to history
-    for (let exerciseIndex = 0; exerciseIndex < day.exercises.length; exerciseIndex++) {
-      const exercise = day.exercises[exerciseIndex];
+    for (let exerciseIndex = 0; exerciseIndex < dynamicExercises.length; exerciseIndex++) {
+      const exercise = dynamicExercises[exerciseIndex];
       const setsData = allSetsData[exerciseIndex] || [];
       const completedSets = setsData.filter(set => set.completed);
       
@@ -1655,7 +2036,7 @@ export default function WorkoutLogScreen() {
         const historyEntry: WorkoutHistory = {
           id: `${currentDate}-${exerciseIndex}-${Date.now()}`,
           routineName: `${blockName}`,
-          dayName: day.day_name,
+          dayName: day?.day_name || '',
           exerciseName: currentExerciseName,
           date: currentDate,
           sets: completedSets.map(set => ({
@@ -1737,9 +2118,9 @@ export default function WorkoutLogScreen() {
       await loadExercisePreferences();
       
       // Load workout progress
-      const savedWorkout = await WorkoutStorage.loadCurrentWorkout(day.day_name, blockName);
+      const savedWorkout = await WorkoutStorage.loadCurrentWorkout(day?.day_name || '', blockName);
       if (savedWorkout && 
-          savedWorkout.day?.day_name === day.day_name && 
+          savedWorkout.day?.day_name === day?.day_name && 
           savedWorkout.blockName === blockName) {
         setAllSetsData(savedWorkout.allSetsData);
         if (savedWorkout.exerciseNotes) {
@@ -1776,7 +2157,7 @@ export default function WorkoutLogScreen() {
   useEffect(() => {
     if (workoutStartTime) {
       setActiveWorkout({
-        dayName: day.day_name,
+        dayName: day?.day_name || '',
         blockName,
         duration: workoutDuration,
         routeParams: { day, blockName, currentWeek }
@@ -1784,7 +2165,7 @@ export default function WorkoutLogScreen() {
     }
     // Don't clear the active workout when workoutStartTime is null
     // Only clear it when explicitly finishing the workout
-  }, [workoutStartTime, workoutDuration, day.day_name, blockName]);
+  }, [workoutStartTime, workoutDuration, day?.day_name, blockName]);
   
   // History view for a specific exercise
   if (showHistory) {
@@ -1864,9 +2245,10 @@ export default function WorkoutLogScreen() {
   // Notes view for a specific exercise
   if (showNotes) {
     const exerciseIndex = showNotes.exerciseIndex;
-    const exercise = day.exercises[exerciseIndex];
+    const exercise = dynamicExercises[exerciseIndex];
     const targetReps = exercise.reps || '';
     const targetSets = exercise.sets || 0;
+    
     
     return (
       <SafeAreaView style={styles.container}>
@@ -1893,12 +2275,33 @@ export default function WorkoutLogScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.notesModalContainer}>
-              {/* Rep Scheme Section */}
-              <View style={styles.repSchemeCard}>
+              {/* Tab Header - moved to top for better UX */}
+              <View style={styles.tabHeader}>
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === 'reps' && styles.activeTab]}
+                  onPress={() => setActiveTab('reps')}
+                >
+                  <Text style={[styles.tabText, activeTab === 'reps' && styles.activeTabText]}>
+                    Target Reps
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === 'notes' && styles.activeTab]}
+                  onPress={() => setActiveTab('notes')}
+                >
+                  <Text style={[styles.tabText, activeTab === 'notes' && styles.activeTabText]}>
+                    Personal Notes
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Rep Scheme Section - only show when reps tab is active */}
+              {activeTab === 'reps' && (
+                <View style={styles.repSchemeCard}>
                 <Text style={styles.repSchemeLabel}>Target Rep Scheme</Text>
                 <View style={styles.repSchemeInfo}>
                   {(() => {
-                    const exercise = day.exercises[showNotes.exerciseIndex];
+                    const exercise = dynamicExercises[showNotes.exerciseIndex];
                     const hasWeeklyReps = exercise.reps_weekly && Object.keys(exercise.reps_weekly).length > 0;
                     
                     // If exercise has weekly progression, show weekly format
@@ -1967,19 +2370,57 @@ export default function WorkoutLogScreen() {
                   )}
                 </View>
               </View>
+              )}
 
-              {/* User Notes Section */}
-              <Text style={styles.notesModalLabel}>Personal Notes</Text>
-              <TextInput
-                style={styles.notesModalInput}
-                value={exerciseNotes[exerciseIndex] || ''}
-                onChangeText={(text) => handleNotesUpdate(exerciseIndex, text)}
-                placeholder="e.g., Week 1: used 50kg, felt easy\nWeek 2: increase to 55kg\nFocus on slow negatives"
-                placeholderTextColor="#52525b"
-                multiline
-                autoFocus
-                textAlignVertical="top"
-              />
+              {/* Tab Content */}
+              {activeTab === 'notes' && (
+                <View style={styles.tabContent}>
+                  {/* Individual Notes List */}
+                  <View style={styles.notesList}>
+                    {personalNotes.map((note, index) => (
+                      <View key={index} style={styles.noteItem}>
+                        <Text style={styles.noteText}>{note}</Text>
+                        <TouchableOpacity
+                          style={styles.deleteNoteButton}
+                          onPress={() => setPersonalNotes(prev => prev.filter((_, i) => i !== index))}
+                        >
+                          <Ionicons name="close-circle" size={20} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Add Note Input */}
+                  <View style={styles.addNoteContainer}>
+                    <TextInput
+                      style={styles.addNoteInput}
+                      value={currentNote}
+                      onChangeText={setCurrentNote}
+                      placeholder="Add a note (e.g., Week 1: used 50kg, felt easy)"
+                      placeholderTextColor="#52525b"
+                      onSubmitEditing={() => {
+                        if (currentNote.trim()) {
+                          setPersonalNotes(prev => [...prev, currentNote.trim()]);
+                          setCurrentNote('');
+                        }
+                      }}
+                      returnKeyType="done"
+                      autoFocus={activeTab === 'notes'}
+                    />
+                    <TouchableOpacity
+                      style={[styles.addNoteButton, { backgroundColor: themeColor }]}
+                      onPress={() => {
+                        if (currentNote.trim()) {
+                          setPersonalNotes(prev => [...prev, currentNote.trim()]);
+                          setCurrentNote('');
+                        }
+                      }}
+                    >
+                      <Ionicons name="add" size={20} color="#000000" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -2009,7 +2450,7 @@ export default function WorkoutLogScreen() {
               <Ionicons name="arrow-back" size={24} color="#ffffff" />
             </TouchableOpacity>
             <View style={styles.titleContainer}>
-              <Text style={styles.title}>{day.day_name}</Text>
+              <Text style={styles.title}>{day?.day_name || 'Workout'}</Text>
               {(() => {
                 // Parse the block weeks to get total week count
                 const weeksRange = block.weeks || '1-4';
@@ -2077,7 +2518,7 @@ export default function WorkoutLogScreen() {
       </View>
           
           {/* Exercise content */}
-          {day.exercises.map((exercise: Exercise, index: number) => (
+          {dynamicExercises.map((exercise: Exercise, index: number) => (
             <React.Fragment key={index}>
               <View style={index === 0 ? { marginTop: 24 } : {}}>
                 <ExerciseCard
@@ -2090,7 +2531,14 @@ export default function WorkoutLogScreen() {
                 onSetUpdate={handleSetUpdate}
                 onSetComplete={handleSetComplete}
                 onDropSetComplete={handleDropSetComplete}
+                onDeleteSet={handleDeleteSet}
+                onAddSet={handleAddSet}
+                onDeleteExercise={handleDeleteExercise}
+                onExerciseSettings={handleExerciseSettings}
                 onHistoryPress={handleHistoryPress}
+                getExerciseUnit={getExerciseUnit}
+                setExerciseUnit={setExerciseUnit}
+                isInSettings={exerciseInSettings === index}
                 onExerciseSelect={handleExerciseSelect}
                 onNotesPress={handleNotesPress}
                 onSetExercisePreference={handleSetExercisePreference}
@@ -2099,13 +2547,10 @@ export default function WorkoutLogScreen() {
                 isLinkedToNext={supersetLinks.has(index)}
                 isLinkedToPrev={supersetLinks.has(index - 1)}
                 themeColor={themeColor}
-                getExerciseUnit={getExerciseUnit}
-                setExerciseUnit={setExerciseUnit}
-                setGlobalUnit={setGlobalUnit}
               />
               
               {/* Superset linking button between exercises */}
-              {index < day.exercises.length - 1 && (
+              {index < dynamicExercises.length - 1 && (
                 <View style={styles.supersetLinkContainer}>
                   <SupersetLinkButton 
                     isActive={supersetLinks.has(index)}
@@ -2118,6 +2563,15 @@ export default function WorkoutLogScreen() {
               </View>
             </React.Fragment>
           ))}
+          
+          {/* Add Exercise Button */}
+          <TouchableOpacity 
+            style={[styles.addExerciseButton, { borderColor: themeColor }]}
+            onPress={() => setShowAddExerciseModal(true)}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={themeColor} />
+            <Text style={[styles.addExerciseText, { color: themeColor }]}>Add Exercise</Text>
+          </TouchableOpacity>
           
 
           <View style={styles.bottomSpacer} />
@@ -2281,7 +2735,7 @@ export default function WorkoutLogScreen() {
                     style={[styles.completionButton, { backgroundColor: themeColor }]}
                     onPress={() => {
                       // Reset and start a new timer
-                      const exercise = day.exercises[activeTimer.exerciseIndex];
+                      const exercise = dynamicExercises[activeTimer.exerciseIndex];
                       const optimalRest = exercise.rest || 120;
                       const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
                       const resetTime = activeTimer.isQuickMode ? quickRest : optimalRest;
@@ -2376,7 +2830,7 @@ export default function WorkoutLogScreen() {
                         } : null);
                       } else {
                         // Reset countdown to original time
-                        const exercise = day.exercises[activeTimer.exerciseIndex];
+                        const exercise = dynamicExercises[activeTimer.exerciseIndex];
                         const optimalRest = exercise.rest || 120;
                         const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
                         const resetTime = activeTimer.isQuickMode ? quickRest : optimalRest;
@@ -2461,7 +2915,7 @@ export default function WorkoutLogScreen() {
             <Ionicons name="play-circle" size={48} color={themeColor} />
             <Text style={styles.confirmModalTitle}>Begin Workout?</Text>
             <Text style={styles.confirmModalMessage}>
-              Start "{day.day_name}" workout session?
+              Start "{day?.day_name || 'workout'}" workout session?
             </Text>
             
             <View style={styles.confirmModalButtons}>
@@ -2535,7 +2989,7 @@ export default function WorkoutLogScreen() {
               <Ionicons name="fitness" size={32} color={themeColor} />
             </View>
             <Text style={styles.completionModalTitle}>Session Complete</Text>
-            <Text style={styles.completionModalSubtitle}>{day.day_name}</Text>
+            <Text style={styles.completionModalSubtitle}>{day?.day_name || 'Workout'}</Text>
             
             {workoutStats && (
               <View style={styles.summaryContainer}>
@@ -2711,6 +3165,57 @@ export default function WorkoutLogScreen() {
         </View>
       </Modal>
 
+      {/* Add Exercise Modal */}
+      <Modal
+        visible={showAddExerciseModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddExerciseModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.addExerciseModal}>
+            {/* Header */}
+            <View style={styles.addExerciseHeader}>
+              <Text style={styles.addExerciseTitle}>Add Exercise</Text>
+              <TouchableOpacity 
+                onPress={() => setShowAddExerciseModal(false)}
+                style={styles.addExerciseCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Options */}
+            <View style={styles.addExerciseOptions}>
+              <TouchableOpacity 
+                style={[styles.addExerciseCard, { backgroundColor: themeColor }]}
+                onPress={() => {
+                  setShowAddExerciseModal(false);
+                  navigation.navigate('FavoriteExercises' as never, { 
+                    ...route.params,
+                    selectionMode: true
+                  } as never);
+                }}
+              >
+                <Ionicons name="heart" size={24} color="#000000" />
+                <Text style={[styles.addExerciseCardText, { color: '#000000' }]}>Choose Favourite</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.addExerciseCard}
+                onPress={() => {
+                  setShowAddExerciseModal(false);
+                  navigation.navigate('ManualExerciseEntry' as never, route.params as never);
+                }}
+              >
+                <Ionicons name="add-circle-outline" size={24} color="#ffffff" />
+                <Text style={styles.addExerciseCardText}>Create New Exercise</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -2719,6 +3224,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0b',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#ffffff',
+    textAlign: 'center',
   },
   flex: {
     flex: 1,
@@ -2940,6 +3456,7 @@ const styles = StyleSheet.create({
   },
   notesModalContainer: {
     flex: 1,
+    paddingHorizontal: 20,
   },
   repSchemeCard: {
     backgroundColor: '#18181b',
@@ -3202,8 +3719,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  addSetButton: {
+    alignItems: 'flex-start',
+    padding: 8,
+    marginTop: 8,
+  },
+  addExerciseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  addExerciseText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   bottomSpacer: {
-    height: 50,
+    height: 180,
   },
   historyContainer: {
     flex: 1,
@@ -4024,5 +4563,169 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  exerciseSettingsView: {
+    padding: 16,
+  },
+  exerciseSettingsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  exerciseSettingsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  exerciseSettingsClose: {
+    padding: 4,
+  },
+  exerciseSettingsContent: {
+    gap: 8,
+  },
+  exerciseSettingsExerciseName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  exerciseSettingsOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#27272a',
+    gap: 12,
+  },
+  exerciseSettingsOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ffffff',
+    flex: 1,
+  },
+  addExerciseModal: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    margin: 20,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  addExerciseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
+  },
+  addExerciseTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  addExerciseCloseButton: {
+    padding: 8,
+  },
+  addExerciseOptions: {
+    padding: 20,
+    gap: 16,
+  },
+  addExerciseCard: {
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    padding: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  addExerciseCardText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  
+  // Tab styles - completely new design
+  tabHeader: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    marginHorizontal: 0,
+    paddingHorizontal: 0,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#ffffff',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#71717a',
+  },
+  activeTabText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  
+  // Notes styles
+  notesList: {
+    marginBottom: 20,
+  },
+  noteItem: {
+    backgroundColor: '#27272a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  noteText: {
+    fontSize: 14,
+    color: '#e4e4e7',
+    flex: 1,
+    lineHeight: 20,
+  },
+  deleteNoteButton: {
+    marginLeft: 8,
+    padding: 2,
+  },
+  addNoteContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-end',
+  },
+  addNoteInput: {
+    flex: 1,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#ffffff',
+    maxHeight: 100,
+  },
+  addNoteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

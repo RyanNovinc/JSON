@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -35,8 +35,19 @@ interface FavoriteExercise {
 
 export default function FavoriteExercisesScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
   const { themeColor } = useTheme();
   const [favoriteExercises, setFavoriteExercises] = useState<FavoriteExercise[]>([]);
+  
+  // Debug logging
+  console.log('=== FAVORITE EXERCISES SCREEN RENDER ===');
+  console.log('Route params:', route.params);
+  
+  // Check if we're in selection mode (for adding to workout)
+  const selectionMode = route.params?.selectionMode as boolean;
+  const onExerciseSelect = route.params?.onExerciseSelect as ((exercise: FavoriteExercise) => void) | undefined;
+  
+  console.log('Selection mode:', selectionMode);
 
   useEffect(() => {
     loadFavoriteExercises();
@@ -201,7 +212,23 @@ export default function FavoriteExercisesScreen() {
     <TouchableOpacity
       style={styles.exerciseCard}
       onPress={() => {
-        navigation.navigate('ExerciseDetail' as any, { exercise });
+        if (selectionMode) {
+          // In selection mode - go back with selected exercise
+          console.log('=== EXERCISE SELECTED ===');
+          console.log('Selected exercise:', exercise.name);
+          console.log('Original route params:', route.params);
+          
+          const navParams = { 
+            ...route.params, 
+            selectedExercise: exercise 
+          };
+          console.log('Navigation params to send:', navParams);
+          
+          navigation.navigate('WorkoutLog' as any, navParams);
+        } else {
+          // Normal mode - view exercise details
+          navigation.navigate('ExerciseDetail' as any, { exercise });
+        }
       }}
       activeOpacity={0.8}
     >
@@ -255,7 +282,16 @@ export default function FavoriteExercisesScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Favorite Exercises</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>
+            {selectionMode ? 'Choose Exercise' : 'Favorite Exercises'}
+          </Text>
+          {selectionMode && (
+            <Text style={styles.headerSubtitle}>
+              Tap any exercise to add it to your workout
+            </Text>
+          )}
+        </View>
         <TouchableOpacity onPress={() => navigation.navigate('AddExercise' as any)} style={styles.addButton}>
           <Ionicons name="add" size={24} color="#ffffff" />
         </TouchableOpacity>
@@ -303,10 +339,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#71717a',
+    marginTop: 2,
   },
   addButton: {
     width: 44,

@@ -29,6 +29,7 @@ interface FavoriteExercise {
   secondaryMuscles?: string[]; // New field for secondary involvement
   instructions?: string;
   notes?: string;
+  alternatives?: string[]; // Alternative exercise names
   addedAt: string;
   estimatedCalories?: number;
   duration?: number;
@@ -173,6 +174,21 @@ export default function ExerciseDetailScreen() {
           {/* Header Section */}
           <View style={styles.headerSection}>
             <Text style={styles.exerciseName}>{exercise.name}</Text>
+            
+            {/* Alternative Exercises - Right under main name */}
+            {exercise.alternatives && exercise.alternatives.length > 0 && (
+              <View style={styles.headerAlternatives}>
+                <Text style={styles.headerAlternativesTitle}>Alternatives:</Text>
+                <View style={styles.headerAlternativesList}>
+                  {exercise.alternatives.map((alternative, index) => (
+                    <Text key={index} style={styles.headerAlternativeText}>
+                      {alternative}{index < exercise.alternatives!.length - 1 ? ' • ' : ''}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            )}
+            
             <View style={[styles.categoryBadge, { backgroundColor: themeColor + '15', borderColor: themeColor + '40' }]}>
               <Ionicons name="fitness-outline" size={16} color={themeColor} />
               <Text style={[styles.categoryText, { color: themeColor }]}>
@@ -357,6 +373,25 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  headerAlternatives: {
+    marginVertical: 8,
+  },
+  headerAlternativesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#71717a',
+    marginBottom: 4,
+  },
+  headerAlternativesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  headerAlternativeText: {
+    fontSize: 16,
+    color: '#a1a1aa',
+    fontWeight: '500',
   },
   divider: {
     height: 1,

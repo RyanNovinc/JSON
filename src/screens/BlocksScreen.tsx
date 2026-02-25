@@ -70,8 +70,7 @@ function MesocycleCard({ mesocycle, onPress, onLongPress, themeColor }: Mesocycl
   // Use theme color only for active mesocycle, gray for others
   const phaseColor = mesocycle.isActive ? themeColor : '#6b7280';
   
-  const title = `Mesocycle ${mesocycle.mesocycleNumber}`;
-  const subtitle = mesocycle.phase?.phaseName || 'Training Phase';
+  const title = mesocycle.phase?.phaseName || `Mesocycle ${mesocycle.mesocycleNumber}`;
 
   return (
     <TouchableOpacity 
@@ -84,15 +83,6 @@ function MesocycleCard({ mesocycle, onPress, onLongPress, themeColor }: Mesocycl
       <View style={styles.cardHeader}>
         <View style={styles.cardTitle}>
           <Text style={styles.blockName}>{title}</Text>
-          <Text style={styles.mesocyclePhaseName}>{subtitle}</Text>
-          
-          {mesocycle.phase && (
-            <View style={[styles.phaseBadge, { backgroundColor: phaseColor + '20' }]}>
-              <Text style={[styles.phaseText, { color: phaseColor }]}>
-                {mesocycle.phase.repFocus} • {mesocycle.phase.weeks} weeks
-              </Text>
-            </View>
-          )}
         </View>
         
         <View style={styles.headerRight}>
@@ -125,15 +115,6 @@ function MesocycleCard({ mesocycle, onPress, onLongPress, themeColor }: Mesocycl
             </Text>
           </View>
         </View>
-        
-        {mesocycle.phase && (
-          <View style={styles.exercisePreview}>
-            <Text style={styles.previewLabel}>Phase Emphasis:</Text>
-            <Text style={styles.previewText}>
-              {mesocycle.phase.emphasis}
-            </Text>
-          </View>
-        )}
 
         {mesocycle.totalBlocks > 0 && (
           <View style={styles.progressSection}>
@@ -307,6 +288,7 @@ export default function BlocksScreen() {
   const [selectedBlock, setSelectedBlock] = useState<{ block: Block; index: number } | null>(null);
   const [showMesocycleModal, setShowMesocycleModal] = useState(false);
   const [selectedMesocycle, setSelectedMesocycle] = useState<MesocycleCard | null>(null);
+  const [showMesocycleMoreOptions, setShowMesocycleMoreOptions] = useState(false);
   const [program, setProgram] = useState<Program | null>(null);
   const [mesocycleCards, setMesocycleCards] = useState<MesocycleCard[]>([]);
   
@@ -384,9 +366,33 @@ export default function BlocksScreen() {
     }
   };
 
-  const updateMesocycleCards = () => {
+  const updateMesocycleCards = async () => {
     if (!program || program.totalMesocycles <= 1) {
       return;
+    }
+
+    // Fix: If mesocycleRoadmap is empty, create default phase data
+    if (!program.mesocycleRoadmap || program.mesocycleRoadmap.length === 0) {
+      const defaultRoadmap = [];
+      for (let i = 1; i <= program.totalMesocycles; i++) {
+        defaultRoadmap.push({
+          mesocycleNumber: i,
+          phaseName: `Mesocycle ${i}`,
+          repFocus: '8-12 reps',
+          emphasis: 'Progressive training',
+          weeks: 12,
+          blocks: 3
+        });
+      }
+      
+      // Update the program with default roadmap
+      await ProgramStorage.updateProgram(program.id, {
+        mesocycleRoadmap: defaultRoadmap
+      });
+      
+      // Update local state
+      setProgram(prev => prev ? {...prev, mesocycleRoadmap: defaultRoadmap} : null);
+      return; // Exit early, useEffect will trigger again with updated data
     }
 
     const cards: MesocycleCard[] = [];
@@ -781,6 +787,7 @@ export default function BlocksScreen() {
         
         setShowMesocycleModal(false);
         setSelectedMesocycle(null);
+        setShowMesocycleMoreOptions(false);
       } catch (error) {
         console.error('Failed to set active mesocycle:', error);
       }
@@ -806,10 +813,12 @@ export default function BlocksScreen() {
         });
         setShowMesocycleModal(false);
         setSelectedMesocycle(null);
+        setShowMesocycleMoreOptions(false);
       } catch (error) {
         console.error('Error sharing mesocycle:', error);
         setShowMesocycleModal(false);
         setSelectedMesocycle(null);
+        setShowMesocycleMoreOptions(false);
       }
     }
   };
@@ -830,6 +839,7 @@ export default function BlocksScreen() {
         await Clipboard.setStringAsync(jsonString);
         setShowMesocycleModal(false);
         setSelectedMesocycle(null);
+        setShowMesocycleMoreOptions(false);
       } catch (error) {
         console.error('Error copying mesocycle:', error);
       }
@@ -853,6 +863,7 @@ export default function BlocksScreen() {
                 Alert.alert('Feature Coming Soon', 'Mesocycle deletion will be available in a future update.');
                 setShowMesocycleModal(false);
                 setSelectedMesocycle(null);
+                setShowMesocycleMoreOptions(false);
               } catch (error) {
                 console.error('Error deleting mesocycle:', error);
               }
@@ -866,6 +877,58 @@ export default function BlocksScreen() {
   const handleCancelMesocycle = () => {
     setShowMesocycleModal(false);
     setSelectedMesocycle(null);
+    setShowMesocycleMoreOptions(false);
+  };
+
+  const handleRenameMesocycle = () => {
+    if (selectedMesocycle) {
+      Alert.prompt(
+        'Rename Mesocycle',
+        `Enter a new name for Mesocycle ${selectedMesocycle.mesocycleNumber}:`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Rename',
+            onPress: async (newName) => {
+              if (newName && newName.trim().length > 0) {
+                try {
+                  // Update the mesocycle name in program roadmap
+                  if (program && selectedMesocycle.phase) {
+                    const updatedRoadmap = program.mesocycleRoadmap.map(phase => 
+                      phase.mesocycleNumber === selectedMesocycle.mesocycleNumber 
+                        ? { ...phase, phaseName: newName.trim() }
+                        : phase
+                    );
+                    
+                    await ProgramStorage.updateProgram(program.id, {
+                      mesocycleRoadmap: updatedRoadmap
+                    });
+
+                    // Reload program data to reflect changes and force refresh
+                    const updatedProgram = await ProgramStorage.getProgram(program.id);
+                    if (updatedProgram) {
+                      // Force state change by creating new object reference
+                      setProgram({...updatedProgram});
+                    }
+                  }
+
+                  setShowMesocycleModal(false);
+                  setSelectedMesocycle(null);
+                  setShowMesocycleMoreOptions(false);
+                } catch (error) {
+                  console.error('Error renaming mesocycle:', error);
+                  Alert.alert('Error', 'Failed to rename mesocycle. Please try again.');
+                }
+              } else {
+                Alert.alert('Invalid Name', 'Please enter a valid name.');
+              }
+            }
+          }
+        ],
+        'plain-text',
+        selectedMesocycle.phase?.phaseName || `Mesocycle ${selectedMesocycle.mesocycleNumber}`
+      );
+    }
   };
 
   const handleToggleMesocycleCompletion = async () => {
@@ -903,6 +966,7 @@ export default function BlocksScreen() {
         // Close modal without success popup
         setShowMesocycleModal(false);
         setSelectedMesocycle(null);
+        setShowMesocycleMoreOptions(false);
         
       } catch (error) {
         console.error('Error toggling mesocycle completion:', error);
@@ -1107,6 +1171,7 @@ export default function BlocksScreen() {
             </View>
             
             <View style={{ width: '100%', gap: 12 }}>
+              {/* Primary Actions */}
               {!selectedMesocycle?.isActive && (
                 <TouchableOpacity
                   style={{
@@ -1156,56 +1221,13 @@ export default function BlocksScreen() {
                   color: '#0a0a0b',
                 }}>{selectedMesocycle?.isCompleted ? 'Mark Incomplete' : 'Mark Complete'}</Text>
               </TouchableOpacity>
-              
+
+              {/* More Options Toggle */}
               <TouchableOpacity
                 style={{
                   backgroundColor: '#27272a',
-                  borderRadius: 8,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 12,
-                }}
-                onPress={handleCopyMesocycle}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="copy-outline" size={20} color="#ffffff" />
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#ffffff',
-                }}>Copy JSON</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#27272a',
-                  borderRadius: 8,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 12,
-                }}
-                onPress={handleShareMesocycle}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="share-outline" size={20} color="#ffffff" />
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#ffffff',
-                }}>Share</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
                   borderWidth: 1,
-                  borderColor: 'rgba(239, 68, 68, 0.3)',
+                  borderColor: '#3a3a3a',
                   borderRadius: 8,
                   paddingVertical: 16,
                   paddingHorizontal: 20,
@@ -1214,16 +1236,115 @@ export default function BlocksScreen() {
                   justifyContent: 'center',
                   gap: 12,
                 }}
-                onPress={handleDeleteMesocycle}
+                onPress={() => setShowMesocycleMoreOptions(!showMesocycleMoreOptions)}
                 activeOpacity={0.8}
               >
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                <Ionicons 
+                  name={showMesocycleMoreOptions ? "chevron-up" : "ellipsis-horizontal"} 
+                  size={20} 
+                  color="#ffffff" 
+                />
                 <Text style={{
                   fontSize: 16,
                   fontWeight: '600',
-                  color: '#ef4444',
-                }}>Delete</Text>
+                  color: '#ffffff',
+                }}>{showMesocycleMoreOptions ? 'Less Options' : 'More Options'}</Text>
               </TouchableOpacity>
+
+              {/* Secondary Actions */}
+              {showMesocycleMoreOptions && (
+                <>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#27272a',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleRenameMesocycle}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="pencil-outline" size={20} color="#ffffff" />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>Rename</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#27272a',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleCopyMesocycle}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="copy-outline" size={20} color="#ffffff" />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>Copy JSON</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#27272a',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleShareMesocycle}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="share-outline" size={20} color="#ffffff" />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>Share</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(239, 68, 68, 0.3)',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleDeleteMesocycle}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ef4444',
+                    }}>Delete</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
             
             <TouchableOpacity

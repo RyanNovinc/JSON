@@ -173,6 +173,9 @@ export default function MesocycleBlocksScreen() {
   const [completionBasedWeek, setCompletionBasedWeek] = useState<number>(1);
   const [showModal, setShowModal] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<{ block: Block; index: number } | null>(null);
+  const [showBlockMoreOptions, setShowBlockMoreOptions] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [localBlocks, setLocalBlocks] = useState(mesocycle.blocksInMesocycle);
 
   // Find the global index of the first block in this mesocycle
   const getGlobalBlockIndex = (localIndex: number): number => {
@@ -313,11 +316,13 @@ export default function MesocycleBlocksScreen() {
     }
     setShowModal(false);
     setSelectedBlock(null);
+    setShowBlockMoreOptions(false);
   };
 
   const handleCancel = () => {
     setShowModal(false);
     setSelectedBlock(null);
+    setShowBlockMoreOptions(false);
   };
 
   const handleShareBlock = async () => {
@@ -340,10 +345,12 @@ export default function MesocycleBlocksScreen() {
         });
         setShowModal(false);
         setSelectedBlock(null);
+        setShowBlockMoreOptions(false);
       } catch (error) {
         console.error('Error sharing block:', error);
         setShowModal(false);
         setSelectedBlock(null);
+        setShowBlockMoreOptions(false);
       }
     }
   };
@@ -365,6 +372,7 @@ export default function MesocycleBlocksScreen() {
         await Clipboard.setStringAsync(jsonString);
         setShowModal(false);
         setSelectedBlock(null);
+        setShowBlockMoreOptions(false);
       } catch (error) {
         console.error('Error copying block:', error);
       }
@@ -388,6 +396,7 @@ export default function MesocycleBlocksScreen() {
                 Alert.alert('Feature Coming Soon', 'Block deletion will be available in a future update.');
                 setShowModal(false);
                 setSelectedBlock(null);
+                setShowBlockMoreOptions(false);
               } catch (error) {
                 console.error('Error deleting block:', error);
               }
@@ -443,6 +452,7 @@ export default function MesocycleBlocksScreen() {
         // Close modal without success popup
         setShowModal(false);
         setSelectedBlock(null);
+        setShowBlockMoreOptions(false);
         
       } catch (error) {
         console.error('Error toggling block completion:', error);
@@ -453,6 +463,84 @@ export default function MesocycleBlocksScreen() {
 
   const isBlockCompleted = (block: Block): boolean => {
     return completionStatus[block.block_name] || false;
+  };
+
+  const handleRenameBlock = () => {
+    if (selectedBlock) {
+      Alert.prompt(
+        'Rename Block',
+        `Enter a new name for "${selectedBlock.block.block_name}":`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Rename',
+            onPress: async (newName) => {
+              if (newName && newName.trim().length > 0) {
+                try {
+                  const oldName = selectedBlock.block.block_name;
+                  const trimmedName = newName.trim();
+
+                  // Update the block name in the mesocycle data
+                  const updatedBlocks = mesocycle.blocksInMesocycle.map(block =>
+                    block.block_name === oldName
+                      ? { ...block, block_name: trimmedName }
+                      : block
+                  );
+                  
+                  // Update local state immediately
+                  setLocalBlocks(updatedBlocks);
+
+                  // Update the routine data if this is stored locally
+                  const updatedRoutine = {
+                    ...routine,
+                    data: {
+                      ...routine.data,
+                      blocks: routine.data.blocks.map((block: any) =>
+                        block.block_name === oldName
+                          ? { ...block, block_name: trimmedName }
+                          : block
+                      )
+                    }
+                  };
+
+                  // Save updated routine
+                  await AsyncStorage.setItem(`routine_${routine.id}`, JSON.stringify(updatedRoutine));
+
+                  // Update completion status keys - copy old completion data to new name
+                  const keys = await AsyncStorage.getAllKeys();
+                  const completionKeys = keys.filter(key => key.includes(`completed_${oldName}_`));
+                  
+                  for (const key of completionKeys) {
+                    const newKey = key.replace(`completed_${oldName}_`, `completed_${trimmedName}_`);
+                    const data = await AsyncStorage.getItem(key);
+                    if (data) {
+                      await AsyncStorage.setItem(newKey, data);
+                      await AsyncStorage.removeItem(key);
+                    }
+                  }
+
+                  // Close modal and force refresh
+                  setShowModal(false);
+                  setSelectedBlock(null);
+                  setShowBlockMoreOptions(false);
+                  
+                  // Force component re-render to show updated name
+                  setRefreshKey(prev => prev + 1);
+                  
+                } catch (error) {
+                  console.error('Error renaming block:', error);
+                  Alert.alert('Error', 'Failed to rename block. Please try again.');
+                }
+              } else {
+                Alert.alert('Invalid Name', 'Please enter a valid name.');
+              }
+            }
+          }
+        ],
+        'plain-text',
+        selectedBlock.block.block_name
+      );
+    }
   };
 
   const handleBack = () => {
@@ -475,10 +563,10 @@ export default function MesocycleBlocksScreen() {
         </TouchableOpacity>
         <View style={styles.titleContainer}>
           <Text style={styles.title} numberOfLines={1}>
-            Mesocycle {mesocycle.mesocycleNumber}
+            {phaseName}
           </Text>
           <Text style={styles.subtitle}>
-            {phaseName} • {mesocycle.blocksInMesocycle.length} blocks
+            {localBlocks.length} blocks
           </Text>
         </View>
         <View style={styles.backButton} />
@@ -486,8 +574,9 @@ export default function MesocycleBlocksScreen() {
 
 
       <FlatList
-        data={mesocycle.blocksInMesocycle}
-        keyExtractor={(item, index) => `${item.block_name}-${index}`}
+        key={refreshKey}
+        data={localBlocks}
+        keyExtractor={(item, index) => `${item.block_name}-${index}-${refreshKey}`}
         renderItem={({ item, index }) => (
           <BlockCard
             block={item}
@@ -545,6 +634,7 @@ export default function MesocycleBlocksScreen() {
             </View>
             
             <View style={{ width: '100%', gap: 12 }}>
+              {/* Primary Actions */}
               {selectedBlock?.index !== activeBlockIndex && (
                 <TouchableOpacity
                   style={{
@@ -594,74 +684,128 @@ export default function MesocycleBlocksScreen() {
                   color: '#0a0a0b',
                 }}>{selectedBlock && isBlockCompleted(selectedBlock.block) ? 'Mark Incomplete' : 'Mark Complete'}</Text>
               </TouchableOpacity>
-              
+
+              {/* More Options Toggle */}
               <TouchableOpacity
                 style={{
                   backgroundColor: '#27272a',
                   borderRadius: 8,
-                  paddingVertical: 16,
+                  paddingVertical: 12,
                   paddingHorizontal: 20,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 12,
+                  gap: 8,
                 }}
-                onPress={handleCopyBlock}
+                onPress={() => setShowBlockMoreOptions(!showBlockMoreOptions)}
                 activeOpacity={0.8}
               >
-                <Ionicons name="copy-outline" size={20} color="#ffffff" />
+                <Ionicons 
+                  name={showBlockMoreOptions ? "chevron-up" : "ellipsis-horizontal"} 
+                  size={16} 
+                  color="#ffffff" 
+                />
                 <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
+                  fontSize: 14,
+                  fontWeight: '500',
                   color: '#ffffff',
-                }}>Copy JSON</Text>
+                }}>{showBlockMoreOptions ? 'Less Options' : 'More Options'}</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#27272a',
-                  borderRadius: 8,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 12,
-                }}
-                onPress={handleShareBlock}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="share-outline" size={20} color="#ffffff" />
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#ffffff',
-                }}>Share</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(239, 68, 68, 0.3)',
-                  borderRadius: 8,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 12,
-                }}
-                onPress={handleDeleteBlock}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#ef4444',
-                }}>Delete</Text>
-              </TouchableOpacity>
+
+              {/* Secondary Actions (shown when expanded) */}
+              {showBlockMoreOptions && (
+                <>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#27272a',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleRenameBlock}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="pencil-outline" size={20} color="#ffffff" />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>Rename</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#27272a',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleCopyBlock}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="copy-outline" size={20} color="#ffffff" />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>Copy JSON</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#27272a',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleShareBlock}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="share-outline" size={20} color="#ffffff" />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>Share</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(239, 68, 68, 0.3)',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleDeleteBlock}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ef4444',
+                    }}>Delete</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
             
             <TouchableOpacity
