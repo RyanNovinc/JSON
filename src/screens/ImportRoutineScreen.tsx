@@ -19,6 +19,10 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { getAIPrompt, MUSCLE_GROUPS, QuestionnaireData, generateProgramSpecs } from '../data/workoutPrompt';
+import { assemblePlanningPrompt, ProgramContext } from '../data/planningPrompt';
+import { ProgramStorage, Program, MesocyclePhase } from '../data/programStorage';
+import { extractMesocycleSummary } from '../data/mesocycleExtractor';
+import { WorkoutStorage } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import * as Crypto from 'expo-crypto';
 import { useTheme } from '../contexts/ThemeContext';
@@ -49,9 +53,22 @@ export default function ImportRoutineScreen() {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
 
+  // Mesocycle state
+  const [currentProgram, setCurrentProgram] = useState<Program | null>(null);
+  const [mesocycleContext, setMesocycleContext] = useState<ProgramContext | null>(null);
+  const [planText, setPlanText] = useState<string>('');
+  const [showPlanInput, setShowPlanInput] = useState(false);
+  const [planInputCopied, setPlanInputCopied] = useState(false);
+  const [roadmapSaved, setRoadmapSaved] = useState(false);
+
   // Handle schema version migration on component mount
   useEffect(() => {
     handleSchemaMigration();
+  }, []);
+
+  // Load current program and mesocycle context
+  useEffect(() => {
+    loadMesocycleContext();
   }, []);
 
   // Handle schema version migration - clear old format data
@@ -736,46 +753,63 @@ export default function ImportRoutineScreen() {
 
   const handleConfirmImport = async () => {
     if (parsedProgram) {
-      // Success animation
-      Animated.sequence([
-        Animated.spring(successScale, {
-          toValue: 1.2,
-          useNativeDriver: true,
-        }),
-        Animated.spring(successScale, {
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      try {
+        // Handle mesocycle program association if applicable
+        await handleMesocycleProgramAssociation(parsedProgram);
 
-      setTimeout(() => {
-        // Animate modal exit
-        Animated.parallel([
-          Animated.timing(modalScale, {
-            toValue: 0,
-            duration: 250,
+        // Success animation
+        Animated.sequence([
+          Animated.spring(successScale, {
+            toValue: 1.2,
             useNativeDriver: true,
           }),
-          Animated.timing(modalOpacity, {
-            toValue: 0,
-            duration: 250,
+          Animated.spring(successScale, {
+            toValue: 1,
             useNativeDriver: true,
           }),
-        ]).start(() => {
-          setShowConfirmation(false);
-          modalScale.setValue(0);
-          modalOpacity.setValue(0);
-          successScale.setValue(0);
-          
-          // Reset accumulated programs after successful import
-          setAccumulatedPrograms([]);
-          
-          navigation.navigate('Main', { 
-            screen: 'Home',
-            params: { importedProgram: parsedProgram }
-          } as any);
-        });
-      }, 500);
+        ]).start();
+
+        setTimeout(() => {
+          // Animate modal exit
+          Animated.parallel([
+            Animated.timing(modalScale, {
+              toValue: 0,
+              duration: 250,
+              useNativeDriver: true,
+            }),
+            Animated.timing(modalOpacity, {
+              toValue: 0,
+              duration: 250,
+              useNativeDriver: true,
+            }),
+          ]).start(async () => {
+            setShowConfirmation(false);
+            modalScale.setValue(0);
+            modalOpacity.setValue(0);
+            successScale.setValue(0);
+            
+            // Reset accumulated programs after successful import
+            setAccumulatedPrograms([]);
+            
+            // Check for mesocycle completion before navigating
+            await checkMesocycleCompletion();
+            
+            navigation.navigate('Main', { 
+              screen: 'Home',
+              params: { importedProgram: parsedProgram }
+            } as any);
+          });
+        }, 500);
+      } catch (error) {
+        console.error('Error during import:', error);
+        Alert.alert('Import Error', 'There was an error associating this import with your program. The import will continue normally.');
+        
+        // Continue with normal import flow
+        navigation.navigate('Main', { 
+          screen: 'Home',
+          params: { importedProgram: parsedProgram }
+        } as any);
+      }
     }
   };
 
@@ -809,6 +843,250 @@ export default function ImportRoutineScreen() {
       modalScale.setValue(0);
       modalOpacity.setValue(0);
     });
+  };
+
+  // Mesocycle helper functions
+  const loadMesocycleContext = async () => {
+    try {
+      const questionnaireData = await loadQuestionnaireData();
+      const duration = questionnaireData.programDuration || '12_weeks';
+      const isLongProgram = ['6_months', '1_year', 'custom'].includes(duration);
+      
+      if (isLongProgram) {
+        // Find existing program for this user based on duration
+        const programs = await ProgramStorage.loadPrograms();
+        const existingProgram = programs.find(p => p.programDuration === duration);
+        
+        if (existingProgram) {
+          setCurrentProgram(existingProgram);
+          
+          // Create mesocycle context
+          const context: ProgramContext = {
+            totalMesocycles: existingProgram.totalMesocycles,
+            currentMesocycle: existingProgram.currentMesocycle,
+            mesocycleWeeks: Math.floor(getDurationWeeks(duration) / existingProgram.totalMesocycles),
+            mesocycleBlocks: Math.floor(existingProgram.mesocycleRoadmap.length > 0 ? 
+              existingProgram.mesocycleRoadmap[0].blocks : calculateDefaultBlocks(duration)),
+            mesocycleRoadmapText: existingProgram.mesocycleRoadmapText,
+            previousMesocycleSummary: existingProgram.completedMesocycles.length > 0 ? 
+              existingProgram.completedMesocycles[existingProgram.completedMesocycles.length - 1] : undefined
+          };
+          setMesocycleContext(context);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load mesocycle context:', error);
+    }
+  };
+
+  const getDurationWeeks = (duration: string): number => {
+    switch (duration) {
+      case '6_months': return 26;
+      case '1_year': return 52;
+      case 'custom': return 52; // Default fallback
+      default: return 12;
+    }
+  };
+
+  const calculateDefaultBlocks = (duration: string): number => {
+    switch (duration) {
+      case '6_months': return 2;
+      case '1_year': return 3;
+      case 'custom': return 3;
+      default: return 2;
+    }
+  };
+
+  const parseMesocycleRoadmap = (planText: string): {
+    roadmapText: string;
+    roadmapData: MesocyclePhase[];
+  } => {
+    // Extract roadmap section
+    const roadmapMatch = planText.match(/### Mesocycle Roadmap\s*([\s\S]*?)(?=### |<!-- END PLAN -->|$)/);
+    const roadmapText = roadmapMatch ? roadmapMatch[1].trim() : '';
+    
+    // Parse roadmap table
+    const roadmapData: MesocyclePhase[] = [];
+    const tableLines = roadmapText.split('\n').filter(line => line.includes('|') && !line.includes('---'));
+    
+    tableLines.forEach((line, index) => {
+      if (index === 0) return; // Skip header
+      
+      const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell);
+      if (cells.length >= 6) {
+        roadmapData.push({
+          mesocycleNumber: parseInt(cells[0]) || index,
+          phaseName: cells[1],
+          repFocus: cells[2],
+          emphasis: cells[3],
+          weeks: parseInt(cells[4]) || 12,
+          blocks: parseInt(cells[5]) || 2
+        });
+      }
+    });
+
+    return { roadmapText, roadmapData };
+  };
+
+  const handlePlanTextSubmit = async () => {
+    try {
+      const { roadmapText, roadmapData } = parseMesocycleRoadmap(planText);
+      
+      if (!roadmapText) {
+        Alert.alert('No Roadmap Found', 'Could not find a Mesocycle Roadmap section in the pasted text.');
+        return;
+      }
+
+      const questionnaireData = await loadQuestionnaireData();
+      const duration = questionnaireData.programDuration || '12_weeks';
+      
+      if (currentProgram) {
+        // Update existing program
+        await ProgramStorage.updateMesocycleRoadmap(currentProgram.id, roadmapText, roadmapData);
+        const updatedProgram = await ProgramStorage.getProgram(currentProgram.id);
+        if (updatedProgram) {
+          setCurrentProgram(updatedProgram);
+        }
+      } else {
+        // Create new program
+        const newProgram: Program = {
+          id: Date.now().toString(),
+          name: `${duration} Mesocycle Program`,
+          createdAt: new Date().toISOString(),
+          programDuration: duration,
+          totalMesocycles: roadmapData.length || calculateDefaultMesocycles(duration),
+          currentMesocycle: 1,
+          mesocycleRoadmap: roadmapData,
+          mesocycleRoadmapText: roadmapText,
+          completedMesocycles: [],
+          routineIds: []
+        };
+        
+        await ProgramStorage.addProgram(newProgram);
+        setCurrentProgram(newProgram);
+      }
+      
+      setRoadmapSaved(true);
+      setPlanText('');
+      setShowPlanInput(false);
+      
+      setTimeout(() => {
+        setRoadmapSaved(false);
+      }, 3000);
+      
+      // Reload context
+      await loadMesocycleContext();
+    } catch (error) {
+      console.error('Failed to save roadmap:', error);
+      Alert.alert('Error', 'Failed to save roadmap. Please try again.');
+    }
+  };
+
+  const calculateDefaultMesocycles = (duration: string): number => {
+    switch (duration) {
+      case '6_months': return 2;
+      case '1_year': return 3;
+      case 'custom': return 3;
+      default: return 1;
+    }
+  };
+
+  const handleMesocycleProgramAssociation = async (importedProgram: WorkoutProgram) => {
+    try {
+      const questionnaireData = await loadQuestionnaireData();
+      const duration = questionnaireData.programDuration || '12_weeks';
+      const isLongProgram = ['6_months', '1_year', 'custom'].includes(duration);
+      
+      if (!isLongProgram) {
+        return; // No mesocycle handling for short programs
+      }
+
+      let program = currentProgram;
+      
+      // Create program if it doesn't exist
+      if (!program) {
+        program = {
+          id: Date.now().toString(),
+          name: `${duration} Mesocycle Program`,
+          createdAt: new Date().toISOString(),
+          programDuration: duration,
+          totalMesocycles: calculateDefaultMesocycles(duration),
+          currentMesocycle: 1,
+          mesocycleRoadmap: [],
+          mesocycleRoadmapText: '',
+          completedMesocycles: [],
+          routineIds: []
+        };
+        
+        await ProgramStorage.addProgram(program);
+        setCurrentProgram(program);
+      }
+
+      // Associate the imported routine with the program
+      // We need to wait for HomeScreen to create the routine, then link it
+      // For now, we'll mark the imported program with the programId
+      importedProgram.programId = program.id;
+      
+    } catch (error) {
+      console.error('Error in mesocycle program association:', error);
+      throw error;
+    }
+  };
+
+  const checkMesocycleCompletion = async () => {
+    try {
+      if (!currentProgram || !mesocycleContext) {
+        return;
+      }
+
+      // Calculate expected blocks for current mesocycle
+      const expectedBlocks = mesocycleContext.mesocycleBlocks * mesocycleContext.currentMesocycle;
+      const currentBlocks = currentProgram.routineIds.length;
+      
+      // Check if mesocycle is complete
+      if (currentBlocks >= mesocycleContext.mesocycleBlocks) {
+        // Get routines for current mesocycle
+        const routines = await WorkoutStorage.loadRoutines();
+        const mesocycleRoutines = routines.filter(r => 
+          currentProgram.routineIds.includes(r.id)
+        ).slice(-mesocycleContext.mesocycleBlocks); // Get last N blocks
+
+        if (mesocycleRoutines.length === mesocycleContext.mesocycleBlocks) {
+          // Extract mesocycle summary
+          const currentPhase = currentProgram.mesocycleRoadmap[mesocycleContext.currentMesocycle - 1];
+          const phaseName = currentPhase?.phaseName || `Mesocycle ${mesocycleContext.currentMesocycle}`;
+          
+          const summary = extractMesocycleSummary(mesocycleRoutines, phaseName);
+          summary.mesocycleNumber = mesocycleContext.currentMesocycle;
+
+          // Complete the mesocycle
+          await ProgramStorage.completeMesocycle(currentProgram.id, summary);
+          
+          // Show completion message
+          const isLastMesocycle = mesocycleContext.currentMesocycle >= mesocycleContext.totalMesocycles;
+          
+          if (isLastMesocycle) {
+            Alert.alert(
+              'Program Complete! 🎉',
+              `Congratulations! You've completed all ${mesocycleContext.totalMesocycles} mesocycles of your program.`,
+              [{ text: 'Awesome!' }]
+            );
+          } else {
+            Alert.alert(
+              'Mesocycle Complete! ✅',
+              `Mesocycle ${mesocycleContext.currentMesocycle} complete. When you're ready, copy the planning prompt to start Mesocycle ${mesocycleContext.currentMesocycle + 1}.`,
+              [{ text: 'Got it!' }]
+            );
+          }
+
+          // Reload context to reflect the changes
+          await loadMesocycleContext();
+        }
+      }
+    } catch (error) {
+      console.error('Error checking mesocycle completion:', error);
+      // Don't throw - this is not critical to the import flow
+    }
   };
 
   const loadQuestionnaireData = async (): Promise<QuestionnaireData> => {
@@ -881,6 +1159,250 @@ export default function ImportRoutineScreen() {
     }
   };
 
+  // Build dynamic profile text from questionnaire data
+  const buildProfileText = (data: QuestionnaireData): string => {
+    const lines: string[] = [];
+
+    // Mapping tables
+    const primaryGoalMap: { [key: string]: string } = {
+      'burn_fat': 'Burn Fat (lose weight while preserving muscle)',
+      'build_muscle': 'Muscle Building (gain lean mass and size)', 
+      'gain_strength': 'Strength Training (increase power and max lifts)',
+      'body_recomposition': 'Body Recomposition (lose fat and gain muscle simultaneously)',
+      'sport_specific': 'Sport-Specific Training (train for {sport_name})',
+      'general_fitness': 'General Fitness (overall health and wellness)',
+      'custom_primary': 'Custom Goal'
+    };
+
+    const secondaryGoalMap: { [key: string]: string } = {
+      'include_cardio': 'Include Cardiovascular Training',
+      'maintain_flexibility': 'Include Flexibility & Mobility Work', 
+      'athletic_performance': 'Improve Athletic Performance',
+      'injury_prevention': 'Include Injury Prevention Work',
+      'fun_social': 'Include Fun & Social Activities',
+      'custom_secondary': 'Custom Focus'
+    };
+
+    const primaryLabelMap: { [key: string]: string } = {
+      'build_muscle': 'Muscle Building',
+      'burn_fat': 'Fat Loss Training',
+      'gain_strength': 'Strength Training', 
+      'body_recomposition': 'Resistance Training',
+      'sport_specific': 'Sport-Specific Training',
+      'general_fitness': 'General Training',
+      'custom_primary': 'Training'
+    };
+
+    const experienceMap: { [key: string]: string } = {
+      'beginner': 'Beginner (under 1 year, still learning form and building base fitness)',
+      'intermediate': 'Intermediate (1-2 years, good technique, consistent progression)',
+      'advanced': 'Advanced (2+ years, excellent technique, slow progression)'
+    };
+
+    const approachMap: { [key: string]: string } = {
+      'push_hard': 'Push Hard — target upper end of optimal volume ranges.',
+      'balanced': 'Balanced — moderate volume, sustainable long-term.',
+      'conservative': 'Conservative — lower volume, focus on recovery and consistency.'
+    };
+
+    const durationMap: { [key: string]: string } = {
+      '4_weeks': '4 weeks (short training block)',
+      '8_weeks': '8 weeks (standard training block)',
+      '12_weeks': '12 weeks (full training cycle)',
+      '16_weeks': '16 weeks (extended training cycle)',
+      '6_months': '6 months (medium-term development plan)',
+      '1_year': '1 year (long-term development plan)',
+      'custom': data.customDuration ? `${data.customDuration} weeks` : 'Custom duration'
+    };
+
+    const equipmentMap: { [key: string]: string } = {
+      'commercial_gym': 'Commercial Gym (full equipment access)',
+      'home_gym': 'Home Gym (personal equipment setup)',
+      'bodyweight': 'Bodyweight Only (no equipment)', 
+      'basic_equipment': 'Basic Equipment (dumbbells, resistance bands)'
+    };
+
+    const sessionLengthMap: { [key: string]: string } = {
+      '30': '30 minutes',
+      '45': '45 minutes', 
+      '60': '60 minutes',
+      '75': '75 minutes',
+      '90': '90 minutes',
+      'custom': data.customDuration ? `${data.customDuration} minutes` : 'Custom duration',
+      'ai_suggest': 'Not specified — let AI suggest optimal duration based on goal and experience.'
+    };
+
+    const restTimeMap: { [key: string]: string } = {
+      'optimal': 'Optimal rest times — prioritize maximum results regardless of session length.',
+      'shorter': 'Shorter rest times — reduced rest (~25% less) for time efficiency.',
+      'minimal': 'Minimal rest times — time efficient, higher intensity.',
+      'ai_choose': 'Not specified — use evidence-based defaults.'
+    };
+
+    const noteDetailMap: { [key: string]: string } = {
+      'detailed': 'Detailed instructions for each exercise.',
+      'brief': 'Brief technique cues only.',
+      'minimal': 'Only non-obvious technique tips or specific setup instructions.'
+    };
+
+    // Primary Goal
+    let goalText = primaryGoalMap[data.primaryGoal || ''] || 'Not specified';
+    if (data.primaryGoal === 'custom_primary' && data.customGoals) {
+      goalText += ` — "${data.customGoals}"`;
+    }
+    if (data.primaryGoal === 'sport_specific' && data.specificSport) {
+      goalText = goalText.replace('{sport_name}', data.specificSport);
+    }
+    lines.push(`**Primary Goal:** ${goalText}`);
+
+    // Secondary Goals
+    if (data.secondaryGoals && data.secondaryGoals.length > 0) {
+      const goalTexts = data.secondaryGoals.map(g => {
+        if (g === 'custom_secondary') {
+          return `Custom Focus — "${data.customGoals || 'No description provided'}"`;
+        }
+        return secondaryGoalMap[g] || g;
+      });
+      lines.push(`**Secondary Goals:** ${goalTexts.join(', ')}`);
+    } else {
+      lines.push(`**Secondary Goals:** None selected`);
+    }
+
+    lines.push(''); // blank line
+
+    // Training Schedule
+    lines.push('**Training Schedule:**');
+    lines.push(`- Total training days per week: ${data.totalTrainingDays || 'Not specified'}`);
+    
+    const primaryLabel = primaryLabelMap[data.primaryGoal || ''] || 'Training';
+    lines.push(`- ${primaryLabel} days: ${data.gymTrainingDays || 'Not specified'}`);
+    
+    if (data.otherTrainingDays && data.otherTrainingDays > 0) {
+      const secondaryLabels = [];
+      if (data.secondaryGoals) {
+        data.secondaryGoals.forEach(goal => {
+          if (goal === 'include_cardio') secondaryLabels.push('cardiovascular training');
+          if (goal === 'maintain_flexibility') secondaryLabels.push('flexibility');
+          if (goal === 'athletic_performance') secondaryLabels.push('athletic performance');
+          if (goal === 'injury_prevention') secondaryLabels.push('injury prevention');
+          if (goal === 'fun_social') secondaryLabels.push('fun & social');
+        });
+      }
+      const secondaryLabel = secondaryLabels.join(', ') || 'additional focus';
+      lines.push(`- Additional focus days (${secondaryLabel}): ${data.otherTrainingDays}`);
+    }
+
+    lines.push(''); // blank line
+
+    // Experience & Approach  
+    lines.push(`**Training Experience:** ${experienceMap[data.trainingExperience || ''] || 'Not specified'}`);
+    lines.push(`**Training Approach:** ${approachMap[data.trainingApproach || ''] || 'Not specified'}`);
+
+    lines.push(''); // blank line
+
+    // Duration
+    lines.push(`**Program Duration:** ${durationMap[data.programDuration || ''] || 'Not specified'}`);
+
+    // Conditional: Cardio activities
+    if (data.secondaryGoals?.includes('include_cardio') && data.cardioPreferences && data.cardioPreferences.length > 0) {
+      const activityMap: { [key: string]: string } = {
+        'treadmill': 'Treadmill / Indoor Running',
+        'stationary_bike': 'Stationary Bike / Cycling', 
+        'rowing_machine': 'Rowing Machine',
+        'swimming': 'Swimming',
+        'stair_climber': 'Stair Climber / StepMill',
+        'elliptical': 'Elliptical',
+        'jump_rope': 'Jump Rope',
+        'outdoor_running': 'Outdoor Running / Walking',
+        'no_preference': 'No Preference (AI chooses)'
+      };
+      const activities = data.cardioPreferences.map(a => activityMap[a] || a);
+      lines.push(`**Preferred Cardio Activities:** ${activities.join(', ')}`);
+    }
+
+    // Conditional: Sport details
+    if (data.primaryGoal === 'sport_specific' && data.specificSport) {
+      const sportDetails = data.athleticPerformanceDetails || 'No additional details provided';
+      lines.push(`**Sport:** ${data.specificSport} — "${sportDetails}"`);
+    }
+
+    // Conditional: Secondary goal details
+    if (data.athleticPerformanceDetails && data.secondaryGoals?.includes('athletic_performance')) {
+      lines.push(`**Athletic Performance Focus:** ${data.athleticPerformanceDetails}`);
+    }
+    if (data.injuryPreventionDetails && data.secondaryGoals?.includes('injury_prevention')) {
+      lines.push(`**Injury Prevention Focus:** ${data.injuryPreventionDetails}`);
+    }
+    if (data.flexibilityDetails && data.secondaryGoals?.includes('maintain_flexibility')) {
+      lines.push(`**Flexibility Focus:** ${data.flexibilityDetails}`);
+    }
+    if (data.funSocialDetails && data.secondaryGoals?.includes('fun_social')) {
+      lines.push(`**Fun & Social Activities:** ${data.funSocialDetails}`);
+    }
+
+    lines.push(''); // blank line
+
+    // Equipment
+    const equipmentTypes = Array.isArray(data.selectedEquipment) ? data.selectedEquipment : 
+                          data.selectedEquipment ? [data.selectedEquipment] : [];
+    if (equipmentTypes.length > 0) {
+      const equipmentTexts = equipmentTypes.map(e => equipmentMap[e] || e);
+      lines.push(`**Available Equipment:** ${equipmentTexts.join(', ')}`);
+    } else {
+      lines.push(`**Available Equipment:** Not specified`);
+    }
+    
+    if (data.specificEquipment) {
+      lines.push(`**Specific Equipment:** ${data.specificEquipment}`);
+    }
+    if (data.unavailableEquipment) {
+      lines.push(`**Unavailable Equipment:** ${data.unavailableEquipment}`);
+    }
+
+    // Session Length
+    const sessionKey = data.useAISuggestion ? 'ai_suggest' : 
+                       data.workoutDuration ? data.workoutDuration.toString() : 'custom';
+    lines.push(`**Session Length:** ${sessionLengthMap[sessionKey] || 'Not specified'}`);
+
+    // Heart Rate Monitor
+    lines.push(`**Heart Rate Monitor:** ${data.hasHeartRateMonitor ? 'Available' : 'Not available'}`);
+
+    // Rest Time Preference
+    const restKey = data.useAIRestTime ? 'ai_choose' : data.restTimePreference || 'ai_choose';
+    lines.push(`**Rest Time Preference:** ${restTimeMap[restKey] || 'Not specified — use evidence-based defaults.'}`);
+
+    // Exercise Note Detail
+    lines.push(`**Exercise Note Detail:** ${noteDetailMap[data.exerciseNoteDetail || 'minimal'] || 'Only non-obvious technique tips or specific setup instructions.'}`);
+
+    lines.push(''); // blank line
+
+    // Conditional fields
+    if (data.priorityMuscleGroups && data.priorityMuscleGroups.length > 0) {
+      const muscles = data.priorityMuscleGroups.concat(data.customMuscleGroup ? [data.customMuscleGroup] : []);
+      lines.push(`**Priority Muscle Groups:** ${muscles.join(', ')}`);
+    }
+
+    if (data.movementLimitations && data.movementLimitations.length > 0) {
+      const limitations = data.movementLimitations.concat(data.customLimitation ? [data.customLimitation] : []);
+      lines.push(`**Movement Limitations:** ${limitations.join('. ')}`);
+    }
+
+    if (data.trainingStylePreference) {
+      const style = data.customTrainingStyle || data.trainingStylePreference;
+      lines.push(`**Training Style Preference:** ${style}`);
+    }
+
+    if (data.likedExercises) {
+      lines.push(`**Liked Exercises:** ${data.likedExercises}`);
+    }
+
+    if (data.dislikedExercises) {
+      lines.push(`**Disliked Exercises:** ${data.dislikedExercises}`);
+    }
+
+    return lines.join('\n');
+  };
+
   const handleCancel = () => {
     navigation.goBack();
   };
@@ -938,151 +1460,7 @@ export default function ImportRoutineScreen() {
                       }
                     })();
                     
-                    const planningPrompt = `I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help designing a personalized workout program.
-
-## INSTRUCTIONS
-
-Review my profile and design a training plan. Show your reasoning — work through split selection, volume distribution, exercise choices, and trade-offs. Before presenting the summary, list every exercise per day with its set count and primary muscle tags, then total weekly volume per muscle group. If any muscle group is below target, revise and recount. Do not present the summary until all targets are met or flagged.
-
-When done, end with a clean summary:
-
----
-## Your Program Plan
-
-**Split:** [split name] — [brief description]
-**Sessions:** [estimated session lengths]
-**Blocks:** [block structure and deload timing]
-
-| Day | Session | Focus |
-|-----|---------|-------|
-| 1   | ...     | ...   |
-| ... | ...     | ...   |
-
-### Volume Targets
-[Volume table — all muscle groups, sets/week, target ranges, status indicators as defined in Quality Check]
-
-### Exercise Selections
-For each training day, list every exercise with sets, primary/secondary muscles, and superset pairings. For programs with multiple exercise pools (rotations across blocks), list all pools.
-
-### Secondary Goal Summary
-If the profile includes secondary goals with dedicated training days, summarize how those days are structured: what activities, how they progress or rotate, and how they fit with the lifting days.
-
-### Trade-offs (if any)
-- [1-3 bullets noting meaningful compromises]
-
-### Recommendation (if applicable)
-If the plan has significant limitations, suggest one clear change. Keep it simple — no jargon. Example: "I'd recommend 5 lifting days + 1 cardio day instead of 4+1. This would solve the volume constraints and keep sessions shorter."
-
-Do not suggest combining cardio with lifting sessions. Do not ask the user questions about the plan — they'll tell you what to change.
-
-End with: "Let me know if you want any changes. When you're happy with the plan, you can use it with your JSON import prompt to generate the program files."
----
-
-The profile represents preferences, not hard constraints. If the user's goals would be significantly better served by a different setup (e.g., more training days), recommend that. Respect their choices if confirmed, but don't silently accept a suboptimal setup.
-
-Do NOT generate the full program. Only plan.
-
-## MY PROFILE
-
-**Primary Goal:** Muscle Building (gain lean mass and size)
-**Secondary Goals:** Include Cardiovascular Training
-
-**Training Schedule:**
-- Total training days per week: 6
-- Muscle Building days: 5
-- Additional focus days (cardiovascular training): 1
-
-**Training Experience:** Advanced (2+ years, excellent technique, slow progression)
-**Training Approach:** Push Hard — target upper end of optimal volume ranges.
-
-**Program Duration:** 1 year (long-term development plan)
-**Preferred Cardio Activities:** Treadmill / Indoor Running, Stationary Bike / Cycling, Swimming, Stair Climber / StepMill
-
-**Available Equipment:** Commercial Gym (full equipment access)
-**Session Length:** Not specified — use 60-75 minutes as typical for hypertrophy with an advanced lifter.
-**Heart Rate Monitor:** Not available
-**Rest Time Preference:** Not specified — use evidence-based defaults.
-**Exercise Note Detail:** Only non-obvious technique tips or specific setup instructions.
-
-## MUSCLE TAXONOMY
-
-Use ONLY these exact muscle names — no generic terms like "Shoulders", "Back", "Arms", or "Legs":
-
-Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
-
-Use "Core" instead of "Lower Back" for spinal stabilization or erector engagement.
-
-### COMPOUND EXERCISE TAGGING GUIDE
-
-Primary = main driver through full ROM. Secondary = assists but not the main driver.
-
-- Bench press variants: Primary Chest, Triceps
-- Incline press variants: Primary Chest, Front Delts | Secondary Triceps
-- Row variants: Primary Upper Back, Lats | Secondary Biceps, Rear Delts
-- Pull-up / Pulldown: Primary Lats | Secondary Biceps, Upper Back
-- Overhead press: Primary Front Delts, Triceps | Secondary Side Delts
-- Squat variants: Primary Quads, Glutes
-- Leg press / Hack squat: Primary Quads | Secondary Glutes
-- Lunge / Split squat: Primary Quads, Glutes
-- Hip hinge (RDL, good morning): Primary Hamstrings, Glutes
-- Hip thrust: Primary Glutes | Secondary Hamstrings
-- Dips: Primary Chest, Triceps
-- Calf raise variants: Primary Calves
-
-## PLANNING RULES
-
-1. **Only use available equipment** — do not include exercises the user can't perform with their listed equipment
-2. **Stay within session duration** — each session must fit the stated time limit
-3. **Rotate secondary goal activities** — if the user has preferred activities (cardio, mobility, sport, etc.), rotate through them. Every preferred activity should appear at least once.
-4. **Rotate exercises between blocks** — change exercise variations while keeping movement patterns. Longer programs need more distinct exercise pools to prevent staleness.
-5. **Plateau management** — for programs longer than 8 weeks, include guidance for when the lifter stalls on a prescribed progression.
-6. **Complete block coverage** — the plan must explicitly cover every block in the program. For each block, specify which exercise pool it uses and list the exercises. Do not use "repeat" or "same as above" — each block must be independently clear so a separate AI can generate it without guessing.
-7. **Deload structure** — if appropriate, include deload weeks with a clear approach (e.g., reduced sets, higher rep ranges). The app does not track weight.
-8. **Long-term periodization** — for programs longer than 16 weeks, the plan should describe how training evolves across repeated cycles. Don't just rotate exercises — show how rep ranges, volume, or intensity shift over the course of the program.
-
-## QUALITY CHECK
-
-Before presenting the plan, verify volume per muscle group. Count only Primary muscle tags. Format as:
-
-| Muscle Group | Sets/Week | Min | Target | Optimal | Status |
-|---|---|---|---|---|---|
-| Chest | 16 | 10 | 16-20 | 12-20 | ✅ |
-| Calves | 18 | 8 | 16-22 | 12-22 (priority) | ✅ |
-
-**Volume targets by training approach (natural lifters):**
-
-| Approach | Major Muscles | Medium Muscles |
-|----------|--------------|----------------|
-| Push Hard | 16-20 sets/week | 12-16 sets/week |
-| Balanced | 12-16 sets/week | 10-14 sets/week |
-| Conservative | 10-12 sets/week | 8-10 sets/week |
-
-Major = Chest, Lats, Upper Back, Quads, Hamstrings, Glutes
-Medium = Side Delts, Biceps, Triceps, Calves
-
-Going above 20 sets/week for any muscle group has diminishing returns for natural lifters.
-
-**Priority muscle groups:** Increase toward 16-22 sets/week. Reduce non-priority muscles toward minimums to keep total stress recoverable.
-
-**Exempt muscles (can show 0 direct sets):** Front Delts, Traps, Rear Delts, Forearms — these get sufficient indirect work from compounds. Core may be exempt for short programs but should be included in longer programs.
-
-**Experience-scaled minimums:**
-
-| Level | Major Muscles | Medium Muscles |
-|-------|--------------|----------------|
-| Beginner | 6-8 sets/week | 6 sets/week |
-| Intermediate | 8-10 sets/week | 6-8 sets/week |
-| Advanced | 10-12 sets/week | 8-10 sets/week |
-
-**Status indicators:**
-- ✅ = within target range
-- ⚠️ LOW = below minimum — must fix before presenting
-- ⚠️ HIGH = above 20 sets — diminishing returns unless priority muscle
-- ℹ️ CONSTRAINED = above minimum but below target due to split/schedule. Must explain in Recommendations.
-
-If any non-exempt muscle is below minimum, revise the plan before presenting. If Push Hard targets aren't met and a practical fix exists (add a superset, swap an exercise), implement it rather than flagging. A Push Hard program where most muscles sit at the floor of their target range is underdelivering — aim for the upper half.
-
-After verifying ranges, check distribution balance — avoid some muscles maxed out while others sit at the floor.`;
+                    const planningPrompt = assemblePlanningPrompt(questionnaireData, mesocycleContext || undefined);
                     
                     await Clipboard.setStringAsync(planningPrompt);
                     setPlanningPromptCopied(true);
@@ -1142,13 +1520,114 @@ After verifying ranges, check distribution balance — avoid some muscles maxed 
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const reviewPrompt = `Now review the block you just generated as an experienced coach would. Check rep progression logic, superset adjacency, exercise name consistency, rest periods, muscle tags, deload volume reduction, faithful translation of the plan, and anything else you find.
+                    const reviewPrompt = `# Review Block
 
-If you find issues, output a corrected JSON file and briefly explain what you changed.
+First, read the JSON file you just created so you have the full content in context. Then review it as an experienced coach auditing a program for a client. This is an independent quality gate — do not assume your self-check caught everything.
 
-If it passes, confirm: ✅ Reviewed — no issues found.
+## Review Checklist
 
-Then say: "Say **next** to generate the next block. After each block, paste this review prompt again to verify it before moving on."`;
+Work through each check. For each, state PASS or FAIL with a brief note.
+
+### 1. Plan Fidelity
+Compare the JSON against the training plan above:
+- Every exercise listed in the plan for this block appears in the JSON
+- Set counts match the plan
+- Muscle tags (primaryMuscles, secondaryMuscles) match the plan
+- Day structure and exercise order match the plan
+- For diff-based blocks (5+ block programs), verify that all carried-over exercises from the base block are present — not just the swapped ones
+- No exercises were added, removed, or renamed
+- If the plan includes cardio or secondary goal days, the cardio entry matches the plan's Secondary Goal Summary (activities, rotation order, duration)
+- **FAIL if** any exercise is missing, added, or has wrong sets/muscles, or cardio day doesn't match the plan
+
+### 2. Rep Progression Logic
+For each exercise, check reps_weekly across all weeks:
+- Reps change meaningfully across weeks (not "10, 10, 10" every week for every exercise)
+- **Compound exercises should trend flat-to-decreasing** over the block (linear/intensity progression)
+- **Isolation exercises should trend flat-to-increasing** over the block (ascending density)
+- Compound rep ranges match the block's stated focus (e.g., a "Strength: 5-8 reps" block shouldn't have compound exercises at 12-15). Isolation exercises can run 2-4 reps higher than the block's stated range.
+- **FAIL if** more than half the exercises have identical reps every week (flat progression)
+- **FAIL if** compounds trend upward or isolations trend downward (wrong direction)
+- **FAIL if** compound rep ranges don't match the block's focus
+
+### 3. Deload Weeks
+If the block includes a deload week:
+- sets_weekly for the deload week is ~40-50% lower than training weeks
+- Reps in the deload week are 2-3 higher per set than training weeks
+- ALL exercises have reduced volume on the deload week, not just some
+- **FAIL if** deload volume reduction is less than 30% or greater than 60%
+- **FAIL if** any exercise has unchanged volume on the deload week
+
+### 4. Superset Integrity
+- Superset exercises are adjacent in the exercises array
+- Both exercises reference each other by exact name in their notes: "Superset with [name]"
+- The first superset exercise (SS[n]a) has shorter rest (60-90s); the second (SS[n]b) has full rest for its exercise type
+- **FAIL if** superset exercises are separated, cross-references are missing/mismatched, or rest encoding is wrong
+
+### 5. Exercise Name Consistency
+- Each exercise uses the exact same name string everywhere: in the exercise field, in superset notes, and across days if it appears more than once
+- **FAIL if** any name varies (e.g., "Cable Overhead Extension" vs "Overhead Cable Extension")
+
+### 6. Rest Periods
+- Heavy compounds (squat, deadlift, barbell bench, barbell OHP): 150-180s rest
+- Other compounds (rows, lunges, dumbbell presses, pull-ups, dips, leg press): 120-150s rest
+- Isolation exercises: 60-90s rest
+- restQuick ≈ 65% of rest (±5s tolerance)
+- If the plan specifies shorter or minimal rest, verify adjustments are consistent
+- **FAIL if** any heavy compound has rest <150s, any other compound has rest <120s, or any isolation has rest >90s (unless plan specifies non-default rest)
+
+### 7. Muscle Tags
+- All primaryMuscles and secondaryMuscles use exact taxonomy names: Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
+- No exercise has an empty primaryMuscles array
+- Tags follow the compound tagging guide (e.g., rows = Primary Upper Back, Lats | Secondary Biceps, Rear Delts)
+- **FAIL if** any non-taxonomy name appears or primaryMuscles is empty
+
+### 8. Schema Compliance
+- Weekly keys are block-relative (start from "1")
+- deload_weeks array is present and correct if the block has deloads; omitted entirely (not an empty array) if no deloads
+- secondaryMuscles is \`[]\` (not omitted) when empty
+- All required fields are present for each exercise type
+- reps_weekly values are comma-separated per-set targets, not shorthand
+- sets_weekly is present for every week in the block; training weeks match the \`sets\` field; deload weeks show reduced values
+- No warm-up sets included
+- **FAIL if** any schema violation
+
+### 9. Volume Verification
+Cross-reference the volume summary output after the block against the plan's Volume Targets table:
+- Count total primary-tagged sets per muscle group across all days (use training week set counts, not deload)
+- Compare against the volume targets from the plan
+- **FAIL if** any non-exempt muscle group is below its stated minimum
+
+### 10. Alternatives Check
+- Every strength exercise has 2 alternatives (or 1 for bodyweight-only programs)
+- Each alternative includes primaryMuscles and secondaryMuscles (secondaryMuscles can be \`[]\`)
+- Alternatives target the same primary muscles as the main exercise
+- **FAIL if** alternatives are missing, incomplete, or target different primary muscles
+
+### 11. Duration Reasonableness
+Check that estimated_duration values are reasonable:
+- Days with more exercises/sets should have proportionally longer durations
+- No training day should exceed 90 minutes (or 95 for Push Hard programs with heavy compound days) or fall below 30 minutes unless the plan explicitly specifies otherwise
+- Cardio days should roughly match the prescribed activity duration + 10 min for warmup/cooldown
+- **FAIL if** any day's duration seems unreasonable given its exercise count and set total (e.g., 8 exercises at 4 sets each with compound rest shouldn't show 45 minutes)
+
+## Output
+
+If ALL checks pass:
+
+> ✅ Reviewed — all checks passed. [One sentence summary of what was verified.]
+
+Then re-output the JSON file with the download link so the user doesn't need to scroll back to find it.
+
+If ANY check fails:
+1. List each failure with the check name, what's wrong, and what the fix is
+2. Output a corrected JSON file
+3. Say what changed
+
+Then say: "Say **next** to generate the next block. After each block, say **review** to verify it before moving on."
+
+---
+
+**Remember this review process.** After each future block in this conversation, when the user says "review", run this same checklist. No need to paste these instructions again.`;
                     await Clipboard.setStringAsync(reviewPrompt);
                     setReviewPromptCopied(true);
                     setTimeout(() => {
@@ -1295,6 +1774,90 @@ Then say: "Say **next** to generate the next block. After each block, paste this
           </TouchableOpacity>
 
         </View>
+
+        {/* Mesocycle Context Display */}
+        {mesocycleContext && (
+          <View style={styles.mesocycleContextWrapper}>
+            <View style={styles.mesocycleContextCard}>
+              <View style={styles.mesocycleHeader}>
+                <Text style={styles.mesocycleTitle}>
+                  Mesocycle {mesocycleContext.currentMesocycle} of {mesocycleContext.totalMesocycles}
+                </Text>
+                {currentProgram?.mesocycleRoadmap[mesocycleContext.currentMesocycle - 1] && (
+                  <Text style={styles.mesocyclePhaseName}>
+                    {currentProgram.mesocycleRoadmap[mesocycleContext.currentMesocycle - 1].phaseName}
+                  </Text>
+                )}
+              </View>
+              
+              {currentProgram && (
+                <View style={styles.mesocycleProgress}>
+                  <Text style={styles.progressLabel}>
+                    Blocks imported: {currentProgram.routineIds.length} / {mesocycleContext.mesocycleBlocks * mesocycleContext.currentMesocycle}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Plan Input Section */}
+            {!showPlanInput ? (
+              <TouchableOpacity 
+                style={[styles.planInputButton, { borderColor: themeColor }]}
+                onPress={() => setShowPlanInput(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="document-text-outline" size={18} color={themeColor} />
+                <Text style={[styles.planInputButtonText, { color: themeColor }]}>
+                  Paste Your Plan
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.planInputSection}>
+                <Text style={styles.planInputLabel}>Paste your AI-generated plan text:</Text>
+                <View style={styles.planInputContainer}>
+                  <TouchableOpacity 
+                    style={[styles.planTextArea, { borderColor: themeColor }]}
+                    onPress={async () => {
+                      const clipboardText = await Clipboard.getStringAsync();
+                      setPlanText(clipboardText);
+                      setPlanInputCopied(true);
+                      setTimeout(() => setPlanInputCopied(false), 2000);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.planTextAreaPlaceholder}>
+                      {planText || 'Tap to paste from clipboard'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.planInputActions}>
+                  <TouchableOpacity 
+                    style={styles.planCancelButton}
+                    onPress={() => {
+                      setShowPlanInput(false);
+                      setPlanText('');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.planCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.planSubmitButton, { backgroundColor: themeColor }]}
+                    onPress={handlePlanTextSubmit}
+                    disabled={!planText.trim()}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.planSubmitButtonText}>
+                      {roadmapSaved ? 'Roadmap Saved ✓' : 'Save Roadmap'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Move help link to bottom of screen */}
         <View style={styles.helpLinkWrapper}>
@@ -2027,5 +2590,115 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  
+  // Mesocycle styles
+  mesocycleContextWrapper: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  mesocycleContextCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 16,
+    marginBottom: 12,
+  },
+  mesocycleHeader: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  mesocycleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  mesocyclePhaseName: {
+    fontSize: 14,
+    color: '#71717a',
+    fontStyle: 'italic',
+  },
+  mesocycleProgress: {
+    alignItems: 'center',
+  },
+  progressLabel: {
+    fontSize: 14,
+    color: '#a1a1aa',
+  },
+  planInputButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  planInputButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  planInputSection: {
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 16,
+  },
+  planInputLabel: {
+    fontSize: 14,
+    color: '#a1a1aa',
+    marginBottom: 8,
+  },
+  planInputContainer: {
+    marginBottom: 12,
+  },
+  planTextArea: {
+    borderWidth: 2,
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 80,
+    backgroundColor: '#27272a',
+  },
+  planTextAreaPlaceholder: {
+    fontSize: 14,
+    color: '#71717a',
+    lineHeight: 20,
+  },
+  planInputActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  planCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'transparent',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#27272a',
+    alignItems: 'center',
+  },
+  planCancelButtonText: {
+    fontSize: 14,
+    color: '#71717a',
+    fontWeight: '600',
+  },
+  planSubmitButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  planSubmitButtonText: {
+    fontSize: 14,
+    color: '#0a0a0b',
+    fontWeight: '600',
   },
 });

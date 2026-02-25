@@ -104,48 +104,63 @@ export default function HomeScreen({ route }: any) {
 
   // Handle imported program
   useEffect(() => {
-    if (route?.params?.importedProgram) {
-      const program = route.params.importedProgram;
-      
-      // Define sample workout IDs to prevent duplicates
-      const sampleWorkoutIds = [
-        'sample_quick_start_ppl',
-        'sample_muscle_builder_pro_52w', 
-        'sample_glute_tone_12w'
-      ];
-      
-      // Check if this is a sample workout trying to be imported
-      if (program.id && sampleWorkoutIds.includes(program.id)) {
-        Alert.alert(
-          'Already Available',
-          'This workout is already available in Sample Plans. You can access it anytime from the Workout Plans screen.',
-          [{ text: 'OK' }]
-        );
+    const handleImportedProgram = async () => {
+      if (route?.params?.importedProgram) {
+        const program = route.params.importedProgram;
         
-        // Clear the params and return early
+        // Define sample workout IDs to prevent duplicates
+        const sampleWorkoutIds = [
+          'sample_quick_start_ppl',
+          'sample_muscle_builder_pro_52w', 
+          'sample_glute_tone_12w'
+        ];
+        
+        // Check if this is a sample workout trying to be imported
+        if (program.id && sampleWorkoutIds.includes(program.id)) {
+          Alert.alert(
+            'Already Available',
+            'This workout is already available in Sample Plans. You can access it anytime from the Workout Plans screen.',
+            [{ text: 'OK' }]
+          );
+          
+          // Clear the params and return early
+          navigation.setParams({ importedProgram: undefined } as any);
+          return;
+        }
+        
+        const newRoutine: WorkoutRoutine = {
+          id: Date.now().toString(),
+          name: program.routine_name,
+          days: program.days_per_week,
+          blocks: program.blocks.length,
+          data: program,
+          programId: program.programId, // Link to mesocycle program if applicable
+        };
+        addRoutine(newRoutine);
+        
+        // If this routine is part of a mesocycle program, update the program's routine list
+        if (program.programId) {
+          try {
+            const { ProgramStorage } = await import('../data/programStorage');
+            await ProgramStorage.addRoutineToProgram(program.programId, newRoutine.id);
+          } catch (error) {
+            console.error('Failed to link routine to program:', error);
+          }
+        }
+        
+        // Trigger feedback modal if the program has an import ID
+        if (program.id) {
+          setTimeout(() => {
+            triggerFeedbackModal(program.id);
+          }, 1000); // Give time for the program to be added to the list
+        }
+        
+        // Clear the params to prevent re-adding
         navigation.setParams({ importedProgram: undefined } as any);
-        return;
       }
-      
-      const newRoutine: WorkoutRoutine = {
-        id: Date.now().toString(),
-        name: program.routine_name,
-        days: program.days_per_week,
-        blocks: program.blocks.length,
-        data: program,
-      };
-      addRoutine(newRoutine);
-      
-      // Trigger feedback modal if the program has an import ID
-      if (program.id) {
-        setTimeout(() => {
-          triggerFeedbackModal(program.id);
-        }, 1000); // Give time for the program to be added to the list
-      }
-      
-      // Clear the params to prevent re-adding
-      navigation.setParams({ importedProgram: undefined } as any);
-    }
+    };
+
+    handleImportedProgram();
   }, [route?.params?.importedProgram, triggerFeedbackModal]);
 
   const loadRoutines = async () => {

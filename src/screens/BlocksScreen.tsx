@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   Modal,
   Alert,
+  SectionList,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -15,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
+import { Program, ProgramStorage, MesocyclePhase } from '../data/programStorage';
 
 type BlocksScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Blocks'>;
 type BlocksScreenRouteProp = RouteProp<RootStackParamList, 'Blocks'>;
@@ -24,6 +26,16 @@ interface Block {
   weeks: string;
   structure?: string;
   days: any[];
+}
+
+interface MesocycleSection {
+  title: string;
+  data: Block[];
+  mesocycleNumber: number;
+  phase?: MesocyclePhase;
+  isCompleted: boolean;
+  blocksCompleted: number;
+  totalBlocks: number;
 }
 
 interface BlockCardProps {
@@ -39,6 +51,74 @@ interface BlockCardProps {
     isComplete: boolean;
     isOverdue: boolean;
   };
+}
+
+interface MesocycleHeaderProps {
+  section: MesocycleSection;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  themeColor: string;
+}
+
+function MesocycleHeader({ section, isCollapsed, onToggle, themeColor }: MesocycleHeaderProps) {
+  const progressPercentage = section.totalBlocks > 0 
+    ? (section.blocksCompleted / section.totalBlocks) * 100 
+    : 0;
+
+  return (
+    <TouchableOpacity 
+      style={styles.mesocycleHeader} 
+      onPress={onToggle}
+      activeOpacity={0.7}
+    >
+      <View style={styles.mesocycleHeaderContent}>
+        <View style={styles.mesocycleHeaderLeft}>
+          <View style={styles.mesocycleHeaderTitle}>
+            <Text style={styles.mesocycleTitle}>{section.title}</Text>
+            {section.phase && (
+              <View style={[styles.repFocusBadge, { backgroundColor: themeColor + '15' }]}>
+                <Text style={[styles.repFocusText, { color: themeColor }]}>
+                  {section.phase.repFocus}
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          <Text style={styles.mesocycleSubtitle}>
+            {section.blocksCompleted}/{section.totalBlocks} blocks completed
+            {section.phase && ` • ${section.phase.weeks} weeks`}
+          </Text>
+          
+          {section.totalBlocks > 0 && (
+            <View style={styles.mesocycleProgressContainer}>
+              <View style={styles.mesocycleProgressBar}>
+                <View 
+                  style={[styles.mesocycleProgress, { 
+                    width: `${progressPercentage}%`,
+                    backgroundColor: section.isCompleted ? '#22c55e' : themeColor
+                  }]}
+                />
+              </View>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.mesocycleHeaderRight}>
+          {section.isCompleted && (
+            <View style={styles.mesocycleCompletedBadge}>
+              <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+              <Text style={styles.mesocycleCompletedText}>COMPLETE</Text>
+            </View>
+          )}
+          <Ionicons 
+            name={isCollapsed ? 'chevron-down' : 'chevron-up'} 
+            size={20} 
+            color={section.isCompleted ? '#22c55e' : themeColor} 
+          />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeColor }: BlockCardProps) {
@@ -172,12 +252,17 @@ export default function BlocksScreen() {
   const [completionStatus, setCompletionStatus] = useState<{[blockName: string]: boolean}>({});
   const [showModal, setShowModal] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<{ block: Block; index: number } | null>(null);
+  const [program, setProgram] = useState<Program | null>(null);
+  const [mesocycleSections, setMesocycleSections] = useState<MesocycleSection[]>([]);
+  const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
   
   const totalWeeks = calculateTotalWeeks(routine.data.blocks);
+  const hasMesocycles = program && program.totalMesocycles > 1;
 
   useEffect(() => {
     loadActiveBlock();
     loadWeekProgress();
+    loadProgramData();
   }, []);
 
   useEffect(() => {
@@ -215,6 +300,13 @@ export default function BlocksScreen() {
     }
   }, [initialBlock, initialWeek, routine, navigation]);
 
+  // Update mesocycle sections when program or completion status changes
+  useEffect(() => {
+    if (program) {
+      updateMesocycleSections();
+    }
+  }, [program, completionStatus, routine.data.blocks]);
+
 
   const loadActiveBlock = async () => {
     try {
@@ -225,6 +317,79 @@ export default function BlocksScreen() {
     } catch (error) {
       console.error('Failed to load active block:', error);
     }
+  };
+
+  const loadProgramData = async () => {
+    if (routine.programId) {
+      try {
+        const programData = await ProgramStorage.getProgram(routine.programId);
+        setProgram(programData);
+      } catch (error) {
+        console.error('Failed to load program data:', error);
+      }
+    }
+  };
+
+  const updateMesocycleSections = () => {
+    if (!program || program.totalMesocycles <= 1) {
+      return;
+    }
+
+    const blocksPerMesocycle = Math.ceil(routine.data.blocks.length / program.totalMesocycles);
+    const sections: MesocycleSection[] = [];
+
+    for (let i = 0; i < program.totalMesocycles; i++) {
+      const mesocycleNumber = i + 1;
+      const startIndex = i * blocksPerMesocycle;
+      const endIndex = Math.min(startIndex + blocksPerMesocycle, routine.data.blocks.length);
+      const mesocycleBlocks = routine.data.blocks.slice(startIndex, endIndex);
+      
+      // Find corresponding phase from roadmap
+      const phase = program.mesocycleRoadmap.find(p => p.mesocycleNumber === mesocycleNumber);
+      
+      // Calculate completion status
+      const completedBlocks = mesocycleBlocks.filter(block => 
+        completionStatus[block.block_name] || false
+      ).length;
+      const isCompleted = completedBlocks === mesocycleBlocks.length;
+      
+      // Determine section title
+      let title = `Mesocycle ${mesocycleNumber}`;
+      if (phase) {
+        title += ` — ${phase.phaseName}`;
+      }
+      
+      sections.push({
+        title,
+        data: mesocycleBlocks,
+        mesocycleNumber,
+        phase,
+        isCompleted,
+        blocksCompleted: completedBlocks,
+        totalBlocks: mesocycleBlocks.length
+      });
+    }
+
+    setMesocycleSections(sections);
+  };
+
+  const toggleSection = (mesocycleNumber: number) => {
+    const newCollapsed = new Set(collapsedSections);
+    if (newCollapsed.has(mesocycleNumber)) {
+      newCollapsed.delete(mesocycleNumber);
+    } else {
+      newCollapsed.add(mesocycleNumber);
+    }
+    setCollapsedSections(newCollapsed);
+  };
+
+  const getBlockIndexFromSection = (sectionIndex: number, itemIndex: number): number => {
+    if (!hasMesocycles) {
+      return itemIndex;
+    }
+    
+    const blocksPerMesocycle = Math.ceil(routine.data.blocks.length / program!.totalMesocycles);
+    return sectionIndex * blocksPerMesocycle + itemIndex;
   };
 
   const loadWeekProgress = async () => {
@@ -452,6 +617,24 @@ export default function BlocksScreen() {
     setShowModal(true);
   };
 
+  const handleBlockPressInSection = (block: Block, sectionIndex: number, itemIndex: number) => {
+    if (hasMesocycles) {
+      const realIndex = getBlockIndexFromSection(sectionIndex, itemIndex);
+      handleBlockPress(block);
+    } else {
+      handleBlockPress(block);
+    }
+  };
+
+  const handleBlockLongPressInSection = (block: Block, sectionIndex: number, itemIndex: number) => {
+    if (hasMesocycles) {
+      const realIndex = getBlockIndexFromSection(sectionIndex, itemIndex);
+      handleBlockLongPress(block, realIndex);
+    } else {
+      handleBlockLongPress(block, itemIndex);
+    }
+  };
+
   const handleSetActive = () => {
     if (selectedBlock) {
       saveActiveBlock(selectedBlock.index);
@@ -488,22 +671,58 @@ export default function BlocksScreen() {
         <View style={styles.backButton} />
       </View>
 
-      <FlatList
-        data={routine.data.blocks}
-        keyExtractor={(item, index) => `${item.block_name}-${index}`}
-        renderItem={({ item, index }) => (
-          <BlockCard
-            block={item}
-            onPress={() => handleBlockPress(item)}
-            onLongPress={() => handleBlockLongPress(item, index)}
-            isActive={index === activeBlockIndex}
-            weekProgress={getWeekProgress(index)}
-            themeColor={themeColor}
-          />
-        )}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {hasMesocycles ? (
+        <SectionList
+          sections={mesocycleSections.map(section => ({
+            ...section,
+            data: collapsedSections.has(section.mesocycleNumber) ? [] : section.data
+          }))}
+          keyExtractor={(item, index) => `${item.block_name}-${index}`}
+          renderItem={({ item, index, section }) => {
+            const sectionIndex = mesocycleSections.findIndex(s => s.mesocycleNumber === section.mesocycleNumber);
+            const realIndex = getBlockIndexFromSection(sectionIndex, index);
+            
+            return (
+              <BlockCard
+                block={item}
+                onPress={() => handleBlockPressInSection(item, sectionIndex, index)}
+                onLongPress={() => handleBlockLongPressInSection(item, sectionIndex, index)}
+                isActive={realIndex === activeBlockIndex}
+                weekProgress={getWeekProgress(realIndex)}
+                themeColor={themeColor}
+              />
+            );
+          }}
+          renderSectionHeader={({ section }) => (
+            <MesocycleHeader 
+              section={section}
+              isCollapsed={collapsedSections.has(section.mesocycleNumber)}
+              onToggle={() => toggleSection(section.mesocycleNumber)}
+              themeColor={themeColor}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
+        />
+      ) : (
+        <FlatList
+          data={routine.data.blocks}
+          keyExtractor={(item, index) => `${item.block_name}-${index}`}
+          renderItem={({ item, index }) => (
+            <BlockCard
+              block={item}
+              onPress={() => handleBlockPress(item)}
+              onLongPress={() => handleBlockLongPress(item, index)}
+              isActive={index === activeBlockIndex}
+              weekProgress={getWeekProgress(index)}
+              themeColor={themeColor}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       <Modal
         visible={showModal}
@@ -809,5 +1028,81 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  mesocycleHeader: {
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  mesocycleHeaderContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  mesocycleHeaderLeft: {
+    flex: 1,
+  },
+  mesocycleHeaderTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  mesocycleTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  repFocusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  repFocusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  mesocycleSubtitle: {
+    fontSize: 13,
+    color: '#a1a1aa',
+    marginBottom: 8,
+  },
+  mesocycleProgressContainer: {
+    marginTop: 4,
+  },
+  mesocycleProgressBar: {
+    height: 3,
+    backgroundColor: '#3f3f46',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  mesocycleProgress: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  mesocycleHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mesocycleCompletedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  mesocycleCompletedText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#22c55e',
+    letterSpacing: 0.5,
   },
 });

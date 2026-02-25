@@ -6,6 +6,7 @@ export interface WorkoutRoutine {
   days: number;
   blocks: number;
   data?: any;
+  programId?: string; // optional link to a Program for mesocycle tracking
 }
 
 export interface MealPlan {

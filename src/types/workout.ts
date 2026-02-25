@@ -69,6 +69,8 @@ export interface SportExercise {
 }
 
 export interface WorkoutProgram {
+  id?: string;                        // Optional ID for linking to mesocycle programs
+  programId?: string;                 // Optional link to mesocycle Program
   routine_name: string;
   description?: string;
   days_per_week: number;

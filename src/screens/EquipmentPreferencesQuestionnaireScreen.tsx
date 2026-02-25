@@ -85,7 +85,7 @@ const restTimeOptions: RestTimeOption[] = [
     description: 'Optimal rest times regardless of workout length',
   },
   {
-    id: 'moderate',
+    id: 'shorter',
     title: 'Shorter Rest Times',
     subtitle: 'Balanced approach',
     description: 'Good results, quicker workout',
@@ -1106,7 +1106,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
                   <Text style={styles.tronValue}>
                     {useAIRestTime ? 'AI will optimize for your workout type' :
                      restTimePreference === 'optimal' ? 'Optimal rest times for maximum results' :
-                     restTimePreference === 'moderate' ? 'Shorter rest times for quicker workouts' :
+                     restTimePreference === 'shorter' ? 'Shorter rest times for quicker workouts' :
                      restTimePreference === 'minimal' ? 'Minimal rest times for time efficiency' :
                      'NOT SPECIFIED'}
                   </Text>
