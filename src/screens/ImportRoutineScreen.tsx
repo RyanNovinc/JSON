@@ -1031,6 +1031,31 @@ export default function ImportRoutineScreen() {
     }
   };
 
+  // Extract mesocycle info from routine name
+  const extractMesocycleInfo = (routineName: string): { mesocycleNumber: number; totalMesocycles: number } | null => {
+    // Try to match patterns like "Mesocycle 3", "Mesocycle 2 of 3", "— Mesocycle 3", etc.
+    const mesocycleMatch = routineName.match(/mesocycle\s+(\d+)(?:\s+of\s+(\d+))?/i);
+    
+    if (mesocycleMatch) {
+      const currentMesocycle = parseInt(mesocycleMatch[1]);
+      let totalMesocycles = mesocycleMatch[2] ? parseInt(mesocycleMatch[2]) : null;
+      
+      // If no explicit total, infer from context
+      if (!totalMesocycles) {
+        // If we see "Mesocycle 3", assume it's likely a 3-mesocycle program
+        // This is heuristic-based but reasonable for most programs
+        totalMesocycles = Math.max(currentMesocycle, 3); // At least 3, could be more
+      }
+      
+      return {
+        mesocycleNumber: currentMesocycle,
+        totalMesocycles: Math.min(totalMesocycles, 5) // Cap at 5 for safety
+      };
+    }
+    
+    return null;
+  };
+
   const calculateDefaultMesocycles = (duration: string): number => {
     switch (duration) {
       case '6_months': return 2;
@@ -1046,21 +1071,36 @@ export default function ImportRoutineScreen() {
       const duration = questionnaireData.programDuration || '12_weeks';
       const isLongProgram = ['6_months', '1_year', 'custom'].includes(duration);
       
-      if (!isLongProgram) {
-        return; // No mesocycle handling for short programs
+      // First, try to detect mesocycle info from the routine name
+      const mesocycleInfo = extractMesocycleInfo(importedProgram.routine_name);
+      
+      // If we detected mesocycle info OR it's a long program, handle mesocycles
+      if (!mesocycleInfo && !isLongProgram) {
+        return; // No mesocycle handling for short programs without mesocycle info
       }
 
       let program = currentProgram;
       
       // Create program if it doesn't exist
       if (!program) {
+        // Don't pre-create empty mesocycles - let them be created as blocks are imported
+        const totalMesocycles = mesocycleInfo ? 
+          mesocycleInfo.mesocycleNumber : // Only track up to the current imported mesocycle
+          calculateDefaultMesocycles(duration);
+          
+        const currentMesocycle = mesocycleInfo ? 
+          mesocycleInfo.mesocycleNumber : 
+          1;
+        
         program = {
           id: Date.now().toString(),
-          name: `${duration} Mesocycle Program`,
+          name: mesocycleInfo ? 
+            `${importedProgram.routine_name.split('—')[0].trim()} Program` :
+            `${duration} Mesocycle Program`,
           createdAt: new Date().toISOString(),
           programDuration: duration,
-          totalMesocycles: calculateDefaultMesocycles(duration),
-          currentMesocycle: 1,
+          totalMesocycles,
+          currentMesocycle,
           mesocycleRoadmap: [],
           mesocycleRoadmapText: '',
           completedMesocycles: [],
@@ -1072,9 +1112,13 @@ export default function ImportRoutineScreen() {
       }
 
       // Associate the imported routine with the program
-      // We need to wait for HomeScreen to create the routine, then link it
-      // For now, we'll mark the imported program with the programId
+      // Only set mesocycleNumber for individual mesocycle imports (when mesocycleInfo exists)
+      // For full program imports, leave mesocycleNumber undefined so blocks get distributed
       importedProgram.programId = program.id;
+      if (mesocycleInfo) {
+        importedProgram.mesocycleNumber = mesocycleInfo.mesocycleNumber;
+      }
+      // Don't set mesocycleNumber for full program imports - let BlocksScreen distribute them
       
     } catch (error) {
       console.error('Error in mesocycle program association:', error);
