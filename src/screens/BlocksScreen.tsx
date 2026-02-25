@@ -13,6 +13,7 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { Program, ProgramStorage, MesocyclePhase } from '../data/programStorage';
@@ -385,8 +386,8 @@ export default function BlocksScreen() {
     const cards: MesocycleCard[] = [];
     const currentMesocycle = program.currentMesocycle;
     
-    // For now, since this is a fresh implementation, assign ALL blocks to current mesocycle
-    // Future enhancement: track which blocks belong to which mesocycle during import
+    // Distribute blocks across mesocycles based on mesocycleNumber field or evenly
+    const blocksPerMesocycle = Math.ceil(routine.data.blocks.length / program.totalMesocycles);
     
     for (let i = 0; i < program.totalMesocycles; i++) {
       const mesocycleNumber = i + 1;
@@ -396,25 +397,37 @@ export default function BlocksScreen() {
       let isCompleted = false;
       let isActive = false;
 
+      // Get blocks that belong to this mesocycle
+      // First check if blocks have mesocycleNumber field, otherwise distribute evenly
+      const blocksWithMesocycle = routine.data.blocks.filter((block: any) => 
+        block.mesocycleNumber === mesocycleNumber
+      );
+      
+      if (blocksWithMesocycle.length > 0) {
+        // Use blocks that are explicitly assigned to this mesocycle
+        mesocycleBlocks = blocksWithMesocycle;
+      } else {
+        // Fall back to even distribution
+        const startIdx = (mesocycleNumber - 1) * blocksPerMesocycle;
+        const endIdx = Math.min(startIdx + blocksPerMesocycle, routine.data.blocks.length);
+        mesocycleBlocks = routine.data.blocks.slice(startIdx, endIdx);
+      }
+      
+      // Determine state based on mesocycle position
       if (mesocycleNumber === currentMesocycle) {
-        // Current mesocycle gets ALL imported blocks
-        mesocycleBlocks = routine.data.blocks;
         isActive = true;
-        
-        // Check if current mesocycle is completed
+      } else if (mesocycleNumber < currentMesocycle) {
+        isCompleted = true;
+      }
+      
+      // Check if current mesocycle is completed
+      if (mesocycleBlocks.length > 0) {
         const completedBlocks = mesocycleBlocks.filter(block => 
           completionStatus[block.block_name] || false
         ).length;
-        isCompleted = completedBlocks === mesocycleBlocks.length && mesocycleBlocks.length > 0;
-      } else if (mesocycleNumber < currentMesocycle) {
-        // Past mesocycles: would show blocks that were previously imported for them
-        // For now, these will be empty since we don't have historical data
-        mesocycleBlocks = [];
-        isCompleted = true;
-      } else {
-        // Future mesocycles: empty until we import blocks for them
-        mesocycleBlocks = [];
-        isCompleted = false;
+        if (mesocycleNumber === currentMesocycle) {
+          isCompleted = completedBlocks === mesocycleBlocks.length;
+        }
       }
       
       // Calculate completion stats
@@ -690,6 +703,100 @@ export default function BlocksScreen() {
     setSelectedBlock(null);
   };
 
+  const handleDebugCopy = async () => {
+    Alert.alert(
+      'Debug Options',
+      'What would you like to do?',
+      [
+        {
+          text: 'Copy Debug Data',
+          onPress: async () => {
+            const debugData = {
+              screenInfo: {
+                routineName: routine.name,
+                hasMesocycles,
+                totalWeeks,
+                blocksLength: routine.data.blocks.length
+              },
+              programData: program ? {
+                id: program.id,
+                name: program.name,
+                programDuration: program.programDuration,
+                totalMesocycles: program.totalMesocycles,
+                currentMesocycle: program.currentMesocycle,
+                routineIds: program.routineIds,
+                mesocycleRoadmapLength: program.mesocycleRoadmap.length,
+                completedMesocyclesLength: program.completedMesocycles.length
+              } : null,
+              routineData: {
+                id: routine.id,
+                programId: routine.programId,
+                mesocycleNumber: routine.mesocycleNumber,
+                blocksData: routine.data.blocks.map(block => ({
+                  block_name: block.block_name,
+                  weeks: block.weeks,
+                  mesocycleNumber: block.mesocycleNumber
+                }))
+              },
+              mesocycleCardsData: mesocycleCards.map(card => ({
+                mesocycleNumber: card.mesocycleNumber,
+                totalBlocks: card.totalBlocks,
+                completedBlocks: card.completedBlocks,
+                isActive: card.isActive,
+                isCompleted: card.isCompleted,
+                progressPercentage: card.progressPercentage
+              })),
+              asyncStorageKeys: {
+                schemaVersion: await AsyncStorage.getItem('schemaVersion'),
+                programsStorage: await AsyncStorage.getItem('workout_programs')
+              }
+            };
+
+            const debugJson = JSON.stringify(debugData, null, 2);
+            await Clipboard.setStringAsync(debugJson);
+            Alert.alert('Debug Info Copied', 'Debug data copied to clipboard.');
+          }
+        },
+        {
+          text: 'Fix Program Data',
+          onPress: async () => {
+            if (program && program.totalMesocycles > 5) {
+              try {
+                let correctedCount: number;
+                
+                switch (program.programDuration) {
+                  case '1_year':
+                    correctedCount = 3;
+                    break;
+                  case '6_months':
+                    correctedCount = 2;
+                    break;
+                  case 'custom':
+                    correctedCount = 3;
+                    break;
+                  default:
+                    correctedCount = 3;
+                }
+                
+                await ProgramStorage.updateProgram(program.id, {
+                  totalMesocycles: correctedCount,
+                  currentMesocycle: Math.min(program.currentMesocycle, correctedCount)
+                });
+                
+                Alert.alert('Fixed!', `Program fixed: ${program.totalMesocycles} → ${correctedCount} mesocycles. Go back and re-enter this screen.`);
+              } catch (error) {
+                Alert.alert('Error', 'Failed to fix program data');
+              }
+            } else {
+              Alert.alert('No Fix Needed', 'Program data looks correct');
+            }
+          }
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
   const handleBack = () => {
     navigation.goBack();
   };
@@ -713,7 +820,13 @@ export default function BlocksScreen() {
             }
           </Text>
         </View>
-        <View style={styles.backButton} />
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={handleDebugCopy}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="bug" size={20} color="#ffffff" />
+        </TouchableOpacity>
       </View>
 
       {hasMesocycles ? (

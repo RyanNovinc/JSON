@@ -111,11 +111,62 @@ export default function ImportRoutineScreen() {
           console.log('Schema migration: cleared old format data:', keysToDelete);
         }
         
+        // Clean up Programs with invalid mesocycle counts (from before recent fixes)
+        await cleanupInvalidPrograms();
+        
         // Set new schema version
         await AsyncStorage.setItem('schemaVersion', '2.0');
       }
     } catch (error) {
       console.error('Schema migration failed:', error);
+    }
+  };
+
+  // Clean up Programs with invalid mesocycle counts from before recent fixes
+  const cleanupInvalidPrograms = async () => {
+    try {
+      const programs = await ProgramStorage.loadPrograms();
+      let cleaned = false;
+      
+      for (const program of programs) {
+        if (program.totalMesocycles > 5) {
+          // Fix or delete programs with excessive mesocycle counts
+          let correctedCount: number;
+          
+          switch (program.programDuration) {
+            case '1_year':
+              correctedCount = 3;
+              break;
+            case '6_months':
+              correctedCount = 2;
+              break;
+            case 'custom':
+              correctedCount = 3;
+              break;
+            default:
+              // Delete programs with unknown durations
+              await ProgramStorage.deleteProgram(program.id);
+              console.log(`Deleted invalid program: ${program.id} (duration: ${program.programDuration})`);
+              cleaned = true;
+              continue;
+          }
+          
+          // Update program with corrected mesocycle count
+          await ProgramStorage.updateProgram(program.id, {
+            totalMesocycles: correctedCount,
+            // Also reset current mesocycle if it exceeds the new total
+            currentMesocycle: Math.min(program.currentMesocycle, correctedCount)
+          });
+          console.log(`Fixed program ${program.id}: ${program.totalMesocycles} → ${correctedCount} mesocycles`);
+          cleaned = true;
+        }
+      }
+      
+      if (cleaned) {
+        console.log('Program cleanup completed');
+      }
+    } catch (error) {
+      console.error('Program cleanup failed:', error);
     }
   };
 
@@ -283,6 +334,7 @@ export default function ImportRoutineScreen() {
     if (incompatibleProgram) {
       throw new Error(`Cannot combine programs with different training frequencies. Found ${firstDaysPerWeek} days/week and ${incompatibleProgram.days_per_week} days/week.`);
     }
+
 
     // Keep the original program name from the first program, but strip mesocycle suffix when combining multiple mesocycles
     let combinedName = programs[0].routine_name;
@@ -845,7 +897,11 @@ export default function ImportRoutineScreen() {
       if (isLongProgram) {
         // Find existing program for this user based on duration
         const programs = await ProgramStorage.loadPrograms();
-        const existingProgram = programs.find(p => p.programDuration === duration);
+        // Find the most recently created program for this duration to avoid duplicates
+        const matchingPrograms = programs.filter(p => p.programDuration === duration);
+        const existingProgram = matchingPrograms.length > 0 ? 
+          matchingPrograms.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] : 
+          null;
         
         if (existingProgram) {
           setCurrentProgram(existingProgram);
@@ -904,8 +960,11 @@ export default function ImportRoutineScreen() {
       
       const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell);
       if (cells.length >= 6) {
+        const mesocycleNum = parseInt(cells[0]);
+        if (isNaN(mesocycleNum) || mesocycleNum <= 0) return; // Skip bad rows
+        
         roadmapData.push({
-          mesocycleNumber: parseInt(cells[0]) || index,
+          mesocycleNumber: mesocycleNum,
           phaseName: cells[1],
           repFocus: cells[2],
           emphasis: cells[3],
@@ -944,7 +1003,7 @@ export default function ImportRoutineScreen() {
           name: `${duration} Mesocycle Program`,
           createdAt: new Date().toISOString(),
           programDuration: duration,
-          totalMesocycles: roadmapData.length || calculateDefaultMesocycles(duration),
+          totalMesocycles: Math.min(roadmapData.length, 5) || calculateDefaultMesocycles(duration),
           currentMesocycle: 1,
           mesocycleRoadmap: roadmapData,
           mesocycleRoadmapText: roadmapText,
@@ -1022,6 +1081,7 @@ export default function ImportRoutineScreen() {
       throw error;
     }
   };
+
 
   const checkMesocycleCompletion = async () => {
     try {
@@ -1768,32 +1828,39 @@ If this is the last block of a mesocycle (not the last mesocycle of the program)
 
         </View>
 
-        {/* Mesocycle Context Display */}
-        {mesocycleContext && (
-          <View style={styles.mesocycleContextWrapper}>
-            <View style={styles.mesocycleContextCard}>
-              <View style={styles.mesocycleHeader}>
-                {/* Removed mesocycle indicator as requested */}
-                {currentProgram?.mesocycleRoadmap[mesocycleContext.currentMesocycle - 1] && (
-                  <Text style={styles.mesocyclePhaseName}>
-                    {currentProgram.mesocycleRoadmap[mesocycleContext.currentMesocycle - 1].phaseName}
-                  </Text>
-                )}
-              </View>
-              
-            </View>
 
-          </View>
-        )}
-
-        {/* Help link */}
-        <View style={styles.helpLinkWrapper}>
+        <View style={{
+          position: 'absolute',
+          bottom: 30,
+          left: 20,
+          right: 20,
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
           <TouchableOpacity 
-            style={styles.helpLink}
-            onPress={() => setShowInstructions(true)}
-            activeOpacity={1}
+            onPress={() => {
+              console.log('Help link pressed');
+              setShowInstructions(true);
+            }}
+            style={{
+              backgroundColor: 'transparent',
+              paddingVertical: 16,
+              paddingHorizontal: 24,
+              minHeight: 48,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom program with AI?</Text>
+            <Text style={{
+              fontSize: 16,
+              fontWeight: '500',
+              textAlign: 'center',
+              textDecorationLine: 'underline',
+              color: themeColor,
+            }}>
+              How to create custom programs with AI?
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -2119,28 +2186,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#e4e4e7',
     letterSpacing: 0.3,
-  },
-  helpLinkWrapper: {
-    position: 'absolute',
-    bottom: 40,
-    left: 0,
-    right: 0,
-    backgroundColor: 'transparent',
-  },
-  helpLink: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: 0,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  helpLinkText: {
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'center',
-    textDecorationLine: 'underline',
   },
   loadingContainer: {
     flex: 1,
@@ -2523,35 +2568,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
-  },
-  
-  // Mesocycle styles
-  mesocycleContextWrapper: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  mesocycleContextCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 16,
-    marginBottom: 12,
-  },
-  mesocycleHeader: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  mesocycleTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  mesocyclePhaseName: {
-    fontSize: 14,
-    color: '#71717a',
-    fontStyle: 'italic',
   },
   mesocycleProgress: {
     alignItems: 'center',

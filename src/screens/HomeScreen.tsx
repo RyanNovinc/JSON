@@ -23,7 +23,6 @@ import WorkoutCalendar from '../components/WorkoutCalendar';
 import ImportFeedbackModal from '../components/ImportFeedbackModal';
 import OnboardingOverlay from '../components/OnboardingOverlay';
 import { useImportFeedback } from '../hooks/useImportFeedback';
-import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAppMode } from '../contexts/AppModeContext';
 
@@ -81,7 +80,6 @@ export default function HomeScreen({ route }: any) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   
   const { showFeedbackModal, submitFeedback, skipFeedback, triggerFeedbackModal } = useImportFeedback();
-  const { hasJSONPro } = useRevenueCat();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
 
@@ -128,6 +126,18 @@ export default function HomeScreen({ route }: any) {
           return;
         }
         
+        // Determine mesocycle number if this is part of a mesocycle program
+        let mesocycleNumber: number | undefined;
+        if (program.programId) {
+          try {
+            const { ProgramStorage } = await import('../data/programStorage');
+            const mesocycleProgram = await ProgramStorage.getProgram(program.programId);
+            mesocycleNumber = mesocycleProgram?.currentMesocycle;
+          } catch (error) {
+            console.error('Failed to get mesocycle program:', error);
+          }
+        }
+
         const newRoutine: WorkoutRoutine = {
           id: Date.now().toString(),
           name: program.routine_name,
@@ -135,6 +145,7 @@ export default function HomeScreen({ route }: any) {
           blocks: program.blocks.length,
           data: program,
           programId: program.programId, // Link to mesocycle program if applicable
+          mesocycleNumber, // which mesocycle this routine belongs to
         };
         addRoutine(newRoutine);
         
@@ -713,20 +724,8 @@ export default function HomeScreen({ route }: any) {
         </View>
       )}
 
-      {/* Shop Button - Top Right - Hidden if user has JSON Pro - DEV ONLY */}
-      {!hasJSONPro && __DEV__ && (
-        <View style={styles.shopButton}>
-          <TouchableOpacity
-            style={styles.buttonInner}
-            onPress={() => navigation.navigate('Payment' as any)}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="storefront-outline" size={24} color="#0a0a0b" />
-          </TouchableOpacity>
-        </View>
-      )}
       {/* Questionnaire Button - Bottom Center */}
-      <View style={styles.questionnaireButton}>
+      <View style={[styles.questionnaireButton, { backgroundColor: themeColor }]}>
         <TouchableOpacity
           style={styles.buttonInner}
           onPress={() => navigation.navigate('WorkoutDashboard' as any)}
@@ -772,18 +771,19 @@ export default function HomeScreen({ route }: any) {
       )}
 
       {/* Gender Theme Toggle - Top Right */}
-      <TouchableOpacity
-        style={[styles.genderToggle, __DEV__ && styles.genderToggleWithDev]}
-        onPress={() => setIsPinkTheme(!isPinkTheme)}
-        activeOpacity={0.8}
-      >
-        <Ionicons 
-          name={isPinkTheme ? "woman" : "man"} 
-          size={24} 
-          color={themeColor} 
-        />
-      </TouchableOpacity>
-
+      <View style={[styles.genderToggle, { backgroundColor: themeColor }]}>
+        <TouchableOpacity
+          style={styles.buttonInner}
+          onPress={() => setIsPinkTheme(!isPinkTheme)}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name={isPinkTheme ? "woman" : "man"} 
+            size={24} 
+            color="#0a0a0b" 
+          />
+        </TouchableOpacity>
+      </View>
 
       {/* Add Routine FAB - Bottom Right */}
       <View style={[styles.fab, { backgroundColor: themeColor }]}>
@@ -1338,12 +1338,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 12,
     textAlign: 'center',
-    textShadowColor: '#22d3ee',
+    textShadowColor: 'rgba(34, 211, 238, 0.5)',
     textShadowOffset: {
       width: 0,
       height: 1,
     },
-    textShadowOpacity: 0.5,
     textShadowRadius: 2,
   },
   dualVerticalSubtitle: {
@@ -1432,12 +1431,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
     marginBottom: 6,
-    textShadowColor: '#22d3ee',
+    textShadowColor: 'rgba(34, 211, 238, 0.5)',
     textShadowOffset: {
       width: 0,
       height: 1,
     },
-    textShadowOpacity: 0.5,
     textShadowRadius: 2,
   },
   tripleSubtitle: {
@@ -1502,12 +1500,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
     marginBottom: 4,
-    textShadowColor: '#22d3ee',
+    textShadowColor: 'rgba(34, 211, 238, 0.5)',
     textShadowOffset: {
       width: 0,
       height: 1,
     },
-    textShadowOpacity: 0.5,
     textShadowRadius: 2,
   },
   quadSubtitle: {
@@ -1684,16 +1681,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#22d3ee',
   },
   
-  // Shop button styles
-  shopButton: {
-    position: 'absolute',
-    right: 16,
-    top: 54, // Aligns with header padding
-    width: 56,
-    height: 56,
-    borderRadius: 4,
-    backgroundColor: '#a855f7',
-  },
   
   // Questionnaire button styles
   questionnaireButton: {
@@ -1703,7 +1690,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 4,
-    backgroundColor: '#22d3ee',
   },
 
   // Share modal styles
@@ -1878,21 +1864,11 @@ const styles = StyleSheet.create({
   // Gender toggle styles
   genderToggle: {
     position: 'absolute',
-    top: 60,
+    top: 54,
     right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    width: 56,
+    height: 56,
+    borderRadius: 4,
   },
   
   // Development mode toggle styles

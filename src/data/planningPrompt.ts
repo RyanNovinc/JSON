@@ -818,7 +818,8 @@ Design Mesocycle ${context.currentMesocycle} following the roadmap above. Rotate
     const context = programContext || {
       totalMesocycles: mesocycleDefaults!.totalMesocycles,
       currentMesocycle: 1,
-      mesocycleBlocks: mesocycleDefaults!.mesocycleBlocks
+      mesocycleBlocks: mesocycleDefaults!.mesocycleBlocks,
+      mesocycleWeeks: mesocycleDefaults!.mesocycleWeeks
     };
     
     prompt += `\n11. **Describe the full mesocycle progression in the Mesocycle Roadmap section.**`;
