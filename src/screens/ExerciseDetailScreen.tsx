@@ -40,8 +40,81 @@ export default function ExerciseDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
   const { themeColor } = useTheme();
-  const [isFavorite, setIsFavorite] = useState(true); // Assume it's already a favorite since we're viewing it
-  const [currentExercise, setCurrentExercise] = useState(route.params?.exercise as FavoriteExercise);
+  const [isFavorite, setIsFavorite] = useState(true);
+  const [currentExercise, setCurrentExercise] = useState<FavoriteExercise | null>(null);
+  
+  // Initialize exercise with safe defaults (no data clearing)
+  React.useEffect(() => {
+    const initializeExercise = async () => {
+      const routeExercise = route.params?.exercise;
+      
+      if (routeExercise && typeof routeExercise === 'object') {
+        // Ensure all required fields are present and properly formatted
+        const safeExercise: FavoriteExercise = {
+          id: typeof routeExercise.id === 'string' ? routeExercise.id : 'unknown',
+          name: typeof routeExercise.name === 'string' ? routeExercise.name : 'Unknown Exercise',
+          category: typeof routeExercise.category === 'string' ? routeExercise.category as any : 'gym',
+          muscleGroups: Array.isArray(routeExercise.muscleGroups) ? routeExercise.muscleGroups.filter(g => typeof g === 'string') : ['Custom'],
+          primaryMuscles: Array.isArray(routeExercise.primaryMuscles) ? routeExercise.primaryMuscles.filter(m => typeof m === 'string') : ['Custom'],
+          secondaryMuscles: Array.isArray(routeExercise.secondaryMuscles) ? routeExercise.secondaryMuscles.filter(m => typeof m === 'string') : [],
+          instructions: typeof routeExercise.instructions === 'string' ? routeExercise.instructions : '',
+          notes: typeof routeExercise.notes === 'string' ? routeExercise.notes : '',
+          alternatives: Array.isArray(routeExercise.alternatives) ? routeExercise.alternatives.filter(a => typeof a === 'string') : [],
+          addedAt: typeof routeExercise.addedAt === 'string' ? routeExercise.addedAt : new Date().toISOString(),
+          estimatedCalories: typeof routeExercise.estimatedCalories === 'number' ? routeExercise.estimatedCalories : 0,
+          duration: typeof routeExercise.duration === 'number' ? routeExercise.duration : 0,
+          intensity: typeof routeExercise.intensity === 'string' ? routeExercise.intensity as any : 'moderate',
+          customCategory: typeof routeExercise.customCategory === 'string' ? routeExercise.customCategory : undefined
+        };
+        
+        setCurrentExercise(safeExercise);
+      }
+    };
+    
+    initializeExercise();
+  }, [route.params?.exercise]);
+
+  // Reload exercise data when screen comes into focus (after editing)
+  useFocusEffect(
+    React.useCallback(() => {
+      const reloadExerciseData = async () => {
+        try {
+          const savedData = await AsyncStorage.getItem('favoriteExercises');
+          if (savedData) {
+            const exercises: FavoriteExercise[] = JSON.parse(savedData);
+            const updatedExercise = exercises.find(ex => ex.id === currentExercise?.id);
+            if (updatedExercise) {
+              setCurrentExercise(updatedExercise);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to reload exercise data:', error);
+        }
+      };
+      
+      if (currentExercise?.id) {
+        reloadExerciseData();
+      }
+    }, [currentExercise?.id])
+  );
+
+  // MOVED HOOKS ABOVE EARLY RETURN - Support both new and legacy muscle group formats
+  const primaryMuscles = React.useMemo(() => {
+    if (currentExercise?.primaryMuscles && Array.isArray(currentExercise.primaryMuscles)) {
+      return currentExercise.primaryMuscles.filter(muscle => typeof muscle === 'string');
+    }
+    if (currentExercise?.muscleGroups && Array.isArray(currentExercise.muscleGroups)) {
+      return currentExercise.muscleGroups.filter(group => typeof group === 'string' && group !== 'Custom');
+    }
+    return [];
+  }, [currentExercise?.primaryMuscles, currentExercise?.muscleGroups]);
+
+  const secondaryMuscles = React.useMemo(() => {
+    if (currentExercise?.secondaryMuscles && Array.isArray(currentExercise.secondaryMuscles)) {
+      return currentExercise.secondaryMuscles.filter(muscle => typeof muscle === 'string');
+    }
+    return [];
+  }, [currentExercise?.secondaryMuscles]);
   
   const exercise = currentExercise;
 
@@ -64,34 +137,6 @@ export default function ExerciseDetailScreen() {
     if (!exercise.instructions) return [];
     return exercise.instructions.split('\n').filter(step => step.trim());
   };
-
-  // Reload exercise data when screen comes into focus (after editing)
-  useFocusEffect(
-    React.useCallback(() => {
-      const reloadExerciseData = async () => {
-        try {
-          const savedData = await AsyncStorage.getItem('favoriteExercises');
-          if (savedData) {
-            const exercises: FavoriteExercise[] = JSON.parse(savedData);
-            // Find the updated exercise by ID
-            const updatedExercise = exercises.find(ex => ex.id === exercise?.id);
-            if (updatedExercise) {
-              setCurrentExercise(updatedExercise);
-              console.log('Reloaded updated exercise:', updatedExercise.name);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to reload exercise data:', error);
-        }
-      };
-      
-      reloadExerciseData();
-    }, [exercise?.id])
-  );
-
-  // Support both new and legacy muscle group formats
-  const primaryMuscles = exercise?.primaryMuscles || exercise?.muscleGroups?.filter(group => group !== 'Custom') || [];
-  const secondaryMuscles = exercise?.secondaryMuscles || [];
 
   const handleShare = async () => {
     try {

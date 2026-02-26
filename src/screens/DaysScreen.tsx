@@ -382,15 +382,32 @@ export default function DaysScreen() {
   // Initial load
   useEffect(() => {
     initializeWeek();
+    reloadBlockData(); // Load manual days on initial load
   }, []);
   
   // Function to reload block data from storage
   const reloadBlockData = async () => {
     try {
-      // DON'T reload from storage - it corrupts the original block structure
-      // The original block passed via navigation params is correct
-      // Only manually added days should be added to the existing block, not replace it
-      console.log('⚠️ Keeping original block structure to avoid corruption');
+      // Load manual days and merge with original block structure
+      const manualDaysKey = `manual_days_${localBlock.block_name}`;
+      const manualDaysData = await AsyncStorage.getItem(manualDaysKey);
+      
+      if (manualDaysData) {
+        const manualDays = JSON.parse(manualDaysData);
+        console.log(`✅ Found ${manualDays.length} manual days for ${localBlock.block_name}`);
+        
+        // Merge original days with manual days
+        const mergedDays = [...block.days, ...manualDays];
+        const updatedBlock = {
+          ...localBlock,
+          days: mergedDays
+        };
+        
+        setLocalBlock(updatedBlock);
+        console.log(`✅ Merged ${block.days.length} original + ${manualDays.length} manual = ${mergedDays.length} total days`);
+      } else {
+        console.log('⚠️ No manual days found, keeping original block structure');
+      }
       return;
       
       const routineData = await AsyncStorage.getItem('routine_1772009535369');
@@ -672,9 +689,22 @@ export default function DaysScreen() {
           debugLog += `✅ New keys: ${Object.keys(updatedRoutine).join(', ')}\n`;
           
         } else if (routine.data && typeof routine.data === 'object') {
-          // DISABLED: Don't save to routine.data - it corrupts the original structure
-          debugLog += `❌ SAVE DISABLED: Would corrupt original block structure\n`;
-          debugLog += `⚠️ Manual days are local only until proper storage is implemented\n`;
+          // Save manual days to a separate storage key to avoid corruption
+          const manualDaysKey = `manual_days_${localBlock.block_name}`;
+          try {
+            const existingManualDays = await AsyncStorage.getItem(manualDaysKey);
+            const manualDaysArray = existingManualDays ? JSON.parse(existingManualDays) : [];
+            
+            // Add the new day to manual days
+            const updatedManualDays = [...manualDaysArray, newDay];
+            await AsyncStorage.setItem(manualDaysKey, JSON.stringify(updatedManualDays));
+            
+            debugLog += `✅ SAVED: Manual day to separate storage\n`;
+            debugLog += `✅ Manual days key: ${manualDaysKey}\n`;
+            debugLog += `✅ Total manual days: ${updatedManualDays.length}\n`;
+          } catch (error) {
+            debugLog += `❌ FAILED to save manual day: ${error.message}\n`;
+          }
           
         } else {
           debugLog += `❌ UNKNOWN STRUCTURE - NO SAVE ATTEMPTED\n`;

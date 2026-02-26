@@ -260,7 +260,9 @@ export default function FavoriteExercisesScreen() {
           
           <Text style={styles.muscleGroupsText}>
             {(() => {
-              const displayMuscles = exercise.primaryMuscles || exercise.muscleGroups.filter(group => group !== 'Custom');
+              const primaryMuscles = Array.isArray(exercise.primaryMuscles) ? exercise.primaryMuscles : [];
+              const muscleGroups = Array.isArray(exercise.muscleGroups) ? exercise.muscleGroups : [];
+              const displayMuscles = primaryMuscles.length > 0 ? primaryMuscles : muscleGroups.filter(group => group !== 'Custom');
               const visibleMuscles = displayMuscles.slice(0, 3);
               const remainingCount = displayMuscles.length - 3;
               return visibleMuscles.join(', ') + (remainingCount > 0 ? ` +${remainingCount}` : '');

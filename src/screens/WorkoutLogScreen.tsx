@@ -179,7 +179,23 @@ function ExerciseCard({
   
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
   const [expandedDropSets, setExpandedDropSets] = useState<Set<number>>(new Set());
+  const [isFavorited, setIsFavorited] = useState(false);
   
+  // Check if exercise is already favorited
+  React.useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      try {
+        const existingData = await AsyncStorage.getItem('favoriteExercises');
+        const existingExercises = existingData ? JSON.parse(existingData) : [];
+        const isAlreadyFavorited = existingExercises.some(ex => ex.name.toLowerCase() === exercise.exercise.toLowerCase());
+        setIsFavorited(isAlreadyFavorited);
+      } catch (error) {
+        console.error('Error checking favorite status:', error);
+      }
+    };
+    checkFavoriteStatus();
+  }, [exercise.exercise]);
+
   // Separate animations for each connection type
   const topConnection = React.useRef(new Animated.Value(0)).current;
   const bottomConnection = React.useRef(new Animated.Value(0)).current;
@@ -449,6 +465,65 @@ function ExerciseCard({
               <Ionicons name="scale-outline" size={20} color={themeColor} />
               <Text style={styles.exerciseSettingsOptionText}>
                 Switch to {currentUnit === 'kg' ? 'lbs' : 'kg'}
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Add to Favorites */}
+            <TouchableOpacity
+              style={styles.exerciseSettingsOption}
+              onPress={async () => {
+                try {
+                  // Get existing favorites
+                  const existingData = await AsyncStorage.getItem('favoriteExercises');
+                  const existingExercises = existingData ? JSON.parse(existingData) : [];
+                  
+                  if (isFavorited) {
+                    // Remove from favorites
+                    const updatedExercises = existingExercises.filter(ex => ex.name.toLowerCase() !== exercise.exercise.toLowerCase());
+                    await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
+                    setIsFavorited(false);
+                  } else {
+                    // Create completely clean favorite object with only primitive values
+                    const exerciseName = exercise?.exercise;
+                    const exerciseInstructions = exercise?.instructions;
+                    const exerciseNotes = exercise?.notes;
+                    const exerciseAlternatives = exercise?.alternatives;
+                    
+                    // Ensure all values are primitive types, not objects
+                    const favoriteExercise = {
+                      id: 'exercise_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                      name: typeof exerciseName === 'string' ? exerciseName : 'Unknown Exercise',
+                      category: 'gym',
+                      muscleGroups: ['Custom'],
+                      primaryMuscles: ['Custom'], 
+                      secondaryMuscles: [],
+                      instructions: typeof exerciseInstructions === 'string' ? exerciseInstructions : '',
+                      notes: typeof exerciseNotes === 'string' ? exerciseNotes : '',
+                      alternatives: Array.isArray(exerciseAlternatives) ? exerciseAlternatives.filter(alt => typeof alt === 'string') : [],
+                      addedAt: new Date().toISOString(),
+                      estimatedCalories: 0,
+                      duration: 0,
+                      intensity: 'moderate',
+                      customCategory: undefined
+                    };
+                    
+                    console.log('=== SAVING FAVORITE FROM WORKOUT SCREEN ===');
+                    console.log('Raw exercise data:', exercise);
+                    console.log('Clean favorite object:', favoriteExercise);
+                    
+                    const updatedExercises = [favoriteExercise, ...existingExercises];
+                    await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
+                    setIsFavorited(true);
+                  }
+                  
+                } catch (error) {
+                  console.error('Error updating favorites:', error);
+                }
+              }}
+            >
+              <Ionicons name={isFavorited ? "heart" : "heart-outline"} size={20} color={isFavorited ? "#ef4444" : themeColor} />
+              <Text style={styles.exerciseSettingsOptionText}>
+                {isFavorited ? "Remove from Favorites" : "Add to Favorites"}
               </Text>
             </TouchableOpacity>
             
@@ -954,6 +1029,13 @@ export default function WorkoutLogScreen() {
   const [activeTab, setActiveTab] = useState<'reps' | 'notes'>('reps');
   const [currentNote, setCurrentNote] = useState('');
   const [personalNotes, setPersonalNotes] = useState<string[]>([]);
+  
+  // Rep scheme editing state
+  const [editingRepScheme, setEditingRepScheme] = useState<{
+    exerciseIndex: number;
+    week: string;
+    currentReps: string;
+  } | null>(null);
 
   // Initialize personal notes from existing notes when showNotes changes
   useEffect(() => {
@@ -1384,6 +1466,9 @@ export default function WorkoutLogScreen() {
             const newData = [...allSetsData];
             newData[exerciseIndex].splice(setIndex, 1);
             setAllSetsData(newData);
+            
+            // Save the updated sets data to AsyncStorage
+            saveSetsData(newData);
           }
         }
       ]
@@ -1406,6 +1491,9 @@ export default function WorkoutLogScreen() {
     
     newData[exerciseIndex].push(newSet);
     setAllSetsData(newData);
+    
+    // Save the updated sets data to AsyncStorage
+    saveSetsData(newData);
   };
 
   const handleDeleteExercise = (exerciseIndex: number) => {
@@ -2275,30 +2363,14 @@ export default function WorkoutLogScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.notesModalContainer}>
-              {/* Tab Header - moved to top for better UX */}
-              <View style={styles.tabHeader}>
-                <TouchableOpacity
-                  style={[styles.tab, activeTab === 'reps' && styles.activeTab]}
-                  onPress={() => setActiveTab('reps')}
-                >
-                  <Text style={[styles.tabText, activeTab === 'reps' && styles.activeTabText]}>
-                    Target Reps
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.tab, activeTab === 'notes' && styles.activeTab]}
-                  onPress={() => setActiveTab('notes')}
-                >
-                  <Text style={[styles.tabText, activeTab === 'notes' && styles.activeTabText]}>
-                    Personal Notes
-                  </Text>
-                </TouchableOpacity>
-              </View>
 
               {/* Rep Scheme Section - only show when reps tab is active */}
               {activeTab === 'reps' && (
                 <View style={styles.repSchemeCard}>
-                <Text style={styles.repSchemeLabel}>Target Rep Scheme</Text>
+                <View style={styles.repSchemeTitleContainer}>
+                  <Ionicons name="analytics-outline" size={24} color="#ffffff" />
+                  <Text style={styles.repSchemeLabel}>Target Rep Scheme</Text>
+                </View>
                 <View style={styles.repSchemeInfo}>
                   {(() => {
                     const exercise = dynamicExercises[showNotes.exerciseIndex];
@@ -2309,10 +2381,26 @@ export default function WorkoutLogScreen() {
                       return (
                         <View style={styles.weeklyScheme}>
                           {Object.entries(exercise.reps_weekly).map(([week, reps]) => (
-                            <View key={week} style={[
-                              styles.weekBlock,
-                              parseInt(week) === currentWeek && [styles.activeWeekBlock, { backgroundColor: themeColor }]
-                            ]}>
+                            <TouchableOpacity 
+                              key={week} 
+                              style={[
+                                styles.weekBlock,
+                                parseInt(week) === currentWeek && [styles.activeWeekBlock, { backgroundColor: themeColor }]
+                              ]}
+                              onLongPress={() => {
+                                // Store exercise index before closing notes view
+                                const exerciseIndex = showNotes.exerciseIndex;
+                                setShowNotes(null);
+                                setTimeout(() => {
+                                  setEditingRepScheme({
+                                    exerciseIndex: exerciseIndex,
+                                    week: week,
+                                    currentReps: reps.replace(/\s*\(.*?\)/, '')
+                                  });
+                                }, 100);
+                              }}
+                              activeOpacity={0.7}
+                            >
                               <Text style={[
                                 styles.weekLabel,
                                 parseInt(week) === currentWeek && styles.activeWeekLabel
@@ -2322,7 +2410,7 @@ export default function WorkoutLogScreen() {
                                 { color: themeColor },
                                 parseInt(week) === currentWeek && styles.activeWeekReps
                               ]}>{reps.replace(/\s*\(.*?\)/, '')}</Text>
-                            </View>
+                            </TouchableOpacity>
                           ))}
                         </View>
                       );
@@ -2372,24 +2460,9 @@ export default function WorkoutLogScreen() {
               </View>
               )}
 
-              {/* Tab Content */}
+              {/* Notes Content */}
               {activeTab === 'notes' && (
-                <View style={styles.tabContent}>
-                  {/* Individual Notes List */}
-                  <View style={styles.notesList}>
-                    {personalNotes.map((note, index) => (
-                      <View key={index} style={styles.noteItem}>
-                        <Text style={styles.noteText}>{note}</Text>
-                        <TouchableOpacity
-                          style={styles.deleteNoteButton}
-                          onPress={() => setPersonalNotes(prev => prev.filter((_, i) => i !== index))}
-                        >
-                          <Ionicons name="close-circle" size={20} color="#ef4444" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-
+                <View style={styles.notesContainer}>
                   {/* Add Note Input */}
                   <View style={styles.addNoteContainer}>
                     <TextInput
@@ -2400,7 +2473,14 @@ export default function WorkoutLogScreen() {
                       placeholderTextColor="#52525b"
                       onSubmitEditing={() => {
                         if (currentNote.trim()) {
-                          setPersonalNotes(prev => [...prev, currentNote.trim()]);
+                          const now = new Date();
+                          const dateString = now.toLocaleDateString();
+                          const noteWithDate = {
+                            text: currentNote.trim(),
+                            date: dateString,
+                            timestamp: now.getTime()
+                          };
+                          setPersonalNotes(prev => [noteWithDate, ...prev]);
                           setCurrentNote('');
                         }
                       }}
@@ -2411,7 +2491,14 @@ export default function WorkoutLogScreen() {
                       style={[styles.addNoteButton, { backgroundColor: themeColor }]}
                       onPress={() => {
                         if (currentNote.trim()) {
-                          setPersonalNotes(prev => [...prev, currentNote.trim()]);
+                          const now = new Date();
+                          const dateString = now.toLocaleDateString();
+                          const noteWithDate = {
+                            text: currentNote.trim(),
+                            date: dateString,
+                            timestamp: now.getTime()
+                          };
+                          setPersonalNotes(prev => [noteWithDate, ...prev]);
                           setCurrentNote('');
                         }
                       }}
@@ -2419,10 +2506,56 @@ export default function WorkoutLogScreen() {
                       <Ionicons name="add" size={20} color="#000000" />
                     </TouchableOpacity>
                   </View>
+
+                  {/* Separator */}
+                  <View style={styles.notesSeparator} />
+
+                  {/* Notes List */}
+                  <View style={styles.notesList}>
+                    {personalNotes.map((note, index) => (
+                      <View key={index} style={styles.noteItem}>
+                        <View style={styles.noteContent}>
+                          <Text style={styles.noteDate}>{typeof note === 'string' ? 'Today' : note.date}</Text>
+                          <Text style={styles.noteText}>{typeof note === 'string' ? note : note.text}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.deleteNoteButton}
+                          onPress={() => setPersonalNotes(prev => prev.filter((_, i) => i !== index))}
+                        >
+                          <Ionicons name="close" size={18} color="#71717a" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )}
             </View>
           </ScrollView>
+          
+          {/* Bottom Navigation */}
+          <View style={styles.bottomNavigation}>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => setActiveTab('reps')}
+            >
+              <Ionicons 
+                name={activeTab === 'reps' ? 'barbell' : 'barbell-outline'}
+                size={24} 
+                color={activeTab === 'reps' ? '#ffffff' : '#71717a'} 
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => setActiveTab('notes')}
+            >
+              <Ionicons 
+                name={activeTab === 'notes' ? 'document-text' : 'document-text-outline'}
+                size={24} 
+                color={activeTab === 'notes' ? '#ffffff' : '#71717a'} 
+              />
+            </TouchableOpacity>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     );
@@ -3216,6 +3349,73 @@ export default function WorkoutLogScreen() {
         </View>
       </Modal>
 
+      {/* Rep Scheme Editing Modal */}
+      {editingRepScheme && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setEditingRepScheme(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.repSchemeEditModal}>
+              <View style={styles.repSchemeEditHeader}>
+                <Text style={styles.repSchemeEditTitle}>
+                  Edit Week {editingRepScheme.week} Reps
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => setEditingRepScheme(null)}
+                  style={styles.repSchemeEditCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#71717a" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.repSchemeEditContent}>
+                <Text style={styles.repSchemeEditLabel}>Target Reps:</Text>
+                <TextInput
+                  style={styles.repSchemeEditInput}
+                  value={editingRepScheme.currentReps}
+                  onChangeText={(text) => 
+                    setEditingRepScheme(prev => prev ? {...prev, currentReps: text} : null)
+                  }
+                  placeholder="e.g. 8, 8, 8, 6"
+                  placeholderTextColor="#71717a"
+                  autoFocus={true}
+                />
+                <Text style={styles.repSchemeEditHint}>
+                  Enter reps separated by commas (e.g. "8, 8, 8, 6")
+                </Text>
+              </View>
+              
+              <View style={styles.repSchemeEditButtons}>
+                <TouchableOpacity 
+                  style={styles.repSchemeEditCancelButton}
+                  onPress={() => setEditingRepScheme(null)}
+                >
+                  <Text style={styles.repSchemeEditCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.repSchemeEditSaveButton, { backgroundColor: themeColor }]}
+                  onPress={() => {
+                    // Update the exercise's reps_weekly
+                    const updatedExercises = [...dynamicExercises];
+                    if (updatedExercises[editingRepScheme.exerciseIndex].reps_weekly) {
+                      updatedExercises[editingRepScheme.exerciseIndex].reps_weekly[editingRepScheme.week] = editingRepScheme.currentReps;
+                    }
+                    setDynamicExercises(updatedExercises);
+                    setEditingRepScheme(null);
+                  }}
+                >
+                  <Text style={styles.repSchemeEditSaveText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
     </SafeAreaView>
   );
 }
@@ -3259,9 +3459,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#ffffff',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    flex: 1,
   },
   workoutDuration: {
     fontSize: 14,
@@ -3459,18 +3662,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   repSchemeCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 4,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#27272a',
-    padding: 16,
+    padding: 20,
     marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  repSchemeTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
   },
   repSchemeLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#71717a',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+    flex: 1,
   },
   repSchemeInfo: {
     gap: 8,
@@ -3486,32 +3701,49 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   weeklyScheme: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: 12,
+    marginTop: 8,
   },
   weekBlock: {
-    backgroundColor: '#0a0a0b',
-    borderRadius: 8,
-    padding: 12,
-    minWidth: 80,
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    padding: 16,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   activeWeekBlock: {
-    // backgroundColor will be set inline
+    borderWidth: 2,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    transform: [{ scale: 1.02 }],
   },
   weekLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#71717a',
-    marginBottom: 4,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#a1a1aa',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   activeWeekLabel: {
     color: '#000000',
   },
   weekReps: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 26,
+    letterSpacing: 0.3,
   },
   activeWeekReps: {
     color: '#000000',
@@ -4651,31 +4883,103 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   
-  // Tab styles - completely new design
-  tabHeader: {
+  // Bottom Navigation - Following 2024 best practices
+  bottomNavigation: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    marginBottom: 20,
-    marginHorizontal: 0,
-    paddingHorizontal: 0,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    justifyContent: 'space-around',
+    backgroundColor: '#18181b',
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+    height: 80,
+    paddingBottom: 20,
   },
-  activeTab: {
-    borderBottomColor: '#ffffff',
+  navButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
-  tabText: {
-    fontSize: 16,
+  activeNavButton: {
+    // Active styling handled by text/icon color
+  },
+  navButtonText: {
+    fontSize: 12,
     fontWeight: '500',
     color: '#71717a',
+    marginTop: 4,
+    textAlign: 'center',
   },
-  activeTabText: {
+  activeNavButtonText: {
     color: '#ffffff',
     fontWeight: '600',
+  },
+  // Simple Notes Styling
+  notesContainer: {
+    flex: 1,
+    paddingTop: 8,
+  },
+  addNoteContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    marginBottom: 0,
+  },
+  notesSeparator: {
+    height: 40,
+  },
+  notesList: {
+    gap: 8,
+  },
+  noteItem: {
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  noteContent: {
+    flex: 1,
+  },
+  noteDate: {
+    fontSize: 11,
+    color: '#71717a',
+    fontWeight: '600',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  noteText: {
+    fontSize: 15,
+    color: '#ffffff',
+    lineHeight: 20,
+  },
+  deleteNoteButton: {
+    padding: 8,
+  },
+  addNoteInput: {
+    flex: 1,
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#ffffff',
+  },
+  addNoteButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabContent: {
     flex: 1,
@@ -4727,5 +5031,86 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  
+  // Rep scheme editing modal styles
+  repSchemeEditModal: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    margin: 20,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  repSchemeEditHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
+  },
+  repSchemeEditTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  repSchemeEditCloseButton: {
+    padding: 4,
+  },
+  repSchemeEditContent: {
+    padding: 20,
+  },
+  repSchemeEditLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  repSchemeEditInput: {
+    backgroundColor: '#27272a',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  repSchemeEditHint: {
+    fontSize: 12,
+    color: '#71717a',
+    fontStyle: 'italic',
+  },
+  repSchemeEditButtons: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 12,
+  },
+  repSchemeEditCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    alignItems: 'center',
+  },
+  repSchemeEditCancelText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#71717a',
+  },
+  repSchemeEditSaveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  repSchemeEditSaveText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
   },
 });
