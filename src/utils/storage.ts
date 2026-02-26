@@ -392,9 +392,28 @@ export class WorkoutStorage {
   static async loadExercisePreferences(): Promise<ExercisePreference[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.EXERCISE_PREFERENCES);
-      return data ? JSON.parse(data) : [];
+      if (!data) {
+        return [];
+      }
+      
+      const parsed = JSON.parse(data);
+      
+      // Ensure the parsed data is an array
+      if (!Array.isArray(parsed)) {
+        console.warn('Exercise preferences data is corrupted, resetting to empty array');
+        await AsyncStorage.setItem(STORAGE_KEYS.EXERCISE_PREFERENCES, JSON.stringify([]));
+        return [];
+      }
+      
+      return parsed;
     } catch (error) {
       console.error('Failed to load exercise preferences:', error);
+      // If JSON parsing fails, reset the corrupted data
+      try {
+        await AsyncStorage.setItem(STORAGE_KEYS.EXERCISE_PREFERENCES, JSON.stringify([]));
+      } catch (resetError) {
+        console.error('Failed to reset corrupted exercise preferences:', resetError);
+      }
       return [];
     }
   }

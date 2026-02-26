@@ -126,10 +126,10 @@ export default function NutritionHomeScreen({ route }: any) {
   const navigation = useNavigation<NutritionNavigationProp>();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
-  const { userProfile } = useMealPlanning();
+  const { userProfile, clearCurrentMealPlan, currentMealPlan } = useMealPlanning();
   
-  // Meal plans state
-  const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
+  // Convert current meal plan to array for rendering logic compatibility
+  const mealPlans = currentMealPlan ? [currentMealPlan] : [];
   
   const [shareModal, setShareModal] = useState<{ visible: boolean; plan: MealPlan | null }>({
     visible: false,
@@ -156,10 +156,6 @@ export default function NutritionHomeScreen({ route }: any) {
   });
 
   // Load completion status on component mount and when screen is focused
-  const loadMealPlans = async () => {
-    const storedMealPlans = await WorkoutStorage.loadMealPlans();
-    setMealPlans(storedMealPlans);
-  };
 
   const loadCompletionStatus = async () => {
     try {
@@ -172,14 +168,13 @@ export default function NutritionHomeScreen({ route }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      loadMealPlans();
       loadCompletionStatus();
     }, [])
   );
 
   useEffect(() => {
     if (route?.params?.refresh) {
-      loadMealPlans();
+      // Refresh happens automatically via MealPlanningContext
     }
   }, [route?.params?.refresh]);
 
@@ -191,11 +186,10 @@ export default function NutritionHomeScreen({ route }: any) {
     if (!deleteModal.plan) return;
     
     try {
-      await WorkoutStorage.removeMealPlan(deleteModal.plan.id);
-      await loadMealPlans();
+      await clearCurrentMealPlan();
       setDeleteModal({ visible: false, plan: null });
     } catch (error) {
-      console.error('Failed to delete meal plan:', error);
+      console.error('Failed to clear meal plan:', error);
     }
   };
 
@@ -860,7 +854,7 @@ export default function NutritionHomeScreen({ route }: any) {
               <Ionicons name="warning" size={32} color="#ef4444" />
             </View>
             
-            <Text style={styles.deleteTitle}>Delete Meal Plan?</Text>
+            <Text style={styles.deleteTitle}>Remove Meal Plan?</Text>
             
             <View style={styles.deletePlanInfo}>
               <Text style={styles.deletePlanName} numberOfLines={2}>
@@ -872,7 +866,7 @@ export default function NutritionHomeScreen({ route }: any) {
             </View>
             
             <Text style={styles.deleteMessage}>
-              This meal plan will be permanently deleted and cannot be recovered.
+              This will remove the meal plan from your home screen but it will remain saved in "My Meals" for future use.
             </Text>
             
             <View style={styles.deleteButtons}>
@@ -890,7 +884,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 activeOpacity={0.7}
               >
                 <Ionicons name="trash" size={18} color="#ffffff" />
-                <Text style={styles.deleteConfirmText}>Delete</Text>
+                <Text style={styles.deleteConfirmText}>Remove</Text>
               </TouchableOpacity>
             </View>
           </View>
