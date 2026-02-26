@@ -452,8 +452,6 @@ export default function DaysScreen() {
       
       if (manualDaysData) {
         const manualDays = JSON.parse(manualDaysData);
-        console.log(`✅ Found ${manualDays.length} manual days for ${localBlock.block_name}`);
-        
         // Merge original days with manual days
         const mergedDays = [...block.days, ...manualDays];
         const updatedBlock = {
@@ -462,9 +460,6 @@ export default function DaysScreen() {
         };
         
         setLocalBlock(updatedBlock);
-        console.log(`✅ Merged ${block.days.length} original + ${manualDays.length} manual = ${mergedDays.length} total days`);
-      } else {
-        console.log('⚠️ No manual days found, keeping original block structure');
       }
       return;
       
@@ -572,14 +567,11 @@ export default function DaysScreen() {
   const loadCompletedWorkouts = async () => {
     try {
       const key = `completed_${localBlock.block_name}_week${currentWeek}`;
-      console.log('Loading completed workouts with key:', key);
       const completed = await AsyncStorage.getItem(key);
       if (completed) {
         const parsedCompleted = JSON.parse(completed);
-        console.log('Found completed workouts:', parsedCompleted);
         setCompletedWorkouts(new Set(parsedCompleted));
       } else {
-        console.log('No completed workouts found for this week');
         setCompletedWorkouts(new Set());
       }
     } catch (error) {
@@ -689,7 +681,6 @@ export default function DaysScreen() {
       
       if (savedCustomization) {
         const customizationData = JSON.parse(savedCustomization);
-        console.log(`📋 Loading modal with customization for ${day.day_name} week ${currentWeek}`);
         
         // Use customized exercises and duration
         setExerciseList([...(customizationData.exercises || day.exercises)]);
@@ -784,113 +775,38 @@ export default function DaysScreen() {
                            themeColor;
 
   const createNewDay = async (dayName: string) => {
-    let debugLog = '';
-    
     try {
-      debugLog += `🚀 STARTING DAY CREATION: "${dayName}"\n\n`;
-      
       // Create new day object
       const newDay: Day = {
         day_name: dayName,
         exercises: [] // Start with empty exercises array
       };
-      debugLog += `📝 Created day object: ${JSON.stringify(newDay)}\n\n`;
 
       // Add the new day to the block
       const updatedBlock = {
         ...localBlock,
         days: [...localBlock.days, newDay]
       };
-      debugLog += `📦 Updated local block - now has ${updatedBlock.days.length} days\n`;
-      debugLog += `📦 Day names: [${updatedBlock.days.map(d => d.day_name).join(', ')}]\n\n`;
 
       // Update local state immediately for instant UI update
       setLocalBlock(updatedBlock);
-      debugLog += `✅ Updated local state\n\n`;
       
-      // Now save to storage using correct structure
-      const routineData = await AsyncStorage.getItem('routine_1772009535369');
-      if (routineData) {
-        const routine = JSON.parse(routineData);
-        debugLog += `💾 STORAGE ANALYSIS:\n`;
-        debugLog += `- Keys: ${Object.keys(routine).join(', ')}\n`;
-        debugLog += `- Has blocks: ${!!routine.blocks} (${typeof routine.blocks})\n`;
-        debugLog += `- Has days: ${!!routine.days} (${typeof routine.days})\n`;
-        debugLog += `- Has data: ${!!routine.data} (${typeof routine.data})\n`;
-        debugLog += `- Is array: ${Array.isArray(routine)}\n`;
+      // Save manual days to a separate storage key to avoid corruption
+      const manualDaysKey = `manual_days_${localBlock.block_name}`;
+      try {
+        const existingManualDays = await AsyncStorage.getItem(manualDaysKey);
+        const manualDaysArray = existingManualDays ? JSON.parse(existingManualDays) : [];
         
-        if (routine.data) {
-          debugLog += `- Data keys: ${Object.keys(routine.data).join(', ')}\n`;
-        }
-        debugLog += `\n`;
+        // Add the new day to manual days
+        const updatedManualDays = [...manualDaysArray, newDay];
+        await AsyncStorage.setItem(manualDaysKey, JSON.stringify(updatedManualDays));
         
-        // Based on the JSON structure you showed, the routine IS the block
-        // So we need to update the routine's own days array
-        if (Array.isArray(routine)) {
-          // Routine is an array of days
-          const updatedRoutine = [...routine, newDay];
-          await AsyncStorage.setItem('routine_1772009535369', JSON.stringify(updatedRoutine));
-          debugLog += `✅ SAVED: Routine as array - ${updatedRoutine.length} total days\n`;
-          
-        } else if (routine.hasOwnProperty('Push') || routine.hasOwnProperty('Pull') || routine.hasOwnProperty('Legs')) {
-          // Routine has day objects as properties (like the JSON you showed)
-          const updatedRoutine = {
-            ...routine,
-            [newDay.day_name]: newDay
-          };
-          await AsyncStorage.setItem('routine_1772009535369', JSON.stringify(updatedRoutine));
-          debugLog += `✅ SAVED: Routine as object with day properties\n`;
-          debugLog += `✅ New keys: ${Object.keys(updatedRoutine).join(', ')}\n`;
-          
-        } else if (routine.data && typeof routine.data === 'object') {
-          // Save manual days to a separate storage key to avoid corruption
-          const manualDaysKey = `manual_days_${localBlock.block_name}`;
-          try {
-            const existingManualDays = await AsyncStorage.getItem(manualDaysKey);
-            const manualDaysArray = existingManualDays ? JSON.parse(existingManualDays) : [];
-            
-            // Add the new day to manual days
-            const updatedManualDays = [...manualDaysArray, newDay];
-            await AsyncStorage.setItem(manualDaysKey, JSON.stringify(updatedManualDays));
-            
-            debugLog += `✅ SAVED: Manual day to separate storage\n`;
-            debugLog += `✅ Manual days key: ${manualDaysKey}\n`;
-            debugLog += `✅ Total manual days: ${updatedManualDays.length}\n`;
-          } catch (error) {
-            debugLog += `❌ FAILED to save manual day: ${error.message}\n`;
-          }
-          
-        } else {
-          debugLog += `❌ UNKNOWN STRUCTURE - NO SAVE ATTEMPTED\n`;
-          
-          // Show detailed debug info
-          console.log('=== DAY CREATION DEBUG LOG ===');
-          console.log(debugLog);
-          console.log('=== END DEBUG LOG ===');
-          return;
-        }
-        
-        debugLog += `\n🎉 SUCCESS: Day "${dayName}" created and saved!`;
-        
-        console.log('=== DAY CREATION DEBUG LOG ===');
-        console.log(debugLog);
-        console.log('=== END DEBUG LOG ===');
-        
-        // Save to state for viewing
-      } else {
-        debugLog += `❌ NO ROUTINE DATA IN STORAGE\n`;
-        
-        console.log('=== DAY CREATION DEBUG LOG ===');
-        console.log(debugLog);
-        console.log('=== END DEBUG LOG ===');
+      } catch (error) {
+        console.error('Failed to save manual day:', error);
       }
-    } catch (error) {
-      debugLog += `\n💥 ERROR: ${error}\n`;
-      debugLog += `💥 Stack: ${error.stack}\n`;
       
-      console.log('=== DAY CREATION ERROR LOG ===');
-      console.log(debugLog);
-      console.log('=== END ERROR LOG ===');
+    } catch (error) {
+      console.error('Error creating new day:', error);
     }
   };
 
@@ -905,7 +821,8 @@ export default function DaysScreen() {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>{localBlock.block_name}</Text>
+          <Text style={styles.blockLabel}>BLOCK {localBlock.block_name.split(' ')[1] || 'A'}</Text>
+          <Text style={styles.blockPhase}>{localBlock.block_name.includes('Hypertrophy') ? 'Hypertrophy' : localBlock.block_name.includes('Strength') ? 'Strength' : 'Training'}</Text>
         </View>
       </View>
 
@@ -1191,15 +1108,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingRight: 40, // Compensate for back button to center title
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
+  blockLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#71717a',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
     marginBottom: 2,
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#71717a',
+  blockPhase: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   listContent: {
     paddingHorizontal: 16,

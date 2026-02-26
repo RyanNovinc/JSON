@@ -309,6 +309,15 @@ export default function HomeScreen({ route }: any) {
 
       const activeBlock = activeRoutine.data.blocks[activeBlockIndex];
       
+      if (!activeBlock || !activeBlock.weeks) {
+        Alert.alert(
+          'Invalid Block',
+          'The selected workout block is missing or invalid.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
       // Calculate current week based on completion
       let currentWeek = 1;
       const totalWeeks = activeBlock.weeks.includes('-') 

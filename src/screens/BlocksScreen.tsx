@@ -1375,13 +1375,8 @@ export default function BlocksScreen() {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>{routine.name}</Text>
-          <Text style={styles.subtitle}>
-            {hasMesocycles 
-              ? `${mesocycleCards.length} mesocycles • ${totalWeeks} weeks`
-              : `${totalWeeks} ${totalWeeks === 1 ? 'week' : 'weeks'} • ${routine.data.blocks.length} blocks`
-            }
-          </Text>
+          <Text style={styles.programLabel}>PROGRAM</Text>
+          <Text style={styles.programName}>{routine.name}</Text>
         </View>
       </View>
 
@@ -1770,7 +1765,7 @@ export default function BlocksScreen() {
         >
           <View style={styles.overlay}>
             <View style={styles.modal}>
-              <Text style={styles.title}>Add New Mesocycle</Text>
+              <Text style={styles.modalTitle}>Add New Mesocycle</Text>
               
               <TextInput
                 style={styles.input}
@@ -1830,16 +1825,20 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     alignItems: 'center',
+    paddingRight: 40, // Compensate for back button to center title
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
+  programLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#71717a',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
     marginBottom: 2,
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#71717a',
+  programName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   listContent: {
     paddingHorizontal: 16,

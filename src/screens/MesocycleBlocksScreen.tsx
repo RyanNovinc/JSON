@@ -394,10 +394,111 @@ export default function MesocycleBlocksScreen() {
     }
   };
 
-  const handleBlockPress = (block: Block) => {
+  const handleBlockPress = async (block: Block) => {
+    // Calculate current week based on completion status and bookmarks (same logic as "Today" button)
+    let currentWeek = 1;
+    const totalWeeks = block.weeks.includes('-') 
+      ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1 
+      : 1;
+
+    try {
+      // Check for manually bookmarked week first
+      const bookmarkKey = `bookmark_${block.block_name}`;
+      const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
+      
+      if (savedBookmark) {
+        const { week, isBookmarked } = JSON.parse(savedBookmark);
+        if (isBookmarked) {
+          currentWeek = week;
+        } else {
+          // Find first incomplete week
+          for (let week = 1; week <= totalWeeks; week++) {
+            const weekKey = `completed_${block.block_name}_week${week}`;
+            const completed = await AsyncStorage.getItem(weekKey);
+            
+            if (!completed) {
+              currentWeek = week;
+              break;
+            }
+            
+            const completedArray = JSON.parse(completed);
+            
+            // Get all days including manual ones for this block
+            const allDays = await getAllBlockDays(block);
+            
+            if (allDays.length === 0) {
+              // For empty blocks, check for special completion marker
+              if (!completedArray.includes('empty_block_completed')) {
+                currentWeek = week;
+                break;
+              }
+            } else {
+              // For blocks with days, check if all days are completed
+              const allDaysCompleted = allDays.every(day => 
+                completedArray.includes(`${day.day_name}_week${week}`)
+              );
+              
+              if (!allDaysCompleted) {
+                currentWeek = week;
+                break;
+              }
+            }
+            
+            // If we're on the last week and it's complete, stay on last week
+            if (week === totalWeeks) {
+              currentWeek = totalWeeks;
+            }
+          }
+        }
+      } else {
+        // No bookmark, find first incomplete week
+        for (let week = 1; week <= totalWeeks; week++) {
+          const weekKey = `completed_${block.block_name}_week${week}`;
+          const completed = await AsyncStorage.getItem(weekKey);
+          
+          if (!completed) {
+            currentWeek = week;
+            break;
+          }
+          
+          const completedArray = JSON.parse(completed);
+          
+          // Get all days including manual ones for this block
+          const allDays = await getAllBlockDays(block);
+          
+          if (allDays.length === 0) {
+            // For empty blocks, check for special completion marker
+            if (!completedArray.includes('empty_block_completed')) {
+              currentWeek = week;
+              break;
+            }
+          } else {
+            // For blocks with days, check if all days are completed
+            const allDaysCompleted = allDays.every(day => 
+              completedArray.includes(`${day.day_name}_week${week}`)
+            );
+            
+            if (!allDaysCompleted) {
+              currentWeek = week;
+              break;
+            }
+          }
+          
+          // If we're on the last week and it's complete, stay on last week
+          if (week === totalWeeks) {
+            currentWeek = totalWeeks;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Error calculating current week, using week 1');
+      currentWeek = 1;
+    }
+
     navigation.navigate('Days' as any, { 
       block, 
-      routineName: routine.name 
+      routineName: routine.name,
+      initialWeek: currentWeek  // Pass the calculated week
     });
   };
 
@@ -942,12 +1043,8 @@ export default function MesocycleBlocksScreen() {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>
-            {phaseName}
-          </Text>
-          <Text style={styles.subtitle}>
-            {localBlocks.length} blocks
-          </Text>
+          <Text style={styles.mesocycleLabel}>MESOCYCLE</Text>
+          <Text style={styles.mesocycleName}>{phaseName}</Text>
         </View>
       </View>
 
@@ -961,7 +1058,7 @@ export default function MesocycleBlocksScreen() {
             block={item}
             onPress={() => handleBlockPress(item)}
             onLongPress={() => handleBlockLongPress(item, index)}
-            isActive={index === activeBlockIndex}
+            isActive={mesocycle.isActive && index === activeBlockIndex}
             weekProgress={getWeekProgress(index)}
             themeColor={themeColor}
             blockIndex={index}
@@ -1436,16 +1533,20 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     alignItems: 'center',
+    paddingRight: 40, // Compensate for back button to center title
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
+  mesocycleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#71717a',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
     marginBottom: 2,
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#71717a',
+  mesocycleName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   listContent: {
     paddingHorizontal: 16,
