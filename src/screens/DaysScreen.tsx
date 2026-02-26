@@ -7,6 +7,11 @@ import {
   SafeAreaView,
   ScrollView,
   Dimensions,
+  Alert,
+  Platform,
+  Modal,
+  TextInput,
+  Button,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -42,6 +47,8 @@ interface DayCardProps {
   isCompleted?: boolean;
   currentWeek: number;
   themeColor: string;
+  blockName: string;
+  refreshTrigger?: number;
   completionStats?: {
     duration: number; // minutes
     totalVolume: number; // kg
@@ -49,20 +56,83 @@ interface DayCardProps {
   };
 }
 
-function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, themeColor }: DayCardProps) {
-  const exerciseCount = day.exercises.length;
+function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, themeColor, blockName, refreshTrigger }: DayCardProps) {
+  const [modifiedExercises, setModifiedExercises] = useState<Exercise[]>(day.exercises || []);
+  const [dynamicExercises, setDynamicExercises] = useState<Exercise[]>([]);
   
-  // Use duration from JSON if available, otherwise calculate estimate
-  const estimatedDuration = day.estimated_duration || (() => {
-    // Calculate based on actual rest times and exercise complexity
-    const totalRestTime = day.exercises.reduce((total, ex) => {
+  // Total exercise count including dynamic exercises
+  const exerciseCount = (modifiedExercises?.length || 0) + (dynamicExercises?.length || 0);
+
+  // Load dynamic exercises that were added during workout
+  const loadDynamicExercises = async () => {
+    try {
+      const dynamicKey = `workout_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}_exercises`;
+      const savedDynamic = await AsyncStorage.getItem(dynamicKey);
+      if (savedDynamic) {
+        const parsedDynamic = JSON.parse(savedDynamic);
+        setDynamicExercises(parsedDynamic);
+      } else {
+        setDynamicExercises([]);
+      }
+    } catch (error) {
+      console.log('No dynamic exercises found');
+      setDynamicExercises([]);
+    }
+  };
+
+  // Load saved sets data to get actual number of sets
+  const loadSetsData = async () => {
+    try {
+      const savedKey = `workout_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}_sets`;
+      const savedData = await AsyncStorage.getItem(savedKey);
+      if (savedData) {
+        const savedSetsData = JSON.parse(savedData);
+        // Update exercises with actual number of sets
+        const updatedExercises = (day.exercises || []).map((exercise, index) => {
+          if (savedSetsData[index] && savedSetsData[index].length > 0) {
+            return {
+              ...exercise,
+              sets: savedSetsData[index].length // Use actual number of sets
+            };
+          }
+          return exercise;
+        });
+        setModifiedExercises(updatedExercises);
+      }
+    } catch (error) {
+      console.log('No saved sets data found, using template data');
+    }
+  };
+
+  useEffect(() => {
+    loadSetsData();
+    loadDynamicExercises();
+  }, [blockName, day.day_name, currentWeek, refreshTrigger]);
+  
+  // Include both original day exercises and dynamic exercises
+  const allExercises = [...(modifiedExercises || []), ...(dynamicExercises || [])];
+  
+  // Calculate duration based on actual exercises (ignore stored duration for dynamic calculation)
+  const estimatedDuration = (() => {
+    // If no exercises, return 0
+    if (exerciseCount === 0) {
+      return 0;
+    }
+
+    // Use stored duration if available and day has original exercises
+    if (day.estimated_duration && (day.exercises?.length || 0) > 0) {
+      return day.estimated_duration;
+    }
+    
+    // Calculate based on actual rest times and exercise complexity for all exercises
+    const totalRestTime = allExercises.reduce((total, ex) => {
       const sets = ex.sets;
       const restPerSet = (ex.rest || 120) / 60; // convert to minutes
       return total + (sets * restPerSet);
     }, 0);
     
     // Estimate exercise execution time (compound vs isolation)
-    const executionTime = day.exercises.reduce((total, ex) => {
+    const executionTime = allExercises.reduce((total, ex) => {
       const name = (ex.exercise || '').toLowerCase();
       const isCompound = name.includes('squat') || name.includes('deadlift') || 
                         name.includes('press') || name.includes('row') || 
@@ -85,7 +155,7 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
     cardio: [] as string[]
   };
   
-  day.exercises.forEach(ex => {
+  allExercises.forEach(ex => {
     const name = (ex.exercise || '').toLowerCase();
     if (name.includes('squat') || name.includes('deadlift') || name.includes('press') || 
         name.includes('row') || name.includes('pull up') || name.includes('chin up')) {
@@ -102,16 +172,16 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
   
   // Get day type color
   const getDayTypeColor = (dayName: string) => {
-    const name = dayName.toLowerCase();
+    const name = (dayName || '').toLowerCase();
     if (name.includes('push') || name.includes('chest') || name.includes('shoulder')) return '#f59e0b';
     if (name.includes('pull') || name.includes('back') || name.includes('bicep')) return '#10b981';
     if (name.includes('legs') || name.includes('lower') || name.includes('glute')) return '#a855f7';
     if (name.includes('upper')) return themeColor;
     if (name.includes('full') || name.includes('total')) return '#ef4444';
-    return '#6b7280'; // default
+    return themeColor; // default to theme color instead of gray
   };
   
-  const dayColor = getDayTypeColor(day.day_name);
+  const dayColor = getDayTypeColor(day.day_name || '');
   
   if (isCompleted && completionStats) {
     // Minimal completed card
@@ -129,7 +199,7 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
           <View style={styles.completedHeader}>
             <View style={styles.completedTitleContainer}>
               <Text style={styles.dayNameCompleted} numberOfLines={2}>
-                {day.day_name}
+                {day.day_name || 'Untitled Day'}
               </Text>
             </View>
             <View style={styles.completedBadge}>
@@ -165,12 +235,14 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardTitle}>
-          <Text style={styles.dayName}>{day.day_name}</Text>
-          <View style={[styles.dayBadge, { backgroundColor: dayColor + '20' }]}>
-            <Text style={[styles.dayBadgeText, { color: dayColor }]}>
-              {estimatedDuration} min estimated
-            </Text>
-          </View>
+          <Text style={styles.dayName}>{day.day_name || 'Untitled Day'}</Text>
+          {exerciseCount > 0 && (
+            <View style={[styles.dayBadge, { backgroundColor: dayColor + '20' }]}>
+              <Text style={[styles.dayBadgeText, { color: dayColor }]}>
+                {estimatedDuration} min estimated
+              </Text>
+            </View>
+          )}
         </View>
         <View style={[styles.startButton, { backgroundColor: themeColor + '20' }]}>
           <Ionicons name="play" size={16} color={themeColor} />
@@ -191,7 +263,7 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
         </View>
         
         <View style={styles.exerciseGrid}>
-          {day.exercises.slice(0, 6).map((exercise, index) => (
+          {allExercises.slice(0, 6).map((exercise, index) => (
             <View key={index} style={styles.exerciseChip}>
               <Text style={styles.exerciseChipText} numberOfLines={1}>
                 {exercise.exercise}
@@ -216,16 +288,24 @@ export default function DaysScreen() {
   const { themeColor } = useTheme();
   const { block, routineName, initialWeek } = route.params;
   
+  
+  // Use local state for the block to enable immediate updates
+  const [localBlock, setLocalBlock] = useState(block);
+  
   const [currentWeek, setCurrentWeek] = useState(1);
   const [completedWorkouts, setCompletedWorkouts] = useState<Set<string>>(new Set());
   const [completionStats, setCompletionStats] = useState<Map<string, any>>(new Map());
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkedWeek, setBookmarkedWeek] = useState<number | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showAddDayModal, setShowAddDayModal] = useState(false);
+  const [newDayName, setNewDayName] = useState('');
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Calculate total weeks for this block
-  const totalWeeks = block.weeks.includes('-') 
-    ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1 
+  const totalWeeks = localBlock.weeks.includes('-') 
+    ? parseInt(localBlock.weeks.split('-')[1]) - parseInt(localBlock.weeks.split('-')[0]) + 1 
     : 1;
   
   // Calculate visible weeks based on screen width
@@ -237,7 +317,7 @@ export default function DaysScreen() {
   // Find first incomplete week
   const findFirstIncompleteWeek = async () => {
     for (let week = 1; week <= totalWeeks; week++) {
-      const weekKey = `completed_${block.block_name}_week${week}`;
+      const weekKey = `completed_${localBlock.block_name}_week${week}`;
       const weekCompleted = await AsyncStorage.getItem(weekKey);
       
       if (!weekCompleted) {
@@ -246,8 +326,8 @@ export default function DaysScreen() {
       
       const completedSet = new Set(JSON.parse(weekCompleted));
       // Check if all days in this week are completed
-      const allDaysCompleted = block.days.every(day => 
-        completedSet.has(`${day.day_name}_week${week}`)
+      const allDaysCompleted = localBlock.days.every(day => 
+        completedSet.has(`${day.day_name || 'unknown'}_week${week}`)
       );
       
       if (!allDaysCompleted) {
@@ -264,7 +344,7 @@ export default function DaysScreen() {
       setCurrentWeek(initialWeek);
       
       // Check if there's a bookmark for this block
-      const bookmarkKey = `bookmark_${block.block_name}`;
+      const bookmarkKey = `bookmark_${localBlock.block_name}`;
       const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
       if (savedBookmark) {
         const { week, isBookmarked: bookmarked } = JSON.parse(savedBookmark);
@@ -274,7 +354,7 @@ export default function DaysScreen() {
       return;
     }
 
-    const bookmarkKey = `bookmark_${block.block_name}`;
+    const bookmarkKey = `bookmark_${localBlock.block_name}`;
     const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
     
     if (savedBookmark) {
@@ -304,11 +384,55 @@ export default function DaysScreen() {
     initializeWeek();
   }, []);
   
+  // Function to reload block data from storage
+  const reloadBlockData = async () => {
+    try {
+      // DON'T reload from storage - it corrupts the original block structure
+      // The original block passed via navigation params is correct
+      // Only manually added days should be added to the existing block, not replace it
+      console.log('⚠️ Keeping original block structure to avoid corruption');
+      return;
+      
+      const routineData = await AsyncStorage.getItem('routine_1772009535369');
+      if (routineData) {
+        const routine = JSON.parse(routineData);
+        
+        if (routine.data && typeof routine.data === 'object') {
+          // Convert routine.data object properties to days array
+          // Filter out non-day properties (like id, routine_name, etc.)
+          const dayObjects = Object.entries(routine.data)
+            .filter(([key, value]) => 
+              // Only include properties that look like workout days
+              value && 
+              typeof value === 'object' && 
+              value.day_name && 
+              !['id', 'routine_name', 'description', 'days_per_week', 'blocks', 'programId'].includes(key)
+            )
+            .map(([key, value]) => value);
+          
+          if (dayObjects.length > 0) {
+            const updatedBlock = {
+              ...localBlock,
+              days: dayObjects
+            };
+            console.log('✅ Reloaded from routine.data - converted object to array:', dayObjects.length, 'days');
+            setLocalBlock(updatedBlock);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to reload block data:', error);
+    }
+  };
+
   // Reload data when screen comes into focus (after workout completion)
   useFocusEffect(
     useCallback(() => {
+      reloadBlockData(); // Reload block data to get any new days
       loadCompletedWorkouts();
       loadCompletionStats();
+      // Trigger refresh for DayCards to reload modified exercises
+      setRefreshTrigger(prev => prev + 1);
     }, [currentWeek])
   );
 
@@ -327,7 +451,7 @@ export default function DaysScreen() {
 
   const loadCurrentWeek = async () => {
     try {
-      const savedWeek = await AsyncStorage.getItem(`currentWeek_${block.block_name}`);
+      const savedWeek = await AsyncStorage.getItem(`currentWeek_${localBlock.block_name}`);
       if (savedWeek) {
         setCurrentWeek(parseInt(savedWeek));
       }
@@ -338,7 +462,7 @@ export default function DaysScreen() {
 
   const saveCurrentWeek = async (week: number) => {
     try {
-      await AsyncStorage.setItem(`currentWeek_${block.block_name}`, week.toString());
+      await AsyncStorage.setItem(`currentWeek_${localBlock.block_name}`, week.toString());
       setCurrentWeek(week);
       
       // Don't update the bookmark week when navigating
@@ -352,7 +476,7 @@ export default function DaysScreen() {
     const newBookmarkState = !isBookmarked;
     setIsBookmarked(newBookmarkState);
     
-    const bookmarkKey = `bookmark_${block.block_name}`;
+    const bookmarkKey = `bookmark_${localBlock.block_name}`;
     if (newBookmarkState) {
       // Save bookmark with current week
       setBookmarkedWeek(currentWeek);
@@ -372,7 +496,7 @@ export default function DaysScreen() {
 
   const loadCompletedWorkouts = async () => {
     try {
-      const key = `completed_${block.block_name}_week${currentWeek}`;
+      const key = `completed_${localBlock.block_name}_week${currentWeek}`;
       console.log('Loading completed workouts with key:', key);
       const completed = await AsyncStorage.getItem(key);
       if (completed) {
@@ -392,7 +516,7 @@ export default function DaysScreen() {
 
   const loadCompletionStats = async () => {
     try {
-      const stats = await AsyncStorage.getItem(`completionStats_${block.block_name}_week${currentWeek}`);
+      const stats = await AsyncStorage.getItem(`completionStats_${localBlock.block_name}_week${currentWeek}`);
       if (stats) {
         setCompletionStats(new Map(JSON.parse(stats)));
       }
@@ -410,14 +534,14 @@ export default function DaysScreen() {
   };
 
   const handleDayPress = (day: Day) => {
-    const isCompleted = isWorkoutCompleted(day.day_name);
-    const stats = getCompletionStats(day.day_name);
+    const isCompleted = isWorkoutCompleted(day.day_name || 'unknown');
+    const stats = getCompletionStats(day.day_name || 'unknown');
     
     if (isCompleted && stats) {
       // Navigate to review screen for completed workouts
       navigation.navigate('WorkoutReview' as any, {
         day,
-        blockName: block.block_name,
+        blockName: localBlock.block_name,
         completionStats: stats,
         currentWeek
       });
@@ -434,7 +558,7 @@ export default function DaysScreen() {
       
       navigation.navigate('WorkoutLog' as any, { 
         day: dayWithPrevious, 
-        blockName: block.block_name,
+        blockName: localBlock.block_name,
         currentWeek: currentWeek,  // Pass the current week
         block: block,  // Pass the full block data for completion detection
         routineName: routineName  // Pass routine name for exercise preferences
@@ -444,6 +568,171 @@ export default function DaysScreen() {
 
   const handleBack = () => {
     navigation.goBack();
+  };
+
+
+  const handleAddDay = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Add New Day',
+        'Enter a name for this workout day:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Create', 
+            onPress: (text) => {
+              if (text && text.trim()) {
+                createNewDay(text.trim());
+              }
+            }
+          }
+        ],
+        'plain-text'
+      );
+    } else {
+      // Use custom modal for Android
+      setNewDayName('');
+      setShowAddDayModal(true);
+    }
+  };
+
+  const handleCreateDay = () => {
+    if (newDayName.trim()) {
+      createNewDay(newDayName.trim());
+      setShowAddDayModal(false);
+      setNewDayName('');
+    }
+  };
+
+  // Create a more vibrant version of theme color for buttons
+  const vibrantThemeColor = themeColor === '#10b981' ? '#059669' : 
+                           themeColor === '#3b82f6' ? '#2563eb' : 
+                           themeColor === '#8b5cf6' ? '#7c3aed' : 
+                           themeColor === '#f59e0b' ? '#d97706' : 
+                           themeColor === '#ef4444' ? '#dc2626' : 
+                           themeColor;
+
+  const createNewDay = async (dayName: string) => {
+    let debugLog = '';
+    
+    try {
+      debugLog += `🚀 STARTING DAY CREATION: "${dayName}"\n\n`;
+      
+      // Create new day object
+      const newDay: Day = {
+        day_name: dayName,
+        exercises: [] // Start with empty exercises array
+      };
+      debugLog += `📝 Created day object: ${JSON.stringify(newDay)}\n\n`;
+
+      // Add the new day to the block
+      const updatedBlock = {
+        ...localBlock,
+        days: [...localBlock.days, newDay]
+      };
+      debugLog += `📦 Updated local block - now has ${updatedBlock.days.length} days\n`;
+      debugLog += `📦 Day names: [${updatedBlock.days.map(d => d.day_name).join(', ')}]\n\n`;
+
+      // Update local state immediately for instant UI update
+      setLocalBlock(updatedBlock);
+      debugLog += `✅ Updated local state\n\n`;
+      
+      // Now save to storage using correct structure
+      const routineData = await AsyncStorage.getItem('routine_1772009535369');
+      if (routineData) {
+        const routine = JSON.parse(routineData);
+        debugLog += `💾 STORAGE ANALYSIS:\n`;
+        debugLog += `- Keys: ${Object.keys(routine).join(', ')}\n`;
+        debugLog += `- Has blocks: ${!!routine.blocks} (${typeof routine.blocks})\n`;
+        debugLog += `- Has days: ${!!routine.days} (${typeof routine.days})\n`;
+        debugLog += `- Has data: ${!!routine.data} (${typeof routine.data})\n`;
+        debugLog += `- Is array: ${Array.isArray(routine)}\n`;
+        
+        if (routine.data) {
+          debugLog += `- Data keys: ${Object.keys(routine.data).join(', ')}\n`;
+        }
+        debugLog += `\n`;
+        
+        // Based on the JSON structure you showed, the routine IS the block
+        // So we need to update the routine's own days array
+        if (Array.isArray(routine)) {
+          // Routine is an array of days
+          const updatedRoutine = [...routine, newDay];
+          await AsyncStorage.setItem('routine_1772009535369', JSON.stringify(updatedRoutine));
+          debugLog += `✅ SAVED: Routine as array - ${updatedRoutine.length} total days\n`;
+          
+        } else if (routine.hasOwnProperty('Push') || routine.hasOwnProperty('Pull') || routine.hasOwnProperty('Legs')) {
+          // Routine has day objects as properties (like the JSON you showed)
+          const updatedRoutine = {
+            ...routine,
+            [newDay.day_name]: newDay
+          };
+          await AsyncStorage.setItem('routine_1772009535369', JSON.stringify(updatedRoutine));
+          debugLog += `✅ SAVED: Routine as object with day properties\n`;
+          debugLog += `✅ New keys: ${Object.keys(updatedRoutine).join(', ')}\n`;
+          
+        } else if (routine.data && typeof routine.data === 'object') {
+          // DISABLED: Don't save to routine.data - it corrupts the original structure
+          debugLog += `❌ SAVE DISABLED: Would corrupt original block structure\n`;
+          debugLog += `⚠️ Manual days are local only until proper storage is implemented\n`;
+          
+        } else {
+          debugLog += `❌ UNKNOWN STRUCTURE - NO SAVE ATTEMPTED\n`;
+          
+          // Show detailed debug info
+          console.log('=== DAY CREATION DEBUG LOG ===');
+          console.log(debugLog);
+          console.log('=== END DEBUG LOG ===');
+          
+          Alert.alert(
+            'Unknown Structure',
+            'Unknown routine structure found. Debug info logged to console.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        
+        debugLog += `\n🎉 SUCCESS: Day "${dayName}" created and saved!`;
+        
+        console.log('=== DAY CREATION DEBUG LOG ===');
+        console.log(debugLog);
+        console.log('=== END DEBUG LOG ===');
+        
+        // Save to state for viewing
+        setDebugLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${debugLog}`]);
+        
+        Alert.alert(
+          'Day Creation Log',
+          debugLog,
+          [{ text: 'OK' }]
+        );
+      } else {
+        debugLog += `❌ NO ROUTINE DATA IN STORAGE\n`;
+        
+        console.log('=== DAY CREATION DEBUG LOG ===');
+        console.log(debugLog);
+        console.log('=== END DEBUG LOG ===');
+        
+        Alert.alert(
+          'Debug Log',
+          debugLog,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      debugLog += `\n💥 ERROR: ${error}\n`;
+      debugLog += `💥 Stack: ${error.stack}\n`;
+      
+      console.log('=== DAY CREATION ERROR LOG ===');
+      console.log(debugLog);
+      console.log('=== END ERROR LOG ===');
+      
+      Alert.alert(
+        'Debug Log - Error',
+        debugLog,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   return (
@@ -457,16 +746,26 @@ export default function DaysScreen() {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>{block.block_name}</Text>
+          <Text style={styles.title} numberOfLines={1}>{localBlock.block_name}</Text>
           <Text style={styles.subtitle}>
-            {block.weeks.includes('-') ? 'Weeks' : 'Week'} {block.weeks}
+            {localBlock.weeks.includes('-') ? 'Weeks' : 'Week'} {localBlock.weeks}
           </Text>
         </View>
-        <View style={styles.backButton} />
+        <TouchableOpacity 
+          style={styles.debugButton} 
+          onPress={() => Alert.alert(
+            'Debug Logs', 
+            debugLogs.length > 0 ? debugLogs.join('\n\n---\n\n') : 'No debug logs yet',
+            [{ text: 'OK' }]
+          )}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.debugButtonText}>LOG ({debugLogs.length})</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        data={block.days}
+        data={localBlock.days}
         keyExtractor={(item, index) => `${item.day_name}-${index}`}
         ListHeaderComponent={() => (
           <View style={styles.weekNavigationContainer}>
@@ -543,11 +842,66 @@ export default function DaysScreen() {
             currentWeek={currentWeek}
             completionStats={getCompletionStats(item.day_name)}
             themeColor={themeColor}
+            blockName={localBlock.block_name}
+            refreshTrigger={refreshTrigger}
           />
+        )}
+        ListFooterComponent={() => (
+          <TouchableOpacity 
+            style={[styles.addDayButton, { borderColor: themeColor }]}
+            onPress={() => handleAddDay()}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={themeColor} />
+            <Text style={[styles.addDayText, { color: themeColor }]}>Add Day</Text>
+          </TouchableOpacity>
         )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
+
+      {/* Add Day Modal - Android Only */}
+      {Platform.OS === 'android' && (
+        <Modal
+          visible={showAddDayModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowAddDayModal(false)}
+        >
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.title}>Add New Day</Text>
+              
+              <TextInput
+                style={styles.input}
+                value={newDayName}
+                onChangeText={setNewDayName}
+                placeholder="Enter day name..."
+                placeholderTextColor="#888"
+                autoFocus={true}
+                maxLength={30}
+              />
+              
+              <View style={styles.buttonContainer}>
+                <View style={styles.buttonWrapper}>
+                  <Button
+                    title="Cancel"
+                    color="#666"
+                    onPress={() => setShowAddDayModal(false)}
+                  />
+                </View>
+                <View style={styles.buttonWrapper}>
+                  <Button
+                    title="Create"
+                    color={themeColor}
+                    onPress={handleCreateDay}
+                    disabled={!newDayName.trim()}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -571,6 +925,20 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  debugButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  debugButtonText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   titleContainer: {
     flex: 1,
@@ -925,5 +1293,339 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#71717a',
     fontWeight: '500',
+  },
+  addDayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  addDayText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Dark Modal Styles
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  modal: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  input: {
+    backgroundColor: '#0a0a0b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#ffffff',
+    marginBottom: 32,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  buttonWrapper: {
+    flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  
+  // New Modal Styles
+  newModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+  },
+  newModalBackdrop: {
+    flex: 1,
+  },
+  newModalContainer: {
+    backgroundColor: '#0a0a0b',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingBottom: 34, // Safe area
+    maxHeight: '85%',
+  },
+  newModalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#3f3f46',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  newModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#18181b',
+  },
+  newModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    flex: 1,
+  },
+  newModalCloseButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  newModalContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  newModalIconWrapper: {
+    marginBottom: 24,
+  },
+  newModalIconBg: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  newModalDescription: {
+    fontSize: 16,
+    color: '#a1a1aa',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  newInputSection: {
+    width: '100%',
+  },
+  newInputLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  newModalInput: {
+    borderWidth: 2,
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 17,
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  newCharacterCount: {
+    fontSize: 12,
+    color: '#71717a',
+    textAlign: 'right',
+    marginBottom: 16,
+  },
+  newModalActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 8,
+    gap: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#18181b',
+  },
+  newCancelButton: {
+    flex: 1,
+    backgroundColor: '#27272a',
+    paddingVertical: 30,
+    paddingHorizontal: 25,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 80,
+  },
+  newCreateButton: {
+    flex: 2,
+    paddingVertical: 30,
+    paddingHorizontal: 25,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 80,
+  },
+  newCancelText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  newCreateText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalContainer: {
+    backgroundColor: '#0a0a0b',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+    flex: 0,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#18181b',
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#3f3f46',
+    borderRadius: 2,
+    position: 'absolute',
+    top: 8,
+    left: '50%',
+    marginLeft: -18,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  modalContent: {
+    padding: 20,
+    paddingBottom: 16,
+  },
+  modalIconContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#a1a1aa',
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  modalInput: {
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    color: '#ffffff',
+    borderWidth: 2,
+    marginBottom: 4,
+  },
+  characterCount: {
+    fontSize: 12,
+    color: '#71717a',
+    textAlign: 'right',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#18181b',
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#27272a',
+    paddingVertical: 18,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 54,
+  },
+  modalCreateButton: {
+    flex: 2.2,
+    flexDirection: 'row',
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 54,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a1a1aa',
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  modalCreateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    flexShrink: 1,
   },
 });
