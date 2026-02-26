@@ -72,9 +72,7 @@ function MesocycleCard({ mesocycle, onPress, onLongPress, themeColor }: Mesocycl
     ? (mesocycle.completedBlocks / mesocycle.totalBlocks) * 100 
     : 0;
 
-  // Use theme color only for active mesocycle, gray for others
   const phaseColor = mesocycle.isActive ? themeColor : '#6b7280';
-  
   const title = mesocycle.phase?.phaseName || `Mesocycle ${mesocycle.mesocycleNumber}`;
 
   return (
@@ -163,7 +161,6 @@ function MesocycleCard({ mesocycle, onPress, onLongPress, themeColor }: Mesocycl
 function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeColor }: BlockCardProps) {
   const dayCount = block.days.length;
   
-  // Count unique exercises for stats
   const exercises = new Set<string>();
   block.days.forEach(day => {
     day.exercises?.forEach((exercise: any) => {
@@ -171,7 +168,6 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeC
     });
   });
   
-  // Use theme color only for active block, gray for others
   const phaseColor = isActive ? themeColor : '#6b7280';
   
   return (
@@ -284,8 +280,8 @@ export default function BlocksScreen() {
   const route = useRoute<BlocksScreenRouteProp>();
   const { routine, initialBlock, initialWeek, autoNavigateToToday } = route.params;
   const { themeColor } = useTheme();
-  const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0); // Default to first block
-  const [currentWeek, setCurrentWeek] = useState<number>(1); // Current week within active block
+  const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0);
+  const [currentWeek, setCurrentWeek] = useState<number>(1);
   const [blockStartDate, setBlockStartDate] = useState<string | null>(null);
   const [completionBasedWeek, setCompletionBasedWeek] = useState<number>(1);
   const [completionStatus, setCompletionStatus] = useState<{[blockName: string]: boolean}>({});
@@ -315,21 +311,16 @@ export default function BlocksScreen() {
     }
   }, [activeBlockIndex, routine]);
 
-  // Recalculate week progress when screen comes into focus (handles bookmark changes)
   useFocusEffect(
     React.useCallback(() => {
       const reloadOnFocus = async () => {
-        
         if (activeBlockIndex !== -1) {
           calculateCompletionBasedWeek();
         }
         
-        // Small delay to ensure any background completion updates have finished
         await new Promise(resolve => setTimeout(resolve, 100));
-        
         await checkAllBlocksCompletion();
         
-        // Reload mesocycle cards to include any new custom mesocycles
         if (program && hasMesocycles) {
           await updateMesocycleCards();
         }
@@ -339,15 +330,11 @@ export default function BlocksScreen() {
     }, [activeBlockIndex, program, hasMesocycles])
   );
 
-  // No auto-navigation from BlocksScreen - "Today" button goes direct to Days
-
-  // Update mesocycle cards when program or completion status changes
   useEffect(() => {
     if (program && hasMesocycles) {
       updateMesocycleCards();
     }
   }, [program, completionStatus, routine.data.blocks]);
-
 
   const loadActiveBlock = async () => {
     try {
@@ -372,281 +359,55 @@ export default function BlocksScreen() {
   };
 
   const updateMesocycleCards = async () => {
-    console.log('🔍 STARTING updateMesocycleCards function');
-    console.log('🔍 PROGRAM DATA:', {
-      programExists: !!program,
-      totalMesocycles: program?.totalMesocycles,
-      currentMesocycle: program?.currentMesocycle,
-      mesocycleRoadmapLength: program?.mesocycleRoadmap?.length
-    });
     
     if (!program || program.totalMesocycles <= 1) {
-      console.log('🔍 EARLY RETURN: No program or totalMesocycles <= 1');
       return;
-    }
-
-    // Fix: If mesocycleRoadmap is empty, create default phase data
-    if (!program.mesocycleRoadmap || program.mesocycleRoadmap.length === 0) {
-      console.log('🔍 Creating default mesocycle roadmap');
-      const defaultRoadmap = [];
-      for (let i = 1; i <= program.totalMesocycles; i++) {
-        defaultRoadmap.push({
-          mesocycleNumber: i,
-          phaseName: `Mesocycle ${i}`,
-          repFocus: '8-12 reps',
-          emphasis: 'Progressive training',
-          weeks: 12,
-          blocks: 3
-        });
-      }
-      
-      // Update the program with default roadmap
-      await ProgramStorage.updateProgram(program.id, {
-        mesocycleRoadmap: defaultRoadmap
-      });
-      
-      // Update local state
-      setProgram(prev => prev ? {...prev, mesocycleRoadmap: defaultRoadmap} : null);
-      return; // Exit early, useEffect will trigger again with updated data
     }
 
     const cards: MesocycleCard[] = [];
     const currentMesocycle = program.currentMesocycle;
-    const routineMesocycle = routine.mesocycleNumber;
+    const totalBlocks = routine.data.blocks.length;
+    const blocksPerMesocycle = Math.ceil(totalBlocks / program.totalMesocycles);
     
-    console.log('🔍 MESOCYCLE LOGIC DECISION POINT:', {
-      currentMesocycle,
-      routineMesocycle,
-      routineId: routine.id,
-      routineName: routine.name,
-      hasRoutineMesocycleNumber: !!routineMesocycle,
-      willUseCase1: !!routineMesocycle,
-      willUseCase2: !routineMesocycle
-    });
-    
-    if (routineMesocycle) {
-      console.log('🔍 ENTERING CASE 1: Individual mesocycle import');
+    for (let i = 0; i < program.totalMesocycles; i++) {
+      const mesocycleNumber = i + 1;
+      const phase = program.mesocycleRoadmap?.find(p => p.mesocycleNumber === mesocycleNumber);
       
-      // CASE 1: Routine has explicit mesocycle number (individual imports)
-      const mesocycleNumber = routineMesocycle;
-      const phase = program.mesocycleRoadmap.find(p => p.mesocycleNumber === mesocycleNumber);
+      const startIdx = i * blocksPerMesocycle;
+      const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
+      const mesocycleBlocks = routine.data.blocks.slice(startIdx, endIdx);
       
-      // For mesocycle routines, the routine.data.blocks should already be filtered
-      // to contain only the blocks for this specific mesocycle
-      const mesocycleBlocks = routine.data.blocks;
+      if (mesocycleBlocks.length === 0) continue;
       
-      console.log(`🔍 CASE 1 MESOCYCLE ${mesocycleNumber} DATA:`, {
-        routineId: routine.id,
-        routineMesocycleNumber: routineMesocycle,
-        blocksCount: mesocycleBlocks.length,
-        blockNames: mesocycleBlocks.map(b => b.block_name),
-        phaseFound: !!phase,
-        phaseName: phase?.phaseName
-      });
       
-      let isCompleted = false;
-      let isActive = false;
-
-      // Determine state based on mesocycle position
-      if (mesocycleNumber === currentMesocycle) {
-        isActive = true;
-      }
-      
-      console.log(`🔍 CASE 1 STATUS CALCULATION:`, {
-        mesocycleNumber,
-        currentMesocycle,
-        isActive,
-        completionStatusKeys: Object.keys(completionStatus),
-        relevantCompletionStatus: mesocycleBlocks.map(b => ({
-          blockName: b.block_name,
-          isCompleted: completionStatus[b.block_name] || false
-        }))
-      });
-      
-      // Check if mesocycle is completed based on actual block completion
-      if (mesocycleBlocks.length > 0) {
-        const completedBlocks = mesocycleBlocks.filter(block => 
-          completionStatus[block.block_name] || false
-        ).length;
-        isCompleted = completedBlocks === mesocycleBlocks.length;
-      }
-      
-      // Calculate completion stats
       const completedBlocks = mesocycleBlocks.filter(block => 
         completionStatus[block.block_name] || false
       ).length;
       
-      // Check if this mesocycle contains the active block
-      const containsActiveBlock = mesocycleBlocks.some((block) => {
-        const globalIndex = routine.data.blocks.findIndex(b => b.block_name === block.block_name);
-        return globalIndex === activeBlockIndex;
-      });
+      const isCompleted = completedBlocks === mesocycleBlocks.length;
+      const isActive = mesocycleNumber === currentMesocycle;
       
-      // Load manual blocks to get accurate total count
       const manualBlocksCount = await getManualBlocksCount(mesocycleNumber, routine);
-      const totalBlocks = mesocycleBlocks.length + manualBlocksCount;
-      
-      console.log(`🔍 CASE 1 FINAL MESOCYCLE CARD:`, {
-        mesocycleNumber,
-        totalBlocks,
-        completedBlocks,
-        isCompleted,
-        isActive,
-        manualBlocksCount
-      });
+      const totalBlocksWithManual = mesocycleBlocks.length + manualBlocksCount;
       
       cards.push({
         mesocycleNumber,
         phase,
         blocksInMesocycle: mesocycleBlocks,
         completedBlocks,
-        totalBlocks: totalBlocks,
+        totalBlocks: totalBlocksWithManual,
         isCompleted,
-        isActive: isActive // Only use program's currentMesocycle, not active block
+        isActive
       });
-      
-      console.log('🔍 CASE 1 COMPLETE: Created', cards.length, 'mesocycle cards');
-    } else {
-      console.log('🔍 ENTERING CASE 2: Full program import with block distribution');
-      
-      // CASE 2: Full program import - distribute blocks across mesocycles
-      const totalBlocks = routine.data.blocks.length;
-      const blocksPerMesocycle = Math.ceil(totalBlocks / program.totalMesocycles);
-      
-      console.log('🔍 CASE 2 DISTRIBUTION CALCULATION:', {
-        totalBlocks,
-        totalMesocycles: program.totalMesocycles,
-        blocksPerMesocycle,
-        allBlockNames: routine.data.blocks.map(b => b.block_name)
-      });
-      
-      for (let i = 0; i < program.totalMesocycles; i++) {
-        const mesocycleNumber = i + 1;
-        const phase = program.mesocycleRoadmap.find(p => p.mesocycleNumber === mesocycleNumber);
-        
-        // Distribute blocks evenly across mesocycles
-        const startIdx = i * blocksPerMesocycle;
-        const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
-        const originalBlocks = routine.data.blocks.slice(startIdx, endIdx);
-        
-        console.log(`🔍 CASE 2 MESOCYCLE ${mesocycleNumber} DISTRIBUTION:`, {
-          mesocycleIndex: i,
-          startIdx,
-          endIdx,
-          originalBlocksCount: originalBlocks.length,
-          originalBlockNames: originalBlocks.map(b => b.block_name),
-          phaseFound: !!phase,
-          phaseName: phase?.phaseName
-        });
-        
-        if (originalBlocks.length === 0) {
-          console.log(`🔍 CASE 2 MESOCYCLE ${mesocycleNumber}: SKIPPING - No blocks`);
-          continue; // Skip empty mesocycles
-        }
-        
-        // Calculate absolute week numbers for this mesocycle
-        let currentWeek = 1;
-        for (let j = 0; j < startIdx; j++) {
-          const blockWeeks = routine.data.blocks[j].weeks;
-          const weeks = blockWeeks.includes('-') 
-            ? parseInt(blockWeeks.split('-')[1]) - parseInt(blockWeeks.split('-')[0]) + 1
-            : 1;
-          currentWeek += weeks;
-        }
-        
-        // Adjust week numbers for blocks in this mesocycle
-        const mesocycleBlocks = originalBlocks.map(block => {
-          const blockWeeks = block.weeks.includes('-') 
-            ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1
-            : 1;
-          
-          const adjustedWeeks = blockWeeks === 1 
-            ? currentWeek.toString()
-            : `${currentWeek}-${currentWeek + blockWeeks - 1}`;
-          
-          currentWeek += blockWeeks;
-          
-          return {
-            ...block,
-            weeks: adjustedWeeks
-          };
-        });
-        
-        let isCompleted = false;
-        let isActive = false;
-
-        // Determine state based on mesocycle position
-        if (mesocycleNumber === currentMesocycle) {
-          isActive = true;
-        }
-        
-        // Check if mesocycle is completed based on actual block completion
-        const completedBlocks = mesocycleBlocks.filter(block => 
-          completionStatus[block.block_name] || false
-        ).length;
-        
-        isCompleted = completedBlocks === mesocycleBlocks.length;
-        
-        // Check if this mesocycle contains the active block
-        const containsActiveBlock = mesocycleBlocks.some((block) => {
-          const globalIndex = routine.data.blocks.findIndex(b => b.block_name === block.block_name);
-          return globalIndex === activeBlockIndex;
-        });
-        
-        // Load manual blocks to get accurate total count
-        const manualBlocksCount = await getManualBlocksCount(mesocycleNumber, routine);
-        const totalBlocksWithManual = mesocycleBlocks.length + manualBlocksCount;
-        
-        console.log(`🔍 CASE 2 MESOCYCLE ${mesocycleNumber} FINAL CARD:`, {
-          mesocycleNumber,
-          totalBlocksWithManual,
-          completedBlocks,
-          isCompleted,
-          isActive,
-          manualBlocksCount
-        });
-        
-        cards.push({
-          mesocycleNumber,
-          phase,
-          blocksInMesocycle: mesocycleBlocks,
-          completedBlocks,
-          totalBlocks: totalBlocksWithManual,
-          isCompleted,
-          isActive: isActive // Only use program's currentMesocycle, not active block
-        });
-      }
-      
-      console.log('🔍 CASE 2 COMPLETE: Created', cards.length, 'mesocycle cards from full program distribution');
     }
     
-    console.log('🔍 BEFORE CUSTOM MESOCYCLES:', {
-      cardsCreated: cards.length,
-      cardMesocycleNumbers: cards.map(c => c.mesocycleNumber),
-      cardBlockCounts: cards.map(c => c.blocksInMesocycle.length)
-    });
-    
-    // Load custom mesocycles and append them
     const customMesocycles = await loadCustomMesocycles();
     const allMesocycles = [...cards, ...customMesocycles];
-    
-    console.log('🔍 FINAL MESOCYCLE CARDS TO SET:', {
-      totalCards: allMesocycles.length,
-      standardCards: cards.length,
-      customCards: customMesocycles.length,
-      finalCardSummary: allMesocycles.map(c => ({
-        mesocycleNumber: c.mesocycleNumber,
-        blocksCount: c.blocksInMesocycle.length,
-        isCustom: c.isCustomMesocycle || false,
-        phaseName: c.phase?.phaseName
-      }))
-    });
     
     setMesocycleCards(allMesocycles);
   };
 
   const handleMesocyclePress = (mesocycle: MesocycleCard) => {
-    // Navigate to a dedicated screen showing blocks within this mesocycle
     navigation.navigate('MesocycleBlocks' as any, {
       mesocycle,
       routine,
@@ -662,7 +423,6 @@ export default function BlocksScreen() {
         setCurrentWeek(currentWeek);
         setBlockStartDate(startDate);
       } else {
-        // Initialize with current date if no progress exists
         const today = new Date().toISOString();
         setBlockStartDate(today);
         await saveWeekProgress(1, today);
@@ -688,7 +448,6 @@ export default function BlocksScreen() {
       await AsyncStorage.setItem(`activeBlock_${routine.id}`, blockIndex.toString());
       setActiveBlockIndex(blockIndex);
       
-      // Reset week progress when switching blocks
       const today = new Date().toISOString();
       await saveWeekProgress(1, today);
     } catch (error) {
@@ -703,13 +462,11 @@ export default function BlocksScreen() {
     const totalWeeks = getBlockWeekCount(block.weeks);
     
     try {
-      // Check if user has manually bookmarked a week (using same key as DaysScreen)
       const bookmarkKey = `bookmark_${block.block_name}`;
       const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
       if (savedBookmark) {
         const { week, isBookmarked } = JSON.parse(savedBookmark);
         if (isBookmarked && week >= 1 && week <= totalWeeks) {
-          // If bookmarked to final week, check if that week is completed
           if (week === totalWeeks) {
             const weekKey = `completed_${block.block_name}_week${week}`;
             const completed = await AsyncStorage.getItem(weekKey);
@@ -721,7 +478,7 @@ export default function BlocksScreen() {
               );
               
               if (allDaysCompleted) {
-                setCompletionBasedWeek(totalWeeks + 1); // Mark as complete
+                setCompletionBasedWeek(totalWeeks + 1);
                 return;
               }
             }
@@ -732,32 +489,26 @@ export default function BlocksScreen() {
         }
       }
       
-      // No bookmark found, calculate based on completed workouts
       for (let week = 1; week <= totalWeeks; week++) {
         const weekKey = `completed_${block.block_name}_week${week}`;
         const completed = await AsyncStorage.getItem(weekKey);
         
         if (!completed) {
-          // No workouts completed in this week yet
           setCompletionBasedWeek(week);
           return;
         }
         
         const completedSet = new Set(JSON.parse(completed));
-        
-        // Check if all days in this week are completed
         const allDaysCompleted = block.days.every(day => 
           completedSet.has(`${day.day_name}_week${week}`)
         );
         
         if (!allDaysCompleted) {
-          // This week is not fully completed
           setCompletionBasedWeek(week);
           return;
         }
       }
       
-      // All weeks are completed, set to the last week + 1 (or cap at totalWeeks)
       setCompletionBasedWeek(totalWeeks + 1);
     } catch (error) {
       console.error('Failed to calculate completion-based week:', error);
@@ -767,7 +518,6 @@ export default function BlocksScreen() {
 
   const checkAllWeeksCompleted = async (block: Block, totalWeeks: number) => {
     try {
-      // Get all days for this block (including manual ones if needed)
       const allDays = block.days || [];
       
       for (let week = 1; week <= totalWeeks; week++) {
@@ -775,32 +525,29 @@ export default function BlocksScreen() {
         const completed = await AsyncStorage.getItem(weekKey);
         
         if (!completed) {
-          return false; // Week has no completed workouts
+          return false;
         }
         
         const completedArray = JSON.parse(completed);
         
         if (allDays.length === 0) {
-          // For empty blocks, check for special completion marker
           if (!completedArray.includes('empty_block_completed')) {
             return false;
           }
         } else {
-          // For blocks with days, check if all days are completed
           if (completedArray.length !== allDays.length) {
             return false;
           }
         }
       }
       
-      return true; // All weeks are completed
+      return true;
     } catch (error) {
       console.error('Error checking all weeks completed:', error);
       return false;
     }
   };
 
-  // Helper functions for week calculations
   const getBlockWeekCount = (weeksString: string): number => {
     if (weeksString.includes('-')) {
       const [start, end] = weeksString.split('-').map(Number);
@@ -814,7 +561,6 @@ export default function BlocksScreen() {
     const totalWeeks = getBlockWeekCount(block.weeks);
     
     if (blockIndex === activeBlockIndex) {
-      // For active block, use completion-based week calculation
       const currentWeekInBlock = completionBasedWeek;
       const remaining = Math.max(0, totalWeeks - currentWeekInBlock + 1);
       const isComplete = currentWeekInBlock > totalWeeks;
@@ -827,7 +573,6 @@ export default function BlocksScreen() {
         isOverdue: false
       };
     } else {
-      // For non-active blocks, check if they're completed
       const isComplete = checkBlockCompletionSync(block, totalWeeks);
       
       return {
@@ -841,22 +586,18 @@ export default function BlocksScreen() {
   };
 
   const checkBlockCompletionSync = (block: Block, totalWeeks: number) => {
-    // This will be updated by the async function, but we need a sync version for rendering
-    // We'll use state to track completion status for each block
     return completionStatus[block.block_name] || false;
   };
 
   const checkAllBlocksCompletion = async () => {
     const newCompletionStatus: {[blockName: string]: boolean} = {};
     
-    // Check completion for original blocks
     for (const block of routine.data.blocks) {
       const totalWeeks = getBlockWeekCount(block.weeks);
       const isComplete = await checkAllWeeksCompleted(block, totalWeeks);
       newCompletionStatus[block.block_name] = isComplete;
     }
     
-    // Also check completion for any manual blocks across all mesocycles
     if (program && program.totalMesocycles > 1) {
       for (let mesocycleNum = 1; mesocycleNum <= program.totalMesocycles; mesocycleNum++) {
         const manualBlocksKey = `manual_blocks_mesocycle_${mesocycleNum}`;
@@ -876,7 +617,6 @@ export default function BlocksScreen() {
       }
     }
     
-    // Check custom mesocycle manual blocks too
     const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
     try {
       const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
@@ -901,7 +641,6 @@ export default function BlocksScreen() {
       console.error('Error loading custom mesocycle manual blocks:', error);
     }
     
-    console.log('📊 BlocksScreen completion status updated:', newCompletionStatus);
     setCompletionStatus(newCompletionStatus);
   };
 
@@ -926,12 +665,11 @@ export default function BlocksScreen() {
   };
 
   const handleBlockLongPress = (block: Block, index: number) => {
-    if (index === activeBlockIndex) return; // Already active
+    if (index === activeBlockIndex) return;
     
     setSelectedBlock({ block, index });
     setShowModal(true);
   };
-
 
   const handleSetActive = () => {
     if (selectedBlock) {
@@ -951,16 +689,13 @@ export default function BlocksScreen() {
     setShowMesocycleModal(true);
   };
 
-
   const handleSetActiveMesocycle = async () => {
     if (selectedMesocycle && program) {
       try {
-        // Update the program's current mesocycle using updateProgram
         await ProgramStorage.updateProgram(program.id, { 
           currentMesocycle: selectedMesocycle.mesocycleNumber 
         });
         
-        // Reload program data to reflect changes
         await loadProgramData();
         
         setShowMesocycleModal(false);
@@ -1038,46 +773,37 @@ export default function BlocksScreen() {
               try {
                 if (!selectedMesocycle) return;
                 
-                // Remove mesocycle from local state
                 const updatedMesocycles = mesocycleCards.filter(m => m !== selectedMesocycle);
                 setMesocycleCards(updatedMesocycles);
                 
                 if (selectedMesocycle.isCustomMesocycle) {
-                  // Remove custom mesocycle from storage
                   const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
                   const existingCustomMesocycles = await AsyncStorage.getItem(customMesocyclesKey);
                   const customMesocycles = existingCustomMesocycles ? JSON.parse(existingCustomMesocycles) : [];
                   
-                  // Filter out the deleted mesocycle
                   const updatedCustomMesocycles = customMesocycles.filter((m: any) => 
                     m.customId !== selectedMesocycle.customId
                   );
                   await AsyncStorage.setItem(customMesocyclesKey, JSON.stringify(updatedCustomMesocycles));
                   
-                  // Also clean up any manual blocks for this mesocycle
                   if (selectedMesocycle.customId) {
                     const manualBlocksKey = `manual_blocks_${selectedMesocycle.customId}`;
                     await AsyncStorage.removeItem(manualBlocksKey);
                   }
                 } else {
-                  // For original program mesocycles, update the program to exclude this mesocycle
-                  if (program && !routine.mesocycleNumber) {
-                    // Only remove blocks if this is a full program (not individual mesocycle imports)
+                  if (program && !(routine as any).mesocycleNumber) {
                     const totalBlocks = routine.data.blocks.length;
                     const blocksPerMesocycle = Math.ceil(totalBlocks / program.totalMesocycles);
                     
-                    // Calculate which blocks belong to the mesocycle being deleted
                     const mesocycleIndex = selectedMesocycle.mesocycleNumber - 1;
                     const startIdx = mesocycleIndex * blocksPerMesocycle;
                     const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
                     
-                    // Remove the blocks that belonged to this mesocycle
                     const updatedBlocks = [
                       ...routine.data.blocks.slice(0, startIdx),
                       ...routine.data.blocks.slice(endIdx)
                     ];
                     
-                    // Update the routine with the remaining blocks
                     const updatedRoutine = {
                       ...routine,
                       data: {
@@ -1086,7 +812,6 @@ export default function BlocksScreen() {
                       }
                     };
                     
-                    // Save the updated routine
                     const routines = await WorkoutStorage.loadRoutines();
                     const routineIndex = routines.findIndex(r => r.id === routine.id);
                     if (routineIndex !== -1) {
@@ -1094,7 +819,6 @@ export default function BlocksScreen() {
                       await WorkoutStorage.saveRoutines(routines);
                     }
                     
-                    // Update local routine reference (though we'll reload anyway)
                     Object.assign(routine, updatedRoutine);
                   }
                   
@@ -1103,7 +827,6 @@ export default function BlocksScreen() {
                       phase.mesocycleNumber !== selectedMesocycle.mesocycleNumber
                     );
                     
-                    // Renumber remaining mesocycles to maintain sequence
                     updatedRoadmap.forEach((phase, index) => {
                       phase.mesocycleNumber = index + 1;
                     });
@@ -1111,16 +834,13 @@ export default function BlocksScreen() {
                     await ProgramStorage.updateProgram(program.id, {
                       mesocycleRoadmap: updatedRoadmap,
                       totalMesocycles: updatedRoadmap.length,
-                      // Adjust current mesocycle if needed
                       currentMesocycle: Math.min(program.currentMesocycle, updatedRoadmap.length)
                     });
                     
-                    // Reload program data to reflect the changes
                     await loadProgramData();
                   }
                 }
                 
-                // Close modal
                 setShowMesocycleModal(false);
                 setSelectedMesocycle(null);
                 setShowMesocycleMoreOptions(false);
@@ -1154,7 +874,6 @@ export default function BlocksScreen() {
             onPress: async (newName) => {
               if (newName && newName.trim().length > 0) {
                 try {
-                  // Update the mesocycle name in program roadmap
                   if (program && selectedMesocycle.phase) {
                     const updatedRoadmap = program.mesocycleRoadmap.map(phase => 
                       phase.mesocycleNumber === selectedMesocycle.mesocycleNumber 
@@ -1166,10 +885,8 @@ export default function BlocksScreen() {
                       mesocycleRoadmap: updatedRoadmap
                     });
 
-                    // Reload program data to reflect changes and force refresh
                     const updatedProgram = await ProgramStorage.getProgram(program.id);
                     if (updatedProgram) {
-                      // Force state change by creating new object reference
                       setProgram({...updatedProgram});
                     }
                   }
@@ -1197,8 +914,6 @@ export default function BlocksScreen() {
     if (selectedMesocycle) {
       try {
         const blocksInMesocycle = selectedMesocycle.blocksInMesocycle;
-        
-        // Check if mesocycle is currently completed (all blocks completed)
         const isCurrentlyCompleted = selectedMesocycle.isCompleted;
         
         for (const block of blocksInMesocycle) {
@@ -1207,13 +922,11 @@ export default function BlocksScreen() {
             : 1;
 
           if (isCurrentlyCompleted) {
-            // Uncomplete the mesocycle - remove all completion data for all blocks
             for (let week = 1; week <= totalWeeks; week++) {
               const weekKey = `completed_${block.block_name}_week${week}`;
               await AsyncStorage.removeItem(weekKey);
             }
           } else {
-            // Complete the mesocycle - mark all days in all blocks as completed
             for (let week = 1; week <= totalWeeks; week++) {
               const completedWorkouts = block.days.map((day: any) => `${day.day_name}_week${week}`);
               const weekKey = `completed_${block.block_name}_week${week}`;
@@ -1222,10 +935,8 @@ export default function BlocksScreen() {
           }
         }
 
-        // Reload completion status to reflect changes
         await checkAllBlocksCompletion();
 
-        // Close modal without success popup
         setShowMesocycleModal(false);
         setSelectedMesocycle(null);
         setShowMesocycleMoreOptions(false);
@@ -1271,7 +982,6 @@ export default function BlocksScreen() {
 
   const createNewMesocycle = async (mesocycleName: string) => {
     try {
-      // Create new mesocycle with empty blocks and unique ID
       const customMesocycleId = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const newMesocycle: MesocycleCard = {
         mesocycleNumber: mesocycleCards.length + 1,
@@ -1288,15 +998,13 @@ export default function BlocksScreen() {
         totalBlocks: 0,
         isCompleted: false,
         isActive: false,
-        isCustomMesocycle: true, // Mark as custom to prevent auto block assignment
-        customId: customMesocycleId // Unique identifier for storage
+        isCustomMesocycle: true,
+        customId: customMesocycleId
       };
 
-      // Add to local state
       const updatedMesocycles = [...mesocycleCards, newMesocycle];
       setMesocycleCards(updatedMesocycles);
 
-      // Save custom mesocycle to storage for persistence
       await saveCustomMesocycle(newMesocycle);
       
     } catch (error) {
@@ -1323,10 +1031,8 @@ export default function BlocksScreen() {
       let mesocycleId;
       
       if (customId) {
-        // For custom mesocycles, use the custom ID
         mesocycleId = customId;
       } else {
-        // For program mesocycles, use mesocycle number
         mesocycleId = `mesocycle_${mesocycleNumber}`;
       }
       
@@ -1350,10 +1056,8 @@ export default function BlocksScreen() {
       let mesocycleId;
       
       if (customId) {
-        // For custom mesocycles, use the custom ID
         mesocycleId = customId;
       } else {
-        // For program mesocycles, use mesocycle number
         mesocycleId = `mesocycle_${mesocycleNumber}`;
       }
       
@@ -1374,7 +1078,6 @@ export default function BlocksScreen() {
 
   const checkAllWeeksCompletedFresh = async (block: Block, totalWeeks: number): Promise<boolean> => {
     try {
-      // Get ALL days including manual ones (like getAllBlockDays does in MesocycleBlocksScreen)
       const originalDays = block.days || [];
       const manualDaysKey = `manual_days_${block.block_name}`;
       const manualDaysData = await AsyncStorage.getItem(manualDaysKey);
@@ -1392,12 +1095,10 @@ export default function BlocksScreen() {
         const completedArray = JSON.parse(completed);
         
         if (allDays.length === 0) {
-          // For empty blocks, check for special completion marker
           if (!completedArray.includes('empty_block_completed')) {
             return false;
           }
         } else {
-          // For blocks with days, check if all days are completed
           if (completedArray.length !== allDays.length) {
             return false;
           }
@@ -1416,15 +1117,12 @@ export default function BlocksScreen() {
       const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
       const customMesocycles = customMesocyclesData ? JSON.parse(customMesocyclesData) : [];
       
-      // Load manual blocks for each custom mesocycle
+      
       const updatedCustomMesocycles = await Promise.all(
         customMesocycles.map(async (mesocycle: any) => {
-          // Load the actual manual blocks, not just the count
           const manualBlocks = await getManualBlocks(mesocycle.mesocycleNumber, routine, mesocycle.customId);
           
-          // Calculate completion status for manual blocks - do FRESH check
           const completedBlocksPromises = manualBlocks.map(async (block) => {
-            // Do a fresh completion check instead of using cached status
             const totalWeeks = getBlockWeekCount(block.weeks);
             const isComplete = await checkAllWeeksCompletedFresh(block, totalWeeks);
             return isComplete;
@@ -1436,9 +1134,9 @@ export default function BlocksScreen() {
           return {
             ...mesocycle,
             isCustomMesocycle: true,
-            blocksInMesocycle: manualBlocks, // Now properly populated
-            completedBlocks: completedBlocks, // Calculate completed blocks
-            totalBlocks: manualBlocks.length, // Total is just the manual blocks
+            blocksInMesocycle: manualBlocks,
+            completedBlocks: completedBlocks,
+            totalBlocks: manualBlocks.length,
             isCompleted: manualBlocks.length > 0 && completedBlocks === manualBlocks.length
           };
         })
@@ -1609,7 +1307,6 @@ export default function BlocksScreen() {
         </View>
       </Modal>
 
-      {/* Mesocycle Actions Modal */}
       <Modal
         visible={showMesocycleModal}
         transparent
@@ -1651,7 +1348,6 @@ export default function BlocksScreen() {
             </View>
             
             <View style={{ width: '100%', gap: 12 }}>
-              {/* Primary Actions */}
               {!selectedMesocycle?.isActive && (
                 <TouchableOpacity
                   style={{
@@ -1702,7 +1398,6 @@ export default function BlocksScreen() {
                 }}>{selectedMesocycle?.isCompleted ? 'Mark Incomplete' : 'Mark Complete'}</Text>
               </TouchableOpacity>
 
-              {/* More Options Toggle */}
               <TouchableOpacity
                 style={{
                   backgroundColor: '#27272a',
@@ -1731,7 +1426,6 @@ export default function BlocksScreen() {
                 }}>{showMesocycleMoreOptions ? 'Less Options' : 'More Options'}</Text>
               </TouchableOpacity>
 
-              {/* Secondary Actions */}
               {showMesocycleMoreOptions && (
                 <>
                   <TouchableOpacity
@@ -1846,7 +1540,6 @@ export default function BlocksScreen() {
         </View>
       </Modal>
 
-      {/* Add Mesocycle Modal - Android Only */}
       {Platform.OS === 'android' && (
         <Modal
           visible={showAddMesocycleModal}
@@ -1889,56 +1582,6 @@ export default function BlocksScreen() {
           </View>
         </Modal>
       )}
-      
-      {/* Debug Button */}
-      <View style={{
-        position: 'absolute',
-        bottom: 100,
-        right: 20,
-        backgroundColor: '#27272a',
-        borderRadius: 30,
-        width: 60,
-        height: 60,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-      }}>
-        <TouchableOpacity 
-          onPress={() => {
-            const debugInfo = {
-              screenName: 'BlocksScreen',
-              routineName: routine.name,
-              routineId: routine.id,
-              mesocycleNumber: (routine as any).mesocycleNumber,
-              hasMesocycles,
-              totalMesocycles: mesocycleCards?.length || 0,
-              mesocycleNames: mesocycleCards?.map((m: any) => m.name || m.phaseName || 'Unknown') || [],
-              totalBlocksInRoutine: routine.data.blocks.length,
-              allBlocksInRoutine: routine.data.blocks.map((b: any) => b.block_name),
-              completionStatusKeys: Object.keys(completionStatus),
-              completionStatusValues: Object.values(completionStatus)
-            };
-            console.log('🔍 BLOCKS SCREEN DEBUG:', JSON.stringify(debugInfo, null, 2));
-            Alert.alert(
-              'Blocks Screen Debug Info', 
-              `Routine: ${routine.name}\nMesocycles: ${hasMesocycles ? mesocycleCards?.length || 0 : 'None'}\nTotal blocks: ${routine.data.blocks.length}\n\nCheck console for full details`,
-              [{ text: 'OK' }]
-            );
-          }}
-          style={{
-            width: 60,
-            height: 60,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Ionicons name="bug" size={24} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -1966,7 +1609,7 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     alignItems: 'center',
-    paddingRight: 40, // Compensate for back button to center title
+    paddingRight: 40,
   },
   programLabel: {
     fontSize: 14,
@@ -2146,84 +1789,6 @@ const styles = StyleSheet.create({
     color: '#71717a',
     fontWeight: '500',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  modalContent: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 24,
-    width: '100%',
-    maxWidth: 340,
-    alignItems: 'center',
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  modalMessage: {
-    fontSize: 16,
-    color: '#71717a',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  blockNameHighlight: {
-    fontWeight: '600',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    width: '100%',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#27272a',
-    borderRadius: 8,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 56,
-  },
-  confirmButton: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 56,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0a0a0b',
-  },
-  mesocyclePhaseName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#a1a1aa',
-    marginBottom: 8,
-  },
   addMesocycleButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2253,6 +1818,13 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: '#27272a',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   input: {
     backgroundColor: '#0a0a0b',

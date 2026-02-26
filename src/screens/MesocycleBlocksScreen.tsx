@@ -79,7 +79,7 @@ interface BlockCardProps {
   };
 }
 
-function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeColor, blockIndex }: BlockCardProps) {
+function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeColor, blockIndex, refreshKey }: BlockCardProps & { refreshKey: number }) {
   const [allDays, setAllDays] = useState<any[]>([]);
   const [trainingSplit, setTrainingSplit] = useState<string>('Loading...');
   
@@ -93,7 +93,7 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeC
     };
     
     loadDaysData();
-  }, [block]);
+  }, [block, refreshKey]); // Added refreshKey to dependencies
   
   const dayCount = allDays.length;
   
@@ -218,14 +218,6 @@ export default function MesocycleBlocksScreen() {
   
   // DEBUG: Log what data is being passed to this screen
   React.useEffect(() => {
-    console.log('🔍 MESOCYCLE SCREEN PROPS:', {
-      mesocycleName: mesocycle?.name || mesocycle?.phaseName,
-      mesocycleNumber: mesocycle?.mesocycleNumber,
-      blocksInMesocycle: mesocycle?.blocksInMesocycle?.length,
-      routineName: routine?.name,
-      routineId: routine?.id,
-      routineBlocks: routine?.data?.blocks?.length
-    });
   }, []);
   const { themeColor } = useTheme();
   const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0);
@@ -266,6 +258,9 @@ export default function MesocycleBlocksScreen() {
       const reloadScreen = async () => {
         const loadedBlocks = await reloadManualBlocks(); // Reload manual blocks first
         await checkAllBlocksCompletion(loadedBlocks); // Then check completion status with loaded blocks
+        
+        // Force BlockCard components to refresh their day count
+        setRefreshKey(prev => prev + 1);
       };
       reloadScreen();
     }, [])
@@ -1077,6 +1072,7 @@ export default function MesocycleBlocksScreen() {
             weekProgress={getWeekProgress(index)}
             themeColor={themeColor}
             blockIndex={index}
+            refreshKey={refreshKey}
           />
         )}
         ListFooterComponent={() => (
@@ -1521,58 +1517,6 @@ export default function MesocycleBlocksScreen() {
           </View>
         </Modal>
       )}
-      
-      {/* Debug Button */}
-      <View style={{
-        position: 'absolute',
-        bottom: 100,
-        right: 20,
-        backgroundColor: '#27272a',
-        borderRadius: 30,
-        width: 60,
-        height: 60,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-      }}>
-        <TouchableOpacity 
-          onPress={() => {
-            const debugInfo = {
-              screenName: 'MesocycleBlocksScreen',
-              mesocycleName: phaseName,
-              mesocycleNumber: mesocycle.mesocycleNumber,
-              totalBlocksInMesocycle: localBlocks.length,
-              blocksInMesocycle: localBlocks.map(b => b.block_name),
-              routineData: {
-                routineName: routine.name,
-                routineId: routine.id,
-                totalBlocksInRoutine: routine.data.blocks.length,
-                allBlocksInRoutine: routine.data.blocks.map((b: any) => b.block_name)
-              },
-              completionStatus: Object.keys(completionStatus).length,
-              completionStatusKeys: Object.keys(completionStatus)
-            };
-            console.log('🔍 MESOCYCLE BLOCKS DEBUG:', JSON.stringify(debugInfo, null, 2));
-            Alert.alert(
-              'Mesocycle Debug Info', 
-              `Mesocycle: ${phaseName}\nMesocycle blocks: ${localBlocks.length}\nRoutine blocks: ${routine.data.blocks.length}\nRoutine ID: ${routine.id}\n\nCheck console for details`,
-              [{ text: 'OK' }]
-            );
-          }}
-          style={{
-            width: 60,
-            height: 60,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Ionicons name="bug" size={24} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
