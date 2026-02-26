@@ -314,6 +314,9 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
           ]}>
             {day}
           </Text>
+          {isToday && (
+            <View style={[styles.todayIndicator, { backgroundColor: themeColor }]} />
+          )}
         </TouchableOpacity>
       );
     }
@@ -602,24 +605,31 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     backgroundColor: '#18181b',
     borderRadius: 16,
-    padding: 8,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#27272a',
   },
   dayCell: {
-    width: '14.28%',
+    width: '14.285714%',
     aspectRatio: 1,
     padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: 44,
   },
   dayCellWithWorkout: {
     borderRadius: 8,
   },
   dayCellToday: {
-    borderWidth: 2,
-    borderColor: '#3f3f46',
-    borderRadius: 8,
+    position: 'relative',
+  },
+  todayIndicator: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   dayText: {
     fontSize: 16,

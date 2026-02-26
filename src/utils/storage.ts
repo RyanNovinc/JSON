@@ -16,6 +16,8 @@ export interface MealPlan {
   duration: number; // days
   meals: number; // total meals count
   data?: any; // the full JSON structure
+  fingerprint?: string; // content fingerprint for duplicate detection
+  createdAt?: number; // timestamp for sorting/organization
 }
 
 export interface WorkoutHistory {
@@ -365,6 +367,14 @@ export class WorkoutStorage {
     try {
       const preferences = await this.loadExercisePreferences();
       
+      // Safety check: ensure preferences is an array
+      if (!Array.isArray(preferences)) {
+        console.warn('Exercise preferences is not an array, resetting to empty array');
+        const newPreferences = [preference];
+        await AsyncStorage.setItem(STORAGE_KEYS.EXERCISE_PREFERENCES, JSON.stringify(newPreferences));
+        return;
+      }
+      
       // Remove existing preference for same program/block/exercise combo
       const filtered = preferences.filter(p => 
         !(p.programId === preference.programId && 
@@ -396,6 +406,11 @@ export class WorkoutStorage {
   ): Promise<string | null> {
     try {
       const preferences = await this.loadExercisePreferences();
+      // Safety check: ensure preferences is an array
+      if (!Array.isArray(preferences)) {
+        console.warn('Exercise preferences is not an array, returning null');
+        return null;
+      }
       const preference = preferences.find(p => 
         p.programId === programId && 
         p.blockName === blockName && 

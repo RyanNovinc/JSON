@@ -23,6 +23,7 @@ interface MealPlanningContextType extends NutritionState {
   // Meal Plan Management
   generateMealPlan: (request: MealPlanRequest) => Promise<void>;
   saveMealPlan: (mealPlan: MealPlan) => Promise<void>;
+  clearCurrentMealPlan: () => Promise<void>;
   getMealPlan: (date: string) => MealPlan | null;
   
   // Favorites Management
@@ -254,6 +255,20 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
       }));
     } catch (error) {
       console.error('Failed to save meal plan:', error);
+      throw error;
+    }
+  };
+
+  const clearCurrentMealPlan = async () => {
+    try {
+      await AsyncStorage.removeItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
+      
+      setState(prev => ({
+        ...prev,
+        currentMealPlan: null,
+      }));
+    } catch (error) {
+      console.error('Failed to clear current meal plan:', error);
       throw error;
     }
   };
@@ -599,6 +614,7 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
     updateUserProfile,
     generateMealPlan,
     saveMealPlan,
+    clearCurrentMealPlan,
     getMealPlan,
     addToFavorites,
     removeFromFavorites,

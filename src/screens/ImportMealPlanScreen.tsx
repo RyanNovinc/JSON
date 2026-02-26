@@ -7,7 +7,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
-  Animated,
   Linking,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
@@ -22,6 +21,7 @@ import { generateUserMealPlanPrompt } from '../data/generateUserMealPrompt';
 import { generateJsonConversionPrompt } from '../data/generateJsonConversionPrompt';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
+import { useMealPlanning } from '../contexts/MealPlanningContext';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
 
@@ -67,18 +67,14 @@ interface MealPlan {
 export default function ImportMealPlanScreen() {
   const navigation = useNavigation<ImportMealPlanNavigationProp>();
   const { themeColor } = useTheme();
+  const { saveMealPlan } = useMealPlanning();
   const [isLoading, setIsLoading] = useState(false);
-  const [parsedMealPlan, setParsedMealPlan] = useState<MealPlan | null>(null);
-  const [showConfirmation, setShowConfirmation] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const [auditPromptCopied, setAuditPromptCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sampleCopied, setSampleCopied] = useState(false);
-  const [modalScale] = useState(new Animated.Value(0));
-  const [modalOpacity] = useState(new Animated.Value(0));
-  const [successScale] = useState(new Animated.Value(0));
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
@@ -302,20 +298,27 @@ export default function ImportMealPlanScreen() {
     // Continue with existing validation logic
     try {
       
-      // Basic validation
-      if (!parsed.plan_name || typeof parsed.plan_name !== 'string') {
+      // Basic validation - handle both original format and saved format
+      const planName = parsed.plan_name || parsed.name;
+      if (!planName || typeof planName !== 'string') {
         throw new Error('Invalid meal plan name');
       }
       
-      if (!parsed.duration_days || typeof parsed.duration_days !== 'number') {
+      // Handle both original format (duration_days) and saved format (duration)
+      const durationDays = parsed.duration_days || parsed.duration;
+      if (!durationDays || typeof durationDays !== 'number') {
         throw new Error('Invalid duration days');
       }
 
-      if (!parsed.total_meals || typeof parsed.total_meals !== 'number') {
+      // Handle both original format (total_meals) and saved format (meals)
+      const totalMeals = parsed.total_meals || parsed.meals;
+      if (!totalMeals || typeof totalMeals !== 'number') {
         throw new Error('Invalid total meals count');
       }
       
-      if (!Array.isArray(parsed.days) || parsed.days.length === 0) {
+      // Handle both formats - check for days array or nested data.days
+      const days = parsed.days || (parsed.data && parsed.data.days);
+      if (!Array.isArray(days) || days.length === 0) {
         throw new Error('No meal plan days found');
       }
       
@@ -325,7 +328,7 @@ export default function ImportMealPlanScreen() {
       }
 
       // Validate days structure
-      parsed.days.forEach((day: any, dayIndex: number) => {
+      days.forEach((day: any, dayIndex: number) => {
         if (!day.day_name || !day.day_number) {
           throw new Error(`Day ${dayIndex + 1} needs day_name and day_number`);
         }
@@ -407,7 +410,16 @@ export default function ImportMealPlanScreen() {
         }
       }
       
-      return parsed as MealPlan;
+      // Normalize the parsed object to ensure consistent format
+      const normalizedPlan = {
+        ...parsed,
+        plan_name: planName,
+        duration_days: durationDays,
+        total_meals: totalMeals,
+        days: days
+      };
+      
+      return normalizedPlan as MealPlan;
     } catch (validationError) {
       const error = validationError as Error;
       const detailedError = `⚠️ Validation Error:\n\n${error.message}\n\n💡 This means your JSON was parsed successfully, but the meal plan structure has issues. Please check that all required fields are present and correctly formatted.`;
@@ -455,7 +467,7 @@ export default function ImportMealPlanScreen() {
     setGenerationStartTime(startTime);
     
     // Simulate processing time for better UX
-    setTimeout(() => {
+    setTimeout(async () => {
       const mealPlan = validateAndParseJSON(text);
       const endTime = Date.now();
       const totalTime = (endTime - startTime) / 1000; // Convert to seconds
@@ -466,104 +478,109 @@ export default function ImportMealPlanScreen() {
         // Generate unique ID for this meal plan import
         const mealPlanId = Date.now().toString() + Math.random().toString(36);
         mealPlan.id = mealPlanId;
-        setParsedMealPlan(mealPlan);
-        setShowConfirmation(true);
         
-        // Animate modal entrance with futuristic easing
-        Animated.parallel([
-          Animated.timing(modalScale, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(modalOpacity, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        // Import the meal plan directly without confirmation modal
+        await importMealPlanDirectly(mealPlan);
       }
     }, 800);
   };
 
-  const handleConfirmImport = async () => {
-    if (parsedMealPlan) {
-      // Success animation
-      Animated.sequence([
-        Animated.spring(successScale, {
-          toValue: 1.2,
-          useNativeDriver: true,
-          duration: 200,
-        }),
-        Animated.spring(successScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          duration: 150,
-        }),
-      ]).start();
+  // Create content fingerprint excluding metadata
+  const createMealPlanFingerprint = (mealPlan: any): string => {
+    // Extract only content that matters for uniqueness
+    const contentToHash = {
+      plan_name: (mealPlan.plan_name || '').toLowerCase().trim(),
+      duration_days: mealPlan.duration_days || 0,
+      total_meals: mealPlan.total_meals || 0,
+      days: (mealPlan.days || []).map((day: any) => ({
+        day_name: day.day_name,
+        day_number: day.day_number,
+        meals: (day.meals || []).map((meal: any) => ({
+          meal_name: meal.meal_name,
+          meal_type: meal.meal_type,
+          ingredients: (meal.ingredients || []).sort((a: any, b: any) => 
+            (a.item || '').localeCompare(b.item || '')
+          ),
+          instructions: meal.instructions || [],
+          macros: meal.macros,
+          calories: meal.calories,
+          prep_time: meal.prep_time,
+          cook_time: meal.cook_time,
+          servings: meal.servings
+        }))
+      })),
+      grocery_list: mealPlan.grocery_list,
+      meal_prep_schedule: mealPlan.meal_prep_schedule
+    };
+    
+    // Create a simple hash from the stringified content
+    const contentString = JSON.stringify(contentToHash);
+    let hash = 0;
+    for (let i = 0; i < contentString.length; i++) {
+      const char = contentString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(36);
+  };
 
-      // Save the meal plan to storage
-      try {
-        // Transform the parsed meal plan to match the MealPlan interface
+  const importMealPlanDirectly = async (parsedMealPlan: MealPlan) => {
+    // Check for duplicates before saving
+    let duplicateMessage = '';
+    try {
+      // Generate fingerprint for the new meal plan
+      const newFingerprint = createMealPlanFingerprint(parsedMealPlan);
+      
+      // Load existing meal plans and check for duplicates
+      const existingMealPlans = await WorkoutStorage.loadMealPlans();
+      const isDuplicate = existingMealPlans.some(existing => 
+        existing.fingerprint === newFingerprint
+      );
+      
+      let shouldSaveToMyMeals = true;
+      
+      if (isDuplicate) {
+        shouldSaveToMyMeals = false;
+        duplicateMessage = `"${parsedMealPlan.plan_name}" is already in your collection, so we won't save it again. You can still use it for meal planning!`;
+      }
+
+      // Only save to "My Meals" if it's not a duplicate
+      if (shouldSaveToMyMeals) {
         const transformedMealPlan = {
           id: parsedMealPlan.id,
           name: parsedMealPlan.plan_name,
           duration: parsedMealPlan.duration_days,
           meals: parsedMealPlan.total_meals,
           data: parsedMealPlan,  // Store the complete JSON data
+          fingerprint: newFingerprint,  // Store the content fingerprint
+          createdAt: Date.now(), // Add creation timestamp for sorting
         };
         
         await WorkoutStorage.addMealPlan(transformedMealPlan);
-      } catch (error) {
-        console.error('Failed to save meal plan:', error);
       }
-
-      setTimeout(() => {
-        // Animate modal exit
-        Animated.parallel([
-          Animated.timing(modalScale, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-          Animated.timing(modalOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          setShowConfirmation(false);
-          modalScale.setValue(0);
-          modalOpacity.setValue(0);
-          successScale.setValue(0);
-          
-          navigation.navigate('NutritionHome', { 
-            refresh: true
-          } as any);
-        });
-      }, 500);
+      
+      // Always set as current meal plan for immediate use (whether duplicate or not)
+      const currentMealPlan = {
+        id: parsedMealPlan.id,
+        name: parsedMealPlan.plan_name,
+        duration: parsedMealPlan.duration_days,
+        meals: parsedMealPlan.total_meals,
+        data: parsedMealPlan,
+      };
+      
+      await saveMealPlan(currentMealPlan);
+      
+      // Navigate directly without any popups
+      navigation.navigate('NutritionHome', { 
+        refresh: true
+      } as any);
+    } catch (error) {
+      console.error('Failed to import meal plan:', error);
+      Alert.alert('Error', 'Failed to import meal plan. Please try again.');
     }
   };
 
-  const handleModalCancel = () => {
-    Animated.parallel([
-      Animated.timing(modalScale, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(modalOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowConfirmation(false);
-      setParsedMealPlan(null);
-      modalScale.setValue(0);
-      modalOpacity.setValue(0);
-    });
-  };
+
 
   const handleCancel = () => {
     navigation.goBack();
@@ -923,86 +940,6 @@ After you've completed this audit and made any necessary corrections, regenerate
         </View>
       </View>
 
-      <Modal
-        visible={showConfirmation}
-        transparent
-        animationType="none"
-      >
-        <Animated.View 
-          style={[
-            styles.modalOverlay,
-            { opacity: modalOpacity }
-          ]}
-        >
-          <Animated.View 
-            style={[
-              styles.modalContent,
-              { 
-                transform: [{ scale: modalScale }],
-                opacity: modalOpacity,
-                borderColor: themeColor,
-                shadowColor: themeColor,
-              }
-            ]}
-          >
-            {/* Close Button */}
-            <View style={styles.closeButtonWrapper}>
-              <TouchableOpacity 
-                style={styles.closeButtonInner} 
-                onPress={handleModalCancel}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.closeButtonText}>×</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Header Badge */}
-            {generationTime && (
-              <View style={[styles.headerBadge, { backgroundColor: themeColor + '1A', borderColor: themeColor }]}>
-                <Text style={[styles.badgeText, { color: themeColor }]}>Generated in {generationTime.toFixed(2)}s</Text>
-              </View>
-            )}
-
-            {/* Main Content */}
-            <View style={styles.mainContent}>
-              <Text style={styles.title}>Meal Plan Ready</Text>
-              <Text style={styles.planName}>{parsedMealPlan?.plan_name}</Text>
-              
-              {/* Plan Summary */}
-              <View style={styles.summaryCard}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Duration</Text>
-                  <Text style={[styles.summaryValue, { color: themeColor }]}>{parsedMealPlan?.duration_days} days</Text>
-                </View>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Unique Recipes</Text>
-                  <Text style={[styles.summaryValue, { color: themeColor }]}>
-                    {(() => {
-                      const uniqueMeals = new Set();
-                      parsedMealPlan?.days.forEach(day => 
-                        day.meals.forEach(meal => uniqueMeals.add(meal.meal_name))
-                      );
-                      return uniqueMeals.size;
-                    })()} recipes
-                  </Text>
-                </View>
-              </View>
-            </View>
-            
-            {/* Action Button */}
-            <View style={styles.actionSection}>
-              <TouchableOpacity
-                style={[styles.createButton, { backgroundColor: themeColor }]}
-                onPress={handleConfirmImport}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.createButtonText}>Create Meal Plan</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
     </>
   );
 }
