@@ -713,12 +713,6 @@ export default function DaysScreen() {
           console.log('=== DAY CREATION DEBUG LOG ===');
           console.log(debugLog);
           console.log('=== END DEBUG LOG ===');
-          
-          Alert.alert(
-            'Unknown Structure',
-            'Unknown routine structure found. Debug info logged to console.',
-            [{ text: 'OK' }]
-          );
           return;
         }
         
@@ -730,24 +724,12 @@ export default function DaysScreen() {
         
         // Save to state for viewing
         setDebugLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${debugLog}`]);
-        
-        Alert.alert(
-          'Day Creation Log',
-          debugLog,
-          [{ text: 'OK' }]
-        );
       } else {
         debugLog += `❌ NO ROUTINE DATA IN STORAGE\n`;
         
         console.log('=== DAY CREATION DEBUG LOG ===');
         console.log(debugLog);
         console.log('=== END DEBUG LOG ===');
-        
-        Alert.alert(
-          'Debug Log',
-          debugLog,
-          [{ text: 'OK' }]
-        );
       }
     } catch (error) {
       debugLog += `\n💥 ERROR: ${error}\n`;
@@ -756,12 +738,6 @@ export default function DaysScreen() {
       console.log('=== DAY CREATION ERROR LOG ===');
       console.log(debugLog);
       console.log('=== END ERROR LOG ===');
-      
-      Alert.alert(
-        'Debug Log - Error',
-        debugLog,
-        [{ text: 'OK' }]
-      );
     }
   };
 
