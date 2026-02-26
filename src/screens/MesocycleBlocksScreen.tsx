@@ -226,7 +226,6 @@ export default function MesocycleBlocksScreen() {
   const [localBlocks, setLocalBlocks] = useState(mesocycle.blocksInMesocycle);
   const [showAddBlockModal, setShowAddBlockModal] = useState(false);
   const [newBlockName, setNewBlockName] = useState('');
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   // Find the global index of the first block in this mesocycle
   const getGlobalBlockIndex = (localIndex: number): number => {
@@ -251,7 +250,6 @@ export default function MesocycleBlocksScreen() {
   useFocusEffect(
     React.useCallback(() => {
       const reloadScreen = async () => {
-        console.log('🔄 MesocycleBlocksScreen coming into focus - reloading completion status');
         const loadedBlocks = await reloadManualBlocks(); // Reload manual blocks first
         await checkAllBlocksCompletion(loadedBlocks); // Then check completion status with loaded blocks
       };
@@ -290,19 +288,15 @@ export default function MesocycleBlocksScreen() {
   const checkAllBlocksCompletion = async (blocksToCheck?: Block[]) => {
     // Use provided blocks or fallback to localBlocks
     const blocks = blocksToCheck || localBlocks;
-    console.log('🔍 Checking completion for', blocks.length, 'blocks');
     const newCompletionStatus: {[blockName: string]: boolean} = {};
     
     // Check completion for all blocks (original + manual)
     for (const block of blocks) {
-      console.log('🔍 Checking block:', block.block_name);
       const totalWeeks = getBlockWeekCount(block.weeks);
       const isComplete = await checkAllWeeksCompleted(block, totalWeeks);
-      console.log('📊 Block', block.block_name, 'is complete:', isComplete);
       newCompletionStatus[block.block_name] = isComplete;
     }
     
-    console.log('📊 Updated completion status:', newCompletionStatus);
     setCompletionStatus(newCompletionStatus);
   };
 
@@ -336,40 +330,29 @@ export default function MesocycleBlocksScreen() {
     try {
       // Get all days including manual ones
       const allDays = await getAllBlockDays(block);
-      console.log(`🔍 Checking completion for "${block.block_name}":`);
-      console.log(`  📅 Total weeks: ${totalWeeks}`);
-      console.log(`  📋 All days: ${allDays.length}`, allDays.map(d => d.day_name));
       
       for (let week = 1; week <= totalWeeks; week++) {
         const weekKey = `completed_${block.block_name}_week${week}`;
         const completed = await AsyncStorage.getItem(weekKey);
         
-        console.log(`  📊 Week ${week} (${weekKey}):`, completed ? 'has data' : 'no data');
-        
         if (!completed) {
-          console.log(`  ❌ Week ${week} not completed - returning false`);
           return false;
         }
         
         const completedArray = JSON.parse(completed);
-        console.log(`  ✅ Week ${week} completed array:`, completedArray);
         
         if (allDays.length === 0) {
           // For empty blocks, check for special completion marker
           if (!completedArray.includes('empty_block_completed')) {
-            console.log(`  ❌ Empty block missing completion marker - returning false`);
             return false;
           }
         } else {
           // For blocks with days, check if all days are completed
-          console.log(`  🔍 Comparing: completed=${completedArray.length} vs expected=${allDays.length}`);
           if (completedArray.length !== allDays.length) {
-            console.log(`  ❌ Day count mismatch - returning false`);
             return false;
           }
         }
       }
-      console.log(`  ✅ All weeks completed for "${block.block_name}"`);
       return true;
     } catch (error) {
       console.error('Error checking all weeks completed:', error);
@@ -599,43 +582,32 @@ export default function MesocycleBlocksScreen() {
           }
         }
 
-        console.log('✅ Block completion status before toggle:', isCompleted);
-        
         if (isCompleted) {
-          console.log('🔄 Block is currently complete - marking as incomplete');
           // Uncomplete the block - remove all completion data
           for (let week = 1; week <= totalWeeks; week++) {
             const weekKey = `completed_${block.block_name}_week${week}`;
-            console.log('🗑️ Removing completion data for:', weekKey);
             await AsyncStorage.removeItem(weekKey);
           }
         } else {
-          console.log('🔄 Block is currently incomplete - marking as complete');
           // Complete the block - mark all days as completed
           if (allDays.length === 0) {
             // For empty blocks, create a special completion marker
-            console.log('📝 Marking empty block as complete with special marker');
             for (let week = 1; week <= totalWeeks; week++) {
               const weekKey = `completed_${block.block_name}_week${week}`;
-              console.log('💾 Saving empty block completion:', weekKey);
               await AsyncStorage.setItem(weekKey, JSON.stringify(['empty_block_completed']));
             }
           } else {
             // For blocks with days, mark all days as completed
-            console.log('📝 Marking block with days as complete:', allDays.length, 'days');
             for (let week = 1; week <= totalWeeks; week++) {
               const completedWorkouts = allDays.map(day => `${day.day_name}_week${week}`);
               const weekKey = `completed_${block.block_name}_week${week}`;
-              console.log('💾 Saving day completions for week', week, ':', completedWorkouts);
               await AsyncStorage.setItem(weekKey, JSON.stringify(completedWorkouts));
             }
           }
         }
 
-        console.log('🔄 Reloading completion status');
         // Reload completion status to reflect changes
         await checkAllBlocksCompletion();
-        console.log('✅ Block completion toggle completed successfully');
 
         // Close modal without success popup
         setShowModal(false);
@@ -820,7 +792,6 @@ export default function MesocycleBlocksScreen() {
       console.log('=== END DEBUG LOG ===');
       
       // Save to state for viewing
-      setDebugLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${debugLog}`]);
         
     } catch (error) {
       debugLog += `\n💥 ERROR: ${error}\n`;
@@ -856,19 +827,15 @@ export default function MesocycleBlocksScreen() {
       
       if (manualBlocksData) {
         const manualBlocks = JSON.parse(manualBlocksData);
-        console.log(`✅ Found ${manualBlocks.length} manual blocks for ${mesocycleId}`);
         
         // For custom mesocycles, blocksInMesocycle already contains the manual blocks
         if (mesocycle.isCustomMesocycle) {
-          console.log(`🔄 Custom mesocycle: using blocksInMesocycle (${mesocycle.blocksInMesocycle.length} blocks)`);
           mergedBlocks = mesocycle.blocksInMesocycle;
         } else {
           // For regular mesocycles, merge original blocks with manual blocks
           mergedBlocks = [...mesocycle.blocksInMesocycle, ...manualBlocks];
-          console.log(`✅ Regular mesocycle: Merged ${mesocycle.blocksInMesocycle.length} original + ${manualBlocks.length} manual = ${mergedBlocks.length} total blocks`);
         }
       } else {
-        console.log('⚠️ No manual blocks found, keeping original block structure');
         // For custom mesocycles with no manual blocks, just use the original (empty) structure
         mergedBlocks = mesocycle.blocksInMesocycle;
       }
@@ -982,17 +949,6 @@ export default function MesocycleBlocksScreen() {
             {localBlocks.length} blocks
           </Text>
         </View>
-        <TouchableOpacity 
-          style={styles.debugButton} 
-          onPress={() => Alert.alert(
-            'Debug Logs', 
-            debugLogs.length > 0 ? debugLogs.join('\n\n---\n\n') : 'No debug logs yet',
-            [{ text: 'OK' }]
-          )}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.debugButtonText}>LOG ({debugLogs.length})</Text>
-        </TouchableOpacity>
       </View>
 
 
@@ -1720,20 +1676,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
-  },
-  debugButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 70,
-  },
-  debugButtonText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
   },
   addBlockButton: {
     flexDirection: 'row',

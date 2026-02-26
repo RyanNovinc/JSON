@@ -1066,22 +1066,42 @@ export default function WorkoutLogScreen() {
   useEffect(() => {
     const loadDynamicExercises = async () => {
       if (day?.exercises && blockName) {
-        // Try to load saved dynamic exercises first
+        let exercisesToUse = day.exercises;
+        let hasCustomization = false;
+        
+        // First check for week-specific customizations (exercise reordering)
+        const customizationKey = `day_customization_${blockName}_${day.day_name}_week${currentWeek}`;
+        try {
+          const savedCustomization = await AsyncStorage.getItem(customizationKey);
+          if (savedCustomization) {
+            const customizationData = JSON.parse(savedCustomization);
+            if (customizationData.exercises) {
+              exercisesToUse = customizationData.exercises;
+              hasCustomization = true;
+            }
+          }
+        } catch (error) {
+          // Use original order if customization fails to load
+        }
+        
+        // Only load dynamic exercises if there's no customization, or merge them carefully
         const savedKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_exercises`;
         try {
           const savedData = await AsyncStorage.getItem(savedKey);
-          if (savedData) {
+          if (savedData && !hasCustomization) {
+            // Only use saved dynamic exercises if there's no customization
             const savedExercises = JSON.parse(savedData);
-            console.log('Loaded saved dynamic exercises:', savedExercises.length, 'exercises');
             setDynamicExercises(savedExercises);
+          } else if (savedData && hasCustomization) {
+            // If there's both customization and saved data, prioritize customization
+            setDynamicExercises(exercisesToUse);
           } else {
-            // No saved data, use original exercises
-            console.log('No saved exercises, using original:', day.exercises.length, 'exercises');
-            setDynamicExercises(day.exercises);
+            // No saved data, use customized or original exercises
+            setDynamicExercises(exercisesToUse);
           }
         } catch (error) {
           console.error('Failed to load saved exercises:', error);
-          setDynamicExercises(day.exercises);
+          setDynamicExercises(exercisesToUse);
         }
       }
     };

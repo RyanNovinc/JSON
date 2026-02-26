@@ -44,6 +44,7 @@ interface Day {
 interface DayCardProps {
   day: Day;
   onPress: () => void;
+  onLongPress?: () => void;
   isCompleted?: boolean;
   currentWeek: number;
   themeColor: string;
@@ -56,15 +57,62 @@ interface DayCardProps {
   };
 }
 
-function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, themeColor, blockName, refreshTrigger }: DayCardProps) {
+function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completionStats, themeColor, blockName, refreshTrigger }: DayCardProps) {
   const [modifiedExercises, setModifiedExercises] = useState<Exercise[]>(day.exercises || []);
   const [dynamicExercises, setDynamicExercises] = useState<Exercise[]>([]);
+  const [customizedDuration, setCustomizedDuration] = useState<number | undefined>(day.estimated_duration);
   
   // Total exercise count including dynamic exercises
   const exerciseCount = (modifiedExercises?.length || 0) + (dynamicExercises?.length || 0);
 
-  // Load dynamic exercises that were added during workout
+  // Load week-specific customizations (exercise order and duration)
+  const loadWeekCustomizations = async () => {
+    try {
+      const customizationKey = `day_customization_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}`;
+      const savedCustomization = await AsyncStorage.getItem(customizationKey);
+      if (savedCustomization) {
+        const customizationData = JSON.parse(savedCustomization);
+        
+        // PRIORITY: Use customized exercises, ignore any dynamic exercises when customization exists
+        if (customizationData.exercises) {
+          setModifiedExercises(customizationData.exercises);
+        }
+        
+        // Update duration with customized value
+        if (customizationData.estimated_duration !== undefined) {
+          setCustomizedDuration(customizationData.estimated_duration);
+        }
+        
+        // Don't load dynamic exercises when customization exists
+        setDynamicExercises([]);
+        return; // Early return to skip dynamic loading
+      } else {
+        // No customization, use original data and load dynamic exercises
+        setModifiedExercises(day.exercises || []);
+        setCustomizedDuration(day.estimated_duration);
+        // Dynamic exercises will be loaded separately
+      }
+    } catch (error) {
+      setModifiedExercises(day.exercises || []);
+      setCustomizedDuration(day.estimated_duration);
+    }
+  };
+
+  // Load dynamic exercises that were added during workout (only if no customization)
   const loadDynamicExercises = async () => {
+    // Check if customization exists first
+    const customizationKey = `day_customization_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}`;
+    try {
+      const savedCustomization = await AsyncStorage.getItem(customizationKey);
+      if (savedCustomization) {
+        setDynamicExercises([]);
+        return;
+      }
+    } catch (error) {
+      // Continue to load dynamic exercises if customization check fails
+    }
+    
+    // Only load dynamic exercises if no customization exists
     try {
       const dynamicKey = `workout_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}_exercises`;
       const savedDynamic = await AsyncStorage.getItem(dynamicKey);
@@ -75,7 +123,6 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
         setDynamicExercises([]);
       }
     } catch (error) {
-      console.log('No dynamic exercises found');
       setDynamicExercises([]);
     }
   };
@@ -100,11 +147,12 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
         setModifiedExercises(updatedExercises);
       }
     } catch (error) {
-      console.log('No saved sets data found, using template data');
+      // Use template data if no saved sets
     }
   };
 
   useEffect(() => {
+    loadWeekCustomizations();
     loadSetsData();
     loadDynamicExercises();
   }, [blockName, day.day_name, currentWeek, refreshTrigger]);
@@ -119,6 +167,11 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
       return 0;
     }
 
+    // Use customized duration if available, otherwise use original day duration
+    if (customizedDuration !== undefined) {
+      return customizedDuration;
+    }
+    
     // Use stored duration if available and day has original exercises
     if (day.estimated_duration && (day.exercises?.length || 0) > 0) {
       return day.estimated_duration;
@@ -232,6 +285,8 @@ function DayCard({ day, onPress, isCompleted, currentWeek, completionStats, them
       ]} 
       activeOpacity={0.8}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={800}
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardTitle}>
@@ -300,7 +355,10 @@ export default function DaysScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showAddDayModal, setShowAddDayModal] = useState(false);
   const [newDayName, setNewDayName] = useState('');
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<Day | null>(null);
+  const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
+  const [editedDuration, setEditedDuration] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Calculate total weeks for this block
@@ -621,6 +679,102 @@ export default function DaysScreen() {
     }
   };
 
+  const handleDayLongPress = async (day: Day) => {
+    setSelectedDay(day);
+    
+    // Load current customizations for this specific week
+    try {
+      const customizationKey = `day_customization_${localBlock.block_name}_${day.day_name}_week${currentWeek}`;
+      const savedCustomization = await AsyncStorage.getItem(customizationKey);
+      
+      if (savedCustomization) {
+        const customizationData = JSON.parse(savedCustomization);
+        console.log(`📋 Loading modal with customization for ${day.day_name} week ${currentWeek}`);
+        
+        // Use customized exercises and duration
+        setExerciseList([...(customizationData.exercises || day.exercises)]);
+        setEditedDuration(customizationData.estimated_duration?.toString() || day.estimated_duration?.toString() || '');
+      } else {
+        // No customization, use original data
+        setExerciseList([...day.exercises]);
+        setEditedDuration(day.estimated_duration?.toString() || '');
+      }
+    } catch (error) {
+      console.log('Error loading customizations for modal, using original data');
+      setExerciseList([...day.exercises]);
+      setEditedDuration(day.estimated_duration?.toString() || '');
+    }
+    
+    setShowExerciseModal(true);
+  };
+
+  const handleSaveExerciseChanges = async () => {
+    if (!selectedDay) return;
+
+    try {
+      // Update the day with new exercise order and duration
+      const updatedDay = {
+        ...selectedDay,
+        exercises: exerciseList,
+        estimated_duration: editedDuration ? parseInt(editedDuration) : undefined
+      };
+
+      // Update the local block immediately for UI
+      const updatedBlock = {
+        ...localBlock,
+        days: localBlock.days.map(d => 
+          d.day_name === selectedDay.day_name ? updatedDay : d
+        )
+      };
+
+      setLocalBlock(updatedBlock);
+
+      // Save week-specific exercise customizations
+      const customizationKey = `day_customization_${localBlock.block_name}_${selectedDay.day_name}_week${currentWeek}`;
+      const customizationData = {
+        exercises: exerciseList,
+        estimated_duration: editedDuration ? parseInt(editedDuration) : undefined,
+        customizedAt: new Date().toISOString(),
+        week: currentWeek
+      };
+      
+      await AsyncStorage.setItem(customizationKey, JSON.stringify(customizationData));
+
+      // Check if this is a manual day (not in original block)
+      const isManualDay = !block.days.some(originalDay => originalDay.day_name === selectedDay.day_name);
+      
+      if (isManualDay) {
+        // Also save to manual days storage for manual days
+        const manualDaysKey = `manual_days_${localBlock.block_name}`;
+        const existingManualDays = await AsyncStorage.getItem(manualDaysKey);
+        const manualDaysArray = existingManualDays ? JSON.parse(existingManualDays) : [];
+        
+        // Update the specific manual day
+        const updatedManualDays = manualDaysArray.map((day: Day) => 
+          day.day_name === selectedDay.day_name ? updatedDay : day
+        );
+        
+        await AsyncStorage.setItem(manualDaysKey, JSON.stringify(updatedManualDays));
+      }
+
+      // Trigger a refresh of the day cards to show updated data
+      setRefreshTrigger(prev => prev + 1);
+
+      setShowExerciseModal(false);
+      setSelectedDay(null);
+    } catch (error) {
+      console.error('Error saving exercise changes:', error);
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+    }
+  };
+
+  const moveExercise = (fromIndex: number, toIndex: number) => {
+    const newList = [...exerciseList];
+    const [removed] = newList.splice(fromIndex, 1);
+    newList.splice(toIndex, 0, removed);
+    setExerciseList(newList);
+  };
+
   // Create a more vibrant version of theme color for buttons
   const vibrantThemeColor = themeColor === '#10b981' ? '#059669' : 
                            themeColor === '#3b82f6' ? '#2563eb' : 
@@ -723,7 +877,6 @@ export default function DaysScreen() {
         console.log('=== END DEBUG LOG ===');
         
         // Save to state for viewing
-        setDebugLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${debugLog}`]);
       } else {
         debugLog += `❌ NO ROUTINE DATA IN STORAGE\n`;
         
@@ -753,21 +906,7 @@ export default function DaysScreen() {
         </TouchableOpacity>
         <View style={styles.titleContainer}>
           <Text style={styles.title} numberOfLines={1}>{localBlock.block_name}</Text>
-          <Text style={styles.subtitle}>
-            {localBlock.weeks.includes('-') ? 'Weeks' : 'Week'} {localBlock.weeks}
-          </Text>
         </View>
-        <TouchableOpacity 
-          style={styles.debugButton} 
-          onPress={() => Alert.alert(
-            'Debug Logs', 
-            debugLogs.length > 0 ? debugLogs.join('\n\n---\n\n') : 'No debug logs yet',
-            [{ text: 'OK' }]
-          )}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.debugButtonText}>LOG ({debugLogs.length})</Text>
-        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -844,6 +983,7 @@ export default function DaysScreen() {
           <DayCard
             day={item}
             onPress={() => handleDayPress(item)}
+            onLongPress={() => handleDayLongPress(item)}
             isCompleted={isWorkoutCompleted(item.day_name)}
             currentWeek={currentWeek}
             completionStats={getCompletionStats(item.day_name)}
@@ -908,6 +1048,120 @@ export default function DaysScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Exercise Management Modal */}
+      <Modal
+        visible={showExerciseModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowExerciseModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            onPress={() => setShowExerciseModal(false)}
+          />
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHandle} />
+            
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Manage Day</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setShowExerciseModal(false)}
+              >
+                <Ionicons name="close" size={24} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollContent} showsVerticalScrollIndicator={false}>
+              {selectedDay && (
+                <>
+                  <Text style={styles.modalSubtitle}>
+                    Customize the exercise order and estimated duration for {selectedDay.day_name}
+                  </Text>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Duration (minutes)</Text>
+                    <TextInput
+                      style={[styles.modalInput, { borderColor: themeColor }]}
+                      value={editedDuration}
+                      onChangeText={setEditedDuration}
+                      placeholder="Enter duration..."
+                      placeholderTextColor="#71717a"
+                      keyboardType="numeric"
+                      maxLength={3}
+                    />
+                  </View>
+
+                  <View style={styles.exerciseListContainer}>
+                    <Text style={styles.exerciseListLabel}>Exercise Order</Text>
+                    {exerciseList.map((exercise, index) => (
+                      <View key={index} style={styles.exerciseItem}>
+                        <TouchableOpacity
+                          style={styles.dragHandle}
+                          onPress={() => {
+                            if (index > 0) {
+                              moveExercise(index, index - 1);
+                            }
+                          }}
+                        >
+                          <Ionicons name="reorder-two" size={20} color="#71717a" />
+                        </TouchableOpacity>
+                        
+                        <View style={styles.exerciseContent}>
+                          <Text style={styles.exerciseName}>{exercise.exercise}</Text>
+                        </View>
+                        
+                        <View style={styles.moveButtons}>
+                          <TouchableOpacity
+                            style={[styles.moveButton, index === 0 && styles.moveButtonDisabled]}
+                            onPress={() => index > 0 && moveExercise(index, index - 1)}
+                            disabled={index === 0}
+                          >
+                            <Ionicons 
+                              name="chevron-up" 
+                              size={16} 
+                              color={index === 0 ? "#3f3f46" : themeColor} 
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.moveButton, index === exerciseList.length - 1 && styles.moveButtonDisabled]}
+                            onPress={() => index < exerciseList.length - 1 && moveExercise(index, index + 1)}
+                            disabled={index === exerciseList.length - 1}
+                          >
+                            <Ionicons 
+                              name="chevron-down" 
+                              size={16} 
+                              color={index === exerciseList.length - 1 ? "#3f3f46" : themeColor} 
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.modalCancelButton}
+                onPress={() => setShowExerciseModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalCreateButton, { backgroundColor: themeColor }]}
+                onPress={handleSaveExerciseChanges}
+              >
+                <Ionicons name="checkmark" size={20} color="#ffffff" />
+                <Text style={styles.modalCreateText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -932,23 +1186,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  debugButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 70,
-  },
-  debugButtonText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
   titleContainer: {
     flex: 1,
     alignItems: 'center',
+    paddingRight: 40, // Compensate for back button to center title
   },
   title: {
     fontSize: 18,
@@ -1496,18 +1737,18 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
   },
   modalBackdrop: {
     flex: 1,
   },
   modalContainer: {
     backgroundColor: '#0a0a0b',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
+    borderRadius: 24,
+    height: '80%',
+    marginHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#27272a',
     flex: 0,
   },
   modalHeader: {
@@ -1545,8 +1786,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   modalContent: {
-    padding: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   modalIconContainer: {
     alignItems: 'center',
@@ -1633,5 +1875,65 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
     flexShrink: 1,
+  },
+
+  // Exercise modal specific styles
+  modalScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 16,
+    flex: 1,
+  },
+  exerciseListContainer: {
+    marginTop: 24,
+  },
+  exerciseListLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  exerciseItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    minHeight: 60,
+  },
+  dragHandle: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  exerciseContent: {
+    flex: 1,
+  },
+  exerciseName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  moveButtons: {
+    flexDirection: 'column',
+    gap: 2,
+  },
+  moveButton: {
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#27272a',
+    borderRadius: 6,
+  },
+  moveButtonDisabled: {
+    backgroundColor: '#18181b',
   },
 });
