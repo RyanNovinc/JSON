@@ -8,6 +8,9 @@ import {
   Modal,
   Alert,
   Share,
+  Platform,
+  TextInput,
+  Button,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -38,6 +41,8 @@ interface MesocycleCard {
   totalBlocks: number;
   isCompleted: boolean;
   isActive: boolean;
+  isCustomMesocycle?: boolean;
+  customId?: string;
 }
 
 interface BlockCardProps {
@@ -291,6 +296,8 @@ export default function BlocksScreen() {
   const [showMesocycleMoreOptions, setShowMesocycleMoreOptions] = useState(false);
   const [program, setProgram] = useState<Program | null>(null);
   const [mesocycleCards, setMesocycleCards] = useState<MesocycleCard[]>([]);
+  const [showAddMesocycleModal, setShowAddMesocycleModal] = useState(false);
+  const [newMesocycleName, setNewMesocycleName] = useState('');
   
   const totalWeeks = calculateTotalWeeks(routine.data.blocks);
   const hasMesocycles = program && program.totalMesocycles > 1;
@@ -315,7 +322,12 @@ export default function BlocksScreen() {
         calculateCompletionBasedWeek();
       }
       checkAllBlocksCompletion();
-    }, [activeBlockIndex])
+      
+      // Reload mesocycle cards to include any new custom mesocycles
+      if (program && hasMesocycles) {
+        updateMesocycleCards();
+      }
+    }, [activeBlockIndex, program, hasMesocycles])
   );
 
   // Handle auto-navigation when coming from "Today" button
@@ -432,12 +444,16 @@ export default function BlocksScreen() {
         return globalIndex === activeBlockIndex;
       });
       
+      // Load manual blocks to get accurate total count
+      const manualBlocksCount = await getManualBlocksCount(mesocycleNumber, routine);
+      const totalBlocks = mesocycleBlocks.length + manualBlocksCount;
+      
       cards.push({
         mesocycleNumber,
         phase,
         blocksInMesocycle: mesocycleBlocks,
         completedBlocks,
-        totalBlocks: mesocycleBlocks.length,
+        totalBlocks: totalBlocks,
         isCompleted,
         isActive: isActive // Only use program's currentMesocycle, not active block
       });
@@ -506,19 +522,27 @@ export default function BlocksScreen() {
           return globalIndex === activeBlockIndex;
         });
         
+        // Load manual blocks to get accurate total count
+        const manualBlocksCount = await getManualBlocksCount(mesocycleNumber, routine);
+        const totalBlocksWithManual = mesocycleBlocks.length + manualBlocksCount;
+        
         cards.push({
           mesocycleNumber,
           phase,
           blocksInMesocycle: mesocycleBlocks,
           completedBlocks,
-          totalBlocks: mesocycleBlocks.length,
+          totalBlocks: totalBlocksWithManual,
           isCompleted,
           isActive: isActive // Only use program's currentMesocycle, not active block
         });
       }
     }
     
-    setMesocycleCards(cards);
+    // Load custom mesocycles and append them
+    const customMesocycles = await loadCustomMesocycles();
+    const allMesocycles = [...cards, ...customMesocycles];
+    
+    setMesocycleCards(allMesocycles);
   };
 
   const handleMesocyclePress = (mesocycle: MesocycleCard) => {
@@ -643,6 +667,9 @@ export default function BlocksScreen() {
 
   const checkAllWeeksCompleted = async (block: Block, totalWeeks: number) => {
     try {
+      // Get all days for this block (including manual ones if needed)
+      const allDays = block.days || [];
+      
       for (let week = 1; week <= totalWeeks; week++) {
         const weekKey = `completed_${block.block_name}_week${week}`;
         const completed = await AsyncStorage.getItem(weekKey);
@@ -651,15 +678,18 @@ export default function BlocksScreen() {
           return false; // Week has no completed workouts
         }
         
-        const completedSet = new Set(JSON.parse(completed));
+        const completedArray = JSON.parse(completed);
         
-        // Check if all days in this week are completed
-        const allDaysCompleted = block.days.every(day => 
-          completedSet.has(`${day.day_name}_week${week}`)
-        );
-        
-        if (!allDaysCompleted) {
-          return false; // Week is not fully completed
+        if (allDays.length === 0) {
+          // For empty blocks, check for special completion marker
+          if (!completedArray.includes('empty_block_completed')) {
+            return false;
+          }
+        } else {
+          // For blocks with days, check if all days are completed
+          if (completedArray.length !== allDays.length) {
+            return false;
+          }
         }
       }
       
@@ -719,12 +749,59 @@ export default function BlocksScreen() {
   const checkAllBlocksCompletion = async () => {
     const newCompletionStatus: {[blockName: string]: boolean} = {};
     
+    // Check completion for original blocks
     for (const block of routine.data.blocks) {
       const totalWeeks = getBlockWeekCount(block.weeks);
       const isComplete = await checkAllWeeksCompleted(block, totalWeeks);
       newCompletionStatus[block.block_name] = isComplete;
     }
     
+    // Also check completion for any manual blocks across all mesocycles
+    if (program && program.totalMesocycles > 1) {
+      for (let mesocycleNum = 1; mesocycleNum <= program.totalMesocycles; mesocycleNum++) {
+        const manualBlocksKey = `manual_blocks_mesocycle_${mesocycleNum}`;
+        try {
+          const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+          if (manualBlocksData) {
+            const manualBlocks = JSON.parse(manualBlocksData);
+            for (const block of manualBlocks) {
+              const totalWeeks = getBlockWeekCount(block.weeks);
+              const isComplete = await checkAllWeeksCompleted(block, totalWeeks);
+              newCompletionStatus[block.block_name] = isComplete;
+            }
+          }
+        } catch (error) {
+          console.error('Error loading manual blocks for mesocycle', mesocycleNum, error);
+        }
+      }
+    }
+    
+    // Check custom mesocycle manual blocks too
+    const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
+    try {
+      const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
+      if (customMesocyclesData) {
+        const customMesocycles = JSON.parse(customMesocyclesData);
+        for (const mesocycle of customMesocycles) {
+          if (mesocycle.customId) {
+            const manualBlocksKey = `manual_blocks_${mesocycle.customId}`;
+            const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+            if (manualBlocksData) {
+              const manualBlocks = JSON.parse(manualBlocksData);
+              for (const block of manualBlocks) {
+                const totalWeeks = getBlockWeekCount(block.weeks);
+                const isComplete = await checkAllWeeksCompleted(block, totalWeeks);
+                newCompletionStatus[block.block_name] = isComplete;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading custom mesocycle manual blocks:', error);
+    }
+    
+    console.log('📊 BlocksScreen completion status updated:', newCompletionStatus);
     setCompletionStatus(newCompletionStatus);
   };
 
@@ -858,14 +935,98 @@ export default function BlocksScreen() {
             style: 'destructive',
             onPress: async () => {
               try {
-                // TODO: Add actual delete functionality
-                // For now just show a message
-                Alert.alert('Feature Coming Soon', 'Mesocycle deletion will be available in a future update.');
+                if (!selectedMesocycle) return;
+                
+                // Remove mesocycle from local state
+                const updatedMesocycles = mesocycleCards.filter(m => m !== selectedMesocycle);
+                setMesocycleCards(updatedMesocycles);
+                
+                if (selectedMesocycle.isCustomMesocycle) {
+                  // Remove custom mesocycle from storage
+                  const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
+                  const existingCustomMesocycles = await AsyncStorage.getItem(customMesocyclesKey);
+                  const customMesocycles = existingCustomMesocycles ? JSON.parse(existingCustomMesocycles) : [];
+                  
+                  // Filter out the deleted mesocycle
+                  const updatedCustomMesocycles = customMesocycles.filter((m: any) => 
+                    m.customId !== selectedMesocycle.customId
+                  );
+                  await AsyncStorage.setItem(customMesocyclesKey, JSON.stringify(updatedCustomMesocycles));
+                  
+                  // Also clean up any manual blocks for this mesocycle
+                  if (selectedMesocycle.customId) {
+                    const manualBlocksKey = `manual_blocks_${selectedMesocycle.customId}`;
+                    await AsyncStorage.removeItem(manualBlocksKey);
+                  }
+                } else {
+                  // For original program mesocycles, update the program to exclude this mesocycle
+                  if (program && !routine.mesocycleNumber) {
+                    // Only remove blocks if this is a full program (not individual mesocycle imports)
+                    const totalBlocks = routine.data.blocks.length;
+                    const blocksPerMesocycle = Math.ceil(totalBlocks / program.totalMesocycles);
+                    
+                    // Calculate which blocks belong to the mesocycle being deleted
+                    const mesocycleIndex = selectedMesocycle.mesocycleNumber - 1;
+                    const startIdx = mesocycleIndex * blocksPerMesocycle;
+                    const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
+                    
+                    // Remove the blocks that belonged to this mesocycle
+                    const updatedBlocks = [
+                      ...routine.data.blocks.slice(0, startIdx),
+                      ...routine.data.blocks.slice(endIdx)
+                    ];
+                    
+                    // Update the routine with the remaining blocks
+                    const updatedRoutine = {
+                      ...routine,
+                      data: {
+                        ...routine.data,
+                        blocks: updatedBlocks
+                      }
+                    };
+                    
+                    // Save the updated routine
+                    const routines = await WorkoutStorage.loadRoutines();
+                    const routineIndex = routines.findIndex(r => r.id === routine.id);
+                    if (routineIndex !== -1) {
+                      routines[routineIndex] = updatedRoutine;
+                      await WorkoutStorage.saveRoutines(routines);
+                    }
+                    
+                    // Update local routine reference (though we'll reload anyway)
+                    Object.assign(routine, updatedRoutine);
+                  }
+                  
+                  if (program) {
+                    const updatedRoadmap = program.mesocycleRoadmap.filter(phase => 
+                      phase.mesocycleNumber !== selectedMesocycle.mesocycleNumber
+                    );
+                    
+                    // Renumber remaining mesocycles to maintain sequence
+                    updatedRoadmap.forEach((phase, index) => {
+                      phase.mesocycleNumber = index + 1;
+                    });
+                    
+                    await ProgramStorage.updateProgram(program.id, {
+                      mesocycleRoadmap: updatedRoadmap,
+                      totalMesocycles: updatedRoadmap.length,
+                      // Adjust current mesocycle if needed
+                      currentMesocycle: Math.min(program.currentMesocycle, updatedRoadmap.length)
+                    });
+                    
+                    // Reload program data to reflect the changes
+                    await loadProgramData();
+                  }
+                }
+                
+                // Close modal
                 setShowMesocycleModal(false);
                 setSelectedMesocycle(null);
                 setShowMesocycleMoreOptions(false);
+                
               } catch (error) {
                 console.error('Error deleting mesocycle:', error);
+                Alert.alert('Error', 'Failed to delete mesocycle. Please try again.');
               }
             }
           }
@@ -975,6 +1136,139 @@ export default function BlocksScreen() {
     }
   };
 
+  const handleAddMesocycle = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Add New Mesocycle',
+        'Enter a name for this mesocycle:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Create', 
+            onPress: (text) => {
+              if (text && text.trim()) {
+                createNewMesocycle(text.trim());
+              }
+            }
+          }
+        ],
+        'plain-text'
+      );
+    } else {
+      setNewMesocycleName('');
+      setShowAddMesocycleModal(true);
+    }
+  };
+
+  const handleCreateMesocycle = () => {
+    if (newMesocycleName.trim()) {
+      createNewMesocycle(newMesocycleName.trim());
+      setShowAddMesocycleModal(false);
+      setNewMesocycleName('');
+    }
+  };
+
+  const createNewMesocycle = async (mesocycleName: string) => {
+    try {
+      // Create new mesocycle with empty blocks and unique ID
+      const customMesocycleId = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newMesocycle: MesocycleCard = {
+        mesocycleNumber: mesocycleCards.length + 1,
+        phase: {
+          mesocycleNumber: mesocycleCards.length + 1,
+          phaseName: mesocycleName,
+          repFocus: '',
+          emphasis: '',
+          weeks: 4,
+          blocks: 0
+        },
+        blocksInMesocycle: [],
+        completedBlocks: 0,
+        totalBlocks: 0,
+        isCompleted: false,
+        isActive: false,
+        isCustomMesocycle: true, // Mark as custom to prevent auto block assignment
+        customId: customMesocycleId // Unique identifier for storage
+      };
+
+      // Add to local state
+      const updatedMesocycles = [...mesocycleCards, newMesocycle];
+      setMesocycleCards(updatedMesocycles);
+
+      // Save custom mesocycle to storage for persistence
+      await saveCustomMesocycle(newMesocycle);
+      
+    } catch (error) {
+      console.error('Error creating mesocycle:', error);
+      Alert.alert('Error', 'Failed to create mesocycle. Please try again.');
+    }
+  };
+
+  const saveCustomMesocycle = async (mesocycle: MesocycleCard) => {
+    try {
+      const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
+      const existingCustomMesocycles = await AsyncStorage.getItem(customMesocyclesKey);
+      const customMesocycles = existingCustomMesocycles ? JSON.parse(existingCustomMesocycles) : [];
+      
+      const updatedCustomMesocycles = [...customMesocycles, mesocycle];
+      await AsyncStorage.setItem(customMesocyclesKey, JSON.stringify(updatedCustomMesocycles));
+    } catch (error) {
+      console.error('Failed to save custom mesocycle:', error);
+    }
+  };
+
+  const getManualBlocksCount = async (mesocycleNumber: number, routine: any, customId?: string): Promise<number> => {
+    try {
+      let mesocycleId;
+      
+      if (customId) {
+        // For custom mesocycles, use the custom ID
+        mesocycleId = customId;
+      } else {
+        // For program mesocycles, use mesocycle number
+        mesocycleId = `mesocycle_${mesocycleNumber}`;
+      }
+      
+      const manualBlocksKey = `manual_blocks_${mesocycleId}`;
+      const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+      
+      if (manualBlocksData) {
+        const manualBlocks = JSON.parse(manualBlocksData);
+        return manualBlocks.length;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error counting manual blocks:', error);
+      return 0;
+    }
+  };
+
+  const loadCustomMesocycles = async () => {
+    try {
+      const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
+      const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
+      const customMesocycles = customMesocyclesData ? JSON.parse(customMesocyclesData) : [];
+      
+      // Load manual block counts for each custom mesocycle
+      const updatedCustomMesocycles = await Promise.all(
+        customMesocycles.map(async (mesocycle: any) => {
+          const manualBlocksCount = await getManualBlocksCount(mesocycle.mesocycleNumber, routine, mesocycle.customId);
+          return {
+            ...mesocycle,
+            isCustomMesocycle: true,
+            totalBlocks: (mesocycle.blocksInMesocycle?.length || 0) + manualBlocksCount
+          };
+        })
+      );
+      
+      return updatedCustomMesocycles;
+    } catch (error) {
+      console.error('Failed to load custom mesocycles:', error);
+      return [];
+    }
+  };
+
   const handleBack = () => {
     navigation.goBack();
   };
@@ -993,7 +1287,7 @@ export default function BlocksScreen() {
           <Text style={styles.title} numberOfLines={1}>{routine.name}</Text>
           <Text style={styles.subtitle}>
             {hasMesocycles 
-              ? `${program?.totalMesocycles} mesocycles • ${totalWeeks} weeks`
+              ? `${mesocycleCards.length} mesocycles • ${totalWeeks} weeks`
               : `${totalWeeks} ${totalWeeks === 1 ? 'week' : 'weeks'} • ${routine.data.blocks.length} blocks`
             }
           </Text>
@@ -1011,6 +1305,15 @@ export default function BlocksScreen() {
               onLongPress={() => handleMesocycleLongPress(item)}
               themeColor={themeColor}
             />
+          )}
+          ListFooterComponent={() => (
+            <TouchableOpacity 
+              style={[styles.addMesocycleButton, { borderColor: themeColor }]}
+              onPress={() => handleAddMesocycle()}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={themeColor} />
+              <Text style={[styles.addMesocycleText, { color: themeColor }]}>Add Mesocycle</Text>
+            </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -1365,6 +1668,50 @@ export default function BlocksScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Add Mesocycle Modal - Android Only */}
+      {Platform.OS === 'android' && (
+        <Modal
+          visible={showAddMesocycleModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowAddMesocycleModal(false)}
+        >
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.title}>Add New Mesocycle</Text>
+              
+              <TextInput
+                style={styles.input}
+                value={newMesocycleName}
+                onChangeText={setNewMesocycleName}
+                placeholder="Enter mesocycle name..."
+                placeholderTextColor="#888"
+                autoFocus={true}
+                maxLength={30}
+              />
+              
+              <View style={styles.buttonContainer}>
+                <View style={styles.buttonWrapper}>
+                  <Button
+                    title="Cancel"
+                    color="#666"
+                    onPress={() => setShowAddMesocycleModal(false)}
+                  />
+                </View>
+                <View style={styles.buttonWrapper}>
+                  <Button
+                    title="Create"
+                    color={themeColor}
+                    onPress={handleCreateMesocycle}
+                    disabled={!newMesocycleName.trim()}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -1645,5 +1992,54 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#a1a1aa',
     marginBottom: 8,
+  },
+  addMesocycleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  addMesocycleText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  modal: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  input: {
+    backgroundColor: '#0a0a0b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#ffffff',
+    marginBottom: 32,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  buttonWrapper: {
+    flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
 });

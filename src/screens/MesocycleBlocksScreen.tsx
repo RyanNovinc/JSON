@@ -8,6 +8,9 @@ import {
   Modal,
   Alert,
   Share,
+  Platform,
+  TextInput,
+  Button,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -28,6 +31,38 @@ interface Block {
   days: any[];
 }
 
+const getTrainingSplit = async (block: Block): Promise<string> => {
+  // Get all days including manual ones
+  const allDays = await getAllBlockDays(block);
+  
+  if (allDays.length > 0) {
+    // Extract day names and join them
+    const dayNames = allDays.map(day => day.day_name || day.name || 'Unnamed Day');
+    return dayNames.join(', ');
+  }
+  
+  // For empty blocks, show a helpful message
+  return 'No days added yet';
+};
+
+const getAllBlockDays = async (block: Block): Promise<any[]> => {
+  try {
+    // Start with original block days
+    const originalDays = block.days || [];
+    
+    // Load manual days for this block
+    const manualDaysKey = `manual_days_${block.block_name}`;
+    const manualDaysData = await AsyncStorage.getItem(manualDaysKey);
+    const manualDays = manualDaysData ? JSON.parse(manualDaysData) : [];
+    
+    // Combine original and manual days
+    return [...originalDays, ...manualDays];
+  } catch (error) {
+    console.error('Error loading block days:', error);
+    return block.days || [];
+  }
+};
+
 interface BlockCardProps {
   block: Block;
   onPress: () => void;
@@ -45,11 +80,26 @@ interface BlockCardProps {
 }
 
 function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeColor, blockIndex }: BlockCardProps) {
-  const dayCount = block.days.length;
+  const [allDays, setAllDays] = useState<any[]>([]);
+  const [trainingSplit, setTrainingSplit] = useState<string>('Loading...');
+  
+  useEffect(() => {
+    const loadDaysData = async () => {
+      const days = await getAllBlockDays(block);
+      setAllDays(days);
+      
+      const split = await getTrainingSplit(block);
+      setTrainingSplit(split);
+    };
+    
+    loadDaysData();
+  }, [block]);
+  
+  const dayCount = allDays.length;
   
   // Count unique exercises for stats
   const exercises = new Set<string>();
-  block.days.forEach(day => {
+  allDays.forEach(day => {
     day.exercises?.forEach((exercise: any) => {
       exercises.add(exercise.exercise);
     });
@@ -102,14 +152,12 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeC
           </View>
         </View>
         
-        {block.structure && (
-          <View style={styles.exercisePreview}>
-            <Text style={styles.previewLabel}>Training Split:</Text>
-            <Text style={styles.previewText}>
-              {block.structure}
-            </Text>
-          </View>
-        )}
+        <View style={styles.exercisePreview}>
+          <Text style={styles.previewLabel}>Training Split:</Text>
+          <Text style={styles.previewText}>
+            {trainingSplit}
+          </Text>
+        </View>
 
         {isActive && weekProgress && (
           <View style={styles.progressSection}>
@@ -176,6 +224,9 @@ export default function MesocycleBlocksScreen() {
   const [showBlockMoreOptions, setShowBlockMoreOptions] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [localBlocks, setLocalBlocks] = useState(mesocycle.blocksInMesocycle);
+  const [showAddBlockModal, setShowAddBlockModal] = useState(false);
+  const [newBlockName, setNewBlockName] = useState('');
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   // Find the global index of the first block in this mesocycle
   const getGlobalBlockIndex = (localIndex: number): number => {
@@ -189,13 +240,22 @@ export default function MesocycleBlocksScreen() {
   };
 
   useEffect(() => {
-    loadActiveBlock();
-    checkAllBlocksCompletion();
+    const initializeScreen = async () => {
+      await loadActiveBlock();
+      await reloadManualBlocks(); // Load manual blocks first
+      await checkAllBlocksCompletion(); // Then check completion status
+    };
+    initializeScreen();
   }, []);
 
   useFocusEffect(
     React.useCallback(() => {
-      checkAllBlocksCompletion();
+      const reloadScreen = async () => {
+        console.log('🔄 MesocycleBlocksScreen coming into focus - reloading completion status');
+        await reloadManualBlocks(); // Reload manual blocks first
+        await checkAllBlocksCompletion(); // Then check completion status
+      };
+      reloadScreen();
     }, [])
   );
 
@@ -228,18 +288,24 @@ export default function MesocycleBlocksScreen() {
   };
 
   const checkAllBlocksCompletion = async () => {
+    console.log('🔍 Checking completion for', localBlocks.length, 'blocks');
     const newCompletionStatus: {[blockName: string]: boolean} = {};
     
-    for (const block of mesocycle.blocksInMesocycle) {
+    // Check completion for all blocks (original + manual)
+    for (const block of localBlocks) {
+      console.log('🔍 Checking block:', block.block_name);
       const totalWeeks = getBlockWeekCount(block.weeks);
       const isComplete = await checkAllWeeksCompleted(block, totalWeeks);
+      console.log('📊 Block', block.block_name, 'is complete:', isComplete);
       newCompletionStatus[block.block_name] = isComplete;
     }
     
+    console.log('📊 Updated completion status:', newCompletionStatus);
     setCompletionStatus(newCompletionStatus);
   };
 
   const getBlockWeekCount = (weeksString: string): number => {
+    if (!weeksString) return 4; // Default to 4 weeks if undefined
     if (weeksString.includes('-')) {
       const [start, end] = weeksString.split('-').map(Number);
       return end - start + 1;
@@ -247,8 +313,28 @@ export default function MesocycleBlocksScreen() {
     return 1;
   };
 
+  const getStartingWeek = (weeksString: string): number => {
+    if (!weeksString) return 1; // Default to week 1
+    if (weeksString.includes('-')) {
+      const [start] = weeksString.split('-').map(Number);
+      return start;
+    }
+    return 1;
+  };
+
+  const createWeeksString = (startWeek: number, duration: number): string => {
+    if (duration === 1) {
+      return startWeek.toString();
+    }
+    const endWeek = startWeek + duration - 1;
+    return `${startWeek}-${endWeek}`;
+  };
+
   const checkAllWeeksCompleted = async (block: Block, totalWeeks: number) => {
     try {
+      // Get all days including manual ones
+      const allDays = await getAllBlockDays(block);
+      
       for (let week = 1; week <= totalWeeks; week++) {
         const weekKey = `completed_${block.block_name}_week${week}`;
         const completed = await AsyncStorage.getItem(weekKey);
@@ -257,13 +343,18 @@ export default function MesocycleBlocksScreen() {
           return false;
         }
         
-        const completedSet = new Set(JSON.parse(completed));
-        const allDaysCompleted = block.days.every(day => 
-          completedSet.has(`${day.day_name}_week${week}`)
-        );
+        const completedArray = JSON.parse(completed);
         
-        if (!allDaysCompleted) {
-          return false;
+        if (allDays.length === 0) {
+          // For empty blocks, check for special completion marker
+          if (!completedArray.includes('empty_block_completed')) {
+            return false;
+          }
+        } else {
+          // For blocks with days, check if all days are completed
+          if (completedArray.length !== allDays.length) {
+            return false;
+          }
         }
       }
       return true;
@@ -274,7 +365,16 @@ export default function MesocycleBlocksScreen() {
   };
 
   const getWeekProgress = (localIndex: number) => {
-    const block = mesocycle.blocksInMesocycle[localIndex];
+    const block = localBlocks[localIndex];
+    if (!block || !block.weeks) {
+      return {
+        current: 1,
+        total: 4,
+        remaining: 4,
+        isComplete: false,
+        isOverdue: false
+      };
+    }
     const totalWeeks = getBlockWeekCount(block.weeks);
     
     if (localIndex === activeBlockIndex) {
@@ -391,14 +491,44 @@ export default function MesocycleBlocksScreen() {
             style: 'destructive',
             onPress: async () => {
               try {
-                // TODO: Add actual delete functionality
-                // For now just show a message
-                Alert.alert('Feature Coming Soon', 'Block deletion will be available in a future update.');
+                if (!selectedBlock) return;
+                
+                // Remove block from local state
+                const updatedBlocks = localBlocks.filter((_, index) => index !== selectedBlock.index);
+                setLocalBlocks(updatedBlocks);
+                
+                // If this was a manual block, also remove it from storage
+                if (selectedBlock.index >= mesocycle.blocksInMesocycle.length) {
+                  let mesocycleId;
+                  if (mesocycle.isCustomMesocycle && mesocycle.customId) {
+                    mesocycleId = mesocycle.customId;
+                  } else {
+                    mesocycleId = mesocycle.name || mesocycle.mesocycleName || mesocycle.id || 'default';
+                  }
+                  
+                  const manualBlocksKey = `manual_blocks_${mesocycleId}`;
+                  const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+                  
+                  if (manualBlocksData) {
+                    const manualBlocks = JSON.parse(manualBlocksData);
+                    const manualIndex = selectedBlock.index - mesocycle.blocksInMesocycle.length;
+                    
+                    if (manualIndex >= 0 && manualIndex < manualBlocks.length) {
+                      // Remove the block from manual blocks array
+                      const updatedManualBlocks = manualBlocks.filter((_, index) => index !== manualIndex);
+                      await AsyncStorage.setItem(manualBlocksKey, JSON.stringify(updatedManualBlocks));
+                    }
+                  }
+                }
+                
+                // Close modal
                 setShowModal(false);
                 setSelectedBlock(null);
                 setShowBlockMoreOptions(false);
+                
               } catch (error) {
                 console.error('Error deleting block:', error);
+                Alert.alert('Error', 'Failed to delete block. Please try again.');
               }
             }
           }
@@ -408,7 +538,9 @@ export default function MesocycleBlocksScreen() {
   };
 
   const handleToggleBlockCompletion = async () => {
+    console.log('🔄 Block completion toggle started');
     if (selectedBlock) {
+      console.log('🔄 Selected block:', selectedBlock.block.block_name);
       try {
         const block = selectedBlock.block;
         const totalWeeks = block.weeks.includes('-') 
@@ -416,38 +548,81 @@ export default function MesocycleBlocksScreen() {
           : 1;
 
         // Check if block is currently completed
+        const allDays = await getAllBlockDays(block);
+        console.log('📋 All days for block:', allDays);
+        console.log('📋 Total weeks:', totalWeeks);
         let isCompleted = true;
-        for (let week = 1; week <= totalWeeks; week++) {
-          const weekKey = `completed_${block.block_name}_week${week}`;
-          const completedData = await AsyncStorage.getItem(weekKey);
-          if (!completedData) {
-            isCompleted = false;
-            break;
+        
+        // Check completion based on whether block has days
+        if (allDays.length === 0) {
+          // For empty blocks, check for special completion marker
+          for (let week = 1; week <= totalWeeks; week++) {
+            const weekKey = `completed_${block.block_name}_week${week}`;
+            const completedData = await AsyncStorage.getItem(weekKey);
+            if (!completedData) {
+              isCompleted = false;
+              break;
+            }
+            const completedWorkouts = JSON.parse(completedData);
+            if (!completedWorkouts.includes('empty_block_completed')) {
+              isCompleted = false;
+              break;
+            }
           }
-          const completedWorkouts = JSON.parse(completedData);
-          if (completedWorkouts.length !== block.days.length) {
-            isCompleted = false;
-            break;
+        } else {
+          // For blocks with days, check normal completion
+          for (let week = 1; week <= totalWeeks; week++) {
+            const weekKey = `completed_${block.block_name}_week${week}`;
+            const completedData = await AsyncStorage.getItem(weekKey);
+            if (!completedData) {
+              isCompleted = false;
+              break;
+            }
+            const completedWorkouts = JSON.parse(completedData);
+            if (completedWorkouts.length !== allDays.length) {
+              isCompleted = false;
+              break;
+            }
           }
         }
 
+        console.log('✅ Block completion status before toggle:', isCompleted);
+        
         if (isCompleted) {
+          console.log('🔄 Block is currently complete - marking as incomplete');
           // Uncomplete the block - remove all completion data
           for (let week = 1; week <= totalWeeks; week++) {
             const weekKey = `completed_${block.block_name}_week${week}`;
+            console.log('🗑️ Removing completion data for:', weekKey);
             await AsyncStorage.removeItem(weekKey);
           }
         } else {
+          console.log('🔄 Block is currently incomplete - marking as complete');
           // Complete the block - mark all days as completed
-          for (let week = 1; week <= totalWeeks; week++) {
-            const completedWorkouts = block.days.map(day => `${day.day_name}_week${week}`);
-            const weekKey = `completed_${block.block_name}_week${week}`;
-            await AsyncStorage.setItem(weekKey, JSON.stringify(completedWorkouts));
+          if (allDays.length === 0) {
+            // For empty blocks, create a special completion marker
+            console.log('📝 Marking empty block as complete with special marker');
+            for (let week = 1; week <= totalWeeks; week++) {
+              const weekKey = `completed_${block.block_name}_week${week}`;
+              console.log('💾 Saving empty block completion:', weekKey);
+              await AsyncStorage.setItem(weekKey, JSON.stringify(['empty_block_completed']));
+            }
+          } else {
+            // For blocks with days, mark all days as completed
+            console.log('📝 Marking block with days as complete:', allDays.length, 'days');
+            for (let week = 1; week <= totalWeeks; week++) {
+              const completedWorkouts = allDays.map(day => `${day.day_name}_week${week}`);
+              const weekKey = `completed_${block.block_name}_week${week}`;
+              console.log('💾 Saving day completions for week', week, ':', completedWorkouts);
+              await AsyncStorage.setItem(weekKey, JSON.stringify(completedWorkouts));
+            }
           }
         }
 
+        console.log('🔄 Reloading completion status');
         // Reload completion status to reflect changes
         await checkAllBlocksCompletion();
+        console.log('✅ Block completion toggle completed successfully');
 
         // Close modal without success popup
         setShowModal(false);
@@ -462,7 +637,9 @@ export default function MesocycleBlocksScreen() {
   };
 
   const isBlockCompleted = (block: Block): boolean => {
-    return completionStatus[block.block_name] || false;
+    const isCompleted = completionStatus[block.block_name] || false;
+    console.log(`📋 Block "${block.block_name}" completion status:`, isCompleted);
+    return isCompleted;
   };
 
   const handleRenameBlock = () => {
@@ -543,6 +720,216 @@ export default function MesocycleBlocksScreen() {
     }
   };
 
+  const handleAddBlock = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Add New Block',
+        'Enter a name for this block:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Create', 
+            onPress: (text) => {
+              if (text && text.trim()) {
+                createNewBlock(text.trim());
+              }
+            }
+          }
+        ],
+        'plain-text'
+      );
+    } else {
+      setNewBlockName('');
+      setShowAddBlockModal(true);
+    }
+  };
+
+  const handleCreateBlock = () => {
+    if (newBlockName.trim()) {
+      createNewBlock(newBlockName.trim());
+      setShowAddBlockModal(false);
+      setNewBlockName('');
+    }
+  };
+
+  const createNewBlock = async (blockName: string) => {
+    let debugLog = '';
+    
+    try {
+      debugLog += `🚀 STARTING BLOCK CREATION: "${blockName}"\n\n`;
+      
+      // Create new block object with complete structure to prevent render errors
+      const newBlock: Block = {
+        block_name: blockName,
+        weeks: "1-4", // Default to 4 weeks
+        days: [], // Start with empty days array
+        structure: "Custom Block" // Add structure property
+      };
+      debugLog += `📝 Created block object: ${JSON.stringify(newBlock)}\n\n`;
+
+      // Add the new block to the mesocycle
+      const updatedBlocks = [...localBlocks, newBlock];
+      debugLog += `📦 Updated local blocks - now has ${updatedBlocks.length} blocks\n`;
+      debugLog += `📦 Block names: [${updatedBlocks.map(b => b.block_name).join(', ')}]\n\n`;
+
+      // Update local state immediately for instant UI update
+      setLocalBlocks(updatedBlocks);
+      debugLog += `✅ Updated local state\n\n`;
+      
+      // Save manual blocks to separate storage to avoid corruption
+      let mesocycleId;
+      if (mesocycle.isCustomMesocycle && mesocycle.customId) {
+        mesocycleId = mesocycle.customId;
+      } else {
+        mesocycleId = mesocycle.name || mesocycle.mesocycleName || mesocycle.id || 'default';
+      }
+      const manualBlocksKey = `manual_blocks_${mesocycleId}`;
+      try {
+        const existingManualBlocks = await AsyncStorage.getItem(manualBlocksKey);
+        const manualBlocksArray = existingManualBlocks ? JSON.parse(existingManualBlocks) : [];
+        
+        // Add the new block to manual blocks
+        const updatedManualBlocks = [...manualBlocksArray, newBlock];
+        await AsyncStorage.setItem(manualBlocksKey, JSON.stringify(updatedManualBlocks));
+        
+        debugLog += `✅ SAVED: Manual block to separate storage\n`;
+        debugLog += `✅ Manual blocks key: ${manualBlocksKey}\n`;
+        debugLog += `✅ Mesocycle ID: ${mesocycleId}\n`;
+        debugLog += `✅ Total manual blocks: ${updatedManualBlocks.length}\n`;
+      } catch (error) {
+        debugLog += `❌ FAILED to save manual block: ${error.message}\n`;
+      }
+      
+      debugLog += `\n🎉 SUCCESS: Block "${blockName}" created and saved!`;
+      
+      console.log('=== BLOCK CREATION DEBUG LOG ===');
+      console.log(debugLog);
+      console.log('=== END DEBUG LOG ===');
+      
+      // Save to state for viewing
+      setDebugLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${debugLog}`]);
+        
+    } catch (error) {
+      debugLog += `\n💥 ERROR: ${error}\n`;
+      debugLog += `💥 Stack: ${error.stack}\n`;
+      
+      console.log('=== BLOCK CREATION ERROR LOG ===');
+      console.log(debugLog);
+      console.log('=== END ERROR LOG ===');
+      
+      Alert.alert(
+        'Debug Log - Error',
+        debugLog,
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  // Function to reload manual blocks from storage
+  const reloadManualBlocks = async () => {
+    try {
+      // For custom mesocycles, use the unique customId if available
+      let mesocycleId;
+      if (mesocycle.isCustomMesocycle && mesocycle.customId) {
+        mesocycleId = mesocycle.customId;
+      } else {
+        mesocycleId = mesocycle.name || mesocycle.mesocycleName || mesocycle.id || 'default';
+      }
+      
+      const manualBlocksKey = `manual_blocks_${mesocycleId}`;
+      const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+      
+      if (manualBlocksData) {
+        const manualBlocks = JSON.parse(manualBlocksData);
+        console.log(`✅ Found ${manualBlocks.length} manual blocks for ${mesocycleId}`);
+        
+        // Merge original blocks with manual blocks
+        const mergedBlocks = [...mesocycle.blocksInMesocycle, ...manualBlocks];
+        setLocalBlocks(mergedBlocks);
+        console.log(`✅ Merged ${mesocycle.blocksInMesocycle.length} original + ${manualBlocks.length} manual = ${mergedBlocks.length} total blocks`);
+      } else {
+        console.log('⚠️ No manual blocks found, keeping original block structure');
+        // For custom mesocycles with no manual blocks, just use the original (empty) structure
+        setLocalBlocks(mesocycle.blocksInMesocycle);
+      }
+    } catch (error) {
+      console.error('Failed to reload manual blocks:', error);
+    }
+  };
+
+  const handleWeekCountChange = async (delta: number) => {
+    if (!selectedBlock) return;
+    
+    const currentDuration = getBlockWeekCount(selectedBlock.block.weeks);
+    const currentStart = getStartingWeek(selectedBlock.block.weeks);
+    const newDuration = Math.max(1, Math.min(12, currentDuration + delta)); // Limit between 1-12 weeks
+    
+    if (newDuration === currentDuration) return; // No change needed
+    
+    const newWeeksString = createWeeksString(currentStart, newDuration);
+    const updatedBlock = { ...selectedBlock.block, weeks: newWeeksString };
+    
+    await updateBlockWeeks(updatedBlock);
+  };
+
+  const handleStartingWeekChange = async (delta: number) => {
+    if (!selectedBlock) return;
+    
+    const currentDuration = getBlockWeekCount(selectedBlock.block.weeks);
+    const currentStart = getStartingWeek(selectedBlock.block.weeks);
+    const newStart = Math.max(1, Math.min(50, currentStart + delta)); // Limit between 1-50 weeks
+    
+    if (newStart === currentStart) return; // No change needed
+    
+    const newWeeksString = createWeeksString(newStart, currentDuration);
+    const updatedBlock = { ...selectedBlock.block, weeks: newWeeksString };
+    
+    await updateBlockWeeks(updatedBlock);
+  };
+
+  const updateBlockWeeks = async (updatedBlock: Block) => {
+    if (!selectedBlock) return;
+    
+    // Update in local state
+    const updatedBlocks = localBlocks.map((block, index) => 
+      index === selectedBlock.index ? updatedBlock : block
+    );
+    setLocalBlocks(updatedBlocks);
+    
+    // Update selected block for the modal
+    setSelectedBlock({ ...selectedBlock, block: updatedBlock });
+    
+    // Save to storage if this is a manual block (index >= original blocks length)
+    if (selectedBlock.index >= mesocycle.blocksInMesocycle.length) {
+      try {
+        let mesocycleId;
+        if (mesocycle.isCustomMesocycle && mesocycle.customId) {
+          mesocycleId = mesocycle.customId;
+        } else {
+          mesocycleId = mesocycle.name || mesocycle.mesocycleName || mesocycle.id || 'default';
+        }
+        const manualBlocksKey = `manual_blocks_${mesocycleId}`;
+        const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+        
+        if (manualBlocksData) {
+          const manualBlocks = JSON.parse(manualBlocksData);
+          const manualIndex = selectedBlock.index - mesocycle.blocksInMesocycle.length;
+          
+          if (manualBlocks[manualIndex]) {
+            manualBlocks[manualIndex] = updatedBlock;
+            await AsyncStorage.setItem(manualBlocksKey, JSON.stringify(manualBlocks));
+            console.log(`✅ Updated manual block weeks: ${selectedBlock.block.block_name} -> ${updatedBlock.weeks}`);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update manual block weeks:', error);
+      }
+    }
+    
+    // Force refresh to update UI
+    setRefreshKey(prev => prev + 1);
+  };
+
   const handleBack = () => {
     navigation.goBack();
   };
@@ -569,7 +956,17 @@ export default function MesocycleBlocksScreen() {
             {localBlocks.length} blocks
           </Text>
         </View>
-        <View style={styles.backButton} />
+        <TouchableOpacity 
+          style={styles.debugButton} 
+          onPress={() => Alert.alert(
+            'Debug Logs', 
+            debugLogs.length > 0 ? debugLogs.join('\n\n---\n\n') : 'No debug logs yet',
+            [{ text: 'OK' }]
+          )}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.debugButtonText}>LOG ({debugLogs.length})</Text>
+        </TouchableOpacity>
       </View>
 
 
@@ -587,6 +984,15 @@ export default function MesocycleBlocksScreen() {
             themeColor={themeColor}
             blockIndex={index}
           />
+        )}
+        ListFooterComponent={() => (
+          <TouchableOpacity 
+            style={[styles.addBlockButton, { borderColor: themeColor }]}
+            onPress={() => handleAddBlock()}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={themeColor} />
+            <Text style={[styles.addBlockText, { color: themeColor }]}>Add Block</Text>
+          </TouchableOpacity>
         )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -634,87 +1040,89 @@ export default function MesocycleBlocksScreen() {
             </View>
             
             <View style={{ width: '100%', gap: 12 }}>
-              {/* Primary Actions */}
-              {selectedBlock?.index !== activeBlockIndex && (
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: themeColor,
-                    borderRadius: 8,
-                    paddingVertical: 16,
-                    paddingHorizontal: 20,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 12,
-                  }}
-                  onPress={handleSetActive}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="checkmark-circle" size={20} color="#0a0a0b" />
-                  <Text style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: '#0a0a0b',
-                  }}>Set as Active</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={{
-                  backgroundColor: selectedBlock && isBlockCompleted(selectedBlock.block) ? '#ef4444' : '#22c55e',
-                  borderRadius: 8,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 12,
-                }}
-                onPress={handleToggleBlockCompletion}
-                activeOpacity={0.8}
-              >
-                <Ionicons 
-                  name={selectedBlock && isBlockCompleted(selectedBlock.block) ? "close-circle" : "checkmark-done"} 
-                  size={20} 
-                  color="#0a0a0b" 
-                />
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#0a0a0b',
-                }}>{selectedBlock && isBlockCompleted(selectedBlock.block) ? 'Mark Incomplete' : 'Mark Complete'}</Text>
-              </TouchableOpacity>
-
-              {/* More Options Toggle */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#27272a',
-                  borderRadius: 8,
-                  paddingVertical: 12,
-                  paddingHorizontal: 20,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                }}
-                onPress={() => setShowBlockMoreOptions(!showBlockMoreOptions)}
-                activeOpacity={0.8}
-              >
-                <Ionicons 
-                  name={showBlockMoreOptions ? "chevron-up" : "ellipsis-horizontal"} 
-                  size={16} 
-                  color="#ffffff" 
-                />
-                <Text style={{
-                  fontSize: 14,
-                  fontWeight: '500',
-                  color: '#ffffff',
-                }}>{showBlockMoreOptions ? 'Less Options' : 'More Options'}</Text>
-              </TouchableOpacity>
-
-              {/* Secondary Actions (shown when expanded) */}
-              {showBlockMoreOptions && (
+              {!showBlockMoreOptions ? (
                 <>
+                  {/* Primary Actions */}
+                  {selectedBlock?.index !== activeBlockIndex && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: themeColor,
+                        borderRadius: 8,
+                        paddingVertical: 16,
+                        paddingHorizontal: 20,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 12,
+                      }}
+                      onPress={handleSetActive}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="checkmark-circle" size={20} color="#0a0a0b" />
+                      <Text style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: '#0a0a0b',
+                      }}>Set as Active</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: selectedBlock && isBlockCompleted(selectedBlock.block) ? '#ef4444' : '#22c55e',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 12,
+                    }}
+                    onPress={handleToggleBlockCompletion}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons 
+                      name={selectedBlock && isBlockCompleted(selectedBlock.block) ? "close-circle" : "checkmark-done"} 
+                      size={20} 
+                      color="#0a0a0b" 
+                    />
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#0a0a0b',
+                    }}>{selectedBlock && isBlockCompleted(selectedBlock.block) ? 'Mark Incomplete' : 'Mark Complete'}</Text>
+                  </TouchableOpacity>
+
+                  {/* More Options Toggle - Primary View */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#27272a',
+                      borderRadius: 8,
+                      paddingVertical: 12,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                    }}
+                    onPress={() => setShowBlockMoreOptions(!showBlockMoreOptions)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons 
+                      name="ellipsis-horizontal" 
+                      size={16} 
+                      color="#ffffff" 
+                    />
+                    <Text style={{
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#ffffff',
+                    }}>More Options</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {/* Secondary Actions */}
                   <TouchableOpacity
                     style={{
                       backgroundColor: '#27272a',
@@ -736,6 +1144,128 @@ export default function MesocycleBlocksScreen() {
                       color: '#ffffff',
                     }}>Rename</Text>
                   </TouchableOpacity>
+
+                  {/* Starting Week Editor */}
+                  <View style={{
+                    backgroundColor: '#27272a',
+                    borderRadius: 8,
+                    paddingVertical: 16,
+                    paddingHorizontal: 20,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Ionicons name="play-outline" size={20} color="#ffffff" />
+                      <Text style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: '#ffffff',
+                      }}>Start Week</Text>
+                    </View>
+                    
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#18181b',
+                      borderRadius: 8,
+                      paddingHorizontal: 4,
+                    }}>
+                      <TouchableOpacity
+                        style={{
+                          padding: 8,
+                          paddingHorizontal: 12,
+                        }}
+                        onPress={() => handleStartingWeekChange(-1)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="chevron-back" size={18} color={themeColor} />
+                      </TouchableOpacity>
+                      
+                      <Text style={{
+                        fontSize: 16,
+                        fontWeight: '700',
+                        color: '#ffffff',
+                        minWidth: 30,
+                        textAlign: 'center',
+                        paddingHorizontal: 8,
+                      }}>
+                        {selectedBlock ? getStartingWeek(selectedBlock.block.weeks) : 1}
+                      </Text>
+                      
+                      <TouchableOpacity
+                        style={{
+                          padding: 8,
+                          paddingHorizontal: 12,
+                        }}
+                        onPress={() => handleStartingWeekChange(1)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="chevron-forward" size={18} color={themeColor} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Duration Editor */}
+                  <View style={{
+                    backgroundColor: '#27272a',
+                    borderRadius: 8,
+                    paddingVertical: 16,
+                    paddingHorizontal: 20,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Ionicons name="calendar-outline" size={20} color="#ffffff" />
+                      <Text style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: '#ffffff',
+                      }}>Duration</Text>
+                    </View>
+                    
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#18181b',
+                      borderRadius: 8,
+                      paddingHorizontal: 4,
+                    }}>
+                      <TouchableOpacity
+                        style={{
+                          padding: 8,
+                          paddingHorizontal: 12,
+                        }}
+                        onPress={() => handleWeekCountChange(-1)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="chevron-back" size={18} color={themeColor} />
+                      </TouchableOpacity>
+                      
+                      <Text style={{
+                        fontSize: 16,
+                        fontWeight: '700',
+                        color: '#ffffff',
+                        minWidth: 50,
+                        textAlign: 'center',
+                        paddingHorizontal: 8,
+                      }}>
+                        {selectedBlock ? `${getBlockWeekCount(selectedBlock.block.weeks)} wks` : '4 wks'}
+                      </Text>
+                      
+                      <TouchableOpacity
+                        style={{
+                          padding: 8,
+                          paddingHorizontal: 12,
+                        }}
+                        onPress={() => handleWeekCountChange(1)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="chevron-forward" size={18} color={themeColor} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
 
                   <TouchableOpacity
                     style={{
@@ -804,6 +1334,33 @@ export default function MesocycleBlocksScreen() {
                       color: '#ef4444',
                     }}>Delete</Text>
                   </TouchableOpacity>
+
+                  {/* Back to Primary Options */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#27272a',
+                      borderRadius: 8,
+                      paddingVertical: 12,
+                      paddingHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                    }}
+                    onPress={() => setShowBlockMoreOptions(!showBlockMoreOptions)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons 
+                      name="chevron-back" 
+                      size={16} 
+                      color="#ffffff" 
+                    />
+                    <Text style={{
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#ffffff',
+                    }}>Back</Text>
+                  </TouchableOpacity>
                 </>
               )}
             </View>
@@ -821,11 +1378,55 @@ export default function MesocycleBlocksScreen() {
                 fontSize: 16,
                 fontWeight: '500',
                 color: '#71717a',
-              }}>Cancel</Text>
+              }}>Save</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* Add Block Modal - Android Only */}
+      {Platform.OS === 'android' && (
+        <Modal
+          visible={showAddBlockModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowAddBlockModal(false)}
+        >
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.title}>Add New Block</Text>
+              
+              <TextInput
+                style={styles.input}
+                value={newBlockName}
+                onChangeText={setNewBlockName}
+                placeholder="Enter block name..."
+                placeholderTextColor="#888"
+                autoFocus={true}
+                maxLength={30}
+              />
+              
+              <View style={styles.buttonContainer}>
+                <View style={styles.buttonWrapper}>
+                  <Button
+                    title="Cancel"
+                    color="#666"
+                    onPress={() => setShowAddBlockModal(false)}
+                  />
+                </View>
+                <View style={styles.buttonWrapper}>
+                  <Button
+                    title="Create"
+                    color={themeColor}
+                    onPress={handleCreateBlock}
+                    disabled={!newBlockName.trim()}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -1093,5 +1694,75 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  debugButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  debugButtonText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  addBlockButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  addBlockText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  modal: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  input: {
+    backgroundColor: '#0a0a0b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#ffffff',
+    marginBottom: 32,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  buttonWrapper: {
+    flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
 });

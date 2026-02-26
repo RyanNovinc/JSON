@@ -825,7 +825,7 @@ Design Mesocycle ${context.currentMesocycle} following the roadmap above. Rotate
     prompt += `\n11. **Describe the full mesocycle progression in the Mesocycle Roadmap section.**`;
     prompt += '\n' + BLOCK_STRUCTURE_HEADER;
     prompt += '\n' + getRule12(expTier);
-    prompt += `\n13. **Program duration → block count:** Plan ${context.mesocycleBlocks} blocks within this ~${context.mesocycleWeeks || mesocycleDefaults!.mesocycleWeeks} week mesocycle.`;
+    prompt += `\n13. **Program duration → block count:** Plan ${context.mesocycleBlocks} blocks within this ~${context.N || mesocycleDefaults!.mesocycleWeeks} week mesocycle.`;
     prompt += `\n14. **Follow the mesocycle progression you define in the Mesocycle Roadmap.**`;
   } else {
     // Use original rules for non-mesocycle programs
