@@ -165,6 +165,15 @@ export class WorkoutStorage {
     await this.saveRoutines(filtered);
   }
 
+  static async updateRoutine(updatedRoutine: WorkoutRoutine): Promise<void> {
+    const routines = await this.loadRoutines();
+    const index = routines.findIndex(r => r.id === updatedRoutine.id);
+    if (index !== -1) {
+      routines[index] = updatedRoutine;
+      await this.saveRoutines(routines);
+    }
+  }
+
   // Meal plan management
   static async saveMealPlans(mealPlans: MealPlan[]): Promise<void> {
     try {
@@ -594,6 +603,30 @@ export class WorkoutStorage {
     } catch (error) {
       console.error('Failed to get completed workouts:', error);
       return [];
+    }
+  }
+
+  // Clean up corrupted or test completion data
+  static async cleanupCorruptedCompletionData(): Promise<void> {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      
+      // Find all completion and bookmark keys
+      const completionKeys = allKeys.filter(key => 
+        key.startsWith('completed_') || 
+        key.startsWith('bookmark_') ||
+        key.includes('ads') || 
+        key.includes('asdads') ||
+        key.includes('test')
+      );
+
+      if (completionKeys.length > 0) {
+        console.log('🧹 Cleaning up corrupted completion data:', completionKeys.length, 'keys');
+        await AsyncStorage.multiRemove(completionKeys);
+        console.log('✅ Cleanup complete');
+      }
+    } catch (error) {
+      console.error('Failed to cleanup corrupted data:', error);
     }
   }
 }

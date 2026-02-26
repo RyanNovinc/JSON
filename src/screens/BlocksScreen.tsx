@@ -282,7 +282,7 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeC
 export default function BlocksScreen() {
   const navigation = useNavigation<BlocksScreenNavigationProp>();
   const route = useRoute<BlocksScreenRouteProp>();
-  const { routine, initialBlock, initialWeek } = route.params;
+  const { routine, initialBlock, initialWeek, autoNavigateToToday } = route.params;
   const { themeColor } = useTheme();
   const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0); // Default to first block
   const [currentWeek, setCurrentWeek] = useState<number>(1); // Current week within active block
@@ -339,23 +339,7 @@ export default function BlocksScreen() {
     }, [activeBlockIndex, program, hasMesocycles])
   );
 
-  // Handle auto-navigation when coming from "Today" button
-  useEffect(() => {
-    if (initialBlock !== undefined && initialWeek !== undefined && routine.data.blocks[initialBlock]) {
-      // Set the active block and navigate to today's workout
-      setActiveBlockIndex(initialBlock);
-      
-      // Small delay to ensure state is updated
-      setTimeout(() => {
-        const block = routine.data.blocks[initialBlock];
-        navigation.navigate('Days' as any, { 
-          block, 
-          routineName: routine.name,
-          initialWeek: initialWeek
-        });
-      }, 100);
-    }
-  }, [initialBlock, initialWeek, routine, navigation]);
+  // No auto-navigation from BlocksScreen - "Today" button goes direct to Days
 
   // Update mesocycle cards when program or completion status changes
   useEffect(() => {
@@ -1798,6 +1782,56 @@ export default function BlocksScreen() {
           </View>
         </Modal>
       )}
+      
+      {/* Debug Button */}
+      <View style={{
+        position: 'absolute',
+        bottom: 100,
+        right: 20,
+        backgroundColor: '#27272a',
+        borderRadius: 30,
+        width: 60,
+        height: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      }}>
+        <TouchableOpacity 
+          onPress={() => {
+            const debugInfo = {
+              screenName: 'BlocksScreen',
+              routineName: routine.name,
+              routineId: routine.id,
+              mesocycleNumber: (routine as any).mesocycleNumber,
+              hasMesocycles,
+              totalMesocycles: mesocycleCards?.length || 0,
+              mesocycleNames: mesocycleCards?.map((m: any) => m.name || m.phaseName || 'Unknown') || [],
+              totalBlocksInRoutine: routine.data.blocks.length,
+              allBlocksInRoutine: routine.data.blocks.map((b: any) => b.block_name),
+              completionStatusKeys: Object.keys(completionStatus),
+              completionStatusValues: Object.values(completionStatus)
+            };
+            console.log('🔍 BLOCKS SCREEN DEBUG:', JSON.stringify(debugInfo, null, 2));
+            Alert.alert(
+              'Blocks Screen Debug Info', 
+              `Routine: ${routine.name}\nMesocycles: ${hasMesocycles ? mesocycleCards?.length || 0 : 'None'}\nTotal blocks: ${routine.data.blocks.length}\n\nCheck console for full details`,
+              [{ text: 'OK' }]
+            );
+          }}
+          style={{
+            width: 60,
+            height: 60,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Ionicons name="bug" size={24} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }

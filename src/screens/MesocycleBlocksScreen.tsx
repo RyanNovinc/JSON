@@ -214,7 +214,7 @@ function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeC
 export default function MesocycleBlocksScreen() {
   const navigation = useNavigation<MesocycleBlocksScreenNavigationProp>();
   const route = useRoute<MesocycleBlocksScreenRouteProp>();
-  const { mesocycle, routine, program } = route.params;
+  const { mesocycle, routine, program, autoNavigateToToday, todayBlockIndex, todayWeek } = route.params;
   const { themeColor } = useTheme();
   const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0);
   const [completionStatus, setCompletionStatus] = useState<{[blockName: string]: boolean}>({});
@@ -243,9 +243,11 @@ export default function MesocycleBlocksScreen() {
       await loadActiveBlock();
       const loadedBlocks = await reloadManualBlocks(); // Load manual blocks first
       await checkAllBlocksCompletion(loadedBlocks); // Then check completion status with loaded blocks
+      
+      // No auto-navigation from MesocycleBlocksScreen - "Today" button bypasses this screen
     };
     initializeScreen();
-  }, []);
+  }, [autoNavigateToToday, todayBlockIndex, todayWeek, activeBlockIndex]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -1042,11 +1044,42 @@ export default function MesocycleBlocksScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.backButton, { left: 60 }]} 
+          onPress={() => {
+            const debugInfo = {
+              screenName: 'MesocycleBlocksScreen',
+              mesocycleName: phaseName,
+              mesocycleNumber: mesocycle.mesocycleNumber,
+              totalBlocksInMesocycle: localBlocks.length,
+              blocksInMesocycle: localBlocks.map(b => b.block_name),
+              routineData: {
+                routineName: routine.name,
+                totalBlocksInRoutine: routine.data.blocks.length,
+                allBlocksInRoutine: routine.data.blocks.map(b => b.block_name)
+              },
+              completionStatus: Object.keys(completionStatus).length,
+              completionStatusKeys: Object.keys(completionStatus)
+            };
+            console.log('🔍 MESOCYCLE BLOCKS DEBUG:', JSON.stringify(debugInfo, null, 2));
+            Alert.alert(
+              'Debug Info', 
+              `Mesocycle: ${phaseName}\nBlocks shown: ${localBlocks.length}\nTotal in routine: ${routine.data.blocks.length}\n\nCheck console for full details`,
+              [{ text: 'OK' }]
+            );
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="bug" size={20} color="#ffffff" />
+        </TouchableOpacity>
+        
         <View style={styles.titleContainer}>
           <Text style={styles.mesocycleLabel}>MESOCYCLE</Text>
           <Text style={styles.mesocycleName}>{phaseName}</Text>
         </View>
       </View>
+
 
 
       <FlatList

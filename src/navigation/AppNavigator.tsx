@@ -82,6 +82,7 @@ export type RootStackParamList = {
     };
     initialBlock?: number;
     initialWeek?: number;
+    autoNavigateToToday?: boolean;
   };
   MesocycleBlocks: {
     mesocycle: {
@@ -102,6 +103,9 @@ export type RootStackParamList = {
       programId?: string;
     };
     program: any;
+    autoNavigateToToday?: boolean;
+    todayBlockIndex?: number;
+    todayWeek?: number;
   };
   MealPlanWeeks: {
     mealPlan: {

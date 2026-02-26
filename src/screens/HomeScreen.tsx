@@ -11,12 +11,14 @@ import {
   Animated,
   Image,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
 import WorkoutCalendar from '../components/WorkoutCalendar';
@@ -73,6 +75,11 @@ export default function HomeScreen({ route }: any) {
     visible: false,
     routine: null,
   });
+  const [renameModal, setRenameModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null; newName: string }>({
+    visible: false,
+    routine: null,
+    newName: '',
+  });
   const [calendarModal, setCalendarModal] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -85,7 +92,15 @@ export default function HomeScreen({ route }: any) {
 
   // Load routines from storage on component mount
   useEffect(() => {
-    loadRoutines();
+    const initializeApp = async () => {
+      // Clean up any corrupted completion data on app start
+      await WorkoutStorage.cleanupCorruptedCompletionData();
+      
+      // Load app data
+      loadRoutines();
+    };
+    
+    initializeApp();
   }, []);
 
   // Check if onboarding should be shown
@@ -193,25 +208,228 @@ export default function HomeScreen({ route }: any) {
     const routine = shareModal.routine;
     if (!routine?.data) return;
     
-    const jsonString = JSON.stringify(routine.data, null, 2);
-    
-    if (action === 'copy') {
-      await Clipboard.setStringAsync(jsonString);
-      setShareModal({ visible: false, routine: null });
-      setTimeout(() => {
-        setSuccessModal(true);
-      }, 100);
-    } else if (action === 'share') {
+    try {
+      // Enhanced export with complete state including manual modifications
+      let exportData = { ...routine.data };
+      let programData = null;
+      
+      // Load program data if available
+      if (routine.programId) {
+        const { ProgramStorage } = await import('../data/programStorage');
+        programData = await ProgramStorage.getProgram(routine.programId);
+      }
+      
+      // Collect all manual blocks across all mesocycles
+      const manualBlocks = [];
+      const completionStatus = {};
+      const workoutHistory = [];
+      
+      if (programData && programData.totalMesocycles > 1) {
+        // Multi-mesocycle program - collect manual blocks from each mesocycle
+        for (let mesocycleNum = 1; mesocycleNum <= programData.totalMesocycles; mesocycleNum++) {
+          const manualBlocksKey = `manual_blocks_mesocycle_${mesocycleNum}`;
+          try {
+            const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+            if (manualBlocksData) {
+              const mesocycleManualBlocks = JSON.parse(manualBlocksData);
+              manualBlocks.push(...mesocycleManualBlocks.map(block => ({
+                ...block,
+                mesocycleNumber: mesocycleNum
+              })));
+            }
+          } catch (error) {
+            console.log(`Could not load manual blocks for mesocycle ${mesocycleNum}`);
+          }
+        }
+        
+        // Load custom mesocycles
+        try {
+          const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
+          const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
+          if (customMesocyclesData) {
+            const customMesocycles = JSON.parse(customMesocyclesData);
+            for (const customMeso of customMesocycles) {
+              if (customMeso.customId) {
+                const customManualBlocksKey = `manual_blocks_${customMeso.customId}`;
+                const customManualBlocksData = await AsyncStorage.getItem(customManualBlocksKey);
+                if (customManualBlocksData) {
+                  const customManualBlocks = JSON.parse(customManualBlocksData);
+                  manualBlocks.push(...customManualBlocks.map(block => ({
+                    ...block,
+                    customMesocycleId: customMeso.customId
+                  })));
+                }
+              }
+            }
+            
+            // Include custom mesocycles in export
+            exportData._customMesocycles = customMesocycles;
+          }
+        } catch (error) {
+          console.log('Could not load custom mesocycles');
+        }
+      } else {
+        // Single routine or no mesocycles - load manual blocks directly
+        const manualBlocksKey = `manual_blocks_${routine.id}`;
+        try {
+          const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+          if (manualBlocksData) {
+            const singleManualBlocks = JSON.parse(manualBlocksData);
+            manualBlocks.push(...singleManualBlocks);
+          }
+        } catch (error) {
+          console.log('Could not load manual blocks');
+        }
+      }
+      
+      // Load completion status
       try {
+        const completionKey = `completion_${routine.id}`;
+        const completionData = await AsyncStorage.getItem(completionKey);
+        if (completionData) {
+          Object.assign(completionStatus, JSON.parse(completionData));
+        }
+      } catch (error) {
+        console.log('Could not load completion status');
+      }
+      
+      // Load workout history
+      try {
+        const historyKey = `workoutHistory_${routine.id}`;
+        const historyData = await AsyncStorage.getItem(historyKey);
+        if (historyData) {
+          workoutHistory.push(...JSON.parse(historyData));
+        }
+      } catch (error) {
+        console.log('Could not load workout history');
+      }
+      
+      // Load exercise customizations and dynamic exercises
+      const exerciseCustomizations = {};
+      const dynamicExercisesData = {};
+      const setsData = {};
+      
+      if (routine.data && routine.data.blocks) {
+        for (const block of routine.data.blocks) {
+          for (const day of block.days) {
+            // Check for various week customizations
+            for (let week = 1; week <= 20; week++) { // Check up to 20 weeks
+              // Load exercise customizations (order changes, rep scheme changes)
+              const customizationKey = `day_customization_${block.block_name}_${day.day_name}_week${week}`;
+              try {
+                const customizationData = await AsyncStorage.getItem(customizationKey);
+                if (customizationData) {
+                  exerciseCustomizations[customizationKey] = JSON.parse(customizationData);
+                }
+              } catch (error) {
+                // Continue to next
+              }
+              
+              // Load dynamic exercises (added during workouts)
+              const dynamicKey = `workout_${block.block_name}_${day.day_name}_week${week}_exercises`;
+              try {
+                const dynamicData = await AsyncStorage.getItem(dynamicKey);
+                if (dynamicData) {
+                  dynamicExercisesData[dynamicKey] = JSON.parse(dynamicData);
+                }
+              } catch (error) {
+                // Continue to next
+              }
+              
+              // Load sets data (modified sets/reps)
+              const setsKey = `workout_${block.block_name}_${day.day_name}_week${week}_sets`;
+              try {
+                const setsInfo = await AsyncStorage.getItem(setsKey);
+                if (setsInfo) {
+                  setsData[setsKey] = JSON.parse(setsInfo);
+                }
+              } catch (error) {
+                // Continue to next
+              }
+            }
+          }
+        }
+      }
+      
+      // Load exercise preferences
+      let exercisePreferences = {};
+      try {
+        const preferencesData = await AsyncStorage.getItem('exercise_preferences');
+        if (preferencesData) {
+          exercisePreferences = JSON.parse(preferencesData);
+        }
+      } catch (error) {
+        console.log('Could not load exercise preferences');
+      }
+      
+      // Load active block and week progress
+      let activeBlock = null;
+      let weekProgress = null;
+      try {
+        activeBlock = await AsyncStorage.getItem(`activeBlock_${routine.id}`);
+        const weekProgressData = await AsyncStorage.getItem(`weekProgress_${routine.id}`);
+        if (weekProgressData) {
+          weekProgress = JSON.parse(weekProgressData);
+        }
+      } catch (error) {
+        console.log('Could not load progress data');
+      }
+      
+      // Enhanced metadata with complete state
+      const metadata = {
+        originalProgramId: routine.programId,
+        totalMesocycles: programData?.totalMesocycles || 1,
+        mesocycleNumber: routine.mesocycleNumber,
+        mesocycleRoadmap: programData?.mesocycleRoadmap || [],
+        exportedAt: new Date().toISOString(),
+        exportType: 'complete_state',
+        routineId: routine.id,
+        routineName: routine.name, // Use the current UI display name
+        currentDisplayName: routine.name, // Store the renamed display name separately
+        // Complete state data
+        manualBlocks: manualBlocks,
+        completionStatus: completionStatus,
+        workoutHistory: workoutHistory,
+        activeBlock: activeBlock ? parseInt(activeBlock) : null,
+        weekProgress: weekProgress,
+        // Exercise-level modifications
+        exerciseCustomizations: exerciseCustomizations,
+        dynamicExercisesData: dynamicExercisesData,
+        setsData: setsData,
+        exercisePreferences: exercisePreferences
+      };
+      
+      exportData._metadata = metadata;
+      
+      // Use the current display name instead of the original routine_name
+      exportData.routine_name = routine.name;
+      
+      // DEBUG: Log export metadata
+      console.log('🔍 EXPORT DEBUG - Metadata:', {
+        totalMesocycles: metadata.totalMesocycles,
+        exportType: metadata.exportType,
+        routineName: metadata.routineName,
+        blockCount: exportData.blocks?.length
+      });
+      
+      const jsonString = JSON.stringify(exportData, null, 2);
+      
+      if (action === 'copy') {
+        await Clipboard.setStringAsync(jsonString);
+        setShareModal({ visible: false, routine: null });
+        setTimeout(() => {
+          setSuccessModal(true);
+        }, 100);
+      } else if (action === 'share') {
         await Share.share({
           message: jsonString,
           title: `${routine.name} Workout`,
         });
         setShareModal({ visible: false, routine: null });
-      } catch (error) {
-        console.error('Error sharing:', error);
-        setShareModal({ visible: false, routine: null });
       }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      setShareModal({ visible: false, routine: null });
     }
   };
 
@@ -229,6 +447,26 @@ export default function HomeScreen({ route }: any) {
       setDeleteModal({ visible: false, routine: null });
     } catch (error) {
       console.error('Failed to delete routine:', error);
+    }
+  };
+
+  const handleRenameRequest = (routine: WorkoutRoutine) => {
+    setDeleteModal({ visible: false, routine: null });
+    setRenameModal({ visible: true, routine, newName: routine.name });
+  };
+
+  const handleRenameConfirm = async () => {
+    const { routine, newName } = renameModal;
+    if (!routine || !newName.trim()) return;
+
+    try {
+      const updatedRoutine = { ...routine, name: newName.trim() };
+      await WorkoutStorage.updateRoutine(updatedRoutine);
+      setRoutines(prev => prev.map(r => r.id === routine.id ? updatedRoutine : r));
+      setRenameModal({ visible: false, routine: null, newName: '' });
+    } catch (error) {
+      console.error('Failed to rename routine:', error);
+      Alert.alert('Error', 'Failed to rename routine. Please try again.');
     }
   };
 
@@ -273,6 +511,7 @@ export default function HomeScreen({ route }: any) {
     });
   };
 
+
   const handleGoToTodayWorkout = async () => {
     try {
       if (routines.length === 0) {
@@ -287,6 +526,7 @@ export default function HomeScreen({ route }: any) {
       // Find the active routine (first one for now, but could be extended to find truly active one)
       const activeRoutine = routines[0];
       
+      
       if (!activeRoutine.data?.blocks || activeRoutine.data.blocks.length === 0) {
         Alert.alert(
           'Invalid Routine',
@@ -296,18 +536,23 @@ export default function HomeScreen({ route }: any) {
         return;
       }
 
-      // Get the active block from storage
+      // Get the active block from storage, or find first incomplete block
       let activeBlockIndex = 0;
       try {
         const savedActiveBlock = await WorkoutStorage.getActiveBlock(activeRoutine.id);
-        if (savedActiveBlock !== null) {
+        if (savedActiveBlock !== null && savedActiveBlock >= 0 && savedActiveBlock < activeRoutine.data.blocks.length) {
           activeBlockIndex = savedActiveBlock;
+        } else {
+          console.log('Invalid active block index, using first block');
+          activeBlockIndex = 0;
         }
       } catch (error) {
         console.log('No active block saved, using first block');
+        activeBlockIndex = 0;
       }
 
       const activeBlock = activeRoutine.data.blocks[activeBlockIndex];
+      
       
       if (!activeBlock || !activeBlock.weeks) {
         Alert.alert(
@@ -327,6 +572,7 @@ export default function HomeScreen({ route }: any) {
       try {
         // Check for manually bookmarked week first
         const bookmarkData = await WorkoutStorage.getBookmark(activeBlock.block_name);
+        
         if (bookmarkData?.isBookmarked) {
           currentWeek = bookmarkData.week;
         } else {
@@ -360,11 +606,12 @@ export default function HomeScreen({ route }: any) {
         currentWeek = 1;
       }
 
-      // Navigate to BlocksScreen first, then it will handle going to today's workout
-      navigation.navigate('Blocks' as any, { 
-        routine: activeRoutine,
-        initialBlock: activeBlockIndex,
-        initialWeek: currentWeek  // Pass the calculated week to jump to today
+      // Navigate directly to the Days screen with the active block
+      const todayActiveBlock = activeRoutine.data.blocks[activeBlockIndex];
+      navigation.navigate('Days' as any, {
+        block: todayActiveBlock,
+        routineName: activeRoutine.name,
+        initialWeek: currentWeek
       });
       
     } catch (error) {
@@ -949,6 +1196,15 @@ export default function HomeScreen({ route }: any) {
               </TouchableOpacity>
               
               <TouchableOpacity
+                style={styles.renameButton}
+                onPress={() => deleteModal.routine && handleRenameRequest(deleteModal.routine)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="create-outline" size={18} color="#ffffff" />
+                <Text style={styles.renameText}>Rename</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
                 style={styles.deleteConfirmButton}
                 onPress={handleDeleteConfirm}
                 activeOpacity={0.7}
@@ -973,6 +1229,55 @@ export default function HomeScreen({ route }: any) {
         onFeedback={submitFeedback}
         onSkip={skipFeedback}
       />
+
+      {/* Rename Modal */}
+      <Modal
+        visible={renameModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setRenameModal({ visible: false, routine: null, newName: '' })}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.renameContainer}>
+            <View style={styles.renameIconContainer}>
+              <Ionicons name="create-outline" size={32} color="#22d3ee" />
+            </View>
+            
+            <Text style={styles.renameTitle}>Rename Routine</Text>
+            
+            <View style={styles.renameInputContainer}>
+              <TextInput
+                style={styles.renameInput}
+                value={renameModal.newName}
+                onChangeText={(text) => setRenameModal(prev => ({ ...prev, newName: text }))}
+                placeholder="Enter new name"
+                placeholderTextColor="#71717a"
+                autoFocus={true}
+                selectTextOnFocus={true}
+              />
+            </View>
+            
+            <View style={styles.renameButtons}>
+              <TouchableOpacity
+                style={styles.renameCancelButton}
+                onPress={() => setRenameModal({ visible: false, routine: null, newName: '' })}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.renameCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.renameConfirmButton, { backgroundColor: themeColor }]}
+                onPress={handleRenameConfirm}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="checkmark" size={18} color="#0a0a0b" />
+                <Text style={styles.renameConfirmText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Onboarding Overlay */}
       <OnboardingOverlay
@@ -1243,7 +1548,7 @@ const styles = StyleSheet.create({
   },
   deleteButtons: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 8,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1259,25 +1564,45 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#27272a',
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#3f3f46',
-    minHeight: 50,
+    minHeight: 44,
+  },
+  renameButton: {
+    flex: 1,
+    backgroundColor: '#22d3ee',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    shadowColor: '#22d3ee',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   deleteConfirmButton: {
     flex: 1,
     backgroundColor: '#ef4444',
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-    minHeight: 50,
+    gap: 6,
+    minHeight: 44,
     shadowColor: '#ef4444',
     shadowOffset: {
       width: 0,
@@ -1288,12 +1613,17 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   deleteCancelText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
   },
+  renameText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0a0a0b',
+  },
   deleteConfirmText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
   },
@@ -2022,5 +2352,100 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: 'rgba(10, 10, 11, 0.7)',
     letterSpacing: 0.2,
+  },
+  // Rename Modal Styles
+  renameContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#27272a',
+    padding: 28,
+    width: '100%',
+    maxWidth: 350,
+    alignItems: 'center',
+    shadowColor: '#22d3ee',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  renameIconContainer: {
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+    borderRadius: 50,
+    padding: 16,
+    marginBottom: 20,
+  },
+  renameTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  renameInputContainer: {
+    backgroundColor: '#0f0f0f',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 4,
+    width: '100%',
+    marginBottom: 28,
+  },
+  renameInput: {
+    fontSize: 16,
+    color: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'transparent',
+  },
+  renameButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  renameCancelButton: {
+    flex: 1,
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    minHeight: 50,
+  },
+  renameConfirmButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 50,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  renameCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  renameConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0a0a0b',
   },
 });
