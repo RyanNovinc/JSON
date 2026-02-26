@@ -375,12 +375,31 @@ export default function HomeScreen({ route }: any) {
         console.log('Could not load progress data');
       }
       
+      // Load custom mesocycles for this routine
+      let customMesocycles = [];
+      try {
+        const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
+        const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
+        if (customMesocyclesData) {
+          customMesocycles = JSON.parse(customMesocyclesData);
+        }
+      } catch (error) {
+        console.log('Could not load custom mesocycles');
+      }
+      
+      // Calculate total mesocycles including custom ones
+      const totalMesocyclesWithCustom = (programData?.totalMesocycles || 1) + customMesocycles.length;
+      
       // Enhanced metadata with complete state
       const metadata = {
         originalProgramId: routine.programId,
-        totalMesocycles: programData?.totalMesocycles || 1,
-        mesocycleNumber: routine.mesocycleNumber,
+        totalMesocycles: totalMesocyclesWithCustom,
+        // Only include mesocycleNumber if this is truly an individual mesocycle routine
+        // Full programs should NOT have a mesocycleNumber to allow proper distribution
+        ...(routine.mesocycleNumber ? { mesocycleNumber: routine.mesocycleNumber } : {}),
         mesocycleRoadmap: programData?.mesocycleRoadmap || [],
+        // Include custom mesocycles in export
+        customMesocycles: customMesocycles,
         exportedAt: new Date().toISOString(),
         exportType: 'complete_state',
         routineId: routine.id,
@@ -401,6 +420,11 @@ export default function HomeScreen({ route }: any) {
       
       exportData._metadata = metadata;
       
+      // Add custom mesocycles to export data (separate from metadata)
+      if (customMesocycles.length > 0) {
+        exportData._customMesocycles = customMesocycles;
+      }
+      
       // Use the current display name instead of the original routine_name
       exportData.routine_name = routine.name;
       
@@ -409,7 +433,14 @@ export default function HomeScreen({ route }: any) {
         totalMesocycles: metadata.totalMesocycles,
         exportType: metadata.exportType,
         routineName: metadata.routineName,
-        blockCount: exportData.blocks?.length
+        blockCount: exportData.blocks?.length,
+        originalRoutineMesocycleNumber: routine.mesocycleNumber,
+        exportedMesocycleNumber: metadata.mesocycleNumber,
+        isFullProgram: !routine.mesocycleNumber,
+        isIndividualMesocycle: !!routine.mesocycleNumber,
+        programMesocycles: programData?.totalMesocycles || 1,
+        customMesocyclesCount: customMesocycles.length,
+        customMesocycleNames: customMesocycles.map(m => m.phase?.phaseName || 'Unknown')
       });
       
       const jsonString = JSON.stringify(exportData, null, 2);
@@ -1278,6 +1309,58 @@ export default function HomeScreen({ route }: any) {
           </View>
         </View>
       </Modal>
+
+      {/* Debug Button */}
+      <View style={{
+        position: 'absolute',
+        bottom: 200,
+        right: 20,
+        backgroundColor: '#27272a',
+        borderRadius: 30,
+        width: 60,
+        height: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      }}>
+        <TouchableOpacity 
+          onPress={async () => {
+            const allRoutines = await WorkoutStorage.loadRoutines();
+            console.log('🔍 ALL ROUTINES:', allRoutines.map(r => ({ id: r.id, name: r.name })));
+            
+            // Find a mesocycle routine
+            const mesoRoutine = allRoutines.find(r => r.id.includes('_meso_2'));
+            if (mesoRoutine) {
+              console.log('🔍 MESOCYCLE 2 ROUTINE DATA:', {
+                id: mesoRoutine.id,
+                name: mesoRoutine.name,
+                blocksCount: mesoRoutine.data.blocks.length,
+                blockNames: mesoRoutine.data.blocks.map(b => b.block_name)
+              });
+            } else {
+              console.log('❌ No mesocycle routine found!');
+            }
+            
+            Alert.alert(
+              'Routines Debug', 
+              `Total routines: ${allRoutines.length}\nMesocycle routines: ${allRoutines.filter(r => r.id.includes('_meso_')).length}\n\nCheck console for details`,
+              [{ text: 'OK' }]
+            );
+          }}
+          style={{
+            width: 60,
+            height: 60,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Ionicons name="bug" size={24} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
 
       {/* Onboarding Overlay */}
       <OnboardingOverlay

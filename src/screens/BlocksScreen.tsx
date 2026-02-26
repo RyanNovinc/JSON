@@ -372,12 +372,22 @@ export default function BlocksScreen() {
   };
 
   const updateMesocycleCards = async () => {
+    console.log('🔍 STARTING updateMesocycleCards function');
+    console.log('🔍 PROGRAM DATA:', {
+      programExists: !!program,
+      totalMesocycles: program?.totalMesocycles,
+      currentMesocycle: program?.currentMesocycle,
+      mesocycleRoadmapLength: program?.mesocycleRoadmap?.length
+    });
+    
     if (!program || program.totalMesocycles <= 1) {
+      console.log('🔍 EARLY RETURN: No program or totalMesocycles <= 1');
       return;
     }
 
     // Fix: If mesocycleRoadmap is empty, create default phase data
     if (!program.mesocycleRoadmap || program.mesocycleRoadmap.length === 0) {
+      console.log('🔍 Creating default mesocycle roadmap');
       const defaultRoadmap = [];
       for (let i = 1; i <= program.totalMesocycles; i++) {
         defaultRoadmap.push({
@@ -404,12 +414,36 @@ export default function BlocksScreen() {
     const currentMesocycle = program.currentMesocycle;
     const routineMesocycle = routine.mesocycleNumber;
     
+    console.log('🔍 MESOCYCLE LOGIC DECISION POINT:', {
+      currentMesocycle,
+      routineMesocycle,
+      routineId: routine.id,
+      routineName: routine.name,
+      hasRoutineMesocycleNumber: !!routineMesocycle,
+      willUseCase1: !!routineMesocycle,
+      willUseCase2: !routineMesocycle
+    });
+    
     if (routineMesocycle) {
+      console.log('🔍 ENTERING CASE 1: Individual mesocycle import');
+      
       // CASE 1: Routine has explicit mesocycle number (individual imports)
       const mesocycleNumber = routineMesocycle;
       const phase = program.mesocycleRoadmap.find(p => p.mesocycleNumber === mesocycleNumber);
       
+      // For mesocycle routines, the routine.data.blocks should already be filtered
+      // to contain only the blocks for this specific mesocycle
       const mesocycleBlocks = routine.data.blocks;
+      
+      console.log(`🔍 CASE 1 MESOCYCLE ${mesocycleNumber} DATA:`, {
+        routineId: routine.id,
+        routineMesocycleNumber: routineMesocycle,
+        blocksCount: mesocycleBlocks.length,
+        blockNames: mesocycleBlocks.map(b => b.block_name),
+        phaseFound: !!phase,
+        phaseName: phase?.phaseName
+      });
+      
       let isCompleted = false;
       let isActive = false;
 
@@ -417,6 +451,17 @@ export default function BlocksScreen() {
       if (mesocycleNumber === currentMesocycle) {
         isActive = true;
       }
+      
+      console.log(`🔍 CASE 1 STATUS CALCULATION:`, {
+        mesocycleNumber,
+        currentMesocycle,
+        isActive,
+        completionStatusKeys: Object.keys(completionStatus),
+        relevantCompletionStatus: mesocycleBlocks.map(b => ({
+          blockName: b.block_name,
+          isCompleted: completionStatus[b.block_name] || false
+        }))
+      });
       
       // Check if mesocycle is completed based on actual block completion
       if (mesocycleBlocks.length > 0) {
@@ -441,6 +486,15 @@ export default function BlocksScreen() {
       const manualBlocksCount = await getManualBlocksCount(mesocycleNumber, routine);
       const totalBlocks = mesocycleBlocks.length + manualBlocksCount;
       
+      console.log(`🔍 CASE 1 FINAL MESOCYCLE CARD:`, {
+        mesocycleNumber,
+        totalBlocks,
+        completedBlocks,
+        isCompleted,
+        isActive,
+        manualBlocksCount
+      });
+      
       cards.push({
         mesocycleNumber,
         phase,
@@ -450,10 +504,21 @@ export default function BlocksScreen() {
         isCompleted,
         isActive: isActive // Only use program's currentMesocycle, not active block
       });
+      
+      console.log('🔍 CASE 1 COMPLETE: Created', cards.length, 'mesocycle cards');
     } else {
+      console.log('🔍 ENTERING CASE 2: Full program import with block distribution');
+      
       // CASE 2: Full program import - distribute blocks across mesocycles
       const totalBlocks = routine.data.blocks.length;
       const blocksPerMesocycle = Math.ceil(totalBlocks / program.totalMesocycles);
+      
+      console.log('🔍 CASE 2 DISTRIBUTION CALCULATION:', {
+        totalBlocks,
+        totalMesocycles: program.totalMesocycles,
+        blocksPerMesocycle,
+        allBlockNames: routine.data.blocks.map(b => b.block_name)
+      });
       
       for (let i = 0; i < program.totalMesocycles; i++) {
         const mesocycleNumber = i + 1;
@@ -464,7 +529,20 @@ export default function BlocksScreen() {
         const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
         const originalBlocks = routine.data.blocks.slice(startIdx, endIdx);
         
-        if (originalBlocks.length === 0) continue; // Skip empty mesocycles
+        console.log(`🔍 CASE 2 MESOCYCLE ${mesocycleNumber} DISTRIBUTION:`, {
+          mesocycleIndex: i,
+          startIdx,
+          endIdx,
+          originalBlocksCount: originalBlocks.length,
+          originalBlockNames: originalBlocks.map(b => b.block_name),
+          phaseFound: !!phase,
+          phaseName: phase?.phaseName
+        });
+        
+        if (originalBlocks.length === 0) {
+          console.log(`🔍 CASE 2 MESOCYCLE ${mesocycleNumber}: SKIPPING - No blocks`);
+          continue; // Skip empty mesocycles
+        }
         
         // Calculate absolute week numbers for this mesocycle
         let currentWeek = 1;
@@ -519,6 +597,15 @@ export default function BlocksScreen() {
         const manualBlocksCount = await getManualBlocksCount(mesocycleNumber, routine);
         const totalBlocksWithManual = mesocycleBlocks.length + manualBlocksCount;
         
+        console.log(`🔍 CASE 2 MESOCYCLE ${mesocycleNumber} FINAL CARD:`, {
+          mesocycleNumber,
+          totalBlocksWithManual,
+          completedBlocks,
+          isCompleted,
+          isActive,
+          manualBlocksCount
+        });
+        
         cards.push({
           mesocycleNumber,
           phase,
@@ -529,11 +616,31 @@ export default function BlocksScreen() {
           isActive: isActive // Only use program's currentMesocycle, not active block
         });
       }
+      
+      console.log('🔍 CASE 2 COMPLETE: Created', cards.length, 'mesocycle cards from full program distribution');
     }
+    
+    console.log('🔍 BEFORE CUSTOM MESOCYCLES:', {
+      cardsCreated: cards.length,
+      cardMesocycleNumbers: cards.map(c => c.mesocycleNumber),
+      cardBlockCounts: cards.map(c => c.blocksInMesocycle.length)
+    });
     
     // Load custom mesocycles and append them
     const customMesocycles = await loadCustomMesocycles();
     const allMesocycles = [...cards, ...customMesocycles];
+    
+    console.log('🔍 FINAL MESOCYCLE CARDS TO SET:', {
+      totalCards: allMesocycles.length,
+      standardCards: cards.length,
+      customCards: customMesocycles.length,
+      finalCardSummary: allMesocycles.map(c => ({
+        mesocycleNumber: c.mesocycleNumber,
+        blocksCount: c.blocksInMesocycle.length,
+        isCustom: c.isCustomMesocycle || false,
+        phaseName: c.phase?.phaseName
+      }))
+    });
     
     setMesocycleCards(allMesocycles);
   };

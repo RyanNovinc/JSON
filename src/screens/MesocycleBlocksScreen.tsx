@@ -215,6 +215,18 @@ export default function MesocycleBlocksScreen() {
   const navigation = useNavigation<MesocycleBlocksScreenNavigationProp>();
   const route = useRoute<MesocycleBlocksScreenRouteProp>();
   const { mesocycle, routine, program, autoNavigateToToday, todayBlockIndex, todayWeek } = route.params;
+  
+  // DEBUG: Log what data is being passed to this screen
+  React.useEffect(() => {
+    console.log('🔍 MESOCYCLE SCREEN PROPS:', {
+      mesocycleName: mesocycle?.name || mesocycle?.phaseName,
+      mesocycleNumber: mesocycle?.mesocycleNumber,
+      blocksInMesocycle: mesocycle?.blocksInMesocycle?.length,
+      routineName: routine?.name,
+      routineId: routine?.id,
+      routineBlocks: routine?.data?.blocks?.length
+    });
+  }, []);
   const { themeColor } = useTheme();
   const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0);
   const [completionStatus, setCompletionStatus] = useState<{[blockName: string]: boolean}>({});
@@ -1044,36 +1056,6 @@ export default function MesocycleBlocksScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.backButton, { left: 60 }]} 
-          onPress={() => {
-            const debugInfo = {
-              screenName: 'MesocycleBlocksScreen',
-              mesocycleName: phaseName,
-              mesocycleNumber: mesocycle.mesocycleNumber,
-              totalBlocksInMesocycle: localBlocks.length,
-              blocksInMesocycle: localBlocks.map(b => b.block_name),
-              routineData: {
-                routineName: routine.name,
-                totalBlocksInRoutine: routine.data.blocks.length,
-                allBlocksInRoutine: routine.data.blocks.map(b => b.block_name)
-              },
-              completionStatus: Object.keys(completionStatus).length,
-              completionStatusKeys: Object.keys(completionStatus)
-            };
-            console.log('🔍 MESOCYCLE BLOCKS DEBUG:', JSON.stringify(debugInfo, null, 2));
-            Alert.alert(
-              'Debug Info', 
-              `Mesocycle: ${phaseName}\nBlocks shown: ${localBlocks.length}\nTotal in routine: ${routine.data.blocks.length}\n\nCheck console for full details`,
-              [{ text: 'OK' }]
-            );
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="bug" size={20} color="#ffffff" />
-        </TouchableOpacity>
-        
         <View style={styles.titleContainer}>
           <Text style={styles.mesocycleLabel}>MESOCYCLE</Text>
           <Text style={styles.mesocycleName}>{phaseName}</Text>
@@ -1539,6 +1521,58 @@ export default function MesocycleBlocksScreen() {
           </View>
         </Modal>
       )}
+      
+      {/* Debug Button */}
+      <View style={{
+        position: 'absolute',
+        bottom: 100,
+        right: 20,
+        backgroundColor: '#27272a',
+        borderRadius: 30,
+        width: 60,
+        height: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      }}>
+        <TouchableOpacity 
+          onPress={() => {
+            const debugInfo = {
+              screenName: 'MesocycleBlocksScreen',
+              mesocycleName: phaseName,
+              mesocycleNumber: mesocycle.mesocycleNumber,
+              totalBlocksInMesocycle: localBlocks.length,
+              blocksInMesocycle: localBlocks.map(b => b.block_name),
+              routineData: {
+                routineName: routine.name,
+                routineId: routine.id,
+                totalBlocksInRoutine: routine.data.blocks.length,
+                allBlocksInRoutine: routine.data.blocks.map((b: any) => b.block_name)
+              },
+              completionStatus: Object.keys(completionStatus).length,
+              completionStatusKeys: Object.keys(completionStatus)
+            };
+            console.log('🔍 MESOCYCLE BLOCKS DEBUG:', JSON.stringify(debugInfo, null, 2));
+            Alert.alert(
+              'Mesocycle Debug Info', 
+              `Mesocycle: ${phaseName}\nMesocycle blocks: ${localBlocks.length}\nRoutine blocks: ${routine.data.blocks.length}\nRoutine ID: ${routine.id}\n\nCheck console for details`,
+              [{ text: 'OK' }]
+            );
+          }}
+          style={{
+            width: 60,
+            height: 60,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Ionicons name="bug" size={24} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }

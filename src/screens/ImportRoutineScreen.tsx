@@ -838,7 +838,10 @@ export default function ImportRoutineScreen() {
             
             navigation.navigate('Main', { 
               screen: 'Home',
-              params: { importedProgram: parsedProgram }
+              params: { 
+                importedProgram: parsedProgram,
+                refreshRoutines: true // Force refresh to load new mesocycle routines
+              }
             } as any);
           });
         }, 500);
@@ -849,7 +852,10 @@ export default function ImportRoutineScreen() {
         // Continue with normal import flow
         navigation.navigate('Main', { 
           screen: 'Home',
-          params: { importedProgram: parsedProgram }
+          params: { 
+            importedProgram: parsedProgram,
+            refreshRoutines: true // Force refresh to load new mesocycle routines
+          }
         } as any);
       }
     }
@@ -1032,6 +1038,308 @@ export default function ImportRoutineScreen() {
   };
 
   // Extract mesocycle info from routine name
+  const createMesocycleRoutines = async (importedProgram: WorkoutProgram, metadata: any, baseRoutineId: string) => {
+    try {
+      console.log('🚨 IMPORT TRIGGERED - createMesocycleRoutines called');
+      console.log('🔄 IMPORT DEBUG - Creating individual mesocycle routines from complete state...');
+      
+      const totalBlocks = importedProgram.blocks.length;
+      const blocksPerMesocycle = Math.ceil(totalBlocks / metadata.totalMesocycles);
+      
+      console.log('🔍 IMPORT DEBUG - Distribution plan:', {
+        totalBlocks,
+        totalMesocycles: metadata.totalMesocycles,
+        blocksPerMesocycle,
+        routineName: metadata.currentDisplayName || importedProgram.routine_name
+      });
+      
+      for (let i = 0; i < metadata.totalMesocycles; i++) {
+        const mesocycleNumber = i + 1;
+        const mesocycleName = metadata.mesocycleRoadmap?.[i]?.phaseName || `Mesocycle ${mesocycleNumber}`;
+        
+        // Distribute blocks across mesocycles
+        const startIdx = i * blocksPerMesocycle;
+        const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
+        const mesocycleBlocks = importedProgram.blocks.slice(startIdx, endIdx);
+        
+        if (mesocycleBlocks.length === 0) continue;
+        
+        // Create routine for this mesocycle
+        const mesocycleRoutine = {
+          id: `${baseRoutineId}_meso_${mesocycleNumber}`,
+          name: `${metadata.currentDisplayName || importedProgram.routine_name}`,
+          days: importedProgram.days_per_week,
+          blocks: mesocycleBlocks.length,
+          data: {
+            ...importedProgram,
+            routine_name: `${metadata.currentDisplayName || importedProgram.routine_name} — ${mesocycleName}`,
+            blocks: mesocycleBlocks // This should override the imported blocks
+          },
+          programId: metadata.originalProgramId, // Use current program ID
+          mesocycleNumber: mesocycleNumber // Explicitly set mesocycle number
+        };
+        
+        // Add this mesocycle routine to storage
+        console.log('💾 SAVING MESOCYCLE ROUTINE:', mesocycleRoutine.id, mesocycleRoutine.name);
+        await WorkoutStorage.addRoutine(mesocycleRoutine);
+        console.log('✅ SAVED MESOCYCLE ROUTINE SUCCESSFULLY');
+        
+        // DEBUG: Check what routines are now in storage
+        const allRoutines = await WorkoutStorage.loadRoutines();
+        console.log('📋 ALL ROUTINES IN STORAGE:', allRoutines.map(r => ({ id: r.id, name: r.name })));
+        console.log(`📦 IMPORT DEBUG - Created routine for ${mesocycleName}:`, {
+          routineId: mesocycleRoutine.id,
+          mesocycleNumber,
+          blocksInThisMesocycle: mesocycleBlocks.length,
+          blockRange: `${startIdx}-${endIdx-1}`,
+          programId: mesocycleRoutine.programId,
+          displayName: mesocycleRoutine.name,
+          actualBlocksInData: mesocycleRoutine.data.blocks.length,
+          blockNamesInData: mesocycleRoutine.data.blocks.map(b => b.block_name)
+        });
+        
+        // Restore mesocycle-specific data with new routine ID
+        await restoreCompleteStateForMesocycle(mesocycleRoutine.id, metadata, mesocycleNumber);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error creating mesocycle routines:', error);
+      throw error;
+    }
+  };
+
+  const restoreCompleteStateForMesocycle = async (routineId: string, metadata: any, mesocycleNumber: number) => {
+    try {
+      // Restore manual blocks for this specific mesocycle
+      if (metadata.manualBlocks) {
+        const mesocycleManualBlocks = metadata.manualBlocks.filter(
+          block => block.mesocycleNumber === mesocycleNumber
+        );
+        
+        if (mesocycleManualBlocks.length > 0) {
+          const storageKey = `manual_blocks_mesocycle_${mesocycleNumber}`;
+          const cleanBlocks = mesocycleManualBlocks.map(block => {
+            const cleanBlock = { ...block };
+            delete cleanBlock.mesocycleNumber;
+            return cleanBlock;
+          });
+          await AsyncStorage.setItem(storageKey, JSON.stringify(cleanBlocks));
+          console.log(`📦 Restored ${cleanBlocks.length} manual blocks for mesocycle ${mesocycleNumber}`);
+        }
+      }
+      
+      // Restore completion status
+      if (metadata.completionStatus) {
+        const completionKey = `completion_${routineId}`;
+        await AsyncStorage.setItem(completionKey, JSON.stringify(metadata.completionStatus));
+      }
+      
+      // Restore workout history
+      if (metadata.workoutHistory) {
+        const historyKey = `workoutHistory_${routineId}`;
+        await AsyncStorage.setItem(historyKey, JSON.stringify(metadata.workoutHistory));
+      }
+      
+      // Restore exercise customizations, dynamic exercises, sets data
+      const dataCategories = [
+        { source: 'exerciseCustomizations', prefix: 'day_customization_' },
+        { source: 'dynamicExercisesData', prefix: 'workout_' },
+        { source: 'setsData', prefix: 'workout_' }
+      ];
+      
+      for (const category of dataCategories) {
+        const sourceData = metadata[category.source];
+        if (sourceData) {
+          for (const [originalKey, data] of Object.entries(sourceData)) {
+            // Only restore data that belongs to this mesocycle's blocks
+            const newKey = originalKey.replace(metadata.routineId, routineId);
+            await AsyncStorage.setItem(newKey, JSON.stringify(data));
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.log(`Could not restore data for mesocycle ${mesocycleNumber}:`, error);
+    }
+  };
+
+  const restoreCompleteState = async (importedProgram: WorkoutProgram, metadata: any) => {
+    try {
+      console.log('🔄 Restoring complete state from export...');
+      
+      // Generate new routine ID to avoid conflicts
+      const newRoutineId = Date.now().toString() + Math.random().toString(36);
+      
+      // Restore manual blocks
+      if (metadata.manualBlocks && metadata.manualBlocks.length > 0) {
+        const manualBlocksByMesocycle = {};
+        
+        for (const block of metadata.manualBlocks) {
+          if (block.mesocycleNumber) {
+            // Multi-mesocycle manual block
+            const mesocycleNum = block.mesocycleNumber;
+            if (!manualBlocksByMesocycle[mesocycleNum]) {
+              manualBlocksByMesocycle[mesocycleNum] = [];
+            }
+            
+            // Remove mesocycle metadata from the block before storing
+            const cleanBlock = { ...block };
+            delete cleanBlock.mesocycleNumber;
+            manualBlocksByMesocycle[mesocycleNum].push(cleanBlock);
+          } else if (block.customMesocycleId) {
+            // Custom mesocycle manual block - will be handled with custom mesocycles
+            continue;
+          } else {
+            // Single routine manual block
+            if (!manualBlocksByMesocycle.single) {
+              manualBlocksByMesocycle.single = [];
+            }
+            manualBlocksByMesocycle.single.push(block);
+          }
+        }
+        
+        // Store manual blocks for each mesocycle
+        for (const [mesocycleKey, blocks] of Object.entries(manualBlocksByMesocycle)) {
+          const storageKey = mesocycleKey === 'single' 
+            ? `manual_blocks_${newRoutineId}`
+            : `manual_blocks_mesocycle_${mesocycleKey}`;
+          
+          await AsyncStorage.setItem(storageKey, JSON.stringify(blocks));
+          console.log(`📦 Restored ${blocks.length} manual blocks for ${mesocycleKey}`);
+        }
+      }
+      
+      // Restore custom mesocycles
+      const customMesocycles = (importedProgram as any)._customMesocycles;
+      if (customMesocycles && customMesocycles.length > 0) {
+        const customMesocyclesKey = `custom_mesocycles_${newRoutineId}`;
+        
+        // Update custom mesocycle IDs to avoid conflicts
+        const updatedCustomMesocycles = customMesocycles.map(mesocycle => ({
+          ...mesocycle,
+          customId: Date.now().toString() + Math.random().toString(36)
+        }));
+        
+        await AsyncStorage.setItem(customMesocyclesKey, JSON.stringify(updatedCustomMesocycles));
+        console.log(`🎯 Restored ${customMesocycles.length} custom mesocycles`);
+        
+        // Restore manual blocks for custom mesocycles
+        for (let i = 0; i < customMesocycles.length; i++) {
+          const originalCustomId = customMesocycles[i].customId;
+          const newCustomId = updatedCustomMesocycles[i].customId;
+          
+          const customManualBlocks = metadata.manualBlocks?.filter(
+            block => block.customMesocycleId === originalCustomId
+          );
+          
+          if (customManualBlocks && customManualBlocks.length > 0) {
+            const cleanBlocks = customManualBlocks.map(block => {
+              const cleanBlock = { ...block };
+              delete cleanBlock.customMesocycleId;
+              return cleanBlock;
+            });
+            
+            const customManualBlocksKey = `manual_blocks_${newCustomId}`;
+            await AsyncStorage.setItem(customManualBlocksKey, JSON.stringify(cleanBlocks));
+            console.log(`📋 Restored ${cleanBlocks.length} manual blocks for custom mesocycle`);
+          }
+        }
+      }
+      
+      // Restore completion status (with new routine ID)
+      if (metadata.completionStatus && Object.keys(metadata.completionStatus).length > 0) {
+        const completionKey = `completion_${newRoutineId}`;
+        await AsyncStorage.setItem(completionKey, JSON.stringify(metadata.completionStatus));
+        console.log('✅ Restored completion status');
+      }
+      
+      // Restore workout history (with new routine ID)
+      if (metadata.workoutHistory && metadata.workoutHistory.length > 0) {
+        const historyKey = `workoutHistory_${newRoutineId}`;
+        await AsyncStorage.setItem(historyKey, JSON.stringify(metadata.workoutHistory));
+        console.log(`📈 Restored ${metadata.workoutHistory.length} workout history entries`);
+      }
+      
+      // Restore active block
+      if (metadata.activeBlock !== null && metadata.activeBlock !== undefined) {
+        const activeBlockKey = `activeBlock_${newRoutineId}`;
+        await AsyncStorage.setItem(activeBlockKey, metadata.activeBlock.toString());
+        console.log(`🎯 Restored active block: ${metadata.activeBlock}`);
+      }
+      
+      // Restore week progress
+      if (metadata.weekProgress) {
+        const weekProgressKey = `weekProgress_${newRoutineId}`;
+        await AsyncStorage.setItem(weekProgressKey, JSON.stringify(metadata.weekProgress));
+        console.log('📅 Restored week progress');
+      }
+      
+      // Restore exercise customizations
+      if (metadata.exerciseCustomizations && Object.keys(metadata.exerciseCustomizations).length > 0) {
+        for (const [originalKey, customizationData] of Object.entries(metadata.exerciseCustomizations)) {
+          // Update key to use new routine ID if needed
+          const newKey = originalKey.replace(metadata.routineId, newRoutineId);
+          await AsyncStorage.setItem(newKey, JSON.stringify(customizationData));
+        }
+        console.log(`🎨 Restored ${Object.keys(metadata.exerciseCustomizations).length} exercise customizations`);
+      }
+      
+      // Restore dynamic exercises
+      if (metadata.dynamicExercisesData && Object.keys(metadata.dynamicExercisesData).length > 0) {
+        for (const [originalKey, dynamicData] of Object.entries(metadata.dynamicExercisesData)) {
+          const newKey = originalKey.replace(metadata.routineId, newRoutineId);
+          await AsyncStorage.setItem(newKey, JSON.stringify(dynamicData));
+        }
+        console.log(`💪 Restored ${Object.keys(metadata.dynamicExercisesData).length} dynamic exercise sets`);
+      }
+      
+      // Restore sets data
+      if (metadata.setsData && Object.keys(metadata.setsData).length > 0) {
+        for (const [originalKey, setsInfo] of Object.entries(metadata.setsData)) {
+          const newKey = originalKey.replace(metadata.routineId, newRoutineId);
+          await AsyncStorage.setItem(newKey, JSON.stringify(setsInfo));
+        }
+        console.log(`📊 Restored ${Object.keys(metadata.setsData).length} sets data records`);
+      }
+      
+      // Restore exercise preferences (global, not routine-specific)
+      if (metadata.exercisePreferences && Object.keys(metadata.exercisePreferences).length > 0) {
+        try {
+          // Load existing preferences
+          const existingPreferencesData = await AsyncStorage.getItem('exercise_preferences');
+          let existingPreferences = {};
+          if (existingPreferencesData) {
+            existingPreferences = JSON.parse(existingPreferencesData);
+          }
+          
+          // Merge with imported preferences (imported preferences take priority)
+          const mergedPreferences = { ...existingPreferences, ...metadata.exercisePreferences };
+          await AsyncStorage.setItem('exercise_preferences', JSON.stringify(mergedPreferences));
+          console.log('🏋️ Restored exercise preferences');
+        } catch (error) {
+          console.log('Could not restore exercise preferences:', error);
+        }
+      }
+      
+      // For complete state imports with multiple mesocycles, create individual mesocycle routines
+      if (metadata.exportType === 'complete_state' && metadata.totalMesocycles > 1) {
+        console.log('🔥 FIRST BRANCH - About to call createMesocycleRoutines');
+        await createMesocycleRoutines(importedProgram, metadata, newRoutineId);
+        console.log(`🎯 FIRST BRANCH - Complete state: created ${metadata.totalMesocycles} individual mesocycle routines`);
+        return; // Exit early since we've created separate routines
+      }
+      
+      // Update the imported program's ID to the new one
+      importedProgram.id = newRoutineId;
+      
+      console.log('✨ Complete state restoration finished');
+      
+    } catch (error) {
+      console.error('❌ Error restoring complete state:', error);
+      // Don't throw - let import continue with basic functionality
+    }
+  };
+
   const extractMesocycleInfo = (routineName: string): { mesocycleNumber: number; totalMesocycles: number } | null => {
     // Try to match patterns like "Mesocycle 3", "Mesocycle 2 of 3", "— Mesocycle 3", etc.
     const mesocycleMatch = routineName.match(/mesocycle\s+(\d+)(?:\s+of\s+(\d+))?/i);
@@ -1071,11 +1379,37 @@ export default function ImportRoutineScreen() {
       const duration = questionnaireData.programDuration || '12_weeks';
       const isLongProgram = ['6_months', '1_year', 'custom'].includes(duration);
       
-      // First, try to detect mesocycle info from the routine name
-      const mesocycleInfo = extractMesocycleInfo(importedProgram.routine_name);
+      // Check for enhanced export metadata first
+      const metadata = (importedProgram as any)._metadata;
+      let mesocycleInfo = null;
+      let totalMesocycles = null;
+      
+      // DEBUG: Log import metadata
+      console.log('🔍 IMPORT DEBUG - Raw metadata found:', metadata);
+      
+      if (metadata && metadata.totalMesocycles) {
+        // Use metadata from enhanced export
+        totalMesocycles = metadata.totalMesocycles;
+        if (metadata.mesocycleNumber) {
+          mesocycleInfo = {
+            mesocycleNumber: metadata.mesocycleNumber,
+            totalMesocycles: metadata.totalMesocycles
+          };
+        }
+        console.log('🔍 IMPORT DEBUG - Processing metadata:', {
+          totalMesocycles: metadata.totalMesocycles,
+          exportType: metadata.exportType,
+          routineName: metadata.routineName,
+          blockCount: importedProgram.blocks?.length,
+          mesocycleNumber: metadata.mesocycleNumber
+        });
+      } else {
+        // Fall back to routine name detection
+        mesocycleInfo = extractMesocycleInfo(importedProgram.routine_name);
+      }
       
       // If we detected mesocycle info OR it's a long program, handle mesocycles
-      if (!mesocycleInfo && !isLongProgram) {
+      if (!mesocycleInfo && !isLongProgram && !totalMesocycles) {
         return; // No mesocycle handling for short programs without mesocycle info
       }
 
@@ -1084,9 +1418,8 @@ export default function ImportRoutineScreen() {
       // Create program if it doesn't exist
       if (!program) {
         // Don't pre-create empty mesocycles - let them be created as blocks are imported
-        const totalMesocycles = mesocycleInfo ? 
-          mesocycleInfo.mesocycleNumber : // Only track up to the current imported mesocycle
-          calculateDefaultMesocycles(duration);
+        const calculatedTotalMesocycles = totalMesocycles || // Use metadata if available
+          (mesocycleInfo ? mesocycleInfo.totalMesocycles : calculateDefaultMesocycles(duration));
           
         const currentMesocycle = mesocycleInfo ? 
           mesocycleInfo.mesocycleNumber : 
@@ -1096,12 +1429,14 @@ export default function ImportRoutineScreen() {
           id: Date.now().toString(),
           name: mesocycleInfo ? 
             `${importedProgram.routine_name.split('—')[0].trim()} Program` :
-            `${duration} Mesocycle Program`,
+            totalMesocycles ? 
+              `${metadata?.currentDisplayName || importedProgram.routine_name} Program` : // Use display name from metadata
+              `${duration} Mesocycle Program`,
           createdAt: new Date().toISOString(),
           programDuration: duration,
-          totalMesocycles,
+          totalMesocycles: calculatedTotalMesocycles,
           currentMesocycle,
-          mesocycleRoadmap: [],
+          mesocycleRoadmap: metadata?.mesocycleRoadmap || [],
           mesocycleRoadmapText: '',
           completedMesocycles: [],
           routineIds: []
@@ -1111,14 +1446,54 @@ export default function ImportRoutineScreen() {
         setCurrentProgram(program);
       }
 
+      // Handle complete state restoration if available
+      const importMetadata = (importedProgram as any)._metadata;
+      console.log('🔍 IMPORT DEBUG - Main import logic:', {
+        hasMetadata: !!importMetadata,
+        exportType: importMetadata?.exportType,
+        totalMesocycles: importMetadata?.totalMesocycles,
+        willCreateMultipleMesocycles: importMetadata?.totalMesocycles > 1
+      });
+      
+      if (importMetadata && importMetadata.exportType === 'complete_state') {
+        // For multi-mesocycle complete state, create individual mesocycle routines
+        if (importMetadata.totalMesocycles > 1) {
+          const baseRoutineId = Date.now().toString() + Math.random().toString(36);
+          // Update metadata to use current program ID
+          importMetadata.originalProgramId = program.id;
+          console.log('🎯 IMPORT DEBUG - About to create multiple mesocycle routines');
+          await createMesocycleRoutines(importedProgram, importMetadata, baseRoutineId);
+          console.log(`✨ IMPORT DEBUG - Completed creating ${importMetadata.totalMesocycles} mesocycle routines`);
+          return; // Exit early since we've handled the import
+        } else {
+          // Single mesocycle complete state - use normal restore
+          const currentRoutineName = importedProgram.routine_name;
+          await restoreCompleteState(importedProgram, importMetadata);
+          importedProgram.routine_name = currentRoutineName;
+        }
+      }
+      
+      // Clean up metadata before storing the program
+      if ((importedProgram as any)._metadata) {
+        delete (importedProgram as any)._metadata;
+      }
+      if ((importedProgram as any)._customMesocycles) {
+        delete (importedProgram as any)._customMesocycles;
+      }
+      
       // Associate the imported routine with the program
-      // Only set mesocycleNumber for individual mesocycle imports (when mesocycleInfo exists)
-      // For full program imports, leave mesocycleNumber undefined so blocks get distributed
+      // Handle complete state imports differently from fresh imports
       importedProgram.programId = program.id;
-      if (mesocycleInfo) {
+      
+      if (importMetadata && importMetadata.exportType === 'complete_state') {
+        // For complete state imports, preserve the original mesocycle structure
+        // by NOT setting mesocycleNumber - this prevents block redistribution
+        console.log('🔄 Complete state import: preserving original mesocycle structure');
+      } else if (mesocycleInfo) {
+        // Only set mesocycleNumber for individual mesocycle imports
         importedProgram.mesocycleNumber = mesocycleInfo.mesocycleNumber;
       }
-      // Don't set mesocycleNumber for full program imports - let BlocksScreen distribute them
+      // For fresh full program imports, leave mesocycleNumber undefined so blocks get distributed
       
     } catch (error) {
       console.error('Error in mesocycle program association:', error);
