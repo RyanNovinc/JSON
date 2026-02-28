@@ -884,6 +884,19 @@ export default function NutritionHomeScreen({ route }: any) {
         />
       </TouchableOpacity>
 
+      {/* Test Button - Development Only */}
+      {__DEV__ && (
+        <View style={[styles.testButton, { backgroundColor: '#10b981' }]}>
+          <TouchableOpacity
+            style={styles.buttonInner}
+            onPress={() => navigation.navigate('MealPlanTest' as any)}
+            activeOpacity={0.9}
+          >
+            <Ionicons name="flask" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Add Meal Plan FAB - Bottom Right */}
       <View style={[styles.fab, { backgroundColor: themeColor }]}>
         <TouchableOpacity
@@ -1611,6 +1624,15 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 4,
     backgroundColor: '#22d3ee',
+  },
+  testButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 100,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#10b981',
   },
   genderToggle: {
     position: 'absolute',

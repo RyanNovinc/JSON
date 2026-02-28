@@ -126,7 +126,7 @@ export default function MealPlanDayScreen() {
   const { themeColor } = useTheme();
   const { markMealCompleted, isMealCompleted, getDailyCompletionProgress, getFavoriteMeals, getMealsForDay, deleteMealFromPlan, addMealToPlan } = useMealPlanning();
 
-  const { day, weekNumber, mealPlanName, dayIndex, calculatedDayName } = route.params;
+  const { day, weekNumber, mealPlanName, dayIndex, calculatedDayName, calculatedDateString } = route.params;
   const [allMeals, setAllMeals] = useState(day.meals || []);
   const meals = allMeals;
 
@@ -165,8 +165,9 @@ export default function MealPlanDayScreen() {
     try {
       console.log('🔍 Loading meals for day via context');
       
-      // Get the viewing date
-      const currentViewingDate = day.date || parseDayNameToDate(day.day_name);
+      // Get the viewing date - prioritize calculatedDateString from navigation
+      const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+      console.log(`📅 Loading: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
       
       if (!currentViewingDate) {
         console.log('⚠️ No viewing date available, using original meals');
@@ -318,8 +319,9 @@ export default function MealPlanDayScreen() {
     try {
       console.log('🗑️ Attempting to delete meal via context:', meal.meal_name);
       
-      // Get the viewing date
-      const currentViewingDate = day.date || parseDayNameToDate(day.day_name);
+      // Get the viewing date - prioritize calculatedDateString from navigation
+      const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+      console.log(`📅 Loading: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
       
       if (!currentViewingDate) {
         Alert.alert('Error', 'Could not determine the day date for deletion.');
@@ -410,8 +412,9 @@ export default function MealPlanDayScreen() {
       if (success) {
         console.log('🔄 Screen: Forcing immediate meal reload...');
         
-        // Get the viewing date
-        const currentViewingDate = day.date || parseDayNameToDate(day.day_name);
+        // Get the viewing date - prioritize calculatedDateString from navigation
+        const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+        console.log(`📅 Reload: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
         if (currentViewingDate) {
           // CRITICAL FIX: Don't pass stale route parameter meals
           const updatedMeals = getMealsForDay(currentViewingDate, []);

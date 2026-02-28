@@ -413,12 +413,25 @@ export default function MealPlanDaysScreen() {
   };
 
   const handleDayPress = (day: Day, index: number) => {
+    const calculatedDate = getDayDate(index);
+    const calculatedDateString = calculatedDate.toISOString().split('T')[0]; // Format: "2026-02-28"
+    
+    // Create an enhanced day object with the proper date
+    const enhancedDay = {
+      ...day,
+      date: calculatedDateString, // Fix: Set proper date instead of undefined
+      calculatedDate,
+    };
+    
+    console.log(`📅 Navigation: Passing calculated date ${calculatedDateString} for day ${index}`);
+    
     navigation.navigate('MealPlanDay', {
-      day,
+      day: enhancedDay,
       weekNumber: week.week_number,
       mealPlanName,
       dayIndex: index,
       calculatedDayName: getDayName(index),
+      calculatedDateString, // Also pass as separate param for easy access
     });
   };
 

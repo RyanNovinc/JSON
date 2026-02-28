@@ -131,6 +131,7 @@ export type RootStackParamList = {
     mealPlanName: string;
     dayIndex: number;
     calculatedDayName: string;
+    calculatedDateString?: string; // Add the calculated date string
   };
   MealPlanMealDetail: {
     meal: any;
