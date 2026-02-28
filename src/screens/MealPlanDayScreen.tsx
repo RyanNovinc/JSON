@@ -9,6 +9,7 @@ import {
   Alert,
   SafeAreaView,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import {Picker} from '@react-native-picker/picker';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -340,6 +341,76 @@ export default function MealPlanDayScreen() {
 
   const dayDateString = getDayDateString();
 
+  // Debug function to gather all relevant data
+  const generateDebugInfo = async () => {
+    const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+    const contextMeals = getMealsForDate(currentViewingDate);
+    
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      screenInfo: {
+        dayName: calculatedDayName,
+        originalDayName: day.day_name,
+        dayDate: day.date,
+        calculatedDateString,
+        currentViewingDate,
+        dayIndex,
+        weekNumber,
+        mealPlanName
+      },
+      mealData: {
+        allMealsCount: allMeals.length,
+        contextMealsCount: contextMeals.length,
+        allMeals: allMeals.map((meal, index) => ({
+          index,
+          name: meal.name,
+          type: meal.type,
+          time: meal.time,
+          id: meal.id,
+          calories: meal.calories,
+          hasName: meal.name !== undefined,
+          hasType: meal.type !== undefined,
+          hasTime: meal.time !== undefined,
+          rawMeal: meal
+        })),
+        contextMeals: contextMeals.map((meal, index) => ({
+          index,
+          name: meal.name,
+          type: meal.type,
+          time: meal.time,
+          id: meal.id,
+          calories: meal.calories,
+          hasName: meal.name !== undefined,
+          hasType: meal.type !== undefined,
+          hasTime: meal.time !== undefined,
+          rawMeal: meal
+        }))
+      },
+      planContext: {
+        hasPlan: !!currentPlan,
+        planId: currentPlan?.id,
+        planName: currentPlan?.name,
+        dailyMealsKeys: currentPlan ? Object.keys(currentPlan.dailyMeals) : [],
+        targetDateExists: currentPlan ? !!currentPlan.dailyMeals[currentViewingDate] : false,
+        targetDateMealCount: currentPlan?.dailyMeals[currentViewingDate]?.meals?.length || 0
+      },
+      routeParams: route.params
+    };
+
+    const debugText = JSON.stringify(debugInfo, null, 2);
+    
+    try {
+      await Clipboard.setStringAsync(debugText);
+      Alert.alert(
+        'Debug Info Copied!',
+        'Debug information has been copied to your clipboard. You can now paste it to share.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to copy debug info to clipboard');
+    }
+  };
+
   // Generate a unique ID for meals since the current interface doesn't have one
   const generateMealId = (meal: Meal, globalIndex: number) => {
     // Use a combination of meal name, type, and index for uniqueness
@@ -609,6 +680,15 @@ export default function MealPlanDayScreen() {
             <Text style={styles.dayTitle}>{calculatedDayName.split(',')[0]}</Text>
             <Text style={styles.dateSubtitle}>{getDayDate().split(' ').slice(1).join(' ')}</Text>
           </View>
+          {/* Debug button - Development only */}
+          {__DEV__ && (
+            <TouchableOpacity 
+              onPress={generateDebugInfo} 
+              style={[styles.addButton, { backgroundColor: '#ef4444', marginRight: 8 }]}
+            >
+              <Ionicons name="bug" size={18} color="#ffffff" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             onPress={() => setShowAddMealModal(true)} 
             style={styles.addButton}
