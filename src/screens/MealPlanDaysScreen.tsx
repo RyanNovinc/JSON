@@ -413,7 +413,25 @@ export default function MealPlanDaysScreen() {
   };
 
   const handleDayPress = (day: Day, index: number) => {
-    const calculatedDate = getDayDate(index);
+    // Calculate the actual Date object (not the string from getDayDate)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const calculatedDate = new Date(today);
+    
+    if (week.week_number === 1) {
+      // Week 1: Start from today
+      calculatedDate.setDate(today.getDate() + index);
+    } else {
+      // Week 2+: Calculate based on week start offset
+      const currentDayOfWeek = today.getDay();
+      const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
+      let weekStartOffset = week1Days;
+      for (let i = 2; i < week.week_number; i++) {
+        weekStartOffset += 7;
+      }
+      calculatedDate.setDate(today.getDate() + weekStartOffset + index);
+    }
+    
     const calculatedDateString = calculatedDate.toISOString().split('T')[0]; // Format: "2026-02-28"
     
     // Create an enhanced day object with the proper date
