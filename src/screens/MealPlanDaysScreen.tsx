@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -226,7 +227,7 @@ export default function MealPlanDaysScreen() {
   const route = useRoute<MealPlanDaysScreenRouteProp>();
   const { themeColor } = useTheme();
   const mealPlanning = useMealPlanning();
-  const { currentPlan, deleteMealFromDate } = useSimplifiedMealPlanning();
+  const { currentPlan, deleteMealFromDate, saveMealPlan } = useSimplifiedMealPlanning();
 
   const { week, mealPlanName, mealPrepSession, allMealPrepSessions, groceryList } = route.params;
   
@@ -344,8 +345,51 @@ export default function MealPlanDaysScreen() {
     }
   }, [mealPrepSession]);
   
-  // Days are already properly redistributed by MealPlanWeeksScreen
-  const days: Day[] = week.days || [];
+  // Create days array from current meal plan instead of legacy week.days
+  const createDaysFromCurrentPlan = () => {
+    if (!currentPlan) {
+      console.log('⚠️ No current plan available, falling back to legacy week.days');
+      return week.days || [];
+    }
+
+    const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+    console.log(`📅 Creating days from ${availableDates.length} available dates in current plan`);
+    
+    return availableDates.map((date, index) => {
+      const dayData = currentPlan.dailyMeals[date];
+      
+      // Convert SimplifiedMeals to legacy Meal format for compatibility with existing UI
+      const convertedMeals = dayData.meals.map((meal, mealIndex) => ({
+        meal_name: meal.name,
+        meal_type: meal.type as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+        calories: meal.nutrition?.calories || 0,
+        macros: {
+          protein: meal.nutrition?.protein || 0,
+          carbs: meal.nutrition?.carbs || meal.nutrition?.carbohydrates || 0,
+          fat: meal.nutrition?.fat || 0,
+          fiber: meal.nutrition?.fiber || 0,
+        },
+        ingredients: meal.ingredients || [],
+        instructions: meal.instructions || [],
+        prep_time: meal.prepTime,
+        cook_time: meal.cookTime,
+        total_time: meal.totalTime,
+        servings: meal.servings,
+        recommended_time: meal.time,
+        notes: meal.notes,
+        tags: meal.tags,
+      }));
+
+      return {
+        day_name: dayData.dayName || new Date(date).toLocaleDateString('en-US', { weekday: 'long' }),
+        day_number: index + 1,
+        meals: convertedMeals,
+        daily_totals: dayData.dailyTotals,
+      } as Day;
+    });
+  };
+
+  const days: Day[] = createDaysFromCurrentPlan();
 
   // Calculate the meal plan start date - starts from today (same as MealPlanWeeksScreen)
   const getMealPlanStartDate = () => {
@@ -355,56 +399,65 @@ export default function MealPlanDaysScreen() {
   };
 
   const getDayDate = (dayIndex: number) => {
+    if (currentPlan) {
+      // Use actual dates from the meal plan
+      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+      if (dayIndex >= 0 && dayIndex < availableDates.length) {
+        const dateString = availableDates[dayIndex];
+        const date = new Date(dateString);
+        const month = date.toLocaleDateString('en-US', { month: 'short' });
+        const day = date.getDate();
+        return `${month} ${day}`;
+      }
+    }
+    
+    // Fallback to legacy calculation
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    // Calculate the date for this specific day
     const dayDate = new Date(today);
     
     if (week.week_number === 1) {
-      // Week 1: Start from today
       dayDate.setDate(today.getDate() + dayIndex);
     } else {
-      // Week 2+: Calculate based on week start offset
       const currentDayOfWeek = today.getDay();
       const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
-      
-      // Calculate start date of this week
-      let weekStartOffset = week1Days; // Days after today that Week 2 starts
+      let weekStartOffset = week1Days;
       for (let i = 2; i < week.week_number; i++) {
-        weekStartOffset += 7; // Add 7 days for each full week
+        weekStartOffset += 7;
       }
-      
       dayDate.setDate(today.getDate() + weekStartOffset + dayIndex);
     }
     
     const month = dayDate.toLocaleDateString('en-US', { month: 'short' });
     const day = dayDate.getDate();
-    
     return `${month} ${day}`;
   };
 
   const getDayName = (dayIndex: number) => {
+    if (currentPlan) {
+      // Use actual dates from the meal plan
+      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+      if (dayIndex >= 0 && dayIndex < availableDates.length) {
+        const dateString = availableDates[dayIndex];
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { weekday: 'long' });
+      }
+    }
+    
+    // Fallback to legacy calculation
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    // Calculate the actual day name based on the date
     const dayDate = new Date(today);
     
     if (week.week_number === 1) {
-      // Week 1: Start from today
       dayDate.setDate(today.getDate() + dayIndex);
     } else {
-      // Week 2+: Calculate based on week start offset
       const currentDayOfWeek = today.getDay();
       const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
-      
-      // Calculate start date of this week
-      let weekStartOffset = week1Days; // Days after today that Week 2 starts
+      let weekStartOffset = week1Days;
       for (let i = 2; i < week.week_number; i++) {
-        weekStartOffset += 7; // Add 7 days for each full week
+        weekStartOffset += 7;
       }
-      
       dayDate.setDate(today.getDate() + weekStartOffset + dayIndex);
     }
     
@@ -415,57 +468,72 @@ export default function MealPlanDaysScreen() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Calculate the date for this day using the same logic as getDayDate
+    if (currentPlan) {
+      // Use actual dates from the meal plan
+      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+      if (dayIndex >= 0 && dayIndex < availableDates.length) {
+        const dateString = availableDates[dayIndex];
+        const date = new Date(dateString);
+        date.setHours(0, 0, 0, 0);
+        return today.toDateString() === date.toDateString();
+      }
+    }
+    
+    // Fallback to legacy calculation
     const dayDate = new Date(today);
     
     if (week.week_number === 1) {
-      // Week 1: Start from today
       dayDate.setDate(today.getDate() + dayIndex);
     } else {
-      // Week 2+: Calculate based on week start offset
-      const currentDayOfWeek = today.getDay();
-      const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
-      
-      // Calculate start date of this week
-      let weekStartOffset = week1Days; // Days after today that Week 2 starts
-      for (let i = 2; i < week.week_number; i++) {
-        weekStartOffset += 7; // Add 7 days for each full week
-      }
-      
-      dayDate.setDate(today.getDate() + weekStartOffset + dayIndex);
-    }
-    
-    // Compare just the date parts (ignore time)
-    return today.toDateString() === dayDate.toDateString();
-  };
-
-  const handleDayPress = (day: Day, index: number) => {
-    // Calculate the actual Date object (not the string from getDayDate)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const calculatedDate = new Date(today);
-    
-    if (week.week_number === 1) {
-      // Week 1: Start from today
-      calculatedDate.setDate(today.getDate() + index);
-    } else {
-      // Week 2+: Calculate based on week start offset
       const currentDayOfWeek = today.getDay();
       const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
       let weekStartOffset = week1Days;
       for (let i = 2; i < week.week_number; i++) {
         weekStartOffset += 7;
       }
-      calculatedDate.setDate(today.getDate() + weekStartOffset + index);
+      dayDate.setDate(today.getDate() + weekStartOffset + dayIndex);
     }
     
-    const calculatedDateString = calculatedDate.toISOString().split('T')[0]; // Format: "2026-02-28"
+    return today.toDateString() === dayDate.toDateString();
+  };
+
+  const handleDayPress = (day: Day, index: number) => {
+    let calculatedDateString: string;
+    
+    if (currentPlan) {
+      // Use actual date from meal plan
+      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+      if (index >= 0 && index < availableDates.length) {
+        calculatedDateString = availableDates[index];
+      } else {
+        console.warn(`⚠️ Day index ${index} out of range`);
+        calculatedDateString = new Date().toISOString().split('T')[0];
+      }
+    } else {
+      // Fallback to legacy calculation
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const calculatedDate = new Date(today);
+      
+      if (week.week_number === 1) {
+        calculatedDate.setDate(today.getDate() + index);
+      } else {
+        const currentDayOfWeek = today.getDay();
+        const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
+        let weekStartOffset = week1Days;
+        for (let i = 2; i < week.week_number; i++) {
+          weekStartOffset += 7;
+        }
+        calculatedDate.setDate(today.getDate() + weekStartOffset + index);
+      }
+      calculatedDateString = calculatedDate.toISOString().split('T')[0];
+    }
     
     // Create an enhanced day object with the proper date
     const enhancedDay = {
       ...day,
-      date: calculatedDateString, // Fix: Set proper date instead of undefined
-      calculatedDate,
+      date: calculatedDateString,
+      calculatedDate: new Date(calculatedDateString),
     };
     
     console.log(`📅 Navigation: Passing calculated date ${calculatedDateString} for day ${index}`);
@@ -476,7 +544,7 @@ export default function MealPlanDaysScreen() {
       mealPlanName,
       dayIndex: index,
       calculatedDayName: getDayName(index),
-      calculatedDateString, // Also pass as separate param for easy access
+      calculatedDateString,
     });
   };
 
@@ -497,6 +565,75 @@ export default function MealPlanDaysScreen() {
         },
       ],
     );
+  };
+
+  // Function to add a new day to the meal plan
+  const handleAddDay = () => {
+    Alert.alert(
+      'Add New Day',
+      'This will add a new empty day to your meal plan. You can then add meals to it.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Add Day',
+          style: 'default',
+          onPress: () => addNewDay(),
+        },
+      ],
+    );
+  };
+
+  const addNewDay = async () => {
+    try {
+      if (!currentPlan) {
+        Alert.alert('Error', 'No meal plan loaded');
+        return;
+      }
+
+      // Calculate the next available date
+      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+      const lastDate = availableDates[availableDates.length - 1];
+      const nextDate = new Date(lastDate);
+      nextDate.setDate(nextDate.getDate() + 1);
+      const nextDateString = nextDate.toISOString().split('T')[0];
+
+      console.log(`➕ Adding new day: ${nextDateString}`);
+
+      // Calculate the day name for the new date
+      const dayName = nextDate.toLocaleDateString('en-US', { weekday: 'long' });
+
+      // Add the new empty day to the meal plan
+      const updatedPlan = {
+        ...currentPlan,
+        dailyMeals: {
+          ...currentPlan.dailyMeals,
+          [nextDateString]: {
+            date: nextDateString,
+            dayName: dayName,
+            meals: [],
+            dailyTotals: {
+              calories: 0,
+              protein: 0,
+              carbs: 0,
+              fat: 0,
+              fiber: 0,
+            },
+          },
+        },
+      };
+
+      // Save the updated plan using the context method
+      await saveMealPlan(updatedPlan);
+      
+      Alert.alert('Success', `Added new day: ${nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}. The new day will appear at the bottom of your meal plan.`);
+      
+    } catch (error) {
+      console.error('❌ Error adding new day:', error);
+      Alert.alert('Error', 'Failed to add new day');
+    }
   };
 
   // Function to delete all meals from a specific day
@@ -716,6 +853,24 @@ export default function MealPlanDaysScreen() {
           ))}
         </ScrollView>
       )}
+
+      {/* Add Day Button */}
+      <View style={styles.addDayContainer}>
+        <TouchableOpacity 
+          style={[styles.addDayButton, { borderColor: themeColor }]}
+          onPress={handleAddDay}
+          activeOpacity={0.7}
+        >
+          <View style={styles.addDayContent}>
+            <View style={[styles.addDayIcon, { backgroundColor: themeColor }]}>
+              <Ionicons name="add" size={24} color="#ffffff" />
+            </View>
+            <Text style={[styles.addDayText, { color: themeColor }]}>
+              Add Day
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -1067,44 +1222,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginLeft: 8,
   },
-  
-  // Simple Meal Prep Card
-  mealPrepContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  mealPrepCard: {
-    borderRadius: 20,
-    padding: 24,
-    backgroundColor: 'rgba(24, 24, 27, 0.8)',
-    borderWidth: 1,
-    borderColor: 'rgba(63, 63, 70, 0.3)',
-  },
-  mealPrepContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  mealPrepIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  mealPrepText: {
-    flex: 1,
-  },
-  mealPrepTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  mealPrepSubtitle: {
-    fontSize: 14,
-    color: '#a1a1aa',
-  },
   prepCardFriendly: {
     borderRadius: 16,
     padding: 20,
@@ -1150,6 +1267,40 @@ const styles = StyleSheet.create({
     color: '#71717a',
     fontWeight: '500',
     lineHeight: 20,
+  },
+
+  // Add Day Button Styles
+  addDayContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    paddingBottom: 34, // Extra padding for safe area
+  },
+  addDayButton: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addDayContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  addDayIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addDayText: {
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
 });
 
