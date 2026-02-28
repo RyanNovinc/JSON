@@ -203,6 +203,26 @@ export default function MealPlanDaysScreen() {
 
   const { week, mealPlanName, mealPrepSession, allMealPrepSessions, groceryList } = route.params;
   
+  // Get current grocery list from context to reflect any updates (deletions, additions)
+  const currentGroceryList = mealPlanning.currentMealPlan?.data?.grocery_list || groceryList;
+  
+  // Calculate total cost from actual grocery items (source of truth)
+  const calculateGroceryTotal = (groceryData: any) => {
+    if (!groceryData?.categories) return 0;
+    
+    let total = 0;
+    groceryData.categories.forEach((category: any) => {
+      if (category.items) {
+        category.items.forEach((item: any) => {
+          total += item.estimated_price || 0;
+        });
+      }
+    });
+    return total;
+  };
+  
+  const actualGroceryTotal = calculateGroceryTotal(currentGroceryList);
+  
   // Helper function to group days by their prep session
   const groupDaysByPrepSession = () => {
     // For legacy format (single session) or when no allMealPrepSessions, show all days ungrouped
@@ -444,19 +464,19 @@ export default function MealPlanDaysScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Grocery List Section */}
-          {groceryList && (
+          {currentGroceryList && (
             <View style={styles.grocerySection}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionTitle}>Shopping List</Text>
               </View>
               <TouchableOpacity 
                 style={[styles.groceryCardFriendly, { backgroundColor: `${themeColor}15` }]}
-                onPress={() => navigation.navigate('GroceryList', { groceryList })}
+                onPress={() => navigation.navigate('GroceryList', { groceryList: currentGroceryList })}
                 activeOpacity={0.8}
               >
                 <View style={styles.groceryFriendlyContent}>
                   <Text style={styles.groceryFriendlyMain}>
-                    ${groceryList.total_estimated_cost} grocery trip
+                    ${actualGroceryTotal.toFixed(2)} grocery trip
                   </Text>
                   <Text style={styles.groceryFriendlySubtext}>
                     Tap to see your shopping list

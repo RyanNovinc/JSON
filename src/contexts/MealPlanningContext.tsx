@@ -52,6 +52,7 @@ interface MealPlanningContextType extends NutritionState {
   // Grocery List
   getGroceryList: () => GroceryList | null;
   updateGroceryItem: (itemId: string, purchased: boolean) => Promise<void>;
+  addGroceryItem: (item: Omit<GroceryItem, 'id'>) => Promise<void>;
   
   // Utility Functions
   clearAllData: () => Promise<void>;
@@ -517,6 +518,34 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
     }
   };
 
+  const addGroceryItem = async (itemData: Omit<GroceryItem, 'id'>) => {
+    try {
+      if (!state.currentMealPlan?.groceryList) return;
+
+      const newItem: GroceryItem = {
+        ...itemData,
+        id: `manual_${Date.now()}_${itemData.name.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      };
+
+      const updatedGroceryList = {
+        ...state.currentMealPlan.groceryList,
+        items: [...state.currentMealPlan.groceryList.items, newItem],
+        totalCost: state.currentMealPlan.groceryList.totalCost + newItem.estimatedCost,
+      };
+
+      const updatedMealPlan = {
+        ...state.currentMealPlan,
+        groceryList: updatedGroceryList,
+        totalCost: state.currentMealPlan.totalCost + newItem.estimatedCost,
+      };
+
+      await saveMealPlan(updatedMealPlan);
+    } catch (error) {
+      console.error('Failed to add grocery item:', error);
+      throw error;
+    }
+  };
+
   const clearAllData = async () => {
     try {
       await Promise.all([
@@ -631,6 +660,7 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
     getDailyCompletionProgress,
     getGroceryList,
     updateGroceryItem,
+    addGroceryItem,
     clearAllData,
     hasCompletedSetup,
     refreshData,

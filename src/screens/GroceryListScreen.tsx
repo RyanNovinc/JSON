@@ -13,7 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -83,10 +83,15 @@ const convertMealPlanGroceryList = (mealPlanGroceryList: any) => {
     const mappedCategory = mapMealPlanCategory(category.category_name);
     
     category.items?.forEach((item: any) => {
+      // Generate appropriate ID - use manual prefix if this was manually added
+      const itemId = item.manual_item 
+        ? `manual_${item.item_name}`.replace(/[^a-zA-Z0-9]/g, '_')
+        : `${category.category_name}-${item.item_name}`.replace(/[^a-zA-Z0-9]/g, '_');
+      
       items.push({
-        id: `${category.category_name}-${item.item_name}`.replace(/[^a-zA-Z0-9]/g, '_'),
+        id: itemId,
         name: item.item_name,
-        amount: item.quantity,
+        amount: typeof item.quantity === 'string' ? parseFloat(item.quantity) || 1 : item.quantity || 1,
         unit: item.unit || '',
         category: mappedCategory,
         estimatedCost: item.estimated_price || 0,
@@ -108,7 +113,7 @@ export default function GroceryListScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<GroceryListRouteProp>();
   const { themeColor, themeColorLight } = useTheme();
-  const { getGroceryList, updateGroceryItem } = useMealPlanning();
+  const { getGroceryList, updateGroceryItem, addGroceryItem, currentMealPlan, saveMealPlan } = useMealPlanning();
 
   // State declarations first
   const [localGroceryState, setLocalGroceryState] = useState<any>(null);
@@ -116,6 +121,9 @@ export default function GroceryListScreen() {
   const [isLoadingPurchaseStates, setIsLoadingPurchaseStates] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItemName, setNewItemName] = useState('');
+  const [newItemAmount, setNewItemAmount] = useState('');
+  const [newItemUnit, setNewItemUnit] = useState('');
+  const [newItemCost, setNewItemCost] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<FoodCategory>('other');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<FoodCategory[]>(CATEGORY_ORDER);
@@ -183,10 +191,16 @@ export default function GroceryListScreen() {
   // Calculate statistics
   const totalItems = groceryList.items.length;
   const purchasedItems = groceryList.items.filter(item => item.isPurchased).length;
-  const totalCost = groceryList.items.reduce((sum, item) => sum + item.estimatedCost, 0);
+  const totalCost = groceryList.items.reduce((sum, item) => {
+    console.log('📊 Item cost:', item.name, '=', item.estimatedCost, 'type:', typeof item.estimatedCost);
+    return sum + (item.estimatedCost || 0);
+  }, 0);
   const remainingCost = groceryList.items
     .filter(item => !item.isPurchased)
-    .reduce((sum, item) => sum + item.estimatedCost, 0);
+    .reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
+    
+  console.log('💰 Total calculated cost:', totalCost, 'from', totalItems, 'items');
+  console.log('🔍 Using items as source of truth for pricing');
 
   // Generate a unique key for this grocery list (use simpler key)
   const groceryListKey = passedGroceryList ? 
@@ -236,6 +250,34 @@ export default function GroceryListScreen() {
       setLocalGroceryState(converted);
     }
   }, [passedGroceryList, purchasedItemsState, isLoadingPurchaseStates]);
+
+  // Refresh data when screen comes back into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🔄 Screen focused - refreshing grocery data');
+      
+      // If we're using context grocery list, refresh it
+      if (!passedGroceryList) {
+        console.log('🔄 Refreshing context grocery list');
+        // The context will automatically update via getGroceryList()
+      } else {
+        // If using passed grocery list, check if there's updated data in context
+        const updatedContextList = getGroceryList();
+        if (updatedContextList && currentMealPlan?.data?.grocery_list) {
+          console.log('🔄 Checking for updates in meal plan data');
+          const refreshedGroceryList = convertMealPlanGroceryList(currentMealPlan.data.grocery_list);
+          if (refreshedGroceryList) {
+            refreshedGroceryList.items = refreshedGroceryList.items.map((item: any) => ({
+              ...item,
+              isPurchased: purchasedItemsState[item.id] || false
+            }));
+            setLocalGroceryState(refreshedGroceryList);
+            console.log('✅ Refreshed local grocery state from updated meal plan');
+          }
+        }
+      }
+    }, [passedGroceryList, currentMealPlan, purchasedItemsState, getGroceryList])
+  );
 
   const toggleItemPurchased = async (item: GroceryItem) => {
     try {
@@ -292,11 +334,332 @@ export default function GroceryListScreen() {
     }
   };
 
-  const toggleCategoryFilter = (category: FoodCategory) => {
-    setSelectedCategories(prev => 
-      prev.includes(category)
-        ? prev.filter(c => c !== category)
-        : [...prev, category]
+  const addManualItem = async () => {
+    if (!newItemName.trim()) return;
+
+    try {
+      // Better cost parsing with validation
+      const parsedCost = newItemCost.trim() ? parseFloat(newItemCost.trim()) : 0;
+      const validCost = isNaN(parsedCost) ? 0 : Math.max(0, parsedCost);
+      
+      console.log('🛒 Adding manual item:', {
+        name: newItemName.trim(),
+        rawCostInput: newItemCost,
+        parsedCost: validCost,
+        category: newItemCategory
+      });
+
+      const newItem: GroceryItem = {
+        id: `manual_${Date.now()}_${newItemName.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        name: newItemName.trim(),
+        category: newItemCategory,
+        amount: parseFloat(newItemAmount) || 1,
+        unit: newItemUnit.trim() || 'piece',
+        estimatedCost: validCost,
+        isPurchased: false,
+        isFromInventory: false,
+        notes: 'Manually added'
+      };
+
+      if (passedGroceryList && localGroceryState) {
+        // Update local state for passed grocery list
+        console.log('📊 Current total cost:', localGroceryState.totalCost);
+        console.log('💰 Adding item cost:', newItem.estimatedCost);
+        
+        setLocalGroceryState((prev: any) => {
+          const newTotal = (prev.totalCost || 0) + newItem.estimatedCost;
+          console.log('📈 New total cost will be:', newTotal);
+          return {
+            ...prev,
+            items: [...prev.items, newItem],
+            totalCost: newTotal
+          };
+        });
+
+        // Also update the passed grocery list structure to ensure it persists
+        const existingCategory = passedGroceryList.categories?.find(
+          cat => mapMealPlanCategory(cat.category_name) === newItemCategory
+        );
+
+        let updatedCategories;
+        if (existingCategory) {
+          // Add to existing category
+          updatedCategories = passedGroceryList.categories.map(cat => {
+            if (mapMealPlanCategory(cat.category_name) === newItemCategory) {
+              return {
+                ...cat,
+                items: [
+                  ...(cat.items || []),
+                  {
+                    item_name: newItem.name,
+                    quantity: `${newItem.amount} ${newItem.unit}`,
+                    unit: newItem.unit,
+                    estimated_price: newItem.estimatedCost,
+                    is_purchased: false,
+                    notes: newItem.notes,
+                    manual_item: true // Mark as manually added
+                  }
+                ]
+              };
+            }
+            return cat;
+          });
+        } else {
+          // Create new category
+          updatedCategories = [
+            ...(passedGroceryList.categories || []),
+            {
+              category_name: CATEGORY_NAMES[newItemCategory],
+              items: [{
+                item_name: newItem.name,
+                quantity: `${newItem.amount} ${newItem.unit}`,
+                unit: newItem.unit,
+                estimated_price: newItem.estimatedCost,
+                is_purchased: false,
+                notes: newItem.notes,
+                manual_item: true // Mark as manually added
+              }]
+            }
+          ];
+        }
+
+        const updatedPassedList = {
+          ...passedGroceryList,
+          categories: updatedCategories,
+          total_estimated_cost: (passedGroceryList.total_estimated_cost || 0) + newItem.estimatedCost
+        };
+        
+        // Update the route params to persist changes
+        // Note: This is a workaround to ensure the parent component gets updated data
+        if (route.params) {
+          route.params.groceryList = updatedPassedList;
+        }
+        
+        // IMPORTANT: Also save to the actual meal plan context so it persists in exports
+        // This ensures manual items show up when the meal plan is copied/shared
+        if (currentMealPlan) {
+          const currentMealPlanTotalCost = isNaN(currentMealPlan.totalCost) ? 0 : (currentMealPlan.totalCost || 0);
+          const currentGroceryListTotalCost = isNaN(currentMealPlan.groceryList?.totalCost) ? 0 : (currentMealPlan.groceryList?.totalCost || 0);
+          
+          console.log('💰 Current meal plan total cost:', currentMealPlanTotalCost);
+          console.log('💰 Current grocery list total cost:', currentGroceryListTotalCost);
+          
+          const contextUpdatedGroceryList = {
+            ...currentMealPlan.groceryList,
+            items: [...(currentMealPlan.groceryList?.items || []), newItem],
+            totalCost: currentGroceryListTotalCost + newItem.estimatedCost,
+          };
+
+          const contextUpdatedMealPlan = {
+            ...currentMealPlan,
+            groceryList: contextUpdatedGroceryList,
+            totalCost: currentMealPlanTotalCost + newItem.estimatedCost,
+          };
+          
+          console.log('🔄 Also updating meal plan context for export persistence');
+          console.log('📝 About to save meal plan with updated grocery list');
+          console.log('📊 Updated meal plan grocery items count:', contextUpdatedGroceryList.items.length);
+          console.log('💰 Updated meal plan total cost:', contextUpdatedMealPlan.totalCost);
+          
+          // CRITICAL: Also update the data structure that gets exported
+          // We need to make sure the manual item gets added to the export format
+          if (contextUpdatedMealPlan.data && contextUpdatedMealPlan.data.grocery_list) {
+            console.log('📋 Updating export data structure with manual item');
+            
+            // Find or create the category in the export format
+            let targetCategory = contextUpdatedMealPlan.data.grocery_list.categories?.find(
+              (cat: any) => mapMealPlanCategory(cat.category_name) === newItem.category
+            );
+            
+            if (targetCategory) {
+              // Add to existing category
+              targetCategory.items = targetCategory.items || [];
+              targetCategory.items.push({
+                item_name: newItem.name,
+                quantity: `${newItem.amount} ${newItem.unit}`,
+                unit: newItem.unit,
+                estimated_price: newItem.estimatedCost,
+                is_purchased: false,
+                notes: newItem.notes,
+                manual_item: true
+              });
+            } else {
+              // Create new category
+              contextUpdatedMealPlan.data.grocery_list.categories = contextUpdatedMealPlan.data.grocery_list.categories || [];
+              contextUpdatedMealPlan.data.grocery_list.categories.push({
+                category_name: CATEGORY_NAMES[newItem.category],
+                items: [{
+                  item_name: newItem.name,
+                  quantity: `${newItem.amount} ${newItem.unit}`,
+                  unit: newItem.unit,
+                  estimated_price: newItem.estimatedCost,
+                  is_purchased: false,
+                  notes: newItem.notes,
+                  manual_item: true
+                }]
+              });
+            }
+            
+            // Update total cost in export data
+            contextUpdatedMealPlan.data.grocery_list.total_estimated_cost = 
+              (contextUpdatedMealPlan.data.grocery_list.total_estimated_cost || 0) + newItem.estimatedCost;
+              
+            console.log('✅ Updated export data structure');
+          }
+          
+          try {
+            // Save the updated meal plan to ensure manual items persist in exports
+            await saveMealPlan(contextUpdatedMealPlan);
+            console.log('✅ Successfully saved updated meal plan to context AND export data');
+          } catch (saveError) {
+            console.error('❌ Failed to save meal plan:', saveError);
+          }
+        }
+      } else {
+        // Use context method for meal planning grocery lists
+        await addGroceryItem({
+          name: newItem.name,
+          category: newItem.category,
+          amount: newItem.amount,
+          unit: newItem.unit,
+          estimatedCost: newItem.estimatedCost,
+          isPurchased: newItem.isPurchased,
+          isFromInventory: newItem.isFromInventory,
+          notes: newItem.notes
+        });
+      }
+
+      // Reset form and close modal
+      setNewItemName('');
+      setNewItemAmount('');
+      setNewItemUnit('');
+      setNewItemCost('');
+      setNewItemCategory('other');
+      setShowAddModal(false);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add item to grocery list');
+      console.error('Add manual item error:', error);
+    }
+  };
+
+  const handleDeleteItem = async (item: GroceryItem) => {
+    try {
+      console.log('🗑️ Deleting item:', item.name, 'ID:', item.id);
+      
+      if (passedGroceryList && localGroceryState) {
+        // Update local state for passed grocery list
+        setLocalGroceryState((prev: any) => ({
+          ...prev,
+          items: prev.items.filter((i: GroceryItem) => i.id !== item.id),
+          totalCost: Math.max(0, (prev.totalCost || 0) - item.estimatedCost)
+        }));
+        
+        // Update passed grocery list structure
+        if (passedGroceryList.categories) {
+          const updatedCategories = passedGroceryList.categories.map((cat: any) => ({
+            ...cat,
+            items: (cat.items || []).filter((catItem: any) => {
+              const itemId = catItem.manual_item 
+                ? `manual_${catItem.item_name}`.replace(/[^a-zA-Z0-9]/g, '_')
+                : `${cat.category_name}-${catItem.item_name}`.replace(/[^a-zA-Z0-9]/g, '_');
+              return itemId !== item.id;
+            })
+          })).filter((cat: any) => cat.items && cat.items.length > 0); // Remove empty categories
+          
+          const updatedPassedList = {
+            ...passedGroceryList,
+            categories: updatedCategories,
+            total_estimated_cost: Math.max(0, (passedGroceryList.total_estimated_cost || 0) - item.estimatedCost)
+          };
+          
+          if (route.params) {
+            route.params.groceryList = updatedPassedList;
+          }
+          
+          // CRITICAL: Also update the export data structure
+          if (currentMealPlan?.data?.grocery_list?.categories) {
+            console.log('📋 Removing item from export data structure');
+            
+            const exportUpdatedCategories = currentMealPlan.data.grocery_list.categories.map((cat: any) => ({
+              ...cat,
+              items: (cat.items || []).filter((catItem: any) => {
+                const itemId = catItem.manual_item 
+                  ? `manual_${catItem.item_name}`.replace(/[^a-zA-Z0-9]/g, '_')
+                  : `${cat.category_name}-${catItem.item_name}`.replace(/[^a-zA-Z0-9]/g, '_');
+                return itemId !== item.id;
+              })
+            })).filter((cat: any) => cat.items && cat.items.length > 0);
+            
+            const contextUpdatedMealPlan = {
+              ...currentMealPlan,
+              groceryList: {
+                ...currentMealPlan.groceryList,
+                items: currentMealPlan.groceryList?.items?.filter(i => i.id !== item.id) || [],
+                totalCost: Math.max(0, (currentMealPlan.groceryList?.totalCost || 0) - item.estimatedCost)
+              },
+              data: {
+                ...currentMealPlan.data,
+                grocery_list: {
+                  ...currentMealPlan.data.grocery_list,
+                  categories: exportUpdatedCategories,
+                  total_estimated_cost: Math.max(0, (currentMealPlan.data.grocery_list.total_estimated_cost || 0) - item.estimatedCost)
+                }
+              },
+              totalCost: Math.max(0, (currentMealPlan.totalCost || 0) - item.estimatedCost)
+            };
+            
+            await saveMealPlan(contextUpdatedMealPlan);
+            console.log('✅ Successfully removed item from context AND export data');
+            console.log('🔍 Updated meal plan saved with items count:', contextUpdatedMealPlan.groceryList.items.length);
+            console.log('🔍 Export data categories count:', contextUpdatedMealPlan.data.grocery_list.categories.length);
+          }
+        }
+      } else {
+        // Use context method for meal planning grocery lists
+        if (currentMealPlan?.groceryList?.items) {
+          const updatedGroceryList = {
+            ...currentMealPlan.groceryList,
+            items: currentMealPlan.groceryList.items.filter(i => i.id !== item.id),
+            totalCost: Math.max(0, (currentMealPlan.groceryList.totalCost || 0) - item.estimatedCost)
+          };
+          
+          const updatedMealPlan = {
+            ...currentMealPlan,
+            groceryList: updatedGroceryList,
+            totalCost: Math.max(0, (currentMealPlan.totalCost || 0) - item.estimatedCost)
+          };
+          
+          await saveMealPlan(updatedMealPlan);
+          console.log('✅ Successfully removed item from context grocery list');
+        }
+      }
+      
+      
+      console.log('🎉 Item deletion completed successfully');
+    } catch (error) {
+      console.error('❌ Failed to delete item:', error);
+      Alert.alert('Error', 'Failed to delete item from grocery list');
+    }
+  };
+
+  const handleLongPressItem = (item: GroceryItem) => {
+    console.log('👆 Long press detected on item:', item.name);
+    Alert.alert(
+      'Remove Item',
+      `Are you sure you want to remove "${item.name}" from your grocery list?`,
+      [
+        {
+          text: 'Cancel',
+          onPress: () => console.log('Delete cancelled'),
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          onPress: () => handleDeleteItem(item),
+          style: 'destructive',
+        },
+      ],
+      { cancelable: true }
     );
   };
 
@@ -308,6 +671,8 @@ export default function GroceryListScreen() {
         item.isFromInventory && styles.inventoryItemRow,
       ]}
       onPress={() => toggleItemPurchased(item)}
+      onLongPress={() => handleLongPressItem(item)}
+      delayLongPress={800}
       activeOpacity={0.7}
     >
       <TouchableOpacity
@@ -411,8 +776,8 @@ export default function GroceryListScreen() {
           <TouchableOpacity onPress={shareGroceryList} style={styles.headerButton}>
             <Ionicons name="share-outline" size={24} color="#ffffff" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowCategoryFilter(true)} style={styles.headerButton}>
-            <Ionicons name="filter-outline" size={24} color="#ffffff" />
+          <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.headerButton}>
+            <Ionicons name="add" size={24} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -495,79 +860,173 @@ export default function GroceryListScreen() {
       </ScrollView>
       )}
 
-      {/* Category Filter Modal */}
+      {/* Add Item Modal */}
       <Modal
-        visible={showCategoryFilter}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowCategoryFilter(false)}
+        visible={showAddModal}
+        transparent={false}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setShowAddModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.filterModalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter Categories</Text>
-              <TouchableOpacity
-                onPress={() => setShowCategoryFilter(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="#ffffff" />
-              </TouchableOpacity>
+        <View style={styles.modalScreen}>
+          {/* Navigation Header */}
+          <View style={styles.navHeader}>
+            <TouchableOpacity 
+              onPress={() => {
+                setShowAddModal(false);
+                setNewItemName('');
+                setNewItemAmount('');
+                setNewItemUnit('');
+                setNewItemCost('');
+                setNewItemCategory('other');
+              }}
+              style={styles.navBackButton}
+            >
+              <Ionicons name="arrow-back" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <Text style={styles.navTitle}>Add Grocery Item</Text>
+            <TouchableOpacity 
+              style={[
+                styles.navSaveButton,
+                { backgroundColor: themeColor },
+                !newItemName.trim() && styles.navSaveDisabled
+              ]}
+              onPress={addManualItem}
+              disabled={!newItemName.trim()}
+            >
+              <Text style={styles.navSaveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Content Area */}
+          <ScrollView 
+            style={styles.scrollContent}
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Item Name Field */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Item Name *</Text>
+              <TextInput
+                style={styles.inputField}
+                placeholder="e.g., Greek Yogurt, Bananas"
+                placeholderTextColor="#6b7280"
+                value={newItemName}
+                onChangeText={setNewItemName}
+                autoCapitalize="words"
+                autoFocus
+              />
             </View>
 
-            <ScrollView style={styles.filterContent}>
-              {CATEGORY_ORDER.filter(cat => groupedItems[cat]?.length > 0).map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={styles.filterOption}
-                  onPress={() => toggleCategoryFilter(category)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.filterOptionLeft}>
+            {/* Amount & Unit Row */}
+            <View style={styles.dualFieldRow}>
+              <View style={styles.halfField}>
+                <Text style={styles.fieldLabel}>Amount</Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="1"
+                  placeholderTextColor="#6b7280"
+                  value={newItemAmount}
+                  onChangeText={setNewItemAmount}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.halfField}>
+                <Text style={styles.fieldLabel}>Unit</Text>
+                <TextInput
+                  style={styles.inputField}
+                  placeholder="kg, lb, pieces"
+                  placeholderTextColor="#6b7280"
+                  value={newItemUnit}
+                  onChangeText={setNewItemUnit}
+                />
+              </View>
+            </View>
+
+            {/* Cost Field */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Estimated Cost <Text style={styles.optionalLabel}>(optional)</Text></Text>
+              <View style={styles.currencyInputContainer}>
+                <Text style={styles.currencySymbol}>$</Text>
+                <TextInput
+                  style={styles.currencyInput}
+                  placeholder="0.00"
+                  placeholderTextColor="#6b7280"
+                  value={newItemCost}
+                  onChangeText={setNewItemCost}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+
+            {/* Category Selection */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Category</Text>
+              <View style={styles.categoryGrid}>
+                {CATEGORY_ORDER.map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryOption,
+                      newItemCategory === category && [styles.categorySelected, { borderColor: themeColor }]
+                    ]}
+                    onPress={() => setNewItemCategory(category)}
+                    activeOpacity={0.7}
+                  >
                     <Ionicons
                       name={CATEGORY_ICONS[category]}
-                      size={20}
-                      color={selectedCategories.includes(category) ? themeColor : '#71717a'}
+                      size={18}
+                      color={newItemCategory === category ? themeColor : '#9ca3af'}
                     />
                     <Text style={[
-                      styles.filterOptionText,
-                      selectedCategories.includes(category) && { color: themeColor }
+                      styles.categoryOptionText,
+                      newItemCategory === category && { color: themeColor }
                     ]}>
                       {CATEGORY_NAMES[category]}
                     </Text>
-                  </View>
-                  <View style={styles.filterOptionRight}>
-                    <Text style={styles.filterOptionCount}>
-                      {groupedItems[category]?.length || 0}
-                    </Text>
-                    <Ionicons
-                      name={selectedCategories.includes(category) ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={20}
-                      color={selectedCategories.includes(category) ? themeColor : '#71717a'}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
 
-            <View style={styles.filterActions}>
-              <TouchableOpacity
-                style={[styles.filterButton, { backgroundColor: themeColor }]}
+          {/* Fixed Bottom Action Area */}
+          <View style={styles.actionArea}>
+            <View style={styles.actionButtonContainer}>
+              <TouchableOpacity 
+                style={styles.secondaryActionButton}
                 onPress={() => {
-                  setSelectedCategories(CATEGORY_ORDER.filter(cat => groupedItems[cat]?.length > 0));
+                  setShowAddModal(false);
+                  setNewItemName('');
+                  setNewItemAmount('');
+                  setNewItemUnit('');
+                  setNewItemCost('');
+                  setNewItemCategory('other');
                 }}
+                activeOpacity={0.8}
               >
-                <Text style={styles.filterButtonText}>Select All</Text>
+                <Text style={styles.secondaryActionText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterButton, { backgroundColor: '#3f3f46' }]}
-                onPress={() => setSelectedCategories([])}
+              
+              <TouchableOpacity 
+                style={[
+                  styles.primaryActionButton,
+                  { backgroundColor: themeColor },
+                  !newItemName.trim() && styles.primaryActionDisabled
+                ]}
+                onPress={addManualItem}
+                disabled={!newItemName.trim()}
+                activeOpacity={0.8}
               >
-                <Text style={styles.filterButtonText}>Clear All</Text>
+                <Ionicons name="add" size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                <Text style={styles.primaryActionText}>Add to List</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+      
     </View>
   );
 }
@@ -845,84 +1304,204 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
-  filterModalContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    maxHeight: '80%',
-    overflow: 'hidden',
+  modalScreen: {
+    flex: 1,
+    backgroundColor: '#0a0a0b',
   },
-  modalHeader: {
+  
+  // Navigation Header (iOS/Android Standard)
+  navHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
+    borderBottomColor: '#1f2937',
+    backgroundColor: '#0a0a0b',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  modalCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#27272a',
+  navBackButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1f2937',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterContent: {
-    maxHeight: 400,
-  },
-  filterOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
-  },
-  filterOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  filterOptionText: {
-    fontSize: 16,
+  navTitle: {
+    fontSize: 17,
+    fontWeight: '600',
     color: '#ffffff',
-  },
-  filterOptionRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  filterOptionCount: {
-    fontSize: 12,
-    color: '#71717a',
-    backgroundColor: '#27272a',
-    borderRadius: 12,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    minWidth: 20,
     textAlign: 'center',
   },
-  filterActions: {
-    flexDirection: 'row',
+  navSaveButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navSaveDisabled: {
+    opacity: 0.4,
+  },
+  navSaveText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  
+  // Content Area
+  scrollContent: {
+    flex: 1,
+  },
+  contentContainer: {
     padding: 20,
+    paddingBottom: 100,
+  },
+  
+  // Form Fields
+  fieldContainer: {
+    marginBottom: 24,
+  },
+  dualFieldRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+  },
+  halfField: {
+    flex: 1,
+  },
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#f9fafb',
+    marginBottom: 8,
+  },
+  optionalLabel: {
+    fontWeight: '400',
+    color: '#9ca3af',
+  },
+  inputField: {
+    backgroundColor: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#374151',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#f9fafb',
+    minHeight: 48,
+  },
+  
+  // Currency Input
+  currencyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#374151',
+    borderRadius: 12,
+    paddingLeft: 16,
+    minHeight: 48,
+  },
+  currencySymbol: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#f9fafb',
+    marginRight: 8,
+  },
+  currencyInput: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingRight: 16,
+    fontSize: 16,
+    color: '#f9fafb',
+  },
+  
+  // Category Selection
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
-  filterButton: {
-    flex: 1,
-    backgroundColor: '#22d3ee',
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#374151',
     borderRadius: 8,
     paddingVertical: 12,
-    alignItems: 'center',
+    paddingHorizontal: 16,
+    minWidth: '45%',
+    gap: 8,
   },
-  filterButtonText: {
+  categorySelected: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderWidth: 2,
+  },
+  categoryOptionText: {
     fontSize: 14,
+    fontWeight: '500',
+    color: '#d1d5db',
+    flex: 1,
+  },
+  
+  // Bottom Action Area (Modern Mobile Pattern)
+  actionArea: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#0a0a0b',
+    borderTopWidth: 1,
+    borderTopColor: '#1f2937',
+    paddingTop: 16,
+    paddingBottom: 34,
+    paddingHorizontal: 20,
+  },
+  actionButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondaryActionButton: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#374151',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  secondaryActionText: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#9ca3af',
+  },
+  primaryActionButton: {
+    flex: 2,
+    flexDirection: 'row',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  primaryActionDisabled: {
+    opacity: 0.5,
+  },
+  primaryActionText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#ffffff',
   },
 });

@@ -22,6 +22,8 @@ import { generateJsonConversionPrompt } from '../data/generateJsonConversionProm
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
 
@@ -353,8 +355,11 @@ export default function ImportMealPlanScreen() {
             
             // Validate ingredients
             meal.ingredients.forEach((ingredient: any, ingredientIndex: number) => {
-              if (!ingredient.item || !ingredient.amount || !ingredient.unit) {
-                throw new Error(`Ingredient ${ingredientIndex + 1} in "${meal.meal_name}" is missing required fields (item, amount, unit)`);
+              // Check for either 'name' (correct format) or 'item' (legacy format)
+              const ingredientName = ingredient.name || ingredient.item;
+              if (!ingredientName || !ingredient.amount || !ingredient.unit) {
+                const requiredFields = ingredient.name ? '(name, amount, unit)' : '(item, amount, unit)';
+                throw new Error(`Ingredient ${ingredientIndex + 1} in "${meal.meal_name}" is missing required fields ${requiredFields}`);
               }
               // No glossary validation - AI can use any ingredient names
             });
@@ -559,14 +564,66 @@ export default function ImportMealPlanScreen() {
         await WorkoutStorage.addMealPlan(transformedMealPlan);
       }
       
+      // Before importing, preserve any manually added meals from current plan
+      const existingPlanData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
+      let mergedPlanData = { ...parsedMealPlan };
+      
+      if (existingPlanData) {
+        try {
+          const existingPlan = JSON.parse(existingPlanData);
+          console.log('🔄 Preserving manually added meals from existing plan');
+          
+          // If the existing plan has manually added meals, merge them with the imported plan
+          if (existingPlan.data?.days) {
+            const existingDays = existingPlan.data.days;
+            
+            // Create a merged days array that combines imported plan with manually added meals
+            if (!mergedPlanData.days) {
+              mergedPlanData.days = [];
+            }
+            
+            // Find and preserve manually added meals
+            for (const existingDay of existingDays) {
+              if (existingDay.meals && Array.isArray(existingDay.meals)) {
+                const manualMeals = existingDay.meals.filter(meal => meal.isManuallyAdded);
+                if (manualMeals.length > 0) {
+                  console.log(`🔄 Found ${manualMeals.length} manual meals to preserve`);
+                  
+                  // Find or create corresponding day in merged plan
+                  let targetDay = mergedPlanData.days.find(d => d.date === existingDay.date);
+                  if (!targetDay) {
+                    // Create a new day entry for manually added meals
+                    targetDay = {
+                      date: existingDay.date,
+                      meals: []
+                    };
+                    mergedPlanData.days.push(targetDay);
+                  }
+                  
+                  // Add the manual meals to the target day
+                  if (!targetDay.meals) targetDay.meals = [];
+                  targetDay.meals.push(...manualMeals);
+                  console.log(`📋 Preserved ${manualMeals.length} manual meals for day ${existingDay.date}`);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('⚠️ Error preserving manual meals:', error);
+        }
+      }
+      
       // Always set as current meal plan for immediate use (whether duplicate or not)
       const currentMealPlan = {
         id: parsedMealPlan.id,
         name: parsedMealPlan.plan_name,
         duration: parsedMealPlan.duration_days,
         meals: parsedMealPlan.total_meals,
-        data: parsedMealPlan,
+        data: mergedPlanData, // Use the merged data instead of original
       };
+      
+      console.log('📤 Imported meal plan with permanently deleted meals already removed');
+      console.log('📤 Imported manually added meals in data structure');
       
       await saveMealPlan(currentMealPlan);
       
