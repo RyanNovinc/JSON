@@ -175,18 +175,14 @@ export default function MealPlanDayScreen() {
         return;
       }
       
-      // CRITICAL FIX: Don't pass route parameter meals as they may be stale
-      // Instead, let getMealsForDay get the current meals from stored data
+      // CRITICAL FIX: Always trust the context data, even if it's 0 meals
+      // After deletion, 0 meals is the correct state, not a fallback condition
       const mealsForDay = getMealsForDay(currentViewingDate, []);
       console.log('🔍 Context returned meals:', mealsForDay.length);
       
-      // If no meals from context, fall back to route parameters
-      if (mealsForDay.length === 0) {
-        console.log('📋 No meals from context, using route parameter meals as fallback');
-        setAllMeals(day.meals || []);
-      } else {
-        setAllMeals(mealsForDay);
-      }
+      // Always use context data - if it's 0 meals, that's correct (maybe all deleted)
+      setAllMeals(mealsForDay);
+      console.log('✅ Screen: Using context meals directly (no fallback to stale route data)');
     } catch (error) {
       console.error('❌ Error loading meals from context:', error);
       // Fallback to original meals on error
@@ -416,19 +412,13 @@ export default function MealPlanDayScreen() {
         const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
         console.log(`📅 Reload: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
         if (currentViewingDate) {
-          // CRITICAL FIX: Don't pass stale route parameter meals
+          // CRITICAL FIX: Always trust context data, even if 0 meals (after deletion)
           const updatedMeals = getMealsForDay(currentViewingDate, []);
           console.log('🔄 Screen: Context returned updated meals:', updatedMeals.length);
           
-          // If no meals from context, fall back to reloading
-          if (updatedMeals.length === 0) {
-            console.log('📋 No meals from context, reloading from storage');
-            loadCurrentDayMeals();
-          } else {
-            // Force state update immediately
-            setAllMeals(updatedMeals);
-            console.log('✅ Screen: Forced UI update complete');
-          }
+          // Always use context data - 0 meals is valid after deletion
+          setAllMeals(updatedMeals);
+          console.log('✅ Screen: Forced UI update complete (no fallback logic)');
         }
       }
     }
