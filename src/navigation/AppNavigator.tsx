@@ -32,6 +32,7 @@ import { FloatingWorkoutIndicator } from '../components/FloatingWorkoutIndicator
 import { FeedbackTab } from '../components/FeedbackTab';
 import { AppModeProvider } from '../contexts/AppModeContext';
 import { MealPlanningProvider } from '../contexts/MealPlanningContext';
+import { SimplifiedMealPlanningProvider } from '../contexts/SimplifiedMealPlanningContext';
 import { WeightUnitProvider } from '../contexts/WeightUnitContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import ShareIntentHandler from '../components/ShareIntentHandler';
@@ -54,6 +55,7 @@ import FavoriteMealsScreen from '../screens/FavoriteMealsScreen';
 import AddMealScreen from '../screens/AddMealScreen';
 import ManualMealEntryScreen from '../screens/ManualMealEntryScreen';
 import MealPlanHelpScreen from '../screens/MealPlanHelpScreen';
+import MealPlanTestScreen from '../screens/MealPlanTestScreen';
 import FavoriteExercisesScreen from '../screens/FavoriteExercisesScreen';
 import ExerciseDetailScreen from '../screens/ExerciseDetailScreen';
 import AddExerciseSelectionScreen from '../screens/AddExerciseSelectionScreen';
@@ -182,6 +184,7 @@ export type RootStackParamList = {
   AddMeal: undefined;
   ManualMealEntry: undefined;
   MealPlanHelp: undefined;
+  MealPlanTest: undefined;
   FavoriteExercises: undefined;
   AddExercise: undefined;
   ManualExerciseEntry: undefined;
@@ -266,7 +269,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
         <AppModeProvider>
           <WeightUnitProvider>
             <MealPlanningProvider>
-              <NavigationContainer ref={navigationRef}>
+              <SimplifiedMealPlanningProvider>
+                <NavigationContainer ref={navigationRef}>
                 <ShareIntentHandler />
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (
@@ -528,6 +532,13 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 }}
               />
               <RootStack.Screen 
+                name="MealPlanTest" 
+                component={MealPlanTestScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
                 name="FavoriteExercises" 
                 component={FavoriteExercisesScreen}
                 options={{
@@ -577,7 +588,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />
           <FeedbackTab />
-              </NavigationContainer>
+                </NavigationContainer>
+              </SimplifiedMealPlanningProvider>
             </MealPlanningProvider>
           </WeightUnitProvider>
         </AppModeProvider>
