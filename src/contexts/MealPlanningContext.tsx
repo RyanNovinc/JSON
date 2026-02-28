@@ -813,41 +813,26 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
         });
       }
 
-      // Remove from data.weeks structure (original meal plan)
+      // CRITICAL FIX: Only remove from the SPECIFIC day, not all days
+      // Remove from data.weeks structure (original meal plan) - ONLY FOR THE SPECIFIC DAY
       if (updatedMealPlan.data?.weeks) {
-        updatedMealPlan.data.weeks.forEach((week: any) => {
-          week.days?.forEach((weekDay: any) => {
-            if (weekDay.meals) {
-              const originalLength = weekDay.meals.length;
-              weekDay.meals = weekDay.meals.filter((m: any) => {
-                const nameMatches = m.meal_name === mealIdentifier.meal_name;
-                const timeMatches = !mealIdentifier.recommended_time || m.recommended_time === mealIdentifier.recommended_time;
-                const shouldRemove = nameMatches && timeMatches;
-                
-                if (nameMatches) {
-                  console.log(`🔍 Context: Found meal with matching name "${m.meal_name}"`);
-                  console.log(`🔍 Context: Time check - looking for: "${mealIdentifier.recommended_time}", found: "${m.recommended_time}", matches: ${timeMatches}`);
-                }
-                
-                if (shouldRemove) {
-                  mealFound = true;
-                  console.log('🗑️ Context: Removed from weeks structure:', m.meal_name);
-                }
-                return !shouldRemove;
-              });
-              
-              if (weekDay.meals.length !== originalLength) {
-                console.log(`🗑️ Context: Day ${weekDay.day_name}: meals ${originalLength} -> ${weekDay.meals.length}`);
-              }
-            }
-          });
-        });
+        console.log('🎯 Context: CRITICAL FIX - Only deleting from specific day, not all days');
+        console.log('🎯 Context: Target date for deletion:', dayDate);
+        
+        // We need to figure out which day in the weeks structure corresponds to our dayDate
+        // This is tricky because weeks uses day_name while we have dayDate
+        // For now, let's SKIP deleting from data.weeks to prevent cross-day deletion
+        console.log('⚠️ Context: SKIPPING data.weeks deletion to prevent deleting from all days');
+        console.log('⚠️ Context: This meal will only be deleted if found in data.days structure');
       }
 
-      // Remove from data.days structure (manually added meals)
+      // Remove from data.days structure (manually added meals) - ONLY FOR THE SPECIFIC DAY
       if (updatedMealPlan.data?.days) {
         updatedMealPlan.data.days = updatedMealPlan.data.days.map((dataDay: any) => {
-          if (dataDay.meals) {
+          // CRITICAL FIX: Only process the day that matches our target dayDate
+          if (dataDay.date === dayDate && dataDay.meals) {
+            console.log(`🎯 Context: Processing specific day ${dayDate} for meal deletion`);
+            
             const originalLength = dataDay.meals.length;
             const filteredMeals = dataDay.meals.filter((m: any) => {
               const nameMatches = m.meal_name === mealIdentifier.meal_name;
@@ -861,49 +846,28 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
               
               if (shouldRemove) {
                 mealFound = true;
-                console.log('🗑️ Context: Removed from days structure:', m.meal_name);
+                console.log(`🗑️ Context: Removed from days structure on ${dayDate}:`, m.meal_name);
               }
               return !shouldRemove;
             });
             
             if (filteredMeals.length !== originalLength) {
-              console.log(`🗑️ Context: Data day: meals ${originalLength} -> ${filteredMeals.length}`);
+              console.log(`🗑️ Context: Day ${dayDate}: meals ${originalLength} -> ${filteredMeals.length}`);
               return { ...dataDay, meals: filteredMeals };
             }
+          } else if (dataDay.date !== dayDate) {
+            console.log(`⏭️ Context: Skipping day ${dataDay.date} - not our target day ${dayDate}`);
           }
           return dataDay;
         });
       }
 
-      // Remove from the context's days structure as well
+      // CRITICAL FIX: Skip context.days deletion entirely to prevent cross-day issues
+      // The context's days structure doesn't have reliable date matching
       if (updatedMealPlan.days) {
-        updatedMealPlan.days = updatedMealPlan.days.map((day: any) => {
-          if (day.meals) {
-            const originalLength = day.meals.length;
-            const filteredMeals = day.meals.filter((m: any) => {
-              const nameMatches = m.meal_name === mealIdentifier.meal_name;
-              const timeMatches = !mealIdentifier.recommended_time || m.recommended_time === mealIdentifier.recommended_time;
-              const shouldRemove = nameMatches && timeMatches;
-              
-              if (nameMatches) {
-                console.log(`🔍 Context: Found meal in context.days with matching name "${m.meal_name}"`);
-                console.log(`🔍 Context: Time check - looking for: "${mealIdentifier.recommended_time}", found: "${m.recommended_time}", matches: ${timeMatches}`);
-              }
-              
-              if (shouldRemove) {
-                mealFound = true;
-                console.log('🗑️ Context: Removed from context days structure:', m.meal_name);
-              }
-              return !shouldRemove;
-            });
-            
-            if (filteredMeals.length !== originalLength) {
-              console.log(`🗑️ Context: Context day: meals ${originalLength} -> ${filteredMeals.length}`);
-              return { ...day, meals: filteredMeals };
-            }
-          }
-          return day;
-        });
+        console.log('⚠️ Context: SKIPPING context.days deletion to prevent deleting from all days');
+        console.log('⚠️ Context: Context.days structure lacks reliable date matching for target day:', dayDate);
+        console.log('⚠️ Context: This prevents accidental deletion from wrong days');
       }
 
       // TARGETED FIX: Handle original meal deletion by adding to deleted meals list
