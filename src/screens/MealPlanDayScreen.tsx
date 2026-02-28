@@ -57,10 +57,10 @@ function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor,
             <Ionicons name={mealIcon as any} size={20} color={mealColor} />
           </View>
           <View style={styles.mealTitleContainer}>
-            <Text style={styles.mealName}>{meal.name}</Text>
+            <Text style={styles.mealName}>{meal.name || 'Unknown Meal'}</Text>
             <View style={styles.mealSubInfo}>
               <Text style={[styles.mealType, { color: mealColor }]}>
-                {meal.type.charAt(0).toUpperCase() + meal.type.slice(1)}
+                {(meal.type || 'snack').charAt(0).toUpperCase() + (meal.type || 'snack').slice(1)}
               </Text>
               {meal.time && (
                 <Text style={styles.mealTime}> • {meal.time}</Text>
@@ -198,6 +198,16 @@ export default function MealPlanDayScreen() {
       // Use simplified context to get meals for this date
       const mealsForDay = getMealsForDate(currentViewingDate);
       console.log('🔍 Simplified Context returned meals:', mealsForDay.length);
+      
+      // Debug: Check each meal for required properties
+      mealsForDay.forEach((meal, index) => {
+        console.log(`🔍 Screen Meal ${index}:`, {
+          name: meal.name,
+          type: meal.type,
+          hasName: meal.name !== undefined && meal.name !== null,
+          hasType: meal.type !== undefined && meal.type !== null
+        });
+      });
       
       // Always use context data - simplified system is reliable
       setAllMeals(mealsForDay);

@@ -102,6 +102,19 @@ export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProv
     }
 
     console.log(`🍽️ SimplifiedContext: Found ${dayData.meals.length} meals for ${date}`);
+    
+    // Debug: Log meal data structure
+    dayData.meals.forEach((meal, index) => {
+      console.log(`🔍 Meal ${index}:`, {
+        id: meal.id,
+        name: meal.name,
+        type: meal.type,
+        time: meal.time,
+        hasName: meal.name !== undefined,
+        hasType: meal.type !== undefined
+      });
+    });
+    
     return [...dayData.meals]; // Return copy to prevent mutations
   };
 
