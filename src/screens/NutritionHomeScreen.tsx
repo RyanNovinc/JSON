@@ -21,6 +21,8 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAppMode } from '../contexts/AppModeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
+import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
+import { MigrationHelper } from '../utils/migrationHelper';
 import { WorkoutStorage, NutritionCompletionStatus, MealPlan } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
@@ -145,6 +147,7 @@ export default function NutritionHomeScreen({ route }: any) {
   const [preferencesModal, setPreferencesModal] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
+  const [showMigration, setShowMigration] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
