@@ -580,34 +580,11 @@ export default function MealPlanDaysScreen() {
 
   // Function to add a new day to the meal plan
   const handleAddDay = () => {
-    if (Platform.OS === 'ios') {
-      // On iOS, show date picker in alert
-      Alert.prompt(
-        'Add New Day',
-        'Choose a date for the new day:',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Pick Date',
-            onPress: () => {
-              const tomorrow = new Date();
-              tomorrow.setDate(tomorrow.getDate() + 1);
-              setSelectedDate(tomorrow);
-              setShowDatePicker(true);
-            },
-          },
-        ]
-      );
-    } else {
-      // On Android, show date picker directly
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setSelectedDate(tomorrow);
-      setShowDatePicker(true);
-    }
+    // Show date picker directly - no intermediate alert
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setSelectedDate(tomorrow);
+    setShowDatePicker(true);
   };
 
   const addNewDay = async (dateToAdd: Date) => {
@@ -617,15 +594,23 @@ export default function MealPlanDaysScreen() {
         return;
       }
 
-      const dateString = dateToAdd.toISOString().split('T')[0];
+      // Create date string more reliably to avoid timezone issues
+      const year = dateToAdd.getFullYear();
+      const month = String(dateToAdd.getMonth() + 1).padStart(2, '0');
+      const day = String(dateToAdd.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
       console.log(`➕ Adding new day: ${dateString}`);
       console.log(`📋 Current plan keys before:`, Object.keys(currentPlan.dailyMeals));
 
       // Check if date already exists
       if (currentPlan.dailyMeals[dateString]) {
-        Alert.alert('Date Already Exists', `A day for ${dateToAdd.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} already exists in your meal plan.`);
+        console.log(`⚠️ Date ${dateString} already exists in meal plan`);
+        console.log(`📅 Existing dates:`, Object.keys(currentPlan.dailyMeals));
+        Alert.alert('Date Already Exists', `A day for ${dateString} (${dateToAdd.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}) already exists in your meal plan.`);
         return;
       }
+
+      console.log(`✅ Date ${dateString} is available - proceeding with creation`);
 
       // Calculate the day name for the new date
       const dayName = dateToAdd.toLocaleDateString('en-US', { weekday: 'long' });
