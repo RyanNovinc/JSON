@@ -266,10 +266,8 @@ export default function MealPlanDayScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<{ meal: Meal; index: number; mealId: string; isCompleted: boolean } | null>(null);
   
-  // Get favorite meals and meal planning functions
-  const favoriteMeals = getFavoriteMeals();
-  const mealPlanningContext = useMealPlanning();
-  const { saveMealPlan, currentMealPlan } = mealPlanningContext;
+  // Note: Favorite meals functionality can be added later if needed
+  // For now we focus on the core deletion functionality
 
   // Simplified meal addition using context
   const addMealToToday = async (meal: any, time: string) => {
@@ -284,8 +282,18 @@ export default function MealPlanDayScreen() {
         return false;
       }
       
-      // Use context method for addition
-      const success = await addMealToPlan(meal, viewingDate, time);
+      // Use simplified context method for addition
+      const success = await addMealToDate(viewingDate, {
+        name: meal.name || meal.meal_name,
+        type: meal.type || meal.meal_type || 'snack',
+        time: time,
+        calories: meal.calories || 0,
+        macros: meal.macros || { protein: 0, carbs: 0, fat: 0 },
+        ingredients: meal.ingredients || [],
+        instructions: meal.instructions || [],
+        tags: meal.tags || [],
+        isOriginal: false,
+      });
       
       if (success) {
         console.log('✅ Meal added successfully via context');
