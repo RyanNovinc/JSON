@@ -21,55 +21,18 @@ import { generateUserMealPlanPrompt } from '../data/generateUserMealPrompt';
 import { generateJsonConversionPrompt } from '../data/generateJsonConversionPrompt';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
-import { useMealPlanning } from '../contexts/MealPlanningContext';
+import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
 
-interface MealPlan {
-  plan_name: string;
-  description?: string;
-  duration_days: number;
-  total_meals: number;
-  weeks: Array<{
-    week_number: number;
-    days: Array<{
-      day_name: string;
-      day_number: number;
-      meals: Array<{
-        meal_name: string;
-        meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-        prep_time?: number;
-        cook_time?: number;
-        total_time?: number;
-        servings?: number;
-        calories?: number;
-        macros?: {
-          protein: number;
-          carbs: number;
-          fat: number;
-          fiber?: number;
-        };
-        ingredients: Array<{
-          item: string;
-          amount: string;
-          unit: string;
-          notes?: string;
-        }>;
-        instructions: string[];
-        notes?: string;
-        tags?: string[];
-      }>;
-    }>;
-  }>;
-  id?: string;
-}
+import { SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
 
 export default function ImportMealPlanScreen() {
   const navigation = useNavigation<ImportMealPlanNavigationProp>();
   const { themeColor } = useTheme();
-  const { saveMealPlan } = useMealPlanning();
+  const { saveMealPlan } = useSimplifiedMealPlanning();
   const [isLoading, setIsLoading] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
@@ -215,7 +178,7 @@ export default function ImportMealPlanScreen() {
     }, 2000);
   };
 
-  const validateAndParseJSON = (input: string): MealPlan | null => {
+  const validateAndParseJSON = (input: string): SimplifiedMealPlan | null => {
     let parsed: any;
     
     // Normalize smart quotes to straight quotes before parsing
@@ -299,27 +262,58 @@ export default function ImportMealPlanScreen() {
     
     // Continue with existing validation logic
     try {
+      // Debug what we actually received
+      console.log('🔍 Parsed JSON keys:', Object.keys(parsed));
+      console.log('🔍 Has dailyMeals:', !!parsed.dailyMeals);
+      console.log('🔍 Has metadata:', !!parsed.metadata);
+      console.log('🔍 Metadata content:', parsed.metadata);
       
-      // Basic validation - handle both original format and saved format
+      // Check if this is the new SimplifiedMealPlan format first
+      if (parsed.dailyMeals && parsed.metadata) {
+        // New format - minimal validation then return directly
+        if (!parsed.name || typeof parsed.name !== 'string') {
+          throw new Error('Invalid meal plan name');
+        }
+        if (!parsed.metadata.duration || typeof parsed.metadata.duration !== 'number') {
+          throw new Error('Invalid duration in metadata');
+        }
+        if (!parsed.dailyMeals || typeof parsed.dailyMeals !== 'object') {
+          throw new Error('Invalid dailyMeals structure');
+        }
+        console.log('✅ New SimplifiedMealPlan format detected');
+        return parsed as SimplifiedMealPlan;
+      }
+      
+      // Legacy format validation
       const planName = parsed.plan_name || parsed.name;
       if (!planName || typeof planName !== 'string') {
         throw new Error('Invalid meal plan name');
       }
       
-      // Handle both original format (duration_days) and saved format (duration)
+      // Handle legacy formats  
       const durationDays = parsed.duration_days || parsed.duration;
       if (!durationDays || typeof durationDays !== 'number') {
         throw new Error('Invalid duration days');
       }
 
-      // Handle both original format (total_meals) and saved format (meals)
-      const totalMeals = parsed.total_meals || parsed.meals;
+      // Handle total meals calculation - new format calculates from dailyMeals
+      let totalMeals = parsed.total_meals || parsed.meals;
+      if (!totalMeals && parsed.dailyMeals) {
+        // Calculate total meals from dailyMeals structure
+        totalMeals = Object.values(parsed.dailyMeals).reduce((total: number, day: any) => {
+          return total + (day.meals?.length || 0);
+        }, 0);
+      }
       if (!totalMeals || typeof totalMeals !== 'number') {
         throw new Error('Invalid total meals count');
       }
       
-      // Handle both formats - check for days array or nested data.days
-      const days = parsed.days || (parsed.data && parsed.data.days);
+      // Handle both formats - new format uses dailyMeals object, old format uses days array
+      let days = parsed.days || (parsed.data && parsed.data.days);
+      if (parsed.dailyMeals && !days) {
+        // Convert dailyMeals object to days array for validation
+        days = Object.values(parsed.dailyMeals);
+      }
       if (!Array.isArray(days) || days.length === 0) {
         throw new Error('No meal plan days found');
       }
@@ -415,16 +409,14 @@ export default function ImportMealPlanScreen() {
         }
       }
       
-      // Normalize the parsed object to ensure consistent format
-      const normalizedPlan = {
-        ...parsed,
-        plan_name: planName,
-        duration_days: durationDays,
-        total_meals: totalMeals,
-        days: days
-      };
-      
-      return normalizedPlan as MealPlan;
+      // Return SimplifiedMealPlan format
+      if (parsed.dailyMeals) {
+        // New format - already in SimplifiedMealPlan structure
+        return parsed as SimplifiedMealPlan;
+      } else {
+        // Legacy format - needs conversion (this would need a proper conversion function)
+        throw new Error('Legacy meal plan format detected. Please use the updated AI prompt to generate plans in the new format.');
+      }
     } catch (validationError) {
       const error = validationError as Error;
       const detailedError = `⚠️ Validation Error:\n\n${error.message}\n\n💡 This means your JSON was parsed successfully, but the meal plan structure has issues. Please check that all required fields are present and correctly formatted.`;
@@ -529,12 +521,12 @@ export default function ImportMealPlanScreen() {
     return Math.abs(hash).toString(36);
   };
 
-  const importMealPlanDirectly = async (parsedMealPlan: MealPlan) => {
+  const importMealPlanDirectly = async (simplifiedPlan: SimplifiedMealPlan) => {
     // Check for duplicates before saving
     let duplicateMessage = '';
     try {
       // Generate fingerprint for the new meal plan
-      const newFingerprint = createMealPlanFingerprint(parsedMealPlan);
+      const newFingerprint = createMealPlanFingerprint(simplifiedPlan);
       
       // Load existing meal plans and check for duplicates
       const existingMealPlans = await WorkoutStorage.loadMealPlans();

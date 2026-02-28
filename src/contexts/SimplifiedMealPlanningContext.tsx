@@ -276,17 +276,18 @@ export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProv
   const migrateLegacyPlan = async (legacyPlan: any): Promise<boolean> => {
     try {
       console.log('🔄 SimplifiedContext: Migrating legacy meal plan...');
+      console.log('📊 SimplifiedContext: Legacy plan structure:', Object.keys(legacyPlan));
       
       const simplifiedPlan: SimplifiedMealPlan = {
         id: legacyPlan.id || `migrated_${Date.now()}`,
-        name: legacyPlan.name || 'Migrated Meal Plan',
+        name: legacyPlan.plan_name || legacyPlan.name || 'Migrated Meal Plan',
         startDate: legacyPlan.startDate || new Date().toISOString().split('T')[0],
         endDate: legacyPlan.endDate || new Date().toISOString().split('T')[0],
         dailyMeals: {},
         metadata: {
           generatedAt: legacyPlan.generatedAt || new Date().toISOString(),
-          totalCost: legacyPlan.totalCost || 0,
-          duration: legacyPlan.duration || 7,
+          totalCost: legacyPlan.totalCost || legacyPlan.estimated_cost || 0,
+          duration: legacyPlan.duration || legacyPlan.duration_days || 7,
         },
       };
 
