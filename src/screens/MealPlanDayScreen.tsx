@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import {Picker} from '@react-native-picker/picker';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -124,7 +124,7 @@ export default function MealPlanDayScreen() {
   const navigation = useNavigation<MealPlanDayScreenNavigationProp>();
   const route = useRoute<MealPlanDayScreenRouteProp>();
   const { themeColor } = useTheme();
-  const { markMealCompleted, isMealCompleted, getDailyCompletionProgress, getFavoriteMeals } = useMealPlanning();
+  const { markMealCompleted, isMealCompleted, getDailyCompletionProgress, getFavoriteMeals, getMealsForDay, deleteMealFromPlan, addMealToPlan } = useMealPlanning();
 
   const { day, weekNumber, mealPlanName, dayIndex, calculatedDayName } = route.params;
   const [allMeals, setAllMeals] = useState(day.meals || []);
@@ -161,123 +161,50 @@ export default function MealPlanDayScreen() {
     }
   };
 
-  const loadCurrentDayMeals = useCallback(async () => {
+  const loadCurrentDayMeals = useCallback(() => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const mealPlanData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
+      console.log('🔍 Loading meals for day via context');
       
-      console.log('🔍 Debug loadCurrentDayMeals - today:', today);
-      console.log('🔍 Debug loadCurrentDayMeals - day.date:', day.date);
-      console.log('🔍 Debug loadCurrentDayMeals - day.day_name:', day.day_name);
-      console.log('🚨 CRITICAL: Are we viewing today or a different day?');
-      console.log('🚨 CRITICAL: day object:', JSON.stringify(day, null, 2));
+      // Get the viewing date
+      const currentViewingDate = day.date || parseDayNameToDate(day.day_name);
       
-      if (mealPlanData) {
-        const currentMealPlan = JSON.parse(mealPlanData);
-        console.log('🔍 Debug - currentMealPlan.data?.days length:', currentMealPlan.data?.days?.length);
-        
-        // CRITICAL FIX: Only look for manually added meals if we're actually viewing TODAY
-        // Don't contaminate historical days with today's manually added meals!
-        
-        // Start with original meals for this specific day (deleted meals are already removed from the data)
-        const originalMeals = day.meals || [];
-        
-        // Get the viewing date
-        const currentViewingDate = day.date || parseDayNameToDate(day.day_name);
-        
-        console.log('🔍 Original day meals:', originalMeals.length);
-        console.log('🎯 Currently viewing day date:', currentViewingDate);
-        console.log('🎯 Parsed from day_name:', day.day_name, '->', currentViewingDate);
-        
-        // Look for manually added meals for THIS viewing day
-        if (currentViewingDate) {
-          console.log('✅ Looking for manually added meals for viewing date:', currentViewingDate);
-          
-          const viewingData = currentMealPlan.data?.days?.find(d => {
-            console.log('🔍 Checking day in storage:', d.date, 'vs viewing date:', currentViewingDate);
-            return d.date === currentViewingDate;
-          });
-          
-          console.log('🔍 Debug - viewingData found:', !!viewingData);
-          console.log('🔍 Debug - viewingData meals count:', viewingData?.meals?.length || 0);
-          
-          if (viewingData?.meals && viewingData.date === currentViewingDate) {
-            const manualMealsForViewingDay = viewingData.meals.filter(meal => {
-              const isManual = meal.isManuallyAdded === true;
-              const isForThisDay = meal.addedDate === currentViewingDate || !meal.addedDate;
-              console.log(`🔍 Meal "${meal.meal_name}": isManual=${isManual}, addedDate="${meal.addedDate}", isForThisDay=${isForThisDay}`);
-              return isManual && isForThisDay;
-            });
-            
-            if (manualMealsForViewingDay.length > 0) {
-              // Convert manually added meals to the display format while preserving the isManuallyAdded flag
-              const convertedManualMeals = manualMealsForViewingDay.map(meal => ({
-                meal_name: meal.meal_name,
-                meal_type: meal.meal_type,
-                prep_time: meal.prep_time || 0,
-                cook_time: meal.cook_time || 0,
-                total_time: meal.total_time || meal.prep_time || 0,
-                servings: meal.servings || 1,
-                calories: meal.calories,
-                recommended_time: meal.recommended_time || meal.time,
-                timing_reason: meal.timing_reason || '',
-                macros: meal.macros || {},
-                ingredients: meal.ingredients || [],
-                instructions: meal.instructions || [],
-                notes: meal.notes || '',
-                tags: meal.tags || [],
-                isManuallyAdded: true // CRITICAL: Preserve this flag for delete functionality
-              }));
-              
-              const combinedMeals = [...originalMeals, ...convertedManualMeals];
-              console.log('🔍 Original meals:', originalMeals.length);
-              console.log('🔍 Manual meals for viewing day:', manualMealsForViewingDay.length);
-              console.log('🔍 Converted manual meals with isManuallyAdded flag:', convertedManualMeals.length);
-              console.log('🔍 Combined meals:', combinedMeals.length);
-              
-              // Debug: Log each meal with its isManuallyAdded status
-              combinedMeals.forEach((meal, index) => {
-                console.log(`🔍 Meal ${index}: "${meal.meal_name}" - isManuallyAdded: ${(meal as any).isManuallyAdded}`);
-              });
-              
-              setAllMeals(combinedMeals);
-              console.log('🔄 Updated meals display with viewing day\'s manual meals:', combinedMeals.length);
-            } else {
-              console.log('⚠️ No manual meals found for viewing day');
-              setAllMeals(originalMeals);
-              console.log('🔄 Showing original meals only:', originalMeals.length);
-            }
-          } else {
-            console.log('⚠️ No viewing day data found in storage');
-            setAllMeals(originalMeals);
-            console.log('🔄 Showing original meals only:', originalMeals.length);
-          }
-        } else {
-          console.log('🚫 No viewing date available - showing original meals only');
-          setAllMeals(originalMeals);
-          console.log('🔄 Showing original meals only:', originalMeals.length);
-        }
-        
-        // The main logic above already handles manually added meals correctly
-        // No need for additional fallback logic that was causing cross-day contamination
+      if (!currentViewingDate) {
+        console.log('⚠️ No viewing date available, using original meals');
+        setAllMeals(day.meals || []);
+        return;
+      }
+      
+      // CRITICAL FIX: Don't pass route parameter meals as they may be stale
+      // Instead, let getMealsForDay get the current meals from stored data
+      const mealsForDay = getMealsForDay(currentViewingDate, []);
+      console.log('🔍 Context returned meals:', mealsForDay.length);
+      
+      // If no meals from context, fall back to route parameters
+      if (mealsForDay.length === 0) {
+        console.log('📋 No meals from context, using route parameter meals as fallback');
+        setAllMeals(day.meals || []);
       } else {
-        console.log('⚠️ No meal plan data found in storage');
-        // Fallback to original meals
-        const originalMeals = day.meals || [];
-        setAllMeals(originalMeals);
+        setAllMeals(mealsForDay);
       }
     } catch (error) {
-      console.error('❌ Error loading current day meals:', error);
+      console.error('❌ Error loading meals from context:', error);
       // Fallback to original meals on error
-      const originalMeals = day.meals || [];
-      setAllMeals(originalMeals);
+      setAllMeals(day.meals || []);
     }
-  }, [day.date, day.meals, day.day_name]);
+  }, [day.date, day.day_name, getMealsForDay]); // Removed day.meals dependency to prevent stale data
 
-  // Load meals when screen focuses
+  // Load meals when screen mounts
   React.useEffect(() => {
     loadCurrentDayMeals();
   }, [loadCurrentDayMeals]);
+
+  // Reload meals when screen comes into focus (ensures data consistency)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🔄 Screen focused, reloading meals for consistency');
+      loadCurrentDayMeals();
+    }, [loadCurrentDayMeals])
+  );
 
   // Add meal modal state
   const [showAddMealModal, setShowAddMealModal] = useState(false);
@@ -294,173 +221,44 @@ export default function MealPlanDayScreen() {
   const [newMealCarbs, setNewMealCarbs] = useState('');
   const [newMealFat, setNewMealFat] = useState('');
   
+  // Action sheet and delete modal states
+  const [showActionSheet, setShowActionSheet] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedMeal, setSelectedMeal] = useState<{ meal: Meal; index: number; mealId: string; isCompleted: boolean } | null>(null);
+  
   // Get favorite meals and meal planning functions
   const favoriteMeals = getFavoriteMeals();
   const mealPlanningContext = useMealPlanning();
   const { saveMealPlan, currentMealPlan } = mealPlanningContext;
 
-  // Function to add a meal to the current viewing day's timeline
+  // Simplified meal addition using context
   const addMealToToday = async (meal: any, time: string) => {
     try {
-      console.log('🚀 Adding meal to viewing day:', meal?.name, 'at', time);
+      console.log('🚀 Adding meal via context:', meal?.name, 'at', time);
       
-      // Load the current meal plan from storage directly
-      const mealPlanData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
-      if (!mealPlanData) {
-        Alert.alert('Error', 'No meal plan found. Please generate a meal plan first.');
+      // Get the viewing date
+      const viewingDate = day.date || parseDayNameToDate(day.day_name);
+      
+      if (!viewingDate) {
+        Alert.alert('Error', 'Could not determine the day date for adding meal.');
         return false;
       }
       
-      const currentMealPlan = JSON.parse(mealPlanData);
-      console.log('📊 Loaded meal plan from storage');
+      // Use context method for addition
+      const success = await addMealToPlan(meal, viewingDate, time);
       
-      // Create a new meal object with updated time
-      const newMeal = {
-        ...meal,
-        id: `${meal.id}_added_${Date.now()}`,
-        time: time,
-        isManuallyAdded: true
-      };
-
-      // Use the VIEWING day's date, not today's date
-      const viewingDate = day.date || parseDayNameToDate(day.day_name) || new Date().toISOString().split('T')[0];
-      console.log('📅 Adding meal to viewing date:', viewingDate);
-      console.log('📅 Parsed from day_name:', day.day_name, '->', parseDayNameToDate(day.day_name));
-      
-      // Find the viewing day's meal plan day or create it
-      const updatedDays = [...(currentMealPlan.days || [])];
-      let viewingDayIndex = updatedDays.findIndex(day => day.date === viewingDate);
-      
-      if (viewingDayIndex === -1) {
-        console.log('➕ Creating new day for viewing date');
-        // Create new day if it doesn't exist
-        const newDay = {
-          date: viewingDate,
-          meals: [newMeal],
-          totalCalories: meal.nutritionInfo?.calories || 0,
-          totalMacros: {
-            protein: meal.nutritionInfo?.protein || 0,
-            carbs: meal.nutritionInfo?.carbs || 0,
-            fat: meal.nutritionInfo?.fat || 0
-          }
-        };
-        updatedDays.push(newDay);
+      if (success) {
+        console.log('✅ Meal added successfully via context');
+        // Reload meals to reflect changes
+        loadCurrentDayMeals();
+        return true;
       } else {
-        console.log('📝 Adding to existing viewing day');
-        // Add to existing day
-        updatedDays[viewingDayIndex] = {
-          ...updatedDays[viewingDayIndex],
-          meals: [...(updatedDays[viewingDayIndex].meals || []), newMeal],
-          totalCalories: (updatedDays[viewingDayIndex].totalCalories || 0) + (meal.nutritionInfo?.calories || 0),
-          totalMacros: {
-            protein: (updatedDays[viewingDayIndex].totalMacros?.protein || 0) + (meal.nutritionInfo?.protein || 0),
-            carbs: (updatedDays[viewingDayIndex].totalMacros?.carbs || 0) + (meal.nutritionInfo?.carbs || 0),
-            fat: (updatedDays[viewingDayIndex].totalMacros?.fat || 0) + (meal.nutritionInfo?.fat || 0)
-          }
-        };
-      }
-
-      // Update the meal plan in both formats
-      const updatedMealPlan = {
-        ...currentMealPlan,
-        days: updatedDays
-      };
-
-      // Create the meal in timeline format
-      const newMealForDataFormat = {
-        meal_name: meal.name,
-        meal_type: meal.type || 'lunch',
-        time: time,
-        recommended_time: time, // This is what the timeline displays
-        calories: meal.nutritionInfo?.calories || 0,
-        macros: {
-          protein: meal.nutritionInfo?.protein || 0,
-          carbs: meal.nutritionInfo?.carbs || 0,
-          fat: meal.nutritionInfo?.fat || 0,
-          fiber: meal.nutritionInfo?.fiber || 0
-        },
-        ingredients: meal.ingredients || [],
-        instructions: meal.instructions || [],
-        isManuallyAdded: true,
-        addedDate: viewingDate // Explicitly track the target date
-      };
-
-      // ONLY work with data.days format - create deep copies to avoid shared references
-      if (!currentMealPlan.data) {
-        currentMealPlan.data = { days: [] };
+        Alert.alert('Error', 'Failed to add meal to timeline');
+        return false;
       }
       
-      if (!currentMealPlan.data.days) {
-        currentMealPlan.data.days = [];
-      }
-
-      // Create a DEEP copy of data.days to avoid any shared references
-      const updatedDataDays = currentMealPlan.data.days.map(day => ({
-        ...day,
-        meals: day.meals ? [...day.meals] : [] // Deep copy the meals array too
-      }));
-      
-      console.log('🔍 DEBUG: Looking for viewing date in data.days...');
-      console.log('🔍 DEBUG: Viewing date is:', viewingDate);
-      console.log('🔍 DEBUG: Available days:');
-      updatedDataDays.forEach((day, index) => {
-        console.log(`🔍 DEBUG: Day ${index}: date="${day.date}", day_name="${day.day_name}"`);
-      });
-      
-      // Find viewing day with EXACT date matching
-      let viewingDataIndex = updatedDataDays.findIndex(day => {
-        console.log(`🔍 DEBUG: Comparing day.date "${day.date}" === viewingDate "${viewingDate}": ${day.date === viewingDate}`);
-        return day.date === viewingDate; // Must be exact match - no fallbacks
-      });
-      
-      console.log('🔍 DEBUG: viewingDataIndex:', viewingDataIndex);
-
-      if (viewingDataIndex === -1) {
-        // Create new day entry specifically for viewing date
-        console.log('➕ Creating NEW day specifically for viewing date');
-        const newDataDay = {
-          date: viewingDate, // Exact date format
-          day_name: `Manual Meals ${viewingDate}`, // Clear identifier
-          meals: [newMealForDataFormat]
-        };
-        updatedDataDays.push(newDataDay);
-        console.log('✅ Created brand new day entry for viewing date');
-      } else {
-        // Add meal ONLY to the found viewing day
-        console.log('📝 Adding meal ONLY to existing viewing day');
-        updatedDataDays[viewingDataIndex].meals.push(newMealForDataFormat);
-        console.log(`✅ Added meal to day ${viewingDataIndex} - total meals now: ${updatedDataDays[viewingDataIndex].meals.length}`);
-      }
-
-      // Update ONLY the data.days format 
-      updatedMealPlan.data = {
-        ...currentMealPlan.data,
-        days: updatedDataDays
-      };
-      
-      console.log('📋 Final meal plan structure created with targeted day update');
-
-      // Save back to storage
-      await AsyncStorage.setItem(
-        NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN,
-        JSON.stringify(updatedMealPlan)
-      );
-      
-      // Also save using the context method to update the state
-      await saveMealPlan(updatedMealPlan);
-      
-      console.log('✅ Meal added to viewing day\'s timeline successfully!');
-      console.log('🔄 Context state should now be updated');
-      console.log('📋 Added meal with recommended_time:', time);
-      
-      // Refresh the meal display to show the newly added meal
-      console.log('🔄 Refreshing meal display...');
-      await loadCurrentDayMeals();
-      console.log('✅ Meal display refreshed');
-      
-      return true;
     } catch (error) {
-      console.error('❌ Failed to add meal to timeline:', error);
+      console.error('❌ Failed to add meal via context:', error);
       Alert.alert('Error', 'Failed to add meal to timeline');
       return false;
     }
@@ -515,200 +313,48 @@ export default function MealPlanDayScreen() {
     return `${cleanName}_${meal.meal_type}_${globalIndex}`;
   };
 
-  // Function to delete any meal (manual or original)
+  // Simplified meal deletion using context
   const deleteMealFromDay = async (meal: Meal, index: number) => {
     try {
-      console.log('🗑️ Attempting to delete meal:', meal.meal_name);
-      const isManuallyAdded = (meal as any).isManuallyAdded === true;
+      console.log('🗑️ Attempting to delete meal via context:', meal.meal_name);
       
-      if (isManuallyAdded) {
-        // Handle manually added meals - remove from storage
-        console.log('🗑️ Deleting manually added meal from storage');
-        
-        // Load the current meal plan from storage
-        const mealPlanData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
-        if (!mealPlanData) {
-          Alert.alert('Error', 'No meal plan found.');
-          return false;
-        }
-        
-        const currentMealPlan = JSON.parse(mealPlanData);
-        
-        // Get the viewing date
-        const currentViewingDate = day.date || parseDayNameToDate(day.day_name) || new Date().toISOString().split('T')[0];
-        console.log('🗑️ Deleting from viewing date:', currentViewingDate);
-        
-        // Find the day in data.days format
-        if (!currentMealPlan.data?.days) {
-          console.log('⚠️ No data.days found');
-          return false;
-        }
-        
-        const updatedDataDays = currentMealPlan.data.days.map(day => ({
-          ...day,
-          meals: day.meals ? [...day.meals] : []
-        }));
-        
-        const viewingDataIndex = updatedDataDays.findIndex(day => day.date === currentViewingDate);
-        
-        if (viewingDataIndex === -1) {
-          console.log('⚠️ No day found for deletion');
-          Alert.alert('Error', 'Could not find the day to delete from.');
-          return false;
-        }
-        
-        // Filter out the manually added meal
-        const originalMealsLength = updatedDataDays[viewingDataIndex].meals.length;
-        updatedDataDays[viewingDataIndex].meals = updatedDataDays[viewingDataIndex].meals.filter(m => {
-          const isMatch = m.meal_name === meal.meal_name && 
-                         m.isManuallyAdded === true && 
-                         m.recommended_time === meal.recommended_time;
-          if (isMatch) {
-            console.log('🗑️ Found matching manually added meal to delete:', m.meal_name, 'at', m.recommended_time);
-          }
-          return !isMatch;
-        });
-        
-        const newMealsLength = updatedDataDays[viewingDataIndex].meals.length;
-        
-        if (originalMealsLength === newMealsLength) {
-          console.log('⚠️ No meal was deleted - no match found');
-          Alert.alert('Error', 'Could not find the meal to delete.');
-          return false;
-        }
-        
-        console.log(`🗑️ Successfully removed manually added meal. Meals count: ${originalMealsLength} -> ${newMealsLength}`);
-        
-        // Update the meal plan
-        const updatedMealPlan = {
-          ...currentMealPlan,
-          data: {
-            ...currentMealPlan.data,
-            days: updatedDataDays
-          }
-        };
-        
-        // Save to storage
-        await AsyncStorage.setItem(
-          NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN,
-          JSON.stringify(updatedMealPlan)
-        );
-        
-        // Update context
-        await saveMealPlan(updatedMealPlan);
-        
-        console.log('✅ Manually added meal deleted successfully!');
-        
-      } else {
-        // Handle original meal plan meals - actually remove them from the data structure
-        console.log('🗑️ Permanently deleting original meal plan meal from data structure');
-        
-        // Load the current meal plan from storage
-        const mealPlanData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
-        if (!mealPlanData) {
-          Alert.alert('Error', 'No meal plan found.');
-          return false;
-        }
-        
-        const currentMealPlan = JSON.parse(mealPlanData);
-        
-        // Get the viewing date to find the correct day in the original data structure
-        const currentViewingDate = day.date || parseDayNameToDate(day.day_name);
-        console.log('🗑️ Deleting meal from original data structure for date:', currentViewingDate);
-        
-        // The meal being displayed comes from day.meals (the original week data structure)
-        // We need to remove it from ALL possible data structures to ensure it's gone everywhere
-        
-        let mealFound = false;
-        
-        // Remove from the data.weeks structure (this is where the original data comes from)
-        if (currentMealPlan.data?.weeks) {
-          currentMealPlan.data.weeks.forEach(week => {
-            week.days?.forEach(weekDay => {
-              if (weekDay.meals) {
-                const originalLength = weekDay.meals.length;
-                weekDay.meals = weekDay.meals.filter(m => {
-                  const shouldRemove = m.meal_name === meal.meal_name && 
-                                     m.recommended_time === meal.recommended_time;
-                  if (shouldRemove) {
-                    mealFound = true;
-                    console.log('🗑️ Removed meal from weeks structure:', m.meal_name, 'from day:', weekDay.day_name);
-                  }
-                  return !shouldRemove;
-                });
-                
-                if (weekDay.meals.length !== originalLength) {
-                  console.log(`🗑️ Day ${weekDay.day_name}: meals count ${originalLength} -> ${weekDay.meals.length}`);
-                }
-              }
-            });
-          });
-        }
-        
-        // Also remove from data.days if it exists  
-        if (currentMealPlan.data?.days) {
-          currentMealPlan.data.days.forEach(dataDay => {
-            if (dataDay.meals) {
-              const originalLength = dataDay.meals.length;
-              dataDay.meals = dataDay.meals.filter(m => {
-                const shouldRemove = m.meal_name === meal.meal_name && 
-                                   m.recommended_time === meal.recommended_time;
-                if (shouldRemove) {
-                  mealFound = true;
-                  console.log('🗑️ Removed meal from days structure:', m.meal_name);
-                }
-                return !shouldRemove;
-              });
-              
-              if (dataDay.meals.length !== originalLength) {
-                console.log(`🗑️ Data day: meals count ${originalLength} -> ${dataDay.meals.length}`);
-              }
-            }
-          });
-        }
-        
-        if (!mealFound) {
-          console.log('⚠️ WARNING: Meal was not found in any data structure! This might cause it to reappear.');
-          console.log('🔍 Looking for meal:', meal.meal_name, 'with time:', meal.recommended_time);
-        }
-        
-        // Save to storage
-        await AsyncStorage.setItem(
-          NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN,
-          JSON.stringify(currentMealPlan)
-        );
-        
-        // Update context
-        await saveMealPlan(currentMealPlan);
-        
-        console.log('✅ Original meal permanently deleted from data structure!');
-        
-        // Immediately update the display by removing the meal from current state
-        const updatedMeals = allMeals.filter(m => 
-          !(m.meal_name === meal.meal_name && m.recommended_time === meal.recommended_time)
-        );
-        setAllMeals(updatedMeals);
-        console.log(`🔄 Immediate display update: ${allMeals.length} -> ${updatedMeals.length} meals`);
-        
-        // Also refresh from storage to ensure consistency
-        await loadCurrentDayMeals();
+      // Get the viewing date
+      const currentViewingDate = day.date || parseDayNameToDate(day.day_name);
+      
+      if (!currentViewingDate) {
+        Alert.alert('Error', 'Could not determine the day date for deletion.');
+        return false;
       }
       
-      Alert.alert('Success', 'Meal deleted successfully!');
-      return true;
+      // Use context method for deletion
+      const success = await deleteMealFromPlan(
+        { 
+          meal_name: meal.meal_name,
+          recommended_time: meal.recommended_time 
+        },
+        currentViewingDate
+      );
+      
+      if (success) {
+        // Reload meals to reflect changes
+        loadCurrentDayMeals();
+        return true;
+      } else {
+        Alert.alert('Error', 'Failed to delete meal. Please try again.');
+        return false;
+      }
       
     } catch (error) {
-      console.error('❌ Error deleting meal:', error);
+      console.error('❌ Error deleting meal via context:', error);
       Alert.alert('Error', 'Failed to delete meal. Please try again.');
       return false;
     }
   };
 
-  // Handle long press to show options
+  // Handle long press to show custom action sheet
   const handleMealLongPress = async (meal: Meal, index: number) => {
     const mealId = generateMealId(meal, index);
     const isCurrentlyCompleted = isMealCompleted(mealId, dayDateString);
-    const isManuallyAdded = (meal as any).isManuallyAdded === true;
     
     console.log('Long press:', { 
       mealName: meal.meal_name, 
@@ -716,61 +362,79 @@ export default function MealPlanDayScreen() {
       index, 
       dayDateString, 
       isCurrentlyCompleted,
-      isManuallyAdded,
       fullMeal: meal
     });
     
-    console.log('🔍 DEBUG: Checking meal for delete option');
-    console.log('🔍 DEBUG: meal.isManuallyAdded =', (meal as any).isManuallyAdded);
-    console.log('🔍 DEBUG: typeof meal.isManuallyAdded =', typeof (meal as any).isManuallyAdded);
-    console.log('🔍 DEBUG: Will show delete option?', isManuallyAdded);
-    
-    // Show action sheet with options
-    const options = [];
-    
-    // Always show completion toggle
-    options.push(isCurrentlyCompleted ? 'Mark as Incomplete' : 'Mark as Complete');
-    
-    // Show delete option for all meals
-    options.push('Delete Meal');
-    
-    options.push('Cancel');
-    
-    Alert.alert(
-      meal.meal_name,
-      'Choose an action:',
-      options.map((option, optionIndex) => ({
-        text: option,
-        style: option === 'Cancel' ? 'cancel' : option === 'Delete Meal' ? 'destructive' : 'default',
-        onPress: async () => {
-          if (option === 'Cancel') {
-            return;
-          } else if (option === 'Delete Meal') {
-            // Show confirmation dialog
-            Alert.alert(
-              'Delete Meal',
-              `Are you sure you want to delete "${meal.meal_name}"?`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Delete', 
-                  style: 'destructive',
-                  onPress: () => deleteMealFromDay(meal, index)
-                }
-              ]
-            );
+    // Set selected meal data and show custom action sheet
+    setSelectedMeal({ meal, index, mealId, isCompleted: isCurrentlyCompleted });
+    setShowActionSheet(true);
+  };
+
+  // Handle action sheet actions
+  const handleActionSheetAction = async (action: 'complete' | 'delete' | 'cancel') => {
+    if (!selectedMeal) return;
+
+    setShowActionSheet(false);
+
+    if (action === 'cancel') {
+      setSelectedMeal(null);
+      return;
+    }
+
+    if (action === 'complete') {
+      // Toggle completion
+      try {
+        await markMealCompleted(selectedMeal.mealId, dayDateString, !selectedMeal.isCompleted);
+        console.log('Meal completion updated successfully');
+      } catch (error) {
+        console.error('Failed to toggle meal completion:', error);
+      }
+      setSelectedMeal(null);
+    } else if (action === 'delete') {
+      // Show delete confirmation modal
+      setShowDeleteModal(true);
+    }
+  };
+
+  // Handle delete confirmation
+  const handleConfirmDelete = async () => {
+    if (selectedMeal) {
+      console.log('🔄 Screen: Starting deletion process...');
+      const success = await deleteMealFromDay(selectedMeal.meal, selectedMeal.index);
+      console.log('🔄 Screen: Deletion result:', success);
+      
+      setShowDeleteModal(false);
+      setSelectedMeal(null);
+      
+      // CRITICAL FIX: Force immediate UI update
+      if (success) {
+        console.log('🔄 Screen: Forcing immediate meal reload...');
+        
+        // Get the viewing date
+        const currentViewingDate = day.date || parseDayNameToDate(day.day_name);
+        if (currentViewingDate) {
+          // CRITICAL FIX: Don't pass stale route parameter meals
+          const updatedMeals = getMealsForDay(currentViewingDate, []);
+          console.log('🔄 Screen: Context returned updated meals:', updatedMeals.length);
+          
+          // If no meals from context, fall back to reloading
+          if (updatedMeals.length === 0) {
+            console.log('📋 No meals from context, reloading from storage');
+            loadCurrentDayMeals();
           } else {
-            // Toggle completion
-            try {
-              await markMealCompleted(mealId, dayDateString, !isCurrentlyCompleted);
-              console.log('Meal completion updated successfully');
-            } catch (error) {
-              console.error('Failed to toggle meal completion:', error);
-            }
+            // Force state update immediately
+            setAllMeals(updatedMeals);
+            console.log('✅ Screen: Forced UI update complete');
           }
         }
-      }))
-    );
+      }
+    }
+  };
+
+  // Handle cancel delete
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+    // Keep selectedMeal for action sheet return
   };
 
   // Calculate daily totals
@@ -1389,6 +1053,117 @@ export default function MealPlanDayScreen() {
             </View>
           </View>
         </Modal>
+      </Modal>
+
+      {/* Custom Action Sheet */}
+      <Modal
+        visible={showActionSheet}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => handleActionSheetAction('cancel')}
+      >
+        <View style={styles.actionSheetOverlay}>
+          <TouchableOpacity 
+            style={styles.actionSheetBackdrop}
+            activeOpacity={1}
+            onPress={() => handleActionSheetAction('cancel')}
+          />
+          <View style={styles.actionSheetContainer}>
+            {/* Header */}
+            <View style={styles.actionSheetHeader}>
+              <Text style={styles.actionSheetTitle}>
+                {selectedMeal?.meal.meal_name}
+              </Text>
+              <Text style={styles.actionSheetSubtitle}>
+                Choose an action:
+              </Text>
+            </View>
+            
+            {/* Actions */}
+            <TouchableOpacity 
+              style={styles.actionSheetButton}
+              onPress={() => handleActionSheetAction('complete')}
+            >
+              <Ionicons 
+                name={selectedMeal?.isCompleted ? "checkmark-circle" : "checkmark-circle-outline"} 
+                size={24} 
+                color="#10b981" 
+              />
+              <Text style={styles.actionSheetButtonText}>
+                {selectedMeal?.isCompleted ? 'Mark as Incomplete' : 'Mark as Complete'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionSheetButton}
+              onPress={() => handleActionSheetAction('delete')}
+            >
+              <Ionicons name="trash-outline" size={24} color="#ef4444" />
+              <Text style={[styles.actionSheetButtonText, { color: '#ef4444' }]}>
+                Delete Meal
+              </Text>
+            </TouchableOpacity>
+            
+            {/* Cancel Button */}
+            <TouchableOpacity 
+              style={styles.actionSheetCancelButton}
+              onPress={() => handleActionSheetAction('cancel')}
+            >
+              <Text style={styles.actionSheetCancelText}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelDelete}
+      >
+        <View style={styles.deleteModalOverlay}>
+          <View style={styles.deleteModalContainer}>
+            {/* Icon */}
+            <View style={styles.deleteIconContainer}>
+              <Ionicons name="trash-outline" size={32} color="#ef4444" />
+            </View>
+            
+            {/* Title */}
+            <Text style={styles.deleteModalTitle}>
+              Delete Meal
+            </Text>
+            
+            {/* Meal Name */}
+            <Text style={styles.deleteModalMealName}>
+              {selectedMeal?.meal.meal_name}
+            </Text>
+            
+            {/* Description */}
+            <Text style={styles.deleteModalDescription}>
+              Are you sure you want to delete this meal? This action cannot be undone.
+            </Text>
+            
+            {/* Buttons */}
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity 
+                style={[styles.deleteModalButton, styles.deleteModalCancelButton]}
+                onPress={handleCancelDelete}
+              >
+                <Text style={styles.deleteModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.deleteModalButton, styles.deleteModalConfirmButton]}
+                onPress={handleConfirmDelete}
+              >
+                <Text style={styles.deleteModalConfirmText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -2198,6 +1973,156 @@ const styles = StyleSheet.create({
   },
   timePickerItem: {
     fontSize: 18,
+    color: '#ffffff',
+  },
+
+  // Action Sheet Styles
+  actionSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  actionSheetBackdrop: {
+    flex: 1,
+  },
+  actionSheetContainer: {
+    backgroundColor: '#18181b',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 32,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  actionSheetHeader: {
+    alignItems: 'center',
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
+    marginBottom: 20,
+  },
+  actionSheetTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  actionSheetSubtitle: {
+    fontSize: 16,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  actionSheetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#27272a',
+    borderRadius: 16,
+    marginBottom: 12,
+    gap: 16,
+  },
+  actionSheetButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#ffffff',
+    flex: 1,
+  },
+  actionSheetCancelButton: {
+    backgroundColor: '#ef4444',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  actionSheetCancelText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+
+  // Delete Modal Styles
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  deleteModalContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: 24,
+    padding: 32,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.25,
+    shadowRadius: 25,
+    elevation: 25,
+  },
+  deleteIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#fef2f2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  deleteModalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deleteModalMealName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ef4444',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  deleteModalDescription: {
+    fontSize: 16,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    width: '100%',
+  },
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+  },
+  deleteModalCancelButton: {
+    backgroundColor: '#27272a',
+    borderWidth: 1,
+    borderColor: '#404040',
+  },
+  deleteModalConfirmButton: {
+    backgroundColor: '#ef4444',
+  },
+  deleteModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  deleteModalConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#ffffff',
   },
 });
