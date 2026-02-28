@@ -231,7 +231,7 @@ export default function MealPlanDayScreen() {
       // Fallback to original meals on error
       setAllMeals(day.meals || []);
     }
-  }, [day.date, day.day_name, getMealsForDay]); // Removed day.meals dependency to prevent stale data
+  }, [day.date, day.day_name, getMealsForDate]); // Removed day.meals dependency to prevent stale data
 
   // Load meals when screen mounts
   React.useEffect(() => {
