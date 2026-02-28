@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  
+  Alert,
   SafeAreaView,
   ScrollView,
 } from 'react-native';
@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
+import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 
 type MealPlanDaysScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MealPlanDays'>;
 type MealPlanDaysScreenRouteProp = RouteProp<RootStackParamList, 'MealPlanDays'>;
@@ -56,58 +57,81 @@ interface Day {
 interface DayCardProps {
   day: Day;
   onPress: () => void;
+  onLongPress?: () => void;
   themeColor: string;
   isCompleted?: boolean;
   dayDate?: string;
   dayName?: string;
   isToday?: boolean;
   mealPlanning: any; // Add meal planning context
+  dayIndex: number; // Add dayIndex to map to current plan
+  currentPlan: any; // Add current plan to get live meal data
 }
 
-function DayCard({ day, onPress, themeColor, isCompleted, dayDate, dayName, isToday, mealPlanning }: DayCardProps) {
-  const mealCount = day.meals.length;
-
-  // Generate meal IDs and check completion status (must match MealPlanDayScreen)
-  const generateMealId = (meal: Meal, index: number) => {
-    // Use a combination of meal name, type, and index for uniqueness
-    const cleanName = meal.meal_name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    return `${cleanName}_${meal.meal_type}_${index}`;
+function DayCard({ day, onPress, onLongPress, themeColor, isCompleted, dayDate, dayName, isToday, mealPlanning, dayIndex, currentPlan }: DayCardProps) {
+  // Get live meal data from current plan instead of legacy day.meals
+  const getCurrentDayMeals = () => {
+    if (!currentPlan || typeof dayIndex !== 'number') {
+      console.log(`⚠️ DayCard: No current plan or invalid dayIndex (${dayIndex})`);
+      return [];
+    }
+    
+    const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+    if (dayIndex >= 0 && dayIndex < availableDates.length) {
+      const dateKey = availableDates[dayIndex];
+      const dayData = currentPlan.dailyMeals[dateKey];
+      console.log(`📊 DayCard: Day ${dayIndex} (${dateKey}) has ${dayData?.meals?.length || 0} meals`);
+      return dayData?.meals || [];
+    }
+    
+    console.log(`⚠️ DayCard: dayIndex ${dayIndex} out of range (0-${availableDates.length-1})`);
+    return [];
   };
 
-  // Use a simple date format for now - this should match the format used in MealPlanDayScreen
-  const dayDateString = new Date().toISOString().split('T')[0];
-  
-  const completedMealsCount = day.meals.filter((meal, index) => {
-    const mealId = generateMealId(meal, index);
-    return mealPlanning.isMealCompleted(mealId, dayDateString);
-  }).length;
+  const currentDayMeals = getCurrentDayMeals();
+  const mealCount = currentDayMeals.length;
+
+  // For now, disable meal completion tracking and just show as not completed
+  const completedMealsCount = 0; // Simplified - all meals show as not completed
   
   const progressPercentage = mealCount > 0 ? (completedMealsCount / mealCount) * 100 : 0;
   
-  // Use daily totals from scaled data, fallback to calculation if not available
-  const totalCalories = day.daily_totals?.calories || day.meals.reduce((total, meal) => {
-    return total + (meal.calories || 0);
-  }, 0);
-
-  // Use daily totals from scaled data, fallback to calculation if not available
-  const totalMacros = day.daily_totals ? {
-    protein: day.daily_totals.protein,
-    carbs: day.daily_totals.carbs,
-    fat: day.daily_totals.fat,
-    fiber: day.daily_totals.fiber || 0,
-  } : day.meals.reduce((totals, meal) => {
-    if (meal.macros) {
+  // Calculate totals from live meal data
+  const calculateTotalsFromCurrentMeals = () => {
+    if (currentDayMeals.length === 0) {
       return {
-        protein: totals.protein + meal.macros.protein,
-        carbs: totals.carbs + meal.macros.carbs,
-        fat: totals.fat + meal.macros.fat,
-        fiber: totals.fiber + (meal.macros.fiber || 0),
+        calories: 0,
+        macros: { protein: 0, carbs: 0, fat: 0, fiber: 0 }
       };
     }
+
+    const totals = currentDayMeals.reduce((acc, meal) => {
+      const calories = meal.nutrition?.calories || meal.calories || 0;
+      const nutrition = meal.nutrition || meal.macros || {};
+      
+      return {
+        calories: acc.calories + calories,
+        macros: {
+          protein: acc.macros.protein + (nutrition.protein || 0),
+          carbs: acc.macros.carbs + (nutrition.carbs || nutrition.carbohydrates || 0),
+          fat: acc.macros.fat + (nutrition.fat || 0),
+          fiber: acc.macros.fiber + (nutrition.fiber || 0),
+        }
+      };
+    }, { calories: 0, macros: { protein: 0, carbs: 0, fat: 0, fiber: 0 } });
+
     return totals;
-  }, { protein: 0, carbs: 0, fat: 0, fiber: 0 });
+  };
 
+  const currentTotals = calculateTotalsFromCurrentMeals();
+  const totalCalories = currentTotals.calories;
+  const totalMacros = currentTotals.macros;
 
+  // Don't render the day card if there are no meals
+  if (mealCount === 0) {
+    console.log(`📊 DayCard: Skipping render for day ${dayIndex} - no meals found`);
+    return null;
+  }
 
   return (
     <TouchableOpacity 
@@ -120,6 +144,8 @@ function DayCard({ day, onPress, themeColor, isCompleted, dayDate, dayName, isTo
       ]} 
       activeOpacity={0.8}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={800}
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardTitle}>
@@ -200,6 +226,7 @@ export default function MealPlanDaysScreen() {
   const route = useRoute<MealPlanDaysScreenRouteProp>();
   const { themeColor } = useTheme();
   const mealPlanning = useMealPlanning();
+  const { currentPlan, deleteMealFromDate } = useSimplifiedMealPlanning();
 
   const { week, mealPlanName, mealPrepSession, allMealPrepSessions, groceryList } = route.params;
   
@@ -453,17 +480,89 @@ export default function MealPlanDaysScreen() {
     });
   };
 
+  // Day deletion function 
+  const handleDayLongPress = (day: Day, dayIndex: number) => {
+    Alert.alert(
+      'Delete Day',
+      `Are you sure you want to delete all meals from ${getDayName(dayIndex)}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteDayMeals(day, dayIndex),
+        },
+      ],
+    );
+  };
+
+  // Function to delete all meals from a specific day
+  const deleteDayMeals = async (day: Day, dayIndex: number) => {
+    try {
+      if (!currentPlan) {
+        Alert.alert('Error', 'No meal plan loaded');
+        return;
+      }
+
+      // Use the same dayIndex mapping approach as the individual day screen
+      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+      let dateKey: string;
+      
+      if (dayIndex >= 0 && dayIndex < availableDates.length) {
+        // Map dayIndex to actual plan dates (same as MealPlanDayScreen)
+        dateKey = availableDates[dayIndex];
+        console.log(`🗑️ Deletion: Mapped dayIndex ${dayIndex} to plan date ${dateKey}`);
+      } else {
+        console.log(`🗑️ Deletion: dayIndex ${dayIndex} out of range (0-${availableDates.length-1})`);
+        Alert.alert('Error', `Invalid day index: ${dayIndex}`);
+        return;
+      }
+      
+      console.log(`🗑️ Available dates in plan:`, availableDates);
+      console.log(`🗑️ Target date:`, dateKey);
+
+      // Get all meals for this day and delete them one by one
+      const dayData = currentPlan.dailyMeals[dateKey];
+      if (dayData && dayData.meals.length > 0) {
+        const mealIds = dayData.meals.map(meal => meal.id);
+        
+        let deletedCount = 0;
+        for (const mealId of mealIds) {
+          const success = await deleteMealFromDate(dateKey, mealId);
+          if (success) deletedCount++;
+        }
+
+        if (deletedCount > 0) {
+          Alert.alert('Success', `Deleted ${deletedCount} meals from ${getDayName(dayIndex)}`);
+        } else {
+          Alert.alert('Error', 'Failed to delete meals');
+        }
+      } else {
+        Alert.alert('Info', 'This day has no meals to delete');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting day meals:', error);
+      Alert.alert('Error', 'Failed to delete day meals');
+    }
+  };
+
   const renderDay = ({ item: day, index }: { item: Day; index: number }) => {
     return (
       <DayCard
         day={day}
         onPress={() => handleDayPress(day, index)}
+        onLongPress={() => handleDayLongPress(day, index)}
         themeColor={themeColor}
         isCompleted={false} // TODO: Track completion status
         dayDate={getDayDate(index)}
         dayName={getDayName(index)}
         isToday={isToday(index)}
         mealPlanning={mealPlanning}
+        dayIndex={index}
+        currentPlan={currentPlan}
       />
     );
   };
@@ -602,12 +701,15 @@ export default function MealPlanDaysScreen() {
                   key={`${week.week_number}-${dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day)}`}
                   day={day}
                   onPress={() => handleDayPress(day, dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
+                  onLongPress={() => handleDayLongPress(day, dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
                   themeColor={themeColor}
                   isCompleted={false}
                   dayDate={getDayDate(dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
                   dayName={getDayName(dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
                   isToday={isToday(dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
                   mealPlanning={mealPlanning}
+                  dayIndex={dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day)}
+                  currentPlan={currentPlan}
                 />
               ))}
             </View>
