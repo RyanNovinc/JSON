@@ -142,7 +142,37 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
   const loadCurrentMealPlan = async (): Promise<MealPlan | null> => {
     try {
       const data = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
-      return data ? JSON.parse(data) : null;
+      if (!data) return null;
+      
+      const mealPlan = JSON.parse(data);
+      
+      // FIX: Add proper dates to any days that have undefined dates
+      if (mealPlan.data?.days) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        let hasUndefinedDates = false;
+        
+        mealPlan.data.days.forEach((day: any, index: number) => {
+          if (!day.date || day.date === 'undefined') {
+            hasUndefinedDates = true;
+            // Calculate proper date for this day
+            const dayDate = new Date(today);
+            dayDate.setDate(today.getDate() + index);
+            day.date = dayDate.toISOString().split('T')[0]; // Format: "2026-02-27"
+            
+            console.log(`🔧 Context: Fixed day ${index} date from undefined to ${day.date}`);
+          }
+        });
+        
+        // If we fixed any dates, save the updated meal plan
+        if (hasUndefinedDates) {
+          console.log('💾 Context: Saving meal plan with fixed dates');
+          await AsyncStorage.setItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN, JSON.stringify(mealPlan));
+        }
+      }
+      
+      return mealPlan;
     } catch (error) {
       console.error('Failed to load meal plan:', error);
       return null;
