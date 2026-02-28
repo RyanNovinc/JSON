@@ -7,8 +7,10 @@ import {
   Alert,
   SafeAreaView,
   ScrollView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -128,10 +130,15 @@ function DayCard({ day, onPress, onLongPress, themeColor, isCompleted, dayDate, 
   const totalCalories = currentTotals.calories;
   const totalMacros = currentTotals.macros;
 
-  // Don't render the day card if there are no meals
-  if (mealCount === 0) {
-    console.log(`📊 DayCard: Skipping render for day ${dayIndex} - no meals found`);
+  // Only hide day cards with no meals if they're old legacy days
+  // New empty days should always be shown so users can add meals to them
+  if (mealCount === 0 && !currentPlan) {
+    console.log(`📊 DayCard: Skipping render for legacy day ${dayIndex} - no meals found`);
     return null;
+  }
+
+  if (mealCount === 0) {
+    console.log(`📊 DayCard: Rendering empty day ${dayIndex} - ready for meals to be added`);
   }
 
   return (
@@ -315,6 +322,10 @@ export default function MealPlanDaysScreen() {
   // State for tracking meal prep completion
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
   
+  // State for date picker
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  
   // Debug: Log the meal prep session and calorie data
   console.log('🔍 MealPlanDaysScreen received data:');
   console.log('Week data:', week);
@@ -353,7 +364,7 @@ export default function MealPlanDaysScreen() {
     }
 
     const availableDates = Object.keys(currentPlan.dailyMeals).sort();
-    console.log(`📅 Creating days from ${availableDates.length} available dates in current plan`);
+    console.log(`📅 Creating days from ${availableDates.length} available dates in current plan:`, availableDates);
     
     return availableDates.map((date, index) => {
       const dayData = currentPlan.dailyMeals[date];
@@ -569,49 +580,63 @@ export default function MealPlanDaysScreen() {
 
   // Function to add a new day to the meal plan
   const handleAddDay = () => {
-    Alert.alert(
-      'Add New Day',
-      'This will add a new empty day to your meal plan. You can then add meals to it.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Add Day',
-          style: 'default',
-          onPress: () => addNewDay(),
-        },
-      ],
-    );
+    if (Platform.OS === 'ios') {
+      // On iOS, show date picker in alert
+      Alert.prompt(
+        'Add New Day',
+        'Choose a date for the new day:',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Pick Date',
+            onPress: () => {
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              setSelectedDate(tomorrow);
+              setShowDatePicker(true);
+            },
+          },
+        ]
+      );
+    } else {
+      // On Android, show date picker directly
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setSelectedDate(tomorrow);
+      setShowDatePicker(true);
+    }
   };
 
-  const addNewDay = async () => {
+  const addNewDay = async (dateToAdd: Date) => {
     try {
       if (!currentPlan) {
         Alert.alert('Error', 'No meal plan loaded');
         return;
       }
 
-      // Calculate the next available date
-      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
-      const lastDate = availableDates[availableDates.length - 1];
-      const nextDate = new Date(lastDate);
-      nextDate.setDate(nextDate.getDate() + 1);
-      const nextDateString = nextDate.toISOString().split('T')[0];
+      const dateString = dateToAdd.toISOString().split('T')[0];
+      console.log(`➕ Adding new day: ${dateString}`);
+      console.log(`📋 Current plan keys before:`, Object.keys(currentPlan.dailyMeals));
 
-      console.log(`➕ Adding new day: ${nextDateString}`);
+      // Check if date already exists
+      if (currentPlan.dailyMeals[dateString]) {
+        Alert.alert('Date Already Exists', `A day for ${dateToAdd.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} already exists in your meal plan.`);
+        return;
+      }
 
       // Calculate the day name for the new date
-      const dayName = nextDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const dayName = dateToAdd.toLocaleDateString('en-US', { weekday: 'long' });
 
       // Add the new empty day to the meal plan
       const updatedPlan = {
         ...currentPlan,
         dailyMeals: {
           ...currentPlan.dailyMeals,
-          [nextDateString]: {
-            date: nextDateString,
+          [dateString]: {
+            date: dateString,
             dayName: dayName,
             meals: [],
             dailyTotals: {
@@ -625,15 +650,46 @@ export default function MealPlanDaysScreen() {
         },
       };
 
+      console.log(`📋 Updated plan keys after:`, Object.keys(updatedPlan.dailyMeals));
+
       // Save the updated plan using the context method
       await saveMealPlan(updatedPlan);
       
-      Alert.alert('Success', `Added new day: ${nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}. The new day will appear at the bottom of your meal plan.`);
+      console.log(`✅ Successfully saved plan with new day`);
+      
+      Alert.alert('Success', `Added new day: ${dateToAdd.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`);
       
     } catch (error) {
       console.error('❌ Error adding new day:', error);
       Alert.alert('Error', 'Failed to add new day');
     }
+  };
+
+  // Handle date picker change
+  const onDateChange = (event: any, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+
+    if (event.type === 'dismissed') {
+      return;
+    }
+
+    if (date) {
+      if (Platform.OS === 'android') {
+        // On Android, immediately add the day
+        addNewDay(date);
+      } else {
+        // On iOS, store the selected date
+        setSelectedDate(date);
+      }
+    }
+  };
+
+  // Handle iOS date picker confirmation
+  const handleDateConfirm = () => {
+    setShowDatePicker(false);
+    addNewDay(selectedDate);
   };
 
   // Function to delete all meals from a specific day
@@ -851,26 +907,53 @@ export default function MealPlanDaysScreen() {
               ))}
             </View>
           ))}
+
+          {/* Add Day Button - Inside ScrollView */}
+          <View style={styles.addDayContainer}>
+            <TouchableOpacity 
+              style={[styles.addDayButton, { borderColor: themeColor }]}
+              onPress={handleAddDay}
+              activeOpacity={0.7}
+            >
+              <View style={styles.addDayContent}>
+                <Ionicons name="add-circle-outline" size={20} color={themeColor} />
+                <Text style={[styles.addDayText, { color: themeColor }]}>
+                  Add Day
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
 
-      {/* Add Day Button */}
-      <View style={styles.addDayContainer}>
-        <TouchableOpacity 
-          style={[styles.addDayButton, { borderColor: themeColor }]}
-          onPress={handleAddDay}
-          activeOpacity={0.7}
-        >
-          <View style={styles.addDayContent}>
-            <View style={[styles.addDayIcon, { backgroundColor: themeColor }]}>
-              <Ionicons name="add" size={24} color="#ffffff" />
+      {/* Date Picker */}
+      {showDatePicker && (
+        <View>
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={onDateChange}
+            minimumDate={new Date()}
+          />
+          {Platform.OS === 'ios' && (
+            <View style={styles.datePickerButtons}>
+              <TouchableOpacity
+                style={[styles.datePickerButton, styles.cancelButton]}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.datePickerButton, { backgroundColor: themeColor }]}
+                onPress={handleDateConfirm}
+              >
+                <Text style={styles.confirmButtonText}>Add Day</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={[styles.addDayText, { color: themeColor }]}>
-              Add Day
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1222,6 +1305,27 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginLeft: 8,
   },
+  
+  // Meal Prep Styles
+  mealPrepContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mealPrepIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  mealPrepText: {
+    flex: 1,
+  },
+  mealPrepSubtitle: {
+    fontSize: 14,
+    color: '#a1a1aa',
+  },
   prepCardFriendly: {
     borderRadius: 16,
     padding: 20,
@@ -1288,19 +1392,41 @@ const styles = StyleSheet.create({
   addDayContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  addDayIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
   addDayText: {
     fontSize: 18,
     fontWeight: '600',
     letterSpacing: -0.3,
+  },
+
+  // Date Picker Styles
+  datePickerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#18181b',
+  },
+  datePickerButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  cancelButtonText: {
+    color: '#a1a1aa',
+    fontWeight: '600',
+  },
+  confirmButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
   },
 });
 
