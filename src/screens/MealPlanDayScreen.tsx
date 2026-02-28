@@ -19,40 +19,16 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
+import { NUTRITION_STORAGE_KEYS, SimplifiedMeal } from '../types/nutrition';
 
 type MealPlanDayScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MealPlanDay'>;
 type MealPlanDayScreenRouteProp = RouteProp<RootStackParamList, 'MealPlanDay'>;
 
-interface Meal {
-  meal_name: string;
-  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
-  prep_time?: number;
-  cook_time?: number;
-  total_time?: number;
-  servings?: number;
-  calories?: number;
-  recommended_time?: string; // e.g., "7:45 AM", "12:30 PM"
-  timing_reason?: string; // e.g., "Within your optimal morning window"
-  macros?: {
-    protein: number;
-    carbs: number;
-    fat: number;
-    fiber?: number;
-  };
-  ingredients: Array<{
-    item: string;
-    amount: string;
-    unit: string;
-    notes?: string;
-  }>;
-  instructions: string[];
-  notes?: string;
-  tags?: string[];
-}
+// Use SimplifiedMeal from types instead of custom Meal interface
+type Meal = SimplifiedMeal;
 
 interface MealCardProps {
-  meal: Meal;
+  meal: SimplifiedMeal;
   onPress: () => void;
   onLongPress: () => void;
   themeColor: string;
@@ -62,7 +38,7 @@ interface MealCardProps {
 }
 
 function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor, isCompleted }: MealCardProps) {
-  const totalTime = meal.total_time || (meal.prep_time || 0) + (meal.cook_time || 0);
+  // SimplifiedMeal doesn't have prep/cook time, so we'll skip that calculation
   
   return (
     <TouchableOpacity 
@@ -81,13 +57,13 @@ function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor,
             <Ionicons name={mealIcon as any} size={20} color={mealColor} />
           </View>
           <View style={styles.mealTitleContainer}>
-            <Text style={styles.mealName}>{meal.meal_name}</Text>
+            <Text style={styles.mealName}>{meal.name}</Text>
             <View style={styles.mealSubInfo}>
               <Text style={[styles.mealType, { color: mealColor }]}>
-                {meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1)}
+                {meal.type.charAt(0).toUpperCase() + meal.type.slice(1)}
               </Text>
-              {meal.recommended_time && (
-                <Text style={styles.mealTime}> • {meal.recommended_time}</Text>
+              {meal.time && (
+                <Text style={styles.mealTime}> • {meal.time}</Text>
               )}
             </View>
           </View>
@@ -284,8 +260,8 @@ export default function MealPlanDayScreen() {
       
       // Use simplified context method for addition
       const success = await addMealToDate(viewingDate, {
-        name: meal.name || meal.meal_name,
-        type: meal.type || meal.meal_type || 'snack',
+        name: meal.name,
+        type: meal.type || 'snack',
         time: time,
         calories: meal.calories || 0,
         macros: meal.macros || { protein: 0, carbs: 0, fat: 0 },
@@ -357,14 +333,14 @@ export default function MealPlanDayScreen() {
   // Generate a unique ID for meals since the current interface doesn't have one
   const generateMealId = (meal: Meal, globalIndex: number) => {
     // Use a combination of meal name, type, and index for uniqueness
-    const cleanName = meal.meal_name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    return `${cleanName}_${meal.meal_type}_${globalIndex}`;
+    const cleanName = meal.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    return `${cleanName}_${meal.type}_${globalIndex}`;
   };
 
   // Simplified meal deletion using context
   const deleteMealFromDay = async (meal: Meal, index: number) => {
     try {
-      console.log('🗑️ Attempting to delete meal via context:', meal.meal_name);
+      console.log('🗑️ Attempting to delete meal via context:', meal.name);
       
       // Get the viewing date - prioritize calculatedDateString from navigation
       const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
@@ -379,7 +355,7 @@ export default function MealPlanDayScreen() {
       // First we need to find the meal ID from the simplified context
       const simplifiedMeals = getMealsForDate(currentViewingDate);
       const targetMeal = simplifiedMeals.find(m => 
-        m.name === meal.meal_name && m.time === meal.recommended_time
+        m.name === meal.name && m.time === meal.time
       );
       
       if (!targetMeal) {
@@ -412,7 +388,7 @@ export default function MealPlanDayScreen() {
     const isCurrentlyCompleted = false; // Simplified: completion tracking disabled
     
     console.log('Long press:', { 
-      mealName: meal.meal_name, 
+      mealName: meal.name, 
       mealId, 
       index, 
       dayDateString, 
@@ -505,7 +481,7 @@ export default function MealPlanDayScreen() {
     const mealId = generateMealId(meal, index);
     const isCompleted = false; // Simplified: all meals show as not completed for now
     console.log('Progress check:', { 
-      mealName: meal.meal_name, 
+      mealName: meal.name, 
       mealId, 
       index, 
       isCompleted 
@@ -598,12 +574,12 @@ export default function MealPlanDayScreen() {
   // Sort meals chronologically by recommended_time, fallback to meal type order
   const mealTypeOrder = { 'breakfast': 0, 'snack': 1, 'lunch': 2, 'dinner': 3 };
   const sortedMeals = meals.sort((a, b) => {
-    const timeA = a.recommended_time ? timeToMinutes(a.recommended_time) : mealTypeOrder[a.meal_type] * 360; // 6-hour gaps as fallback
-    const timeB = b.recommended_time ? timeToMinutes(b.recommended_time) : mealTypeOrder[b.meal_type] * 360;
+    const timeA = a.time ? timeToMinutes(a.time) : mealTypeOrder[a.type] * 360; // 6-hour gaps as fallback
+    const timeB = b.time ? timeToMinutes(b.time) : mealTypeOrder[b.type] * 360;
     
-    console.log(`⏰ Sorting: ${a.meal_name} (${a.recommended_time || 'no time'}) = ${timeA} minutes`);
-    console.log(`⏰ Sorting: ${b.meal_name} (${b.recommended_time || 'no time'}) = ${timeB} minutes`);
-    console.log(`⏰ Comparison: ${a.meal_name} vs ${b.meal_name} = ${timeA - timeB}`);
+    console.log(`⏰ Sorting: ${a.name} (${a.time || 'no time'}) = ${timeA} minutes`);
+    console.log(`⏰ Sorting: ${b.name} (${b.time || 'no time'}) = ${timeB} minutes`);
+    console.log(`⏰ Comparison: ${a.name} vs ${b.name} = ${timeA - timeB}`);
     
     return timeA - timeB;
   });
@@ -709,8 +685,8 @@ export default function MealPlanDayScreen() {
                 onPress={() => handleMealPress(meal)}
                 onLongPress={() => handleMealLongPress(meal, index)}
                 themeColor={themeColor}
-                mealIcon={getMealIcon(meal.meal_type)}
-                mealColor={getMealColor(meal.meal_type)}
+                mealIcon={getMealIcon(meal.type)}
+                mealColor={getMealColor(meal.type)}
                 isCompleted={isCompleted}
               />
             );
@@ -824,7 +800,7 @@ export default function MealPlanDayScreen() {
                         selectedFavoriteMeal?.mealId === favorite.mealId && styles.selectedMealCard
                       ]}
                       onPress={() => {
-                        console.log('🎯 Meal card tapped:', favorite.meal?.name || favorite.meal?.meal_name);
+                        console.log('🎯 Meal card tapped:', favorite.meal?.name);
                         setSelectedFavoriteMeal(favorite);
                         console.log('✅ Selected favorite meal set');
                       }}
@@ -832,7 +808,7 @@ export default function MealPlanDayScreen() {
                     >
                       <View style={styles.mealCardHeader}>
                         <Text style={styles.favoriteMealName}>
-                          {favorite.meal?.meal_name || favorite.meal?.name || 'Unknown Meal'}
+                          {favorite.meal?.name || 'Unknown Meal'}
                         </Text>
                         <View style={styles.mealMetrics}>
                           <Text style={styles.calorieText}>
@@ -1123,7 +1099,7 @@ export default function MealPlanDayScreen() {
             {/* Header */}
             <View style={styles.actionSheetHeader}>
               <Text style={styles.actionSheetTitle}>
-                {selectedMeal?.meal.meal_name}
+                {selectedMeal?.meal.name}
               </Text>
               <Text style={styles.actionSheetSubtitle}>
                 Choose an action:
@@ -1189,7 +1165,7 @@ export default function MealPlanDayScreen() {
             
             {/* Meal Name */}
             <Text style={styles.deleteModalMealName}>
-              {selectedMeal?.meal.meal_name}
+              {selectedMeal?.meal.name}
             </Text>
             
             {/* Description */}

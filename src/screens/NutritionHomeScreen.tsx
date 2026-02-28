@@ -20,17 +20,53 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAppMode } from '../contexts/AppModeContext';
-import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import { MigrationHelper } from '../utils/migrationHelper';
 import { WorkoutStorage, NutritionCompletionStatus, MealPlan } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
+import { NUTRITION_STORAGE_KEYS, SimplifiedMealPlan } from '../types/nutrition';
 import { generateUserMealPlanPrompt } from '../data/generateUserMealPrompt';
 
 type NutritionNavigationProp = StackNavigationProp<RootStackParamList, 'NutritionHome'>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Helper function to convert SimplifiedMealPlan to legacy MealPlan format for UI compatibility
+const convertToLegacyFormat = (simplifiedPlan: SimplifiedMealPlan): MealPlan => {
+  // Convert dailyMeals object to days array format
+  const days = Object.entries(simplifiedPlan.dailyMeals).map(([date, dayData], index) => ({
+    day_name: dayData.dayName,
+    day_number: index + 1,
+    date: date,
+    meals: dayData.meals.map(meal => ({
+      meal_name: meal.name,
+      meal_type: meal.type,
+      calories: meal.calories,
+      macros: meal.macros,
+      ingredients: meal.ingredients,
+      instructions: meal.instructions,
+      recommended_time: meal.time,
+      prep_time: 0,
+      cook_time: 0,
+      total_time: 0,
+      servings: 1,
+      tags: meal.tags || [],
+      notes: '',
+      weekly_meal_coverage: []
+    }))
+  }));
+
+  return {
+    id: simplifiedPlan.id,
+    name: simplifiedPlan.name,
+    duration: simplifiedPlan.metadata.duration,
+    data: {
+      days: days,
+      // Include metadata for macro calculations
+      estimated_cost: simplifiedPlan.metadata.totalCost || 0,
+    }
+  };
+};
 
 // Helper function to get macro split display
 const getMacroSplitDisplay = (plan: MealPlan) => {
@@ -130,9 +166,17 @@ export default function NutritionHomeScreen({ route }: any) {
   const navigation = useNavigation<NutritionNavigationProp>();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
-  const { userProfile, clearCurrentMealPlan, currentMealPlan } = useMealPlanning();
+  const { currentPlan } = useSimplifiedMealPlanning();
   
-  // Convert current meal plan to array for rendering logic compatibility
+  // For compatibility with existing code
+  const userProfile = null; // TODO: Will need to handle user profile separately
+  const clearCurrentMealPlan = async () => {
+    // TODO: Implement clear function if needed
+    console.log('Clear meal plan not implemented in SimplifiedContext yet');
+  };
+  
+  // Convert SimplifiedMealPlan to legacy format for UI compatibility
+  const currentMealPlan = currentPlan ? convertToLegacyFormat(currentPlan) : null;
   const mealPlans = currentMealPlan ? [currentMealPlan] : [];
   
   const [shareModal, setShareModal] = useState<{ visible: boolean; plan: MealPlan | null }>({
