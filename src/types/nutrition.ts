@@ -117,6 +117,40 @@ export interface MealPlan {
   generatedAt: string;
 }
 
+// NEW SIMPLIFIED ARCHITECTURE
+export interface SimplifiedMealPlan {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  dailyMeals: Record<string, SimplifiedMealPlanDay>; // key: "2024-02-20"
+  metadata: {
+    generatedAt: string;
+    totalCost: number;
+    duration: number;
+  };
+}
+
+export interface SimplifiedMealPlanDay {
+  date: string; // "2024-02-20"
+  dayName: string; // "Monday"
+  meals: SimplifiedMeal[];
+}
+
+export interface SimplifiedMeal {
+  id: string;
+  name: string;
+  type: MealType;
+  time: string; // "7:45 AM"
+  calories: number;
+  macros: MacroBreakdown;
+  ingredients: Ingredient[];
+  instructions: CookingInstruction[];
+  tags: MealTag[];
+  isOriginal: boolean; // true if from generated plan, false if manually added
+  addedAt?: string; // timestamp when added (for manual meals)
+}
+
 export interface MealPlanDay {
   date: string;
   meals: Meal[];
@@ -258,6 +292,8 @@ export const NUTRITION_STORAGE_KEYS = {
   WEIGHT_ENTRIES: '@nutrition_weight_entries',
   MEAL_RATINGS: '@nutrition_meal_ratings',
   COMPLETED_MEALS: '@nutrition_completed_meals',
+  // NEW SIMPLIFIED ARCHITECTURE
+  SIMPLIFIED_MEAL_PLAN: '@nutrition_simplified_plan',
 } as const;
 
 // Utility Types
@@ -270,6 +306,26 @@ export interface NutritionState {
   completedMeals: Record<string, boolean>; // key format: "date:mealId"
   isLoading: boolean;
   hasCompletedQuestionnaire: boolean;
+  // NEW SIMPLIFIED ARCHITECTURE
+  simplifiedMealPlan: SimplifiedMealPlan | null;
+}
+
+// NEW SIMPLIFIED CONTEXT OPERATIONS
+export interface SimplifiedMealPlanOperations {
+  // Core data operations
+  loadSimplifiedMealPlan: () => Promise<SimplifiedMealPlan | null>;
+  saveSimplifiedMealPlan: (plan: SimplifiedMealPlan) => Promise<void>;
+  
+  // Day operations
+  getMealsForDate: (date: string) => SimplifiedMeal[];
+  
+  // Meal operations
+  addMealToDay: (date: string, meal: Omit<SimplifiedMeal, 'id'>) => Promise<boolean>;
+  deleteMealFromDay: (date: string, mealId: string) => Promise<boolean>;
+  updateMeal: (date: string, mealId: string, updates: Partial<SimplifiedMeal>) => Promise<boolean>;
+  
+  // Migration utilities
+  convertLegacyMealPlan: (legacyPlan: any) => SimplifiedMealPlan;
 }
 
 export interface MealPlanFilters {

@@ -13,14 +13,18 @@ import {
   Meal,
   GroceryList,
   MealPlanRequest,
+  SimplifiedMealPlan,
+  SimplifiedMealPlanDay,
+  SimplifiedMeal,
+  SimplifiedMealPlanOperations,
 } from '../types/nutrition';
 
-interface MealPlanningContextType extends NutritionState {
+interface MealPlanningContextType extends NutritionState, SimplifiedMealPlanOperations {
   // Profile Management
   saveUserProfile: (profile: UserNutritionProfile) => Promise<void>;
   updateUserProfile: (updates: Partial<UserNutritionProfile>) => Promise<void>;
   
-  // Meal Plan Management
+  // Meal Plan Management (Legacy)
   generateMealPlan: (request: MealPlanRequest) => Promise<void>;
   saveMealPlan: (mealPlan: MealPlan) => Promise<void>;
   clearCurrentMealPlan: () => Promise<void>;
@@ -79,6 +83,7 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
     completedMeals: {},
     isLoading: true,
     hasCompletedQuestionnaire: false,
+    simplifiedMealPlan: null,
   });
 
   // Load data on mount
@@ -1032,6 +1037,272 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
     }
   };
 
+  // NEW SIMPLIFIED ARCHITECTURE FUNCTIONS
+  const loadSimplifiedMealPlan = async (): Promise<SimplifiedMealPlan | null> => {
+    try {
+      const data = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLAN);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Failed to load simplified meal plan:', error);
+      return null;
+    }
+  };
+
+  const saveSimplifiedMealPlan = async (plan: SimplifiedMealPlan): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(
+        NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLAN,
+        JSON.stringify(plan)
+      );
+      setState(prev => ({ ...prev, simplifiedMealPlan: plan }));
+      console.log('✅ Simplified meal plan saved successfully');
+    } catch (error) {
+      console.error('Failed to save simplified meal plan:', error);
+      throw error;
+    }
+  };
+
+  const getMealsForDate = (date: string): SimplifiedMeal[] => {
+    if (!state.simplifiedMealPlan) {
+      console.log('⚠️ No simplified meal plan loaded');
+      return [];
+    }
+
+    const dayData = state.simplifiedMealPlan.dailyMeals[date];
+    if (!dayData) {
+      console.log(`⚠️ No meals found for date: ${date}`);
+      return [];
+    }
+
+    console.log(`✅ Found ${dayData.meals.length} meals for date: ${date}`);
+    return [...dayData.meals]; // Return a copy to prevent mutations
+  };
+
+  const addMealToDay = async (date: string, meal: Omit<SimplifiedMeal, 'id'>): Promise<boolean> => {
+    try {
+      if (!state.simplifiedMealPlan) {
+        console.log('⚠️ No simplified meal plan to add meal to');
+        return false;
+      }
+
+      const updatedPlan = JSON.parse(JSON.stringify(state.simplifiedMealPlan));
+      
+      // Generate unique meal ID
+      const mealId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const newMeal: SimplifiedMeal = {
+        ...meal,
+        id: mealId,
+        addedAt: new Date().toISOString(),
+      };
+
+      // Initialize day if it doesn't exist
+      if (!updatedPlan.dailyMeals[date]) {
+        const dayDate = new Date(date);
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        updatedPlan.dailyMeals[date] = {
+          date,
+          dayName: dayNames[dayDate.getDay()],
+          meals: [],
+        };
+      }
+
+      // Add meal to day
+      updatedPlan.dailyMeals[date].meals.push(newMeal);
+      
+      // Save updated plan
+      await saveSimplifiedMealPlan(updatedPlan);
+      
+      console.log(`✅ Added meal "${meal.name}" to ${date}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to add meal to day:', error);
+      return false;
+    }
+  };
+
+  const deleteMealFromDay = async (date: string, mealId: string): Promise<boolean> => {
+    try {
+      if (!state.simplifiedMealPlan) {
+        console.log('⚠️ No simplified meal plan to delete meal from');
+        return false;
+      }
+
+      const updatedPlan = JSON.parse(JSON.stringify(state.simplifiedMealPlan));
+      
+      const dayData = updatedPlan.dailyMeals[date];
+      if (!dayData) {
+        console.log(`⚠️ No day found for date: ${date}`);
+        return false;
+      }
+
+      const mealIndex = dayData.meals.findIndex((meal: SimplifiedMeal) => meal.id === mealId);
+      if (mealIndex === -1) {
+        console.log(`⚠️ Meal with ID ${mealId} not found on ${date}`);
+        return false;
+      }
+
+      const deletedMeal = dayData.meals[mealIndex];
+      
+      // Remove meal from array
+      dayData.meals.splice(mealIndex, 1);
+      
+      // Save updated plan
+      await saveSimplifiedMealPlan(updatedPlan);
+      
+      console.log(`✅ Deleted meal "${deletedMeal.name}" from ${date}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to delete meal from day:', error);
+      return false;
+    }
+  };
+
+  const updateMeal = async (date: string, mealId: string, updates: Partial<SimplifiedMeal>): Promise<boolean> => {
+    try {
+      if (!state.simplifiedMealPlan) {
+        console.log('⚠️ No simplified meal plan to update meal in');
+        return false;
+      }
+
+      const updatedPlan = JSON.parse(JSON.stringify(state.simplifiedMealPlan));
+      
+      const dayData = updatedPlan.dailyMeals[date];
+      if (!dayData) {
+        console.log(`⚠️ No day found for date: ${date}`);
+        return false;
+      }
+
+      const mealIndex = dayData.meals.findIndex((meal: SimplifiedMeal) => meal.id === mealId);
+      if (mealIndex === -1) {
+        console.log(`⚠️ Meal with ID ${mealId} not found on ${date}`);
+        return false;
+      }
+
+      // Update meal with provided updates
+      dayData.meals[mealIndex] = {
+        ...dayData.meals[mealIndex],
+        ...updates,
+        id: mealId, // Preserve original ID
+      };
+      
+      // Save updated plan
+      await saveSimplifiedMealPlan(updatedPlan);
+      
+      console.log(`✅ Updated meal "${dayData.meals[mealIndex].name}" on ${date}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to update meal:', error);
+      return false;
+    }
+  };
+
+  const convertLegacyMealPlan = (legacyPlan: any): SimplifiedMealPlan => {
+    console.log('🔄 Converting legacy meal plan to simplified structure');
+    
+    const simplifiedPlan: SimplifiedMealPlan = {
+      id: legacyPlan.id || `simplified_${Date.now()}`,
+      name: legacyPlan.name || 'Converted Meal Plan',
+      startDate: legacyPlan.startDate || new Date().toISOString().split('T')[0],
+      endDate: legacyPlan.endDate || new Date().toISOString().split('T')[0],
+      dailyMeals: {},
+      metadata: {
+        generatedAt: legacyPlan.generatedAt || new Date().toISOString(),
+        totalCost: legacyPlan.totalCost || 0,
+        duration: legacyPlan.duration || 7,
+      },
+    };
+
+    // Convert from legacy data.weeks structure
+    if (legacyPlan.data?.weeks) {
+      let dayOffset = 0;
+      const baseDate = new Date(simplifiedPlan.startDate);
+      
+      legacyPlan.data.weeks.forEach((week: any) => {
+        week.days?.forEach((legacyDay: any) => {
+          const dayDate = new Date(baseDate);
+          dayDate.setDate(baseDate.getDate() + dayOffset);
+          const dateStr = dayDate.toISOString().split('T')[0];
+          
+          const simplifiedDay: SimplifiedMealPlanDay = {
+            date: dateStr,
+            dayName: legacyDay.day_name || `Day ${dayOffset + 1}`,
+            meals: [],
+          };
+
+          // Convert meals
+          if (legacyDay.meals) {
+            legacyDay.meals.forEach((legacyMeal: any, mealIndex: number) => {
+              const simplifiedMeal: SimplifiedMeal = {
+                id: `converted_${Date.now()}_${dayOffset}_${mealIndex}`,
+                name: legacyMeal.meal_name || 'Unnamed Meal',
+                type: legacyMeal.meal_type || 'lunch',
+                time: legacyMeal.recommended_time || '12:00 PM',
+                calories: legacyMeal.calories || 0,
+                macros: legacyMeal.macros || { protein: 0, carbs: 0, fat: 0 },
+                ingredients: legacyMeal.ingredients || [],
+                instructions: legacyMeal.instructions || [],
+                tags: legacyMeal.tags || [],
+                isOriginal: true,
+              };
+              
+              simplifiedDay.meals.push(simplifiedMeal);
+            });
+          }
+
+          simplifiedPlan.dailyMeals[dateStr] = simplifiedDay;
+          dayOffset++;
+        });
+      });
+    }
+
+    // Add any manually added meals from data.days
+    if (legacyPlan.data?.days) {
+      legacyPlan.data.days.forEach((legacyDataDay: any) => {
+        if (legacyDataDay.date && legacyDataDay.meals) {
+          const dateStr = legacyDataDay.date;
+          
+          // Initialize day if it doesn't exist
+          if (!simplifiedPlan.dailyMeals[dateStr]) {
+            const dayDate = new Date(dateStr);
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            
+            simplifiedPlan.dailyMeals[dateStr] = {
+              date: dateStr,
+              dayName: dayNames[dayDate.getDay()],
+              meals: [],
+            };
+          }
+
+          // Add manual meals
+          legacyDataDay.meals.forEach((legacyMeal: any, mealIndex: number) => {
+            if (legacyMeal.isManuallyAdded) {
+              const simplifiedMeal: SimplifiedMeal = {
+                id: `manual_${Date.now()}_${mealIndex}`,
+                name: legacyMeal.meal_name || 'Manual Meal',
+                type: legacyMeal.meal_type || 'lunch',
+                time: legacyMeal.recommended_time || legacyMeal.time || '12:00 PM',
+                calories: legacyMeal.calories || 0,
+                macros: legacyMeal.macros || { protein: 0, carbs: 0, fat: 0 },
+                ingredients: legacyMeal.ingredients || [],
+                instructions: legacyMeal.instructions || [],
+                tags: legacyMeal.tags || [],
+                isOriginal: false,
+                addedAt: legacyMeal.addedDate || new Date().toISOString(),
+              };
+              
+              simplifiedPlan.dailyMeals[dateStr].meals.push(simplifiedMeal);
+            }
+          });
+        }
+      });
+    }
+
+    console.log(`✅ Converted legacy plan with ${Object.keys(simplifiedPlan.dailyMeals).length} days`);
+    return simplifiedPlan;
+  };
+
   const contextValue: MealPlanningContextType = {
     ...state,
     saveUserProfile,
@@ -1062,6 +1333,14 @@ export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ chil
     clearAllData,
     hasCompletedSetup,
     refreshData,
+    // New simplified architecture functions
+    loadSimplifiedMealPlan,
+    saveSimplifiedMealPlan,
+    getMealsForDate,
+    addMealToDay,
+    deleteMealFromDay,
+    updateMeal,
+    convertLegacyMealPlan,
   };
 
   return (
