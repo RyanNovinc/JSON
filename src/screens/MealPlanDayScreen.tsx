@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { useMealPlanning } from '../contexts/MealPlanningContext';
+import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 
@@ -124,11 +124,55 @@ export default function MealPlanDayScreen() {
   const navigation = useNavigation<MealPlanDayScreenNavigationProp>();
   const route = useRoute<MealPlanDayScreenRouteProp>();
   const { themeColor } = useTheme();
-  const { markMealCompleted, isMealCompleted, getDailyCompletionProgress, getFavoriteMeals, getMealsForDay, deleteMealFromPlan, addMealToPlan } = useMealPlanning();
+  const { 
+    getMealsForDate, 
+    deleteMealFromDate, 
+    addMealToDate,
+    migrateLegacyPlan,
+    currentPlan 
+  } = useSimplifiedMealPlanning();
 
   const { day, weekNumber, mealPlanName, dayIndex, calculatedDayName, calculatedDateString } = route.params;
   const [allMeals, setAllMeals] = useState(day.meals || []);
+  const [isMigrated, setIsMigrated] = useState(false);
   const meals = allMeals;
+
+  // Auto-migrate legacy data on component mount
+  useEffect(() => {
+    const handleMigration = async () => {
+      try {
+        if (!currentPlan && !isMigrated) {
+          console.log('🔄 MealPlanDay: No simplified plan found, checking for legacy data');
+          const legacyData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
+          
+          if (legacyData) {
+            console.log('🔄 MealPlanDay: Found legacy data, starting migration');
+            const legacyPlan = JSON.parse(legacyData);
+            const success = await migrateLegacyPlan(legacyPlan);
+            
+            if (success) {
+              console.log('✅ MealPlanDay: Migration completed successfully');
+            } else {
+              console.log('❌ MealPlanDay: Migration failed');
+            }
+          }
+          setIsMigrated(true);
+        }
+      } catch (error) {
+        console.error('❌ MealPlanDay migration error:', error);
+        setIsMigrated(true);
+      }
+    };
+
+    handleMigration();
+  }, [currentPlan, migrateLegacyPlan, isMigrated]);
+
+  // Load meals when migration is complete or plan is available
+  useEffect(() => {
+    if (isMigrated || currentPlan) {
+      loadCurrentDayMeals();
+    }
+  }, [isMigrated, currentPlan]);
 
   // Function to load current day's meals from storage
   // Helper function to convert day_name to a proper date string
@@ -175,14 +219,13 @@ export default function MealPlanDayScreen() {
         return;
       }
       
-      // CRITICAL FIX: Always trust the context data, even if it's 0 meals
-      // After deletion, 0 meals is the correct state, not a fallback condition
-      const mealsForDay = getMealsForDay(currentViewingDate, []);
-      console.log('🔍 Context returned meals:', mealsForDay.length);
+      // Use simplified context to get meals for this date
+      const mealsForDay = getMealsForDate(currentViewingDate);
+      console.log('🔍 Simplified Context returned meals:', mealsForDay.length);
       
-      // Always use context data - if it's 0 meals, that's correct (maybe all deleted)
+      // Always use context data - simplified system is reliable
       setAllMeals(mealsForDay);
-      console.log('✅ Screen: Using context meals directly (no fallback to stale route data)');
+      console.log('✅ Screen: Using simplified context meals directly');
     } catch (error) {
       console.error('❌ Error loading meals from context:', error);
       // Fallback to original meals on error
@@ -324,14 +367,20 @@ export default function MealPlanDayScreen() {
         return false;
       }
       
-      // Use context method for deletion
-      const success = await deleteMealFromPlan(
-        { 
-          meal_name: meal.meal_name,
-          recommended_time: meal.recommended_time 
-        },
-        currentViewingDate
+      // Use simplified context method for deletion
+      // First we need to find the meal ID from the simplified context
+      const simplifiedMeals = getMealsForDate(currentViewingDate);
+      const targetMeal = simplifiedMeals.find(m => 
+        m.name === meal.meal_name && m.time === meal.recommended_time
       );
+      
+      if (!targetMeal) {
+        console.log('⚠️ Meal not found in simplified context, may need migration');
+        Alert.alert('Error', 'Meal not found. Please try refreshing the screen.');
+        return false;
+      }
+      
+      const success = await deleteMealFromDate(currentViewingDate, targetMeal.id);
       
       if (success) {
         // Reload meals to reflect changes
@@ -412,13 +461,13 @@ export default function MealPlanDayScreen() {
         const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
         console.log(`📅 Reload: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
         if (currentViewingDate) {
-          // CRITICAL FIX: Always trust context data, even if 0 meals (after deletion)
-          const updatedMeals = getMealsForDay(currentViewingDate, []);
-          console.log('🔄 Screen: Context returned updated meals:', updatedMeals.length);
+          // Use simplified context for force reload
+          const updatedMeals = getMealsForDate(currentViewingDate);
+          console.log('🔄 Screen: Simplified context returned updated meals:', updatedMeals.length);
           
-          // Always use context data - 0 meals is valid after deletion
+          // Always use simplified context data
           setAllMeals(updatedMeals);
-          console.log('✅ Screen: Forced UI update complete (no fallback logic)');
+          console.log('✅ Screen: Forced UI update complete with simplified context');
         }
       }
     }
