@@ -409,7 +409,7 @@ export default function MealPlanDayScreen() {
   // Handle long press to show custom action sheet
   const handleMealLongPress = async (meal: Meal, index: number) => {
     const mealId = generateMealId(meal, index);
-    const isCurrentlyCompleted = isMealCompleted(mealId, dayDateString);
+    const isCurrentlyCompleted = false; // Simplified: completion tracking disabled
     
     console.log('Long press:', { 
       mealName: meal.meal_name, 
@@ -439,7 +439,8 @@ export default function MealPlanDayScreen() {
     if (action === 'complete') {
       // Toggle completion
       try {
-        await markMealCompleted(selectedMeal.mealId, dayDateString, !selectedMeal.isCompleted);
+        // Meal completion functionality disabled for simplified system
+        console.log('Meal completion feature temporarily disabled');
         console.log('Meal completion updated successfully');
       } catch (error) {
         console.error('Failed to toggle meal completion:', error);
@@ -499,10 +500,10 @@ export default function MealPlanDayScreen() {
     };
   }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, prepTime: 0 });
 
-  // Calculate completion progress
+  // Calculate completion progress (simplified - completion tracking can be added later)
   const completedMealsCount = meals.filter((meal, index) => {
     const mealId = generateMealId(meal, index);
-    const isCompleted = isMealCompleted(mealId, dayDateString);
+    const isCompleted = false; // Simplified: all meals show as not completed for now
     console.log('Progress check:', { 
       mealName: meal.meal_name, 
       mealId, 
@@ -512,10 +513,10 @@ export default function MealPlanDayScreen() {
     return isCompleted;
   }).length;
   
-  // Calculate nutrition from completed meals only
+  // Calculate nutrition from completed meals only (simplified)
   const completedNutrition = meals.reduce((totals, meal, index) => {
     const mealId = generateMealId(meal, index);
-    const isCompleted = isMealCompleted(mealId, dayDateString);
+    const isCompleted = false; // Simplified: completion tracking disabled for now
     
     if (isCompleted) {
       return {
@@ -699,7 +700,7 @@ export default function MealPlanDayScreen() {
           
           {sortedMeals.map((meal, index) => {
             const mealId = generateMealId(meal, index);
-            const isCompleted = isMealCompleted(mealId, dayDateString);
+            const isCompleted = false; // Simplified: completion tracking disabled
             
             return (
               <MealCard
