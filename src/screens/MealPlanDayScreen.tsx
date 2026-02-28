@@ -333,8 +333,8 @@ export default function MealPlanDayScreen() {
   // Generate a unique ID for meals since the current interface doesn't have one
   const generateMealId = (meal: Meal, globalIndex: number) => {
     // Use a combination of meal name, type, and index for uniqueness
-    const cleanName = meal.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    return `${cleanName}_${meal.type}_${globalIndex}`;
+    const cleanName = (meal.name || 'unknown_meal').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    return `${cleanName}_${meal.type || 'unknown'}_${globalIndex}`;
   };
 
   // Simplified meal deletion using context
@@ -574,12 +574,12 @@ export default function MealPlanDayScreen() {
   // Sort meals chronologically by recommended_time, fallback to meal type order
   const mealTypeOrder = { 'breakfast': 0, 'snack': 1, 'lunch': 2, 'dinner': 3 };
   const sortedMeals = meals.sort((a, b) => {
-    const timeA = a.time ? timeToMinutes(a.time) : mealTypeOrder[a.type] * 360; // 6-hour gaps as fallback
-    const timeB = b.time ? timeToMinutes(b.time) : mealTypeOrder[b.type] * 360;
+    const timeA = a.time ? timeToMinutes(a.time) : (mealTypeOrder[a.type] || 0) * 360; // 6-hour gaps as fallback
+    const timeB = b.time ? timeToMinutes(b.time) : (mealTypeOrder[b.type] || 0) * 360;
     
-    console.log(`⏰ Sorting: ${a.name} (${a.time || 'no time'}) = ${timeA} minutes`);
-    console.log(`⏰ Sorting: ${b.name} (${b.time || 'no time'}) = ${timeB} minutes`);
-    console.log(`⏰ Comparison: ${a.name} vs ${b.name} = ${timeA - timeB}`);
+    console.log(`⏰ Sorting: ${a.name || 'unnamed'} (${a.time || 'no time'}) = ${timeA} minutes`);
+    console.log(`⏰ Sorting: ${b.name || 'unnamed'} (${b.time || 'no time'}) = ${timeB} minutes`);
+    console.log(`⏰ Comparison: ${a.name || 'unnamed'} vs ${b.name || 'unnamed'} = ${timeA - timeB}`);
     
     return timeA - timeB;
   });
