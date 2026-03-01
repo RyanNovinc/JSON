@@ -1,5 +1,4 @@
-export const generateJsonConversionPrompt = () => {
-  return `Please convert the meal plan you just created into a specific JSON format that can be imported into my nutrition app called JSON.fit.
+Please convert the meal plan you just created into a specific JSON format that can be imported into my nutrition app called JSON.fit.
 
 # MEAL PLANNING STRUCTURE
 
@@ -18,7 +17,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 
 # JSON Schema Required
 
-\`\`\`json
+```json
 {
   "id": "string",
   "name": "string",
@@ -95,7 +94,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
     "duration": number
   }
 }
-\`\`\`
+```
 
 # Field Requirements
 
@@ -181,12 +180,12 @@ This JSON format is designed to work directly with the app's simplified meal pla
 - Instructions should ONLY contain actual cooking steps needed to make the meal
 
 **Example - WRONG:**
-\`\`\`
+```
 "instructions": ["Bake chicken 200°C 25min. Cook rice. Steam broccoli."]
-\`\`\`
+```
 
 **Example - CORRECT:**
-\`\`\`
+```
 "instructions": [
   "Preheat oven to 200°C",
   "Season chicken breast with salt and pepper", 
@@ -195,7 +194,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
   "Steam broccoli for 5-7 minutes until tender",
   "Serve chicken over rice with broccoli on the side"
 ]
-\`\`\`
+```
 
 # Ingredient Guidelines
 
@@ -224,7 +223,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 - Total quantities correctly across all days (e.g., if 4 meals use 80g oats, list 320g)
 - Use realistic prices for the specified store and location
 - Organize into logical shopping categories
-- Set all \`is_purchased\` to \`false\` (user checks these off in the app)
+- Set all `is_purchased` to `false` (user checks these off in the app)
 - Include helpful notes about usage, storage, and substitutions
 
 **Category suggestions:**
@@ -246,14 +245,14 @@ This JSON format is designed to work directly with the app's simplified meal pla
 - Match the actual recipes — don't reference items that aren't in the plan
 
 **storage_guidelines format:**
-\`\`\`json
+```json
 "storage_guidelines": {
   "cooked_chicken": "Refrigerate up to 4 days, freeze up to 3 months",
   "cooked_rice": "Refrigerate up to 5 days",
   "bolognese_sauce": "Refrigerate 3 days, freeze up to 3 months",
   "prepped_vegetables": "Refrigerate 3-5 days, do not freeze"
 }
-\`\`\`
+```
 
 # Quality Standards
 
@@ -279,7 +278,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 - Format suggestion: "meal_{dayNumber}_{mealType}_{index}"
 
 **Example Structure:**
-\`\`\`json
+```json
 {
   "id": "plan_7day_balanced",
   "name": "7-Day Balanced Nutrition Plan",
@@ -370,7 +369,6 @@ This JSON format is designed to work directly with the app's simplified meal pla
     "duration": 7
   }
 }
-\`\`\`
+```
 
-Convert the meal plan you created above into this exact JSON format and save it to a file for download.`;
-};
+Convert the meal plan you created above into this exact JSON format and save it to a file for download.

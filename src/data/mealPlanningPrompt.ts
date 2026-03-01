@@ -1,0 +1,842 @@
+// ================================
+// MEAL PLANNING PROMPT ASSEMBLY
+// ================================
+
+export interface MealPlanUserData {
+  nutritionData: any;
+  budgetData: any;
+  sleepData?: any;
+  fridgePantryData?: any;
+  favoriteMeals: any[];
+  userProfile?: any;
+}
+
+// ================================
+// STATIC HEADER SECTIONS
+// ================================
+
+export const MEAL_PLAN_HEADER = `I'm using a nutrition planning app called JSON.fit and need help creating a personalized meal plan.`;
+
+export const getResearchInstructions = (researchMode: boolean, groceryStore: string, country: string): string => {
+  if (!researchMode) {
+    return `
+**QUICK CREATION INSTRUCTIONS:**
+1. **STANDARD KNOWLEDGE** - Use your existing knowledge base for common foods and recipes
+2. **ESTIMATED PRICING** - Use typical pricing patterns for ${groceryStore} in ${country}`;
+  }
+  
+  return `
+**CRITICAL RESEARCH INSTRUCTIONS (Research-Verified Mode):**
+1. **USE WEB SEARCH FOR VERIFICATION** - Before creating the meal plan, search the web to verify:
+   - Current pricing at ${groceryStore} in ${country} for all major ingredients
+   - Accurate nutritional data from USDA database or Cronometer for precise macro calculations
+   - Ingredient availability at ${groceryStore} in ${country}
+   - Current seasonal pricing for produce in ${country} to optimize budget
+2. **VERIFY ALL NUTRITION DATA** - Use reliable sources like USDA database or Cronometer to verify calories and macros for each meal
+3. **CRITICAL AUDIT STEP** - After gathering information, perform a skeptical review of your research:
+   - Double-check pricing against multiple sources
+   - Verify nutritional claims against authoritative databases
+   - Flag any data that seems outdated or inconsistent
+   - Correct any errors found during this audit phase
+4. **SOURCE CITATIONS** - Provide sources for all pricing and nutritional data used`;
+};
+
+export const MEAL_PLAN_REQUIREMENTS_HEADER = `
+**MEAL PLAN REQUIREMENTS:**`;
+
+// ================================
+// DYNAMIC BUDGET SECTION
+// ================================
+
+export const getBudgetConstraint = (weeklyBudget: string, customBudgetAmount?: string): string => {
+  const budgetMap: { [key: string]: string } = {
+    'very_tight': 'Very tight budget category',
+    'budget_conscious': 'Budget conscious category',
+    'moderate': 'Moderate budget category',
+    'comfortable': 'Comfortable budget category',
+    'generous': 'Generous budget category'
+  };
+  
+  if (weeklyBudget === 'custom') {
+    return `Target weekly grocery budget: $${customBudgetAmount || '0'}`;
+  }
+  
+  return budgetMap[weeklyBudget] || 'Moderate budget category';
+};
+
+export const getMealPrepStyle = (planningStyle: number): string => {
+  const styleMap: { [key: number]: string } = {
+    1: 'I want to meal prep everything - batch cook all proteins, same meals multiple days, cook once per week',
+    2: 'I want to meal prep as much as possible - batch cook proteins, repeat meals multiple days, minimize daily cooking - this means I want REPEATED meals and batch cooking, NOT 21 different meals',
+    3: 'I like some meal prep but also some fresh cooking - batch cook 1-2 items but vary the rest',
+    4: 'I prefer mostly fresh cooking - minimal meal prep, enjoys cooking most meals daily',
+    5: 'I prefer cooking fresh meals daily - no meal prep, enjoys daily cooking variety and spontaneous meal choices'
+  };
+  
+  return styleMap[planningStyle] || styleMap[3];
+};
+
+// ================================
+// FIBER TARGET CALCULATION
+// ================================
+
+export const computeFiberTarget = (calories: number): number => {
+  return Math.min(45, Math.max(25, Math.round((calories / 1000) * 14)));
+};
+
+// ================================
+// NUTRITION TARGETS SECTION
+// ================================
+
+export const getNutritionTargets = (nutritionData: any, budgetData: any): string => {
+  const fiberTarget = computeFiberTarget(nutritionData.macroResults.calories);
+  return `NUTRITION TARGETS:
+- Daily calories: ${nutritionData.macroResults.calories}
+- Protein: ${nutritionData.macroResults.protein}g | Carbs: ${nutritionData.macroResults.carbs}g | Fat: ${nutritionData.macroResults.fat}g
+- Daily fiber target: ${fiberTarget}g (aim for ${fiberTarget - 5}–${fiberTarget + 5}g range)
+- ${budgetData.mealsPerDay} meals per day
+- Plan duration: ${budgetData.planDuration} days
+- Snacking style: ${budgetData.snackingStyle}
+- Goal: ${nutritionData.formData?.goal || 'Not specified'} at ${nutritionData.formData?.rate || 'standard'} rate`;
+};
+
+// ================================
+// PERSONAL INFO SECTION
+// ================================
+
+export const getPersonalInfo = (nutritionData: any): string => {
+  return `PERSONAL INFO:
+- Gender: ${nutritionData.formData?.gender || 'Not specified'}
+- Age: ${nutritionData.formData?.age || 'Not specified'}
+- Activity level: ${nutritionData.formData?.activityLevel || 'moderate'}
+- Job type: ${nutritionData.formData?.jobType || 'Not specified'}`;
+};
+
+// ================================
+// DIETARY REQUIREMENTS SECTION
+// ================================
+
+export const getDietaryRequirements = (budgetData: any): string => {
+  return `DIETARY REQUIREMENTS:
+- Allergies: ${budgetData.allergies?.length ? budgetData.allergies.join(', ') : 'None'}
+- Avoid foods: ${budgetData.avoidFoods?.length ? budgetData.avoidFoods.join(', ') : 'None'}
+- Eating challenges: ${budgetData.eatingChallenges?.length ? budgetData.eatingChallenges.join(', ') : 'None'}`;
+};
+
+// ================================
+// NUTRIENT VARIETY SECTION
+// ================================
+
+export const getNutrientVarietySection = (userProfile?: any): string => {
+  if (!userProfile?.nutrientVariety) {
+    return 'NUTRIENT VARIETY PRIORITY:\n**NOT SPECIFIED** - Use standard approach to nutrient variety balanced with other preferences';
+  }
+  
+  const varietyMap: { [key: string]: string } = {
+    'high': `**VERY IMPORTANT** - I want maximum nutrient variety and diversity. Please:
+  • Include a wide range of different vegetables, fruits, protein sources, and whole grains
+  • Vary nutrients across meals (different vitamins, minerals, antioxidants)
+  • Use colorful ingredients (aim for different colors each day)
+  • Include both common and less common nutrient-dense foods
+  • Consider seasonal produce for peak nutrient content`,
+    
+    'moderate': `**MODERATELY IMPORTANT** - I want some nutrient variety with convenience. Please:
+  • Include variety but balance with practicality and meal prep efficiency
+  • Focus on nutrient-dense staples with some diverse additions
+  • Vary protein sources and include different vegetables
+  • Don't sacrifice convenience for minor nutrient differences`,
+    
+    'low': `**LESS IMPORTANT** - I prefer simple, consistent meals over nutrient variety. Please:
+  • Focus on nutritionally complete but simple ingredient combinations
+  • Repeat successful nutrient-dense staples frequently
+  • Prioritize convenience and familiarity over exotic variety
+  • Use proven combinations rather than experimenting with diverse ingredients`
+  };
+  
+  return `NUTRIENT VARIETY PRIORITY:\n${varietyMap[userProfile.nutrientVariety]}`;
+};
+
+// ================================
+// SLEEP OPTIMIZATION SECTION
+// ================================
+
+export const getSleepOptimizedSection = (sleepData?: any): string => {
+  if (!sleepData) {
+    return '';
+  }
+  
+  const getOptimizationGuideline = (level: string): string => {
+    const guidelines: { [key: string]: string } = {
+      'minimal': '• First meal: Within 2 hours of wake time\n  • Last meal: 2 hours before bedtime\n  • 12-hour eating window',
+      'moderate': '• First meal: 30-90 minutes after wake time\n  • Last meal: 3 hours before bedtime\n  • 8-10 hour eating window',
+      'maximal': '• First meal: 30-60 minutes after wake time\n  • Last meal: 4+ hours before bedtime\n  • 8-hour early eating window'
+    };
+    
+    return guidelines[level] || guidelines['moderate'];
+  };
+  
+  return `
+**SLEEP-OPTIMIZED MEAL TIMING REQUIREMENTS:**
+Based on my completed Sleep Optimization questionnaire:
+- Sleep schedule: ${sleepData.bedtime} - ${sleepData.wakeTime}
+- Optimization level: ${sleepData.optimizationLevel}
+- CRITICAL: Calculate and provide specific meal times for each day based on these sleep parameters:
+  ${getOptimizationGuideline(sleepData.optimizationLevel)}
+- PROVIDE SPECIFIC TIMES: For each meal in your plan, specify the recommended time (e.g., "7:45 AM", "12:30 PM", "6:00 PM") and briefly explain why that timing supports better sleep and metabolism`;
+};
+
+// ================================
+// FRIDGE & PANTRY SECTION
+// ================================
+
+export const getFridgePantrySection = (fridgePantryData?: any): string => {
+  if (!fridgePantryData?.wantToUseExistingIngredients || !fridgePantryData.ingredients?.length) {
+    return `FRIDGE & PANTRY INVENTORY:
+- No fridge/pantry inventory provided or user chose not to include existing ingredients`;
+  }
+  
+  const getApproachText = (approach: string): string => {
+    const approaches: { [key: string]: string } = {
+      'maximize': 'MAXIMIZE MY INVENTORY - Plan meals specifically around what I already have',
+      'expiry': 'EXPIRY FOCUSED - Prioritize using items before they expire',
+      'ai_led': 'AI-LED PLANNING - Create optimal meal plans first, naturally incorporate my items when they fit'
+    };
+    
+    return approaches[approach] || approaches['ai_led'];
+  };
+  
+  const getCriticalInstruction = (approach: string): string => {
+    const instructions: { [key: string]: string } = {
+      'maximize': 'Build the meal plan around these ingredients as much as possible. These should be the foundation of your meal suggestions.',
+      'expiry': 'Prioritize ingredients with expiry dates first, especially those expiring soon. Build meals around expiring items.',
+      'ai_led': 'Use these ingredients when they naturally fit into optimal meal plans, but don\'t force them if they don\'t work well.'
+    };
+    
+    return instructions[approach] || instructions['ai_led'];
+  };
+  
+  const ingredientsList = fridgePantryData.ingredients.map((item: any) => {
+    const expiryInfo = item.expiryDate ? ` (expires ${new Date(item.expiryDate).toLocaleDateString()})` : '';
+    const quantity = item.quantity && item.unit ? ` - ${item.quantity} ${item.unit}` : '';
+    const notes = item.notes ? ` (${item.notes})` : '';
+    return `• ${item.name}${quantity}${expiryInfo}${notes} [${item.location}]`;
+  }).join('\n');
+  
+  return `FRIDGE & PANTRY INVENTORY:
+**IMPORTANT: I have ingredients at home that I want to use in my meal plan**
+- Usage preference: ${getApproachText(fridgePantryData.preferences?.primaryApproach)}
+
+Available ingredients:
+${ingredientsList}
+
+**CRITICAL: ${getCriticalInstruction(fridgePantryData.preferences?.primaryApproach)}**`;
+};
+
+// ================================
+// MEAL PREFERENCES SECTION
+// ================================
+
+export const getMealPreferencesSection = (budgetData: any, favoriteMeals: any[]): string => {
+  const formatSelectedFavoriteMeals = (selectedFavoriteIds: string[], allFavoriteMeals: any[]): string => {
+    if (!selectedFavoriteIds?.length || !allFavoriteMeals?.length) {
+      return '';
+    }
+
+    const selectedMealDetails = selectedFavoriteIds
+      .map(mealId => {
+        const favoriteMeal = allFavoriteMeals.find(fav => fav.mealId === mealId);
+        if (!favoriteMeal?.meal) return null;
+        
+        const meal = favoriteMeal.meal;
+        return `  • ${meal.name || 'Unnamed Meal'}${meal.ingredients?.length ? ` - ${meal.ingredients.slice(0, 5).map((ing: any) => ing.name).join(', ')}${meal.ingredients.length > 5 ? '...' : ''}` : ''}`;
+      })
+      .filter(Boolean)
+      .join('\n\n');
+
+    return selectedMealDetails ? `\n- Selected favorite meals to include in the plan:\n${selectedMealDetails}` : '';
+  };
+  
+  if (budgetData.mealPreferences === 'include_favorites') {
+    return `MEAL PREFERENCES:
+- User wants to include their favorite meals in the plan${formatSelectedFavoriteMeals(budgetData.selectedFavorites, favoriteMeals)}${budgetData.customMealRequests ? `\n- Custom requests: ${budgetData.customMealRequests}` : ''}`;
+  }
+  
+  return `MEAL PREFERENCES:
+- User wants AI to suggest all meals based on their profile and preferences`;
+};
+
+// ================================
+// COOKING PREFERENCES SECTION
+// ================================
+
+export const getCookingPreferencesSection = (budgetData: any): string => {
+  const getPlanningStyleText = (style: number): string => {
+    const styles: { [key: number]: string } = {
+      1: 'User wants to meal prep everything - batch cook all proteins, same meals multiple days, cook once per week',
+      2: 'User wants to meal prep as much as possible - batch cook proteins, repeat meals multiple days, minimize daily cooking',
+      3: 'User likes some meal prep but also some fresh cooking - batch cook 1-2 items but vary the rest',
+      4: 'User prefers mostly fresh cooking - minimal meal prep, enjoys cooking most meals daily',
+      5: 'User prefers cooking fresh meals daily - no meal prep, enjoys daily cooking variety and spontaneous meal choices'
+    };
+    
+    return styles[style] || styles[3];
+  };
+  
+  const getTimeInvestmentText = (investment: number): string => {
+    const investments: { [key: number]: string } = {
+      1: 'User wants 5-minute meals only - microwave meals, no-cook options, absolute minimal prep work',
+      2: 'User wants quick, simple meals - 10-15 minutes cooking time, minimal prep work, one-pot meals',
+      3: 'User prefers moderate cooking times - 20-30 minute meals are ideal, comfortable with some prep',
+      4: 'User enjoys spending time cooking - comfortable with 45-60 minute recipes and more involved preparations',
+      5: 'User loves long cooking sessions - happy spending 2+ hours, enjoys complex multi-step recipes'
+    };
+    
+    return investments[investment] || investments[3];
+  };
+  
+  const getVarietySeekingText = (seeking: number): string => {
+    const varieties: { [key: number]: string } = {
+      1: 'User loves routine and repetition - identical meals all week is perfect, finds comfort in consistency',
+      2: 'User is fine eating the same meals repeatedly - can have identical breakfast for a week, enjoys routine',
+      3: 'User likes moderate variety - okay with some repeated meals but wants some different options too',
+      4: 'User seeks variety but some repetition is okay - wants different meals most days but some repeats are fine',
+      5: 'User needs variety and gets bored easily - wants completely different meals every day, craves new experiences'
+    };
+    
+    return varieties[seeking] || varieties[3];
+  };
+  
+  const getSkillConfidenceText = (confidence: number): string => {
+    const skills: { [key: number]: string } = {
+      1: 'User is a complete kitchen beginner - stick to very basic techniques, pre-made components, familiar ingredients only',
+      2: 'User is a cautious cook - stick to simple techniques, avoid complex recipes, use familiar ingredients',
+      3: 'User has moderate cooking skills - can handle most standard recipes but avoid overly complex techniques',
+      4: 'User is a confident cook - comfortable with most recipes, willing to try new techniques and ingredients',
+      5: 'User loves experimenting in the kitchen - excited by complex recipes, new techniques, and unusual ingredients'
+    };
+    
+    return skills[confidence] || skills[3];
+  };
+  
+  const getCookingEnjoymentText = (enjoyment: number): string => {
+    const enjoyments: { [key: number]: string } = {
+      1: 'User avoids cooking whenever possible - prioritize convenience, takeout alternatives, minimal cleanup',
+      2: 'User sees cooking as a chore - prioritize convenience, minimal cleanup, simple preparation methods',
+      3: 'User has a neutral attitude toward cooking - willing to cook but values efficiency and practicality',
+      4: 'User enjoys cooking - finds it relaxing, comfortable with more involved recipes and techniques',
+      5: 'User is passionate about cooking - loves the process, excited by complex recipes, cooking is a favorite hobby'
+    };
+    
+    return enjoyments[enjoyment] || enjoyments[3];
+  };
+  
+  return `COOKING PREFERENCES:
+- ${getPlanningStyleText(budgetData.planningStyle)}
+- ${getTimeInvestmentText(budgetData.timeInvestment)}
+- ${getVarietySeekingText(budgetData.varietySeeking)}
+- ${getSkillConfidenceText(budgetData.skillConfidence)}
+- ${getCookingEnjoymentText(budgetData.cookingEnjoyment)}`;
+};
+
+// ================================
+// COOKING EQUIPMENT SECTION
+// ================================
+
+export const getCookingEquipmentSection = (budgetData: any): string => {
+  const equipmentText = budgetData.cookingEquipment?.length 
+    ? `Available equipment: ${budgetData.cookingEquipment.join(', ')}
+- IMPORTANT: Only suggest meals that can be made with the above equipment. Do not suggest oven recipes if no oven available, etc.`
+    : 'No cooking equipment specified - assume basic stovetop and microwave access';
+    
+  return `AVAILABLE COOKING EQUIPMENT:
+- ${equipmentText}`;
+};
+
+// ================================
+// LOCATION & BUDGET SECTION
+// ================================
+
+export const getLocationBudgetSection = (budgetData: any): string => {
+  const getBudgetLevelDescription = (budgetLevel: string, customAmount?: string): string => {
+    const descriptions: { [key: string]: string } = {
+      'custom': `Custom Budget - $${customAmount || '0'}/week`,
+      'very_tight': 'Very Tight Budget - Every dollar counts, prioritize affordability over all other factors',
+      'budget_conscious': 'Budget Conscious - Value and cost-effectiveness are important considerations',
+      'moderate': 'Moderate Spending - Balanced approach to cost and quality, some flexibility for variety',
+      'comfortable': 'Comfortable Budget - Quality and convenience valued over strict cost savings',
+      'generous': 'Generous Budget - Cost is not a primary constraint, quality and variety prioritized'
+    };
+    
+    return descriptions[budgetLevel] || descriptions['moderate'];
+  };
+  
+  const budgetGuidance = budgetData.weeklyBudget === 'custom' 
+    ? '' 
+    : `\n- Budget guidance: Based on the budget level above, estimate a realistic weekly grocery cost range in local currency for ${budgetData.city}, ${budgetData.country} and keep the plan within that range. State your estimate in the grocery list summary.`;
+
+  return `LOCATION & BUDGET:
+- Location: ${budgetData.city}, ${budgetData.country}
+- Shop at: ${budgetData.groceryStore}
+- Focus on ingredients commonly available at ${budgetData.country} supermarkets
+- Budget level: ${getBudgetLevelDescription(budgetData.weeklyBudget, (budgetData as any).customBudgetAmount)}${budgetGuidance}`;
+};
+
+// ================================
+// MEAL PREP REQUIREMENTS SECTION
+// ================================
+
+export const getMealPrepRequirementsSection = (budgetData: any): string => {
+  if (budgetData.planningStyle <= 2) {
+    return `**MEAL PREP REQUIREMENTS** (based on my planning style):
+- I want to meal prep! Give me 3-4 repeated meals max, not 21 different ones
+- Focus on batch cooking 1-2 proteins for the week
+- Same breakfast for multiple days is fine
+- Think about what actually benefits from meal prep vs what should be made fresh daily
+- Provide a detailed meal prep session guide with exact quantities and containers needed
+
+**CRITICAL — VARIETY WITHIN REPETITION:**
+- Use at least 3 different primary protein sources across the week (not the same protein in every meal)
+- Rotate vegetables within repeated meal templates (if a bowl repeats 5x, use at least 3 different vegetable combinations)
+- Vary carb sources — don't pair every single meal with the same carb
+- The goal is STRUCTURAL repetition with INGREDIENT rotation, not identical meals every day`;
+  } else if (budgetData.planningStyle >= 4) {
+    return `**MEAL PREP REQUIREMENTS** (based on my planning style):
+- I prefer fresh, different meals each day
+- Minimal meal prep, focus on quick daily cooking
+- Provide shopping list organized by store sections for efficient daily/every-other-day shopping`;
+  } else {
+    return `**MEAL PREP REQUIREMENTS** (based on my planning style):
+- Moderate meal prep - some repeated meals, some variety
+- 1-2 batch cooked items, but change up sides and seasonings
+- 5-6 different meals max across the week
+- Rotate protein sources and vegetables across repeated meals`;
+  }
+};
+
+// ================================
+// OUTPUT REQUIREMENTS SECTION
+// ================================
+
+export const getOutputRequirements = (budgetData: any, sleepData?: any): string => {
+  const getCurrentDate = (): string => {
+    const today = new Date();
+    const startDate = new Date(today.getTime() + (24 * 60 * 60 * 1000)); // Start tomorrow
+    return startDate.toLocaleDateString('en-AU', { weekday: 'long', month: 'short', day: 'numeric' });
+  };
+  
+  const sleepTimingText = sleepData 
+    ? '4. **INCLUDES SPECIFIC MEAL TIMES - For each meal, provide the exact recommended time (e.g., "Breakfast: 7:45 AM", "Dinner: 6:00 PM") based on my sleep schedule and optimization level**'
+    : '4. **INCLUDES GENERAL MEAL TIMING - Provide suggested meal times**';
+    
+  const sleepRationaleText = sleepData 
+    ? '\n10. **PROVIDES MEAL TIMING RATIONALE** - Explain why each meal time optimizes sleep and circadian health'
+    : '';
+  
+  return `Please create a detailed ${budgetData.planDuration}-day meal plan that:
+1. **STARTS on ${getCurrentDate()}** and uses actual calendar dates
+2. **MATCHES my meal prep personality** - don't give me 21 meals if I'm a "Weekly Planner"
+3. **SHOWS NUTRITION CALCULATIONS** - briefly explain how you got the calories/macros for each meal
+${sleepTimingText}
+5. **INCLUDES DETAILED RECIPES** - For each meal provide:
+   - Complete ingredients list with exact quantities and units
+   - Step-by-step cooking instructions (minimum 3-5 steps per recipe)
+   - Prep time and cook time for each meal
+   - Serving size information
+6. **INCLUDES STRUCTURED MEAL PREP PLAN** - exactly what to prep, how much, and what containers to use
+7. Uses ingredients available at ${budgetData.groceryStore} in ${budgetData.country}
+8. Accounts for my dietary restrictions and cooking skill level
+9. Hits macro targets within 5-10%${sleepRationaleText}`;
+};
+
+// ================================
+// GROCERY LIST AND MEAL PREP REQUIREMENTS
+// ================================
+
+export const getGroceryListRequirements = (budgetData: any): string => {
+  return `
+---
+
+## GROCERY LIST REQUIREMENTS
+
+**IMPORTANT:** Your meal plan MUST include a detailed grocery list structured by category. This grocery list will be imported into the app for shopping, so accuracy matters.
+
+For each grocery item include:
+- **Item name** - Specific product name (e.g., "${budgetData.groceryStore} Lean Beef Mince" not just "beef")
+- **Quantity** - Exact amount needed for the full week
+- **Unit** - Standard unit (kg, g, L, ml, cans, bags, etc.)
+- **Estimated price** - Realistic price for the specified store and location
+- **Notes** - How the item is used in the plan, storage tips, or substitution notes
+- **Purchased status** - Always set to not purchased (the user will check these off in the app)
+
+Organize items into logical shopping categories:
+- Meat & Seafood
+- Dairy & Refrigerated
+- Produce (Fresh)
+- Frozen
+- Pantry & Grains
+- Condiments & Supplements
+- (Add other categories as needed)
+
+Include a **total estimated cost** and **currency** for the full grocery list.`;
+};
+
+export const getMealPrepSessionRequirements = (): string => {
+  return `
+---
+
+## MEAL PREP SESSION REQUIREMENTS
+
+**IMPORTANT:** Your meal plan MUST include a structured meal prep session guide. This will be displayed in the app as a step-by-step prep walkthrough.
+
+Include:
+- **Session name** - e.g., "Sunday Meal Prep" or "Weekly Batch Cook"
+- **Prep time and cook time** - Separate active prep vs passive cooking time
+- **Total time** - Combined duration
+- **Coverage** - What days/meals the prep covers (e.g., "7 days of lunches and dinners")
+- **Recommended timing** - When to do the prep (e.g., "Sunday afternoon")
+- **Equipment needed** - List of equipment required for the prep session
+- **Step-by-step instructions** - Clear, ordered instructions for the full prep session
+- **Storage guidelines** - How long each prepped item lasts in fridge vs freezer`;
+};
+
+// ================================
+// FOOTER SECTIONS
+// ================================
+
+export const FORMAT_REQUIREMENTS = `
+
+**FORMAT REQUIREMENTS:**
+- Create the plan as a text document (not a formatted document)
+- Use simple text formatting with headers, bullet points, and tables
+- Make it fast to generate and easy to copy/edit
+- Include a "Weekly Meal Prep" summary section showing total prep time and number of unique recipes
+- Structure each meal as a complete recipe with ingredients and instructions
+- **INCLUDE THE GROCERY LIST** in the document — organized by category with quantities, prices, and notes
+- **INCLUDE THE MEAL PREP SESSION** in the document — with step-by-step instructions, equipment, and storage guidelines
+- Present ONLY the final plan — do not show working, drafts, or iteration. If you need to adjust during creation, do so silently and present only the clean final version.
+
+Focus on practical, batch-cookable meals that match my planning preferences.`;
+
+export const FEEDBACK_WORKFLOW = `
+**IMPORTANT - FEEDBACK WORKFLOW:**
+After creating the initial meal plan:
+1. Present the complete meal plan with a brief summary
+2. Ask me to review the plan and provide feedback on:
+   - Foods I don't like or want to substitute
+   - Meals that seem too complex or too simple for my skill level
+   - Any ingredients I want to avoid or swap out
+   - Portion sizes or macro distribution adjustments
+   - Meal prep timing or complexity concerns
+3. **WAIT for my feedback before proceeding**
+4. Make any requested adjustments to the meal plan
+5. Only after I'm satisfied with the plan should you ask if I want the JSON conversion
+
+**Do NOT automatically convert to JSON** - I need to approve the meal plan first.`;
+
+// ================================
+// MEAL PLAN VERIFICATION
+// ================================
+
+export const getMealPlanVerification = (): string => {
+  return `---
+
+## VERIFICATION STEPS
+
+Before presenting the meal plan, complete these checks:
+
+1. **Daily macro totals** — For each day, sum calories, protein, carbs, and fat across all meals. Confirm each day is within 5-10% of the user's targets. If any day is off, adjust portion sizes or swap ingredients before presenting.
+
+2. **Protein distribution** — Check that protein is spread across meals, not loaded into one. Each meal should have a meaningful protein source (minimum 15-20g per main meal). Snacks can be lower.
+
+3. **Cooking time alignment** — Verify that actual cooking times match the user's time investment preference. If they said "5-minute meals only," no recipe should require 30+ minutes. If they said "meal prep focused," verify that batch-cooked items are actually reused across multiple meals.
+
+4. **Meal prep coherence** — If the user's planning style is 1-2 (meal prep focused), verify:
+   - No more than 4-6 unique recipes for the entire plan duration
+   - Batch-cooked proteins appear in multiple meals
+   - Meals repeat across days as expected
+   If the user's planning style is 4-5 (daily cooking), verify meals are mostly different each day.
+
+5. **Budget reasonableness** — Mentally estimate the grocery cost. If the user specified a tight budget, verify no premium ingredients (e.g., salmon, avocado, specialty items) appear frequently. If comfortable/generous budget, more variety is fine.
+
+6. **Equipment check** — Confirm every recipe can be made with the user's listed cooking equipment. No oven recipes if no oven. No blender recipes if no blender.
+
+7. **Dietary restriction compliance** — Scan every ingredient across every meal. Confirm zero allergens or avoided foods appear anywhere in the plan, including hidden ingredients (e.g., soy sauce contains gluten, pesto contains nuts).
+
+8. **Ingredient diversity audit** — Count across the entire plan:
+   - Unique primary protein sources: MINIMUM 3. FAIL if fewer.
+   - Unique vegetables: MINIMUM 6 different vegetables. FAIL if fewer.
+   - Unique carb sources: MINIMUM 3. FAIL if fewer.
+   - Unique fruits (if included): MINIMUM 3. FAIL if fewer.
+   If any count fails, swap ingredients to meet minimums before presenting.
+
+9. **Fiber target check** — Sum daily fiber for each day. If any day falls below 80% of the stated fiber target, add high-fiber swaps (e.g., white rice → brown rice, add legumes, increase vegetable portions, add seeds to breakfast). Fix before presenting.
+
+10. **Meal timing gap check** — Verify no gap longer than 5 hours between meals during waking hours. If sleep data was provided, verify the last meal is at least 2 hours before stated bedtime. Add a snack or shift timing if gaps are too long.
+
+11. **Grocery list completeness** — Verify the grocery list includes every ingredient from every meal with correct total quantities across all days.
+
+12. **Grocery list cross-check** — Walk through each recipe ingredient and confirm it appears in the grocery list with the right total quantity for the week. Flag any missing items.
+
+13. **Meal prep session completeness** — Verify the meal prep guide covers all batch-cooked items mentioned in the recipes and that storage times are realistic.
+
+If any check fails, fix the plan before presenting. Do not present a plan with known issues — revise and recheck.
+
+---`;
+};
+
+// ================================
+// MEAL PLAN REVIEW PROMPT
+// ================================
+
+export const getMealPlanReviewPrompt = (): string => {
+  return `# Review Meal Plan
+
+First, read the meal plan you just created so you have the full content in context. Then review it as an experienced nutritionist and meal planning expert auditing a plan for a client. This is an independent quality gate — do not assume your self-check caught everything.
+
+## Review Checklist
+
+Work through each check. For each, state PASS or FAIL with a brief note.
+
+### 1. Nutrition Target Verification
+Compare actual nutrition against the user's targets:
+- Daily calorie totals within 5-10% of target across all days
+- Daily protein totals within 5-10% of target across all days
+- Daily carb totals within 5-10% of target across all days
+- Daily fat totals within 5-10% of target across all days
+- Weekly averages hit nutrition targets even if individual days vary slightly
+- **FAIL if** any macro is consistently off target by >10% or weekly averages miss targets
+
+### 2. Budget Compliance
+Check if the plan respects budget constraints:
+- Grocery list total aligns with stated budget level (very tight, moderate, comfortable, etc.)
+- Ingredient choices match budget category (budget-conscious vs premium items)
+- Portion sizes are realistic for the stated budget
+- No unnecessarily expensive ingredients for tight budgets
+- **FAIL if** grocery costs significantly exceed stated budget or include inappropriate premium items for budget level
+
+### 3. Meal Prep Style Alignment
+Verify the plan matches the user's planning style preference:
+- Weekly Planners (1-2): Should have 3-4 repeated meals max, batch cooking focus, detailed prep instructions
+- Moderate Planners (3): Should have 5-6 different meals, some batch elements, balanced approach
+- Daily Cookers (4-5): Should have mostly different meals, minimal batch cooking, fresh preparation focus
+- Meal variety and prep instructions match stated preference level
+- **FAIL if** meal variety/prep style doesn't align with user's stated planning preference
+
+### 4. Dietary Restrictions & Preferences
+Check compliance with dietary requirements:
+- All listed allergies completely avoided in every meal
+- All "avoid foods" list respected throughout the plan
+- Eating challenges addressed appropriately
+- Favorite meals incorporated if requested
+- Custom meal requests fulfilled if specified
+- **FAIL if** any restricted foods appear or preferences ignored
+
+### 5. Cooking Feasibility
+Assess if the plan is practical for the user:
+- Cooking times align with user's time investment preference (5-min vs 2+ hours)
+- Recipe complexity matches stated skill confidence level
+- Only uses available cooking equipment (no oven recipes if no oven, etc.)
+- Ingredient preparation difficulty appropriate for skill level
+- Total daily cooking time realistic for lifestyle
+- **FAIL if** recipes are too complex for skill level or equipment constraints violated
+
+### 6. Location & Ingredient Availability
+Verify ingredients are accessible:
+- All ingredients commonly available at the specified grocery store in the specified country
+- Seasonal ingredient considerations appropriate for location
+- No exotic ingredients that would be hard to find
+- Ingredient names and units match local standards
+- **FAIL if** ingredients would be difficult to source at specified location/store
+
+### 7. Sleep Optimization Compliance (if applicable)
+If sleep optimization was requested, check meal timing:
+- Meal times align with specified sleep schedule
+- Eating window matches optimization level (12-hour, 8-10 hour, or 8-hour)
+- Last meal timing respects bedtime constraints (2-4+ hours before bed)
+- First meal timing aligns with wake time preferences
+- **FAIL if** meal timing conflicts with sleep optimization requirements
+
+### 8. Practical Implementation
+Assess overall plan practicality:
+- Shopping list is well-organized and complete
+- Meal prep instructions are clear and actionable
+- Storage and reheating guidance provided where needed
+- Recipe instructions are detailed enough (minimum 3-5 steps)
+- Serving sizes and portions are realistic
+- **FAIL if** plan lacks practical implementation details or has unclear instructions
+
+### 9. Nutritional Quality & Balance
+Beyond macro targets, evaluate nutritional completeness:
+- **Fiber**: Daily fiber meets the stated target (within 80%). FAIL if consistently under.
+- **Protein diversity**: At least 3 different primary protein sources across the plan. FAIL if only 1-2.
+- **Vegetable diversity**: At least 6 different vegetables across the plan. FAIL if fewer.
+- **Vegetable volume**: At least 300g non-starchy vegetables per day. FAIL if consistently under.
+- **Carb diversity**: At least 3 different carb sources across the plan. FAIL if only 1-2.
+- **Micronutrient coverage**: Across the full week, check for at least one serving each of: dark leafy greens, cruciferous vegetables, a vitamin C source, an omega-3 source, legumes/beans, and whole grains. FAIL if 3+ categories are completely absent.
+- **FAIL if** 2+ of the above sub-checks fail
+
+### 10. Grocery List Completeness & Accuracy
+Verify the grocery list is complete and correct:
+- **Every ingredient** from every recipe across all 7 days appears in the grocery list
+- **Quantities are totalled correctly** — e.g., if 4 meals use 200g chicken each, the list shows 800g
+- **Prices are realistic** for the specified store and location
+- **Categories are logical** — items are in the right shopping section
+- **No phantom items** — nothing in the grocery list that isn't used in any recipe
+- **Notes are helpful** — storage tips, usage notes, substitution suggestions
+- Cross-check: Pick 3 random ingredients from recipes and verify they appear in the grocery list with correct quantities
+- **FAIL if** 3+ ingredients are missing from the grocery list or quantities are significantly wrong
+
+### 11. Meal Prep Session Completeness
+Verify the meal prep guide is functional:
+- **All batch-cooked items** from the recipes are covered in the prep session
+- **Step-by-step instructions** are clear and logically ordered
+- **Equipment list** matches what's actually needed for the prep
+- **Storage guidelines** are included with realistic fridge/freezer times
+- **Time estimates** are realistic (prep time + cook time = total time)
+- **Coverage statement** accurately describes what the prep covers
+- **FAIL if** meal prep session is missing, incomplete, or doesn't match the actual recipes
+
+### 12. Overall Coherence
+Final assessment of plan quality:
+- All meals work together as a cohesive weekly plan
+- No conflicting instructions or impossible logistics
+- Plan feels realistic and sustainable for the described lifestyle
+- Cost estimates seem reasonable and well-researched
+- Plan addresses the user's primary nutrition goals effectively
+- Grocery list, meal prep session, and daily meals all reference the same ingredients consistently
+- **FAIL if** plan has internal contradictions or feels unrealistic overall
+
+## Summary & Recommendations
+
+After completing all checks:
+1. **Count total PASS vs FAIL scores**
+2. **List the top 3 issues found (if any)**
+3. **Provide specific fix recommendations for any failures**
+4. **Give an overall quality rating: Excellent / Good / Needs Revision / Major Issues**
+5. **State whether the plan is ready for JSON conversion or needs adjustments**
+
+If 3+ checks failed or any critical failures (nutrition targets, dietary restrictions, equipment constraints), recommend significant revisions before proceeding.
+
+If 1-2 minor failures, provide specific fixes that can be made quickly.
+
+If all checks pass, approve for JSON conversion.`;
+};
+
+// ================================
+// MAIN ASSEMBLY FUNCTION
+// ================================
+
+export const assembleMealPlanningPrompt = async (
+  researchMode: boolean = false
+): Promise<string> => {
+  // This function will be implemented to load user data and assemble the prompt
+  // Similar to assemblePlanningPrompt but for meal planning
+  const { WorkoutStorage } = await import('../utils/storage');
+  const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+  
+  try {
+    // Load all questionnaire data
+    const nutritionResults = await WorkoutStorage.loadNutritionResults();
+    const budgetCookingResults = await WorkoutStorage.loadBudgetCookingResults();
+    const sleepResults = await WorkoutStorage.loadSleepOptimizationResults();
+    const fridgePantryResults = await WorkoutStorage.loadFridgePantryResults();
+    
+    // Load favorite meals data for detailed meal information
+    const favoriteMealsData = await AsyncStorage.getItem('@nutrition_favorites');
+    const favoriteMeals = favoriteMealsData ? JSON.parse(favoriteMealsData) : [];
+    
+    // Also load user profile for nutrient variety data
+    const userProfileData = await AsyncStorage.getItem('@nutrition_user_profile');
+    const userProfile = userProfileData ? JSON.parse(userProfileData) : null;
+
+    if (!nutritionResults || !budgetCookingResults) {
+      throw new Error('Please complete the Nutrition Goals and Budget & Cooking questionnaires first.');
+    }
+
+    const nutritionData = nutritionResults;
+    const budgetData = budgetCookingResults.formData;
+    const sleepData = sleepResults?.formData;
+    const fridgePantryData = fridgePantryResults?.formData;
+
+    // Handle missing nutrition data with fallbacks (same logic as original)
+    if (!nutritionData.formData) {
+      nutritionData.formData = {} as any;
+    }
+
+    if (!nutritionData.macroResults || !nutritionData.macroResults.calories) {
+      if (userProfile?.macros?.calories) {
+        nutritionData.macroResults = {
+          calories: userProfile.macros.calories,
+          protein: userProfile.macros.protein,
+          carbs: userProfile.macros.carbs,
+          fat: userProfile.macros.fat,
+          bmr: 0,
+          tdee: 0,
+          weeklyWeightChange: 0,
+          ...nutritionData.macroResults,
+        } as any;
+        
+        if (!nutritionData.formData || !nutritionData.formData.goal) {
+          nutritionData.formData = {
+            goal: userProfile.goal || userProfile.goals?.primaryGoal || 'maintain',
+            rate: userProfile.goal === 'maintain' ? 'maintain' : 
+                  userProfile.goal === 'lose_weight' ? `${userProfile.targetRate || 0.5} kg/week loss` :
+                  userProfile.goal === 'gain_weight' ? `${userProfile.targetRate || 0.5} kg/week gain` :
+                  'maintain',
+            gender: userProfile.gender || 'Not specified',
+            age: userProfile.age?.toString() || 'Not specified',
+            height: userProfile.height?.toString() || 'Not specified',
+            weight: userProfile.weight?.toString() || userProfile.currentWeight?.toString() || 'Not specified',
+            heightUnit: 'cm',
+            weightUnit: 'kg',
+            activityLevel: userProfile.activityLevel || 'moderate',
+            jobType: 'Not specified',
+            ...nutritionData.formData,
+          } as any;
+        }
+      } else {
+        throw new Error('Nutrition questionnaire appears incomplete. Please complete the Nutrition Goals questionnaire again.');
+      }
+    }
+
+    // Assemble the complete prompt
+    let prompt = '';
+    
+    // Header
+    prompt += MEAL_PLAN_HEADER;
+    prompt += getResearchInstructions(researchMode, budgetData.groceryStore, budgetData.country);
+    
+    // Requirements
+    prompt += MEAL_PLAN_REQUIREMENTS_HEADER;
+    prompt += `\n1. **BUDGET CONSTRAINT** - ${getBudgetConstraint(budgetData.weeklyBudget, (budgetData as any).customBudgetAmount)}`;
+    prompt += `\n2. **MEAL PREP FOCUSED** - ${getMealPrepStyle(budgetData.planningStyle)}`;
+    prompt += `\n3. **INCLUDE DETAILED GROCERY LIST** - Organize by categories (Proteins, Dairy, Produce, etc.) with exact quantities, units, and estimated prices from ${budgetData.groceryStore}`;
+    prompt += `\n4. **SPECIFIC DATES** - Start the meal plan on tomorrow's date and use actual calendar dates`;
+    prompt += `\n5. **SHOW CALCULATIONS** - For each meal, briefly explain how you arrived at the calorie/macro numbers`;
+    
+    // Main sections
+    prompt += `\n\n${getNutritionTargets(nutritionData, budgetData)}`;
+    prompt += `\n\n${getPersonalInfo(nutritionData)}`;
+    prompt += `\n\n${getDietaryRequirements(budgetData)}`;
+    prompt += `\n\n${getNutrientVarietySection(userProfile)}`;
+    prompt += getSleepOptimizedSection(sleepData);
+    prompt += `\n\n${getFridgePantrySection(fridgePantryData)}`;
+    prompt += `\n\n${getMealPreferencesSection(budgetData, favoriteMeals)}`;
+    prompt += `\n\n${getCookingPreferencesSection(budgetData)}`;
+    prompt += `\n\n${getCookingEquipmentSection(budgetData)}`;
+    prompt += `\n\n${getLocationBudgetSection(budgetData)}`;
+    prompt += `\n\n${getMealPrepRequirementsSection(budgetData)}`;
+    prompt += `\n\n${getOutputRequirements(budgetData, sleepData)}`;
+    prompt += `\n\n${getGroceryListRequirements(budgetData)}`;
+    prompt += `\n\n${getMealPrepSessionRequirements()}`;
+    prompt += `\n\n${getMealPlanVerification()}`;
+    prompt += `\n\n${FORMAT_REQUIREMENTS}`;
+    prompt += `\n\n${FEEDBACK_WORKFLOW}`;
+
+    return prompt;
+
+  } catch (error) {
+    console.error('Error generating meal planning prompt:', error);
+    throw error;
+  }
+};
