@@ -100,7 +100,7 @@ Only return the JSON, nothing else.`;
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Create Meal with AI</Text>
-          <Text style={styles.headerSubtitle}>3 simple steps to add custom meals</Text>
+          <Text style={styles.headerSubtitle}>4 simple steps to add custom meals</Text>
         </View>
       </View>
 
@@ -169,11 +169,40 @@ Only return the JSON, nothing else.`;
             <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
               <Text style={styles.stepNumberText}>3</Text>
             </View>
+            <Text style={styles.stepTitle}>Review & Verify</Text>
+          </View>
+          
+          <Text style={styles.stepDescription}>
+            Have your AI review the meal plan for quality and compliance
+          </Text>
+          
+          <TouchableOpacity 
+            style={[styles.promptButton, { backgroundColor: themeColor }]}
+            onPress={() => copyToClipboard('Please review the meal plan above for quality and compliance. Check nutritional accuracy, ingredient feasibility, and recipe clarity. Verify all measurements and cooking instructions are correct. Suggest any improvements if needed.', 'review')}
+            activeOpacity={0.8}
+          >
+            <Ionicons 
+              name={copiedButton === 'review' ? "checkmark" : "checkmark"} 
+              size={20} 
+              color="#000000" 
+            />
+            <Text style={styles.promptButtonText}>
+              {copiedButton === 'review' ? 'Copied!' : 'Copy Review Prompt'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Step 4 */}
+        <View style={styles.stepCard}>
+          <View style={styles.stepHeader}>
+            <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
+              <Text style={styles.stepNumberText}>4</Text>
+            </View>
             <Text style={styles.stepTitle}>Import & Enjoy</Text>
           </View>
           
           <Text style={styles.stepDescription}>
-            Copy the JSON your AI created and paste it using "Paste & Import" button
+            Copy the verified JSON your AI created and paste it using "Paste & Import" button
           </Text>
         </View>
 

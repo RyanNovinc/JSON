@@ -1931,7 +1931,7 @@ export default function ImportRoutineScreen() {
             </TouchableOpacity>
             <View style={styles.headerContent}>
               <Text style={styles.headerTitle}>How It Works</Text>
-              <Text style={styles.headerSubtitle}>3 simple steps to create custom programs</Text>
+              <Text style={styles.headerSubtitle}>4 simple steps to create custom programs</Text>
             </View>
           </View>
             <View style={styles.stepsContainer}>
@@ -2157,27 +2157,28 @@ If this is the last block of a mesocycle (not the last mesocycle of the program)
                   Copy the verified JSON file and paste it in
                 </Text>
               </View>
+
+            {/* Need Help Section */}
+            <View style={styles.helpSection}>
+              <Text style={styles.helpTitle}>Need Help?</Text>
+              
+              <TouchableOpacity 
+                style={[styles.tutorialButton, { backgroundColor: themeColor }]}
+                onPress={() => {
+                  // Open YouTube tutorial
+                  const url = 'https://youtube.com/shorts/_l6E9sX-9QQ';
+                  Linking.openURL(url);
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="play" size={20} color="#000000" />
+                <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
+                <Text style={styles.tutorialDuration}>30 seconds</Text>
+              </TouchableOpacity>
             </View>
-          
-          {/* Separator */}
-          <View style={styles.sectionSeparator} />
-          
-          <View style={styles.tutorialSection}>
-            <Text style={styles.tutorialSectionTitle}>Need Help?</Text>
-            <TouchableOpacity 
-              style={[styles.tutorialButton, { backgroundColor: themeColor }]}
-              onPress={() => {
-                // Open YouTube tutorial
-                const url = 'https://youtube.com/shorts/_l6E9sX-9QQ';
-                Linking.openURL(url);
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="play" size={18} color="#ffffff" />
-              <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
-              <Text style={styles.tutorialButtonSubtext}>30 seconds</Text>
-            </TouchableOpacity>
-          </View>
+
+            <View style={styles.bottomPadding} />
+            </View>
         </ScrollView>
       </SafeAreaView>
     );
@@ -2955,24 +2956,43 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  helpSection: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  helpTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 20,
+  },
   tutorialButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
     gap: 8,
   },
   tutorialButtonText: {
     fontSize: 16,
-    color: '#0a0a0b',
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#000000',
+  },
+  tutorialDuration: {
+    fontSize: 14,
+    color: '#000000',
+    opacity: 0.8,
+    marginLeft: 8,
   },
   tutorialButtonSubtext: {
     fontSize: 12,
     color: '#0a0a0b',
     opacity: 0.7,
     marginLeft: 4,
+  },
+  bottomPadding: {
+    height: 40,
   },
   errorContainer: {
     flex: 1,

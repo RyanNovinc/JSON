@@ -629,19 +629,23 @@ export default function ImportMealPlanScreen() {
   if (showInstructions) {
     return (
       <View style={styles.container}>
-        <View style={styles.closeButtonWrapper}>
-          <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.closeButtonInner}>
-            <Ionicons name="close" size={28} color="#71717a" />
-          </TouchableOpacity>
-        </View>
-        
         <View style={styles.instructionsContainer}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.backButton}>
+              <Ionicons name="close" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>How It Works</Text>
+              <Text style={styles.headerSubtitle}>4 simple steps to create custom meals</Text>
+            </View>
+          </View>
+          
           <ScrollView 
             style={styles.instructionsScrollView}
             contentContainerStyle={styles.instructionsContent}
             showsVerticalScrollIndicator={false}
           >
-            <View style={{ height: 60 }} />
             
             
             <View style={styles.stepsContainer}>
@@ -659,7 +663,7 @@ export default function ImportMealPlanScreen() {
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
-                      const planningPrompt = await assembleMealPlanningPrompt(false);
+                      const planningPrompt = await assembleMealPlanningPrompt();
                       await Clipboard.setStringAsync(planningPrompt);
                       setPlanningPromptCopied(true);
                       setTimeout(() => {
@@ -757,24 +761,28 @@ export default function ImportMealPlanScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Need Help Section */}
+            <View style={styles.helpSection}>
+              <Text style={styles.helpTitle}>Need Help?</Text>
+              
+              <TouchableOpacity 
+                style={[styles.tutorialButton, { backgroundColor: themeColor }]}
+                onPress={() => {
+                  // Open YouTube tutorial
+                  const url = 'https://youtube.com/shorts/_l6E9sX-9QQ';
+                  Linking.openURL(url);
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="play" size={20} color="#000000" />
+                <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
+                <Text style={styles.tutorialDuration}>30 seconds</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.bottomPadding} />
           </ScrollView>
-          
-          <View style={styles.tutorialSection}>
-            <Text style={styles.tutorialSectionTitle}>Need Help?</Text>
-            <TouchableOpacity 
-              style={[styles.tutorialButton, { backgroundColor: themeColor }]}
-              onPress={() => {
-                // Open YouTube tutorial
-                const url = 'https://youtube.com/shorts/_l6E9sX-9QQ';
-                Linking.openURL(url);
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="play" size={18} color="#ffffff" />
-              <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
-              <Text style={styles.tutorialButtonSubtext}>30 seconds</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     );
@@ -1403,21 +1411,72 @@ const styles = StyleSheet.create({
   tutorialButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
     gap: 8,
   },
   tutorialButtonText: {
     fontSize: 16,
-    color: '#0a0a0b',
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#000000',
   },
   tutorialButtonSubtext: {
     fontSize: 12,
     color: '#0a0a0b',
     opacity: 0.7,
     marginLeft: 4,
+  },
+  // Header styles
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#18181b',
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#71717a',
+  },
+  helpSection: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  helpTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 20,
+  },
+  tutorialDuration: {
+    fontSize: 14,
+    color: '#000000',
+    opacity: 0.8,
+    marginLeft: 8,
+  },
+  bottomPadding: {
+    height: 40,
   },
   progressIndicator: {
     flexDirection: 'row',

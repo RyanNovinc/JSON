@@ -29,7 +29,7 @@ const DISTANCE_THRESHOLD = 50;
 type TabType = 'rating' | 'bug' | 'feature';
 
 export function FeedbackTab() {
-  const { themeColor } = useTheme();
+  const { themeColor, isPinkTheme, setIsPinkTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('rating');
   const [feedback, setFeedback] = useState('');
@@ -319,9 +319,21 @@ export function FeedbackTab() {
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>Feedback</Text>
-              <TouchableOpacity onPress={closePanel} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#71717a" />
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                <TouchableOpacity 
+                  onPress={() => setIsPinkTheme(!isPinkTheme)} 
+                  style={[styles.colorToggle, { backgroundColor: themeColor }]}
+                >
+                  <Ionicons 
+                    name={isPinkTheme ? "woman" : "man"} 
+                    size={20} 
+                    color="#0a0a0b" 
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={closePanel} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color="#71717a" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Tabs */}
@@ -531,6 +543,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  colorToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,

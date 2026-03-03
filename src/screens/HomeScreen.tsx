@@ -1089,55 +1089,51 @@ export default function HomeScreen({ route }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* App Mode Toggle - Top Right (Development Only) */}
-      {__DEV__ && (
-        <View style={styles.devToggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.modeToggle, 
-              isTrainingMode && { backgroundColor: themeColor, borderColor: themeColor }
-            ]}
-            onPress={() => setAppMode('training')}
-            activeOpacity={0.8}
-          >
-            <Ionicons 
-              name="barbell" 
-              size={18} 
-              color={isTrainingMode ? "#0a0a0b" : themeColor} 
-            />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.modeToggle, 
-              isNutritionMode && { backgroundColor: themeColor, borderColor: themeColor }
-            ]}
-            onPress={handleNutritionTransition}
-            activeOpacity={0.8}
-          >
-            <Ionicons 
-              name="restaurant" 
-              size={18} 
-              color={isNutritionMode ? "#0a0a0b" : themeColor} 
-            />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Gender Theme Toggle - Top Right */}
-      <View style={[styles.genderToggle, { backgroundColor: themeColor }]}>
+      {/* App Mode Toggle - Centered at Top */}
+      <View style={styles.centralToggleContainer}>
         <TouchableOpacity
-          style={styles.buttonInner}
-          onPress={() => setIsPinkTheme(!isPinkTheme)}
+          style={[
+            styles.centralModeToggle, 
+            isTrainingMode && { backgroundColor: themeColor, borderColor: themeColor }
+          ]}
+          onPress={() => setAppMode('training')}
           activeOpacity={0.8}
         >
           <Ionicons 
-            name={isPinkTheme ? "woman" : "man"} 
-            size={24} 
-            color="#0a0a0b" 
+            name="barbell" 
+            size={20} 
+            color={isTrainingMode ? "#0a0a0b" : themeColor} 
           />
+          <Text style={[
+            styles.centralToggleText,
+            { color: isTrainingMode ? "#0a0a0b" : themeColor }
+          ]}>
+            Workouts
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.centralModeToggle, 
+            isNutritionMode && { backgroundColor: themeColor, borderColor: themeColor }
+          ]}
+          onPress={handleNutritionTransition}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="restaurant" 
+            size={20} 
+            color={isNutritionMode ? "#0a0a0b" : themeColor} 
+          />
+          <Text style={[
+            styles.centralToggleText,
+            { color: isNutritionMode ? "#0a0a0b" : themeColor }
+          ]}>
+            Nutrition
+          </Text>
         </TouchableOpacity>
       </View>
+
 
       {/* Add Routine FAB - Bottom Right */}
       <View style={[styles.fab, { backgroundColor: themeColor }]}>
@@ -2330,41 +2326,43 @@ const styles = StyleSheet.create({
     color: '#e4e4e7',
   },
   
-  // Gender toggle styles
-  genderToggle: {
+  
+  // Central mode toggle styles
+  centralToggleContainer: {
     position: 'absolute',
     top: 54,
-    right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 4,
-  },
-  
-  // Development mode toggle styles
-  devToggleContainer: {
-    position: 'absolute',
-    top: 60,
-    left: 16, // Position in the left corner
+    left: '50%',
+    marginLeft: -120, // Half of the total width (240px / 2)
     flexDirection: 'row',
-    gap: 4,
-  },
-  modeToggle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    gap: 8,
     backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 4,
     borderWidth: 1,
     borderColor: '#27272a',
-    justifyContent: 'center',
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  genderToggleWithDev: {
-    right: 16, // Keep same position as before
+  centralModeToggle: {
+    width: 112,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  centralToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   
   // New Share Modal Styles

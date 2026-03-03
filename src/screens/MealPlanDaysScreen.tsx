@@ -488,8 +488,34 @@ export default function MealPlanDaysScreen() {
     
     const mealPrepSessions = [];
     
+    // Helper function to get the next occurrence of a specific day
+    const getNextDayDate = (targetDay: number) => {
+      const today = new Date();
+      const todayDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      let daysUntilTarget = (targetDay - todayDay + 7) % 7;
+      if (daysUntilTarget === 0 && today.getHours() >= 18) {
+        // If it's already past 6 PM today and we're looking for today, get next week
+        daysUntilTarget = 7;
+      }
+      
+      const targetDate = new Date(today);
+      targetDate.setDate(today.getDate() + daysUntilTarget);
+      
+      return {
+        date: targetDate,
+        dateString: targetDate.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'short', 
+          day: 'numeric' 
+        })
+      };
+    };
+    
     // Session 1: Sunday Main Prep (batch-cook, meal-prep, air-fryer, oven meals)
     if (finalMainPrepMeals.length > 0) {
+      const sundayInfo = getNextDayDate(0); // 0 = Sunday
+      
       mealPrepSessions.push({
         id: 'sunday_main_prep',
         session_name: 'Sunday Main Prep',
@@ -500,6 +526,7 @@ export default function MealPlanDaysScreen() {
         total_time: mainPrepTime,
         covers: finalMainPrepMeals.length > 0 ? `${finalMainPrepMeals.length} main prep meals: ${finalMainPrepMeals.map(m => m.name).slice(0, 3).join(', ')}${finalMainPrepMeals.length > 3 ? '...' : ''}` : 'Main proteins and batch items',
         recommended_timing: "Sunday morning - allows time for cooking proteins",
+        recommended_date: sundayInfo.dateString,
         equipment_needed: (() => {
           const equipment = new Set<string>();
           finalMainPrepMeals.forEach(meal => {
@@ -557,6 +584,8 @@ export default function MealPlanDaysScreen() {
     
     // Session 2: Wednesday Mini Prep (no-cook, quick, sheet-pan meals)  
     if (finalQuickPrepMeals.length > 0) {
+      const wednesdayInfo = getNextDayDate(3); // 3 = Wednesday
+      
       mealPrepSessions.push({
         id: 'wednesday_mini_prep',
         session_name: 'Wednesday Mini Prep',
@@ -567,6 +596,7 @@ export default function MealPlanDaysScreen() {
         total_time: quickPrepTime,
         covers: finalQuickPrepMeals.length > 0 ? `${finalQuickPrepMeals.length} quick prep meals: ${finalQuickPrepMeals.map(m => m.name).slice(0, 3).join(', ')}${finalQuickPrepMeals.length > 3 ? '...' : ''}` : 'Fresh items and quick meals',
         recommended_timing: "Wednesday evening - refresh for end of week",
+        recommended_date: wednesdayInfo.dateString,
         equipment_needed: (() => {
           const equipment = new Set<string>();
           finalQuickPrepMeals.forEach(meal => {
@@ -623,6 +653,8 @@ export default function MealPlanDaysScreen() {
     
     // If no meals match either category, create one session with all meals
     if (mealPrepSessions.length === 0) {
+      const fallbackSundayInfo = getNextDayDate(0); // 0 = Sunday
+      
       mealPrepSessions.push({
         id: 'weekly_meal_prep',
         session_name: 'Weekly Meal Prep',
@@ -633,6 +665,7 @@ export default function MealPlanDaysScreen() {
         total_time: totalPrepTime,
         covers: `${uniqueMealsArray.length} recipes for 7 days`,
         recommended_timing: "Sunday morning or evening for best results",
+        recommended_date: fallbackSundayInfo.dateString,
         equipment_needed: (() => {
           const equipment = new Set<string>();
           uniqueMealsArray.forEach(meal => {
@@ -1313,11 +1346,15 @@ export default function MealPlanDaysScreen() {
                       </Text>
                     </View>
                     <Text style={styles.prepFriendlyWhen}>
-                      {session.prep_day}
+                      {session.recommended_date}
                     </Text>
+                    {session.recommended_timing && (
+                      <Text style={styles.prepFriendlyTiming}>
+                        {session.recommended_timing}
+                      </Text>
+                    )}
                     <Text style={styles.prepFriendlyDays}>
-                      For {session.covers_days?.slice(0, 2).join(' & ')} 
-                      {session.covers_days?.length > 2 ? ` +${session.covers_days.length - 2} more days` : ''}
+                      {session.covers || 'Meal prep recipes'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={themeColor} />
@@ -1838,8 +1875,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
-    marginBottom: 6,
+    marginBottom: 4,
     marginTop: 4,
+  },
+  prepFriendlyTiming: {
+    fontSize: 13,
+    color: '#a1a1aa',
+    fontWeight: '500',
+    marginBottom: 6,
   },
   prepFriendlyDays: {
     fontSize: 14,

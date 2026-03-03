@@ -956,44 +956,54 @@ export default function NutritionHomeScreen({ route }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* App Mode Toggle - Top Left (Development Only) */}
-      {__DEV__ && (
-        <View style={styles.devToggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.modeToggle, 
-              isTrainingMode && { backgroundColor: themeColor, borderColor: themeColor }
-            ]}
-            onPress={handleTrainingTransition}
-            activeOpacity={0.8}
-          >
-            <Ionicons 
-              name="barbell" 
-              size={18} 
-              color={isTrainingMode ? "#0a0a0b" : themeColor} 
-            />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.modeToggle, 
-              isNutritionMode && { backgroundColor: themeColor, borderColor: themeColor }
-            ]}
-            onPress={() => {}} // Already in nutrition mode
-            activeOpacity={0.8}
-          >
-            <Ionicons 
-              name="restaurant" 
-              size={18} 
-              color={isNutritionMode ? "#0a0a0b" : themeColor} 
-            />
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* App Mode Toggle - Centered at Top */}
+      <View style={styles.centralToggleContainer}>
+        <TouchableOpacity
+          style={[
+            styles.centralModeToggle, 
+            isTrainingMode && { backgroundColor: themeColor, borderColor: themeColor }
+          ]}
+          onPress={handleTrainingTransition}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="barbell" 
+            size={20} 
+            color={isTrainingMode ? "#0a0a0b" : themeColor} 
+          />
+          <Text style={[
+            styles.centralToggleText,
+            { color: isTrainingMode ? "#0a0a0b" : themeColor }
+          ]}>
+            Workouts
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.centralModeToggle, 
+            isNutritionMode && { backgroundColor: themeColor, borderColor: themeColor }
+          ]}
+          onPress={() => {}} // Already in nutrition mode
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="restaurant" 
+            size={20} 
+            color={isNutritionMode ? "#0a0a0b" : themeColor} 
+          />
+          <Text style={[
+            styles.centralToggleText,
+            { color: isNutritionMode ? "#0a0a0b" : themeColor }
+          ]}>
+            Nutrition
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Gender Theme Toggle - Top Right */}
       <TouchableOpacity
-        style={[styles.genderToggle, __DEV__ && styles.genderToggleWithDev]}
+        style={styles.genderToggle}
         onPress={() => setIsPinkTheme(!isPinkTheme)}
         activeOpacity={0.8}
       >
@@ -1004,18 +1014,6 @@ export default function NutritionHomeScreen({ route }: any) {
         />
       </TouchableOpacity>
 
-      {/* Test Button - Development Only */}
-      {__DEV__ && (
-        <View style={[styles.testButton, { backgroundColor: '#10b981' }]}>
-          <TouchableOpacity
-            style={styles.buttonInner}
-            onPress={() => navigation.navigate('MealPlanTest' as any)}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="flask" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Add Meal Plan FAB - Bottom Right */}
       <View style={[styles.fab, { backgroundColor: themeColor }]}>
@@ -2051,15 +2049,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#22d3ee',
   },
-  testButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 100,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#10b981',
-  },
   genderToggle: {
     position: 'absolute',
     top: 60,
@@ -2078,31 +2067,42 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  // Development mode toggle styles
-  devToggleContainer: {
+  // Central mode toggle styles
+  centralToggleContainer: {
     position: 'absolute',
-    top: 60,
-    left: 16,
+    top: 54,
+    left: '50%',
+    marginLeft: -120, // Half of the total width (240px / 2)
     flexDirection: 'row',
-    gap: 4,
-  },
-  modeToggle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    gap: 8,
     backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 4,
     borderWidth: 1,
     borderColor: '#27272a',
-    justifyContent: 'center',
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  genderToggleWithDev: {
-    right: 16,
+  centralModeToggle: {
+    width: 112,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  centralToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   // Share modal styles
   newShareOverlay: {

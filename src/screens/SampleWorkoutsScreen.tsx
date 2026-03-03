@@ -6,9 +6,9 @@ import {
   ScrollView,
   ImageBackground,
   Modal,
+  TouchableOpacity,
   Alert,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -29,6 +29,7 @@ export default function SampleWorkoutsScreen() {
   const navigation = useNavigation<SampleWorkoutsNavigationProp>();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showWorkoutInfo, setShowWorkoutInfo] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<SampleWorkout | null>(null);
   const [activeTab, setActiveTab] = useState<'sample' | 'my'>('sample');
   const [userWorkouts, setUserWorkouts] = useState<WorkoutRoutine[]>([]);
@@ -49,13 +50,43 @@ export default function SampleWorkoutsScreen() {
 
   // Convert user routine to display format
   const convertUserWorkoutToSample = (routine: WorkoutRoutine): SampleWorkout => {
+    // Extract meaningful info from workout name and data
+    const name = routine.name.toLowerCase();
+    
+    // Determine program type and details
+    let programLength = 'Variable';
+    let workoutType = 'Strength Training';
+    let split = 'Custom Split';
+    let equipment = 'Gym Required';
+    let difficulty = 'Intermediate';
+    
+    if (name.includes('hypertrophy') || name.includes('muscle') || name.includes('builder')) {
+      workoutType = 'Muscle Building & Hypertrophy';
+      programLength = '52 weeks';
+      split = 'Lower/Push/Pull/Lower/Upper';
+      equipment = 'Full Gym Required';
+      difficulty = 'Advanced';
+    } else if (name.includes('glute') || name.includes('tone')) {
+      workoutType = 'Glute Development & Toning';
+      programLength = '12 weeks';
+      split = 'Lower/Upper Body Focus';
+      equipment = 'Home or Gym';
+      difficulty = 'Intermediate';
+    } else if (name.includes('beginner') || name.includes('start')) {
+      workoutType = 'General Fitness & Strength';
+      programLength = '10 weeks';
+      split = 'Push/Pull/Legs';
+      equipment = 'Basic Gym Equipment';
+      difficulty = 'Beginner';
+    }
+    
     return {
       id: routine.id,
       title: routine.name,
       description: 'Custom AI workout',
-      duration: `${routine.days} days • ${routine.blocks} blocks`,
-      difficulty: 'Custom',
-      focus: 'Personal Training',
+      duration: `${routine.days} days/week • ${programLength}`,
+      difficulty: difficulty,
+      focus: workoutType,
       program: routine.data,
       detailInfo: {
         overview: 'Custom workout program generated or imported by you.',
@@ -66,10 +97,10 @@ export default function SampleWorkoutsScreen() {
           'AI-generated or imported',
           'Saved to your library'
         ],
-        targetMuscles: 'Customized based on your program design',
-        restPeriods: 'As specified in your program',
-        progression: 'Custom progression scheme',
-        equipment: 'As required by your exercises'
+        targetMuscles: split,
+        restPeriods: 'Optimized for muscle growth and strength',
+        progression: 'Progressive overload with weekly advancement',
+        equipment: equipment
       }
     };
   };
@@ -195,7 +226,7 @@ export default function SampleWorkoutsScreen() {
     console.log('ℹ️ INFO BUTTON PRESSED:', workout.title);
     
     setSelectedWorkout(workout);
-    setShowDetailModal(true);
+    setShowWorkoutInfo(true);
   };
 
 
@@ -327,56 +358,54 @@ export default function SampleWorkoutsScreen() {
               
               return (
                 <View key={workout.id} style={styles.cardContainer}>
-                  <TouchableOpacity 
-                    style={[styles.nutritionStyleCard, { borderColor: themeColor, shadowColor: themeColor }]}
+                  <TouchableOpacity
+                    style={styles.card}
+                    activeOpacity={0.9}
                     onPress={() => handleCopyWorkout(workout)}
-                    activeOpacity={0.8}
                   >
-                    {/* Delete Button */}
-                    <TouchableOpacity 
-                      style={styles.deleteButtonTop}
-                      onPress={() => handleDeleteWorkout(routine.id, routine.name)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                    </TouchableOpacity>
-                    
-                    <View style={styles.nutritionCardContent}>
-                      <Text style={[styles.nutritionCardTitle, { textShadowColor: `${themeColor}40` }]}>{workout.title}</Text>
-                      <Text style={styles.nutritionCardSubtitle}>
-                        {workout.duration}
-                      </Text>
-                      <Text style={[styles.nutritionCardDescription, { color: themeColor }]}>
-                        Tap to copy & share
-                      </Text>
-                    </View>
-                    
-                    {/* Info Button */}
-                    <TouchableOpacity 
-                      style={styles.infoButtonBottom}
-                      onPress={() => handleShowDetails(workout)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="information-circle-outline" size={24} color="#71717a" />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                    
-                  {/* Copied Overlay */}
-                  {copiedId === workout.id && (
-                    <View style={styles.copiedOverlay}>
-                      <LinearGradient
-                        colors={[`${themeColor}F2`, `${themeColor}D9`]}
-                        style={styles.copiedGradient}
+                    <View style={styles.userMealGradient}>
+                      <View style={styles.userMealHeader}>
+                        <Text style={styles.userMealTitle}>{workout.title}</Text>
+                        <TouchableOpacity 
+                          style={styles.deleteButton}
+                          onPress={() => handleDeleteWorkout(routine.id, routine.name)}
+                        >
+                          <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.userMealSubtitle}>Custom workout</Text>
+                      <View style={styles.userMealDetails}>
+                        <Text style={styles.userMealText}>Tap to copy & share</Text>
+                      </View>
+
+                      {/* Info Button - Bottom Right */}
+                      <TouchableOpacity 
+                        style={styles.infoButtonBottomRight}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleShowDetails(workout);
+                        }}
                       >
-                        <View style={styles.copiedContent}>
-                          <Ionicons name="checkmark-circle" size={60} color="#ffffff" />
-                          <Text style={styles.copiedTitle}>Copied!</Text>
-                          <Text style={styles.copiedSubtitle}>{workout.title} is ready to import</Text>
-                        </View>
-                      </LinearGradient>
+                        <Ionicons name="information-circle-outline" size={20} color={themeColor} />
+                      </TouchableOpacity>
                     </View>
-                  )}
+                    
+                    {/* Copied Overlay */}
+                    {copiedId === workout.id && (
+                      <View style={styles.copiedOverlay}>
+                        <LinearGradient
+                          colors={[`${themeColor}F2`, `${themeColor}D9`]}
+                          style={styles.copiedGradient}
+                        >
+                          <View style={styles.copiedContent}>
+                            <Ionicons name="checkmark-circle" size={60} color="#ffffff" />
+                            <Text style={styles.copiedTitle}>Copied!</Text>
+                            <Text style={styles.copiedSubtitle}>{workout.title} is ready to import</Text>
+                          </View>
+                        </LinearGradient>
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 </View>
               );
             })
@@ -414,60 +443,151 @@ export default function SampleWorkoutsScreen() {
         </View>
       </ScrollView>
 
-      {/* Detail Modal */}
+      {/* Workout Modal - EXACT copy from working nutrition screen */}
       <Modal
         visible={showDetailModal}
+        transparent={true}
         animationType="slide"
-        presentationStyle="pageSheet"
         onRequestClose={() => setShowDetailModal(false)}
       >
-        {selectedWorkout && (
+        <View style={styles.actionModalOverlay}>
+          <TouchableOpacity 
+            style={styles.actionModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowDetailModal(false)}
+          />
+          
+          <View style={styles.actionSheet}>
+            {/* Handle Bar */}
+            <View style={styles.handleBar} />
+            
+            {/* Header */}
+            <View style={styles.actionHeader}>
+              <Text style={styles.actionTitle}>Workout Options</Text>
+              <TouchableOpacity
+                style={styles.actionCloseButton}
+                onPress={() => setShowDetailModal(false)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={24} color="#a1a1aa" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Plan Info */}
+            {selectedWorkout && (
+              <>
+                <View style={styles.actionPlanInfo}>
+                  <Text style={styles.actionPlanName} numberOfLines={2}>
+                    {selectedWorkout.title}
+                  </Text>
+                  <Text style={styles.actionPlanDetails}>
+                    {selectedWorkout.duration} • {selectedWorkout.difficulty}
+                  </Text>
+                </View>
+                
+                <View style={styles.modernActionButtons}>
+                  {/* Save to Collection Button */}
+                  <TouchableOpacity
+                    style={styles.saveActionButton}
+                    onPress={() => {
+                      // Handle save to collection
+                      console.log('💾 Save to My Workouts');
+                      setShowDetailModal(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons 
+                      name="heart" 
+                      size={18} 
+                      color="#ffffff" 
+                    />
+                    <Text style={styles.saveActionText}>Save to Collection</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.renameButton}
+                    onPress={() => {
+                      console.log('✏️ Rename workout');
+                      setShowDetailModal(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="create-outline" size={18} color="#ffffff" />
+                    <Text style={styles.renameText}>Rename</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.deleteConfirmButton}
+                    onPress={() => {
+                      console.log('🗑️ Remove workout');
+                      setShowDetailModal(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash" size={18} color="#ffffff" />
+                    <Text style={styles.deleteConfirmText}>Remove</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.deleteCancelButton}
+                    onPress={() => setShowDetailModal(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.deleteCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Workout Info Modal */}
+      <Modal
+        visible={showWorkoutInfo}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowWorkoutInfo(false)}
+      >
+        <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedWorkout.title}</Text>
-              <TouchableOpacity 
-                style={styles.modalCloseButton}
-                onPress={() => setShowDetailModal(false)}
+              <Text style={styles.modalTitle}>{selectedWorkout?.title}</Text>
+              <TouchableOpacity
+                onPress={() => setShowWorkoutInfo(false)}
+                style={styles.closeButton}
               >
-                <Ionicons name="close" size={28} color="#ffffff" />
+                <Ionicons name="close" size={24} color="#71717a" />
               </TouchableOpacity>
             </View>
             
             <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-              <Text style={styles.overviewText}>{selectedWorkout.detailInfo.overview}</Text>
+              <Text style={styles.modalDescription}>
+                Program structure and organization for your custom workout plan.
+              </Text>
               
-              <View style={styles.highlightsSection}>
-                <Text style={styles.sectionTitle}>Key Features</Text>
-                {selectedWorkout.detailInfo.highlights.map((highlight, idx) => (
-                  <View key={idx} style={styles.highlightItem}>
-                    <Ionicons name="checkmark" size={16} color={themeColor} />
-                    <Text style={styles.highlightText}>{highlight}</Text>
+              {selectedWorkout && (
+                <View style={styles.nutritionInfo}>
+                  <Text style={styles.nutritionTitle}>Program Structure:</Text>
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionLabel}>Structure:</Text>
+                    <Text style={[styles.nutritionValue, { color: themeColor }]}>
+                      {selectedWorkout.duration}
+                    </Text>
                   </View>
-                ))}
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Target Muscles</Text>
-                <Text style={styles.detailText}>{selectedWorkout.detailInfo.targetMuscles}</Text>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Rest Periods</Text>
-                <Text style={styles.detailText}>{selectedWorkout.detailInfo.restPeriods}</Text>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Progression</Text>
-                <Text style={styles.detailText}>{selectedWorkout.detailInfo.progression}</Text>
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.sectionTitle}>Equipment</Text>
-                <Text style={styles.detailText}>{selectedWorkout.detailInfo.equipment}</Text>
+                </View>
+              )}
+              
+              <View style={styles.features}>
+                <Text style={styles.featuresTitle}>Actions:</Text>
+                <Text style={styles.featureItem}>• Tap the card to copy JSON data</Text>
+                <Text style={styles.featureItem}>• Share with other users</Text>
+                <Text style={styles.featureItem}>• Use in workout planning apps</Text>
+                <Text style={styles.featureItem}>• Delete when no longer needed</Text>
               </View>
             </ScrollView>
           </View>
-        )}
+        </View>
       </Modal>
     </View>
   );
@@ -526,71 +646,83 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 12,
   },
-  // New nutrition-style card
-  nutritionStyleCard: {
-    position: 'relative',
-    backgroundColor: '#18181b',
+  // Copied exact meal plan card styles
+  card: {
+    height: 280,
     borderRadius: 20,
-    borderWidth: 2,
-    padding: 24,
-    paddingTop: 36,
-    paddingBottom: 36,
-    alignItems: 'center',
-    width: '100%',
-    minHeight: 180,
-    justifyContent: 'center',
-    marginBottom: 16,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 16,
     elevation: 8,
   },
-  deleteButtonTop: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    zIndex: 10,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  userMealGradient: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+    borderRadius: 20,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  userMealHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  infoButton: {
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
     borderRadius: 16,
     padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 211, 238, 0.3)',
   },
-  nutritionCardContent: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  nutritionCardTitle: {
+  userMealTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 30,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    flex: 1,
+    marginRight: 12,
   },
-  nutritionCardSubtitle: {
+  userMealSubtitle: {
     fontSize: 16,
-    color: '#a1a1aa',
-    textAlign: 'center',
-    marginBottom: 16,
+    color: '#e4e4e7',
+    marginBottom: 12,
   },
-  nutritionCardDescription: {
+  userMealDetails: {
+    marginTop: 'auto',
+  },
+  userMealText: {
     fontSize: 14,
+    color: '#a1a1aa',
     fontWeight: '500',
-    textAlign: 'center',
   },
-  infoButtonBottom: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    zIndex: 10,
-    backgroundColor: 'rgba(113, 113, 122, 0.1)',
+  deleteButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderRadius: 16,
     padding: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  infoButtonBottomRight: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   expandedCard: {
     height: 400,
@@ -892,39 +1024,245 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  // Modal styles
-  modalContainer: {
+  // Working Modal styles - copied from nutrition screen
+  actionModalOverlay: {
     flex: 1,
-    backgroundColor: '#0d1117',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  actionModalBackdrop: {
+    flex: 1,
+  },
+  actionSheet: {
+    backgroundColor: '#18181b',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: 34,
+    paddingHorizontal: 20,
+    maxHeight: '80%',
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#71717a',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  actionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  actionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  actionCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionPlanInfo: {
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
+  },
+  actionPlanName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  actionPlanDetails: {
+    fontSize: 14,
+    color: '#a1a1aa',
+  },
+  modalScrollContent: {
+    flex: 1,
+  },
+  modernActionButtons: {
+    flexDirection: 'column',
+    gap: 16,
+    width: '100%',
+  },
+  saveActionButton: {
+    width: '100%',
+    backgroundColor: '#10b981',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  saveActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  renameButton: {
+    width: '100%',
+    backgroundColor: '#3b82f6',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  renameText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  deleteConfirmButton: {
+    width: '100%',
+    backgroundColor: '#ef4444',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  deleteConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  deleteCancelButton: {
+    width: '100%',
+    backgroundColor: '#27272a',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#3f3f46',
+  },
+  deleteCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a1a1aa',
+  },
+  // Modal styles (copied from nutrition screen)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    width: '100%',
+    maxHeight: '80%',
   },
   modalHeader: {
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#27272a',
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: '#ffffff',
-    flex: 1,
   },
-  modalCloseButton: {
-    width: 44,
-    height: 44,
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#27272a',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 22,
   },
   modalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    padding: 20,
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: '#e4e4e7',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  nutritionInfo: {
+    backgroundColor: '#0a0a0b',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  nutritionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 12,
+  },
+  nutritionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  nutritionLabel: {
+    fontSize: 14,
+    color: '#a1a1aa',
+  },
+  nutritionValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  features: {
+    backgroundColor: '#0a0a0b',
+    borderRadius: 12,
+    padding: 16,
+  },
+  featuresTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 12,
+  },
+  featureItem: {
+    fontSize: 14,
+    color: '#a1a1aa',
+    marginBottom: 6,
+    lineHeight: 20,
   },
   // Tab styles
   tabContainer: {
