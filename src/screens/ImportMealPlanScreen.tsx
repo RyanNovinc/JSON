@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   Linking,
+  Animated,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
@@ -17,7 +18,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import { getMealPlanPrompt } from '../data/mealPlanPrompt';
-import { generateUserMealPlanPrompt } from '../data/generateUserMealPrompt';
+import { assembleMealPlanningPrompt, getMealPlanReviewPrompt } from '../data/mealPlanningPrompt';
 import { generateJsonConversionPrompt } from '../data/generateJsonConversionPrompt';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
@@ -43,130 +44,301 @@ export default function ImportMealPlanScreen() {
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
-  const [instructionsCreationMode, setInstructionsCreationMode] = useState<'quick' | 'research'>('quick');
-  const [showModeInfo, setShowModeInfo] = useState(false);
+  const [reviewPromptCopied, setReviewPromptCopied] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [parsedMealPlan, setParsedMealPlan] = useState<SimplifiedMealPlan | null>(null);
+  const [modalScale] = useState(new Animated.Value(0));
+  const [modalOpacity] = useState(new Animated.Value(0));
+
+  const getCurrentDate = (): string => {
+    const today = new Date();
+    const startDate = new Date(today.getTime() + (24 * 60 * 60 * 1000)); // Start tomorrow
+    return startDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+  };
+
+  const getDatePlusN = (n: number): string => {
+    const today = new Date();
+    const targetDate = new Date(today.getTime() + ((n + 1) * 24 * 60 * 60 * 1000));
+    return targetDate.toISOString().split('T')[0];
+  };
+
+  const getDayName = (n: number): string => {
+    const today = new Date();
+    const targetDate = new Date(today.getTime() + ((n + 1) * 24 * 60 * 60 * 1000));
+    return targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+  };
 
   const sampleMealPlan = {
-    "plan_name": "Quick Start - Balanced Meal Plan",
-    "description": "3-day sample meal plan to try the app",
-    "duration_days": 3,
-    "total_meals": 9,
-    "weeks": [
-      {
-        "week_number": 1,
-        "days": [
+    "id": "sample_3day_balanced",
+    "name": "Quick Start - Balanced Meal Plan",
+    "startDate": getCurrentDate(),
+    "endDate": getDatePlusN(2),
+    "dailyMeals": {
+      [getCurrentDate()]: {
+        "date": getCurrentDate(),
+        "dayName": getDayName(0),
+        "meals": [
           {
-            "day_name": "Monday",
-            "day_number": 1,
-            "meals": [
+            "id": "meal_1_breakfast_1",
+            "name": "Greek Yogurt Bowl",
+            "type": "breakfast",
+            "time": "7:30 AM",
+            "calories": 320,
+            "macros": {
+              "protein": 20,
+              "carbs": 35,
+              "fat": 8,
+              "fiber": 6
+            },
+            "ingredients": [
               {
-                "meal_name": "Greek Yogurt Bowl",
-                "meal_type": "breakfast",
-                "prep_time": 5,
-                "cook_time": 0,
-                "total_time": 5,
-                "servings": 1,
-                "calories": 320,
-                "macros": {
-                  "protein": 20,
-                  "carbs": 35,
-                  "fat": 8,
-                  "fiber": 6
-                },
-                "ingredients": [
-                  {
-                    "item": "Greek yogurt",
-                    "amount": "1",
-                    "unit": "cup",
-                    "notes": "plain, non-fat"
-                  },
-                  {
-                    "item": "Mixed berries",
-                    "amount": "0.5",
-                    "unit": "cup"
-                  },
-                  {
-                    "item": "Honey",
-                    "amount": "1",
-                    "unit": "tbsp"
-                  },
-                  {
-                    "item": "Granola",
-                    "amount": "2",
-                    "unit": "tbsp"
-                  }
-                ],
-                "instructions": [
-                  "Add Greek yogurt to bowl",
-                  "Top with mixed berries",
-                  "Drizzle honey over berries",
-                  "Sprinkle granola on top"
-                ],
-                "notes": "Use frozen berries if fresh not available",
-                "tags": ["high-protein", "quick", "vegetarian"]
+                "item": "Greek yogurt",
+                "amount": "1",
+                "unit": "cup",
+                "notes": "plain, non-fat"
               },
               {
-                "meal_name": "Grilled Chicken Salad",
-                "meal_type": "lunch",
-                "prep_time": 10,
-                "cook_time": 15,
-                "total_time": 25,
-                "servings": 1,
-                "calories": 450,
-                "macros": {
-                  "protein": 35,
-                  "carbs": 15,
-                  "fat": 25,
-                  "fiber": 8
-                },
-                "ingredients": [
-                  {
-                    "item": "Chicken breast",
-                    "amount": "4",
-                    "unit": "oz"
-                  },
-                  {
-                    "item": "Mixed greens",
-                    "amount": "2",
-                    "unit": "cups"
-                  },
-                  {
-                    "item": "Cherry tomatoes",
-                    "amount": "0.5",
-                    "unit": "cup"
-                  },
-                  {
-                    "item": "Avocado",
-                    "amount": "0.5",
-                    "unit": "medium"
-                  },
-                  {
-                    "item": "Olive oil",
-                    "amount": "1",
-                    "unit": "tbsp"
-                  },
-                  {
-                    "item": "Lemon juice",
-                    "amount": "1",
-                    "unit": "tbsp"
-                  }
-                ],
-                "instructions": [
-                  "Season and grill chicken breast until cooked through",
-                  "Let chicken rest, then slice",
-                  "Combine greens, tomatoes in bowl",
-                  "Add sliced chicken and avocado",
-                  "Whisk olive oil and lemon juice",
-                  "Drizzle dressing over salad"
-                ],
-                "notes": "Cook chicken to internal temp of 165°F",
-                "tags": ["high-protein", "low-carb", "gluten-free"]
+                "item": "Mixed berries",
+                "amount": "0.5",
+                "unit": "cup",
+                "notes": ""
+              },
+              {
+                "item": "Honey",
+                "amount": "1",
+                "unit": "tbsp",
+                "notes": ""
+              },
+              {
+                "item": "Granola",
+                "amount": "2",
+                "unit": "tbsp",
+                "notes": ""
               }
-            ]
+            ],
+            "instructions": [
+              "Add Greek yogurt to bowl",
+              "Top with mixed berries",
+              "Drizzle honey over berries",
+              "Sprinkle granola on top"
+            ],
+            "tags": ["high-protein", "quick", "vegetarian"],
+            "isOriginal": true,
+            "addedAt": new Date().toISOString()
+          },
+          {
+            "id": "meal_1_lunch_1",
+            "name": "Grilled Chicken Salad",
+            "type": "lunch",
+            "time": "12:30 PM",
+            "calories": 450,
+            "macros": {
+              "protein": 35,
+              "carbs": 15,
+              "fat": 25,
+              "fiber": 8
+            },
+            "ingredients": [
+              {
+                "item": "Chicken breast",
+                "amount": "4",
+                "unit": "oz",
+                "notes": ""
+              },
+              {
+                "item": "Mixed greens",
+                "amount": "2",
+                "unit": "cups",
+                "notes": ""
+              },
+              {
+                "item": "Cherry tomatoes",
+                "amount": "0.5",
+                "unit": "cup",
+                "notes": ""
+              },
+              {
+                "item": "Avocado",
+                "amount": "0.5",
+                "unit": "medium",
+                "notes": ""
+              },
+              {
+                "item": "Olive oil",
+                "amount": "1",
+                "unit": "tbsp",
+                "notes": ""
+              },
+              {
+                "item": "Lemon juice",
+                "amount": "1",
+                "unit": "tbsp",
+                "notes": ""
+              }
+            ],
+            "instructions": [
+              "Season and grill chicken breast until cooked through",
+              "Let chicken rest, then slice",
+              "Combine greens, tomatoes in bowl",
+              "Add sliced chicken and avocado",
+              "Whisk olive oil and lemon juice",
+              "Drizzle dressing over salad"
+            ],
+            "tags": ["high-protein", "low-carb", "gluten-free"],
+            "isOriginal": true,
+            "addedAt": new Date().toISOString()
+          },
+          {
+            "id": "meal_1_dinner_1",
+            "name": "Baked Salmon with Vegetables",
+            "type": "dinner",
+            "time": "6:30 PM",
+            "calories": 520,
+            "macros": {
+              "protein": 40,
+              "carbs": 20,
+              "fat": 32,
+              "fiber": 6
+            },
+            "ingredients": [
+              {
+                "item": "Salmon fillet",
+                "amount": "5",
+                "unit": "oz",
+                "notes": ""
+              },
+              {
+                "item": "Broccoli",
+                "amount": "1",
+                "unit": "cup",
+                "notes": ""
+              },
+              {
+                "item": "Sweet potato",
+                "amount": "1",
+                "unit": "medium",
+                "notes": ""
+              }
+            ],
+            "instructions": [
+              "Preheat oven to 400°F",
+              "Season salmon with salt and pepper",
+              "Cut vegetables into bite-sized pieces",
+              "Bake salmon and vegetables for 20 minutes",
+              "Serve immediately"
+            ],
+            "tags": ["high-protein", "omega-3", "gluten-free"],
+            "isOriginal": true,
+            "addedAt": new Date().toISOString()
+          }
+        ]
+      },
+      [getDatePlusN(1)]: {
+        "date": getDatePlusN(1),
+        "dayName": getDayName(1),
+        "meals": [
+          {
+            "id": "meal_2_breakfast_1",
+            "name": "Protein Smoothie",
+            "type": "breakfast",
+            "time": "7:30 AM",
+            "calories": 350,
+            "macros": {
+              "protein": 25,
+              "carbs": 30,
+              "fat": 12,
+              "fiber": 5
+            },
+            "ingredients": [
+              {
+                "item": "Protein powder",
+                "amount": "1",
+                "unit": "scoop",
+                "notes": "vanilla"
+              },
+              {
+                "item": "Banana",
+                "amount": "1",
+                "unit": "medium",
+                "notes": ""
+              },
+              {
+                "item": "Spinach",
+                "amount": "1",
+                "unit": "cup",
+                "notes": ""
+              },
+              {
+                "item": "Almond milk",
+                "amount": "1",
+                "unit": "cup",
+                "notes": ""
+              }
+            ],
+            "instructions": [
+              "Add all ingredients to blender",
+              "Blend until smooth",
+              "Pour into glass and serve"
+            ],
+            "tags": ["high-protein", "quick", "vegetarian"],
+            "isOriginal": true,
+            "addedAt": new Date().toISOString()
+          }
+        ]
+      },
+      [getDatePlusN(2)]: {
+        "date": getDatePlusN(2),
+        "dayName": getDayName(2),
+        "meals": [
+          {
+            "id": "meal_3_breakfast_1",
+            "name": "Oatmeal with Nuts",
+            "type": "breakfast",
+            "time": "7:30 AM",
+            "calories": 380,
+            "macros": {
+              "protein": 18,
+              "carbs": 45,
+              "fat": 15,
+              "fiber": 8
+            },
+            "ingredients": [
+              {
+                "item": "Rolled oats",
+                "amount": "0.5",
+                "unit": "cup",
+                "notes": ""
+              },
+              {
+                "item": "Almonds",
+                "amount": "2",
+                "unit": "tbsp",
+                "notes": "chopped"
+              },
+              {
+                "item": "Milk",
+                "amount": "1",
+                "unit": "cup",
+                "notes": ""
+              }
+            ],
+            "instructions": [
+              "Cook oats with milk according to package directions",
+              "Top with chopped almonds",
+              "Serve warm"
+            ],
+            "tags": ["high-fiber", "quick", "vegetarian"],
+            "isOriginal": true,
+            "addedAt": new Date().toISOString()
           }
         ]
       }
-    ]
+    },
+    "metadata": {
+      "generatedAt": new Date().toISOString(),
+      "totalCost": 45.50,
+      "duration": 3
+    }
   };
 
   const handleCopySample = async () => {
@@ -178,250 +350,59 @@ export default function ImportMealPlanScreen() {
     }, 2000);
   };
 
+
   const validateAndParseJSON = (input: string): SimplifiedMealPlan | null => {
-    let parsed: any;
-    
-    // Normalize smart quotes to straight quotes before parsing
-    let text = input;
-    text = text.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');  // curly double quotes
-    text = text.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");  // curly single quotes
-    
-    // Enhanced JSON parsing with detailed error reporting
     try {
-      parsed = JSON.parse(text);
+      // Normalize smart quotes to straight quotes before parsing
+      let text = input;
+      text = text.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');  // curly double quotes
+      text = text.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");  // curly single quotes
+      
+      const parsed = JSON.parse(text);
+      console.log("📥 Parsed JSON successfully");
+      
+      // Simple validation for SimplifiedMealPlan format
+      if (!parsed.id) {
+        setErrorMessage("❌ Missing required field: id");
+        return null;
+      }
+      
+      if (!parsed.name) {
+        setErrorMessage("❌ Missing required field: name");
+        return null;
+      }
+      
+      if (!parsed.dailyMeals || typeof parsed.dailyMeals !== "object") {
+        setErrorMessage("❌ Missing or invalid dailyMeals structure");
+        return null;
+      }
+      
+      if (!parsed.metadata || !parsed.metadata.duration) {
+        setErrorMessage("❌ Missing metadata.duration field");
+        return null;
+      }
+      
+      // Validate that dailyMeals has at least one day
+      const dailyMealsKeys = Object.keys(parsed.dailyMeals);
+      if (dailyMealsKeys.length === 0) {
+        setErrorMessage("❌ No meal days found in dailyMeals");
+        return null;
+      }
+      
+      // Quick validation of date format in keys
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const invalidDates = dailyMealsKeys.filter(key => !dateRegex.test(key));
+      if (invalidDates.length > 0) {
+        setErrorMessage(`❌ Invalid date format in dailyMeals keys: ${invalidDates.join(", ")}. Expected YYYY-MM-DD format.`);
+        return null;
+      }
+      
+      console.log("✅ SimplifiedMealPlan format validated successfully");
+      return parsed as SimplifiedMealPlan;
+      
     } catch (jsonError) {
       const error = jsonError as Error;
-      let detailedError = 'JSON Parse Error:\n\n';
-      
-      // Extract position information from error message
-      const positionMatch = error.message.match(/position (\d+)/i) || 
-                           error.message.match(/at position (\d+)/i) ||
-                           error.message.match(/column (\d+)/i);
-      
-      const lineMatch = error.message.match(/line (\d+)/i);
-      
-      if (positionMatch || lineMatch) {
-        const position = positionMatch ? parseInt(positionMatch[1]) : null;
-        const line = lineMatch ? parseInt(lineMatch[1]) : null;
-        
-        if (position !== null) {
-          detailedError += `Error at position ${position}`;
-          if (line) detailedError += ` (line ${line})`;
-          detailedError += '\n\n';
-          
-          // Show snippet around error position
-          const start = Math.max(0, position - 50);
-          const end = Math.min(text.length, position + 50);
-          const snippet = text.slice(start, end);
-          const errorPos = position - start;
-          
-          detailedError += 'Context:\n';
-          detailedError += `...${snippet.slice(0, errorPos)}⚠️${snippet.slice(errorPos)}...\n\n`;
-        }
-      }
-      
-      // Detect specific common issues
-      const rawError = error.message.toLowerCase();
-      
-      if (rawError.includes('unexpected end') || rawError.includes('unterminated')) {
-        detailedError += '🔍 Issue: JSON appears truncated or incomplete\n';
-        detailedError += '💡 Solution: File may be too large for mobile clipboard. Try:\n';
-        detailedError += '• Use a smaller meal plan file\n';
-        detailedError += '• Import via computer/simulator\n';
-        detailedError += '• Copy in smaller chunks\n';
-      } else if (input.includes('\u201c') || input.includes('\u201d') || input.includes('\u2018') || input.includes('\u2019')) {
-        detailedError += '🔍 Issue: Smart/curly quotes were detected and auto-fixed\n';
-        detailedError += '💡 Note: Quotes were normalized, but there may be other syntax issues\n';
-      } else if (rawError.includes('unexpected token')) {
-        const tokenMatch = error.message.match(/unexpected token '(.*)'/i) || 
-                          error.message.match(/unexpected token (.*) in/i);
-        if (tokenMatch) {
-          detailedError += `🔍 Issue: Unexpected character "${tokenMatch[1]}"\n`;
-          detailedError += '💡 Solution: Remove invalid characters or fix JSON syntax\n';
-        }
-      } else if (text.trim().startsWith('```')) {
-        detailedError += '🔍 Issue: Code block markers found\n';
-        detailedError += '💡 Solution: Copy only the JSON content, not the ```json markers\n';
-      } else if (!text.trim().startsWith('{')) {
-        detailedError += '🔍 Issue: JSON must start with {\n';
-        detailedError += '💡 Solution: Copy the complete JSON object\n';
-      } else {
-        detailedError += '🔍 Issue: JSON syntax error\n';
-        detailedError += '💡 Common fixes:\n';
-        detailedError += '• Check for missing commas between items\n';
-        detailedError += '• Remove trailing commas\n';
-        detailedError += '• Ensure all brackets are properly closed\n';
-        detailedError += '• Use straight quotes, not curly quotes\n';
-      }
-      
-      detailedError += '\n📋 Raw error: ' + error.message;
-      
-      setErrorMessage(detailedError);
-      return null;
-    }
-    
-    // Continue with existing validation logic
-    try {
-      // Debug what we actually received
-      console.log('🔍 Parsed JSON keys:', Object.keys(parsed));
-      console.log('🔍 Has dailyMeals:', !!parsed.dailyMeals);
-      console.log('🔍 Has metadata:', !!parsed.metadata);
-      console.log('🔍 Metadata content:', parsed.metadata);
-      
-      // Check if this is the new SimplifiedMealPlan format first
-      if (parsed.dailyMeals && parsed.metadata) {
-        // New format - minimal validation then return directly
-        if (!parsed.name || typeof parsed.name !== 'string') {
-          throw new Error('Invalid meal plan name');
-        }
-        if (!parsed.metadata.duration || typeof parsed.metadata.duration !== 'number') {
-          throw new Error('Invalid duration in metadata');
-        }
-        if (!parsed.dailyMeals || typeof parsed.dailyMeals !== 'object') {
-          throw new Error('Invalid dailyMeals structure');
-        }
-        console.log('✅ New SimplifiedMealPlan format detected');
-        return parsed as SimplifiedMealPlan;
-      }
-      
-      // Legacy format validation
-      const planName = parsed.plan_name || parsed.name;
-      if (!planName || typeof planName !== 'string') {
-        throw new Error('Invalid meal plan name');
-      }
-      
-      // Handle legacy formats  
-      const durationDays = parsed.duration_days || parsed.duration;
-      if (!durationDays || typeof durationDays !== 'number') {
-        throw new Error('Invalid duration days');
-      }
-
-      // Handle total meals calculation - new format calculates from dailyMeals
-      let totalMeals = parsed.total_meals || parsed.meals;
-      if (!totalMeals && parsed.dailyMeals) {
-        // Calculate total meals from dailyMeals structure
-        totalMeals = Object.values(parsed.dailyMeals).reduce((total: number, day: any) => {
-          return total + (day.meals?.length || 0);
-        }, 0);
-      }
-      if (!totalMeals || typeof totalMeals !== 'number') {
-        throw new Error('Invalid total meals count');
-      }
-      
-      // Handle both formats - new format uses dailyMeals object, old format uses days array
-      let days = parsed.days || (parsed.data && parsed.data.days);
-      if (parsed.dailyMeals && !days) {
-        // Convert dailyMeals object to days array for validation
-        days = Object.values(parsed.dailyMeals);
-      }
-      if (!Array.isArray(days) || days.length === 0) {
-        throw new Error('No meal plan days found');
-      }
-      
-      // Validate plan-level optional fields
-      if (parsed.description && typeof parsed.description !== 'string') {
-        throw new Error('Description must be a string');
-      }
-
-      // Validate days structure
-      days.forEach((day: any, dayIndex: number) => {
-        if (!day.day_name || !day.day_number) {
-          throw new Error(`Day ${dayIndex + 1} needs day_name and day_number`);
-        }
-        
-        if (!Array.isArray(day.meals) || day.meals.length === 0) {
-          throw new Error(`"${day.day_name}" has no meals`);
-        }
-        
-        day.meals.forEach((meal: any, mealIndex: number) => {
-            // Validate required fields
-            if (!meal.meal_name || !meal.meal_type || 
-                !Array.isArray(meal.ingredients) || meal.ingredients.length === 0 ||
-                !Array.isArray(meal.instructions) || meal.instructions.length === 0) {
-              throw new Error(`Meal ${mealIndex + 1} in "${day.day_name}" is missing required fields`);
-            }
-            
-            // Validate meal type
-            const validMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
-            if (!validMealTypes.includes(meal.meal_type)) {
-              throw new Error(`Meal "${meal.meal_name}" has invalid meal_type. Must be one of: ${validMealTypes.join(', ')}`);
-            }
-            
-            // Validate ingredients
-            meal.ingredients.forEach((ingredient: any, ingredientIndex: number) => {
-              // Check for either 'name' (correct format) or 'item' (legacy format)
-              const ingredientName = ingredient.name || ingredient.item;
-              if (!ingredientName || !ingredient.amount || !ingredient.unit) {
-                const requiredFields = ingredient.name ? '(name, amount, unit)' : '(item, amount, unit)';
-                throw new Error(`Ingredient ${ingredientIndex + 1} in "${meal.meal_name}" is missing required fields ${requiredFields}`);
-              }
-              // No glossary validation - AI can use any ingredient names
-            });
-            
-            // Validate optional numeric fields
-            const numericFields = ['prep_time', 'cook_time', 'total_time', 'servings', 'calories'];
-            numericFields.forEach(field => {
-              if (meal[field] && (typeof meal[field] !== 'number' || meal[field] <= 0)) {
-                throw new Error(`Meal "${meal.meal_name}" has invalid ${field} value`);
-              }
-            });
-            
-            // Validate macros if present
-            if (meal.macros) {
-              if (typeof meal.macros !== 'object' || meal.macros === null) {
-                throw new Error(`Meal "${meal.meal_name}" has invalid macros format`);
-              }
-              const requiredMacros = ['protein', 'carbs', 'fat'];
-              requiredMacros.forEach(macro => {
-                if (typeof meal.macros[macro] !== 'number' || meal.macros[macro] < 0) {
-                  throw new Error(`Meal "${meal.meal_name}" has invalid ${macro} value in macros`);
-                }
-              });
-            }
-            
-            // Validate tags if present
-            if (meal.tags && !Array.isArray(meal.tags)) {
-              throw new Error(`Meal "${meal.meal_name}" tags must be an array`);
-            }
-          });
-        });
-      
-      // Validate optional grocery list if present
-      if (parsed.grocery_list) {
-        if (typeof parsed.grocery_list !== 'object') {
-          throw new Error('grocery_list must be an object');
-        }
-        
-        if (parsed.grocery_list.categories && !Array.isArray(parsed.grocery_list.categories)) {
-          throw new Error('grocery_list.categories must be an array');
-        }
-        
-        if (parsed.grocery_list.categories) {
-          parsed.grocery_list.categories.forEach((category: any, catIndex: number) => {
-            if (!category.category_name) {
-              throw new Error(`Grocery category ${catIndex + 1} missing category_name`);
-            }
-            
-            if (category.items && !Array.isArray(category.items)) {
-              throw new Error(`Grocery category "${category.category_name}" items must be an array`);
-            }
-          });
-        }
-      }
-      
-      // Return SimplifiedMealPlan format
-      if (parsed.dailyMeals) {
-        // New format - already in SimplifiedMealPlan structure
-        return parsed as SimplifiedMealPlan;
-      } else {
-        // Legacy format - needs conversion (this would need a proper conversion function)
-        throw new Error('Legacy meal plan format detected. Please use the updated AI prompt to generate plans in the new format.');
-      }
-    } catch (validationError) {
-      const error = validationError as Error;
-      const detailedError = `⚠️ Validation Error:\n\n${error.message}\n\n💡 This means your JSON was parsed successfully, but the meal plan structure has issues. Please check that all required fields are present and correctly formatted.`;
-      
-      setErrorMessage(detailedError);
+      setErrorMessage(`❌ JSON Parse Error: ${error.message}`);
       return null;
     }
   };
@@ -482,32 +463,26 @@ export default function ImportMealPlanScreen() {
     }, 800);
   };
 
-  // Create content fingerprint excluding metadata
-  const createMealPlanFingerprint = (mealPlan: any): string => {
+  // Create content fingerprint for SimplifiedMealPlan
+  const createMealPlanFingerprint = (simplifiedPlan: SimplifiedMealPlan): string => {
     // Extract only content that matters for uniqueness
     const contentToHash = {
-      plan_name: (mealPlan.plan_name || '').toLowerCase().trim(),
-      duration_days: mealPlan.duration_days || 0,
-      total_meals: mealPlan.total_meals || 0,
-      days: (mealPlan.days || []).map((day: any) => ({
-        day_name: day.day_name,
-        day_number: day.day_number,
-        meals: (day.meals || []).map((meal: any) => ({
-          meal_name: meal.meal_name,
-          meal_type: meal.meal_type,
+      name: simplifiedPlan.name.toLowerCase().trim(),
+      duration: simplifiedPlan.metadata.duration,
+      dailyMeals: Object.keys(simplifiedPlan.dailyMeals).sort().map(date => ({
+        date,
+        dayName: simplifiedPlan.dailyMeals[date].dayName,
+        meals: simplifiedPlan.dailyMeals[date].meals.map((meal: any) => ({
+          name: meal.name,
+          type: meal.type,
           ingredients: (meal.ingredients || []).sort((a: any, b: any) => 
             (a.item || '').localeCompare(b.item || '')
           ),
           instructions: meal.instructions || [],
           macros: meal.macros,
-          calories: meal.calories,
-          prep_time: meal.prep_time,
-          cook_time: meal.cook_time,
-          servings: meal.servings
+          calories: meal.calories
         }))
-      })),
-      grocery_list: mealPlan.grocery_list,
-      meal_prep_schedule: mealPlan.meal_prep_schedule
+      }))
     };
     
     // Create a simple hash from the stringified content
@@ -522,43 +497,12 @@ export default function ImportMealPlanScreen() {
   };
 
   const importMealPlanDirectly = async (simplifiedPlan: SimplifiedMealPlan) => {
-    // Check for duplicates before saving
-    let duplicateMessage = '';
     try {
-      // Generate fingerprint for the new meal plan
-      const newFingerprint = createMealPlanFingerprint(simplifiedPlan);
-      
-      // Load existing meal plans and check for duplicates
-      const existingMealPlans = await WorkoutStorage.loadMealPlans();
-      const isDuplicate = existingMealPlans.some(existing => 
-        existing.fingerprint === newFingerprint
-      );
-      
-      let shouldSaveToMyMeals = true;
-      
-      if (isDuplicate) {
-        shouldSaveToMyMeals = false;
-        duplicateMessage = `"${parsedMealPlan.plan_name}" is already in your collection, so we won't save it again. You can still use it for meal planning!`;
-      }
-
-      // Only save to "My Meals" if it's not a duplicate
-      if (shouldSaveToMyMeals) {
-        const transformedMealPlan = {
-          id: parsedMealPlan.id,
-          name: parsedMealPlan.plan_name,
-          duration: parsedMealPlan.duration_days,
-          meals: parsedMealPlan.total_meals,
-          data: parsedMealPlan,  // Store the complete JSON data
-          fingerprint: newFingerprint,  // Store the content fingerprint
-          createdAt: Date.now(), // Add creation timestamp for sorting
-        };
-        
-        await WorkoutStorage.addMealPlan(transformedMealPlan);
-      }
+      // Skip auto-saving to "My Meals" - users will manually save if they want
       
       // Before importing, preserve any manually added meals from current plan
       const existingPlanData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
-      let mergedPlanData = { ...parsedMealPlan };
+      let mergedPlanData = { ...simplifiedPlan };
       
       if (existingPlanData) {
         try {
@@ -605,24 +549,24 @@ export default function ImportMealPlanScreen() {
         }
       }
       
-      // Always set as current meal plan for immediate use (whether duplicate or not)
-      const currentMealPlan = {
-        id: parsedMealPlan.id,
-        name: parsedMealPlan.plan_name,
-        duration: parsedMealPlan.duration_days,
-        meals: parsedMealPlan.total_meals,
-        data: mergedPlanData, // Use the merged data instead of original
-      };
+      // Save the parsed meal plan to state and show confirmation
+      console.log('📤 Meal plan ready for confirmation');
+      setParsedMealPlan(simplifiedPlan);
+      setShowConfirmation(true);
       
-      console.log('📤 Imported meal plan with permanently deleted meals already removed');
-      console.log('📤 Imported manually added meals in data structure');
-      
-      await saveMealPlan(currentMealPlan);
-      
-      // Navigate directly without any popups
-      navigation.navigate('NutritionHome', { 
-        refresh: true
-      } as any);
+      // Animate modal entrance
+      Animated.parallel([
+        Animated.timing(modalScale, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(modalOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } catch (error) {
       console.error('Failed to import meal plan:', error);
       Alert.alert('Error', 'Failed to import meal plan. Please try again.');
@@ -633,6 +577,44 @@ export default function ImportMealPlanScreen() {
 
   const handleCancel = () => {
     navigation.goBack();
+  };
+
+  const handleModalCancel = () => {
+    Animated.parallel([
+      Animated.timing(modalScale, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowConfirmation(false);
+      setParsedMealPlan(null);
+      modalScale.setValue(0);
+      modalOpacity.setValue(0);
+    });
+  };
+
+  const handleConfirmImport = async () => {
+    if (!parsedMealPlan) return;
+    
+    try {
+      // Save to SimplifiedMealPlanningContext
+      console.log('📤 Importing meal plan to SimplifiedMealPlanningContext');
+      await saveMealPlan(parsedMealPlan);
+      
+      // Navigate to nutrition home
+      navigation.navigate('NutritionHome', { 
+        refresh: true
+      } as any);
+    } catch (error) {
+      console.error('Failed to save meal plan:', error);
+      Alert.alert('Error', 'Failed to save meal plan. Please try again.');
+    }
   };
 
   if (isLoading) {
@@ -661,67 +643,6 @@ export default function ImportMealPlanScreen() {
           >
             <View style={{ height: 60 }} />
             
-            {/* Mode Selection Section */}
-            <View style={styles.modeSection}>
-              <View style={styles.simpleModeToggle}>
-                <TouchableOpacity
-                  style={[
-                    styles.simpleOption,
-                    instructionsCreationMode === 'quick' && [styles.simpleOptionActive, { backgroundColor: themeColor }]
-                  ]}
-                  onPress={() => setInstructionsCreationMode('quick')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[
-                    styles.simpleOptionText,
-                    instructionsCreationMode === 'quick' && { color: '#0a0a0b' }
-                  ]}>Quick</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.simpleOption,
-                    instructionsCreationMode === 'research' && [styles.simpleOptionActive, { backgroundColor: themeColor }]
-                  ]}
-                  onPress={() => setInstructionsCreationMode('research')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[
-                    styles.simpleOptionText,
-                    instructionsCreationMode === 'research' && { color: '#0a0a0b' }
-                  ]}>Research</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity
-                style={styles.centeredInfoButton}
-                onPress={() => setShowModeInfo(!showModeInfo)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.infoButtonText, { color: themeColor }]}>What's the difference?</Text>
-                <Ionicons 
-                  name={showModeInfo ? "chevron-up" : "chevron-down"} 
-                  size={14} 
-                  color={themeColor} 
-                />
-              </TouchableOpacity>
-              
-              {showModeInfo && (
-                <View style={[styles.infoCard, { borderColor: themeColor + '20' }]}>
-                  <View style={styles.infoRow}>
-                    <View style={styles.infoColumn}>
-                      <Text style={[styles.infoTitle, { color: themeColor }]}>Quick</Text>
-                      <Text style={styles.infoDesc}>Faster but less accurate meal plan</Text>
-                    </View>
-                    <View style={styles.infoDivider} />
-                    <View style={styles.infoColumn}>
-                      <Text style={[styles.infoTitle, { color: themeColor }]}>Research</Text>
-                      <Text style={styles.infoDesc}>Longer but more accurate meal plan</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-            </View>
             
             <View style={styles.stepsContainer}>
               <View style={styles.stepCard}>
@@ -732,24 +653,13 @@ export default function ImportMealPlanScreen() {
                   <Text style={styles.stepCardTitle}>Plan Your Meals</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  {instructionsCreationMode === 'research' 
-                    ? 'Send this enhanced prompt for research-verified meal planning'
-                    : 'Send this prompt to your AI of choice for quick meal planning'
-                  }
+                  Send this prompt to your AI of choice for quick meal planning
                 </Text>
-                {instructionsCreationMode === 'research' && (
-                  <View style={[styles.researchNote, { borderColor: themeColor + '30', backgroundColor: themeColor + '10' }]}>
-                    <Ionicons name="information-circle" size={16} color={themeColor} />
-                    <Text style={[styles.researchNoteText, { color: themeColor }]}>
-                      Enable web search/research tools in your AI (Claude, ChatGPT, etc.)
-                    </Text>
-                  </View>
-                )}
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
-                      const planningPrompt = await generateUserMealPlanPrompt(instructionsCreationMode === 'research');
+                      const planningPrompt = await assembleMealPlanningPrompt(false);
                       await Clipboard.setStringAsync(planningPrompt);
                       setPlanningPromptCopied(true);
                       setTimeout(() => {
@@ -767,63 +677,49 @@ export default function ImportMealPlanScreen() {
                 >
                   <Ionicons name="copy-outline" size={18} color="#0a0a0b" />
                   <Text style={styles.actionButtonText}>
-                    {planningPromptCopied ? 'Copied!' : `Copy ${instructionsCreationMode === 'research' ? 'Research' : 'Quick'} Planning Prompt`}
+                    {planningPromptCopied ? 'Copied!' : 'Copy Planning Prompt'}
                   </Text>
                 </TouchableOpacity>
               </View>
               
-              {instructionsCreationMode === 'research' && (
-                <View style={styles.stepCard}>
-                  <View style={styles.stepCardHeader}>
-                    <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                      <Text style={styles.stepBadgeText}>2</Text>
-                    </View>
-                    <Text style={styles.stepCardTitle}>Critical Audit</Text>
+              <View style={styles.stepCard}>
+                <View style={styles.stepCardHeader}>
+                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
+                    <Text style={styles.stepBadgeText}>2</Text>
                   </View>
-                  <Text style={styles.stepCardDescription}>
-                    Challenge the AI to prove its research with this skeptical follow-up
-                  </Text>
-                  <TouchableOpacity 
-                    style={[styles.actionButton, { backgroundColor: themeColor }]}
-                    onPress={async () => {
-                      const auditPrompt = `I'm skeptical about the accuracy of your research and calculations. Can you prove the legitimacy of what you just presented? Specifically:
-
-1. Source Verification: Show me the actual URLs or direct links you used for pricing verification. Provide the specific links you accessed.
-
-2. Macro Math Audit: Walk me through the exact calculations for your protein/macro claims. Show the database entries you used and any conversions you applied.
-
-3. Pricing Reality Check: Prove your pricing claims are accurate for current market conditions. These need verification.
-
-4. Cross-Reference Claims: Pick 3 specific nutritional claims and show me how you verified them across multiple databases.
-
-5. Calculation Transparency: Your totals need to add up. Show your exact arithmetic for daily calories and macros.
-
-If you can't provide specific URLs, database entry numbers, or verifiable calculations, then admit which parts are estimates vs. actual research. Don't present confident claims without backing them up with real, accessible sources.
-
-Prove your research is real, not just confident-sounding assumptions.
-
-After you've completed this audit and made any necessary corrections, regenerate the complete meal plan using your verified data.`;
-                      
-                      await Clipboard.setStringAsync(auditPrompt);
-                      setAuditPromptCopied(true);
-                      setTimeout(() => {
-                        setAuditPromptCopied(false);
-                      }, 2000);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="shield-checkmark" size={18} color="#0a0a0b" />
-                    <Text style={styles.actionButtonText}>
-                      {auditPromptCopied ? 'Copied!' : 'Copy Audit Prompt'}
-                    </Text>
-                  </TouchableOpacity>
+                  <Text style={styles.stepCardTitle}>Review & Verify</Text>
                 </View>
-              )}
+                <Text style={styles.stepCardDescription}>
+                  Have your AI review the meal plan for quality and compliance
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: themeColor }]}
+                  onPress={async () => {
+                    try {
+                      const reviewPrompt = await getMealPlanReviewPrompt();
+                      await Clipboard.setStringAsync(reviewPrompt);
+                      setReviewPromptCopied(true);
+                      setTimeout(() => {
+                        setReviewPromptCopied(false);
+                      }, 2000);
+                    } catch (error) {
+                      console.error('Error generating review prompt:', error);
+                      // Optionally show an error message to the user
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
+                  <Text style={styles.actionButtonText}>
+                    {reviewPromptCopied ? 'Copied!' : 'Copy Review Prompt'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
               
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>{instructionsCreationMode === 'research' ? '3' : '2'}</Text>
+                    <Text style={styles.stepBadgeText}>3</Text>
                   </View>
                   <Text style={styles.stepCardTitle}>Generate Meal Plan</Text>
                 </View>
@@ -852,7 +748,7 @@ After you've completed this audit and made any necessary corrections, regenerate
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>{instructionsCreationMode === 'research' ? '4' : '3'}</Text>
+                    <Text style={styles.stepBadgeText}>4</Text>
                   </View>
                   <Text style={styles.stepCardTitle}>Import & Enjoy</Text>
                 </View>
@@ -988,6 +884,93 @@ After you've completed this audit and made any necessary corrections, regenerate
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmation}
+        transparent
+        animationType="none"
+      >
+        <Animated.View 
+          style={[
+            styles.modalOverlay,
+            { opacity: modalOpacity }
+          ]}
+        >
+          <Animated.View 
+            style={[
+              styles.modalContent,
+              { 
+                transform: [{ scale: modalScale }],
+                opacity: modalOpacity,
+                borderColor: themeColor,
+                shadowColor: themeColor,
+              }
+            ]}
+          >
+            {/* Close Button */}
+            <View style={styles.closeButtonWrapper}>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={handleModalCancel}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={24} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+            
+            {parsedMealPlan && (
+              <>
+                {/* Header Badge */}
+                <View style={styles.headerBadgeContainer}>
+                  {generationTime && (
+                    <View style={[styles.headerBadge, { backgroundColor: themeColor + '1A', borderColor: themeColor }]}>
+                      <Text style={[styles.badgeText, { color: themeColor }]}>Generated in {generationTime.toFixed(2)}s</Text>
+                    </View>
+                  )}
+                </View>
+                
+                {/* Main Content */}
+                <View style={styles.mainContent}>
+                  <Text style={styles.title}>Meal Plan Ready</Text>
+                  <Text style={styles.routineName}>{parsedMealPlan.name}</Text>
+                </View>
+                
+                  {/* Meal Plan Summary */}
+                  <View style={styles.summaryCard}>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Duration</Text>
+                      <Text style={[styles.summaryValue, { color: themeColor }]}>{Object.keys(parsedMealPlan.dailyMeals).length} days</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Total Meals</Text>
+                      <Text style={[styles.summaryValue, { color: themeColor }]}>
+                        {Object.values(parsedMealPlan.dailyMeals).reduce((total, day) => total + day.meals.length, 0)} meals
+                      </Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Start Date</Text>
+                      <Text style={[styles.summaryValue, { color: themeColor }]}>{new Date(parsedMealPlan.startDate).toLocaleDateString()}</Text>
+                    </View>
+                  </View>
+                
+                {/* Actions */}
+                <View style={styles.actionSection}>
+                  <TouchableOpacity
+                    style={[styles.createButton, { backgroundColor: themeColor }]}
+                    onPress={handleConfirmImport}
+                    activeOpacity={0.9}
+                  >
+                    <Text style={styles.createButtonText}>Start Meal Plan</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </Animated.View>
+        </Animated.View>
+      </Modal>
 
     </>
   );
@@ -1509,5 +1492,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  // Added missing styles for modal
+  headerBadgeContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  routineName: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 38,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#18181b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#27272a',
   },
 });

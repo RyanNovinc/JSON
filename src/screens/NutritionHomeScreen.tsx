@@ -11,6 +11,7 @@ import {
   Image,
   Animated,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
@@ -59,7 +60,7 @@ const convertToLegacyFormat = (simplifiedPlan: SimplifiedMealPlan): MealPlan => 
   return {
     id: simplifiedPlan.id,
     name: simplifiedPlan.name,
-    duration: simplifiedPlan.metadata.duration,
+    duration: Object.keys(simplifiedPlan.dailyMeals).length,
     data: {
       days: days,
       // Include metadata for macro calculations
@@ -166,18 +167,18 @@ export default function NutritionHomeScreen({ route }: any) {
   const navigation = useNavigation<NutritionNavigationProp>();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
-  const { currentPlan } = useSimplifiedMealPlanning();
+  const { mealPlans, currentPlan, setCurrentPlan, deleteMealPlan, saveMealPlan } = useSimplifiedMealPlanning();
   
   // For compatibility with existing code
   const userProfile = null; // TODO: Will need to handle user profile separately
   const clearCurrentMealPlan = async () => {
-    // TODO: Implement clear function if needed
-    console.log('Clear meal plan not implemented in SimplifiedContext yet');
+    if (currentPlan) {
+      await deleteMealPlan(currentPlan.id);
+    }
   };
   
-  // Convert SimplifiedMealPlan to legacy format for UI compatibility
-  const currentMealPlan = currentPlan ? convertToLegacyFormat(currentPlan) : null;
-  const mealPlans = currentMealPlan ? [currentMealPlan] : [];
+  // Convert SimplifiedMealPlans to legacy format for UI compatibility
+  const convertedMealPlans = mealPlans.map(plan => convertToLegacyFormat(plan));
   
   const [shareModal, setShareModal] = useState<{ visible: boolean; plan: MealPlan | null }>({
     visible: false,
@@ -188,10 +189,16 @@ export default function NutritionHomeScreen({ route }: any) {
     visible: false,
     plan: null,
   });
+  const [renameModal, setRenameModal] = useState<{ visible: boolean; plan: MealPlan | null; newName: string }>({
+    visible: false,
+    plan: null,
+    newName: '',
+  });
   const [preferencesModal, setPreferencesModal] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const [showMigration, setShowMigration] = useState(false);
+  const [savedMealPlans, setSavedMealPlans] = useState<Set<string>>(new Set());
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -215,9 +222,21 @@ export default function NutritionHomeScreen({ route }: any) {
     }
   };
 
+  // Load saved meal plans state
+  const loadSavedMealPlansState = async () => {
+    try {
+      const existingMealPlans = await WorkoutStorage.loadMealPlans();
+      const savedIds = new Set(existingMealPlans.map(plan => plan.fingerprint || plan.id));
+      setSavedMealPlans(savedIds);
+    } catch (error) {
+      console.error('Failed to load saved meal plans state:', error);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadCompletionStatus();
+      loadSavedMealPlansState();
     }, [])
   );
 
@@ -235,15 +254,54 @@ export default function NutritionHomeScreen({ route }: any) {
     if (!deleteModal.plan) return;
     
     try {
-      await clearCurrentMealPlan();
+      // Find the original SimplifiedMealPlan ID from the converted plan
+      const originalPlan = mealPlans.find(p => p.name === deleteModal.plan?.name);
+      if (originalPlan) {
+        await deleteMealPlan(originalPlan.id);
+      }
       setDeleteModal({ visible: false, plan: null });
     } catch (error) {
-      console.error('Failed to clear meal plan:', error);
+      console.error('Failed to delete meal plan:', error);
+    }
+  };
+
+  const handleRenameRequest = (plan: MealPlan) => {
+    setDeleteModal({ visible: false, plan: null });
+    setRenameModal({ visible: true, plan, newName: plan.name });
+  };
+
+  const handleRenameConfirm = async () => {
+    const { plan, newName } = renameModal;
+    if (!plan || !newName.trim()) return;
+    
+    try {
+      // Find the original SimplifiedMealPlan from the converted plan
+      const originalPlan = mealPlans.find(p => p.name === plan.name);
+      if (originalPlan) {
+        const updatedPlan = { ...originalPlan, name: newName.trim() };
+        await saveMealPlan(updatedPlan);
+      }
+      setRenameModal({ visible: false, plan: null, newName: '' });
+    } catch (error) {
+      console.error('Failed to rename meal plan:', error);
+      Alert.alert('Error', 'Failed to rename meal plan. Please try again.');
+    }
+  };
+
+  const handleMealPlanSwitch = async (plan: MealPlan) => {
+    // Find the original SimplifiedMealPlan and switch to it
+    const originalPlan = mealPlans.find(p => p.name === plan.name);
+    if (originalPlan && originalPlan.id !== currentPlan?.id) {
+      await setCurrentPlan(originalPlan.id);
+      console.log(`🔄 Switched to meal plan: ${originalPlan.name}`);
     }
   };
 
   const handleMealPlanNavigation = (plan: MealPlan) => {
     console.log('🍽️ Navigating to meal plan (no scaling):', plan.name);
+    
+    // First switch to this meal plan if it's not current
+    handleMealPlanSwitch(plan);
 
     // Handle new days structure (JSON.fit format)
     if (plan.data?.days) {
@@ -539,6 +597,67 @@ export default function NutritionHomeScreen({ route }: any) {
     });
   };
 
+  const handleSaveMealPlan = async (plan: MealPlan) => {
+    try {
+      // Find the original SimplifiedMealPlan and save it to "My Meals"
+      const originalPlan = mealPlans.find(p => p.name === plan.name);
+      if (!originalPlan) {
+        Alert.alert('Error', 'Could not find meal plan to save.');
+        return;
+      }
+
+      // Create a fingerprint to check for duplicates
+      const createFingerprint = (plan: any): string => {
+        const contentString = JSON.stringify({
+          name: plan.name.toLowerCase().trim(),
+          duration: Object.keys(plan.dailyMeals).length,
+          meals: Object.values(plan.dailyMeals)
+        });
+        let hash = 0;
+        for (let i = 0; i < contentString.length; i++) {
+          const char = contentString.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash;
+        }
+        return Math.abs(hash).toString(36);
+      };
+
+      const fingerprint = createFingerprint(originalPlan);
+
+      // Check if already saved
+      const existingMealPlans = await WorkoutStorage.loadMealPlans();
+      const isDuplicate = existingMealPlans.some(existing => 
+        existing.fingerprint === fingerprint
+      );
+
+      if (isDuplicate) {
+        Alert.alert('Already Saved', `"${originalPlan.name}" is already in your My Meals collection.`);
+        return;
+      }
+
+      // Transform and save to "My Meals"
+      const transformedMealPlan = {
+        id: originalPlan.id,
+        name: originalPlan.name,
+        duration: Object.keys(originalPlan.dailyMeals).length,
+        meals: Object.values(originalPlan.dailyMeals).reduce((total, day: any) => total + day.meals.length, 0),
+        data: originalPlan,
+        fingerprint: fingerprint,
+        createdAt: Date.now(),
+      };
+
+      await WorkoutStorage.addMealPlan(transformedMealPlan);
+      
+      // Update local state to show heart as filled
+      setSavedMealPlans(prev => new Set([...prev, fingerprint]));
+      
+      Alert.alert('Saved!', `"${originalPlan.name}" has been saved to your My Meals collection.`);
+    } catch (error) {
+      console.error('Failed to save meal plan:', error);
+      Alert.alert('Error', 'Failed to save meal plan. Please try again.');
+    }
+  };
+
   const handleExport = (plan: MealPlan) => {
     setShareModal({ visible: true, plan });
   };
@@ -547,54 +666,26 @@ export default function NutritionHomeScreen({ route }: any) {
     if (!shareModal.plan) return;
 
     try {
-      // Export the complete customized meal plan with actual deletions (no hidden meals needed)
-      console.log('📤 Exporting meal plan with all customizations (deleted meals are already removed)');
+      // Export the current SimplifiedMealPlan directly (no conversion needed)
+      console.log('📤 Exporting SimplifiedMealPlan with all customizations');
       
-      let mealPlanToExport = {
-        ...shareModal.plan.data,
+      if (!currentPlan) {
+        console.error('❌ No current plan to export');
+        return;
+      }
+
+      const mealPlanToExport = {
+        ...currentPlan,
         exported_with_customizations: true,
         export_timestamp: new Date().toISOString(),
-        export_note: "This export includes all customizations: manually added meals and permanently deleted meals",
-        // Include manually added meals in the export
-        includesManualMeals: true
+        export_note: "This export includes all customizations: manually added meals and permanently deleted meals"
       };
       
-      // Properly merge manually added meals into the correct day structure for export
-      console.log('📤 Including manually added meals in export');
-      
-      if (mealPlanToExport.days) {
-        // Separate properly formatted days from manually added meal day entries
-        const properDays = mealPlanToExport.days.filter(day => day.day_name && day.day_number);
-        const manualMealDays = mealPlanToExport.days.filter(day => !day.day_name && !day.day_number && day.date);
-        
-        console.log('📤 Proper days:', properDays.length);
-        console.log('📤 Manual meal days to merge:', manualMealDays.length);
-        
-        // Merge manually added meals into proper days based on date matching
-        for (const manualDay of manualMealDays) {
-          if (manualDay.meals && manualDay.meals.length > 0) {
-            // Find the proper day that corresponds to this date
-            // We need to map the date back to the day structure
-            const manualMeals = manualDay.meals.filter(meal => meal.isManuallyAdded);
-            if (manualMeals.length > 0) {
-              console.log(`📤 Found ${manualMeals.length} manual meals for date ${manualDay.date}`);
-              
-              // For now, add these meals to the first available day (this is a limitation)
-              // In a perfect world, we'd need date-to-day mapping logic here
-              if (properDays.length > 0) {
-                const targetDay = properDays[0]; // Add to first day as fallback
-                if (!targetDay.meals) targetDay.meals = [];
-                targetDay.meals.push(...manualMeals);
-                console.log(`📤 Merged ${manualMeals.length} manual meals into ${targetDay.day_name}`);
-              }
-            }
-          }
-        }
-        
-        // Use only the properly formatted days for export
-        mealPlanToExport.days = properDays;
-        console.log('📤 Final days count for export:', mealPlanToExport.days.length);
-      }
+      console.log('📤 Ready to export SimplifiedMealPlan:', {
+        id: mealPlanToExport.id,
+        name: mealPlanToExport.name,
+        dailyMealsCount: Object.keys(mealPlanToExport.dailyMeals).length
+      });
       
       const mealPlanData = JSON.stringify(mealPlanToExport, null, 2);
       
@@ -618,7 +709,7 @@ export default function NutritionHomeScreen({ route }: any) {
   };
 
   const renderContent = () => {
-    if (mealPlans.length === 0) {
+    if (convertedMealPlans.length === 0) {
       return (
         <View style={styles.emptyState}>
           <Ionicons name="restaurant-outline" size={80} color="#3f3f46" />
@@ -630,56 +721,100 @@ export default function NutritionHomeScreen({ route }: any) {
       );
     }
 
-    if (mealPlans.length === 1) {
+    if (convertedMealPlans.length === 1) {
       // Hero layout for single meal plan (matching workout screen)
-      const plan = mealPlans[0];
+      const plan = convertedMealPlans[0];
       return (
         <View style={styles.heroContainer}>
-          <TouchableOpacity
-            style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
-            activeOpacity={0.8}
-            onPress={() => handleMealPlanNavigation(plan)}
-            onLongPress={() => handleDeleteRequest(plan)}
-            delayLongPress={800}
-          >
-            <View style={styles.heroContent}>
-              <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
-              <Text style={styles.heroSubtitle}>
-                {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
-              </Text>
-              <Text style={[styles.heroDescription, { color: themeColor }]}>
-                Tap to view your meal plan
-              </Text>
-            </View>
+          <View style={styles.heroCardWrapper}>
+            <TouchableOpacity
+              style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
+              activeOpacity={0.8}
+              onPress={() => handleMealPlanNavigation(plan)}
+              onLongPress={() => handleDeleteRequest(plan)}
+              delayLongPress={800}
+            >
+              <View style={styles.heroContent}>
+                <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
+                <Text style={styles.heroSubtitle}>
+                  {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
+                </Text>
+                <Text style={[styles.heroDescription, { color: themeColor }]}>
+                  Tap to view your meal plan
+                </Text>
+              </View>
+              
+              <View style={styles.heroActions}>
+                <TouchableOpacity
+                  style={styles.heroActionButton}
+                  onPress={() => handleExport(plan)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="share-outline" size={24} color={themeColor} />
+                  <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.heroSecondaryButton}
+                  onPress={() => handleJumpToToday(plan)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="today-outline" size={18} color="#71717a" />
+                  <Text style={styles.heroSecondaryText}>Today</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
             
-            <View style={styles.heroActions}>
-              <TouchableOpacity
-                style={styles.heroActionButton}
-                onPress={() => handleExport(plan)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="share-outline" size={24} color={themeColor} />
-                <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.heroSecondaryButton}
-                onPress={() => handleJumpToToday(plan)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="today-outline" size={18} color="#71717a" />
-                <Text style={styles.heroSecondaryText}>Today</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+            {/* Heart Save Icon - Top Right */}
+            <TouchableOpacity
+              style={styles.heartButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleSaveMealPlan(plan);
+              }}
+              activeOpacity={0.7}
+            >
+              {(() => {
+                // Check if this plan is saved by creating its fingerprint
+                const originalPlan = mealPlans.find(p => p.name === plan.name);
+                if (!originalPlan) return <Ionicons name="heart-outline" size={24} color="rgba(255, 255, 255, 0.7)" />;
+                
+                const createFingerprint = (plan: any): string => {
+                  const contentString = JSON.stringify({
+                    name: plan.name.toLowerCase().trim(),
+                    duration: Object.keys(plan.dailyMeals).length,
+                    meals: Object.values(plan.dailyMeals)
+                  });
+                  let hash = 0;
+                  for (let i = 0; i < contentString.length; i++) {
+                    const char = contentString.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                  }
+                  return Math.abs(hash).toString(36);
+                };
+                
+                const fingerprint = createFingerprint(originalPlan);
+                const isSaved = savedMealPlans.has(fingerprint);
+                
+                return (
+                  <Ionicons 
+                    name={isSaved ? "heart" : "heart-outline"} 
+                    size={24} 
+                    color={isSaved ? themeColor : "rgba(255, 255, 255, 0.7)"} 
+                  />
+                );
+              })()}
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
 
-    if (mealPlans.length === 2) {
+    if (convertedMealPlans.length === 2) {
       // Two plans - split screen vertically
       return (
         <View style={styles.dualVerticalContainer}>
-          {mealPlans.map((plan, index) => (
+          {convertedMealPlans.map((plan, index) => (
             <View key={plan.id} style={styles.dualVerticalHeroContainer}>
               <TouchableOpacity
                 style={[styles.dualVerticalCard, { borderColor: themeColor, shadowColor: themeColor }]}
@@ -697,13 +832,52 @@ export default function NutritionHomeScreen({ route }: any) {
                     Tap to view your meal plan
                   </Text>
                   
+                  {/* Heart Save Icon - Top Right */}
+                  <TouchableOpacity
+                    style={styles.heartButton}
+                    onPress={() => handleSaveMealPlan(plan)}
+                    activeOpacity={0.7}
+                  >
+                    {(() => {
+                      // Check if this plan is saved
+                      const originalPlan = mealPlans.find(p => p.name === plan.name);
+                      if (!originalPlan) return <Ionicons name="heart-outline" size={24} color="rgba(255, 255, 255, 0.7)" />;
+                      
+                      const createFingerprint = (plan: any): string => {
+                        const contentString = JSON.stringify({
+                          name: plan.name.toLowerCase().trim(),
+                          duration: Object.keys(plan.dailyMeals).length,
+                          meals: Object.values(plan.dailyMeals)
+                        });
+                        let hash = 0;
+                        for (let i = 0; i < contentString.length; i++) {
+                          const char = contentString.charCodeAt(i);
+                          hash = ((hash << 5) - hash) + char;
+                          hash = hash & hash;
+                        }
+                        return Math.abs(hash).toString(36);
+                      };
+                      
+                      const fingerprint = createFingerprint(originalPlan);
+                      const isSaved = savedMealPlans.has(fingerprint);
+                      
+                      return (
+                        <Ionicons 
+                          name={isSaved ? "heart" : "heart-outline"} 
+                          size={20} 
+                          color={isSaved ? themeColor : "rgba(255, 255, 255, 0.7)"} 
+                        />
+                      );
+                    })()}
+                  </TouchableOpacity>
+
                   <View style={styles.dualVerticalActions}>
                     <TouchableOpacity
                       style={styles.dualVerticalShareButton}
                       onPress={() => handleExport(plan)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="share-outline" size={24} color={themeColor} />
+                      <Ionicons name="share-outline" size={20} color={themeColor} />
                       <Text style={[styles.dualVerticalShareText, { color: themeColor }]}>Share</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -723,11 +897,11 @@ export default function NutritionHomeScreen({ route }: any) {
       );
     }
 
-    if (mealPlans.length === 3) {
+    if (convertedMealPlans.length === 3) {
       // Three plans - compact grid layout (matching workout screen)
       return (
         <View style={styles.tripleContainer}>
-          {mealPlans.map((plan, index) => (
+          {convertedMealPlans.map((plan, index) => (
             <View key={plan.id} style={styles.tripleCardContainer}>
               <TouchableOpacity
                 style={[styles.tripleCard, { borderColor: themeColor, shadowColor: themeColor }]}
@@ -764,11 +938,11 @@ export default function NutritionHomeScreen({ route }: any) {
       );
     }
 
-    if (mealPlans.length === 4) {
+    if (convertedMealPlans.length === 4) {
       // Four plans - vertical stack layout (matching workout screen)
       return (
         <View style={styles.quadContainer}>
-          {mealPlans.map((plan, index) => (
+          {convertedMealPlans.map((plan, index) => (
             <View key={plan.id} style={styles.quadCardContainer}>
               <TouchableOpacity
                 style={[styles.quadCard, { borderColor: themeColor, shadowColor: themeColor }]}
@@ -815,7 +989,7 @@ export default function NutritionHomeScreen({ route }: any) {
     // Multiple plans - scrollable list
     return (
       <FlatList
-        data={mealPlans}
+        data={convertedMealPlans}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.heroListContainer}
@@ -838,7 +1012,54 @@ export default function NutritionHomeScreen({ route }: any) {
                 </Text>
               </View>
               
+              {/* Heart Save Icon - Top Right */}
+              <TouchableOpacity
+                style={styles.heartButton}
+                onPress={() => handleSaveMealPlan(plan)}
+                activeOpacity={0.7}
+              >
+                {(() => {
+                  // Check if this plan is saved
+                  const originalPlan = mealPlans.find(p => p.name === plan.name);
+                  if (!originalPlan) return <Ionicons name="heart-outline" size={24} color="rgba(255, 255, 255, 0.7)" />;
+                  
+                  const createFingerprint = (plan: any): string => {
+                    const contentString = JSON.stringify({
+                      name: plan.name.toLowerCase().trim(),
+                      duration: Object.keys(plan.dailyMeals).length,
+                      meals: Object.values(plan.dailyMeals)
+                    });
+                    let hash = 0;
+                    for (let i = 0; i < contentString.length; i++) {
+                      const char = contentString.charCodeAt(i);
+                      hash = ((hash << 5) - hash) + char;
+                      hash = hash & hash;
+                    }
+                    return Math.abs(hash).toString(36);
+                  };
+                  
+                  const fingerprint = createFingerprint(originalPlan);
+                  const isSaved = savedMealPlans.has(fingerprint);
+                  
+                  return (
+                    <Ionicons 
+                      name={isSaved ? "heart" : "heart-outline"} 
+                      size={24} 
+                      color={isSaved ? themeColor : "rgba(255, 255, 255, 0.7)"} 
+                    />
+                  );
+                })()}
+              </TouchableOpacity>
+
               <View style={styles.heroActions}>
+                <TouchableOpacity
+                  style={styles.heroActionButton}
+                  onPress={() => handleExport(plan)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="share-outline" size={24} color={themeColor} />
+                  <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.heroSecondaryButton}
                   onPress={() => handleJumpToToday(plan)}
@@ -990,6 +1211,15 @@ export default function NutritionHomeScreen({ route }: any) {
               </TouchableOpacity>
               
               <TouchableOpacity
+                style={styles.renameButton}
+                onPress={() => deleteModal.plan && handleRenameRequest(deleteModal.plan)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="create-outline" size={18} color="#ffffff" />
+                <Text style={styles.renameText}>Rename</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
                 style={styles.deleteConfirmButton}
                 onPress={handleDeleteConfirm}
                 activeOpacity={0.7}
@@ -1075,6 +1305,55 @@ export default function NutritionHomeScreen({ route }: any) {
                   </View>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rename Modal */}
+      <Modal
+        visible={renameModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setRenameModal({ visible: false, plan: null, newName: '' })}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.renameContainer}>
+            <View style={styles.renameIconContainer}>
+              <Ionicons name="create-outline" size={32} color={themeColor} />
+            </View>
+            
+            <Text style={styles.renameTitle}>Rename Meal Plan</Text>
+            
+            <View style={styles.renameInputContainer}>
+              <TextInput
+                style={styles.renameInput}
+                value={renameModal.newName}
+                onChangeText={(text) => setRenameModal(prev => ({ ...prev, newName: text }))}
+                placeholder="Enter new name"
+                placeholderTextColor="#71717a"
+                autoFocus={true}
+                selectTextOnFocus={true}
+              />
+            </View>
+            
+            <View style={styles.renameButtons}>
+              <TouchableOpacity
+                style={styles.renameCancelButton}
+                onPress={() => setRenameModal({ visible: false, plan: null, newName: '' })}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.renameCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.renameConfirmButton, { backgroundColor: themeColor }]}
+                onPress={handleRenameConfirm}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="checkmark" size={18} color="#0a0a0b" />
+                <Text style={styles.renameConfirmText}>Save</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1186,6 +1465,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  heroCardWrapper: {
+    position: 'relative',
+    width: '100%',
+    maxWidth: 340,
+  },
   heroListContainer: {
     paddingHorizontal: 20,
     paddingTop: 20,
@@ -1240,6 +1524,18 @@ const styles = StyleSheet.create({
   heroActions: {
     width: '100%',
     alignItems: 'center',
+  },
+  heartButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   heroActionButton: {
     flexDirection: 'row',
@@ -1566,12 +1862,133 @@ const styles = StyleSheet.create({
   },
   deleteButtons: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
   deleteCancelButton: {
+    flex: 1,
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    minHeight: 44,
+  },
+  renameButton: {
+    flex: 1,
+    backgroundColor: '#22d3ee',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    shadowColor: '#22d3ee',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    shadowColor: '#ef4444',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  deleteCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  renameText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0a0a0b',
+  },
+  deleteConfirmText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  // Rename Modal Styles
+  renameContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#27272a',
+    padding: 28,
+    width: '100%',
+    maxWidth: 350,
+    alignItems: 'center',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  renameIconContainer: {
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+    borderRadius: 50,
+    padding: 16,
+    marginBottom: 20,
+  },
+  renameTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  renameInputContainer: {
+    backgroundColor: '#0f0f0f',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 4,
+    width: '100%',
+    marginBottom: 28,
+  },
+  renameInput: {
+    fontSize: 16,
+    color: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'transparent',
+  },
+  renameButtons: {
+    flexDirection: 'row',
+    gap: 16,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  renameCancelButton: {
     flex: 1,
     backgroundColor: '#27272a',
     borderRadius: 12,
@@ -1583,9 +2000,8 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
     minHeight: 50,
   },
-  deleteConfirmButton: {
+  renameConfirmButton: {
     flex: 1,
-    backgroundColor: '#ef4444',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 24,
@@ -1594,7 +2010,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     minHeight: 50,
-    shadowColor: '#ef4444',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1603,15 +2018,15 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  deleteCancelText: {
+  renameCancelText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
   },
-  deleteConfirmText: {
+  renameConfirmText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#0a0a0b',
   },
   // Card component styles
   card: {
