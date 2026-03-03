@@ -726,47 +726,16 @@ export default function NutritionHomeScreen({ route }: any) {
       const plan = convertedMealPlans[0];
       return (
         <View style={styles.heroContainer}>
-          <View style={styles.heroCardWrapper}>
+          <TouchableOpacity
+            style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
+            activeOpacity={0.8}
+            onPress={() => handleMealPlanNavigation(plan)}
+            onLongPress={() => handleDeleteRequest(plan)}
+            delayLongPress={800}
+          >
+            {/* Heart Save Icon - Top Right Corner */}
             <TouchableOpacity
-              style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
-              activeOpacity={0.8}
-              onPress={() => handleMealPlanNavigation(plan)}
-              onLongPress={() => handleDeleteRequest(plan)}
-              delayLongPress={800}
-            >
-              <View style={styles.heroContent}>
-                <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
-                <Text style={styles.heroSubtitle}>
-                  {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
-                </Text>
-                <Text style={[styles.heroDescription, { color: themeColor }]}>
-                  Tap to view your meal plan
-                </Text>
-              </View>
-              
-              <View style={styles.heroActions}>
-                <TouchableOpacity
-                  style={styles.heroActionButton}
-                  onPress={() => handleExport(plan)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="share-outline" size={24} color={themeColor} />
-                  <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.heroSecondaryButton}
-                  onPress={() => handleJumpToToday(plan)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="today-outline" size={18} color="#71717a" />
-                  <Text style={styles.heroSecondaryText}>Today</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-            
-            {/* Heart Save Icon - Top Right */}
-            <TouchableOpacity
-              style={styles.heartButton}
+              style={styles.heartIcon}
               onPress={(e) => {
                 e.stopPropagation();
                 handleSaveMealPlan(plan);
@@ -774,9 +743,9 @@ export default function NutritionHomeScreen({ route }: any) {
               activeOpacity={0.7}
             >
               {(() => {
-                // Check if this plan is saved by creating its fingerprint
+                // Check if this plan is saved
                 const originalPlan = mealPlans.find(p => p.name === plan.name);
-                if (!originalPlan) return <Ionicons name="heart-outline" size={24} color="rgba(255, 255, 255, 0.7)" />;
+                if (!originalPlan) return <Ionicons name="heart-outline" size={20} color="rgba(255, 255, 255, 0.6)" />;
                 
                 const createFingerprint = (plan: any): string => {
                   const contentString = JSON.stringify({
@@ -799,13 +768,42 @@ export default function NutritionHomeScreen({ route }: any) {
                 return (
                   <Ionicons 
                     name={isSaved ? "heart" : "heart-outline"} 
-                    size={24} 
-                    color={isSaved ? themeColor : "rgba(255, 255, 255, 0.7)"} 
+                    size={20} 
+                    color={isSaved ? themeColor : "rgba(255, 255, 255, 0.6)"} 
                   />
                 );
               })()}
             </TouchableOpacity>
-          </View>
+
+            <View style={styles.heroContent}>
+              <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
+              <Text style={styles.heroSubtitle}>
+                {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
+              </Text>
+              <Text style={[styles.heroDescription, { color: themeColor }]}>
+                Tap to view your meal plan
+              </Text>
+            </View>
+            
+            <View style={styles.heroActions}>
+              <TouchableOpacity
+                style={styles.heroActionButton}
+                onPress={() => handleExport(plan)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="share-outline" size={24} color={themeColor} />
+                <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.heroSecondaryButton}
+                onPress={() => handleJumpToToday(plan)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="today-outline" size={18} color="#71717a" />
+                <Text style={styles.heroSecondaryText}>Today</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -1465,11 +1463,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  heroCardWrapper: {
-    position: 'relative',
-    width: '100%',
-    maxWidth: 340,
-  },
   heroListContainer: {
     paddingHorizontal: 20,
     paddingTop: 20,
@@ -1493,6 +1486,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 20,
     shadowColor: '#22d3ee',
+    position: 'relative', // Add this for absolute positioning children
   },
   heroContent: {
     alignItems: 'center',
@@ -1525,14 +1519,14 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  heartButton: {
+  heartIcon: {
     position: 'absolute',
-    top: 20,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
