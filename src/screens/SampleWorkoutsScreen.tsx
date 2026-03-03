@@ -41,36 +41,10 @@ export default function SampleWorkoutsScreen() {
   );
 
   const loadUserWorkouts = async () => {
-    const routines = await WorkoutStorage.loadRoutines();
-    
-    // Define sample workout IDs to filter out duplicates
-    const sampleWorkoutIds = [
-      'sample_quick_start_ppl',
-      'sample_muscle_builder_pro_52w', 
-      'sample_glute_tone_12w'
-    ];
-    
-    // Filter out any sample workouts that may have been imported before
-    const customRoutines = routines.filter(routine => {
-      // Check by ID if it exists
-      if (routine.data?.id && sampleWorkoutIds.includes(routine.data.id)) {
-        return false;
-      }
-      // Also check by routine name as fallback
-      const sampleNames = [
-        'Quick Start - Push Pull Legs',
-        '52-Week Advanced Hypertrophy Program',
-        '12-Week Glute & Tone'
-      ];
-      return !sampleNames.includes(routine.name);
-    });
-    
-    // If we filtered out any duplicates, update storage
-    if (customRoutines.length !== routines.length) {
-      await WorkoutStorage.saveRoutines(customRoutines);
-    }
-    
-    setUserWorkouts(customRoutines);
+    // Load from the saved collection (My Collection)
+    const savedRoutines = await WorkoutStorage.loadMyRoutines();
+    console.log('📱 My Workouts loading:', savedRoutines.length, 'saved routines');
+    setUserWorkouts(savedRoutines);
   };
 
   // Convert user routine to display format
@@ -110,8 +84,10 @@ export default function SampleWorkoutsScreen() {
           text: 'Delete', 
           style: 'destructive',
           onPress: async () => {
-            await WorkoutStorage.removeRoutine(workoutId);
+            console.log('🗑️ Deleting saved workout:', workoutName, 'ID:', workoutId);
+            await WorkoutStorage.removeMyRoutine(workoutId);
             loadUserWorkouts();
+            console.log('🗑️ Workout deleted from My Collection');
           }
         }
       ]
@@ -351,69 +327,56 @@ export default function SampleWorkoutsScreen() {
               
               return (
                 <View key={workout.id} style={styles.cardContainer}>
-                  <View style={styles.workoutCard}>
+                  <TouchableOpacity 
+                    style={[styles.nutritionStyleCard, { borderColor: themeColor, shadowColor: themeColor }]}
+                    onPress={() => handleCopyWorkout(workout)}
+                    activeOpacity={0.8}
+                  >
+                    {/* Delete Button */}
                     <TouchableOpacity 
-                      onPress={() => handleCopyWorkout(workout)}
-                      activeOpacity={0.8}
-                      style={styles.cardTouchable}
+                      style={styles.deleteButtonTop}
+                      onPress={() => handleDeleteWorkout(routine.id, routine.name)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <LinearGradient
-                        colors={['#2d3748', '#1a202c']}
-                        style={styles.userCardGradient}
-                      >
-                        <View style={styles.cardContent}>
-                          <View style={styles.cardHeader}>
-                            <View style={[styles.difficultyBadge, { backgroundColor: '#8b5cf6' }]}>
-                              <Text style={styles.difficultyText}>Custom</Text>
-                            </View>
-                            <TouchableOpacity 
-                              style={styles.deleteButton}
-                              onPress={() => handleDeleteWorkout(routine.id, routine.name)}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            >
-                              <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                            </TouchableOpacity>
-                          </View>
-
-                          <View style={styles.cardMainContent}>
-                            <Text style={styles.workoutTitle}>{workout.title}</Text>
-                            <Text style={styles.workoutDescription}>{workout.description}</Text>
-                            
-                            <View style={styles.cardFooter}>
-                              <View style={styles.cardFooterLeft}>
-                                <Text style={styles.focusText}>{workout.focus}</Text>
-                                <Text style={styles.durationText}>{workout.duration}</Text>
-                              </View>
-                              <TouchableOpacity 
-                                style={styles.inlineInfoButton}
-                                onPress={() => handleShowDetails(workout)}
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                activeOpacity={0.7}
-                              >
-                                <Ionicons name="information-circle" size={28} color="rgba(255,255,255,0.9)" />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        </View>
-                      </LinearGradient>
+                      <Ionicons name="trash-outline" size={20} color="#ef4444" />
                     </TouchableOpacity>
                     
-                    {/* Copied Overlay */}
-                    {copiedId === workout.id && (
-                      <View style={styles.copiedOverlay}>
-                        <LinearGradient
-                          colors={[`${themeColor}F2`, `${themeColor}D9`]}
-                          style={styles.copiedGradient}
-                        >
-                          <View style={styles.copiedContent}>
-                            <Ionicons name="checkmark-circle" size={60} color="#ffffff" />
-                            <Text style={styles.copiedTitle}>Copied!</Text>
-                            <Text style={styles.copiedSubtitle}>{workout.title} is ready to import</Text>
-                          </View>
-                        </LinearGradient>
-                      </View>
-                    )}
-                  </View>
+                    <View style={styles.nutritionCardContent}>
+                      <Text style={[styles.nutritionCardTitle, { textShadowColor: `${themeColor}40` }]}>{workout.title}</Text>
+                      <Text style={styles.nutritionCardSubtitle}>
+                        {workout.duration}
+                      </Text>
+                      <Text style={[styles.nutritionCardDescription, { color: themeColor }]}>
+                        Tap to copy & share
+                      </Text>
+                    </View>
+                    
+                    {/* Info Button */}
+                    <TouchableOpacity 
+                      style={styles.infoButtonBottom}
+                      onPress={() => handleShowDetails(workout)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="information-circle-outline" size={24} color="#71717a" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                    
+                  {/* Copied Overlay */}
+                  {copiedId === workout.id && (
+                    <View style={styles.copiedOverlay}>
+                      <LinearGradient
+                        colors={[`${themeColor}F2`, `${themeColor}D9`]}
+                        style={styles.copiedGradient}
+                      >
+                        <View style={styles.copiedContent}>
+                          <Ionicons name="checkmark-circle" size={60} color="#ffffff" />
+                          <Text style={styles.copiedTitle}>Copied!</Text>
+                          <Text style={styles.copiedSubtitle}>{workout.title} is ready to import</Text>
+                        </View>
+                      </LinearGradient>
+                    </View>
+                  )}
                 </View>
               );
             })
@@ -562,6 +525,72 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 12,
+  },
+  // New nutrition-style card
+  nutritionStyleCard: {
+    position: 'relative',
+    backgroundColor: '#18181b',
+    borderRadius: 20,
+    borderWidth: 2,
+    padding: 24,
+    paddingTop: 36,
+    paddingBottom: 36,
+    alignItems: 'center',
+    width: '100%',
+    minHeight: 180,
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  deleteButtonTop: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderRadius: 16,
+    padding: 6,
+  },
+  nutritionCardContent: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  nutritionCardTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 30,
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  nutritionCardSubtitle: {
+    fontSize: 16,
+    color: '#a1a1aa',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  nutritionCardDescription: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  infoButtonBottom: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: 'rgba(113, 113, 122, 0.1)',
+    borderRadius: 16,
+    padding: 6,
   },
   expandedCard: {
     height: 400,

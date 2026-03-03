@@ -207,12 +207,15 @@ export default function HomeScreen({ route }: any) {
   };
 
   const loadMyRoutines = async () => {
+    console.log('📥 Loading my routines...');
     const myRoutinesList = await WorkoutStorage.loadMyRoutines();
+    console.log('📥 Loaded', myRoutinesList.length, 'saved routines');
     setMyRoutines(myRoutinesList);
     
     // Update saved routines set
     const routineIds = new Set(myRoutinesList.map(routine => routine.fingerprint || routine.id));
     setSavedWorkoutRoutines(routineIds);
+    console.log('📥 Saved routine IDs:', Array.from(routineIds));
   };
 
   const addRoutine = async (routine: WorkoutRoutine) => {
@@ -502,20 +505,33 @@ export default function HomeScreen({ route }: any) {
 
   const handleToggleSaveWorkout = async (routine: WorkoutRoutine) => {
     try {
-      // Always save, no duplicate checking
-      const transformedWorkout = {
-        ...routine,
-        id: `${routine.id}_${Date.now()}`,
-        fingerprint: `${routine.id}_${Date.now()}`,
-        createdAt: Date.now(),
-      };
+      const routineId = routine.fingerprint || routine.id;
+      const isCurrentlySaved = savedWorkoutRoutines.has(routineId);
       
-      await WorkoutStorage.addMyRoutine(transformedWorkout);
+      console.log('💾 Save workout button pressed:', routine.name, 'Currently saved:', isCurrentlySaved);
+      
+      if (isCurrentlySaved) {
+        // Remove from collection
+        console.log('🗑️ Removing workout from collection');
+        await WorkoutStorage.removeMyRoutine(routineId);
+      } else {
+        // Add to collection
+        const transformedWorkout = {
+          ...routine,
+          id: `${routine.id}_${Date.now()}`,
+          fingerprint: routineId, // Keep original fingerprint for identification
+          createdAt: Date.now(),
+        };
+        
+        console.log('💾 Saving workout with ID:', transformedWorkout.id);
+        await WorkoutStorage.addMyRoutine(transformedWorkout);
+      }
       
       // Refresh my routines list
       await loadMyRoutines();
+      console.log('💾 Toggle workout completed successfully');
     } catch (error) {
-      console.error('Failed to save workout:', error);
+      console.error('Failed to toggle save workout:', error);
     }
   };
 
@@ -1247,71 +1263,94 @@ export default function HomeScreen({ route }: any) {
         animationType="slide"
         onRequestClose={() => setDeleteModal({ visible: false, routine: null })}
       >
-        <TouchableOpacity 
-          style={styles.actionSheetOverlay}
-          activeOpacity={1}
-          onPress={() => setDeleteModal({ visible: false, routine: null })}
-        >
-          <View style={styles.actionSheetContainer}>
-            <TouchableOpacity activeOpacity={1}>
-              <View style={styles.actionSheetHeader}>
-                <Text style={styles.actionSheetTitle}>
-                  {deleteModal.routine?.name}
+        <View style={styles.actionModalOverlay}>
+          <TouchableOpacity 
+            style={styles.actionModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setDeleteModal({ visible: false, routine: null })}
+          />
+          
+          <View style={styles.actionSheet}>
+            {/* Handle Bar */}
+            <View style={styles.handleBar} />
+            
+            {/* Header */}
+            <View style={styles.actionHeader}>
+              <Text style={styles.actionTitle}>Workout Options</Text>
+              <TouchableOpacity
+                style={styles.actionCloseButton}
+                onPress={() => setDeleteModal({ visible: false, routine: null })}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={24} color="#a1a1aa" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Routine Info */}
+            <View style={styles.actionPlanInfo}>
+              <Text style={styles.actionPlanName} numberOfLines={2}>
+                {deleteModal.routine?.name}
+              </Text>
+              <Text style={styles.actionPlanDetails}>
+                {deleteModal.routine?.days} days • {deleteModal.routine?.blocks} blocks
+              </Text>
+            </View>
+            
+            <View style={styles.modernActionButtons}>
+              {/* Save to Collection Button */}
+              <TouchableOpacity
+                style={[
+                  styles.saveActionButton,
+                  savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') && styles.removeActionButton
+                ]}
+                onPress={() => {
+                  console.log('🔥 Save button pressed, modal routine:', deleteModal.routine?.name);
+                  if (deleteModal.routine) {
+                    handleToggleSaveWorkout(deleteModal.routine);
+                  } else {
+                    console.log('❌ No routine in modal');
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name={savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? "heart-dislike" : "heart"}
+                  size={18} 
+                  color="#ffffff" 
+                />
+                <Text style={styles.saveActionText}>
+                  {savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? 'Remove from Collection' : 'Save to Collection'}
                 </Text>
-                <Text style={styles.actionSheetSubtitle}>
-                  {deleteModal.routine?.days} days • {deleteModal.routine?.blocks} blocks
-                </Text>
-              </View>
+              </TouchableOpacity>
               
-              <View style={styles.actionSheetButtons}>
-                <TouchableOpacity
-                  style={[styles.actionSheetButton, { backgroundColor: savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? '#f59e0b' : themeColor }]}
-                  onPress={() => {
-                    if (deleteModal.routine) {
-                      handleToggleSaveWorkout(deleteModal.routine);
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name={savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? "heart-dislike" : "heart"} 
-                    size={20} 
-                    color="#ffffff" 
-                  />
-                  <Text style={styles.actionSheetButtonText}>
-                    {savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? 'Remove from Collection' : 'Save to Collection'}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={styles.actionSheetButton}
-                  onPress={() => deleteModal.routine && handleRenameRequest(deleteModal.routine)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="create-outline" size={20} color="#ffffff" />
-                  <Text style={styles.actionSheetButtonText}>Rename</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.actionSheetButton, styles.actionSheetButtonDanger]}
-                  onPress={handleDeleteConfirm}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#ffffff" />
-                  <Text style={styles.actionSheetButtonText}>Remove</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.actionSheetButton, styles.actionSheetButtonCancel]}
-                  onPress={() => setDeleteModal({ visible: false, routine: null })}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.actionSheetButtonText, { color: '#71717a' }]}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.renameButton}
+                onPress={() => deleteModal.routine && handleRenameRequest(deleteModal.routine)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="create-outline" size={18} color="#ffffff" />
+                <Text style={styles.renameText}>Rename</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.deleteConfirmButton}
+                onPress={handleDeleteConfirm}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="trash" size={18} color="#ffffff" />
+                <Text style={styles.deleteConfirmText}>Remove</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.deleteCancelButton}
+                onPress={() => setDeleteModal({ visible: false, routine: null })}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.deleteCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Workout Calendar */}
@@ -1671,57 +1710,50 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   renameButton: {
-    flex: 1,
-    backgroundColor: '#22d3ee',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    width: '100%',
+    backgroundColor: '#3b82f6',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
-    minHeight: 44,
+    gap: 12,
     shadowColor: '#22d3ee',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 4,
   },
+  renameText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
   deleteConfirmButton: {
-    flex: 1,
+    width: '100%',
     backgroundColor: '#ef4444',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
-    minHeight: 44,
+    gap: 12,
     shadowColor: '#ef4444',
     shadowOffset: {
       width: 0,
       height: 2,
     },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 4,
   },
-  deleteCancelText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  renameText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0a0a0b',
-  },
   deleteConfirmText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
   },
@@ -2451,44 +2483,78 @@ const styles = StyleSheet.create({
     color: 'rgba(10, 10, 11, 0.7)',
     letterSpacing: 0.2,
   },
-  // Action Sheet Modal Styles
-  actionSheetOverlay: {
+  // Action Sheet Modal Styles (matching nutrition screen)
+  actionModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
-  actionSheetContainer: {
+  actionModalBackdrop: {
+    flex: 1,
+  },
+  actionSheet: {
     backgroundColor: '#18181b',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: 34,
     paddingHorizontal: 20,
+    maxHeight: '80%',
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderColor: '#22d3ee',
   },
-  actionSheetHeader: {
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#52525b',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  actionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
+    marginBottom: 20,
   },
-  actionSheetTitle: {
+  actionTitle: {
+    color: '#ffffff',
     fontSize: 20,
     fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
   },
-  actionSheetSubtitle: {
-    fontSize: 16,
-    color: '#71717a',
-    textAlign: 'center',
+  actionCloseButton: {
+    padding: 4,
   },
-  actionSheetButtons: {
-    gap: 16,
-  },
-  actionSheetButton: {
+  actionPlanInfo: {
     backgroundColor: '#27272a',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  actionPlanName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  actionPlanDetails: {
+    color: '#a1a1aa',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  modernActionButtons: {
+    flexDirection: 'column',
+    gap: 16,
+    width: '100%',
+  },
+  saveActionButton: {
+    width: '100%',
+    backgroundColor: '#10b981',
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 24,
@@ -2496,16 +2562,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+    shadowColor: '#10b981',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  actionSheetButtonDanger: {
-    backgroundColor: '#ef4444',
+  removeActionButton: {
+    backgroundColor: '#f59e0b',
+    shadowColor: '#f59e0b',
   },
-  actionSheetButtonCancel: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
+  saveActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  deleteCancelButton: {
+    width: '100%',
+    backgroundColor: '#27272a',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
     borderColor: '#3f3f46',
   },
-  actionSheetButtonText: {
+  deleteCancelText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',

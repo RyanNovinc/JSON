@@ -206,7 +206,7 @@ export class WorkoutStorage {
 
   static async removeMyRoutine(routineId: string): Promise<void> {
     const myRoutines = await this.loadMyRoutines();
-    const filtered = myRoutines.filter(r => r.id !== routineId);
+    const filtered = myRoutines.filter(r => r.id !== routineId && r.fingerprint !== routineId);
     await this.saveMyRoutines(filtered);
   }
 
@@ -500,6 +500,7 @@ export class WorkoutStorage {
     try {
       await AsyncStorage.multiRemove([
         STORAGE_KEYS.ROUTINES,
+        STORAGE_KEYS.MY_ROUTINES,
         STORAGE_KEYS.MEAL_PLANS,
         STORAGE_KEYS.HISTORY,
         STORAGE_KEYS.CURRENT_WORKOUT,
