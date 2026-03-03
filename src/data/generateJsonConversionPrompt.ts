@@ -1,4 +1,12 @@
-export const generateJsonConversionPrompt = () => {
+// Import the static function from dynamic system
+const { getJsonConversionPrompt } = require('./dynamicMealPlanningPrompt');
+
+export const generateJsonConversionPrompt = (): string => {
+  return getJsonConversionPrompt();
+};
+
+// Keep the original for reference/fallback
+export const generateJsonConversionPromptOriginal = () => {
   return `Please convert the meal plan you just created into a specific JSON format that can be imported into my nutrition app called JSON.fit.
 
 # MEAL PLANNING STRUCTURE
@@ -263,6 +271,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 - Make sure meal timing and complexity is practical
 - All numeric values should be reasonable (no impossible prep times, etc.)
 - Grocery list must be cross-checked against all recipes
+- If a grocery_list is included, verify that the sum of all individual item prices equals the totalCost in metadata. Fix any discrepancy before saving.
 - Meal prep session must align with batch-cooked items in the plan
 
 # Date and Meal ID Instructions

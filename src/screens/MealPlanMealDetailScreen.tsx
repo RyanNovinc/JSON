@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,14 @@ import {
   ScrollView,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
+import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import { Meal, MealType, MealTag, NutritionInfo, Ingredient, CookingInstruction } from '../types/nutrition';
 
 type MealPlanMealDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MealPlanMealDetail'>;
@@ -48,10 +49,48 @@ export default function MealPlanMealDetailScreen() {
   const route = useRoute<MealPlanMealDetailScreenRouteProp>();
   const { themeColor } = useTheme();
   const { addToFavorites, removeFromFavorites, getFavoriteMeals } = useMealPlanning();
+  const { currentPlan, getMealsForDate } = useSimplifiedMealPlanning();
   const [activeTab, setActiveTab] = useState<'macros' | 'ingredients' | 'instructions'>('macros');
   const [isFavorite, setIsFavorite] = useState(false);
+  const [currentMeal, setCurrentMeal] = useState(route.params.meal);
 
-  const { meal, dayName, weekNumber, mealPlanName } = route.params;
+  const { meal: initialMeal, dayName, weekNumber, mealPlanName, dateString } = route.params;
+
+  // Function to refresh meal data from the plan
+  const refreshMealData = useCallback(() => {
+    if (currentPlan && dateString && initialMeal.id) {
+      console.log('🔄 Refreshing meal data for date:', dateString, 'meal ID:', initialMeal.id);
+      const mealsForDate = getMealsForDate(dateString);
+      const updatedMeal = mealsForDate.find(m => m.id === initialMeal.id);
+      
+      if (updatedMeal) {
+        console.log('✅ Found updated meal with new macros:', updatedMeal.macros);
+        // Convert SimplifiedMeal back to the meal plan format
+        const refreshedMeal = {
+          ...initialMeal,
+          meal_name: updatedMeal.name,
+          calories: updatedMeal.calories,
+          macros: updatedMeal.macros,
+          ingredients: updatedMeal.ingredients,
+          instructions: updatedMeal.instructions,
+        };
+        setCurrentMeal(refreshedMeal);
+      } else {
+        console.log('⚠️ Could not find updated meal in plan');
+      }
+    }
+  }, [currentPlan, dateString, initialMeal, getMealsForDate]);
+
+  // Refresh data when screen comes into focus (after editing)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📱 Screen focused, refreshing meal data');
+      refreshMealData();
+    }, [refreshMealData])
+  );
+
+  // Use the current meal data (which may be refreshed)
+  const meal = currentMeal;
   
   // Calculate recommended servings based on meal plan usage
   const recommendedServings = meal.times_used || meal.base_servings || meal.servings || 1;
@@ -67,9 +106,13 @@ export default function MealPlanMealDetailScreen() {
   // Check if meal is already in favorites on load
   React.useEffect(() => {
     const favoriteMeals = getFavoriteMeals();
-    const isAlreadyFavorite = favoriteMeals.some(fav => fav.meal.name === meal.meal_name);
+    const mealName = meal.meal_name || meal.name;
+    const isAlreadyFavorite = favoriteMeals.some(fav => 
+      fav.meal.name === mealName || fav.mealId === meal.id
+    );
     setIsFavorite(isAlreadyFavorite);
-  }, [meal.meal_name, getFavoriteMeals]);
+    console.log('🔍 Checking favorite status for meal:', mealName, 'isFavorite:', isAlreadyFavorite);
+  }, [meal.meal_name, meal.name, meal.id, getFavoriteMeals]);
 
   const getMealIcon = (mealType: string) => {
     switch (mealType) {
@@ -92,12 +135,14 @@ export default function MealPlanMealDetailScreen() {
   };
 
   const convertMealPlanMealToNutritionMeal = (mealPlanMeal: any): Meal => {
-    const mealId = `meal_${mealPlanMeal.meal_name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
+    const mealName = mealPlanMeal.meal_name || mealPlanMeal.name || 'unknown_meal';
+    // Preserve original ID if it exists, otherwise create a new one
+    const mealId = mealPlanMeal.id || `meal_${mealName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
     
     // Convert ingredients
     const ingredients: Ingredient[] = (mealPlanMeal.ingredients || []).map((ing: any, index: number) => ({
       id: `ingredient_${index}_${mealId}`,
-      name: ing.item,
+      name: ing.name || ing.item,
       amount: parseFloat(ing.amount) || 1,
       unit: ing.unit || '',
       category: 'other' as const,
@@ -130,9 +175,9 @@ export default function MealPlanMealDetailScreen() {
     return {
       id: mealId,
       type: (mealPlanMeal.meal_type || 'breakfast') as MealType,
-      name: mealPlanMeal.meal_name,
+      name: mealName,
       description: mealPlanMeal.notes || `Delicious ${mealPlanMeal.meal_type || 'meal'} recipe`,
-      time: '12:00', // Default time
+      time: mealPlanMeal.time || mealPlanMeal.recommended_time || '12:00', // Preserve original time
       ingredients,
       instructions,
       nutritionInfo,
@@ -142,31 +187,88 @@ export default function MealPlanMealDetailScreen() {
       servings: mealPlanMeal.servings || 1,
       tags,
       isFavorite: true,
+      // Add SimplifiedMeal specific properties
+      isOriginal: mealPlanMeal.isOriginal !== undefined ? mealPlanMeal.isOriginal : true,
+      addedAt: mealPlanMeal.addedAt || new Date().toISOString(),
     };
   };
 
   const handleToggleFavorite = async () => {
     try {
       if (isFavorite) {
-        // Find the favorite meal by name and remove it
+        // Find the favorite meal by name or ID and remove it
         const favoriteMeals = getFavoriteMeals();
-        const favoriteToRemove = favoriteMeals.find(fav => fav.meal.name === meal.meal_name);
+        const mealName = meal.meal_name || meal.name;
+        const favoriteToRemove = favoriteMeals.find(fav => 
+          fav.meal.name === mealName || fav.mealId === meal.id
+        );
+        
+        console.log('🗑️ Removing favorite:', { mealName, mealId: meal.id, favoriteToRemove });
+        
         if (favoriteToRemove) {
           await removeFromFavorites(favoriteToRemove.mealId);
+          console.log('✅ Successfully removed from favorites');
+        } else {
+          console.log('⚠️ Favorite meal not found for removal');
         }
         setIsFavorite(false);
       } else {
         // Convert and add to favorites
+        console.log('💝 Converting meal for favorites:', {
+          originalMeal: meal,
+          mealName: meal.meal_name || meal.name,
+          mealType: meal.meal_type || meal.type,
+          mealId: meal.id
+        });
+        
         const nutritionMeal = convertMealPlanMealToNutritionMeal(meal);
+        console.log('💝 Converted meal for favorites:', {
+          id: nutritionMeal.id,
+          name: nutritionMeal.name,
+          type: nutritionMeal.type,
+          nutritionInfo: nutritionMeal.nutritionInfo
+        });
+        
         await addToFavorites(nutritionMeal);
         setIsFavorite(true);
+        console.log('✅ Successfully added to favorites');
+        
+        // Verify it was actually added
+        const updatedFavorites = getFavoriteMeals();
+        const wasAdded = updatedFavorites.some(fav => fav.mealId === nutritionMeal.id);
+        console.log('🔍 Verification - Meal was added to favorites:', wasAdded);
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
   };
 
-  const totalTime = meal.total_time || (meal.prep_time || 0) + (meal.cook_time || 0);
+  const handleEdit = () => {
+    console.log('Edit button pressed for meal:', meal.meal_name);
+    // Convert meal plan meal to the format expected by ManualMealEntryScreen
+    const editMeal = convertMealPlanMealToNutritionMeal(meal);
+    navigation.navigate('ManualMealEntry' as any, { 
+      editMeal: editMeal,
+      isEditing: true 
+    });
+  };
+
+  // Debug the meal object and time values
+  console.log('🕒 DEBUG MEAL TIMING:');
+  console.log('🕒 Full meal object:', meal);
+  console.log('🕒 meal.prepTime:', meal.prepTime);
+  console.log('🕒 meal.prep_time:', meal.prep_time);
+  console.log('🕒 meal.cookTime:', meal.cookTime);
+  console.log('🕒 meal.cook_time:', meal.cook_time);
+  console.log('🕒 meal.total_time:', meal.total_time);
+  
+  const prepTime = meal.prepTime || meal.prep_time || 0;
+  const cookTime = meal.cookTime || meal.cook_time || 0;
+  const totalTime = meal.total_time || (prepTime + cookTime);
+  
+  console.log('🕒 Calculated prepTime:', prepTime);
+  console.log('🕒 Calculated cookTime:', cookTime);
+  console.log('🕒 Calculated totalTime:', totalTime);
   const mealColor = getMealColor(meal.meal_type || 'breakfast');
 
   return (
@@ -181,13 +283,18 @@ export default function MealPlanMealDetailScreen() {
             {meal.meal_type ? meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1) : 'Meal'}
           </Text>
         </View>
-        <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteButton}>
-          <Ionicons 
-            name={isFavorite ? "heart" : "heart-outline"} 
-            size={24} 
-            color={isFavorite ? "#ef4444" : themeColor} 
-          />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleEdit} style={styles.actionButton}>
+            <Ionicons name="pencil" size={20} color={themeColor} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteButton}>
+            <Ionicons 
+              name={isFavorite ? "heart" : "heart-outline"} 
+              size={24} 
+              color={isFavorite ? "#ef4444" : themeColor} 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Tab Bar */}
@@ -225,19 +332,19 @@ export default function MealPlanMealDetailScreen() {
               <View style={styles.modernMacrosGrid}>
                 <View style={styles.modernMacroItem}>
                   <Text style={[styles.modernMacroValue, { color: '#ef4444' }]}>
-                    {Math.round(meal.macros.protein)}g
+                    {Math.round(meal.macros?.protein || 0)}g
                   </Text>
                   <Text style={styles.modernMacroLabel}>Protein</Text>
                 </View>
                 <View style={styles.modernMacroItem}>
                   <Text style={[styles.modernMacroValue, { color: '#3b82f6' }]}>
-                    {Math.round(meal.macros.carbs)}g
+                    {Math.round(meal.macros?.carbs || 0)}g
                   </Text>
                   <Text style={styles.modernMacroLabel}>Carbs</Text>
                 </View>
                 <View style={styles.modernMacroItem}>
                   <Text style={[styles.modernMacroValue, { color: '#10b981' }]}>
-                    {Math.round(meal.macros.fat)}g
+                    {Math.round(meal.macros?.fat || 0)}g
                   </Text>
                   <Text style={styles.modernMacroLabel}>Fat</Text>
                 </View>
@@ -277,8 +384,19 @@ export default function MealPlanMealDetailScreen() {
                     <View style={styles.ingredientDot} />
                     <View style={styles.ingredientContent}>
                       <Text style={styles.ingredientText}>
-                        <Text style={styles.ingredientAmount}>{scaledAmount} {ingredient.unit}</Text>
-                        <Text style={styles.ingredientName}> {ingredient.item}</Text>
+                        {ingredient.unit === 'item' && parseFloat(scaledAmount) === 1 ? (
+                          // For single items, just show the name
+                          <Text style={styles.ingredientName}>{ingredient.name || ingredient.item}</Text>
+                        ) : ingredient.unit === 'item' ? (
+                          // For multiple items, show amount + name
+                          <Text style={styles.ingredientName}>{scaledAmount} {ingredient.name || ingredient.item}</Text>
+                        ) : (
+                          // For real units (cups, tbsp, etc.), show full format
+                          <>
+                            <Text style={styles.ingredientAmount}>{scaledAmount} {ingredient.unit}</Text>
+                            <Text style={styles.ingredientName}> {ingredient.name || ingredient.item}</Text>
+                          </>
+                        )}
                       </Text>
                       {ingredient.notes && (
                         <Text style={styles.ingredientNotes}>
@@ -323,15 +441,18 @@ export default function MealPlanMealDetailScreen() {
           <View style={styles.instructionsCard}>
             <Text style={styles.sectionTitle}>Instructions</Text>
             {(meal.instructions || []).map((instruction, index) => {
+              // Handle both string and object instruction formats
+              const instructionText = typeof instruction === 'string' ? instruction : instruction.instruction;
+              
               // Scale numbers in instructions when servings are adjusted
               const scaledInstruction = isMealPrepRecipe && servingMultiplier !== 1 ? 
-                instruction
+                instructionText
                   .replace(/(\d+)\s*jars?/g, (match, num) => `${Math.round(parseInt(num) * servingMultiplier)} jar${Math.round(parseInt(num) * servingMultiplier) === 1 ? '' : 's'}`)
                   .replace(/(\d+)\s*servings?/g, (match, num) => `${Math.round(parseInt(num) * servingMultiplier)} serving${Math.round(parseInt(num) * servingMultiplier) === 1 ? '' : 's'}`)
                   .replace(/(\d+)\s*containers?/g, (match, num) => `${Math.round(parseInt(num) * servingMultiplier)} container${Math.round(parseInt(num) * servingMultiplier) === 1 ? '' : 's'}`)
                   .replace(/(\d+)\s*packs?/g, (match, num) => `${Math.round(parseInt(num) * servingMultiplier)} pack${Math.round(parseInt(num) * servingMultiplier) === 1 ? '' : 's'}`)
                   .replace(/(\d+)\s*eggs?/g, (match, num) => `${Math.round(parseInt(num) * servingMultiplier)} egg${Math.round(parseInt(num) * servingMultiplier) === 1 ? '' : 's'}`)
-                : instruction;
+                : instructionText;
               
               return (
                 <View key={index} style={styles.instructionItem}>
@@ -916,5 +1037,18 @@ const styles = StyleSheet.create({
   timeLabel: {
     fontSize: 14,
     color: '#71717a',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#18181b',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

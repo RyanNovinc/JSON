@@ -26,7 +26,7 @@ type SleepOptimizationNavigationProp = StackNavigationProp<RootStackParamList, '
 interface FormData {
   bedtime: string;
   wakeTime: string;
-  optimizationLevel: 'minimal' | 'moderate' | 'maximum';
+  optimizationLevel: 'standard' | 'sleep_focused' | 'minimal' | 'moderate' | 'maximum';
 }
 
 export default function SleepOptimizationScreen() {
@@ -40,7 +40,7 @@ export default function SleepOptimizationScreen() {
   const [formData, setFormData] = useState<FormData>({
     bedtime: '',
     wakeTime: '',
-    optimizationLevel: 'moderate',
+    optimizationLevel: 'standard',
   });
 
   // Handle showing results if user has already completed
@@ -150,36 +150,23 @@ export default function SleepOptimizationScreen() {
 
   const optimizationOptions = [
     {
-      level: 'minimal' as const,
-      title: 'Minimal Effort',
-      subtitle: 'Basic guidelines most people can follow',
+      level: 'standard' as const,
+      title: 'Standard',
+      subtitle: 'Finish dinner 2-3 hours before bed. Good sleep hygiene without major schedule changes.',
       features: [
+        'Last meal 2-3 hours before bedtime',
         'First meal within 2 hours of waking',
-        'Last meal 2 hours before bed',
-        '12-hour eating window',
-        'Include protein at breakfast'
+        'Meals spaced 3-5 hours apart'
       ]
     },
     {
-      level: 'moderate' as const,
-      title: 'Moderate Optimization',
-      subtitle: 'Good benefits without being too restrictive',
+      level: 'sleep_focused' as const,
+      title: 'Sleep-Focused',
+      subtitle: 'Finish dinner 3-4 hours before bed. More conservative timing for better sleep quality.',
       features: [
-        'First meal 30-90 minutes after waking',
-        'Last meal 3 hours before bed',
-        '8-10 hour eating window',
-        'Prioritize protein-rich breakfast'
-      ]
-    },
-    {
-      level: 'maximum' as const,
-      title: 'Maximum Optimization',
-      subtitle: 'Complete adherence for optimal results',
-      features: [
-        'First meal within 30-60 minutes of waking',
-        'Last meal 4+ hours before bed',
-        '8-hour early eating window',
-        'High-protein breakfast emphasis'
+        'Last meal 3-4 hours before bedtime',
+        'First meal within 1-2 hours of waking',
+        'Earlier dinner prioritised for digestion'
       ]
     }
   ];
@@ -220,30 +207,23 @@ export default function SleepOptimizationScreen() {
       bedMinutes += 24 * 60; // Add 24 hours
     }
 
-    let firstMealStart, firstMealEnd, lastMealTime;
-
-    switch (formData.optimizationLevel) {
-      case 'minimal':
-        firstMealStart = wakeMinutes;
-        firstMealEnd = wakeMinutes + 120; // 2 hours
-        lastMealTime = bedMinutes - 120; // 2 hours before bed
-        break;
-      case 'moderate':
-        firstMealStart = wakeMinutes + 30; // 30 min after wake
-        firstMealEnd = wakeMinutes + 90; // 90 min after wake
-        lastMealTime = bedMinutes - 180; // 3 hours before bed
-        break;
-      case 'maximum':
-        firstMealStart = wakeMinutes + 30; // 30 min after wake
-        firstMealEnd = wakeMinutes + 60; // 60 min after wake
-        lastMealTime = bedMinutes - 240; // 4 hours before bed
-        break;
+    let firstMealStart: number;
+    let firstMealEnd: number;
+    let lastMealEnd: number;
+    
+    if (formData.optimizationLevel === 'sleep_focused') {
+      firstMealStart = wakeMinutes + 60;  // 1 hour after wake
+      firstMealEnd = wakeMinutes + 120;   // 2 hours after wake
+      lastMealEnd = bedMinutes - 210;     // 3.5 hours before bed (middle of 3-4h range)
+    } else { // 'standard' or legacy values
+      firstMealStart = wakeMinutes + 60;  // 1 hour after wake
+      firstMealEnd = wakeMinutes + 120;   // 2 hours after wake
+      lastMealEnd = bedMinutes - 150;     // 2.5 hours before bed (middle of 2-3h range)
     }
 
     return {
-      firstMealWindow: `${minutesToTime(firstMealStart)} - ${minutesToTime(firstMealEnd)}`,
-      lastMealTime: minutesToTime(lastMealTime),
-      eatingWindow: `${minutesToTime(firstMealStart)} to ${minutesToTime(lastMealTime)}`
+      firstMealRange: `${minutesToTime(firstMealStart)} - ${minutesToTime(firstMealEnd)}`,
+      lastMealBy: minutesToTime(lastMealEnd)
     };
   };
 
@@ -570,17 +550,7 @@ export default function SleepOptimizationScreen() {
                 <View style={styles.timingContent}>
                   <Text style={styles.timingLabel}>First Meal Window</Text>
                   <Text style={[styles.timingValue, { color: themeColor }]}>
-                    {mealTimes.firstMealWindow}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.timingItem}>
-                <Ionicons name="restaurant" size={24} color={themeColor} />
-                <View style={styles.timingContent}>
-                  <Text style={styles.timingLabel}>Eating Window</Text>
-                  <Text style={[styles.timingValue, { color: themeColor }]}>
-                    {mealTimes.eatingWindow}
+                    {mealTimes.firstMealRange}
                   </Text>
                 </View>
               </View>
@@ -590,7 +560,7 @@ export default function SleepOptimizationScreen() {
                 <View style={styles.timingContent}>
                   <Text style={styles.timingLabel}>Last Meal By</Text>
                   <Text style={[styles.timingValue, { color: themeColor }]}>
-                    {mealTimes.lastMealTime}
+                    {mealTimes.lastMealBy}
                   </Text>
                 </View>
               </View>

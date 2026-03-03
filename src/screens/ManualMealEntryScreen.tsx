@@ -8,7 +8,9 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -16,6 +18,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
+import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -36,6 +39,7 @@ export default function ManualMealEntryScreen() {
   const route = useRoute();
   const { themeColor } = useTheme();
   const { addToFavorites, removeFromFavorites, getFavoriteMeals, refreshData } = useMealPlanning();
+  const { updateMeal, currentPlan } = useSimplifiedMealPlanning();
   
   // Check if we're editing an existing meal
   const editMeal = route.params?.editMeal;
@@ -43,12 +47,45 @@ export default function ManualMealEntryScreen() {
 
   // Initialize form data from edit meal if available
   const initializeIngredients = (mealIngredients: any[] = []) => {
-    return mealIngredients.map((ing, index) => ({
-      id: ing.id || `ingredient_${index}`,
-      text: typeof ing === 'string' ? ing : 
-            ing.amount && ing.unit ? `${ing.amount} ${ing.unit} ${ing.name || ing.item}` : 
-            ing.name || ing.item || ''
-    }));
+    console.log('🥕 Initializing ingredients with:', mealIngredients);
+    
+    if (!mealIngredients || !Array.isArray(mealIngredients)) {
+      console.log('⚠️ No valid ingredients array, returning empty');
+      return [];
+    }
+    
+    return mealIngredients.map((ing, index) => {
+      console.log(`🥕 Processing ingredient ${index}:`, ing);
+      
+      let text = '';
+      if (typeof ing === 'string') {
+        text = ing;
+      } else if (ing && typeof ing === 'object') {
+        // Handle both SimplifiedMeal Ingredient format and legacy format
+        if (ing.amount && ing.unit && ing.name) {
+          // Skip generic units like "item" and just show the name with amount if meaningful
+          if (ing.unit === 'item' && ing.amount === 1) {
+            text = ing.name;
+          } else if (ing.unit === 'item') {
+            text = `${ing.amount} ${ing.name}`;
+          } else {
+            text = `${ing.amount} ${ing.unit} ${ing.name}`;
+          }
+        } else if (ing.name || ing.item) {
+          text = ing.name || ing.item || '';
+        } else {
+          text = '';
+        }
+      }
+      
+      const result = {
+        id: ing?.id || `ingredient_${index}`,
+        text: text
+      };
+      
+      console.log(`🥕 Result for ingredient ${index}:`, result);
+      return result;
+    });
   };
 
   const initializeInstructions = (mealInstructions: any[] = []) => {
@@ -62,6 +99,26 @@ export default function ManualMealEntryScreen() {
   // Basic Info
   const [mealName, setMealName] = useState(editMeal?.name || editMeal?.meal_name || '');
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | null>(editMeal?.type || editMeal?.meal_type || null);
+  const [mealTime, setMealTime] = useState(editMeal?.time || '12:00');
+  const [hasSpecificTime, setHasSpecificTime] = useState(!!editMeal?.time);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (editMeal?.time) {
+      // Parse existing time into a Date object
+      const [time, period] = editMeal.time.split(' ');
+      let [hours, minutes] = time.split(':').map(Number);
+      if (period?.toLowerCase() === 'pm' && hours !== 12) hours += 12;
+      if (period?.toLowerCase() === 'am' && hours === 12) hours = 0;
+      
+      const date = new Date();
+      date.setHours(hours, minutes || 0, 0, 0);
+      return date;
+    }
+    // Default to 12:00 PM
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    return date;
+  });
   const [prepTime, setPrepTime] = useState(editMeal?.prepTime?.toString() || editMeal?.prep_time?.toString() || '');
   const [cookTime, setCookTime] = useState(editMeal?.cookTime?.toString() || editMeal?.cook_time?.toString() || '');
 
@@ -117,6 +174,31 @@ export default function ManualMealEntryScreen() {
     setInstructions(updatedInstructions);
   };
 
+  const formatTime = (date: Date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+    return `${displayHours}:${displayMinutes} ${ampm}`;
+  };
+
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    
+    if (selectedTime) {
+      setSelectedDate(selectedTime);
+      const timeString = formatTime(selectedTime);
+      setMealTime(timeString);
+    }
+  };
+
+  const handleTimePickerDone = () => {
+    setShowTimePicker(false);
+  };
+
   const saveMeal = async () => {
     // Validation - only meal name is required
     if (!mealName.trim()) {
@@ -124,13 +206,19 @@ export default function ManualMealEntryScreen() {
       return;
     }
 
+    console.log('💾 SAVE MEAL DEBUG START');
+    console.log('💾 prepTime state:', prepTime);
+    console.log('💾 cookTime state:', cookTime);
+    console.log('💾 isEditing:', isEditing);
+    console.log('💾 editMeal:', editMeal);
+
     try {
       const mealData = {
         id: isEditing ? editMeal.id : 'manual_' + Date.now(),
         type: mealType || 'breakfast',
         name: mealName.trim(),
         description: editMeal?.description || `A custom ${mealType || 'meal'} recipe`,
-        time: editMeal?.time || '12:00', // preserve existing time or default
+        time: hasSpecificTime ? mealTime : '', // use selected time or empty for no specific time
         ingredients: ingredients
           .filter(ing => ing.text.trim())
           .map((ing, index) => {
@@ -204,32 +292,94 @@ export default function ManualMealEntryScreen() {
         isFavorite: editMeal?.isFavorite || false,
       };
 
+      console.log('💾 Created mealData:');
+      console.log('💾 mealData.prepTime:', mealData.prepTime);
+      console.log('💾 mealData.cookTime:', mealData.cookTime);
+
       if (isEditing) {
-        // For editing, manually update the favorites array to avoid state timing issues
         console.log('Editing meal with ID:', editMeal.id);
         
+        // Update favorites if this meal is in favorites
         const currentFavorites = getFavoriteMeals();
-        const updatedFavorites = currentFavorites.map(fav => {
-          if (fav.mealId === editMeal.id) {
-            // Update the existing favorite with new meal data
-            return {
-              ...fav,
-              meal: mealData,
-              // Keep original metadata
-              mealId: mealData.id,
-              addedAt: fav.addedAt,
-              timesCooked: fav.timesCooked,
-              lastCookedAt: fav.lastCookedAt
-            };
+        const isInFavorites = currentFavorites.some(fav => fav.mealId === editMeal.id);
+        
+        if (isInFavorites) {
+          const updatedFavorites = currentFavorites.map(fav => {
+            if (fav.mealId === editMeal.id) {
+              // Update the existing favorite with new meal data
+              return {
+                ...fav,
+                meal: mealData,
+                // Keep original metadata
+                mealId: mealData.id,
+                addedAt: fav.addedAt,
+                timesCooked: fav.timesCooked,
+                lastCookedAt: fav.lastCookedAt
+              };
+            }
+            return fav;
+          });
+          
+          // Save to AsyncStorage and refresh context state
+          await AsyncStorage.setItem('favoriteMeals', JSON.stringify(updatedFavorites));
+          await refreshData();
+        }
+        
+        // Also update the meal in the current plan if it exists
+        if (currentPlan) {
+          console.log('🔍 Looking for meal with ID:', editMeal.id, 'in current plan');
+          console.log('🗓️ Plan has dates:', Object.keys(currentPlan.dailyMeals));
+          
+          // Find the meal in the plan and update it
+          let mealFound = false;
+          for (const [date, dayData] of Object.entries(currentPlan.dailyMeals)) {
+            console.log(`📅 Checking date ${date} with ${dayData.meals.length} meals`);
+            const mealIndex = dayData.meals.findIndex(meal => meal.id === editMeal.id);
+            if (mealIndex !== -1) {
+              console.log(`✅ Found meal at index ${mealIndex} on date ${date}`);
+            }
+            if (mealIndex !== -1) {
+              // Convert the meal data to SimplifiedMeal format
+              console.log('⏰ DEBUG SAVE - mealData.prepTime:', mealData.prepTime);
+              console.log('⏰ DEBUG SAVE - mealData.cookTime:', mealData.cookTime);
+              
+              const simplifiedMealData = {
+                id: mealData.id,
+                name: mealData.name,
+                type: mealData.type,
+                time: mealData.time,
+                calories: mealData.nutritionInfo.calories,
+                macros: {
+                  protein: mealData.nutritionInfo.protein,
+                  carbs: mealData.nutritionInfo.carbs,
+                  fat: mealData.nutritionInfo.fat,
+                },
+                ingredients: mealData.ingredients,
+                instructions: mealData.instructions,
+                tags: mealData.tags || [],
+                prep_time: mealData.prepTime,
+                cook_time: mealData.cookTime,
+                servings: mealData.servings,
+                isOriginal: editMeal.isOriginal || false,
+                addedAt: editMeal.addedAt || new Date().toISOString(),
+              };
+              
+              console.log('⏰ DEBUG SAVE - simplifiedMealData.prep_time:', simplifiedMealData.prep_time);
+              console.log('⏰ DEBUG SAVE - simplifiedMealData.cook_time:', simplifiedMealData.cook_time);
+              
+              const success = await updateMeal(date, editMeal.id, simplifiedMealData);
+              if (success) {
+                console.log(`✅ Updated meal in plan on date: ${date}`);
+                mealFound = true;
+              }
+              break;
+            }
           }
-          return fav;
-        });
-        
-        // Save to AsyncStorage and refresh context state
-        await AsyncStorage.setItem('favoriteMeals', JSON.stringify(updatedFavorites));
-        
-        // Refresh the context to pick up our AsyncStorage changes
-        await refreshData();
+          
+          if (!mealFound) {
+            console.log('⚠️ Meal not found in current plan');
+          }
+        }
         
         Alert.alert('Success', 'Meal updated successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() }
@@ -320,6 +470,37 @@ export default function ManualMealEntryScreen() {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+        {/* Meal Time Section - Central */}
+        <View style={styles.centralTimeSection}>
+          <Text style={styles.timeLabel}>When will you eat this?</Text>
+          <TouchableOpacity 
+            style={styles.centralTimeButton}
+            onPress={() => {
+              setHasSpecificTime(!hasSpecificTime);
+              if (!hasSpecificTime) {
+                setShowTimePicker(true);
+              }
+            }}
+          >
+            <Ionicons 
+              name="time-outline" 
+              size={24} 
+              color={hasSpecificTime ? themeColor : '#71717a'} 
+            />
+            <Text style={[
+              styles.centralTimeText,
+              hasSpecificTime && { color: themeColor }
+            ]}>
+              {hasSpecificTime ? mealTime : 'Anytime'}
+            </Text>
+            <Ionicons 
+              name="chevron-forward" 
+              size={20} 
+              color="#71717a" 
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Quick Stats Row */}
@@ -477,6 +658,40 @@ export default function ManualMealEntryScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Time Picker Modal */}
+      {showTimePicker && (
+        <Modal transparent animationType="slide" visible={showTimePicker}>
+          <View style={styles.timePickerModalOverlay}>
+            <View style={styles.timePickerModal}>
+              <View style={styles.timePickerHeader}>
+                <TouchableOpacity 
+                  onPress={() => setShowTimePicker(false)}
+                  style={styles.timePickerButton}
+                >
+                  <Text style={styles.timePickerButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.timePickerTitle}>Set Meal Time</Text>
+                <TouchableOpacity 
+                  onPress={handleTimePickerDone}
+                  style={styles.timePickerButton}
+                >
+                  <Text style={[styles.timePickerButtonText, { color: themeColor }]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <DateTimePicker
+                value={selectedDate}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleTimeChange}
+                style={styles.timePicker}
+                textColor="#ffffff"
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -678,5 +893,70 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 500,
+  },
+  centralTimeSection: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  timeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  centralTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  centralTimeText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  timePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  timePickerModal: {
+    backgroundColor: '#18181b',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  timePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
+  },
+  timePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  timePickerButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  timePickerButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#71717a',
+  },
+  timePicker: {
+    backgroundColor: '#18181b',
+    marginTop: 20,
   },
 });

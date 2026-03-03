@@ -11,6 +11,18 @@ First, read the meal plan you just created so you have the full content in conte
 5. **At the end, provide a brief change log** — a short bullet list of what you changed and why (e.g., "Reduced rice from 100g to 80g dry to bring carbs within 10% of target").
 6. **Remind the user about JSON conversion** — after presenting the corrected plan, tell the user: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."
 
+## HARD CONSTRAINTS — ZERO TOLERANCE
+
+These must pass after your fixes. If any of these still fail after revision, you have not finished — go back and fix again.
+
+- **Eating window** MUST be within the specified range (e.g., 8-10h for maximum sleep optimization). Do not rationalize exceeding it.
+- **Protein** MUST be within 10% of target on EVERY individual day. No exceptions.
+- **Weekly average calories** MUST be within 5% of target.
+- **Weekly average carbs and fat** MUST be within 10% of target.
+- **Fiber** MUST hit at least 80% of target on EVERY individual day.
+- **Equipment** — every recipe MUST use only the user's listed equipment. No blender if no blender listed.
+- **No draft content** — the output must contain zero working, iteration, or revision commentary.
+
 ## What "Fix" Means for Each Type of Failure
 
 - **Nutrition targets off**: Adjust portion sizes, swap ingredients, or rebalance meals. Recalculate and verify.
@@ -27,14 +39,13 @@ First, read the meal plan you just created so you have the full content in conte
 Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
 
 ### 1. Nutrition Target Verification
-Compare actual nutrition against the user's targets:
-- Daily calorie totals within 5-10% of target across all days
-- Daily protein totals within 5-10% of target across all days
-- Daily carb totals within 5-10% of target across all days
-- Daily fat totals within 5-10% of target across all days
-- Weekly averages hit nutrition targets even if individual days vary slightly
-- **FAIL if** any macro is consistently off target by >10% or weekly averages miss targets
-- **FIX**: Adjust portion sizes (reduce/increase carb sources, swap proteins, modify fat sources) until all days fall within 10%.
+Use these evidence-based tolerance rules (not all macros need the same daily precision):
+- **Protein**: Must be within 10% of target on EVERY individual day. Muscle protein synthesis is a daily process — consistent daily protein matters most.
+- **Calories**: Weekly average must be within 5% of target. Individual days can vary up to ±10%. Total weekly energy balance drives weight change.
+- **Carbs & Fat**: Weekly average must be within 10% of target. Individual days can flex ±15%. Day-to-day variation is normal and even beneficial.
+- **Fiber**: Must hit at least 80% of the daily target on EVERY day. Gut health requires daily consistency.
+- **FAIL if** protein is off by >10% on any individual day, OR weekly average calories are off by >5%, OR weekly average carbs/fat are off by >10%, OR fiber drops below 80% of target on any day.
+- **FIX**: Adjust portion sizes (reduce/increase carb sources, swap proteins, modify fat sources). For protein fixes, adjust daily. For carb/fat fixes, rebalance the weekly average rather than forcing every day to be identical.
 
 ### 2. Budget Compliance
 Check if the plan respects budget constraints:
@@ -104,12 +115,12 @@ Assess overall plan practicality:
 
 ### 9. Nutritional Quality & Balance
 Beyond macro targets, evaluate nutritional completeness:
-- **Fiber**: Daily fiber meets the stated target (within 80%). FAIL if consistently under.
 - **Protein diversity**: At least 3 different primary protein sources across the plan. FAIL if only 1-2.
 - **Vegetable diversity**: At least 6 different vegetables across the plan. FAIL if fewer.
 - **Vegetable volume**: At least 300g non-starchy vegetables per day. FAIL if consistently under.
 - **Carb diversity**: At least 3 different carb sources across the plan. FAIL if only 1-2.
 - **Micronutrient coverage**: Across the full week, check for at least one serving each of: dark leafy greens, cruciferous vegetables, a vitamin C source, an omega-3 source, legumes/beans, and whole grains. FAIL if 3+ categories are completely absent.
+- (Note: Fiber is checked in Check #1 under macro tolerance rules.)
 - **FAIL if** 2+ of the above sub-checks fail
 - **FIX**: Swap ingredients to add diversity, increase vegetable portions, add missing food groups.
 

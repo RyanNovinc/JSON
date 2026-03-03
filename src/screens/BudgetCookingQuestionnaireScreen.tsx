@@ -66,7 +66,9 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   };
   const [formData, setFormData] = useState({
     weeklyBudget: '',
-    customBudgetAmount: '',
+    budgetMin: '',
+    budgetMax: '',
+    budgetSkipped: false,
     country: '',
     countryCode: '',
     city: '',
@@ -145,7 +147,10 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
             mealPreferences: existingResults.formData.mealPreferences || '',
             selectedFavorites: existingResults.formData.selectedFavorites || [],
             customMealRequests: existingResults.formData.customMealRequests || '',
-            cookingEquipment: existingResults.formData.cookingEquipment || []
+            cookingEquipment: existingResults.formData.cookingEquipment || [],
+            budgetMin: existingResults.formData.budgetMin || '',
+            budgetMax: existingResults.formData.budgetMax || '',
+            budgetSkipped: existingResults.formData.budgetSkipped || false
           });
           setShowResults(true);
         }
@@ -166,63 +171,49 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     primaryAlpha30: themeColor + '60',
   };
 
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   const getStoreRecommendation = () => {
     const budget = formData.weeklyBudget;
     const country = formData.country.toLowerCase();
     
     // For custom budgets, recommend based on amount
-    const getCustomBudgetCategory = (amount: string | undefined) => {
-      const numAmount = parseInt(amount || '0') || 0;
-      if (numAmount < 80) return 'very_tight';
-      if (numAmount < 120) return 'budget_conscious';
-      if (numAmount < 180) return 'moderate';
-      if (numAmount < 250) return 'comfortable';
-      return 'unlimited';
-    };
-    
-    const effectiveBudget = budget === 'custom' ? getCustomBudgetCategory(formData.customBudgetAmount) : budget;
+    const effectiveBudget = budget;
     
     // Budget-conscious recommendations by country
     const recommendations: Record<string, Record<string, string>> = {
       'australia': {
-        'very_tight': 'Aldi',
-        'budget_conscious': 'Aldi',
-        'moderate': 'Coles',
-        'comfortable': 'Woolworths',
-        'unlimited': 'Harris Farm Markets'
+        'critical': 'Aldi',
+        'important': 'Aldi',
+        'keep_reasonable': 'Coles',
+        'not_a_concern': 'Harris Farm Markets'
       },
       'united states': {
-        'very_tight': 'Walmart',
-        'budget_conscious': 'Walmart',
-        'moderate': 'Target',
-        'comfortable': 'Whole Foods',
-        'unlimited': 'Whole Foods'
+        'critical': 'Walmart',
+        'important': 'Walmart',
+        'keep_reasonable': 'Target',
+        'not_a_concern': 'Whole Foods'
       },
       'united kingdom': {
-        'very_tight': 'Aldi',
-        'budget_conscious': 'Lidl',
-        'moderate': 'Tesco',
-        'comfortable': 'Sainsbury\'s',
-        'unlimited': 'Waitrose'
+        'critical': 'Aldi',
+        'important': 'Lidl',
+        'keep_reasonable': 'Tesco',
+        'not_a_concern': 'Waitrose'
       },
       'canada': {
-        'very_tight': 'No Frills',
-        'budget_conscious': 'No Frills',
-        'moderate': 'Metro',
-        'comfortable': 'Loblaws',
-        'unlimited': 'Loblaws'
+        'critical': 'No Frills',
+        'important': 'No Frills',
+        'keep_reasonable': 'Metro',
+        'not_a_concern': 'Loblaws'
       }
     };
 
     // Default fallback recommendations
     const defaultRecommendations: Record<string, string> = {
-      'very_tight': 'Budget grocery store',
-      'budget_conscious': 'Discount supermarket',
-      'moderate': 'Local supermarket',
-      'comfortable': 'Premium supermarket',
-      'unlimited': 'Gourmet grocery store'
+      'critical': 'Budget grocery store',
+      'important': 'Discount supermarket',
+      'keep_reasonable': 'Local supermarket',
+      'not_a_concern': 'Premium grocery store'
     };
 
     return recommendations[country]?.[effectiveBudget] || defaultRecommendations[effectiveBudget] || 'Local supermarket';
@@ -232,54 +223,312 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     setFormData({ ...formData, groceryStore: "I don't care, pick for me" });
   };
 
+  const getCurrencySymbol = (countryCode: string): string => {
+    const currencyMap: Record<string, string> = {
+      // North America
+      'US': '$',
+      'CA': 'CAD$',
+      'MX': 'MX$',
+      
+      // Europe
+      'GB': '£',
+      'IE': '€',
+      'DE': '€',
+      'FR': '€',
+      'ES': '€',
+      'IT': '€',
+      'NL': '€',
+      'BE': '€',
+      'AT': '€',
+      'PT': '€',
+      'FI': '€',
+      'GR': '€',
+      'LU': '€',
+      'MT': '€',
+      'CY': '€',
+      'EE': '€',
+      'LV': '€',
+      'LT': '€',
+      'SK': '€',
+      'SI': '€',
+      'CH': 'CHF',
+      'NO': 'NOK',
+      'SE': 'SEK',
+      'DK': 'DKK',
+      'IS': 'ISK',
+      'PL': 'zł',
+      'CZ': 'Kč',
+      'HU': 'Ft',
+      'HR': 'kn',
+      'RO': 'lei',
+      'BG': 'лв',
+      'RS': 'din',
+      'UA': '₴',
+      'RU': '₽',
+      'TR': '₺',
+      'BY': 'Br',
+      'MD': 'lei',
+      'AL': 'lek',
+      'BA': 'KM',
+      'MK': 'den',
+      'ME': '€',
+      'XK': '€',
+      
+      // Oceania
+      'AU': 'AU$',
+      'NZ': 'NZ$',
+      'FJ': 'FJ$',
+      'PG': 'K',
+      'SB': 'SI$',
+      'VU': 'VT',
+      'NC': 'XPF',
+      'PF': 'XPF',
+      'WS': 'ST',
+      'TO': 'TOP',
+      'TV': 'AU$',
+      'NR': 'AU$',
+      'KI': 'AU$',
+      'MH': '$',
+      'FM': '$',
+      'PW': '$',
+      
+      // Asia
+      'JP': '¥',
+      'CN': '¥',
+      'KR': '₩',
+      'IN': '₹',
+      'ID': 'Rp',
+      'TH': '฿',
+      'VN': '₫',
+      'MY': 'RM',
+      'SG': 'S$',
+      'PH': '₱',
+      'HK': 'HK$',
+      'TW': 'NT$',
+      'MO': 'MOP',
+      'BD': '৳',
+      'LK': 'Rs',
+      'PK': 'Rs',
+      'NP': 'Rs',
+      'BT': 'Nu',
+      'MM': 'K',
+      'KH': '៛',
+      'LA': '₭',
+      'MN': '₮',
+      'KZ': '₸',
+      'UZ': 'soʻm',
+      'KG': 'som',
+      'TJ': 'SM',
+      'TM': 'TMT',
+      'AF': '؋',
+      'IR': '﷼',
+      'AE': 'AED',
+      'SA': 'SR',
+      'QA': 'QR',
+      'KW': 'KD',
+      'BH': 'BD',
+      'OM': 'OR',
+      'YE': '﷼',
+      'JO': 'JD',
+      'LB': 'L£',
+      'SY': '£',
+      'IQ': 'ID',
+      'IL': '₪',
+      'PS': '₪',
+      'GE': '₾',
+      'AM': '֏',
+      'AZ': '₼',
+      
+      // Africa
+      'ZA': 'R',
+      'EG': 'E£',
+      'NG': '₦',
+      'KE': 'KSh',
+      'UG': 'USh',
+      'TZ': 'TSh',
+      'RW': 'RF',
+      'ET': 'Br',
+      'GH': 'GH₵',
+      'SN': 'CFA',
+      'CI': 'CFA',
+      'BF': 'CFA',
+      'ML': 'CFA',
+      'NE': 'CFA',
+      'TD': 'CFA',
+      'CF': 'CFA',
+      'CM': 'CFA',
+      'GA': 'CFA',
+      'CG': 'CFA',
+      'GQ': 'CFA',
+      'MA': 'MAD',
+      'DZ': 'DA',
+      'TN': 'DT',
+      'LY': 'LD',
+      'SD': 'SDG',
+      'SS': 'SSP',
+      'ZW': 'ZW$',
+      'BW': 'P',
+      'NA': 'N$',
+      'SZ': 'E',
+      'LS': 'L',
+      'MZ': 'MT',
+      'ZM': 'ZK',
+      'MW': 'MK',
+      'AO': 'Kz',
+      'MG': 'Ar',
+      'MU': 'Rs',
+      'SC': 'Rs',
+      'KM': 'CF',
+      'DJ': 'Fdj',
+      'SO': 'Sh',
+      'ER': 'Nfk',
+      'LR': 'L$',
+      'SL': 'Le',
+      'GN': 'GNF',
+      'GW': 'CFA',
+      'CV': 'Esc',
+      'ST': 'Db',
+      'LY': 'LD',
+      'TG': 'CFA',
+      'BJ': 'CFA',
+      
+      // South America
+      'BR': 'R$',
+      'AR': 'AR$',
+      'CL': 'CL$',
+      'CO': 'CO$',
+      'PE': 'S/',
+      'VE': 'Bs',
+      'EC': '$',
+      'UY': 'UY$',
+      'PY': '₲',
+      'BO': 'Bs',
+      'GY': 'GY$',
+      'SR': 'Sr$',
+      'FK': '£',
+      'GF': '€',
+      
+      // Central America & Caribbean
+      'GT': 'Q',
+      'BZ': 'BZ$',
+      'SV': '$',
+      'HN': 'L',
+      'NI': 'C$',
+      'CR': '₡',
+      'PA': 'B/',
+      'CU': 'CUP',
+      'JM': 'J$',
+      'HT': 'G',
+      'DO': 'RD$',
+      'TT': 'TT$',
+      'BB': 'Bds$',
+      'LC': 'EC$',
+      'VC': 'EC$',
+      'GD': 'EC$',
+      'AG': 'EC$',
+      'DM': 'EC$',
+      'KN': 'EC$',
+      'BS': 'B$',
+      'CW': 'ƒ',
+      'AW': 'ƒ',
+      'SX': 'ƒ',
+      'BM': 'BD$',
+      'KY': 'CI$',
+      'TC': '$',
+      'VG': '$',
+      'VI': '$',
+      'PR': '$',
+      'AI': 'EC$',
+      'MS': 'EC$',
+      'GP': '€',
+      'MQ': '€',
+      
+      // Special territories and other regions
+      'AQ': '$', // Antarctica (no official currency, fallback to USD)
+      'BV': 'NOK', // Bouvet Island (Norway)
+      'HM': 'AU$', // Heard & McDonald Islands (Australia)
+      'TF': '€', // French Southern Territories
+      'GS': '£', // South Georgia & South Sandwich Islands
+      'IO': '$', // British Indian Ocean Territory
+      'UM': '$', // US Minor Outlying Islands
+      'SH': '£', // Saint Helena
+      'PN': 'NZ$', // Pitcairn Islands
+      'NU': 'NZ$', // Niue
+      'CK': 'NZ$', // Cook Islands
+      'WF': 'XPF', // Wallis and Futuna
+      'BL': '€', // Saint Barthélemy
+      'MF': '€', // Saint Martin
+      'PM': '€', // Saint Pierre and Miquelon
+      'YT': '€', // Mayotte
+      'RE': '€', // Réunion
+      'GG': '£', // Guernsey
+      'JE': '£', // Jersey
+      'IM': '£', // Isle of Man
+      'FO': 'DKK', // Faroe Islands
+      'GL': 'DKK', // Greenland
+      'SJ': 'NOK', // Svalbard and Jan Mayen
+      'AS': '$', // American Samoa
+      'GU': '$', // Guam
+      'MP': '$', // Northern Mariana Islands
+      'VA': '€', // Vatican City
+      'SM': '€', // San Marino
+      'AD': '€', // Andorra
+      'LI': 'CHF', // Liechtenstein
+      'MC': '€', // Monaco
+      
+      // Missing countries found in triple-check
+      'AX': '€', // Åland Islands (Finland)
+      'BI': 'FBu', // Burundi
+      'BN': 'B$', // Brunei
+      'BQ': '$', // Caribbean Netherlands
+      'CC': 'AU$', // Cocos Islands (Australia)
+      'CD': 'FC', // Democratic Republic of Congo
+      'CX': 'AU$', // Christmas Island (Australia)
+      'EH': 'MAD', // Western Sahara (Morocco)
+      'GI': '£', // Gibraltar (UK)
+      'GM': 'D', // Gambia
+      'KP': '₩', // North Korea
+      'MR': 'UM', // Mauritania
+      'MV': 'Rf', // Maldives
+      'NF': 'AU$', // Norfolk Island (Australia)
+      'TK': 'NZ$', // Tokelau (New Zealand)
+      'TL': '$', // Timor-Leste (uses USD)
+    };
+    return currencyMap[countryCode] || '$';
+  };
+
   const budgetOptions = [
     {
-      id: 'custom',
-      title: 'Custom Amount',
-      subtitle: 'Enter your exact budget',
-      icon: 'create-outline',
-      accentColor: '#3b82f6',
-      description: 'Specify your weekly grocery budget'
+      id: 'not_a_concern',
+      title: 'Not a concern',
+      subtitle: 'Quality and convenience first',
+      icon: 'diamond-outline',
+      accentColor: '#ef4444',
+      description: "I'll spend whatever it takes for quality and convenience"
     },
     {
-      id: 'very_tight',
-      title: 'Very Tight Budget',
-      subtitle: 'Every dollar counts',
-      icon: 'water-outline',
-      accentColor: '#71717a',
-      description: 'Rice, beans, pasta, frozen veggies, bulk items'
-    },
-    {
-      id: 'budget_conscious',
-      title: 'Budget Conscious', 
-      subtitle: 'Smart shopping',
-      icon: 'leaf-outline',
-      accentColor: '#22c55e',
-      description: 'Chicken thighs, canned tuna, seasonal produce, store brands'
-    },
-    {
-      id: 'moderate',
-      title: 'Moderate Spending',
-      subtitle: 'Balanced choices',
+      id: 'keep_reasonable',
+      title: 'Keep it reasonable',
+      subtitle: 'Balance cost and quality',
       icon: 'scale-outline',
       accentColor: '#f59e0b',
-      description: 'Mix of fresh & frozen, some premium proteins, variety'
+      description: "Don't overspend, but don't sacrifice quality"
     },
     {
-      id: 'comfortable',
-      title: 'Comfortable Budget',
-      subtitle: 'Quality focused',
-      icon: 'diamond-outline',
-      accentColor: '#8b5cf6',
-      description: 'Organic options, fresh fish, quality meats, specialty items'
+      id: 'important',
+      title: 'Important',
+      subtitle: 'Need to keep costs down',
+      icon: 'leaf-outline',
+      accentColor: '#22c55e',
+      description: 'I need to keep costs down where possible'
     },
     {
-      id: 'unlimited',
-      title: 'Money No Object',
-      subtitle: 'Premium everything',
-      icon: 'star-outline',
-      accentColor: '#ef4444',
-      description: 'Best quality, dining out, premium supplements, anything goes'
+      id: 'critical',
+      title: 'Critical',
+      subtitle: 'Absolute minimum spend',
+      icon: 'water-outline',
+      accentColor: '#71717a',
+      description: 'Money is tight, absolute minimum spend'
     }
   ];
 
@@ -367,7 +616,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
           style={styles.content}
         >
           <Text style={[styles.stepTitle, { color: colors.primary }]}>
-            What's Your Grocery Budget?
+            How important is keeping grocery costs low?
           </Text>
           
           <View style={styles.optionsContainer}>
@@ -387,51 +636,11 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   ]}
                   onPress={() => setFormData({ 
                     ...formData, 
-                    weeklyBudget: formData.weeklyBudget === option.id ? '' : option.id,
-                    customBudgetAmount: formData.weeklyBudget === option.id ? '' : formData.customBudgetAmount
+                    weeklyBudget: formData.weeklyBudget === option.id ? '' : option.id
                   })}
                   activeOpacity={0.8}
                 >
-                  {option.id === 'custom' && formData.weeklyBudget === 'custom' ? (
-                    // Custom input version of the card
-                    <View style={styles.budgetCardContent}>
-                      <View style={[styles.budgetIconContainer, { backgroundColor: `${option.accentColor}20` }]}>
-                        <Ionicons 
-                          name={option.icon as any} 
-                          size={28} 
-                          color={option.accentColor} 
-                        />
-                      </View>
-                      
-                      <View style={styles.budgetTextContainer}>
-                        <Text style={[styles.budgetTitle, { color: '#ffffff' }]}>
-                          {option.title}
-                        </Text>
-                        <View style={styles.inlineCustomBudgetContainer}>
-                          <Text style={styles.inlineCurrencySymbol}>$</Text>
-                          <TextInput
-                            style={styles.inlineCustomBudgetInput}
-                            value={formData.customBudgetAmount}
-                            onChangeText={(text) => setFormData({ 
-                              ...formData, 
-                              customBudgetAmount: text.replace(/[^0-9]/g, '') 
-                            })}
-                            placeholder="150"
-                            placeholderTextColor="#71717a"
-                            keyboardType="numeric"
-                            autoFocus
-                          />
-                          <Text style={styles.inlineBudgetFrequency}>per week</Text>
-                        </View>
-                      </View>
-                      
-                      <View style={styles.budgetSelectIndicator}>
-                        <Ionicons name="radio-button-on" size={24} color={option.accentColor} />
-                      </View>
-                    </View>
-                  ) : (
-                    // Normal card version
-                    <View style={styles.budgetCardContent}>
+                  <View style={styles.budgetCardContent}>
                       <View style={[styles.budgetIconContainer, { backgroundColor: `${option.accentColor}20` }]}>
                         <Ionicons 
                           name={option.icon as any} 
@@ -460,7 +669,6 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                         )}
                       </View>
                     </View>
-                  )}
                   
                   {formData.weeklyBudget === option.id && (
                     <View style={[styles.budgetSelectedBorder, { backgroundColor: option.accentColor }]} />
@@ -473,6 +681,105 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
         </Animatable.View>
       </ScrollView>
     </View>
+  );
+
+  const renderBudgetRangeStep = () => (
+    <KeyboardAvoidingView 
+      style={styles.stepContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[styles.header, { borderBottomColor: colors.primaryAlpha20 }]}>
+          <View style={styles.progressContainer}>
+            <View style={styles.stepIndicator}>
+              <Text style={[styles.stepNumber, { color: colors.primary }]}>
+                {currentStep + 1}
+              </Text>
+              <Text style={styles.stepTotal}>/{totalSteps}</Text>
+            </View>
+            
+            <View style={[styles.progressTrack, { backgroundColor: colors.primaryAlpha20 }]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { 
+                    width: `${((currentStep + 1) / totalSteps) * 100}%`,
+                    backgroundColor: colors.primary 
+                  }
+                ]}
+              />
+            </View>
+          </View>
+        </View>
+        
+        <Animatable.View
+          animation="fadeInUp"
+          delay={200}
+          style={styles.content}
+        >
+          <Text style={[styles.stepTitle, { color: colors.primary }]}>
+            Do you have a weekly grocery budget in mind?
+          </Text>
+          <Text style={styles.stepSubtitle}>
+            Optional — this helps create realistic meal plans
+          </Text>
+          
+          <View style={styles.budgetRangeContainer}>
+            <View style={styles.budgetInputsRow}>
+              <View style={styles.budgetInputGroup}>
+                <Text style={styles.budgetInputLabel}>From {getCurrencySymbol(formData.countryCode)}</Text>
+                <TextInput
+                  style={[styles.budgetInput, { borderColor: colors.primaryAlpha20 }]}
+                  value={formData.budgetMin}
+                  onChangeText={(text) => setFormData({ ...formData, budgetMin: text.replace(/[^0-9]/g, '') })}
+                  placeholder="0"
+                  placeholderTextColor="#666666"
+                  keyboardType="numeric"
+                  maxLength={4}
+                />
+              </View>
+              
+              <View style={styles.budgetInputGroup}>
+                <Text style={styles.budgetInputLabel}>To {getCurrencySymbol(formData.countryCode)}</Text>
+                <TextInput
+                  style={[styles.budgetInput, { borderColor: colors.primaryAlpha20 }]}
+                  value={formData.budgetMax}
+                  onChangeText={(text) => setFormData({ ...formData, budgetMax: text.replace(/[^0-9]/g, '') })}
+                  placeholder="0"
+                  placeholderTextColor="#666666"
+                  keyboardType="numeric"
+                  maxLength={4}
+                />
+              </View>
+            </View>
+            
+            <TouchableOpacity
+              style={[styles.skipBudgetButton, { borderColor: colors.primaryAlpha20 }]}
+              onPress={() => {
+                setFormData({ 
+                  ...formData, 
+                  budgetSkipped: true,
+                  budgetMin: '',
+                  budgetMax: ''
+                });
+                nextStep();
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+              <Text style={[styles.skipBudgetText, { color: colors.primary }]}>
+                Skip — I'm not sure
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animatable.View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 
   const renderLocationStep = () => (
@@ -1401,15 +1708,33 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                 animation="fadeInLeft"
                 delay={700}
               >
-                <Text style={styles.tronDataLabel}>Weekly Budget</Text>
+                <Text style={styles.tronDataLabel}>Budget Attitude</Text>
                 <Text style={[styles.tronDataValue, { color: colors.primary }]}>
-                  ${formData.weeklyBudget}
+                  {formData.weeklyBudget}
                 </Text>
               </Animatable.View>
+              {!formData.budgetSkipped && (formData.budgetMin || formData.budgetMax) && (
+                <Animatable.View 
+                  style={styles.tronDataRow}
+                  animation="fadeInLeft"
+                  delay={750}
+                >
+                  <Text style={styles.tronDataLabel}>Weekly Budget</Text>
+                  <Text style={[styles.tronDataValue, { color: colors.primary }]}>
+                    {formData.budgetMin && formData.budgetMax ? (
+                      `${getCurrencySymbol(formData.countryCode)}${formData.budgetMin}-${formData.budgetMax}`
+                    ) : formData.budgetMax && !formData.budgetMin ? (
+                      `Max ${getCurrencySymbol(formData.countryCode)}${formData.budgetMax}`
+                    ) : formData.budgetMin && !formData.budgetMax ? (
+                      `Min ${getCurrencySymbol(formData.countryCode)}${formData.budgetMin}`
+                    ) : ''}
+                  </Text>
+                </Animatable.View>
+              )}
               <Animatable.View 
                 style={styles.tronDataRow}
                 animation="fadeInLeft"
-                delay={750}
+                delay={800}
               >
                 <Text style={styles.tronDataLabel}>Location</Text>
                 <Text style={[styles.tronDataValue, { color: colors.primary }]}>
@@ -1419,7 +1744,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               <Animatable.View 
                 style={styles.tronDataRow}
                 animation="fadeInLeft"
-                delay={800}
+                delay={850}
               >
                 <Text style={styles.tronDataLabel}>Grocery Store</Text>
                 <Text style={[styles.tronDataValue, { color: colors.primary }]}>
@@ -1429,7 +1754,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               <Animatable.View 
                 style={styles.tronDataRow}
                 animation="fadeInLeft"
-                delay={850}
+                delay={900}
               >
                 <Text style={styles.tronDataLabel}>Plan Duration</Text>
                 <Text style={[styles.tronDataValue, { color: colors.primary }]}>
@@ -2167,13 +2492,14 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     
     // Otherwise render the current step
     switch (currentStep) {
-      case 0: return renderBudgetStep();
-      case 1: return renderLocationStep(); 
-      case 2: return renderKitchenPersonalityStep();
-      case 3: return renderFoodPreferencesStep(); // This is now the new Eating Patterns step
-      case 4: return renderMealPlanDurationStep();
-      case 5: return renderMealPreferencesStep();
-      case 6: return renderCookingEquipmentStep();
+      case 0: return renderLocationStep();
+      case 1: return renderBudgetStep();
+      case 2: return renderBudgetRangeStep(); 
+      case 3: return renderKitchenPersonalityStep();
+      case 4: return renderFoodPreferencesStep(); // This is now the new Eating Patterns step
+      case 5: return renderMealPlanDurationStep();
+      case 6: return renderMealPreferencesStep();
+      case 7: return renderCookingEquipmentStep();
       default: return renderBudgetStep();
     }
   };
@@ -2186,15 +2512,16 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
 
     const isStepValid = () => {
       switch (currentStep) {
-        case 0: return formData.weeklyBudget && (formData.weeklyBudget !== 'custom' || (formData.customBudgetAmount && formData.customBudgetAmount.trim()));
-        case 1: return formData.country && formData.city;
-        case 2: return formData.planningStyle > 0 && formData.cookingEnjoyment > 0 && 
+        case 0: return formData.country && formData.city;
+        case 1: return formData.weeklyBudget;
+        case 2: return true; // Budget range is optional
+        case 3: return formData.planningStyle > 0 && formData.cookingEnjoyment > 0 && 
                        formData.timeInvestment > 0 && formData.varietySeeking > 0 && 
                        formData.skillConfidence > 0;
-        case 3: return true; // Eating patterns are optional
-        case 4: return formData.planDuration > 0; // Duration must be selected
-        case 5: return formData.mealPreferences !== ''; // Meal preferences must be selected
-        case 6: return formData.cookingEquipment.length > 0; // At least one piece of equipment selected
+        case 4: return true; // Eating patterns are optional
+        case 5: return formData.planDuration > 0; // Duration must be selected
+        case 6: return formData.mealPreferences !== ''; // Meal preferences must be selected
+        case 7: return formData.cookingEquipment.length > 0; // At least one piece of equipment selected
         default: return false;
       }
     };
@@ -3233,6 +3560,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#71717a',
+  },
+  // Budget Range Styles
+  budgetRangeContainer: {
+    marginTop: 32,
+  },
+  budgetInputsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 24,
+  },
+  budgetInputGroup: {
+    flex: 1,
+  },
+  budgetInputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  budgetInput: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  skipBudgetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  skipBudgetText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

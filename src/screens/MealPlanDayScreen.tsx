@@ -8,6 +8,8 @@ import {
   TextInput,
   Alert,
   SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import {Picker} from '@react-native-picker/picker';
@@ -19,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
+import { useMealPlanning } from '../contexts/MealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMeal } from '../types/nutrition';
 
@@ -81,16 +84,17 @@ function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor,
 
       {/* Calories and Macros in one clean row */}
       <View style={styles.nutritionRow}>
-        {meal.calories && (
-          <Text style={[styles.caloriesText, { color: mealColor }]}>{meal.calories} cal</Text>
-        )}
-        {meal.macros && (
-          <View style={styles.macrosInline}>
-            <Text style={styles.macroInlineText}>P: {Math.round(meal.macros.protein)}g</Text>
-            <Text style={styles.macroInlineText}>C: {Math.round(meal.macros.carbs)}g</Text>
-            <Text style={styles.macroInlineText}>F: {Math.round(meal.macros.fat)}g</Text>
-          </View>
-        )}
+        {/* Always show calories, even if 0 */}
+        <Text style={[styles.caloriesText, { color: mealColor }]}>
+          {(meal.calories && typeof meal.calories === 'number' ? meal.calories : 0)} cal
+        </Text>
+        
+        {/* Always show macros, even if 0 */}
+        <View style={styles.macrosInline}>
+          <Text style={styles.macroInlineText}>P: {Math.round((meal.macros?.protein || meal.nutritionInfo?.protein || 0))}g</Text>
+          <Text style={styles.macroInlineText}>C: {Math.round((meal.macros?.carbs || meal.nutritionInfo?.carbs || meal.nutritionInfo?.carbohydrates || 0))}g</Text>
+          <Text style={styles.macroInlineText}>F: {Math.round((meal.macros?.fat || meal.nutritionInfo?.fat || 0))}g</Text>
+        </View>
       </View>
 
     </TouchableOpacity>
@@ -108,6 +112,9 @@ export default function MealPlanDayScreen() {
     migrateLegacyPlan,
     currentPlan 
   } = useSimplifiedMealPlanning();
+  
+  const { getFavoriteMeals } = useMealPlanning();
+  const favoriteMeals = getFavoriteMeals();
 
   const { day, weekNumber, mealPlanName, dayIndex, calculatedDayName, calculatedDateString } = route.params;
   const [allMeals, setAllMeals] = useState(day.meals || []);
@@ -184,11 +191,37 @@ export default function MealPlanDayScreen() {
 
   const loadCurrentDayMeals = useCallback(() => {
     try {
-      console.log('🔍 Loading meals for day via context');
+      console.log('🔍 MealPlanDayScreen: Loading meals for day via context');
+      console.log('🔍 MealPlanDayScreen: Route params:', {
+        dayName: calculatedDayName,
+        originalDayName: day.day_name,
+        dayDate: day.date,
+        calculatedDateString,
+        dayIndex,
+        weekNumber,
+        mealPlanName
+      });
       
-      // Get the viewing date - prioritize calculatedDateString from navigation
-      const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
-      console.log(`📅 Loading: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
+      // NEW APPROACH: Map dayIndex to actual plan dates
+      let currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+      
+      // If we have a currentPlan, map the dayIndex to the correct date from the plan
+      if (currentPlan && typeof dayIndex === 'number') {
+        const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+        if (dayIndex >= 0 && dayIndex < availableDates.length) {
+          currentViewingDate = availableDates[dayIndex];
+          console.log(`📅 MealPlanDayScreen: Mapped dayIndex ${dayIndex} to plan date ${currentViewingDate}`);
+        }
+      }
+      
+      console.log(`📅 MealPlanDayScreen: Date calculation:`, {
+        calculatedDateString,
+        dayDate: day.date,
+        parsedDayName: parseDayNameToDate(day.day_name),
+        dayIndex,
+        availableDatesFromPlan: currentPlan ? Object.keys(currentPlan.dailyMeals).sort() : [],
+        finalViewingDate: currentViewingDate
+      });
       
       if (!currentViewingDate) {
         console.log('⚠️ No viewing date available, using original meals');
@@ -238,6 +271,8 @@ export default function MealPlanDayScreen() {
   const [addMealType, setAddMealType] = useState<'manual' | 'favorite' | null>(null);
   const [selectedFavoriteMeal, setSelectedFavoriteMeal] = useState<any>(null);
   const [newMealName, setNewMealName] = useState('');
+  const [newMealType, setNewMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | 'custom'>('snack');
+  const [customMealType, setCustomMealType] = useState('');
   const [newMealTime, setNewMealTime] = useState('');
   const [selectedHour, setSelectedHour] = useState(12);
   const [selectedMinute, setSelectedMinute] = useState(0);
@@ -270,12 +305,29 @@ export default function MealPlanDayScreen() {
       }
       
       // Use simplified context method for addition
+      // Handle both direct meal properties and favorite meal structure
+      const calories = meal.calories || meal.nutritionInfo?.calories || 0;
+      
+      // Extract macros properly from nutritionInfo structure
+      const macros = meal.macros || {
+        protein: meal.nutritionInfo?.protein || 0,
+        carbs: meal.nutritionInfo?.carbs || 0,
+        fat: meal.nutritionInfo?.fat || 0
+      };
+      
+      console.log('🍽️ Adding meal with nutrition:', {
+        name: meal.name,
+        calories: calories,
+        macros: macros,
+        originalMeal: meal
+      });
+      
       const success = await addMealToDate(viewingDate, {
         name: meal.name,
         type: meal.type || 'snack',
         time: time,
-        calories: meal.calories || 0,
-        macros: meal.macros || { protein: 0, carbs: 0, fat: 0 },
+        calories: calories,
+        macros: macros,
         ingredients: meal.ingredients || [],
         instructions: meal.instructions || [],
         tags: meal.tags || [],
@@ -340,6 +392,45 @@ export default function MealPlanDayScreen() {
   };
 
   const dayDateString = getDayDateString();
+
+  // Function to clean up invalid date entries
+  const cleanupInvalidDates = async () => {
+    try {
+      if (!currentPlan) return;
+      
+      console.log('🧹 Cleaning up invalid date entries...');
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const validDates: { [key: string]: SimplifiedMealPlanDay } = {};
+      
+      // Filter out invalid date entries
+      Object.entries(currentPlan.dailyMeals).forEach(([date, dayData]) => {
+        if (dateRegex.test(date)) {
+          validDates[date] = dayData;
+        } else {
+          console.log(`🗑️ Removing invalid date entry: ${date}`);
+        }
+      });
+      
+      // Update the plan with only valid dates
+      const cleanedPlan = {
+        ...currentPlan,
+        dailyMeals: validDates
+      };
+      
+      // Save the cleaned plan
+      await AsyncStorage.setItem(NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLAN, JSON.stringify(cleanedPlan));
+      
+      // Update context state
+      const success = await migrateLegacyPlan(cleanedPlan);
+      if (success) {
+        console.log('✅ Successfully cleaned up invalid date entries');
+        Alert.alert('Success', 'Invalid date entries have been cleaned up');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error cleaning up invalid dates:', error);
+    }
+  };
 
   // Debug function to gather all relevant data
   const generateDebugInfo = async () => {
@@ -423,9 +514,19 @@ export default function MealPlanDayScreen() {
     try {
       console.log('🗑️ Attempting to delete meal via context:', meal.name);
       
-      // Get the viewing date - prioritize calculatedDateString from navigation
-      const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
-      console.log(`📅 Loading: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
+      // Use the same date mapping logic as loadCurrentDayMeals
+      let currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+      
+      // Map dayIndex to actual plan dates (same as display logic)
+      if (currentPlan && typeof dayIndex === 'number') {
+        const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+        if (dayIndex >= 0 && dayIndex < availableDates.length) {
+          currentViewingDate = availableDates[dayIndex];
+          console.log(`🗑️ Deletion: Mapped dayIndex ${dayIndex} to plan date ${currentViewingDate}`);
+        }
+      }
+      
+      console.log(`📅 Deletion: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
       
       if (!currentViewingDate) {
         Alert.alert('Error', 'Could not determine the day date for deletion.');
@@ -483,7 +584,7 @@ export default function MealPlanDayScreen() {
   };
 
   // Handle action sheet actions
-  const handleActionSheetAction = async (action: 'complete' | 'delete' | 'cancel') => {
+  const handleActionSheetAction = async (action: 'complete' | 'edit' | 'delete' | 'cancel') => {
     if (!selectedMeal) return;
 
     setShowActionSheet(false);
@@ -503,6 +604,49 @@ export default function MealPlanDayScreen() {
         console.error('Failed to toggle meal completion:', error);
       }
       setSelectedMeal(null);
+    } else if (action === 'edit') {
+      // Navigate to edit screen
+      try {
+        console.log('🔄 Screen: Editing meal...', selectedMeal.meal.name);
+        
+        // Convert meal to the format expected by ManualMealEntryScreen
+        const mealToEdit = {
+          id: selectedMeal.meal.id,
+          name: selectedMeal.meal.name,
+          type: selectedMeal.meal.type,
+          time: selectedMeal.meal.time,
+          calories: selectedMeal.meal.calories,
+          // Include both formats for nutrition data
+          protein: selectedMeal.meal.macros?.protein || 0,
+          carbs: selectedMeal.meal.macros?.carbs || 0,
+          fat: selectedMeal.meal.macros?.fat || 0,
+          macros: {
+            protein: selectedMeal.meal.macros?.protein || 0,
+            carbs: selectedMeal.meal.macros?.carbs || 0,
+            fat: selectedMeal.meal.macros?.fat || 0,
+          },
+          // Include both formats for timing data
+          prepTime: selectedMeal.meal.prep_time || 0,
+          prep_time: selectedMeal.meal.prep_time || 0,
+          cookTime: selectedMeal.meal.cook_time || 0,
+          cook_time: selectedMeal.meal.cook_time || 0,
+          servings: selectedMeal.meal.servings || 1,
+          ingredients: selectedMeal.meal.ingredients || [],
+          instructions: selectedMeal.meal.instructions || []
+        };
+        
+        // Navigate to ManualMealEntryScreen with edit data
+        navigation.navigate('ManualMealEntry', { 
+          editMeal: mealToEdit,
+          isEditing: true
+        });
+        
+        setSelectedMeal(null);
+      } catch (error) {
+        console.error('Failed to navigate to edit screen:', error);
+        Alert.alert('Error', 'Failed to open edit screen.');
+        setSelectedMeal(null);
+      }
     } else if (action === 'delete') {
       // Show delete confirmation modal
       setShowDeleteModal(true);
@@ -610,16 +754,28 @@ export default function MealPlanDayScreen() {
       case 'lunch': return '#06b6d4';
       case 'dinner': return '#8b5cf6';
       case 'snack': return '#10b981';
-      default: return '#71717a';
+      default: return '#ff6b6b'; // Bright red/coral for custom meal types
     }
   };
 
   const handleMealPress = (meal: Meal) => {
+    // Calculate the current viewing date using the same logic as loadCurrentDayMeals
+    let currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+    
+    // Map dayIndex to actual plan dates (same as display logic)
+    if (currentPlan && typeof dayIndex === 'number') {
+      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+      if (dayIndex >= 0 && dayIndex < availableDates.length) {
+        currentViewingDate = availableDates[dayIndex];
+      }
+    }
+    
     navigation.navigate('MealPlanMealDetail', {
       meal,
       dayName: calculatedDayName,
       weekNumber,
       mealPlanName,
+      dateString: currentViewingDate, // Add the date for refreshing
     });
   };
 
@@ -680,15 +836,6 @@ export default function MealPlanDayScreen() {
             <Text style={styles.dayTitle}>{calculatedDayName.split(',')[0]}</Text>
             <Text style={styles.dateSubtitle}>{getDayDate().split(' ').slice(1).join(' ')}</Text>
           </View>
-          {/* Debug button - Development only */}
-          {__DEV__ && (
-            <TouchableOpacity 
-              onPress={generateDebugInfo} 
-              style={[styles.addButton, { backgroundColor: '#ef4444', marginRight: 8 }]}
-            >
-              <Ionicons name="bug" size={18} color="#ffffff" />
-            </TouchableOpacity>
-          )}
           <TouchableOpacity 
             onPress={() => setShowAddMealModal(true)} 
             style={styles.addButton}
@@ -829,9 +976,14 @@ export default function MealPlanDayScreen() {
             <View style={styles.navSpacer} />
           </View>
 
-          <ScrollView 
-            style={styles.scrollContent}
-            contentContainerStyle={styles.contentContainer}
+          <KeyboardAvoidingView 
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          >
+            <ScrollView 
+              style={styles.scrollContent}
+              contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
@@ -963,6 +1115,15 @@ export default function MealPlanDayScreen() {
                   }}
                   onPress={async () => {
                     if (selectedFavoriteMeal && newMealTime.trim()) {
+                      console.log('🔍 About to add favorite meal:', {
+                        mealName: selectedFavoriteMeal.meal.name,
+                        mealStructure: selectedFavoriteMeal.meal,
+                        hasCalories: !!selectedFavoriteMeal.meal.calories,
+                        hasMacros: !!selectedFavoriteMeal.meal.macros,
+                        hasNutritionInfo: !!selectedFavoriteMeal.meal.nutritionInfo,
+                        time: newMealTime
+                      });
+                      
                       const success = await addMealToToday(selectedFavoriteMeal.meal, newMealTime);
                       if (success) {
                         Alert.alert('Success', `Added "${selectedFavoriteMeal.meal.name}" to your timeline!`);
@@ -1002,9 +1163,45 @@ export default function MealPlanDayScreen() {
                   />
                 </View>
 
+                {/* Meal Type Selection */}
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.fieldLabel}>Type</Text>
+                  <View style={styles.mealTypeSelection}>
+                    {(['breakfast', 'lunch', 'dinner', 'snack', 'custom'] as const).map((type) => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[
+                          styles.mealTypeButton,
+                          newMealType === type && { backgroundColor: themeColor }
+                        ]}
+                        onPress={() => setNewMealType(type)}
+                      >
+                        <Text style={[
+                          styles.mealTypeButtonText,
+                          newMealType === type && { color: '#ffffff' }
+                        ]}>
+                          {type === 'custom' ? 'Custom' : type}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  {/* Custom Type Input */}
+                  {newMealType === 'custom' && (
+                    <TextInput
+                      style={[styles.inputField, { marginTop: 8 }]}
+                      placeholder="e.g., Lunch x2, Post-workout, Late dinner"
+                      placeholderTextColor="#6b7280"
+                      value={customMealType}
+                      onChangeText={setCustomMealType}
+                      autoCapitalize="words"
+                    />
+                  )}
+                </View>
+
                 {/* Time Picker */}
                 <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>Time *</Text>
+                  <Text style={styles.fieldLabel}>Time</Text>
                   <TouchableOpacity
                     style={styles.timePickerButton}
                     onPress={() => setShowTimePicker(true)}
@@ -1018,7 +1215,7 @@ export default function MealPlanDayScreen() {
 
                 {/* Calories */}
                 <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>Calories *</Text>
+                  <Text style={styles.fieldLabel}>Calories</Text>
                   <TextInput
                     style={styles.inputField}
                     placeholder="e.g., 300"
@@ -1070,27 +1267,69 @@ export default function MealPlanDayScreen() {
                 <TouchableOpacity 
                   style={[
                     styles.addMealButton,
-                    { backgroundColor: themeColor },
-                    (!newMealName.trim() || !newMealTime.trim() || !newMealCalories.trim()) && styles.addMealButtonDisabled
+                    { backgroundColor: themeColor }
                   ]}
-                  onPress={() => {
-                    if (newMealName.trim() && newMealTime.trim() && newMealCalories.trim()) {
-                      Alert.alert('Success', 'Manual meal added successfully!');
-                      setShowAddMealModal(false);
-                      setAddMealType(null);
-                      setNewMealName('');
-                      setNewMealTime('');
-                      setSelectedHour(12);
-                setSelectedMinute(0);
-                setSelectedPeriod('PM');
-                      setShowTimePicker(false);
-                      setNewMealCalories('');
-                      setNewMealProtein('');
-                      setNewMealCarbs('');
-                      setNewMealFat('');
+                  onPress={async () => {
+                    if (newMealName.trim()) {
+                      // Create the meal object
+                      const newMeal = {
+                        name: newMealName.trim(),
+                        type: newMealType === 'custom' ? customMealType.trim() || 'custom' : newMealType,
+                        time: newMealTime || '', // Optional - can be empty
+                        calories: parseInt(newMealCalories) || 0,
+                        macros: {
+                          protein: parseInt(newMealProtein) || 0,
+                          carbs: parseInt(newMealCarbs) || 0,
+                          fat: parseInt(newMealFat) || 0,
+                        },
+                        ingredients: [],
+                        instructions: [],
+                        tags: [],
+                        isOriginal: false,
+                        addedAt: new Date().toISOString(),
+                      };
+                      
+                      // Simple approach: Extract the same date the screen is currently viewing
+                      // This is the date that loadCurrentDayMeals successfully found meals for
+                      let targetDate = calculatedDateString || day.date;
+                      
+                      // Map dayIndex to plan dates if we have currentPlan
+                      if (currentPlan && typeof dayIndex === 'number') {
+                        const availableDates = Object.keys(currentPlan.dailyMeals).sort();
+                        if (dayIndex >= 0 && dayIndex < availableDates.length) {
+                          targetDate = availableDates[dayIndex];
+                        }
+                      }
+                      
+                      console.log(`📅 Adding manual meal to: ${targetDate}`);
+                      const success = await addMealToDate(targetDate, newMeal);
+                      
+                      if (success) {
+                        Alert.alert('Success', 'Manual meal added successfully!');
+                        // Clear the form and close modal
+                        setShowAddMealModal(false);
+                        setAddMealType(null);
+                        setNewMealName('');
+                        setNewMealType('snack');
+                        setCustomMealType('');
+                        setNewMealTime('');
+                        setSelectedHour(12);
+                        setSelectedMinute(0);
+                        setSelectedPeriod('PM');
+                        setShowTimePicker(false);
+                        setNewMealCalories('');
+                        setNewMealProtein('');
+                        setNewMealCarbs('');
+                        setNewMealFat('');
+                        
+                        // Reload the meals to show the new addition
+                        await loadCurrentDayMeals();
+                      } else {
+                        Alert.alert('Error', 'Failed to add meal. Please try again.');
+                      }
                     }
                   }}
-                  disabled={!newMealName.trim() || !newMealTime.trim() || !newMealCalories.trim()}
+                  disabled={!newMealName.trim()}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="add" size={18} color="#ffffff" style={{ marginRight: 8 }} />
@@ -1099,6 +1338,7 @@ export default function MealPlanDayScreen() {
               </View>
             )}
           </ScrollView>
+          </KeyboardAvoidingView>
         </View>
 
         {/* Custom Time Picker Modal */}
@@ -1208,6 +1448,16 @@ export default function MealPlanDayScreen() {
               />
               <Text style={styles.actionSheetButtonText}>
                 {selectedMeal?.isCompleted ? 'Mark as Incomplete' : 'Mark as Complete'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionSheetButton}
+              onPress={() => handleActionSheetAction('edit')}
+            >
+              <Ionicons name="pencil-outline" size={24} color="#3b82f6" />
+              <Text style={[styles.actionSheetButtonText, { color: '#3b82f6' }]}>
+                Edit Meal
               </Text>
             </TouchableOpacity>
             
@@ -2009,6 +2259,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  mealTypeSelection: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  mealTypeButton: {
+    backgroundColor: '#374151',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  mealTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#9ca3af',
+    textTransform: 'capitalize',
   },
   
   // Time Picker Button Styles

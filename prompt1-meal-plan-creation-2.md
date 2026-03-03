@@ -84,7 +84,7 @@ Please create a detailed 7-day meal plan that:
 6. **INCLUDES STRUCTURED MEAL PREP PLAN** - exactly what to prep, how much, and what containers to use
 7. Uses ingredients available at Coles in Australia
 8. Accounts for my dietary restrictions and cooking skill level
-9. Hits macro targets within 5-10%
+9. Hits macro targets using the tolerance rules below (protein daily, others weekly average)
 10. **PROVIDES MEAL TIMING RATIONALE** - Explain why each meal time optimizes sleep and circadian health
 
 ---
@@ -134,7 +134,12 @@ Include:
 
 Before presenting the meal plan, complete these checks:
 
-1. **Daily macro totals** — For each day, sum calories, protein, carbs, and fat across all meals. Confirm each day is within 5-10% of the user's targets. If any day is off, adjust portion sizes or swap ingredients before presenting.
+1. **Macro tolerance rules** — Not all macros need the same daily precision. Use these evidence-based rules:
+   - **Protein**: Must be within 10% of target on EVERY individual day. Muscle protein synthesis is a daily process — consistent protein intake matters.
+   - **Calories**: Weekly average must be within 5% of target. Individual days can vary up to ±10%. For weight gain, total weekly energy balance drives results.
+   - **Carbs & Fat**: Weekly average must be within 10% of target. Individual days can flex more freely (±15%). Day-to-day variation in carbs and fat is normal and even beneficial if it aligns with activity levels.
+   - **Fiber**: Must hit at least 80% of the daily target (e.g., 33.6g if target is 42g) on EVERY day. Gut health benefits require daily consistency.
+   For each day, sum calories, protein, carbs, fat, and fiber across all meals. Check individual days against the daily rules (protein, fiber) and calculate weekly averages for the weekly rules (calories, carbs, fat). If any rule is violated, adjust portion sizes or swap ingredients before presenting.
 
 2. **Protein distribution** — Check that protein is spread across meals, not loaded into one. Each meal should have a meaningful protein source (minimum 15-20g per main meal). Snacks can be lower.
 

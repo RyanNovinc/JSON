@@ -8,6 +8,8 @@ export interface WorkoutRoutine {
   data?: any;
   programId?: string; // optional link to a Program for mesocycle tracking
   mesocycleNumber?: number; // which mesocycle this routine belongs to
+  fingerprint?: string; // content fingerprint for duplicate detection
+  createdAt?: number; // timestamp for sorting/organization
 }
 
 export interface MealPlan {
@@ -114,13 +116,14 @@ export interface SleepOptimizationResults {
   formData: {
     bedtime: string;
     wakeTime: string;
-    optimizationLevel: 'minimal' | 'moderate' | 'maximum';
+    optimizationLevel: 'standard' | 'sleep_focused' | 'minimal' | 'moderate' | 'maximum';
   };
   completedAt: string;
 }
 
 const STORAGE_KEYS = {
   ROUTINES: 'workout_routines',
+  MY_ROUTINES: 'my_workout_routines',
   MEAL_PLANS: 'meal_plans',
   HISTORY: 'workout_history',
   CURRENT_WORKOUT: 'current_workout_progress',
@@ -174,6 +177,37 @@ export class WorkoutStorage {
       routines[index] = updatedRoutine;
       await this.saveRoutines(routines);
     }
+  }
+
+  // My Routines management (saved collection)
+  static async saveMyRoutines(routines: WorkoutRoutine[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.MY_ROUTINES, JSON.stringify(routines));
+    } catch (error) {
+      console.error('Failed to save my routines:', error);
+    }
+  }
+
+  static async loadMyRoutines(): Promise<WorkoutRoutine[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.MY_ROUTINES);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Failed to load my routines:', error);
+      return [];
+    }
+  }
+
+  static async addMyRoutine(routine: WorkoutRoutine): Promise<void> {
+    const myRoutines = await this.loadMyRoutines();
+    myRoutines.push(routine);
+    await this.saveMyRoutines(myRoutines);
+  }
+
+  static async removeMyRoutine(routineId: string): Promise<void> {
+    const myRoutines = await this.loadMyRoutines();
+    const filtered = myRoutines.filter(r => r.id !== routineId);
+    await this.saveMyRoutines(filtered);
   }
 
   // Meal plan management

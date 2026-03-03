@@ -129,6 +129,83 @@ export interface SimplifiedMealPlan {
     totalCost: number;
     duration: number;
   };
+  // Optional legacy fields for grocery lists and meal prep
+  grocery_list?: {
+    total_estimated_cost: number;
+    currency: string;
+    categories: Array<{
+      category_name: string;
+      items: Array<{
+        item_name: string;
+        quantity: string;
+        unit: string;
+        estimated_price: number;
+        notes: string;
+        is_purchased: boolean;
+      }>;
+    }>;
+  };
+  weekly_meal_prep?: {
+    total_prep_time: number;
+    unique_recipes: number;
+    batch_proteins?: string[];
+    prep_session_guide: Array<{
+      step: number;
+      title: string;
+      description: string;
+      time_required: number;
+    }>;
+  };
+  // Legacy meal prep session structure (still used by MealPrepSessionScreen)
+  meal_prep_session?: {
+    session_name: string;
+    prep_time: number;
+    cook_time: number; 
+    total_time: number;
+    covers: string;
+    recommended_timing: string;
+    equipment_needed: string[];
+    instructions: string[];
+    storage_guidelines: {
+      proteins: string;
+      grains: string;
+      vegetables: string;
+    };
+    ingredients?: Array<{
+      item: string;
+      amount: string;
+      unit: string;
+      scalable: boolean;
+      notes: string;
+    }>;
+    prep_meals?: Array<{
+      meal_name: string;
+      meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+      prep_time: number;
+      cook_time: number;
+      total_time: number;
+      servings: number;
+      calories: number;
+      macros: {
+        protein: number;
+        carbs: number;
+        fat: number;
+        fiber: number;
+      };
+      ingredients: Array<{
+        item: string;
+        amount: string;
+        unit: string;
+        notes: string;
+      }>;
+      instructions: string[];
+      meal_prep_notes: string;
+      weekly_meal_coverage?: Array<{
+        day: string;
+        meal_type: string;
+      }>;
+    }>;
+  };
 }
 
 export interface SimplifiedMealPlanDay {
@@ -292,7 +369,10 @@ export const NUTRITION_STORAGE_KEYS = {
   WEIGHT_ENTRIES: '@nutrition_weight_entries',
   MEAL_RATINGS: '@nutrition_meal_ratings',
   COMPLETED_MEALS: '@nutrition_completed_meals',
-  // NEW SIMPLIFIED ARCHITECTURE
+  // NEW SIMPLIFIED ARCHITECTURE - Multiple Plans Support
+  SIMPLIFIED_MEAL_PLANS: '@nutrition_simplified_plans',
+  CURRENT_PLAN_ID: '@nutrition_current_plan_id',
+  // Legacy single plan support
   SIMPLIFIED_MEAL_PLAN: '@nutrition_simplified_plan',
 } as const;
 

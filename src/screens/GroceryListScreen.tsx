@@ -61,6 +61,7 @@ const CATEGORY_NAMES: Record<FoodCategory, string> = {
 
 // Map meal plan category names to our internal categories
 const mapMealPlanCategory = (categoryName: string): FoodCategory => {
+  if (!categoryName) return 'other';
   const name = categoryName.toLowerCase();
   if (name.includes('protein') || name.includes('meat') || name.includes('seafood')) return 'protein';
   if (name.includes('dairy') || name.includes('eggs')) return 'dairy';
@@ -71,6 +72,40 @@ const mapMealPlanCategory = (categoryName: string): FoodCategory => {
   if (name.includes('frozen')) return 'frozen';
   if (name.includes('pantry') || name.includes('condiment') || name.includes('sauce')) return 'pantry';
   return 'other';
+};
+
+// Convert new SimplifiedMealPlan grocery list format to internal format
+const convertSimplifiedGroceryList = (simplifiedGroceryList: any) => {
+  if (!simplifiedGroceryList?.categories) return null;
+  
+  const items: GroceryItem[] = [];
+  
+  simplifiedGroceryList.categories.forEach((category: any) => {
+    const mappedCategory = mapMealPlanCategory(category.name || 'other');
+    
+    category.items?.forEach((item: any) => {
+      // Generate appropriate ID
+      const itemId = item.id || `${category.name || 'other'}_${item.name}`.replace(/[^a-zA-Z0-9]/g, '_');
+      
+      items.push({
+        id: itemId,
+        name: item.name || 'Unknown Item',
+        amount: typeof item.amount === 'string' ? parseFloat(item.amount) || 1 : item.amount || 1,
+        unit: item.unit || '',
+        category: mappedCategory,
+        estimatedCost: item.estimated_price || 0,
+        isPurchased: item.is_purchased || false,
+        isFromInventory: false,
+        notes: item.notes || '',
+      });
+    });
+  });
+  
+  return {
+    items,
+    totalEstimatedCost: simplifiedGroceryList.total_estimated_cost || items.reduce((sum, item) => sum + item.estimatedCost, 0),
+    currency: simplifiedGroceryList.currency || 'USD',
+  };
 };
 
 // Convert meal plan grocery list format to internal format
@@ -114,6 +149,12 @@ export default function GroceryListScreen() {
   const route = useRoute<GroceryListRouteProp>();
   const { themeColor, themeColorLight } = useTheme();
   const { getGroceryList, updateGroceryItem, addGroceryItem, currentMealPlan, saveMealPlan } = useMealPlanning();
+  
+  console.log('🛒 GroceryListScreen route params:', route.params);
+  const { groceryList: routeGroceryList } = route.params || {};
+  console.log('🛒 Received routeGroceryList:', routeGroceryList);
+  console.log('🛒 First category:', routeGroceryList?.categories?.[0]);
+  console.log('🛒 First item structure:', routeGroceryList?.categories?.[0]?.items?.[0]);
 
   // State declarations first
   const [localGroceryState, setLocalGroceryState] = useState<any>(null);
@@ -134,7 +175,20 @@ export default function GroceryListScreen() {
   const contextGroceryList = getGroceryList();
   
   // Convert meal plan grocery list format to expected format
-  const groceryList = localGroceryState || (passedGroceryList ? convertMealPlanGroceryList(passedGroceryList) : contextGroceryList);
+  // Check if this is the new SimplifiedMealPlan grocery format (categories with direct items)
+  const isNewSimplifiedFormat = passedGroceryList?.categories?.[0]?.items?.[0]?.name !== undefined && 
+                               passedGroceryList?.categories?.[0]?.name !== undefined;
+  
+  console.log('🔍 Grocery list format check:', {
+    hasPassedGroceryList: !!passedGroceryList,
+    isNewSimplifiedFormat,
+    firstCategory: passedGroceryList?.categories?.[0],
+    firstItemSample: passedGroceryList?.categories?.[0]?.items?.[0]
+  });
+  
+  const groceryList = localGroceryState || (passedGroceryList ? 
+    (isNewSimplifiedFormat ? convertSimplifiedGroceryList(passedGroceryList) : convertMealPlanGroceryList(passedGroceryList)) 
+    : contextGroceryList);
 
   // Show loading state only if we have passed grocery list but are still loading purchase states
   const showLoadingState = passedGroceryList && isLoadingPurchaseStates && !localGroceryState;
@@ -162,14 +216,29 @@ export default function GroceryListScreen() {
   }
 
   // Group items by category
-  const groupedItems = groceryList.items.reduce((groups, item) => {
-    const category = item.category;
-    if (!groups[category]) {
-      groups[category] = [];
-    }
-    groups[category].push(item);
-    return groups;
-  }, {} as Record<FoodCategory, GroceryItem[]>);
+  // Handle both legacy format (items array) and enhanced format (categories array)
+  let groupedItems: Record<string, any[]>;
+  
+  if (groceryList.categories) {
+    // Enhanced format: already grouped by categories
+    groupedItems = {};
+    groceryList.categories.forEach((category: any) => {
+      groupedItems[category.name] = category.items;
+    });
+  } else if (groceryList.items) {
+    // Legacy format: needs grouping
+    groupedItems = groceryList.items.reduce((groups: Record<string, any[]>, item: any) => {
+      const category = item.category;
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(item);
+      return groups;
+    }, {} as Record<FoodCategory, GroceryItem[]>);
+  } else {
+    // Fallback: empty groups
+    groupedItems = {};
+  }
 
   // Sort items within categories
   Object.keys(groupedItems).forEach(category => {
@@ -188,16 +257,27 @@ export default function GroceryListScreen() {
     selectedCategories.includes(category) && groupedItems[category]?.length > 0
   );
 
-  // Calculate statistics
-  const totalItems = groceryList.items.length;
-  const purchasedItems = groceryList.items.filter(item => item.isPurchased).length;
-  const totalCost = groceryList.items.reduce((sum, item) => {
-    console.log('📊 Item cost:', item.name, '=', item.estimatedCost, 'type:', typeof item.estimatedCost);
-    return sum + (item.estimatedCost || 0);
+  // Calculate statistics - handle both formats
+  let allItems: any[] = [];
+  
+  if (groceryList.categories) {
+    // Enhanced format: flatten all items from categories
+    allItems = groceryList.categories.flatMap((category: any) => category.items || []);
+  } else if (groceryList.items) {
+    // Legacy format: use items directly
+    allItems = groceryList.items;
+  }
+  
+  const totalItems = allItems.length;
+  const purchasedItems = allItems.filter(item => item.isPurchased).length;
+  const totalCost = allItems.reduce((sum, item) => {
+    const cost = item.estimatedCost || item.estimated_price || 0;
+    console.log('📊 Item cost:', item.name, '=', cost, 'type:', typeof cost);
+    return sum + cost;
   }, 0);
-  const remainingCost = groceryList.items
+  const remainingCost = allItems
     .filter(item => !item.isPurchased)
-    .reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
+    .reduce((sum, item) => sum + (item.estimatedCost || item.estimated_price || 0), 0);
     
   console.log('💰 Total calculated cost:', totalCost, 'from', totalItems, 'items');
   console.log('🔍 Using items as source of truth for pricing');
@@ -237,7 +317,9 @@ export default function GroceryListScreen() {
   // Initialize local state if using passed grocery list
   useEffect(() => {
     if (passedGroceryList && !isLoadingPurchaseStates) {
-      const converted = convertMealPlanGroceryList(passedGroceryList);
+      const converted = isNewSimplifiedFormat ? 
+        convertSimplifiedGroceryList(passedGroceryList) : 
+        convertMealPlanGroceryList(passedGroceryList);
       // Apply stored purchase states
       if (converted) {
         converted.items = converted.items.map((item: any) => ({
@@ -249,7 +331,7 @@ export default function GroceryListScreen() {
       }
       setLocalGroceryState(converted);
     }
-  }, [passedGroceryList, purchasedItemsState, isLoadingPurchaseStates]);
+  }, [passedGroceryList, purchasedItemsState, isLoadingPurchaseStates, isNewSimplifiedFormat]);
 
   // Refresh data when screen comes back into focus
   useFocusEffect(
@@ -755,8 +837,8 @@ export default function GroceryListScreen() {
         </View>
 
         <View style={styles.categoryItems}>
-          {items.map((item) => (
-            <GroceryItemRow key={item.id} item={item} />
+          {items.map((item, index) => (
+            <GroceryItemRow key={`${item.id || 'no_id'}_${index}_${Date.now()}`} item={item} />
           ))}
         </View>
       </View>

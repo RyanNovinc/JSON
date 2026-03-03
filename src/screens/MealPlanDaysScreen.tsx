@@ -140,6 +140,8 @@ function DayCard({ day, onPress, onLongPress, themeColor, isCompleted, dayDate, 
   if (mealCount === 0) {
     console.log(`📊 DayCard: Rendering empty day ${dayIndex} - ready for meals to be added`);
   }
+  
+  console.log(`📊 DayCard: Proceeding to render day ${dayIndex} with ${mealCount} meals`);
 
   return (
     <TouchableOpacity 
@@ -185,45 +187,41 @@ function DayCard({ day, onPress, onLongPress, themeColor, isCompleted, dayDate, 
       </View>
       
       <View style={styles.cardBody}>
-        {/* Progress Tracking */}
-        {mealCount > 0 && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>Meal Progress</Text>
-              <Text style={styles.progressText}>
-                {completedMealsCount}/{mealCount} completed
-              </Text>
-            </View>
-            <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: `${progressPercentage}%` }]} />
-            </View>
+        {/* Progress Tracking - Always show */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>Meal Progress</Text>
+            <Text style={styles.progressText}>
+              {completedMealsCount}/{mealCount} completed
+            </Text>
           </View>
-        )}
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBar, { width: `${progressPercentage}%` }]} />
+          </View>
+        </View>
 
-        {/* Macros Preview */}
-        {totalCalories > 0 && (
-          <View style={styles.macrosPreview}>
-            <Text style={styles.macrosTitle}>Daily Macros</Text>
-            <View style={styles.macrosRow}>
-              <View style={styles.macroItem}>
-                <View style={[styles.macroDot, { backgroundColor: '#ef4444' }]} />
-                <Text style={styles.macroText}>P: {Math.round(totalMacros.protein)}g</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <View style={[styles.macroDot, { backgroundColor: '#3b82f6' }]} />
-                <Text style={styles.macroText}>C: {Math.round(totalMacros.carbs)}g</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <View style={[styles.macroDot, { backgroundColor: '#f59e0b' }]} />
-                <Text style={styles.macroText}>F: {Math.round(totalMacros.fat)}g</Text>
-              </View>
-              <View style={styles.macroItem}>
-                <View style={[styles.macroDot, { backgroundColor: '#10b981' }]} />
-                <Text style={styles.macroText}>{Math.round(totalCalories)} cal</Text>
-              </View>
+        {/* Macros Preview - Always show */}
+        <View style={styles.macrosPreview}>
+          <Text style={styles.macrosTitle}>Daily Macros</Text>
+          <View style={styles.macrosRow}>
+            <View style={styles.macroItem}>
+              <View style={[styles.macroDot, { backgroundColor: '#ef4444' }]} />
+              <Text style={styles.macroText}>P: {Math.round(totalMacros.protein)}g</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <View style={[styles.macroDot, { backgroundColor: '#3b82f6' }]} />
+              <Text style={styles.macroText}>C: {Math.round(totalMacros.carbs)}g</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <View style={[styles.macroDot, { backgroundColor: '#f59e0b' }]} />
+              <Text style={styles.macroText}>F: {Math.round(totalMacros.fat)}g</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <View style={[styles.macroDot, { backgroundColor: '#10b981' }]} />
+              <Text style={styles.macroText}>{Math.round(totalCalories)} cal</Text>
             </View>
           </View>
-        )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -239,7 +237,487 @@ export default function MealPlanDaysScreen() {
   const { week, mealPlanName, mealPrepSession, allMealPrepSessions, groceryList } = route.params;
   
   // Get current grocery list from context to reflect any updates (deletions, additions)
-  const currentGroceryList = mealPlanning.currentMealPlan?.data?.grocery_list || groceryList;
+  // First check SimplifiedMealPlan (currentPlan), then legacy meal plan, then fallback
+  const currentGroceryList = currentPlan?.grocery_list || mealPlanning.currentMealPlan?.data?.grocery_list || groceryList;
+  
+  // Generate grocery list from SimplifiedMealPlan if legacy grocery list doesn't exist
+  const generateGroceryListFromCurrentPlan = () => {
+    console.log('🚀 GENERATING GROCERY LIST FROM SIMPLIFIED MEAL PLAN');
+    if (!currentPlan) {
+      console.log('❌ No current plan available');
+      return null;
+    }
+    
+    const ingredients = new Map<string, { amount: string; unit: string; count: number }>();
+    
+    // Collect all ingredients from all days
+    Object.values(currentPlan.dailyMeals).forEach((day: any) => {
+      day.meals.forEach((meal: any) => {
+        console.log(`🔍 Meal: ${meal.name}, ingredients:`, meal.ingredients);
+        meal.ingredients?.forEach((ingredient: any, index: number) => {
+          console.log(`📝 Ingredient ${index}:`, ingredient);
+          
+          // Try multiple possible name fields
+          const key = ingredient.name || ingredient.item || ingredient.ingredient || ingredient.food;
+          
+          if (key) {
+            if (ingredients.has(key)) {
+              const existing = ingredients.get(key)!;
+              existing.count += 1;
+            } else {
+              ingredients.set(key, {
+                amount: ingredient.amount || ingredient.quantity || '1',
+                unit: ingredient.unit || ingredient.measurement || '',
+                count: 1
+              });
+            }
+          } else {
+            console.warn('⚠️ Ingredient missing name field:', ingredient);
+          }
+        });
+      });
+    });
+    
+    console.log('🛒 Collected ingredients map:', ingredients);
+    
+    if (ingredients.size === 0) return null;
+    
+    // Group ingredients by category
+    const categorizedIngredients = new Map<string, Array<{name: string; data: any; index: number}>>();
+    
+    Array.from(ingredients.entries()).forEach(([name, data], index) => {
+      // Simple categorization based on ingredient name
+      let category = 'Other';
+      const nameLower = name.toLowerCase();
+      
+      if (nameLower.includes('chicken') || nameLower.includes('beef') || nameLower.includes('pork') || 
+          nameLower.includes('fish') || nameLower.includes('turkey') || nameLower.includes('salmon') ||
+          nameLower.includes('shrimp') || nameLower.includes('tofu') || nameLower.includes('eggs')) {
+        category = 'Protein';
+      } else if (nameLower.includes('milk') || nameLower.includes('cheese') || nameLower.includes('yogurt') || 
+                 nameLower.includes('butter') || nameLower.includes('cream')) {
+        category = 'Dairy';
+      } else if (nameLower.includes('rice') || nameLower.includes('bread') || nameLower.includes('pasta') || 
+                 nameLower.includes('quinoa') || nameLower.includes('oats') || nameLower.includes('flour')) {
+        category = 'Grains';
+      } else if (nameLower.includes('broccoli') || nameLower.includes('spinach') || nameLower.includes('carrot') || 
+                 nameLower.includes('onion') || nameLower.includes('tomato') || nameLower.includes('pepper') ||
+                 nameLower.includes('lettuce') || nameLower.includes('cucumber') || nameLower.includes('celery')) {
+        category = 'Vegetables';
+      } else if (nameLower.includes('apple') || nameLower.includes('banana') || nameLower.includes('berry') || 
+                 nameLower.includes('orange') || nameLower.includes('lemon') || nameLower.includes('lime')) {
+        category = 'Fruits';
+      } else if (nameLower.includes('oil') || nameLower.includes('salt') || nameLower.includes('pepper') || 
+                 nameLower.includes('garlic') || nameLower.includes('herb') || nameLower.includes('spice') ||
+                 nameLower.includes('vanilla') || nameLower.includes('cinnamon')) {
+        category = 'Pantry';
+      }
+      
+      if (!categorizedIngredients.has(category)) {
+        categorizedIngredients.set(category, []);
+      }
+      categorizedIngredients.get(category)!.push({name, data, index});
+    });
+
+    const categories = Array.from(categorizedIngredients.entries()).map(([categoryName, items], catIndex) => ({
+      name: categoryName,
+      items: items.map(({name, data, index}, itemIndex) => ({
+        id: `generated_${catIndex}_${itemIndex}_${name.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        name, // This is the actual ingredient name
+        amount: data.count > 1 ? `${data.amount} (x${data.count})` : data.amount,
+        unit: data.unit || '',
+        estimated_price: 0 // No price available when generating from ingredients
+      }))
+    }));
+    
+    console.log('📦 Generated categories:', categories);
+
+    return {
+      categories
+    };
+  };
+  
+  // Generate meal prep session from SimplifiedMealPlan
+  const generateMealPrepFromCurrentPlan = () => {
+    console.log('🍽️ GENERATING MEAL PREP FROM SIMPLIFIED MEAL PLAN');
+    if (!currentPlan) {
+      console.log('❌ No current plan available for meal prep');
+      return null;
+    }
+    
+    const allMeals: any[] = [];
+    const uniqueMeals = new Map<string, any>();
+    
+    Object.values(currentPlan.dailyMeals).forEach((day: any, dayIndex: number) => {
+      console.log(`📅 Day ${dayIndex}: ${day.meals?.length || 0} meals`);
+      if (day.meals) {
+        day.meals.forEach((meal: any) => {
+          allMeals.push(meal);
+          // Only add unique meal recipes (same name = same recipe)
+          if (!uniqueMeals.has(meal.name)) {
+            uniqueMeals.set(meal.name, meal);
+          }
+        });
+      }
+    });
+    
+    const uniqueMealsArray = Array.from(uniqueMeals.values());
+    console.log(`🍳 Total meals collected: ${allMeals.length}`);
+    console.log(`🔄 Unique recipes found: ${uniqueMealsArray.length}`);
+    console.log(`📝 Unique meal names:`, uniqueMealsArray.map(m => m.name));
+    
+    if (uniqueMealsArray.length === 0) {
+      console.log('❌ No meals found for meal prep generation');
+      return null;
+    }
+    
+    // Smart prep time estimation based on meal complexity
+    const estimateMealTime = (meal: any) => {
+      const instructions = meal.instructions || [];
+      const tags = meal.tags || [];
+      
+      // Quick meals (no-cook, protein shakes)
+      if (tags.includes('no-cook') || tags.includes('quick')) {
+        return { prepTime: 5, cookTime: 0 };
+      }
+      
+      // Air fryer meals
+      if (tags.includes('air-fryer')) {
+        return { prepTime: 10, cookTime: 20 };
+      }
+      
+      // Sheet pan meals
+      if (tags.includes('sheet-pan')) {
+        return { prepTime: 15, cookTime: 25 };
+      }
+      
+      // Complex meals with many steps
+      if (instructions.length > 8) {
+        return { prepTime: 20, cookTime: 30 };
+      }
+      
+      // Medium complexity
+      if (instructions.length > 5) {
+        return { prepTime: 15, cookTime: 20 };
+      }
+      
+      // Simple meals
+      return { prepTime: 10, cookTime: 15 };
+    };
+
+    const totalPrepTime = uniqueMealsArray.reduce((total, meal, index) => {
+      const estimated = estimateMealTime(meal);
+      const prepTime = meal.prep_time || meal.prepTime || estimated.prepTime;
+      const cookTime = meal.cook_time || meal.cookTime || estimated.cookTime;
+      console.log(`🔥 Unique Meal ${index} (${meal.name}): prep=${prepTime}, cook=${cookTime} (estimated: ${estimated.prepTime}+${estimated.cookTime})`);
+      return total + prepTime + cookTime;
+    }, 0);
+    
+    console.log(`⏱️ Total prep time calculated: ${totalPrepTime} minutes`);
+    
+    // Split into 2 logical sessions - more inclusive filtering
+    const mainPrepMeals = uniqueMealsArray.filter(meal => {
+      const tags = meal.tags || [];
+      const instructions = (meal.instructions || []).join(' ').toLowerCase();
+      const mealType = (meal.type || '').toLowerCase();
+      
+      // Main prep: complex meals that benefit from batch cooking
+      return (
+        tags.includes('batch-cook') || 
+        tags.includes('meal-prep') ||
+        tags.includes('air-fryer') ||
+        instructions.includes('oven') ||
+        instructions.includes('bake') ||
+        mealType === 'dinner' ||
+        (meal.instructions && meal.instructions.length > 6) // Complex recipes
+      );
+    });
+    
+    const quickPrepMeals = uniqueMealsArray.filter(meal => {
+      const tags = meal.tags || [];
+      const instructions = (meal.instructions || []).join(' ').toLowerCase();
+      const mealType = (meal.type || '').toLowerCase();
+      
+      // Quick prep: simple meals, snacks, breakfast items
+      return (
+        tags.includes('no-cook') || 
+        tags.includes('quick') ||
+        tags.includes('sheet-pan') ||
+        mealType === 'snack' ||
+        mealType === 'breakfast' ||
+        instructions.includes('microwave') ||
+        instructions.includes('blend') ||
+        (meal.instructions && meal.instructions.length <= 3) // Simple recipes
+      );
+    });
+    
+    // If both categories are empty, distribute meals evenly
+    let finalMainPrepMeals = mainPrepMeals;
+    let finalQuickPrepMeals = quickPrepMeals;
+    
+    if (mainPrepMeals.length === 0 && quickPrepMeals.length === 0) {
+      const halfPoint = Math.ceil(uniqueMealsArray.length / 2);
+      finalMainPrepMeals = uniqueMealsArray.slice(0, halfPoint);
+      finalQuickPrepMeals = uniqueMealsArray.slice(halfPoint);
+    } else if (mainPrepMeals.length === 0) {
+      // Move half of quick meals to main prep
+      const halfPoint = Math.ceil(quickPrepMeals.length / 2);
+      finalMainPrepMeals = quickPrepMeals.slice(0, halfPoint);
+      finalQuickPrepMeals = quickPrepMeals.slice(halfPoint);
+    } else if (quickPrepMeals.length === 0) {
+      // Move half of main meals to quick prep  
+      const halfPoint = Math.ceil(mainPrepMeals.length / 2);
+      finalQuickPrepMeals = mainPrepMeals.slice(halfPoint);
+      finalMainPrepMeals = mainPrepMeals.slice(0, halfPoint);
+    }
+    
+    const mainPrepTime = finalMainPrepMeals.reduce((total, meal) => {
+      const estimated = estimateMealTime(meal);
+      return total + (estimated.prepTime + estimated.cookTime);
+    }, 0);
+    
+    const quickPrepTime = finalQuickPrepMeals.reduce((total, meal) => {
+      const estimated = estimateMealTime(meal);
+      return total + (estimated.prepTime + estimated.cookTime);
+    }, 0);
+    
+    console.log(`📊 Final Main prep meals: ${finalMainPrepMeals.length}, time: ${mainPrepTime} min`);
+    console.log(`📝 Final Main prep meal names:`, finalMainPrepMeals.map(m => m.name));
+    console.log(`📊 Final Quick prep meals: ${finalQuickPrepMeals.length}, time: ${quickPrepTime} min`);
+    console.log(`📝 Final Quick prep meal names:`, finalQuickPrepMeals.map(m => m.name));
+    
+    const mealPrepSessions = [];
+    
+    // Session 1: Sunday Main Prep (batch-cook, meal-prep, air-fryer, oven meals)
+    if (finalMainPrepMeals.length > 0) {
+      mealPrepSessions.push({
+        id: 'sunday_main_prep',
+        session_name: 'Sunday Main Prep',
+        session_number: 1,
+        name: 'Sunday Main Prep',
+        prep_time: Math.round(mainPrepTime * 0.4),
+        cook_time: Math.round(mainPrepTime * 0.6),
+        total_time: mainPrepTime,
+        covers: finalMainPrepMeals.length > 0 ? `${finalMainPrepMeals.length} main prep meals: ${finalMainPrepMeals.map(m => m.name).slice(0, 3).join(', ')}${finalMainPrepMeals.length > 3 ? '...' : ''}` : 'Main proteins and batch items',
+        recommended_timing: "Sunday morning - allows time for cooking proteins",
+        equipment_needed: (() => {
+          const equipment = new Set<string>();
+          finalMainPrepMeals.forEach(meal => {
+            const instructions = (meal.instructions || []).join(' ').toLowerCase();
+            const tags = meal.tags || [];
+            
+            if (tags.includes('air-fryer') || instructions.includes('air fryer')) equipment.add('Air fryer');
+            if (instructions.includes('oven') || instructions.includes('bake')) equipment.add('Oven');
+            if (instructions.includes('baking tray')) equipment.add('Baking tray');
+            if (instructions.includes('slice') || instructions.includes('chop')) equipment.add('Sharp knife & cutting board');
+            equipment.add('Meal prep containers');
+          });
+          return Array.from(equipment);
+        })(),
+        instructions: (() => {
+          const allInstructions: string[] = [];
+          finalMainPrepMeals.forEach((meal, mealIndex) => {
+            if (meal.instructions && meal.instructions.length > 0) {
+              allInstructions.push(`=== ${meal.name} ===`);
+              meal.instructions.forEach((instruction: string, stepIndex: number) => {
+                allInstructions.push(`${mealIndex + 1}.${stepIndex + 1} ${instruction}`);
+              });
+              allInstructions.push('');
+            }
+          });
+          return allInstructions;
+        })(),
+        storage_guidelines: {
+          proteins: "Refrigerate cooked proteins for up to 4 days",
+          grains: "Store cooked rice/oats in refrigerator for up to 5 days", 
+          vegetables: "Keep roasted vegetables fresh for 3-4 days refrigerated"
+        },
+        prep_meals: finalMainPrepMeals.map((meal, index) => {
+          const estimated = estimateMealTime(meal);
+          const prepTime = meal.prep_time || meal.prepTime || estimated.prepTime;
+          const cookTime = meal.cook_time || meal.cookTime || estimated.cookTime;
+          
+          return {
+            meal_name: meal.name,
+            meal_type: meal.type || meal.meal_type || 'meal',
+            prep_time: prepTime,
+            cook_time: cookTime,
+            total_time: prepTime + cookTime,
+            servings: 1,
+            calories: meal.calories || 0,
+            macros: meal.macros || { protein: 0, carbs: 0, fat: 0, fiber: 0 },
+            ingredients: meal.ingredients || [],
+            instructions: meal.instructions || [],
+            meal_prep_notes: `Batch cook this ${meal.type || 'meal'} for multiple days`,
+            tags: meal.tags || []
+          };
+        })
+      });
+    }
+    
+    // Session 2: Wednesday Mini Prep (no-cook, quick, sheet-pan meals)  
+    if (finalQuickPrepMeals.length > 0) {
+      mealPrepSessions.push({
+        id: 'wednesday_mini_prep',
+        session_name: 'Wednesday Mini Prep',
+        session_number: 2,
+        name: 'Wednesday Mini Prep',
+        prep_time: Math.round(quickPrepTime * 0.6),
+        cook_time: Math.round(quickPrepTime * 0.4),
+        total_time: quickPrepTime,
+        covers: finalQuickPrepMeals.length > 0 ? `${finalQuickPrepMeals.length} quick prep meals: ${finalQuickPrepMeals.map(m => m.name).slice(0, 3).join(', ')}${finalQuickPrepMeals.length > 3 ? '...' : ''}` : 'Fresh items and quick meals',
+        recommended_timing: "Wednesday evening - refresh for end of week",
+        equipment_needed: (() => {
+          const equipment = new Set<string>();
+          finalQuickPrepMeals.forEach(meal => {
+            const instructions = (meal.instructions || []).join(' ').toLowerCase();
+            
+            if (instructions.includes('microwave')) equipment.add('Microwave');
+            if (instructions.includes('shaker')) equipment.add('Protein shaker bottle');
+            if (instructions.includes('bowl')) equipment.add('Mixing bowls');
+            if (instructions.includes('slice') || instructions.includes('chop')) equipment.add('Sharp knife & cutting board');
+          });
+          equipment.add('Fresh storage containers');
+          return Array.from(equipment);
+        })(),
+        instructions: (() => {
+          const allInstructions: string[] = [];
+          finalQuickPrepMeals.forEach((meal, mealIndex) => {
+            if (meal.instructions && meal.instructions.length > 0) {
+              allInstructions.push(`=== ${meal.name} ===`);
+              meal.instructions.forEach((instruction: string, stepIndex: number) => {
+                allInstructions.push(`${mealIndex + 1}.${stepIndex + 1} ${instruction}`);
+              });
+              allInstructions.push('');
+            }
+          });
+          return allInstructions;
+        })(),
+        storage_guidelines: {
+          proteins: "Refrigerate fresh proteins for up to 3 days",
+          vegetables: "Keep cut vegetables fresh for 2-3 days refrigerated",
+          assembled_meals: "Consume within 1-2 days for best freshness"
+        },
+        prep_meals: finalQuickPrepMeals.map((meal, index) => {
+          const estimated = estimateMealTime(meal);
+          const prepTime = meal.prep_time || meal.prepTime || estimated.prepTime;
+          const cookTime = meal.cook_time || meal.cookTime || estimated.cookTime;
+          
+          return {
+            meal_name: meal.name,
+            meal_type: meal.type || meal.meal_type || 'meal',
+            prep_time: prepTime,
+            cook_time: cookTime,
+            total_time: prepTime + cookTime,
+            servings: 1,
+            calories: meal.calories || 0,
+            macros: meal.macros || { protein: 0, carbs: 0, fat: 0, fiber: 0 },
+            ingredients: meal.ingredients || [],
+            instructions: meal.instructions || [],
+            meal_prep_notes: `Fresh prep for end of week consumption`,
+            tags: meal.tags || []
+          };
+        })
+      });
+    }
+    
+    // If no meals match either category, create one session with all meals
+    if (mealPrepSessions.length === 0) {
+      mealPrepSessions.push({
+        id: 'weekly_meal_prep',
+        session_name: 'Weekly Meal Prep',
+        session_number: 1,
+        name: 'Weekly Meal Prep',
+        prep_time: Math.round(totalPrepTime * 0.4),
+        cook_time: Math.round(totalPrepTime * 0.6),
+        total_time: totalPrepTime,
+        covers: `${uniqueMealsArray.length} recipes for 7 days`,
+        recommended_timing: "Sunday morning or evening for best results",
+        equipment_needed: (() => {
+          const equipment = new Set<string>();
+          uniqueMealsArray.forEach(meal => {
+            const instructions = (meal.instructions || []).join(' ').toLowerCase();
+            const tags = meal.tags || [];
+            
+            if (tags.includes('air-fryer') || instructions.includes('air fryer')) equipment.add('Air fryer');
+            if (instructions.includes('oven') || instructions.includes('bake')) equipment.add('Oven');
+            if (instructions.includes('microwave')) equipment.add('Microwave');
+            if (instructions.includes('shaker')) equipment.add('Protein shaker bottle');
+            if (instructions.includes('bowl')) equipment.add('Mixing bowls');
+            if (instructions.includes('baking tray')) equipment.add('Baking tray');
+            if (instructions.includes('slice') || instructions.includes('chop')) equipment.add('Sharp knife & cutting board');
+            if (meal.type !== 'snack') equipment.add('Meal prep containers');
+          });
+          return Array.from(equipment);
+        })(),
+        instructions: (() => {
+          const allInstructions: string[] = [];
+          uniqueMealsArray.forEach((meal, mealIndex) => {
+            if (meal.instructions && meal.instructions.length > 0) {
+              allInstructions.push(`=== ${meal.name} ===`);
+              meal.instructions.forEach((instruction: string, stepIndex: number) => {
+                allInstructions.push(`${mealIndex + 1}.${stepIndex + 1} ${instruction}`);
+              });
+              allInstructions.push('');
+            }
+          });
+          return allInstructions;
+        })(),
+        storage_guidelines: {
+          proteins: "Refrigerate cooked proteins for up to 4 days",
+          grains: "Store cooked rice/oats in refrigerator for up to 5 days", 
+          vegetables: "Keep cut vegetables fresh for 3-4 days refrigerated"
+        },
+        prep_meals: uniqueMealsArray.map((meal, index) => {
+          const estimated = estimateMealTime(meal);
+          const prepTime = meal.prep_time || meal.prepTime || estimated.prepTime;
+          const cookTime = meal.cook_time || meal.cookTime || estimated.cookTime;
+          
+          return {
+            meal_name: meal.name,
+            meal_type: meal.type || meal.meal_type || 'meal',
+            prep_time: prepTime,
+            cook_time: cookTime,
+            total_time: prepTime + cookTime,
+            servings: 1,
+            calories: meal.calories || 0,
+            macros: meal.macros || { protein: 0, carbs: 0, fat: 0, fiber: 0 },
+            ingredients: meal.ingredients || [],
+            instructions: meal.instructions || [],
+            meal_prep_notes: `This ${meal.type || 'meal'} can be prepped ahead for convenience`,
+            tags: meal.tags || []
+          };
+        })
+      });
+    }
+    
+    console.log('✅ Generated meal prep sessions:', mealPrepSessions);
+    return mealPrepSessions;
+  };
+  
+  // Use legacy data if available, otherwise generate from SimplifiedMealPlan
+  const effectiveGroceryList = currentGroceryList || generateGroceryListFromCurrentPlan();
+  
+  // Force generate meal prep sessions if no legacy sessions exist
+  let effectiveMealPrepSessions = allMealPrepSessions;
+  if (!effectiveMealPrepSessions || effectiveMealPrepSessions.length === 0) {
+    console.log('🔥 No legacy meal prep sessions, generating from current plan...');
+    effectiveMealPrepSessions = generateMealPrepFromCurrentPlan();
+    console.log('🔥 Generated meal prep sessions:', effectiveMealPrepSessions);
+  } else {
+    console.log('🔥 Using legacy meal prep sessions:', effectiveMealPrepSessions);
+  }
+  
+  // Debug logging
+  console.log('🔍 MealPrepSessions Debug:', {
+    allMealPrepSessions: !!allMealPrepSessions,
+    allMealPrepSessionsLength: allMealPrepSessions?.length,
+    effectiveMealPrepSessions: !!effectiveMealPrepSessions,
+    effectiveMealPrepSessionsLength: effectiveMealPrepSessions?.length,
+    currentPlan: !!currentPlan,
+    hasDailyMeals: currentPlan ? Object.keys(currentPlan.dailyMeals).length : 0,
+    firstSession: effectiveMealPrepSessions?.[0]
+  });
   
   // Calculate total cost from actual grocery items (source of truth)
   const calculateGroceryTotal = (groceryData: any) => {
@@ -256,13 +734,15 @@ export default function MealPlanDaysScreen() {
     return total;
   };
   
-  const actualGroceryTotal = calculateGroceryTotal(currentGroceryList);
+  const actualGroceryTotal = calculateGroceryTotal(effectiveGroceryList);
   
   // Helper function to group days by their prep session
   const groupDaysByPrepSession = () => {
     // For legacy format (single session) or when no allMealPrepSessions, show all days ungrouped
     if (!allMealPrepSessions || allMealPrepSessions.length === 0) {
-      const allDays = (week.days || []).map((day, dayIndex) => ({ day, dayIndex }));
+      // Use days from current plan instead of legacy week.days
+      const allDays = days.map((day, dayIndex) => ({ day, dayIndex }));
+      console.log(`📋 Grouping ${allDays.length} days from current plan instead of legacy week.days`);
       return [{ session: null, days: allDays }];
     }
 
@@ -279,7 +759,7 @@ export default function MealPlanDaysScreen() {
       const sessionDays = [];
       const sessionDayNames = session.covers_days || [];
       
-      week.days?.forEach((day, dayIndex) => {
+      days?.forEach((day, dayIndex) => {
         const dayName = day.day_name.split(' ')[0]; // Extract day name (e.g., "Monday" from "Monday 16 Feb")
         console.log(`🔧 Checking day ${dayName} against session days:`, sessionDayNames);
         
@@ -300,7 +780,7 @@ export default function MealPlanDaysScreen() {
     
     // Add any unmatched days to a general group
     const unmatchedDays = [];
-    week.days?.forEach((day, dayIndex) => {
+    days?.forEach((day, dayIndex) => {
       if (!usedDayIndices.has(dayIndex)) {
         unmatchedDays.push({ day, dayIndex });
       }
@@ -317,44 +797,12 @@ export default function MealPlanDaysScreen() {
     return groups;
   };
 
-  const dayGroups = groupDaysByPrepSession();
-  
   // State for tracking meal prep completion
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
   
   // State for date picker
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  
-  // Debug: Log the meal prep session and calorie data
-  console.log('🔍 MealPlanDaysScreen received data:');
-  console.log('Week data:', week);
-  console.log('Week days count:', week?.days?.length);
-  console.log('First day calories:', week?.days?.[0]?.daily_totals?.calories);
-  console.log('First meal calories:', week?.days?.[0]?.meals?.[0]?.calories);
-  console.log('DEBUG: mealPrepSession:', mealPrepSession);
-  console.log('DEBUG: allMealPrepSessions:', allMealPrepSessions);
-  console.log('DEBUG: allMealPrepSessions length:', allMealPrepSessions?.length);
-  console.log('DEBUG: dayGroups:', dayGroups);
-  console.log('DEBUG: dayGroups length:', dayGroups?.length);
-  
-  // Load completed meals when component mounts
-  useEffect(() => {
-    if (mealPrepSession?.prep_meals) {
-      // TODO: Load from AsyncStorage
-      const loadCompletedMeals = async () => {
-        try {
-          // const stored = await AsyncStorage.getItem(`prep_meals_${mealPrepSession.session_name}`);
-          // if (stored) {
-          //   setCompletedTasks(new Set(JSON.parse(stored)));
-          // }
-        } catch (error) {
-          console.error('Failed to load completed meals:', error);
-        }
-      };
-      loadCompletedMeals();
-    }
-  }, [mealPrepSession]);
   
   // Create days array from current meal plan instead of legacy week.days
   const createDaysFromCurrentPlan = () => {
@@ -401,6 +849,38 @@ export default function MealPlanDaysScreen() {
   };
 
   const days: Day[] = createDaysFromCurrentPlan();
+
+  const dayGroups = groupDaysByPrepSession();
+  
+  // Debug: Log the meal prep session and calorie data
+  console.log('🔍 MealPlanDaysScreen received data:');
+  console.log('Week data:', week);
+  console.log('Week days count:', week?.days?.length);
+  console.log('First day calories:', week?.days?.[0]?.daily_totals?.calories);
+  console.log('First meal calories:', week?.days?.[0]?.meals?.[0]?.calories);
+  console.log('DEBUG: mealPrepSession:', mealPrepSession);
+  console.log('DEBUG: allMealPrepSessions:', allMealPrepSessions);
+  console.log('DEBUG: allMealPrepSessions length:', allMealPrepSessions?.length);
+  console.log('DEBUG: dayGroups:', dayGroups);
+  console.log('DEBUG: dayGroups length:', dayGroups?.length);
+  
+  // Load completed meals when component mounts
+  useEffect(() => {
+    if (mealPrepSession?.prep_meals) {
+      // TODO: Load from AsyncStorage
+      const loadCompletedMeals = async () => {
+        try {
+          // const stored = await AsyncStorage.getItem(`prep_meals_${mealPrepSession.session_name}`);
+          // if (stored) {
+          //   setCompletedTasks(new Set(JSON.parse(stored)));
+          // }
+        } catch (error) {
+          console.error('Failed to load completed meals:', error);
+        }
+      };
+      loadCompletedMeals();
+    }
+  }, [mealPrepSession]);
 
   // Calculate the meal plan start date - starts from today (same as MealPlanWeeksScreen)
   const getMealPlanStartDate = () => {
@@ -702,25 +1182,27 @@ export default function MealPlanDaysScreen() {
       console.log(`🗑️ Available dates in plan:`, availableDates);
       console.log(`🗑️ Target date:`, dateKey);
 
-      // Get all meals for this day and delete them one by one
-      const dayData = currentPlan.dailyMeals[dateKey];
-      if (dayData && dayData.meals.length > 0) {
-        const mealIds = dayData.meals.map(meal => meal.id);
-        
-        let deletedCount = 0;
-        for (const mealId of mealIds) {
-          const success = await deleteMealFromDate(dateKey, mealId);
-          if (success) deletedCount++;
+      // Delete the entire day from the meal plan (regardless of meal count)
+      const updatedPlan = {
+        ...currentPlan,
+        dailyMeals: {
+          ...currentPlan.dailyMeals
         }
+      };
 
-        if (deletedCount > 0) {
-          Alert.alert('Success', `Deleted ${deletedCount} meals from ${getDayName(dayIndex)}`);
-        } else {
-          Alert.alert('Error', 'Failed to delete meals');
-        }
-      } else {
-        Alert.alert('Info', 'This day has no meals to delete');
-      }
+      // Remove the day completely
+      delete updatedPlan.dailyMeals[dateKey];
+
+      console.log(`🗑️ Removing day ${dateKey} from meal plan`);
+      console.log(`📋 Plan keys before deletion:`, Object.keys(currentPlan.dailyMeals));
+      console.log(`📋 Plan keys after deletion:`, Object.keys(updatedPlan.dailyMeals));
+
+      // Save the updated plan
+      await saveMealPlan(updatedPlan);
+      
+      Alert.alert('Success', `Deleted ${getDayName(dayIndex)} from your meal plan`);
+      
+      console.log(`✅ Successfully deleted day ${dateKey}`);
     } catch (error) {
       console.error('❌ Error deleting day meals:', error);
       Alert.alert('Error', 'Failed to delete day meals');
@@ -772,14 +1254,14 @@ export default function MealPlanDaysScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Grocery List Section */}
-          {currentGroceryList && (
+          {effectiveGroceryList && (
             <View style={styles.grocerySection}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionTitle}>Shopping List</Text>
               </View>
               <TouchableOpacity 
                 style={[styles.groceryCardFriendly, { backgroundColor: `${themeColor}15` }]}
-                onPress={() => navigation.navigate('GroceryList', { groceryList: currentGroceryList })}
+                onPress={() => navigation.navigate('GroceryList', { groceryList: effectiveGroceryList })}
                 activeOpacity={0.8}
               >
                 <View style={styles.groceryFriendlyContent}>
@@ -796,12 +1278,20 @@ export default function MealPlanDaysScreen() {
           )}
 
           {/* Prep Sessions Section */}
-          {(allMealPrepSessions && allMealPrepSessions.length > 0) ? (
+          {(() => {
+            console.log('🧪 Meal prep rendering check:', {
+              effectiveMealPrepSessions: !!effectiveMealPrepSessions,
+              isArray: Array.isArray(effectiveMealPrepSessions),
+              length: effectiveMealPrepSessions?.length,
+              firstSession: effectiveMealPrepSessions?.[0]
+            });
+            return (effectiveMealPrepSessions && effectiveMealPrepSessions.length > 0);
+          })() ? (
             <View style={styles.prepSessionsSection}>
               <Text style={styles.sectionTitle}>Meal Prep</Text>
               <Text style={styles.sectionSubtitle}>Your cooking schedule made simple</Text>
               
-              {allMealPrepSessions.map((session, index) => (
+              {effectiveMealPrepSessions.map((session, index) => (
                 <TouchableOpacity 
                   key={session.session_number || index}
                   style={[styles.prepCardFriendly, { backgroundColor: `${themeColor}10` }]}
@@ -816,7 +1306,7 @@ export default function MealPlanDaysScreen() {
                   <View style={styles.prepFriendlyContent}>
                     <View style={styles.prepFriendlyHeader}>
                       <Text style={styles.prepFriendlyTitle}>
-                        {allMealPrepSessions.length > 1 ? `Prep ${index + 1}` : 'Meal Prep'}
+                        {effectiveMealPrepSessions.length > 1 ? `Prep ${index + 1}` : 'Meal Prep'}
                       </Text>
                       <Text style={styles.prepFriendlyTime}>
                         {session.total_time} min

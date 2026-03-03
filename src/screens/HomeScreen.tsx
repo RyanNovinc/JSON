@@ -75,6 +75,8 @@ export default function HomeScreen({ route }: any) {
     visible: false,
     routine: null,
   });
+  const [savedWorkoutRoutines, setSavedWorkoutRoutines] = useState<Set<string>>(new Set());
+  const [myRoutines, setMyRoutines] = useState<WorkoutRoutine[]>([]);
   const [renameModal, setRenameModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null; newName: string }>({
     visible: false,
     routine: null,
@@ -98,6 +100,7 @@ export default function HomeScreen({ route }: any) {
       
       // Load app data
       loadRoutines();
+      loadMyRoutines();
     };
     
     initializeApp();
@@ -201,6 +204,15 @@ export default function HomeScreen({ route }: any) {
   const loadRoutines = async () => {
     const storedRoutines = await WorkoutStorage.loadRoutines();
     setRoutines(storedRoutines);
+  };
+
+  const loadMyRoutines = async () => {
+    const myRoutinesList = await WorkoutStorage.loadMyRoutines();
+    setMyRoutines(myRoutinesList);
+    
+    // Update saved routines set
+    const routineIds = new Set(myRoutinesList.map(routine => routine.fingerprint || routine.id));
+    setSavedWorkoutRoutines(routineIds);
   };
 
   const addRoutine = async (routine: WorkoutRoutine) => {
@@ -484,8 +496,27 @@ export default function HomeScreen({ route }: any) {
     }
   };
 
-  const handleDeleteRequest = (routine: WorkoutRoutine) => {
+  const handleActionRequest = (routine: WorkoutRoutine) => {
     setDeleteModal({ visible: true, routine });
+  };
+
+  const handleToggleSaveWorkout = async (routine: WorkoutRoutine) => {
+    try {
+      // Always save, no duplicate checking
+      const transformedWorkout = {
+        ...routine,
+        id: `${routine.id}_${Date.now()}`,
+        fingerprint: `${routine.id}_${Date.now()}`,
+        createdAt: Date.now(),
+      };
+      
+      await WorkoutStorage.addMyRoutine(transformedWorkout);
+      
+      // Refresh my routines list
+      await loadMyRoutines();
+    } catch (error) {
+      console.error('Failed to save workout:', error);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -792,7 +823,7 @@ export default function HomeScreen({ route }: any) {
             style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
             activeOpacity={0.8}
             onPress={() => navigation.navigate('Blocks' as any, { routine })}
-            onLongPress={() => handleDeleteRequest(routine)}
+            onLongPress={() => handleActionRequest(routine)}
             delayLongPress={800}
           >
             <View style={styles.heroContent}>
@@ -838,7 +869,7 @@ export default function HomeScreen({ route }: any) {
                 style={[styles.dualVerticalCard, { borderColor: themeColor, shadowColor: themeColor }]}
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Blocks' as any, { routine })}
-                onLongPress={() => handleDeleteRequest(routine)}
+                onLongPress={() => handleActionRequest(routine)}
                 delayLongPress={800}
               >
                 <View style={styles.dualVerticalContent}>
@@ -886,7 +917,7 @@ export default function HomeScreen({ route }: any) {
                 style={[styles.tripleCard, { borderColor: themeColor, shadowColor: themeColor }]}
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Blocks' as any, { routine })}
-                onLongPress={() => handleDeleteRequest(routine)}
+                onLongPress={() => handleActionRequest(routine)}
                 delayLongPress={800}
               >
                 <View style={styles.tripleContent}>
@@ -934,7 +965,7 @@ export default function HomeScreen({ route }: any) {
                 style={[styles.quadCard, { borderColor: themeColor, shadowColor: themeColor }]}
                 activeOpacity={0.8}
                 onPress={() => navigation.navigate('Blocks' as any, { routine })}
-                onLongPress={() => handleDeleteRequest(routine)}
+                onLongPress={() => handleActionRequest(routine)}
                 delayLongPress={800}
               >
                 <View style={styles.quadContent}>
@@ -982,7 +1013,7 @@ export default function HomeScreen({ route }: any) {
             routine={item}
             onExport={() => handleExport(item)}
             onPress={() => navigation.navigate('Blocks' as any, { routine: item })}
-            onLongPress={() => handleDeleteRequest(item)}
+            onLongPress={() => handleActionRequest(item)}
             isPinkTheme={isPinkTheme}
             themeColor={themeColor}
           />
@@ -1209,63 +1240,78 @@ export default function HomeScreen({ route }: any) {
         </View>
       </Modal>
 
-      {/* Custom Delete Confirmation Modal */}
+      {/* Action Sheet Modal */}
       <Modal
         visible={deleteModal.visible}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setDeleteModal({ visible: false, routine: null })}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.deleteContainer}>
-            <View style={styles.deleteIconContainer}>
-              <Ionicons name="warning" size={32} color="#ef4444" />
-            </View>
-            
-            <Text style={styles.deleteTitle}>Delete Routine?</Text>
-            
-            <View style={styles.deleteRoutineInfo}>
-              <Text style={styles.deleteRoutineName} numberOfLines={2}>
-                {deleteModal.routine?.name}
-              </Text>
-              <Text style={styles.deleteRoutineDetails}>
-                {deleteModal.routine?.days} days • {deleteModal.routine?.blocks} blocks
-              </Text>
-            </View>
-            
-            <Text style={styles.deleteMessage}>
-              This routine will be permanently deleted and cannot be recovered.
-            </Text>
-            
-            <View style={styles.deleteButtons}>
-              <TouchableOpacity
-                style={styles.deleteCancelButton}
-                onPress={() => setDeleteModal({ visible: false, routine: null })}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.deleteCancelText}>Cancel</Text>
-              </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionSheetOverlay}
+          activeOpacity={1}
+          onPress={() => setDeleteModal({ visible: false, routine: null })}
+        >
+          <View style={styles.actionSheetContainer}>
+            <TouchableOpacity activeOpacity={1}>
+              <View style={styles.actionSheetHeader}>
+                <Text style={styles.actionSheetTitle}>
+                  {deleteModal.routine?.name}
+                </Text>
+                <Text style={styles.actionSheetSubtitle}>
+                  {deleteModal.routine?.days} days • {deleteModal.routine?.blocks} blocks
+                </Text>
+              </View>
               
-              <TouchableOpacity
-                style={styles.renameButton}
-                onPress={() => deleteModal.routine && handleRenameRequest(deleteModal.routine)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="create-outline" size={18} color="#ffffff" />
-                <Text style={styles.renameText}>Rename</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.deleteConfirmButton}
-                onPress={handleDeleteConfirm}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="trash" size={18} color="#ffffff" />
-                <Text style={styles.deleteConfirmText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
+              <View style={styles.actionSheetButtons}>
+                <TouchableOpacity
+                  style={[styles.actionSheetButton, { backgroundColor: savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? '#f59e0b' : themeColor }]}
+                  onPress={() => {
+                    if (deleteModal.routine) {
+                      handleToggleSaveWorkout(deleteModal.routine);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons 
+                    name={savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? "heart-dislike" : "heart"} 
+                    size={20} 
+                    color="#ffffff" 
+                  />
+                  <Text style={styles.actionSheetButtonText}>
+                    {savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? 'Remove from Collection' : 'Save to Collection'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.actionSheetButton}
+                  onPress={() => deleteModal.routine && handleRenameRequest(deleteModal.routine)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="create-outline" size={20} color="#ffffff" />
+                  <Text style={styles.actionSheetButtonText}>Rename</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.actionSheetButton, styles.actionSheetButtonDanger]}
+                  onPress={handleDeleteConfirm}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#ffffff" />
+                  <Text style={styles.actionSheetButtonText}>Remove</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.actionSheetButton, styles.actionSheetButtonCancel]}
+                  onPress={() => setDeleteModal({ visible: false, routine: null })}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.actionSheetButtonText, { color: '#71717a' }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Workout Calendar */}
@@ -2405,7 +2451,66 @@ const styles = StyleSheet.create({
     color: 'rgba(10, 10, 11, 0.7)',
     letterSpacing: 0.2,
   },
-  // Rename Modal Styles
+  // Action Sheet Modal Styles
+  actionSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  actionSheetContainer: {
+    backgroundColor: '#18181b',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  actionSheetHeader: {
+    alignItems: 'center',
+    marginBottom: 30,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
+  },
+  actionSheetTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  actionSheetSubtitle: {
+    fontSize: 16,
+    color: '#71717a',
+    textAlign: 'center',
+  },
+  actionSheetButtons: {
+    gap: 16,
+  },
+  actionSheetButton: {
+    backgroundColor: '#27272a',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  actionSheetButtonDanger: {
+    backgroundColor: '#ef4444',
+  },
+  actionSheetButtonCancel: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  actionSheetButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  // Rename Modal Styles (updated for centered design)
   renameContainer: {
     backgroundColor: '#18181b',
     borderRadius: 20,

@@ -246,7 +246,7 @@ export default function NutritionHomeScreen({ route }: any) {
     }
   }, [route?.params?.refresh]);
 
-  const handleDeleteRequest = (plan: MealPlan) => {
+  const handleActionRequest = (plan: MealPlan) => {
     setDeleteModal({ visible: true, plan });
   };
 
@@ -597,66 +597,40 @@ export default function NutritionHomeScreen({ route }: any) {
     });
   };
 
-  const handleSaveMealPlan = async (plan: MealPlan) => {
+  // Always allow saving - no duplicate checking
+  const isPlanSaved = (plan: MealPlan): boolean => {
+    return false; // Always show "Save to My Meals" to allow multiple saves
+  };
+
+  // Save meal plan (always save, no duplicate checking)
+  const handleToggleSaveMealPlan = async (plan: MealPlan) => {
     try {
-      // Find the original SimplifiedMealPlan and save it to "My Meals"
       const originalPlan = mealPlans.find(p => p.name === plan.name);
       if (!originalPlan) {
-        Alert.alert('Error', 'Could not find meal plan to save.');
+        Alert.alert('Error', 'Could not find meal plan.');
         return;
       }
 
-      // Create a fingerprint to check for duplicates
-      const createFingerprint = (plan: any): string => {
-        const contentString = JSON.stringify({
-          name: plan.name.toLowerCase().trim(),
-          duration: Object.keys(plan.dailyMeals).length,
-          meals: Object.values(plan.dailyMeals)
-        });
-        let hash = 0;
-        for (let i = 0; i < contentString.length; i++) {
-          const char = contentString.charCodeAt(i);
-          hash = ((hash << 5) - hash) + char;
-          hash = hash & hash;
-        }
-        return Math.abs(hash).toString(36);
-      };
-
-      const fingerprint = createFingerprint(originalPlan);
-
-      // Check if already saved
-      const existingMealPlans = await WorkoutStorage.loadMealPlans();
-      const isDuplicate = existingMealPlans.some(existing => 
-        existing.fingerprint === fingerprint
-      );
-
-      if (isDuplicate) {
-        Alert.alert('Already Saved', `"${originalPlan.name}" is already in your My Meals collection.`);
-        return;
-      }
-
-      // Transform and save to "My Meals"
+      // Always save - create unique ID with timestamp
       const transformedMealPlan = {
-        id: originalPlan.id,
+        id: `${originalPlan.id}_${Date.now()}`, // Unique ID to allow multiple saves
         name: originalPlan.name,
         duration: Object.keys(originalPlan.dailyMeals).length,
         meals: Object.values(originalPlan.dailyMeals).reduce((total, day: any) => total + day.meals.length, 0),
         data: originalPlan,
-        fingerprint: fingerprint,
+        fingerprint: `${originalPlan.id}_${Date.now()}`, // Unique fingerprint
         createdAt: Date.now(),
       };
 
       await WorkoutStorage.addMealPlan(transformedMealPlan);
-      
-      // Update local state to show heart as filled
-      setSavedMealPlans(prev => new Set([...prev, fingerprint]));
-      
-      Alert.alert('Saved!', `"${originalPlan.name}" has been saved to your My Meals collection.`);
     } catch (error) {
       console.error('Failed to save meal plan:', error);
       Alert.alert('Error', 'Failed to save meal plan. Please try again.');
     }
   };
+
+  // Legacy function for compatibility (can be removed later)
+  const handleSaveMealPlan = handleToggleSaveMealPlan;
 
   const handleExport = (plan: MealPlan) => {
     setShareModal({ visible: true, plan });
@@ -730,50 +704,9 @@ export default function NutritionHomeScreen({ route }: any) {
             style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
             activeOpacity={0.8}
             onPress={() => handleMealPlanNavigation(plan)}
-            onLongPress={() => handleDeleteRequest(plan)}
+            onLongPress={() => handleActionRequest(plan)}
             delayLongPress={800}
           >
-            {/* Heart Save Icon - Top Right Corner */}
-            <TouchableOpacity
-              style={styles.heartIcon}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleSaveMealPlan(plan);
-              }}
-              activeOpacity={0.7}
-            >
-              {(() => {
-                // Check if this plan is saved
-                const originalPlan = mealPlans.find(p => p.name === plan.name);
-                if (!originalPlan) return <Ionicons name="heart-outline" size={20} color="rgba(255, 255, 255, 0.6)" />;
-                
-                const createFingerprint = (plan: any): string => {
-                  const contentString = JSON.stringify({
-                    name: plan.name.toLowerCase().trim(),
-                    duration: Object.keys(plan.dailyMeals).length,
-                    meals: Object.values(plan.dailyMeals)
-                  });
-                  let hash = 0;
-                  for (let i = 0; i < contentString.length; i++) {
-                    const char = contentString.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash;
-                  }
-                  return Math.abs(hash).toString(36);
-                };
-                
-                const fingerprint = createFingerprint(originalPlan);
-                const isSaved = savedMealPlans.has(fingerprint);
-                
-                return (
-                  <Ionicons 
-                    name={isSaved ? "heart" : "heart-outline"} 
-                    size={20} 
-                    color={isSaved ? themeColor : "rgba(255, 255, 255, 0.6)"} 
-                  />
-                );
-              })()}
-            </TouchableOpacity>
 
             <View style={styles.heroContent}>
               <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
@@ -818,7 +751,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 style={[styles.dualVerticalCard, { borderColor: themeColor, shadowColor: themeColor }]}
                 activeOpacity={0.8}
                 onPress={() => handleMealPlanNavigation(plan)}
-                onLongPress={() => handleDeleteRequest(plan)}
+                onLongPress={() => handleActionRequest(plan)}
                 delayLongPress={800}
               >
                 <View style={styles.dualVerticalContent}>
@@ -830,44 +763,6 @@ export default function NutritionHomeScreen({ route }: any) {
                     Tap to view your meal plan
                   </Text>
                   
-                  {/* Heart Save Icon - Top Right */}
-                  <TouchableOpacity
-                    style={styles.heartButton}
-                    onPress={() => handleSaveMealPlan(plan)}
-                    activeOpacity={0.7}
-                  >
-                    {(() => {
-                      // Check if this plan is saved
-                      const originalPlan = mealPlans.find(p => p.name === plan.name);
-                      if (!originalPlan) return <Ionicons name="heart-outline" size={24} color="rgba(255, 255, 255, 0.7)" />;
-                      
-                      const createFingerprint = (plan: any): string => {
-                        const contentString = JSON.stringify({
-                          name: plan.name.toLowerCase().trim(),
-                          duration: Object.keys(plan.dailyMeals).length,
-                          meals: Object.values(plan.dailyMeals)
-                        });
-                        let hash = 0;
-                        for (let i = 0; i < contentString.length; i++) {
-                          const char = contentString.charCodeAt(i);
-                          hash = ((hash << 5) - hash) + char;
-                          hash = hash & hash;
-                        }
-                        return Math.abs(hash).toString(36);
-                      };
-                      
-                      const fingerprint = createFingerprint(originalPlan);
-                      const isSaved = savedMealPlans.has(fingerprint);
-                      
-                      return (
-                        <Ionicons 
-                          name={isSaved ? "heart" : "heart-outline"} 
-                          size={20} 
-                          color={isSaved ? themeColor : "rgba(255, 255, 255, 0.7)"} 
-                        />
-                      );
-                    })()}
-                  </TouchableOpacity>
 
                   <View style={styles.dualVerticalActions}>
                     <TouchableOpacity
@@ -905,7 +800,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 style={[styles.tripleCard, { borderColor: themeColor, shadowColor: themeColor }]}
                 activeOpacity={0.8}
                 onPress={() => handleMealPlanNavigation(plan)}
-                onLongPress={() => handleDeleteRequest(plan)}
+                onLongPress={() => handleActionRequest(plan)}
                 delayLongPress={800}
               >
                 <View style={styles.tripleContent}>
@@ -946,7 +841,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 style={[styles.quadCard, { borderColor: themeColor, shadowColor: themeColor }]}
                 activeOpacity={0.8}
                 onPress={() => handleMealPlanNavigation(plan)}
-                onLongPress={() => handleDeleteRequest(plan)}
+                onLongPress={() => handleActionRequest(plan)}
                 delayLongPress={800}
               >
                 <View style={styles.quadContent}>
@@ -997,7 +892,7 @@ export default function NutritionHomeScreen({ route }: any) {
               style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
               activeOpacity={0.8}
               onPress={() => handleMealPlanNavigation(plan)}
-              onLongPress={() => handleDeleteRequest(plan)}
+              onLongPress={() => handleActionRequest(plan)}
               delayLongPress={800}
             >
               <View style={styles.heroContent}>
@@ -1010,44 +905,6 @@ export default function NutritionHomeScreen({ route }: any) {
                 </Text>
               </View>
               
-              {/* Heart Save Icon - Top Right */}
-              <TouchableOpacity
-                style={styles.heartButton}
-                onPress={() => handleSaveMealPlan(plan)}
-                activeOpacity={0.7}
-              >
-                {(() => {
-                  // Check if this plan is saved
-                  const originalPlan = mealPlans.find(p => p.name === plan.name);
-                  if (!originalPlan) return <Ionicons name="heart-outline" size={24} color="rgba(255, 255, 255, 0.7)" />;
-                  
-                  const createFingerprint = (plan: any): string => {
-                    const contentString = JSON.stringify({
-                      name: plan.name.toLowerCase().trim(),
-                      duration: Object.keys(plan.dailyMeals).length,
-                      meals: Object.values(plan.dailyMeals)
-                    });
-                    let hash = 0;
-                    for (let i = 0; i < contentString.length; i++) {
-                      const char = contentString.charCodeAt(i);
-                      hash = ((hash << 5) - hash) + char;
-                      hash = hash & hash;
-                    }
-                    return Math.abs(hash).toString(36);
-                  };
-                  
-                  const fingerprint = createFingerprint(originalPlan);
-                  const isSaved = savedMealPlans.has(fingerprint);
-                  
-                  return (
-                    <Ionicons 
-                      name={isSaved ? "heart" : "heart-outline"} 
-                      size={24} 
-                      color={isSaved ? themeColor : "rgba(255, 255, 255, 0.7)"} 
-                    />
-                  );
-                })()}
-              </TouchableOpacity>
 
               <View style={styles.heroActions}>
                 <TouchableOpacity
@@ -1171,41 +1028,63 @@ export default function NutritionHomeScreen({ route }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Delete Modal */}
+      {/* Action Modal */}
       <Modal
         visible={deleteModal.visible}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setDeleteModal({ visible: false, plan: null })}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.deleteContainer}>
-            <View style={styles.deleteIconContainer}>
-              <Ionicons name="warning" size={32} color="#ef4444" />
+        <View style={styles.actionModalOverlay}>
+          <TouchableOpacity 
+            style={styles.actionModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setDeleteModal({ visible: false, plan: null })}
+          />
+          
+          <View style={styles.actionSheet}>
+            {/* Handle Bar */}
+            <View style={styles.handleBar} />
+            
+            {/* Header */}
+            <View style={styles.actionHeader}>
+              <Text style={styles.actionTitle}>Meal Plan Options</Text>
+              <TouchableOpacity
+                style={styles.actionCloseButton}
+                onPress={() => setDeleteModal({ visible: false, plan: null })}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={24} color="#a1a1aa" />
+              </TouchableOpacity>
             </View>
             
-            <Text style={styles.deleteTitle}>Remove Meal Plan?</Text>
-            
-            <View style={styles.deletePlanInfo}>
-              <Text style={styles.deletePlanName} numberOfLines={2}>
+            {/* Plan Info */}
+            <View style={styles.actionPlanInfo}>
+              <Text style={styles.actionPlanName} numberOfLines={2}>
                 {deleteModal.plan?.name}
               </Text>
-              <Text style={styles.deletePlanDetails}>
+              <Text style={styles.actionPlanDetails}>
                 {deleteModal.plan?.duration} days{deleteModal.plan && getMacroSplitDisplay(deleteModal.plan) ? ` • ${getMacroSplitDisplay(deleteModal.plan)}` : ''}
               </Text>
             </View>
             
-            <Text style={styles.deleteMessage}>
-              This will remove the meal plan from your home screen but it will remain saved in "My Meals" for future use.
-            </Text>
-            
-            <View style={styles.deleteButtons}>
+            <View style={styles.modernActionButtons}>
+              {/* Save to My Meals Button */}
               <TouchableOpacity
-                style={styles.deleteCancelButton}
-                onPress={() => setDeleteModal({ visible: false, plan: null })}
+                style={styles.saveActionButton}
+                onPress={() => {
+                  if (deleteModal.plan) {
+                    handleToggleSaveMealPlan(deleteModal.plan);
+                  }
+                }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.deleteCancelText}>Cancel</Text>
+                <Ionicons 
+                  name="heart" 
+                  size={18} 
+                  color="#ffffff" 
+                />
+                <Text style={styles.saveActionText}>Save to My Meals</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -1224,6 +1103,14 @@ export default function NutritionHomeScreen({ route }: any) {
               >
                 <Ionicons name="trash" size={18} color="#ffffff" />
                 <Text style={styles.deleteConfirmText}>Remove</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.deleteCancelButton}
+                onPress={() => setDeleteModal({ visible: false, plan: null })}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.deleteCancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1468,6 +1355,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   heroCard: {
+    position: 'relative',
     backgroundColor: '#18181b',
     borderRadius: 20,
     borderWidth: 2,
@@ -1486,7 +1374,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 20,
     shadowColor: '#22d3ee',
-    position: 'relative', // Add this for absolute positioning children
+    position: 'relative',
   },
   heroContent: {
     alignItems: 'center',
@@ -1575,6 +1463,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   dualVerticalCard: {
+    position: 'relative',
     backgroundColor: '#18181b',
     borderRadius: 16,
     borderWidth: 2,
@@ -1787,6 +1676,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
+  actionModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  actionModalBackdrop: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -1794,23 +1691,73 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
   },
-  deleteContainer: {
+  actionSheet: {
     backgroundColor: '#18181b',
-    borderRadius: 20,
-    borderWidth: 2,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: 34,
+    paddingHorizontal: 20,
+    maxHeight: '80%',
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
     borderColor: '#27272a',
-    padding: 28,
-    width: '100%',
-    maxWidth: 350,
-    alignItems: 'center',
-    shadowColor: '#ef4444',
+    shadowColor: '#000000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: -4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#52525b',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  actionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  actionTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  actionCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#27272a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionPlanInfo: {
+    backgroundColor: '#27272a',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  actionPlanName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  actionPlanDetails: {
+    color: '#a1a1aa',
+    fontSize: 14,
+    textAlign: 'center',
   },
   deleteIconContainer: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -1854,36 +1801,63 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 28,
   },
-  deleteButtons: {
-    flexDirection: 'row',
+  actionButtons: {
+    flexDirection: 'column',
     gap: 12,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  deleteCancelButton: {
-    flex: 1,
-    backgroundColor: '#27272a',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  modernActionButtons: {
+    flexDirection: 'column',
+    gap: 16,
+    width: '100%',
+  },
+  saveActionButton: {
+    width: '100%',
+    backgroundColor: '#10b981',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    gap: 12,
+    shadowColor: '#10b981',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  saveActionText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  deleteCancelButton: {
+    width: '100%',
+    backgroundColor: '#27272a',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
     borderColor: '#3f3f46',
-    minHeight: 44,
   },
   renameButton: {
-    flex: 1,
-    backgroundColor: '#22d3ee',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    width: '100%',
+    backgroundColor: '#3b82f6',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
-    minHeight: 44,
+    gap: 12,
     shadowColor: '#22d3ee',
     shadowOffset: {
       width: 0,
@@ -1894,16 +1868,15 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   deleteConfirmButton: {
-    flex: 1,
+    width: '100%',
     backgroundColor: '#ef4444',
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
-    minHeight: 44,
+    gap: 8,
     shadowColor: '#ef4444',
     shadowOffset: {
       width: 0,
@@ -1914,9 +1887,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   deleteCancelText: {
-    fontSize: 14,
+    color: '#a1a1aa',
+    fontSize: 17,
     fontWeight: '600',
-    color: '#ffffff',
   },
   renameText: {
     fontSize: 14,
@@ -2307,4 +2280,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+
 });

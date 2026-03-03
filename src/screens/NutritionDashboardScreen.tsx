@@ -50,7 +50,7 @@ const questionnaires: QuestionnairCard[] = [
     id: 'sleep',
     title: 'Sleep Optimization',
     subtitle: 'Meal timing & sleep',
-    description: 'Optimize meal timing for better sleep',
+    description: 'Set meal timing around your sleep schedule',
     icon: 'moon-outline',
     navigationTarget: 'SleepOptimizationScreen',
     completionKey: 'sleepOptimization',

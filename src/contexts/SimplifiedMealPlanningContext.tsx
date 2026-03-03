@@ -13,12 +13,19 @@ import {
 
 interface SimplifiedMealPlanningContextType {
   // State
+  mealPlans: SimplifiedMealPlan[];
   currentPlan: SimplifiedMealPlan | null;
   isLoading: boolean;
   
-  // Core operations (simple and reliable)
-  loadMealPlan: () => Promise<void>;
+  // Core operations (multiple meal plans support)
+  loadMealPlans: () => Promise<void>;
   saveMealPlan: (plan: SimplifiedMealPlan) => Promise<void>;
+  setCurrentPlan: (planId: string | null) => Promise<void>;
+  deleteMealPlan: (planId: string) => Promise<void>;
+  
+  // Legacy operations (for backward compatibility)
+  loadMealPlan: () => Promise<void>;
+  clearMealPlan: () => Promise<void>;
   
   // Date-based meal operations (no day name confusion)
   getMealsForDate: (date: string) => SimplifiedMeal[];
@@ -39,6 +46,7 @@ interface SimplifiedMealPlanningProviderProps {
 
 export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProviderProps> = ({ children }) => {
   const [state, setState] = useState({
+    mealPlans: [] as SimplifiedMealPlan[],
     currentPlan: null as SimplifiedMealPlan | null,
     isLoading: true,
   });
@@ -47,41 +55,167 @@ export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProv
   // CORE DATA OPERATIONS - Simple and Reliable
   // =============================================================================
 
-  const loadMealPlan = async (): Promise<void> => {
+  const loadMealPlans = async (): Promise<void> => {
     try {
-      console.log('📂 SimplifiedContext: Loading meal plan...');
+      console.log('📥 SimplifiedContext: Loading meal plans...');
       setState(prev => ({ ...prev, isLoading: true }));
       
-      const data = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLAN);
+      // Load all meal plans
+      const storedPlans = await AsyncStorage.getItem(
+        NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLANS
+      );
       
-      if (data) {
-        const plan = JSON.parse(data) as SimplifiedMealPlan;
-        setState(prev => ({ ...prev, currentPlan: plan, isLoading: false }));
-        console.log(`✅ SimplifiedContext: Loaded plan "${plan.name}" with ${Object.keys(plan.dailyMeals).length} days`);
+      // Load current plan ID
+      const currentPlanId = await AsyncStorage.getItem(
+        NUTRITION_STORAGE_KEYS.CURRENT_PLAN_ID
+      );
+      
+      let plans: SimplifiedMealPlan[] = [];
+      let currentPlan: SimplifiedMealPlan | null = null;
+      
+      if (storedPlans) {
+        plans = JSON.parse(storedPlans) as SimplifiedMealPlan[];
+        console.log(`✅ SimplifiedContext: Loaded ${plans.length} meal plans`);
+        
+        // Find current plan
+        if (currentPlanId && plans.length > 0) {
+          currentPlan = plans.find(p => p.id === currentPlanId) || plans[0];
+        } else if (plans.length > 0) {
+          currentPlan = plans[0]; // Default to first plan
+        }
       } else {
-        console.log('📝 SimplifiedContext: No meal plan found');
-        setState(prev => ({ ...prev, currentPlan: null, isLoading: false }));
+        // Migration: check for legacy single plan
+        const legacyData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLAN);
+        if (legacyData) {
+          const legacyPlan = JSON.parse(legacyData) as SimplifiedMealPlan;
+          plans = [legacyPlan];
+          currentPlan = legacyPlan;
+          // Save in new format
+          await AsyncStorage.setItem(NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLANS, JSON.stringify(plans));
+          await AsyncStorage.setItem(NUTRITION_STORAGE_KEYS.CURRENT_PLAN_ID, legacyPlan.id);
+          console.log('🔄 SimplifiedContext: Migrated legacy plan to new format');
+        }
+      }
+      
+      setState(prev => ({ 
+        ...prev, 
+        mealPlans: plans,
+        currentPlan,
+        isLoading: false 
+      }));
+      
+      if (currentPlan) {
+        console.log(`✅ SimplifiedContext: Current plan: "${currentPlan.name}"`);
       }
     } catch (error) {
-      console.error('❌ SimplifiedContext: Failed to load meal plan:', error);
-      setState(prev => ({ ...prev, currentPlan: null, isLoading: false }));
+      console.error('❌ SimplifiedContext: Failed to load meal plans:', error);
+      setState(prev => ({ 
+        ...prev, 
+        mealPlans: [],
+        currentPlan: null, 
+        isLoading: false 
+      }));
     }
+  };
+
+  // Legacy single plan loading (for backward compatibility)
+  const loadMealPlan = async (): Promise<void> => {
+    await loadMealPlans();
   };
 
   const saveMealPlan = async (plan: SimplifiedMealPlan): Promise<void> => {
     try {
       console.log(`💾 SimplifiedContext: Saving plan "${plan.name}"...`);
       
+      // Update or add plan to the list
+      let updatedPlans = [...state.mealPlans];
+      const existingIndex = updatedPlans.findIndex(p => p.id === plan.id);
+      
+      if (existingIndex >= 0) {
+        updatedPlans[existingIndex] = plan;
+        console.log('✅ SimplifiedContext: Updated existing plan');
+      } else {
+        updatedPlans.push(plan);
+        console.log('✅ SimplifiedContext: Added new plan');
+      }
+      
+      // Save all plans
       await AsyncStorage.setItem(
-        NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLAN,
-        JSON.stringify(plan)
+        NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLANS,
+        JSON.stringify(updatedPlans)
       );
       
-      setState(prev => ({ ...prev, currentPlan: plan }));
+      // Set as current plan and save current plan ID
+      await AsyncStorage.setItem(NUTRITION_STORAGE_KEYS.CURRENT_PLAN_ID, plan.id);
+      
+      setState(prev => ({ 
+        ...prev, 
+        mealPlans: updatedPlans,
+        currentPlan: plan 
+      }));
+      
       console.log('✅ SimplifiedContext: Plan saved successfully');
     } catch (error) {
       console.error('❌ SimplifiedContext: Failed to save meal plan:', error);
       throw error;
+    }
+  };
+
+  const setCurrentPlan = async (planId: string | null): Promise<void> => {
+    try {
+      let newCurrentPlan: SimplifiedMealPlan | null = null;
+      
+      if (planId && state.mealPlans.length > 0) {
+        newCurrentPlan = state.mealPlans.find(p => p.id === planId) || null;
+      }
+      
+      // Save current plan ID
+      if (planId) {
+        await AsyncStorage.setItem(NUTRITION_STORAGE_KEYS.CURRENT_PLAN_ID, planId);
+      } else {
+        await AsyncStorage.removeItem(NUTRITION_STORAGE_KEYS.CURRENT_PLAN_ID);
+      }
+      
+      setState(prev => ({ ...prev, currentPlan: newCurrentPlan }));
+      console.log(`✅ SimplifiedContext: Switched to plan: ${newCurrentPlan?.name || 'none'}`);
+    } catch (error) {
+      console.error('❌ SimplifiedContext: Failed to set current plan:', error);
+    }
+  };
+
+  const deleteMealPlan = async (planId: string): Promise<void> => {
+    try {
+      const updatedPlans = state.mealPlans.filter(p => p.id !== planId);
+      
+      // Save updated plans
+      await AsyncStorage.setItem(
+        NUTRITION_STORAGE_KEYS.SIMPLIFIED_MEAL_PLANS,
+        JSON.stringify(updatedPlans)
+      );
+      
+      // Update current plan if deleted
+      let newCurrentPlan = state.currentPlan;
+      if (state.currentPlan?.id === planId) {
+        newCurrentPlan = updatedPlans.length > 0 ? updatedPlans[0] : null;
+        await setCurrentPlan(newCurrentPlan?.id || null);
+      }
+      
+      setState(prev => ({ 
+        ...prev, 
+        mealPlans: updatedPlans,
+        currentPlan: newCurrentPlan
+      }));
+      
+      console.log(`✅ SimplifiedContext: Deleted plan "${planId}"`);
+    } catch (error) {
+      console.error('❌ SimplifiedContext: Failed to delete meal plan:', error);
+    }
+  };
+
+  // Legacy clear function (for backward compatibility)
+  const clearMealPlan = async (): Promise<void> => {
+    if (state.currentPlan) {
+      await deleteMealPlan(state.currentPlan.id);
     }
   };
 
@@ -90,18 +224,38 @@ export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProv
   // =============================================================================
 
   const getMealsForDate = (date: string): SimplifiedMeal[] => {
+    console.log(`🔍 SimplifiedContext: getMealsForDate called with date: ${date}`);
+    
     if (!state.currentPlan) {
       console.log(`⚠️ SimplifiedContext: No plan loaded, returning empty meals for ${date}`);
       return [];
     }
 
+    console.log(`📋 SimplifiedContext: Current plan loaded:`, {
+      planId: state.currentPlan.id,
+      planName: state.currentPlan.name,
+      totalDailyMealsKeys: Object.keys(state.currentPlan.dailyMeals).length,
+      availableDates: Object.keys(state.currentPlan.dailyMeals),
+      requestedDate: date
+    });
+
     const dayData = state.currentPlan.dailyMeals[date];
     if (!dayData) {
-      console.log(`📅 SimplifiedContext: No meals found for ${date}`);
+      console.log(`❌ SimplifiedContext: No meals found for ${date}`);
+      console.log(`🔍 Available dates in plan:`, Object.keys(state.currentPlan.dailyMeals));
+      console.log(`🔍 Date comparison:`, {
+        requestedDate: date,
+        availableDates: Object.keys(state.currentPlan.dailyMeals),
+        exactMatch: Object.keys(state.currentPlan.dailyMeals).includes(date),
+        similarDates: Object.keys(state.currentPlan.dailyMeals).filter(d => d.includes(date.split('-')[2]) || date.includes(d.split('-')[2]))
+      });
       return [];
     }
 
-    console.log(`🍽️ SimplifiedContext: Found ${dayData.meals.length} meals for ${date}`);
+    console.log(`✅ SimplifiedContext: Found day data for ${date}:`, {
+      dayName: dayData.dayName,
+      mealCount: dayData.meals.length
+    });
     
     // Debug: Log meal data structure
     dayData.meals.forEach((meal, index) => {
@@ -111,7 +265,8 @@ export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProv
         type: meal.type,
         time: meal.time,
         hasName: meal.name !== undefined,
-        hasType: meal.type !== undefined
+        hasType: meal.type !== undefined,
+        calories: meal.calories
       });
     });
     
@@ -398,9 +553,9 @@ export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProv
     }
   };
 
-  // Load plan on mount
+  // Load plans on mount
   useEffect(() => {
-    loadMealPlan();
+    loadMealPlans();
   }, []);
 
   // =============================================================================
@@ -408,10 +563,15 @@ export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProv
   // =============================================================================
 
   const contextValue: SimplifiedMealPlanningContextType = {
+    mealPlans: state.mealPlans,
     currentPlan: state.currentPlan,
     isLoading: state.isLoading,
-    loadMealPlan,
+    loadMealPlans,
     saveMealPlan,
+    setCurrentPlan,
+    deleteMealPlan,
+    loadMealPlan,
+    clearMealPlan,
     getMealsForDate,
     addMealToDate,
     deleteMealFromDate,
