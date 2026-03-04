@@ -61,6 +61,8 @@ const convertToLegacyFormat = (simplifiedPlan: SimplifiedMealPlan): MealPlan => 
     id: simplifiedPlan.id,
     name: simplifiedPlan.name,
     duration: Object.keys(simplifiedPlan.dailyMeals).length,
+    meals: Object.values(simplifiedPlan.dailyMeals).reduce((total: number, day: any) => total + day.meals.length, 0),
+    fingerprint: simplifiedPlan.id, // Use the SimplifiedMealPlan ID as fingerprint
     data: {
       days: days,
       // Include metadata for macro calculations
@@ -491,12 +493,13 @@ export default function NutritionHomeScreen({ route }: any) {
     });
   };
 
-  // Always allow saving - no duplicate checking
+  // Check if plan is already saved
   const isPlanSaved = (plan: MealPlan): boolean => {
-    return false; // Always show "Save to My Meals" to allow multiple saves
+    const planId = plan.fingerprint || plan.id;
+    return savedMealPlans.has(planId);
   };
 
-  // Save meal plan (always save, no duplicate checking)
+  // Toggle save/unsave meal plan
   const handleToggleSaveMealPlan = async (plan: MealPlan) => {
     try {
       const originalPlan = mealPlans.find(p => p.name === plan.name);
@@ -505,21 +508,40 @@ export default function NutritionHomeScreen({ route }: any) {
         return;
       }
 
-      // Always save - create unique ID with timestamp
-      const transformedMealPlan = {
-        id: `${originalPlan.id}_${Date.now()}`, // Unique ID to allow multiple saves
-        name: originalPlan.name,
-        duration: Object.keys(originalPlan.dailyMeals).length,
-        meals: Object.values(originalPlan.dailyMeals).reduce((total, day: any) => total + day.meals.length, 0),
-        data: originalPlan,
-        fingerprint: `${originalPlan.id}_${Date.now()}`, // Unique fingerprint
-        createdAt: Date.now(),
-      };
+      const planId = originalPlan.fingerprint || originalPlan.id;
+      const isCurrentlySaved = savedMealPlans.has(planId);
+      
+      console.log('💾 Save meal plan button pressed:', originalPlan.name, 'Currently saved:', isCurrentlySaved);
+      
+      if (isCurrentlySaved) {
+        // Unsave the meal plan
+        await WorkoutStorage.removeMealPlan(planId);
+        setSavedMealPlans(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(planId);
+          return newSet;
+        });
+        console.log('❌ Meal plan removed from My Meals');
+      } else {
+        // Save the meal plan
+        const transformedMealPlan = {
+          id: originalPlan.id,
+          name: originalPlan.name,
+          duration: Object.keys(originalPlan.dailyMeals).length,
+          meals: Object.values(originalPlan.dailyMeals).reduce((total, day: any) => total + day.meals.length, 0),
+          data: originalPlan,
+          fingerprint: originalPlan.fingerprint || originalPlan.id,
+          createdAt: Date.now(),
+        };
 
-      await WorkoutStorage.addMealPlan(transformedMealPlan);
+        await WorkoutStorage.addMealPlan(transformedMealPlan);
+        setSavedMealPlans(prev => new Set([...prev, transformedMealPlan.fingerprint]));
+        console.log('✅ Meal plan saved successfully');
+      }
+      
     } catch (error) {
-      console.error('Failed to save meal plan:', error);
-      Alert.alert('Error', 'Failed to save meal plan. Please try again.');
+      console.error('Failed to toggle meal plan save:', error);
+      Alert.alert('Error', 'Failed to update meal plan. Please try again.');
     }
   };
 
@@ -963,20 +985,28 @@ export default function NutritionHomeScreen({ route }: any) {
             <View style={styles.modernActionButtons}>
               {/* Save to My Meals Button */}
               <TouchableOpacity
-                style={styles.saveActionButton}
+                style={[
+                  styles.saveActionButton,
+                  deleteModal.plan && savedMealPlans.has(deleteModal.plan.fingerprint || deleteModal.plan.id) && styles.removeActionButton
+                ]}
                 onPress={() => {
+                  console.log('🔥 Save button pressed, modal plan:', deleteModal.plan?.name);
                   if (deleteModal.plan) {
                     handleToggleSaveMealPlan(deleteModal.plan);
+                  } else {
+                    console.log('❌ No plan in modal');
                   }
                 }}
                 activeOpacity={0.7}
               >
                 <Ionicons 
-                  name="heart" 
+                  name={deleteModal.plan && savedMealPlans.has(deleteModal.plan.fingerprint || deleteModal.plan.id) ? "heart-dislike" : "heart"} 
                   size={18} 
                   color="#ffffff" 
                 />
-                <Text style={styles.saveActionText}>Save to My Meals</Text>
+                <Text style={styles.saveActionText}>
+                  {deleteModal.plan && savedMealPlans.has(deleteModal.plan.fingerprint || deleteModal.plan.id) ? 'Remove from My Meals' : 'Save to My Meals'}
+                </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -1723,6 +1753,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
+  },
+  removeActionButton: {
+    backgroundColor: '#f59e0b',
+    shadowColor: '#f59e0b',
   },
   saveActionText: {
     color: '#ffffff',
