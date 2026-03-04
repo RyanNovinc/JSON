@@ -53,14 +53,14 @@ const features = [
     desc: 'Meal times optimized around your circadian rhythm for better recovery, energy, and sleep quality',
   },
   {
-    icon: '💰',
-    title: 'Skip the Dietitian',
-    desc: 'Skip costly dietitian visits — get unlimited personalized meal plans that adjust as you progress',
-  },
-  {
     icon: '🥡',
     title: 'Pantry Intelligence',
     desc: 'Input your existing ingredients and get meal plans that work around what\'s already in your kitchen',
+  },
+  {
+    icon: '💰',
+    title: 'Skip the Dietitian',
+    desc: 'Skip costly dietitian visits — get unlimited personalized meal plans that adjust as you progress',
   },
 ];
 
@@ -250,7 +250,7 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
             onPress={() => setShowComparison(!showComparison)}
           >
             <Text style={styles.comparisonToggleText}>
-              {showComparison ? 'Hide' : 'See how we'} compare to meal planning apps
+              {showComparison ? 'Hide' : 'See how we'} compare to hiring a dietitian
             </Text>
             <Ionicons
               name={showComparison ? 'chevron-up' : 'chevron-down'}
@@ -265,16 +265,16 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
               <View style={styles.comparisonHeader}>
                 <Text style={styles.comparisonHeaderEmpty}></Text>
                 <Text style={[styles.comparisonHeaderText, { color: CYAN }]}>JSON.fit</Text>
-                <Text style={[styles.comparisonHeaderText, { color: TEXT_SECONDARY }]}>Others</Text>
+                <Text style={[styles.comparisonHeaderText, { color: TEXT_SECONDARY }]}>Dietitian</Text>
               </View>
               {[
-                { feature: 'Personalized macros', us: true, them: false },
-                { feature: 'Sleep-optimized timing', us: true, them: false },
-                { feature: 'Skill-adaptive recipes', us: true, them: false },
-                { feature: 'Real grocery pricing', us: true, them: false },
-                { feature: 'Meal prep planning', us: true, them: 'Basic' },
-                { feature: 'No subscription', us: true, them: false },
-                { feature: 'Typical cost', us: '$9.99 once', them: '$15–30/mo' },
+                { feature: 'Personalized macros', us: true, them: true },
+                { feature: 'Unlimited meal plans', us: true, them: false },
+                { feature: 'Available 24/7', us: true, them: false },
+                { feature: 'Ongoing plan adjustments', us: true, them: false },
+                { feature: 'No appointments needed', us: true, them: false },
+                { feature: 'No subscription fees', us: true, them: false },
+                { feature: 'Typical cost', us: '$9.99 once', them: '$150–300/session' },
               ].map((row, index) => (
                 <View key={index} style={styles.comparisonRow}>
                   <Text style={styles.comparisonFeature}>{row.feature}</Text>
@@ -295,7 +295,7 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
 
         {/* Price Section */}
         <View style={styles.priceSection}>
-          <Text style={styles.priceStrike}>$79.99/year (like others)</Text>
+          <Text style={styles.priceStrike}>$150–300/session (dietitians)</Text>
           <View style={styles.priceContainer}>
             <Text style={styles.priceMain}>$9.99</Text>
             <Text style={styles.priceCurrency}>USD</Text>
