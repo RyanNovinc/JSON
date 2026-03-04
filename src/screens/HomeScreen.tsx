@@ -782,17 +782,9 @@ export default function HomeScreen({ route }: any) {
   }, [isNutritionMode, navigation]);
 
   const renderContent = () => {
-    // Show nutrition content when in nutrition mode (development only)
+    // If in nutrition mode, don't render workout content - navigation happens in useEffect above
     if (isNutritionMode) {
-      return (
-        <View style={styles.emptyState}>
-          <Ionicons name="restaurant-outline" size={64} color="#3f3f46" />
-          <Text style={styles.emptyTitle}>Nutrition Planning</Text>
-          <Text style={styles.emptyDescription}>
-            Loading nutrition features...
-          </Text>
-        </View>
-      );
+      return null; // Don't render anything while navigating to nutrition screen
     }
 
     if (routines.length === 0) {
@@ -2665,5 +2657,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  nutritionPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  nutritionPlaceholderTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  nutritionPlaceholderText: {
+    fontSize: 16,
+    color: '#71717a',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

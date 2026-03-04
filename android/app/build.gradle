@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.RyanNovinc.JSON'
+    namespace 'com.RyanNovinc.JSONfit'
     defaultConfig {
-        applicationId 'com.RyanNovinc.JSON'
+        applicationId 'com.RyanNovinc.JSONfit'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

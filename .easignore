@@ -1,0 +1,46 @@
+# Copy everything from .gitignore
+node_modules/
+.expo/
+.vscode/
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# CRITICAL: Exclude massive directories
+ios/
+android/
+DateDownMobile/
+lambda-*/
+aws-lambda/
+lambda-layer/
+lambda-presigned-urls/
+lambda-async-processor/
+lambda-video-recipe/
+*.zip
+
+# Git history
+.git/
+
+# Additional files EAS Build doesn't need
+docs/
+screenshots/
+*.md
+README.md
+coverage/
+tests/
+__tests__/
+*.test.js
+*.spec.js
+
+# Large assets not needed for build
+*.sketch
+*.fig
+*.psd
+*.ai
+
+# Development files
+.env.local
+.env.development
+metro.config.js.bak

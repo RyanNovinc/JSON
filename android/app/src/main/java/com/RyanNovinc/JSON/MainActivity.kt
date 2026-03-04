@@ -1,4 +1,4 @@
-package com.RyanNovinc.JSON
+package com.RyanNovinc.JSONfit
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

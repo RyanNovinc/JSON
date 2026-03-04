@@ -1,4 +1,4 @@
-package com.RyanNovinc.JSON
+package com.RyanNovinc.JSONfit
 
 import android.app.Application
 import android.content.res.Configuration

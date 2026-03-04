@@ -21,21 +21,13 @@ export default function PaymentScreen() {
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
 
   const handlePurchaseSuccess = () => {
-    // Handle successful purchase
-    Alert.alert(
-      'Welcome to Pro!',
-      'You now have access to all premium features.',
-      [{ text: 'Awesome!', onPress: () => navigation.goBack() }]
-    );
+    // Handle successful purchase - custom modal will handle this
+    // The PurchaseSuccessModal will show and navigate to NutritionHome on close
   };
 
   const handleRestoreSuccess = () => {
-    // Handle successful restore
-    Alert.alert(
-      'Purchases Restored!',
-      'Your premium access has been restored.',
-      [{ text: 'Great!', onPress: () => navigation.goBack() }]
-    );
+    // Handle successful restore - navigate to nutrition home screen
+    navigation.navigate('NutritionHome' as any);
   };
 
   return (

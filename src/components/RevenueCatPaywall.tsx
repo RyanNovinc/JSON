@@ -11,7 +11,8 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { PurchasesPackage } from 'react-native-purchases';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
-import { PRODUCT_CONFIG } from '../config/revenueCatConfig';
+import { PRODUCT_CONFIG, REVENUECAT_CONFIG } from '../config/revenueCatConfig';
+import PurchaseSuccessModal from './PurchaseSuccessModal';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface RevenueCatPaywallProps {
@@ -41,6 +42,7 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [lifetimePackage, setLifetimePackage] = useState<PurchasesPackage | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Find lifetime package from current offering
   useEffect(() => {
@@ -60,22 +62,13 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
       clearError();
 
       // Use actual RevenueCat purchase with your configured offering and package
-      const success = await purchasePackage('lifetime_pro', 'lifetime_pro_tier_1');
+      const success = await purchasePackage(
+        REVENUECAT_CONFIG.offerings.lifetime_pro, 
+        REVENUECAT_CONFIG.packages.lifetime_pro_tier_1
+      );
       
       if (success) {
-        Alert.alert(
-          'Welcome to Pro!',
-          'You now have lifetime access to all premium features!',
-          [
-            { 
-              text: 'Awesome!', 
-              onPress: () => {
-                onPurchaseSuccess?.();
-                onClose?.();
-              }
-            }
-          ]
-        );
+        setShowSuccessModal(true);
       } else {
         throw new Error('Purchase failed');
       }
@@ -227,6 +220,16 @@ const RevenueCatPaywall: React.FC<RevenueCatPaywallProps> = ({
       <Text style={styles.urgencyText}>
         This won't last. Claim your lifetime access now — no strings attached.
       </Text>
+
+      {/* Success Modal */}
+      <PurchaseSuccessModal
+        visible={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          onPurchaseSuccess?.();
+          onClose?.();
+        }}
+      />
     </View>
   );
 };

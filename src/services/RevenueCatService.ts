@@ -7,7 +7,7 @@ import Purchases, {
   PURCHASES_ERROR_CODE
 } from 'react-native-purchases';
 import { Platform } from 'react-native';
-import { REVENUECAT_CONFIG, hasJSONProAccess } from '../config/revenueCatConfig';
+import { REVENUECAT_CONFIG, hasJSONProAccess, getRevenueCatAPIKey } from '../config/revenueCatConfig';
 
 interface PurchaseResult {
   success: boolean;
@@ -57,9 +57,14 @@ class RevenueCatService {
         Purchases.setLogLevel(LOG_LEVEL.INFO); // Show important info in development
       }
 
+      // Get the appropriate API key based on environment
+      const apiKey = getRevenueCatAPIKey();
+      console.log(`[RevenueCat] Using API key: ${apiKey.substring(0, 8)}... (${__DEV__ ? 'Test Store' : 'Production'})`);
+      console.log(`[RevenueCat] Full API key for debugging: ${apiKey}`);
+      
       // Configure SDK with LifeCompass-proven settings
       const config = {
-        apiKey: Platform.OS === 'ios' ? REVENUECAT_CONFIG.apple : REVENUECAT_CONFIG.google,
+        apiKey: apiKey,
         appUserID: userId || undefined,
         observerMode: false,
         userDefaultsSuiteName: undefined,
@@ -106,12 +111,15 @@ class RevenueCatService {
     } catch (error) {
       console.error('[RevenueCat] Configuration failed:', error);
       
-      // In development, this is expected (simulator limitations)
+      // In development, log the error but don't throw - Test Store should work
       if (__DEV__) {
-        console.log('🔧 [RevenueCat] Development mode: Configuration failed (expected in simulator)');
-        console.log('✅ [RevenueCat] Service is correctly configured for production builds');
+        console.log('🔧 [RevenueCat] Configuration failed in development mode');
+        console.log('❗ Error details:', error);
+        console.log('💡 This may be due to Test Store API key issues or network connectivity');
+        
+        // Set configured to false but allow app to continue
         this.isConfigured = false;
-        throw new Error(`Development mode: RevenueCat not available in simulator`);
+        return; // Exit gracefully to allow app functionality
       }
       
       this.isConfigured = false;
@@ -190,6 +198,20 @@ class RevenueCatService {
         current: offerings.current?.identifier,
         all: Object.keys(offerings.all),
       });
+      
+      // Debug: Log all available packages in each offering
+      if (__DEV__) {
+        Object.entries(offerings.all).forEach(([offeringId, offering]) => {
+          console.log(`[RevenueCat] Offering "${offeringId}" packages:`, 
+            offering.availablePackages.map(pkg => ({
+              id: pkg.identifier,
+              productId: pkg.product.identifier,
+              price: pkg.product.priceString
+            }))
+          );
+        });
+      }
+      
       return Object.values(offerings.all);
     } catch (error) {
       console.error('[RevenueCat] Failed to get offerings:', error);
@@ -218,6 +240,10 @@ class RevenueCatService {
       console.log('[RevenueCat] Purchasing package:', `${offeringId}.${packageId}`);
       
       if (!this.isConfigured) {
+        // In development mode, provide helpful error message
+        if (__DEV__) {
+          throw new Error('RevenueCat configuration failed. Check your Test Store API key and network connection.');
+        }
         throw new Error('RevenueCat not configured. Please sign in with Apple ID first.');
       }
 
@@ -458,7 +484,7 @@ class RevenueCatService {
    */
   async logoutUser(): Promise<CustomerInfo> {
     try {
-      const { customerInfo } = await Purchases.logOut();
+      const customerInfo = await Purchases.logOut();
       console.log('[RevenueCat] User logged out');
       return customerInfo;
     } catch (error) {

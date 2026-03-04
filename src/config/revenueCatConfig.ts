@@ -1,5 +1,10 @@
+import { Platform } from 'react-native';
+
 // RevenueCat Configuration - Based on working LifeCompass implementation
 export const REVENUECAT_CONFIG = {
+  // Test Store API Key (for development testing without App Store setup)
+  testStore: 'test_axWlVBbeCTMoZdSVmpVTXqORJnq',
+  
   // iOS API Key (Apple App Store)
   apple: 'appl_GISpMfUXbUvJLSKcoRrUZPcZWRp',
   
@@ -13,14 +18,14 @@ export const REVENUECAT_CONFIG = {
     nutrition_access: 'nutrition_access', // Nutrition-specific entitlement
   },
 
-  // Offering IDs (these match what you created in RevenueCat)
+  // Offering IDs (Test Store uses 'default', production uses your custom IDs)
   offerings: {
-    lifetime_pro: 'lifetime_pro',   // Your offering identifier
+    lifetime_pro: __DEV__ ? 'default' : 'lifetime_pro',   // Test Store uses 'default'
   },
 
-  // Package IDs within offerings (these need to match what you set up in RevenueCat)
+  // Package IDs within offerings (Test Store has built-in packages)
   packages: {
-    lifetime_pro_tier_1: 'lifetime_pro_tier_1', // Your package identifier
+    lifetime_pro_tier_1: __DEV__ ? '$rc_lifetime' : 'lifetime_pro_tier_1', // Test Store package
   },
   
   // Debug mode
@@ -61,4 +66,24 @@ export const hasJSONProAccess = (customerInfo: any): boolean => {
 // Helper to check if user has nutrition access
 export const hasNutritionAccess = (customerInfo: any): boolean => {
   return hasEntitlement(customerInfo, REVENUECAT_CONFIG.entitlements.nutrition_access);
+};
+
+// Helper to get the appropriate API key based on environment
+export const getRevenueCatAPIKey = (): string => {
+  // In development, use Test Store for testing
+  if (__DEV__) {
+    console.log('[RevenueCat] Using Test Store for development testing');
+    return REVENUECAT_CONFIG.testStore;
+  }
+  
+  // In production, use platform-specific keys
+  if (Platform.OS === 'ios') {
+    console.log('[RevenueCat] Using Apple App Store API key for production');
+    return REVENUECAT_CONFIG.apple;
+  } else if (Platform.OS === 'android') {
+    return REVENUECAT_CONFIG.google;
+  }
+  
+  // Fallback to iOS key
+  return REVENUECAT_CONFIG.apple;
 };

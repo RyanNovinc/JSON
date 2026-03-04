@@ -13,8 +13,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "2",
+      "bundleIdentifier": "com.RyanNovinc.JSONfit",
+      "buildNumber": "1",
       "infoPlist": {
         "CFBundleDisplayName": "JSON.fit",
         "CFBundleName": "JSON.fit",
@@ -26,7 +26,7 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0f0f0f"
       },
-      "package": "com.RyanNovinc.JSON",
+      "package": "com.RyanNovinc.JSONfit",
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
@@ -42,32 +42,7 @@
     },
     "owner": "ryan_novinc",
     "plugins": [
-      "@react-native-community/datetimepicker",
-      [
-        "expo-share-intent",
-        {
-          "iosActivationRules": {
-            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
-            "NSExtensionActivationSupportsText": true
-          },
-          "androidIntentFilters": [
-            {
-              "action": "android.intent.action.SEND",
-              "category": ["android.intent.category.DEFAULT"],
-              "data": {
-                "mimeType": "text/*"
-              }
-            },
-            {
-              "action": "android.intent.action.SEND",
-              "category": ["android.intent.category.DEFAULT"],
-              "data": {
-                "mimeType": "video/*"
-              }
-            }
-          ]
-        }
-      ]
+      "@react-native-community/datetimepicker"
     ]
   }
 }
