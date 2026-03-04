@@ -2,6 +2,8 @@
 
 First, read the JSON file you just created so you have the full content in context. Then review it as an experienced coach auditing a program for a client. This is an independent quality gate — do not assume your self-check caught everything.
 
+**USE WEB SEARCH** - If you have web search available, use it during the review to verify that volume recommendations, rest periods, or exercise selections align with current research standards when you think it would add value to the quality check.
+
 ## Review Checklist
 
 Work through each check. For each, state PASS or FAIL with a brief note.

@@ -156,7 +156,49 @@ export interface SimplifiedMealPlan {
       time_required: number;
     }>;
   };
-  // Legacy meal prep session structure (still used by MealPrepSessionScreen)
+  // Multiple meal prep sessions support (new format)
+  meal_prep_sessions?: Array<{
+    session_name: string;
+    prep_time: number;
+    cook_time: number;
+    total_time: number;
+    covers: string;
+    recommended_timing: string;
+    equipment_needed: string[];
+    instructions: string[];
+    storage_guidelines: Record<string, string>;
+    ingredients?: Array<{
+      item: string;
+      amount: string;
+      unit: string;
+      scalable: boolean;
+      notes: string;
+    }>;
+    prep_meals?: Array<{
+      meal_name: string;
+      meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+      prep_time: number;
+      cook_time: number;
+      total_time: number;
+      servings: number;
+      calories: number;
+      macros: {
+        protein: number;
+        carbs: number;
+        fat: number;
+        fiber: number;
+      };
+      ingredients: Array<{
+        item: string;
+        amount: string;
+        unit: string;
+        notes: string;
+      }>;
+      instructions: string[];
+      meal_prep_notes: string;
+    }>;
+  }>;
+  // Legacy meal prep session structure (still used by MealPrepSessionScreen for backward compatibility)
   meal_prep_session?: {
     session_name: string;
     prep_time: number;

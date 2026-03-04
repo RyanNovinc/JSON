@@ -541,19 +541,7 @@ export default function MealPlanDaysScreen() {
           });
           return Array.from(equipment);
         })(),
-        instructions: (() => {
-          const allInstructions: string[] = [];
-          finalMainPrepMeals.forEach((meal, mealIndex) => {
-            if (meal.instructions && meal.instructions.length > 0) {
-              allInstructions.push(`=== ${meal.name} ===`);
-              meal.instructions.forEach((instruction: string, stepIndex: number) => {
-                allInstructions.push(`${mealIndex + 1}.${stepIndex + 1} ${instruction}`);
-              });
-              allInstructions.push('');
-            }
-          });
-          return allInstructions;
-        })(),
+        instructions: [],
         storage_guidelines: {
           proteins: "Refrigerate cooked proteins for up to 4 days",
           grains: "Store cooked rice/oats in refrigerator for up to 5 days", 
@@ -610,19 +598,7 @@ export default function MealPlanDaysScreen() {
           equipment.add('Fresh storage containers');
           return Array.from(equipment);
         })(),
-        instructions: (() => {
-          const allInstructions: string[] = [];
-          finalQuickPrepMeals.forEach((meal, mealIndex) => {
-            if (meal.instructions && meal.instructions.length > 0) {
-              allInstructions.push(`=== ${meal.name} ===`);
-              meal.instructions.forEach((instruction: string, stepIndex: number) => {
-                allInstructions.push(`${mealIndex + 1}.${stepIndex + 1} ${instruction}`);
-              });
-              allInstructions.push('');
-            }
-          });
-          return allInstructions;
-        })(),
+        instructions: [],
         storage_guidelines: {
           proteins: "Refrigerate fresh proteins for up to 3 days",
           vegetables: "Keep cut vegetables fresh for 2-3 days refrigerated",
@@ -683,19 +659,7 @@ export default function MealPlanDaysScreen() {
           });
           return Array.from(equipment);
         })(),
-        instructions: (() => {
-          const allInstructions: string[] = [];
-          uniqueMealsArray.forEach((meal, mealIndex) => {
-            if (meal.instructions && meal.instructions.length > 0) {
-              allInstructions.push(`=== ${meal.name} ===`);
-              meal.instructions.forEach((instruction: string, stepIndex: number) => {
-                allInstructions.push(`${mealIndex + 1}.${stepIndex + 1} ${instruction}`);
-              });
-              allInstructions.push('');
-            }
-          });
-          return allInstructions;
-        })(),
+        instructions: [],
         storage_guidelines: {
           proteins: "Refrigerate cooked proteins for up to 4 days",
           grains: "Store cooked rice/oats in refrigerator for up to 5 days", 
@@ -731,14 +695,30 @@ export default function MealPlanDaysScreen() {
   // Use legacy data if available, otherwise generate from SimplifiedMealPlan
   const effectiveGroceryList = currentGroceryList || generateGroceryListFromCurrentPlan();
   
-  // Force generate meal prep sessions if no legacy sessions exist
+  // Priority order for meal prep sessions:
+  // 1. Use imported meal_prep_sessions array from currentPlan (new multi-session format)
+  // 2. Use imported meal_prep_session from currentPlan (legacy single session, wrap in array)
+  // 3. Use legacy allMealPrepSessions from route params
+  // 4. Generate from current plan as fallback
   let effectiveMealPrepSessions = allMealPrepSessions;
-  if (!effectiveMealPrepSessions || effectiveMealPrepSessions.length === 0) {
-    console.log('🔥 No legacy meal prep sessions, generating from current plan...');
+  
+  // Check for new multi-session format first
+  if (currentPlan?.meal_prep_sessions && currentPlan.meal_prep_sessions.length > 0) {
+    console.log('🎯 Using imported meal_prep_sessions array from JSON with multiple sessions');
+    effectiveMealPrepSessions = currentPlan.meal_prep_sessions;
+  }
+  // Check for legacy single session format
+  else if (currentPlan?.meal_prep_session) {
+    console.log('🎯 Using imported meal_prep_session from JSON (legacy single session, wrapped in array)');
+    effectiveMealPrepSessions = [currentPlan.meal_prep_session];
+  } 
+  // Fall back to route params or generated sessions
+  else if (!effectiveMealPrepSessions || effectiveMealPrepSessions.length === 0) {
+    console.log('🔥 No imported meal prep sessions, generating from current plan...');
     effectiveMealPrepSessions = generateMealPrepFromCurrentPlan();
     console.log('🔥 Generated meal prep sessions:', effectiveMealPrepSessions);
   } else {
-    console.log('🔥 Using legacy meal prep sessions:', effectiveMealPrepSessions);
+    console.log('🔥 Using legacy meal prep sessions from route params:', effectiveMealPrepSessions);
   }
   
   // Debug logging
@@ -1293,19 +1273,30 @@ export default function MealPlanDaysScreen() {
                 <Text style={styles.sectionTitle}>Shopping List</Text>
               </View>
               <TouchableOpacity 
-                style={[styles.groceryCardFriendly, { backgroundColor: `${themeColor}15` }]}
+                style={[styles.groceryCardImproved, { backgroundColor: `${themeColor}08` }]}
                 onPress={() => navigation.navigate('GroceryList', { groceryList: effectiveGroceryList })}
                 activeOpacity={0.8}
               >
-                <View style={styles.groceryFriendlyContent}>
-                  <Text style={styles.groceryFriendlyMain}>
-                    ${actualGroceryTotal.toFixed(2)} grocery trip
-                  </Text>
-                  <Text style={styles.groceryFriendlySubtext}>
+                <View style={styles.groceryIconContainer}>
+                  <LinearGradient
+                    colors={[themeColor, `${themeColor}CC`]}
+                    style={styles.groceryIcon}
+                  >
+                    <Ionicons name="bag" size={24} color="#ffffff" />
+                  </LinearGradient>
+                </View>
+                <View style={styles.groceryContentImproved}>
+                  <View style={styles.groceryAmountRow}>
+                    <Text style={styles.groceryAmount}>${actualGroceryTotal.toFixed(2)}</Text>
+                    <Text style={styles.groceryLabel}>grocery trip</Text>
+                  </View>
+                  <Text style={styles.grocerySubtext}>
                     Tap to see your shopping list
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={themeColor} />
+                <View style={styles.groceryArrowContainer}>
+                  <Ionicons name="chevron-forward" size={22} color={themeColor} />
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -1327,37 +1318,62 @@ export default function MealPlanDaysScreen() {
               {effectiveMealPrepSessions.map((session, index) => (
                 <TouchableOpacity 
                   key={session.session_number || index}
-                  style={[styles.prepCardFriendly, { backgroundColor: `${themeColor}10` }]}
+                  style={[styles.prepCardImproved, { backgroundColor: `${themeColor}06` }]}
                   onPress={() => {
                     navigation.navigate('MealPrepSession', {
                       mealPrepSession: session,
                       sessionIndex: index,
-                      allSessions: allMealPrepSessions,
+                      allSessions: effectiveMealPrepSessions,
                     });
                   }}
                 >
-                  <View style={styles.prepFriendlyContent}>
-                    <View style={styles.prepFriendlyHeader}>
-                      <Text style={styles.prepFriendlyTitle}>
-                        {effectiveMealPrepSessions.length > 1 ? `Prep ${index + 1}` : 'Meal Prep'}
-                      </Text>
-                      <Text style={styles.prepFriendlyTime}>
-                        {session.total_time} min
-                      </Text>
+                  <View style={styles.prepIconContainer}>
+                    <LinearGradient
+                      colors={[themeColor, `${themeColor}DD`]}
+                      style={styles.prepIcon}
+                    >
+                      <Ionicons 
+                        name={index === 0 ? "restaurant" : "leaf"} 
+                        size={20} 
+                        color="#ffffff" 
+                      />
+                    </LinearGradient>
+                  </View>
+                  
+                  <View style={styles.prepContentImproved}>
+                    <View style={styles.prepHeaderImproved}>
+                      <View style={styles.prepTitleRow}>
+                        <Text style={styles.prepTitleImproved}>
+                          {effectiveMealPrepSessions.length > 1 ? `Prep ${index + 1}` : 'Meal Prep'}
+                        </Text>
+                        <View style={[styles.prepTimeBadge, { backgroundColor: `${themeColor}20` }]}>
+                          <Ionicons name="time" size={14} color={themeColor} />
+                          <Text style={[styles.prepTimeBadgeText, { color: themeColor }]}>
+                            {session.total_time} min
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                    <Text style={styles.prepFriendlyWhen}>
-                      {session.recommended_date}
-                    </Text>
-                    {session.recommended_timing && (
-                      <Text style={styles.prepFriendlyTiming}>
-                        {session.recommended_timing}
+                    
+                    <View style={styles.prepDateSection}>
+                      <Text style={styles.prepDateText}>
+                        {session.recommended_date}
                       </Text>
-                    )}
-                    <Text style={styles.prepFriendlyDays}>
+                      {session.recommended_timing && (
+                        <Text style={styles.prepTimingText}>
+                          {session.recommended_timing}
+                        </Text>
+                      )}
+                    </View>
+                    
+                    <Text style={styles.prepMealsText}>
                       {session.covers || 'Meal prep recipes'}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={themeColor} />
+                  
+                  <View style={styles.prepArrowContainer}>
+                    <Ionicons name="chevron-forward" size={22} color={themeColor} />
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1386,6 +1402,14 @@ export default function MealPlanDaysScreen() {
               </TouchableOpacity>
             </View>
           ) : null}
+
+          {/* Daily Meal Plans Section */}
+          {days.length > 0 && (
+            <View style={styles.daysSection}>
+              <Text style={styles.sectionTitle}>Your Week</Text>
+              <Text style={styles.sectionSubtitle}>Daily meal plans and progress</Text>
+            </View>
+          )}
 
           {/* Days Grouped by Prep Session */}
           {dayGroups.map((group, groupIndex) => (
@@ -1533,6 +1557,64 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(63, 63, 70, 0.3)',
   },
+  groceryCardImproved: {
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(24, 24, 27, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(63, 63, 70, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  groceryIconContainer: {
+    marginRight: 16,
+  },
+  groceryIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  groceryContentImproved: {
+    flex: 1,
+  },
+  groceryAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 4,
+  },
+  groceryAmount: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: -1,
+    marginRight: 8,
+  },
+  groceryLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a1a1aa',
+  },
+  grocerySubtext: {
+    fontSize: 14,
+    color: '#71717a',
+    fontWeight: '500',
+  },
+  groceryArrowContainer: {
+    marginLeft: 12,
+    padding: 4,
+  },
   groceryFriendlyContent: {
     flex: 1,
   },
@@ -1602,6 +1684,9 @@ const styles = StyleSheet.create({
   },
   prepSessionsSection: {
     marginBottom: 32,
+  },
+  daysSection: {
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 24,
@@ -1845,6 +1930,95 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  prepCardImproved: {
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    backgroundColor: 'rgba(24, 24, 27, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(63, 63, 70, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  prepIconContainer: {
+    marginRight: 16,
+    marginTop: 2,
+  },
+  prepIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  prepContentImproved: {
+    flex: 1,
+  },
+  prepHeaderImproved: {
+    marginBottom: 12,
+  },
+  prepTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  prepTitleImproved: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.6,
+    flex: 1,
+  },
+  prepTimeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  prepTimeBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  prepDateSection: {
+    marginBottom: 12,
+  },
+  prepDateText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 2,
+    letterSpacing: -0.3,
+  },
+  prepTimingText: {
+    fontSize: 13,
+    color: '#a1a1aa',
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  prepMealsText: {
+    fontSize: 14,
+    color: '#71717a',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  prepArrowContainer: {
+    marginLeft: 12,
+    marginTop: 8,
+    padding: 4,
   },
   prepFriendlyContent: {
     flex: 1,

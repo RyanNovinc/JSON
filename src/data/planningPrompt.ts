@@ -18,6 +18,8 @@ export const INSTRUCTIONS_HEADER = `# Plan a Workout Program
 
 I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help designing a personalized workout program.
 
+**USE WEB SEARCH** - If you have web search available, use it selectively if you think it would help verify current research on volume recommendations, rest periods, exercise effectiveness, or advanced training techniques that might improve this program. Current research can enhance programming decisions when it provides meaningful updates to established principles.
+
 ## INSTRUCTIONS
 
 Review my profile and design a training plan. Show your reasoning — work through split selection, volume distribution, exercise choices, and trade-offs. Make definitive choices and explain your reasoning. The user will request changes if they disagree — do not ask questions or present alternatives to choose from.

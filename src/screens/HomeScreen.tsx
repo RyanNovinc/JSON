@@ -824,7 +824,7 @@ export default function HomeScreen({ route }: any) {
           <Ionicons name="barbell-outline" size={64} color="#3f3f46" />
           <Text style={styles.emptyTitle}>No Routines Yet</Text>
           <Text style={styles.emptyDescription}>
-            Generate your first AI-powered workout routine or import a custom JSON workout plan.
+            Import a custom JSON workout plan or choose one of the sample plans.
           </Text>
         </View>
       );

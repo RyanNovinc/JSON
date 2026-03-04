@@ -391,170 +391,64 @@ export default function NutritionHomeScreen({ route }: any) {
   };
 
   const handleJumpToToday = (plan: MealPlan) => {
-    const findTodayAndNavigate = (days: any[], weekNumber: number = 1) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      // Find today's day
-      let todayIndex = -1;
-      for (let i = 0; i < days.length; i++) {
-        const dayDate = new Date(today);
-        
-        if (weekNumber === 1) {
-          // Week 1: Start from today
-          dayDate.setDate(today.getDate() + i);
-        } else {
-          // Week 2+: Calculate based on week start offset
-          const currentDayOfWeek = today.getDay();
-          const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
-          
-          let weekStartOffset = week1Days; // Days after today that Week 2 starts
-          for (let j = 2; j < weekNumber; j++) {
-            weekStartOffset += 7; // Add 7 days for each full week
-          }
-          
-          dayDate.setDate(today.getDate() + weekStartOffset + i);
-        }
-        
-        if (today.toDateString() === dayDate.toDateString()) {
-          todayIndex = i;
-          break;
-        }
+    // Check if today exists in the meal plan using actual dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const checkTodayInPlan = () => {
+      // For JSON.fit format plans with dailyMeals
+      if (plan.data?.dailyMeals) {
+        const todayDateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+        return plan.data.dailyMeals[todayDateString] !== undefined;
       }
       
-      if (todayIndex !== -1) {
-        // Navigate directly to today's day
-        const todayDay = days[todayIndex];
+      // For plans with startDate and endDate
+      if (plan.data?.startDate && plan.data?.endDate) {
+        const startDate = new Date(plan.data.startDate);
+        const endDate = new Date(plan.data.endDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(0, 0, 0, 0);
         
-        // Calculate the actual day name based on today's date
-        const actualDayDate = new Date(today);
-        if (weekNumber === 1) {
-          actualDayDate.setDate(today.getDate() + todayIndex);
-        } else {
-          const currentDayOfWeek = today.getDay();
-          const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
-          let weekStartOffset = week1Days;
-          for (let j = 2; j < weekNumber; j++) {
-            weekStartOffset += 7;
-          }
-          actualDayDate.setDate(today.getDate() + weekStartOffset + todayIndex);
-        }
-        
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const actualDayName = dayNames[actualDayDate.getDay()];
-        
-        navigation.navigate('MealPlanDay' as any, {
-          day: todayDay,
-          weekNumber: weekNumber,
-          mealPlanName: plan.name,
-          dayIndex: todayIndex,
-          calculatedDayName: actualDayName || `Day ${todayIndex + 1}`,
-        });
-        return true;
+        return today >= startDate && today <= endDate;
       }
+      
       return false;
     };
-
-    // Handle new days structure (JSON.fit format)
-    if (plan.data?.days) {
-      const found = findTodayAndNavigate(plan.data.days, 1);
-      if (found) return;
-      
-      // If today not found, just navigate to the first day
-      if (plan.data.days.length > 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const firstDayDate = new Date(today);
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const firstDayName = dayNames[firstDayDate.getDay()];
+    
+    const navigateToToday = () => {
+      // For JSON.fit format plans
+      if (plan.data?.dailyMeals) {
+        const todayDateString = today.toISOString().split('T')[0];
+        const todayData = plan.data.dailyMeals[todayDateString];
         
-        navigation.navigate('MealPlanDay' as any, {
-          day: plan.data.days[0],
-          weekNumber: 1,
-          mealPlanName: plan.name,
-          dayIndex: 0,
-          calculatedDayName: firstDayName || 'Day 1',
-        });
-      }
-      return;
-    }
-
-    if (!plan.data?.weeks) return;
-
-    // For 7-day meal plans, find today and navigate directly to it
-    if (plan.duration <= 7 || plan.data.weeks.length === 1) {
-      const week = plan.data.weeks[0];
-      if (week?.days) {
-        const found = findTodayAndNavigate(week.days, week.week_number || 1);
-        if (found) return;
-        
-        // If today not found, navigate to the first day
-        if (week.days.length > 0) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const firstDayDate = new Date(today);
+        if (todayData) {
           const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-          const firstDayName = dayNames[firstDayDate.getDay()];
+          const actualDayName = dayNames[today.getDay()];
           
           navigation.navigate('MealPlanDay' as any, {
-            day: week.days[0],
-            weekNumber: week.week_number || 1,
+            day: todayData,
+            weekNumber: 1,
             mealPlanName: plan.name,
             dayIndex: 0,
-            calculatedDayName: firstDayName || 'Day 1',
+            calculatedDayName: actualDayName,
           });
+          return true;
         }
       }
+      
+      return false;
+    };
+    
+    // Check if today exists in the plan and navigate if it does
+    if (checkTodayInPlan() && navigateToToday()) {
       return;
     }
-
-    // Use the same start date logic as MealPlanDaysScreen
-    const getMealPlanStartDate = () => {
-      // This matches the hardcoded date in MealPlanDaysScreen
-      const baseDate = new Date('2026-02-05'); // Monday, Feb 5, 2026
-      return baseDate;
-    };
-
-    const isToday = (dayNumber: number) => {
-      const today = new Date();
-      const mealPlanStartDate = getMealPlanStartDate();
-      
-      // Calculate the date for this day
-      const dayDate = new Date(mealPlanStartDate);
-      dayDate.setDate(mealPlanStartDate.getDate() + (dayNumber - 1));
-      
-      // Compare just the date parts (ignore time)
-      return today.toDateString() === dayDate.toDateString();
-    };
-
-    // Find which day is "today"
-    let targetWeek = null;
-    let targetDay = null;
-    let targetWeekNumber = 1;
     
-    for (const week of plan.data.weeks) {
-      for (const day of week.days) {
-        if (isToday(day.day_number)) {
-          targetWeek = week;
-          targetDay = day;
-          targetWeekNumber = week.week_number;
-          break;
-        }
-      }
-      if (targetDay) break;
-    }
-    
-    // If we found today's day, navigate directly to it
-    if (targetDay && targetWeek) {
-      navigation.navigate('MealPlanDay' as any, {
-        day: targetDay,
-        weekNumber: targetWeekNumber,
-        mealPlanName: plan.name
-      });
-    } else {
-      // Fallback: navigate to weeks view
-      navigation.navigate('MealPlanWeeks' as any, { mealPlan: plan });
-    }
+    // If today doesn't exist in the plan, navigate to the meal plan overview
+    navigation.navigate('MealPlanDays' as any, { 
+      mealPlan: plan.data,
+      mealPlanName: plan.name 
+    });
   };
 
   const handleTrainingTransition = () => {
@@ -689,7 +583,7 @@ export default function NutritionHomeScreen({ route }: any) {
           <Ionicons name="restaurant-outline" size={80} color="#3f3f46" />
           <Text style={styles.emptyTitle}>No Meal Plans Yet</Text>
           <Text style={styles.emptyDescription}>
-            Create your first meal plan to get started with your nutrition journey.
+            Import a custom JSON meal plan or choose one of the sample plans.
           </Text>
         </View>
       );

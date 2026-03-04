@@ -54,7 +54,7 @@ interface MealPrepSession {
   total_time: number;
   covers: string;
   recommended_timing: string;
-  ingredients: Array<{
+  ingredients?: Array<{
     item: string;
     amount: string;
     unit: string;
@@ -67,7 +67,7 @@ interface MealPrepSession {
     proteins: string;
     grains: string;
     vegetables: string;
-  };
+  } | Record<string, string>;
   prep_meals?: PrepMeal[];
 }
 
@@ -353,105 +353,6 @@ export default function MealPrepSessionScreen() {
               </LinearGradient>
             </View>
 
-            {/* Meals to Prepare (for tracking) */}
-        {mealPrepSession.prep_meals && mealPrepSession.prep_meals.length > 0 && (
-          <View style={styles.section}>
-            <LinearGradient
-              colors={['#1a1a1d', '#2a2a2f']}
-              style={styles.mealsCard}
-            >
-              <Text style={styles.cardTitle}>Your Recipes</Text>
-              <Text style={styles.cardSubtitle}>
-                {completedMeals.size} of {mealPrepSession.prep_meals.length} completed
-              </Text>
-              
-              <LinearGradient
-                colors={[`${themeColor}20`, `${themeColor}10`]}
-                style={styles.progressSection}
-              >
-                <View style={styles.progressBarContainer}>
-                  <View 
-                    style={[
-                      styles.progressBar, 
-                      { 
-                        width: `${(completedMeals.size / mealPrepSession.prep_meals.length) * 100}%`,
-                        backgroundColor: themeColor 
-                      }
-                    ]} 
-                  />
-                </View>
-              </LinearGradient>
-
-              <View style={styles.mealsGrid}>
-                {mealPrepSession.prep_meals.map((meal, index) => {
-                  const isCompleted = completedMeals.has(meal.meal_name);
-                  const mealColors = {
-                    breakfast: ['#f59e0b', '#fbbf24'],
-                    lunch: ['#06b6d4', '#0891b2'], 
-                    dinner: ['#8b5cf6', '#7c3aed'],
-                    snack: ['#10b981', '#059669']
-                  };
-                  const gradientColors = mealColors[meal.meal_type as keyof typeof mealColors] || ['#71717a', '#525252'];
-                  const mealName = meal.meal_name;
-                  
-                  return (
-                    <LinearGradient
-                      key={mealName}
-                      colors={isCompleted ? ['#27272a', '#3f3f46'] : [`${gradientColors[0]}20`, `${gradientColors[1]}10`]}
-                      style={[styles.mealCard, isCompleted && styles.mealCardCompleted]}
-                    >
-                      <TouchableOpacity
-                        style={styles.mealCardContent}
-                        onPress={() => navigateToMealDetail(meal)}
-                      >
-                        <View style={styles.mealCardHeader}>
-                          <LinearGradient
-                            colors={gradientColors}
-                            style={styles.mealTypeIcon}
-                          >
-                            <Ionicons 
-                              name="restaurant"
-                              size={16} 
-                              color="#ffffff" 
-                            />
-                          </LinearGradient>
-                          <TouchableOpacity
-                            onPress={() => toggleMealCompletion(mealName)}
-                            style={styles.checkButton}
-                          >
-                            <View style={[
-                              styles.checkCircle,
-                              isCompleted && { backgroundColor: themeColor }
-                            ]}>
-                              {isCompleted && (
-                                <Ionicons name="checkmark" size={12} color="#ffffff" />
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        </View>
-                        
-                        <Text style={[styles.mealCardTitle, isCompleted && styles.mealCardTitleCompleted]}>
-                          {mealName}
-                        </Text>
-                        
-                        <View style={styles.mealCardStats}>
-                          <View style={styles.mealStat}>
-                            <Ionicons name="time" size={12} color="#71717a" />
-                            <Text style={styles.mealStatText}>{meal.total_time}m</Text>
-                          </View>
-                          <View style={styles.mealStat}>
-                            <Ionicons name="calendar" size={12} color="#71717a" />
-                            <Text style={styles.mealStatText}>{meal.weekly_meal_coverage?.length || 0}x/week</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    </LinearGradient>
-                  );
-                })}
-              </View>
-            </LinearGradient>
-          </View>
-        )}
           </>
         )}
 
@@ -572,33 +473,74 @@ export default function MealPrepSessionScreen() {
         {/* Steps Tab Content */}
         {activeTab === 'steps' && (
           <>
-            {/* Prep Session Guide - step-by-step instructions */}
+            {/* Prep Session Guide - structured step-by-step instructions */}
             {mealPrepSession.prep_session_guide && mealPrepSession.prep_session_guide.length > 0 && (
               <View style={styles.section}>
                 <LinearGradient
                   colors={[`${themeColor}15`, `${themeColor}05`]}
                   style={styles.prepStepsCard}
                 >
-                  <Text style={styles.cardTitle}>Cooking Instructions</Text>
-                  <Text style={styles.cardSubtitle}>Follow these steps in order for the best results</Text>
+                  <Text style={styles.cardTitle}>{mealPrepSession.session_name || 'Meal Prep Session'}</Text>
+                  <Text style={styles.cardSubtitle}>Step-by-step meal preparation</Text>
                   
                   <View style={styles.stepsContainer}>
-                    {mealPrepSession.prep_session_guide.map((step, index) => (
-                      <View key={step.step || index} style={styles.stepCard}>
-                        <View style={styles.stepHeader}>
-                          <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
-                            <Text style={styles.stepNumberText}>{step.step || index + 1}</Text>
+                    {mealPrepSession.prep_session_guide.map((step, index) => {
+                      // Strip step number prefixes from structured guide titles and descriptions
+                      const cleanTitle = step.title ? step.title.replace(/^Step\s*\d+\s*[—–\-:]\s*/i, '').trim() : '';
+                      const cleanDescription = step.description ? step.description.replace(/^Step\s*\d+\s*[—–\-:]\s*/i, '').trim() : '';
+                      
+                      return (
+                        <View key={step.step || index} style={styles.stepCard}>
+                          <View style={styles.stepHeader}>
+                            <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
+                              <Text style={styles.stepNumberText}>{step.step || index + 1}</Text>
+                            </View>
+                            <View style={styles.stepInfo}>
+                              <Text style={styles.stepTitle}>{cleanTitle}</Text>
+                              {step.time_required && (
+                                <Text style={styles.stepTime}>{step.time_required} min</Text>
+                              )}
+                            </View>
                           </View>
-                          <View style={styles.stepInfo}>
-                            <Text style={styles.stepTitle}>{step.title}</Text>
-                            {step.time_required && (
-                              <Text style={styles.stepTime}>{step.time_required} min</Text>
-                            )}
-                          </View>
+                          <Text style={styles.stepDescription}>{cleanDescription}</Text>
                         </View>
-                        <Text style={styles.stepDescription}>{step.description}</Text>
-                      </View>
-                    ))}
+                      );
+                    })}
+                  </View>
+                </LinearGradient>
+              </View>
+            )}
+            
+            {/* Fallback: Use instructions array if prep_session_guide not available */}
+            {(!mealPrepSession.prep_session_guide || mealPrepSession.prep_session_guide.length === 0) && 
+             mealPrepSession.instructions && mealPrepSession.instructions.length > 0 && (
+              <View style={styles.section}>
+                <LinearGradient
+                  colors={[`${themeColor}15`, `${themeColor}05`]}
+                  style={styles.prepStepsCard}
+                >
+                  <Text style={styles.cardTitle}>{mealPrepSession.session_name || 'Meal Prep Session'}</Text>
+                  <Text style={styles.cardSubtitle}>Step-by-step meal preparation</Text>
+                  
+                  <View style={styles.stepsContainer}>
+                    {mealPrepSession.instructions.map((instruction, index) => {
+                      // Strip step number prefixes from imported instructions
+                      const cleanInstruction = instruction.replace(/^Step\s*\d+\s*[—–\-:]\s*/i, '').trim();
+                      
+                      return (
+                        <View key={index} style={styles.stepCard}>
+                          <View style={styles.stepHeader}>
+                            <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
+                              <Text style={styles.stepNumberText}>{index + 1}</Text>
+                            </View>
+                            <View style={styles.stepInfo}>
+                              <Text style={styles.stepTitle}>Step {index + 1}</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.stepDescription}>{cleanInstruction}</Text>
+                        </View>
+                      );
+                    })}
                   </View>
                 </LinearGradient>
               </View>

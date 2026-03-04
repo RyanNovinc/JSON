@@ -150,23 +150,33 @@ export default function SleepOptimizationScreen() {
 
   const optimizationOptions = [
     {
-      level: 'standard' as const,
-      title: 'Standard',
-      subtitle: 'Finish dinner 2-3 hours before bed. Good sleep hygiene without major schedule changes.',
+      level: 'minimal' as const,
+      title: 'Minimal',
+      subtitle: 'Basic sleep hygiene. Finish dinner 2 hours before bed without major schedule changes.',
       features: [
-        'Last meal 2-3 hours before bedtime',
+        'Last meal 2 hours before bedtime',
         'First meal within 2 hours of waking',
-        'Meals spaced 3-5 hours apart'
+        '12-hour eating window'
       ]
     },
     {
-      level: 'sleep_focused' as const,
-      title: 'Sleep-Focused',
-      subtitle: 'Finish dinner 3-4 hours before bed. More conservative timing for better sleep quality.',
+      level: 'moderate' as const,
+      title: 'Moderate',
+      subtitle: 'Enhanced sleep quality. Finish dinner 3 hours before bed for better digestion.',
       features: [
-        'Last meal 3-4 hours before bedtime',
-        'First meal within 1-2 hours of waking',
-        'Earlier dinner prioritised for digestion'
+        'Last meal 3 hours before bedtime',
+        'First meal 30-90 minutes after waking',
+        '8-10 hour eating window'
+      ]
+    },
+    {
+      level: 'maximum' as const,
+      title: 'Maximum',
+      subtitle: 'Optimal sleep & circadian rhythm. Finish dinner 4+ hours before bed for peak optimization.',
+      features: [
+        'Last meal 4+ hours before bedtime',
+        'First meal 30-60 minutes after waking',
+        '8-hour early eating window'
       ]
     }
   ];

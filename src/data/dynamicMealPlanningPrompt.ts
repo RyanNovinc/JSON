@@ -170,7 +170,7 @@ export const buildSleepOptimizedSection = (data: MealPlanPromptData): string => 
     const guidelines: { [key: string]: string } = {
       'minimal': '• First meal: Within 2 hours of wake time\n  • Last meal: 2 hours before bedtime\n  • 12-hour eating window',
       'moderate': '• First meal: 30-90 minutes after wake time\n  • Last meal: 3 hours before bedtime\n  • 8-10 hour eating window',
-      'maximum': '• First meal: 30-90 minutes after wake time\n  • Last meal: 3 hours before bedtime\n  • 8-10 hour eating window'
+      'maximum': '• First meal: 30-60 minutes after wake time\n  • Last meal: 4+ hours before bedtime\n  • 8-hour early eating window'
     };
     
     return guidelines[level] || guidelines['moderate'];

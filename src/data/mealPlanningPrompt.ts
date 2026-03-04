@@ -29,12 +29,37 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
     // Get current date for meal plan start
     const getCurrentDate = (): string => {
       const today = new Date();
-      const startDate = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+      let startDate = new Date();
+      
+      switch (budgetData.startDate) {
+        case 'today':
+          startDate = new Date(today);
+          break;
+        case 'tomorrow':
+          startDate = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+          break;
+        case 'next_monday':
+          const daysUntilMonday = (8 - today.getDay()) % 7 || 7;
+          startDate = new Date(today.getTime() + (daysUntilMonday * 24 * 60 * 60 * 1000));
+          break;
+        case 'custom':
+          if (budgetData.customStartDate) {
+            startDate = new Date(budgetData.customStartDate);
+          } else {
+            // Fallback to tomorrow if custom date is invalid
+            startDate = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+          }
+          break;
+        default:
+          startDate = new Date(today.getTime() + (24 * 60 * 60 * 1000));
+      }
+      
       return startDate.toLocaleDateString('en-AU', { weekday: 'long', month: 'short', day: 'numeric' });
     };
     
     // Build dynamic prompt with user's actual data
     const store = budgetData.groceryStore || 'Local supermarket';
+    const city = budgetData.city || 'your city';
     const country = budgetData.country || 'your country';
     
     let prompt = `I'm using a nutrition planning app called JSON.fit and need help creating a personalized meal plan.
@@ -42,6 +67,7 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
 **QUICK CREATION INSTRUCTIONS:**
 1. **STANDARD KNOWLEDGE** - Use your existing knowledge base for common foods and recipes
 2. **ESTIMATED PRICING** - Use typical pricing patterns for ${store} in ${country}
+3. **USE WEB SEARCH** - If you have web search available, use it to improve the plan — verifying prices, checking product availability, confirming nutritional info, etc. Current, real-world data produces a better plan than estimates from training data.
 
 **CONSTRAINT CONFLICT HANDLING:**
 
@@ -51,16 +77,7 @@ Sometimes the user's preferences will conflict — for example, a very low budge
 2. **ACKNOWLEDGE** the trade-off in the plan notes — tell the user which constraint you relaxed and why. For example: "Your moderate budget target is difficult to hit at 3000 kcal/day with convenience products. This plan uses some from-scratch cooking (rice cooker instead of microwave pouches) to bring costs closer to your budget. If you prefer fully no-cook meals, expect the weekly cost to be higher."
 3. **NEVER** silently ignore a constraint. If you can't meet it, say so.
 
-**MEAL PLAN REQUIREMENTS:**
-1. **BUDGET CONSTRAINT** - ${getBudgetConstraintText(budgetData)}
-2. **MEAL PREP FOCUSED** - ${getMealPrepStyleText(budgetData.planningStyle, budgetData.skillConfidence, budgetData.timeInvestment)}
-3. **INCLUDE DETAILED GROCERY LIST** - Organize by categories (Proteins, Dairy, Produce, etc.) with exact quantities, units, and estimated prices from ${store}
-4. **SPECIFIC DATES** - Start the meal plan on tomorrow's date and use actual calendar dates
-5. **SHOW CALCULATIONS** - For each meal, briefly explain how you arrived at the calorie/macro numbers
-
-${getVarietyRequirements(budgetData, budgetData.skillConfidence, budgetData.timeInvestment)}${getSkillRequirements(budgetData)}${getTimeRequirements(budgetData)}
-
-NUTRITION TARGETS:
+**NUTRITION TARGETS:**
 - Daily calories: ${macroResults.calories || 2000}
 - Protein: ${macroResults.protein || 150}g | Carbs: ${macroResults.carbs || 200}g | Fat: ${macroResults.fat || 67}g
 - Daily fiber target: ${fiberTarget}g (aim for ${fiberTarget - 5}–${fiberTarget + 5}g range)
@@ -68,6 +85,15 @@ NUTRITION TARGETS:
 - Plan duration: ${budgetData.planDuration || 7} days
 - Snacking style: ${budgetData.snackingStyle || 'Occasional snacker'}
 - Goal: ${nutritionData.goal || 'maintain'} at ${nutritionData.rate || 'moderate'} rate
+
+**MEAL PLAN REQUIREMENTS:**
+1. **BUDGET CONSTRAINT** - ${getBudgetConstraintText(budgetData)}
+2. **MEAL PREP FOCUSED** - ${getMealPrepStyleText(budgetData.planningStyle, budgetData.skillConfidence, budgetData.timeInvestment)}
+3. **INCLUDE DETAILED GROCERY LIST** - Organize by categories (Proteins, Dairy, Produce, etc.) with exact quantities, units, and estimated prices from ${store} in ${city}, ${country}
+4. **SPECIFIC DATES** - Start the meal plan on ${getCurrentDate()} and use actual calendar dates
+5. **SHOW CALCULATIONS** - For each meal, briefly explain how you arrived at the calorie/macro numbers
+
+${getVarietyRequirements(budgetData, budgetData.skillConfidence, budgetData.timeInvestment)}${getSkillRequirements(budgetData)}${getTimeRequirements(budgetData)}
 
 ${getMealStructure(budgetData.mealsPerDay || 3, macroResults.protein || 150)}
 
@@ -85,23 +111,31 @@ DIETARY REQUIREMENTS:
 - Eating challenges: ${budgetData.eatingChallenges?.length ? budgetData.eatingChallenges.join(', ') : 'None'}
 
 NUTRIENT VARIETY PRIORITY:
-**NOT SPECIFIED** - Use standard approach to nutrient variety balanced with other preferences`;
+**NOT SPECIFIED** - Use standard approach to nutrient variety balanced with other preferences
+
+## BASELINE HEALTHY EATING
+
+Every meal plan should include vegetables and fruit daily and rotate protein sources across the week. These are baseline expectations for any nutritionally complete plan — don't skip entire food groups or rely on a single protein source all week. Prioritise the user's macro targets and preferences, but flag it if the plan is significantly lacking in any major food group.`;
 
     // Add sleep optimization section if available
     if (sleepData?.bedtime && sleepData?.wakeTime) {
-      const optimizationLevel = sleepData.optimizationLevel || 'standard';
+      const optimizationLevel = sleepData.optimizationLevel || 'minimal';
       let firstMealTiming: string;
       let lastMealTiming: string;
       let timingGuidance: string;
 
-      if (optimizationLevel === 'sleep_focused') {
-        firstMealTiming = 'within 1-2 hours of wake time';
-        lastMealTiming = '3-4 hours before bedtime';
-        timingGuidance = 'This user has chosen sleep-focused meal timing. Prioritise finishing dinner early enough to allow full digestion before sleep. Earlier is better, but do not force impractical meal times — 3 hours before bed is the minimum.';
-      } else { // 'standard' or any other value (including legacy 'moderate', 'minimal', 'maximum')
+      if (optimizationLevel === 'maximum') {
+        firstMealTiming = 'within 30-60 minutes of wake time';
+        lastMealTiming = '4+ hours before bedtime';
+        timingGuidance = 'This user has chosen maximum sleep optimization. Prioritise finishing dinner 4+ hours before bed for optimal circadian rhythm synchronization and sleep quality.';
+      } else if (optimizationLevel === 'moderate') {
+        firstMealTiming = 'within 30-90 minutes of wake time';
+        lastMealTiming = '3 hours before bedtime';
+        timingGuidance = 'This user has chosen moderate sleep optimization. Finish dinner 3 hours before bed for enhanced sleep quality and proper digestion.';
+      } else { // 'minimal' or any legacy values
         firstMealTiming = 'within 2 hours of wake time';
-        lastMealTiming = '2-3 hours before bedtime';
-        timingGuidance = 'Standard sleep-aware meal timing. Finish dinner with enough time to digest before bed.';
+        lastMealTiming = '2 hours before bedtime';
+        timingGuidance = 'Basic sleep-aware meal timing. Finish dinner with enough time to digest before bed.';
       }
       
       prompt += `
@@ -110,7 +144,7 @@ NUTRIENT VARIETY PRIORITY:
 Based on my completed Sleep Optimization questionnaire:
 - Sleep schedule: ${sleepData.bedtime} - ${sleepData.wakeTime}
 - Optimization level: ${optimizationLevel}
-- CRITICAL: Calculate and provide specific meal times for each day based on these sleep parameters:
+- IMPORTANT: Calculate and provide specific meal times for each day based on these sleep parameters:
   • First meal: ${firstMealTiming}
   • Last meal: ${lastMealTiming}
   • Space meals 3-5 hours apart during waking hours
@@ -137,8 +171,7 @@ COOKING PREFERENCES:
 - ${getMealPrepStyleText(budgetData.planningStyle, budgetData.skillConfidence, budgetData.timeInvestment)}
 - ${getTimeInvestmentText(budgetData.timeInvestment)}
 - ${getVarietySeekingText(budgetData.varietySeeking)}
-- ${getSkillConfidenceText(budgetData.skillConfidence)}
-- ${getCookingEnjoymentText(budgetData.cookingEnjoyment)}
+- ${getSkillConfidenceText(budgetData.skillConfidence)}${(budgetData.skillConfidence || 3) > 1 ? `\n- ${getCookingEnjoymentText(budgetData.cookingEnjoyment)}` : ''}
 
 AVAILABLE COOKING EQUIPMENT:
 - Available equipment: ${budgetData.cookingEquipment?.join(', ') || 'basic kitchen equipment'}
@@ -170,9 +203,10 @@ Please create a detailed ${budgetData.planDuration || 7}-day meal plan that:
 4. **INCLUDES ${sleepData ? 'SPECIFIC' : 'GENERAL'} MEAL TIMES** - ${sleepData ? 'For each meal, provide the exact recommended time based on my sleep schedule' : 'Provide suggested meal times'}
 5. **INCLUDES DETAILED RECIPES** - For each meal provide:
    - Complete ingredients list with exact quantities and units
-   - Step-by-step cooking instructions (minimum ${(budgetData.skillConfidence || 3) <= 1 ? '2-3' : '3-5'} steps per recipe)
+   - Step-by-step instructions (as many steps as needed - some meals may only require 1 step, others may need several)
    - Prep time and cook time for each meal
    - Serving size information
+   - **WHOLE-PACK RULE**: Always use single-serve convenience products whole — never partial pouches, half packets, or fractions of containers. Use complete packages as intended and adjust other ingredients to balance macros around the full portion size.
 6. **INCLUDES STRUCTURED MEAL PREP PLAN** - exactly what to prep, how much, and what containers to use
 7. Uses ingredients available at ${store} in ${budgetData.country}
 8. Accounts for my dietary restrictions and cooking skill level
@@ -185,7 +219,7 @@ Please create a detailed ${budgetData.planDuration || 7}-day meal plan that:
     
     // Add static sections
     prompt += getGroceryListRequirements(store, budgetData.planDuration || 7);
-    prompt += getMealPrepSessionRequirements(budgetData.planDuration || 7);
+    prompt += getMealPrepSessionRequirements(budgetData.planDuration || 7, budgetData.skillConfidence, budgetData.timeInvestment, budgetData.planningStyle);
     prompt += getVerificationSteps(budgetData.mealsPerDay || 3, macroResults.protein || 150, budgetData.planDuration || 7, nutritionData, budgetData);
     prompt += getFormatRequirements();
     prompt += getFeedbackWorkflow();
@@ -235,25 +269,19 @@ These must pass after your fixes. If any of these still fail after revision, you
 
     // Add last meal timing constraint if sleep optimization is enabled
     if (sleepData?.bedtime && sleepData?.wakeTime) {
-      const optimizationLevel = sleepData.optimizationLevel || 'standard';
-      const lastMealBuffer = optimizationLevel === 'sleep_focused' ? '3-4' : '2-3';
+      const optimizationLevel = sleepData.optimizationLevel || 'minimal';
+      const lastMealBuffer = optimizationLevel === 'maximum' ? '4+' : optimizationLevel === 'moderate' ? '3' : '2';
       
-      hardConstraintsSection += `- **Last meal timing** — last meal MUST finish at least ${lastMealBuffer} hours before bedtime (${sleepData.bedtime}). This is the primary sleep optimization constraint.
+      hardConstraintsSection += `- **Sleep optimization priority** — target finishing last meal at least ${lastMealBuffer} hours before bedtime (${sleepData.bedtime}) to support sleep quality.
 `;
     }
     
-    hardConstraintsSection += `- **Protein** MUST be within 10% of ${proteinTarget}g target on EVERY individual day. No exceptions.
-- **${periodLabel} average calories** MUST be within 5% of target ${periodNote}.
-- **${periodLabel} average carbs and fat** MUST be within 10% of target ${periodNote}.
-- **Fiber** MUST hit at least ${fiberMinimum}g (80% of ${fiberTarget}g target) on EVERY individual day.
-- **Equipment** — every recipe MUST use only the user's listed equipment: ${equipmentData.join(', ') || 'basic kitchen equipment'}. No blender if no blender listed.`;
+    hardConstraintsSection += `- **Protein priority** — aim to keep protein within 10% of ${proteinTarget}g target daily for optimal results.
+- **${periodLabel} average calories** — target within 5% of target ${periodNote}.
+- **${periodLabel} average carbs and fat** — aim for within 10% of target ${periodNote}.
+- **Fiber priority** — target at least ${fiberMinimum}g (80% of ${fiberTarget}g target) daily for digestive health.
+- **Equipment compatibility** — design recipes using only the user's listed equipment: ${equipmentData.join(', ') || 'basic kitchen equipment'}. Adapt techniques to available tools.`;
 
-    // Add budget hard constraint if max is provided
-    if (budgetData?.budgetMax) {
-      const currency = getCurrencySymbol(budgetData?.countryCode || 'US');
-      hardConstraintsSection += `
-- **Budget** MUST NOT exceed ${currency}${budgetData.budgetMax} for the grocery list total. This is a hard ceiling, not a suggestion.`;
-    }
     
     // Add skill/time compliance to hard constraints
     const skillTimeConstraints = getSkillTimeHardConstraints(budgetData);
@@ -265,13 +293,13 @@ These must pass after your fixes. If any of these still fail after revision, you
 - **No draft content** — the output must contain zero working, iteration, or revision commentary.`;
     
     const sleepComplianceSection = sleepData?.bedtime && sleepData?.wakeTime ? (() => {
-      const optimizationLevel = sleepData.optimizationLevel || 'standard';
-      const lastMealBuffer = optimizationLevel === 'sleep_focused' ? '3-4' : '2-3';
-      const firstMealWindow = optimizationLevel === 'sleep_focused' ? '1-2' : '2';
+      const optimizationLevel = sleepData.optimizationLevel || 'minimal';
+      const lastMealBuffer = optimizationLevel === 'maximum' ? '4+' : optimizationLevel === 'moderate' ? '3' : '2';
+      const firstMealWindow = optimizationLevel === 'maximum' ? '0.5-1' : optimizationLevel === 'moderate' ? '0.5-1.5' : '2';
       
       return `### 7. Sleep Optimization Compliance (if applicable)
 If sleep optimization was requested, check meal timing:
-- **HARD**: Last meal MUST finish at least ${lastMealBuffer} hours before bedtime (${sleepData.bedtime}). Calculate the actual time and verify.
+- **Sleep timing priority**: Target finishing last meal at least ${lastMealBuffer} hours before bedtime (${sleepData.bedtime}). Calculate the actual time and verify alignment.
 - **SOFT**: First meal should be within ${firstMealWindow} hours of wake time (${sleepData.wakeTime}).
 - **SOFT**: Meals should be spaced 3-5 hours apart. No gap longer than 5 hours during waking hours.
 - **FAIL if** last meal is too close to bedtime (less than ${lastMealBuffer} hours before ${sleepData.bedtime}).
@@ -291,6 +319,7 @@ First, read the meal plan you just created so you have the full content in conte
 4. **Present the CORRECTED plan** — output the complete, clean, final version of the meal plan with all fixes applied. Do not show the review process, do not show before/after comparisons, do not show your working. Present ONLY the clean corrected plan.
 5. **At the end, provide a brief change log** — a short bullet list of what you changed and why (e.g., "Reduced rice from 100g to 80g dry to bring carbs within 10% of target").
 6. **Remind the user about JSON conversion** — after presenting the corrected plan, tell the user: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."
+7. **USE WEB SEARCH** - If you have web search available, use it during the review to verify grocery pricing, confirm product availability, and check nutritional claims against real data.
 ${hardConstraintsSection}
 
 ## What "Fix" Means for Each Type of Failure
@@ -309,21 +338,21 @@ ${hardConstraintsSection}
 Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
 
 ### 1. Nutrition Target Verification
-Use these evidence-based tolerance rules (not all macros need the same daily precision):
-- **Protein**: Must be within 10% of target on EVERY individual day. Muscle protein synthesis is a daily process — consistent daily protein matters most.
-- **Calories**: ${periodLabel} average must be within 5% of target ${periodNote}. Individual days can vary up to ±10%. Total energy balance drives weight change.
-- **Carbs & Fat**: ${periodLabel} average must be within 10% of target ${periodNote}. Individual days can flex ±15%. Day-to-day variation is normal and even beneficial.
-- **Fiber**: Must hit at least 80% of the daily target on EVERY day. Gut health requires daily consistency.
-- **FAIL if** protein is off by >10% on any individual day, OR ${periodLabel.toLowerCase()} average calories are off by >5%, OR ${periodLabel.toLowerCase()} average carbs/fat are off by >10%, OR fiber drops below 80% of target on any day.
-- **FIX**: Adjust portion sizes (reduce/increase carb sources, swap proteins, modify fat sources). For protein fixes, adjust daily. For carb/fat fixes, rebalance the ${periodLabel.toLowerCase()} average rather than forcing every day to be identical.
+Use these evidence-based principles (not all macros need the same daily precision):
+- **Protein**: Aim for consistent daily intake as muscle protein synthesis is a daily process. Daily consistency matters more than weekly averaging for protein.
+- **Calories**: Focus on ${periodLabel} average for energy balance while allowing reasonable daily variation. Total energy balance drives weight change over time.
+- **Carbs & Fat**: Target ${periodLabel} averages with flexible daily variation. Day-to-day variation in carbs and fat is normal and can align with activity levels.
+- **Fiber**: Prioritize daily consistency as gut microbiome responds to consistent fiber intake. Daily intake supports sustained gut health benefits.
+- **Review approach**: Check if protein is reasonably consistent daily, if ${periodLabel.toLowerCase()} calorie averages align with goals, if carbs/fat averages meet targets with natural daily variation, and if fiber intake supports gut health.
+- **Optimization**: Adjust portion sizes as needed (modify carb sources, swap proteins, adjust fat sources). For protein, focus on daily consistency. For carbs/fat, balance ${periodLabel.toLowerCase()} averages. For fiber, maintain daily adequacy.
 
 ### 2. Budget Compliance
 ${budgetData?.budgetMax ? 
-  `- **CRITICAL**: Grocery list total MUST be ≤ ${getCurrencySymbol(budgetData?.countryCode || 'US')}${budgetData.budgetMax}. This is a hard ceiling, not a suggestion.
-- **FAIL if** the grocery total exceeds ${getCurrencySymbol(budgetData?.countryCode || 'US')}${budgetData.budgetMax}.
-- **FIX**: Remove expensive items, choose cheaper alternatives, reduce quantities, or swap premium ingredients for budget options until under the limit.` 
+  `- **Budget target**: The user set a range of ${budgetData?.budgetMin ? getCurrencySymbol(budgetData?.countryCode || 'US') + budgetData.budgetMin + '–' : ''}${getCurrencySymbol(budgetData?.countryCode || 'US')}${budgetData.budgetMax}/week. Aim to stay within this range.
+- **If over budget**: Try swapping premium ingredients for budget alternatives, adjusting quantities, or switching convenience items for cheaper equivalents. If the plan still exceeds the range after optimisation, PASS but clearly flag the overspend in the plan notes — explain why (e.g., "High calorie target + convenience-only constraint makes sub-$200 difficult") and suggest specific changes the user could make to bring costs down in future weeks.
+- **FAIL only if** the budget is exceeded AND no acknowledgement or explanation is provided. The AI must never silently ignore a budget overspend.` 
   : 
-  '- Grocery list total should align with the user\'s budget attitude.'}
+  '- Grocery list total should align with the user\'s budget attitude. Flag if the total seems unreasonable for the user\'s stated preferences.'}
 Check if the plan respects budget constraints.
 
 ### 3. Meal Prep Style Alignment
@@ -342,8 +371,8 @@ ${(() => {
   if (skillConfidence <= 1) {
     cookingFeasibilityCheck = `- **CRITICAL for Kitchen Beginner**: Walk through every recipe. Each one must be assembly-only: open, combine, microwave. Maximum 4-5 ingredients.
 - **FAIL if** any recipe requires: cooking raw meat, chopping/peeling vegetables, using a stovetop, using an oven, timing multiple components, or more than 5 minutes total.
-- **FAIL if** any recipe uses ingredients that aren't pre-cooked, tinned, frozen, or ready-to-eat.
-- **FIX**: Replace with convenience alternatives — tinned protein, rotisserie chicken, microwave rice pouches, frozen steam vegetables, pre-washed salad.`;
+- **FAIL if** any recipe uses ingredients that aren't pre-cooked, tinned, frozen, pre-washed, or ready-to-eat (whole fruits and pre-washed produce count as ready-to-eat).
+- **FIX**: Replace with convenience alternatives — use pre-cooked proteins, ready-to-eat carbohydrates, and minimal-prep vegetables.`;
   } else if (skillConfidence <= 2) {
     cookingFeasibilityCheck = `- Recipes should use simple techniques only (air fryer, rice cooker, basic pan). Raw meat is acceptable with exact temperatures and times.
 - **FAIL if** recipes require advanced techniques, complex sauces from scratch, or managing multiple simultaneous components.
@@ -376,10 +405,25 @@ Evaluate nutritional completeness.
 ### 10. Grocery List Completeness & Accuracy
 Verify the grocery list is complete and correct.
 
-### 11. Meal Prep Session Completeness
-Verify the meal prep guide is functional.${planDuration > 7 ? `
-- For plans longer than 7 days, verify EACH prep session is complete and covers its respective days
-- Verify shopping trips align with prep sessions and perishables aren't bought too early` : ''}
+### 11. Meal Prep Session Completeness & Skill Alignment
+
+- **Structure check**: Does the prep session match the user's skill level?
+  - Skill 1 (Beginner): Session must be "assembly & portioning" only. Zero cooking steps. Equipment is only containers/bags/bowls/spoons. Total time under 20 minutes. Must include a separate mid-week restock session for perishable items.
+  - Skill 2 + Time 1-2: Simple prep only. No stovetop/oven. Under 1 hour total. One task at a time.
+  - Skill 3+: Standard batch cook session is appropriate.
+- **FAIL if** a Beginner user's prep session includes any cooking, heating, chopping, or kitchen equipment beyond containers.
+- **FAIL if** a Beginner user's prep session has no mid-week restock session and includes items that won't last 7 days (rotisserie chicken, salad bags, opened tins).
+- **Step validity**: Every step in the prep session must reference items that actually appear in the meal plan. No orphaned prep steps.
+- **Storage accuracy**: Verify safe storage durations using standard food safety guidelines:
+  - Cooked proteins: typically 3-4 days refrigerated
+  - Assembled items with dairy/liquid: typically 3-4 days refrigerated  
+  - Dry assembled items: typically 5-7 days when stored properly
+  - Opened canned/packaged items: typically 2-3 days when transferred to sealed containers
+  - Pre-washed produce: typically 3-5 days after opening
+- **FAIL if** any storage duration exceeds safe limits.
+- **Check — Prep style compliance**: Cross-reference the user's planning style against the actual prep session content. If the prompt includes GRAB-AND-GO PREP, verify lunches are assembled as complete meals in containers (not just portioned ingredients). If the prompt includes MODERATE PREP, verify lunches are at least partially pre-assembled (e.g., cold components combined into a single container per day). If a meal contains components that can't be pre-assembled (e.g., microwave rice pouches, tins that expire in 2 days), the prep session must explicitly acknowledge this and minimise meal-time steps to the fewest possible actions. FAIL if the prep session ignores the stated prep style entirely.${planDuration > 7 ? `
+- **Multi-week plans**: For plans longer than 7 days, verify EACH prep session is complete and covers its respective days. Verify shopping trips align with prep sessions and perishables aren't bought too early.` : ''}
+- **FIX**: Regenerate the prep session using the correct skill tier structure. Add missing restock items. Correct storage durations.
 
 ### 12. Overall Coherence
 Final assessment of plan quality.
@@ -423,7 +467,18 @@ This JSON format is designed to work directly with the app's simplified meal pla
 
 # JSON Schema Required
 
-The JSON structure includes dailyMeals with date-keyed objects, grocery_list with categories and items, meal_prep_session with instructions, and metadata.
+The JSON structure includes dailyMeals with date-keyed objects, grocery_list with categories and items, meal_prep_sessions with instructions, and metadata.
+
+**MEAL PLAN NAME:**
+- The "name" field should be a short, clean title focused on the goal (e.g., "High Protein Bulk Plan", "Weight Loss Meal Plan", "Lean Gains Plan").
+- Do NOT include dates, date ranges, skill level, or duration in the name — the app displays these separately in the UI.
+- Keep it under 30 characters if possible.
+
+**MEAL PREP SESSIONS FORMAT:**
+- Use \`meal_prep_sessions\` (plural) as an array of session objects, NOT a single \`meal_prep_session\` object.
+- Each session should be a separate object in the array with its own session_name, instructions, equipment_needed, storage_guidelines, etc.
+- If the meal plan has a mid-week restock or second prep day, make it a separate session object in the array.
+- Example: A 7-day plan with a mid-week restock should have 2 sessions in the array.
 
 Start the conversion now and create the JSON file.`;
 };
@@ -456,14 +511,14 @@ const getMealStructure = (mealsPerDay: number, proteinTarget: number): string =>
       return `MEAL STRUCTURE (2 meals per day):
 - Meal 1: breakfast
 - Meal 2: dinner
-- Protein target per meal: ~${Math.round(proteinTarget / 2)}g (split evenly)`;
+- Distribute ${proteinTarget}g protein appropriately across both meals`;
     
     case 3:
       return `MEAL STRUCTURE (3 meals per day):
 - Meal 1: breakfast
 - Meal 2: lunch
 - Meal 3: dinner
-- Protein target per meal: ~${Math.round(proteinTarget / 3)}g minimum per meal`;
+- Distribute ${proteinTarget}g protein appropriately across all meals`;
     
     case 4:
       return `MEAL STRUCTURE (4 meals per day):
@@ -471,7 +526,7 @@ const getMealStructure = (mealsPerDay: number, proteinTarget: number): string =>
 - Meal 2: lunch  
 - Meal 3: snack
 - Meal 4: dinner
-- Protein target: ~${Math.round(proteinTarget * 0.3)}g for main meals, ~${Math.round(proteinTarget * 0.1)}g minimum for snack`;
+- Distribute ${proteinTarget}g protein appropriately, with main meals contributing most and snack contributing naturally based on food choices`;
     
     case 5:
       return `MEAL STRUCTURE (5 meals per day):
@@ -481,7 +536,7 @@ const getMealStructure = (mealsPerDay: number, proteinTarget: number): string =>
 - Meal 4: snack (afternoon)
 - Meal 5: dinner
 - In the JSON, both snacks use type: "snack"
-- Protein target: ~${Math.round(proteinTarget * 0.25)}g for main meals, ~${Math.round(proteinTarget * 0.125)}g minimum for snacks`;
+- Distribute ${proteinTarget}g protein appropriately across all meals and snacks`;
     
     case 6:
       return `MEAL STRUCTURE (6 meals per day):
@@ -492,22 +547,24 @@ const getMealStructure = (mealsPerDay: number, proteinTarget: number): string =>
 - Meal 5: dinner
 - Meal 6: snack (evening — must respect last-meal-before-bed timing)
 - In the JSON, all snacks use type: "snack"
-- Protein target: ~${Math.round(proteinTarget / 6)}g per meal/snack (distribute evenly)`;
+- Distribute ${proteinTarget}g protein appropriately across all meals and snacks`;
     
     default: // fallback to 3
       return `MEAL STRUCTURE (3 meals per day):
 - Meal 1: breakfast
 - Meal 2: lunch
 - Meal 3: dinner
-- Protein target per meal: ~${Math.round(proteinTarget / 3)}g minimum per meal`;
+- Distribute ${proteinTarget}g protein appropriately across all meals`;
   }
 };
 
 const getProteinDistributionGuidance = (mealsPerDay: number, proteinTarget: number): string => {
   if (mealsPerDay <= 3) {
-    return `Each meal should have a meaningful protein source (minimum ${Math.round(proteinTarget * 0.25)}g per meal).`;
+    return `Distribute protein effectively across meals, aiming for ${Math.round(proteinTarget / mealsPerDay)}g per meal on average. Each meal should include a substantial protein source to optimize muscle protein synthesis.`;
   } else {
-    return `Main meals (breakfast, lunch, dinner) should have minimum ${Math.round(proteinTarget * 0.2)}g protein each. Snacks should have minimum ${Math.round(proteinTarget * 0.08)}g protein.`;
+    const avgMainMeal = Math.round(proteinTarget * 0.3);
+    const avgSnack = Math.round(proteinTarget * 0.1);
+    return `Distribute protein strategically: main meals should average ~${avgMainMeal}g protein, snacks ~${avgSnack}g protein. Adjust based on meal timing, food preferences, and individual response while hitting the daily total.`;
   }
 };
 
@@ -586,19 +643,19 @@ const getSkillTimeHardConstraints = (budgetData: any): string => {
   let constraints = '';
   
   if (skillConfidence <= 1) {
-    constraints += `\n- **Skill constraint** MUST be respected: Kitchen Beginner level requires zero cooking skills. No raw meat preparation, no knife work, no stovetop use.`;
+    constraints += `\n- **Skill priority**: Kitchen Beginner level works best with zero cooking skills. Avoid raw meat preparation, knife work, and stovetop use to match user comfort level.`;
   }
   
   if (timeInvestment <= 1) {
-    constraints += `\n- **Time constraint** MUST be respected: Speed Cook requires maximum 5 minutes total per meal including heating.`;
+    constraints += `\n- **Time priority**: Speed Cook preference targets maximum 5 minutes total per meal including heating. Focus on ultra-quick assembly and minimal preparation.`;
   }
   
   if (skillConfidence <= 1 && timeInvestment <= 1) {
-    constraints += `\n- **CRITICAL COMBINATION**: Beginner + Speed Cook combination requires assembly-only meals. Traditional meal prep is impossible.`;
+    constraints += `\n- **Important combination**: Beginner + Speed Cook combination works best with assembly-only meals. Traditional meal prep doesn't align with this user's preferences and skill level.`;
   }
   
   if (skillConfidence <= 1 && planningStyle <= 2) {
-    constraints += `\n- **MEAL PREP CONSTRAINT**: Beginner skill + meal prep style requires assembly-only prep sessions. No cooking allowed in prep.`;
+    constraints += `\n- **Meal prep guidance**: Beginner skill + meal prep style works best with assembly-only prep sessions. Focus on no-cook preparation methods.`;
   }
   
   return constraints;
@@ -617,13 +674,13 @@ const buildBudgetSection = (budgetData: any): string => {
     // Scenario 1: Full range provided
     return `- Budget: ${currency}${budgetMin}–${currency}${budgetMax} per week
 - Budget attitude: ${attitude}
-- HARD CONSTRAINT: Keep the total grocery list within ${currency}${budgetMax}. Do not exceed this ceiling. Prioritize ingredients that fit within the ${currency}${budgetMin}–${currency}${budgetMax} range.`;
+- TARGET: Aim to keep grocery costs within ${currency}${budgetMin}–${currency}${budgetMax}. If higher-priority constraints (macros, dietary needs) make this impossible, explain the trade-off and provide the most cost-effective options possible.`;
     
   } else if (budgetMax && !budgetMin) {
     // Scenario 2: Maximum only (budget ceiling)
     return `- Budget: Up to ${currency}${budgetMax} per week
 - Budget attitude: ${attitude}
-- HARD CONSTRAINT: Keep the total grocery list under ${currency}${budgetMax}. This is the user's maximum spend.`;
+- TARGET: Strongly aim to keep grocery costs under ${currency}${budgetMax}. If nutritional requirements make this challenging, prioritize the most cost-effective options and explain any budget considerations.`;
     
   } else if (budgetMin && !budgetMax) {
     // Scenario 3: Minimum only (quality floor)
@@ -642,9 +699,12 @@ const buildBudgetSection = (budgetData: any): string => {
 const getBudgetConstraintText = (budgetData: any): string => {
   const currency = getCurrencySymbol(budgetData?.countryCode || 'US');
   const attitude = budgetData?.weeklyBudget || 'keep_reasonable';
+  const budgetMin = budgetData?.budgetMin;
   const budgetMax = budgetData?.budgetMax;
 
-  if (budgetMax) {
+  if (budgetMin && budgetMax) {
+    return `Stay within ${currency}${budgetMin}-${budgetMax}/week`;
+  } else if (budgetMax) {
     return `Stay within ${currency}${budgetMax}/week`;
   } else {
     return `${attitude} priority`;
@@ -718,8 +778,8 @@ const getMealPrepRequirementsText = (planningStyle: number, skillConfidence?: nu
   // traditional meal prep doesn't apply regardless of planningStyle
   if (skillConfidence !== undefined && skillConfidence <= 1) {
     return `No traditional batch cooking — this user cannot cook from scratch.
-  • "Meal prep" means: portioning snacks into bags, buying pre-cooked items, assembling overnight oats jars
-  • Assembly-only prep: open packets, combine in containers, refrigerate
+  • "Meal prep" means: portioning snacks into daily servings, buying pre-cooked items, assembling ready-made components into grab-and-go containers, etc.
+  • Assembly-only prep: open packets, combine in containers, refrigerate, etc.
   • Total prep session should be under 20 minutes for the entire week
   • All items should be pre-cooked, tinned, or ready-to-eat`;
   }
@@ -727,7 +787,7 @@ const getMealPrepRequirementsText = (planningStyle: number, skillConfidence?: nu
   if (timeInvestment !== undefined && timeInvestment <= 1) {
     return `Minimal prep — every meal must be under 5 minutes including heating.
   • If any "batch prep" is used, it should be assembly only (no cooking): portioning, combining, refrigerating
-  • Prep session under 30 minutes for the entire week
+  • Prep session under 20 minutes for the entire week
   • Microwave reheating is the only acceptable heating method for prepped meals
   • Pre-cooked and convenience products are the default, not a shortcut`;
   }
@@ -772,7 +832,7 @@ const getGroceryListRequirements = (store: string, planDuration: number = 7): st
 
 ## GROCERY LIST REQUIREMENTS
 
-**IMPORTANT:** Your meal plan MUST include a detailed grocery list structured by category. This grocery list will be imported into the app for shopping, so accuracy matters.
+**IMPORTANT:** Your meal plan should include a detailed grocery list structured by category. This grocery list will be imported into the app for shopping, so accuracy matters.
 
 For each grocery item include:
 - **Item name** - Specific product name (e.g., "${store} Lean Beef Mince" not just "beef")
@@ -794,38 +854,145 @@ Organize items into logical shopping categories:
 Include a **total estimated cost** and **currency** for the full grocery list.${additionalGuidance ? '\n\n' + additionalGuidance : ''}`;
 };
 
-const getMealPrepSessionRequirements = (planDuration: number = 7, skillConfidence?: number, timeInvestment?: number): string => {
+const getMealPrepSessionRequirements = (planDuration: number = 7, skillConfidence?: number, timeInvestment?: number, planningStyle?: number): string => {
   const prepGuidance = getMealPrepSessionGuidance(planDuration);
   
-  // Add skill/time-specific guidance to meal prep sessions
-  let skillTimeGuidance = '';
+  // Tier 1: Assembly Only (skill ≤1, or skill ≤2 + time ≤1)
   if (skillConfidence !== undefined && skillConfidence <= 1) {
-    skillTimeGuidance = `\n\n**BEGINNER SKILL ADJUSTMENT**: Meal prep sessions must be assembly-only. No cooking during prep. Focus on portioning, combining pre-made items, and storage.`;
-  } else if (timeInvestment !== undefined && timeInvestment <= 1) {
-    skillTimeGuidance = `\n\n**SPEED CONSTRAINT ADJUSTMENT**: Meal prep must be minimal - maximum 30 minutes for entire week. Focus on portion prep and microwave-ready assembly.`;
-  } else if (skillConfidence !== undefined && skillConfidence <= 2 && timeInvestment !== undefined && timeInvestment <= 2) {
-    skillTimeGuidance = `\n\n**SIMPLIFIED PREP ADJUSTMENT**: Keep prep sessions simple and basic. Maximum 1 hour total. Use simple techniques only.`;
-  }
-  
-  return `
-
+    return `
 ---
 
 ## MEAL PREP SESSION REQUIREMENTS
 
-**IMPORTANT:** Your meal plan MUST include a structured meal prep session guide. This will be displayed in the app as a step-by-step prep walkthrough.
+**IMPORTANT:** Your meal plan should include a structured weekly assembly guide. This will be displayed in the app as a step-by-step prep walkthrough.
+
+${prepGuidance}
+
+**This user CANNOT cook. The prep session is assembly and portioning only.**
+
+Include:
+- **Session name** — Use "Weekly Assembly & Portioning" (not "Meal Prep" or "Batch Cook")
+- **Total time** — Must be under 20 minutes for the entire week. No separate "cook time" — there is no cooking.
+- **Coverage** — What days/meals the assembly covers
+- **Recommended timing** — When to do it (e.g., "Same day as grocery shop — unpack and portion immediately")
+- **Equipment needed** — ONLY list: containers with lids, zip-lock bags, a bowl, a spoon. No cooking equipment.
+- **Step-by-step instructions** — Clear, ordered steps. Every step must be one of: unpack, portion, combine, stir, store, etc. No step should involve cooking, heating, chopping, or any kitchen skill. Include a time estimate per step (e.g., "Portion chicken — 3 min").
+  Suggested step structure:
+  1. Unpack & sort (fridge vs pantry)
+  2. Portion proteins (e.g., shred rotisserie chicken into containers)
+  3. Portion snacks (e.g., divide nuts into daily bags)
+  4. Assemble make-ahead items (combining dry ingredients for grab-and-go convenience)
+  5. Organize fridge by meal type
+  etc.
+- **Make-ahead assembly rule** — For items requiring moisture/liquid, combine DRY components during the weekly prep session. Add liquid/wet ingredients the night before consumption to prevent texture degradation. This ensures optimal texture and freshness.
+- **Opened tinned items rule** — If a recipe uses half a tin (e.g., half a tin of baked beans), the prep instructions should tell the user to transfer the remaining half to a sealed container, label it, and refrigerate immediately. Use the remainder the next day — do not store opened tinned items for more than 2 days.
+- **Mid-week restock session** — If perishable items won't last 7 days, describe a SEPARATE meal prep session for the mid-week restock. This should have its own name (e.g., "Mid-Week Restock & Assembly"), its own timing, equipment list, and step-by-step instructions. Don't bundle the restock as a final step inside the first prep session — it happens on a different day and should be treated as a distinct session.
+- **Storage guide** — Simple list: item name, container type, fridge or pantry, use-by day. Follow standard food safety guidelines:
+  - Cooked proteins: 3-4 days refrigerated
+  - Assembled items with dairy/liquid: 3-4 days refrigerated
+  - Dry assembled items: 5-7 days when stored properly  
+  - Opened canned/packaged items: 2-3 days in sealed containers
+  - Pre-washed produce: 3-5 days after opening
+  - Dry portioned items: 1-2 weeks in pantry when stored properly${(() => {
+    const prepApproach = (planningStyle !== undefined && planningStyle <= 2)
+      ? `\n\n**GRAB-AND-GO PREP**: This user selected "Dedicated Meal Prepper" — they want to open the fridge, grab a container, microwave it, and eat. The prep session must assemble COMPLETE meals into individual containers, not just portion ingredients. At meal time, the only steps should be: grab container, microwave 2 minutes, eat. If a meal doesn't reheat well (e.g., wraps go soggy), note it as an exception that gets assembled fresh at meal time in under 2 minutes.`
+      : (planningStyle !== undefined && planningStyle >= 4)
+      ? `\n\n**MINIMAL PREP**: This user prefers deciding at meal time. The prep session should only portion long-life ingredients (nuts, dry oats). All meal assembly happens fresh at meal time using convenience products.`
+      : `\n\n**MODERATE PREP**: Portion and assemble some meals fully into containers, leave others for quick assembly at meal time. Prioritise assembling lunches fully into grab-and-go containers and leave dinners for fresh assembly using convenience items.`;
+    return prepApproach;
+  })()}`;
+  }
+
+  // Tier 2: Speed-focused minimal prep (time ≤1, any skill)
+  if (timeInvestment !== undefined && timeInvestment <= 1) {
+    return `
+---
+
+## MEAL PREP SESSION REQUIREMENTS
+
+**IMPORTANT:** Your meal plan should include a structured meal prep session guide. This will be displayed in the app as a step-by-step prep walkthrough.
+
+${prepGuidance}
+
+**SPEED CONSTRAINT: Total prep must be under 20 minutes for the entire week.**
+
+Include:
+- **Session name** — e.g., "Quick Weekly Prep"
+- **Active time** — Hands-on time only (must be under 20 minutes)
+- **Passive time** — Any unattended time (e.g., rice cooker running). Separate from active time.
+- **Total time** — Combined, but the user only needs to be present for active time
+- **Coverage** — What days/meals the prep covers
+- **Recommended timing** — When to do it
+- **Equipment needed** — List only what's actually used. Prefer microwave and rice cooker over stovetop/oven for speed.
+- **Step-by-step instructions** — Ordered for efficiency. Start passive items first (rice cooker), do active tasks while waiting. Include time estimate per step.
+- **Storage guidelines** — How long each prepped item lasts in fridge vs freezer${(() => {
+    const prepApproach = (planningStyle !== undefined && planningStyle <= 2)
+      ? `\n\n**GRAB-AND-GO PREP**: This user selected "Dedicated Meal Prepper" — they want to open the fridge, grab a container, microwave it, and eat. The prep session must assemble COMPLETE meals into individual containers, not just portion ingredients. At meal time, the only steps should be: grab container, microwave 2 minutes, eat. If a meal doesn't reheat well (e.g., wraps go soggy), note it as an exception that gets assembled fresh at meal time in under 2 minutes.`
+      : (planningStyle !== undefined && planningStyle >= 4)
+      ? `\n\n**MINIMAL PREP**: This user prefers deciding at meal time. The prep session should only portion long-life ingredients (nuts, dry oats). All meal assembly happens fresh at meal time using convenience products.`
+      : `\n\n**MODERATE PREP**: Portion and assemble some meals fully into containers, leave others for quick assembly at meal time. Prioritise assembling lunches fully into grab-and-go containers and leave dinners for fresh assembly using convenience items.`;
+    return prepApproach;
+  })()}`;
+  }
+
+  // Tier 3: Simplified prep (skill ≤2 + time ≤2)
+  if (skillConfidence !== undefined && skillConfidence <= 2 && timeInvestment !== undefined && timeInvestment <= 2) {
+    return `
+---
+
+## MEAL PREP SESSION REQUIREMENTS
+
+**IMPORTANT:** Your meal plan should include a structured meal prep session guide. This will be displayed in the app as a step-by-step prep walkthrough.
+
+${prepGuidance}
+
+**SIMPLIFIED PREP: Keep it simple and basic. Maximum 1 hour total. No complex techniques.**
+
+Include:
+- **Session name** — e.g., "Weekly Prep Session"
+- **Prep time** — Active hands-on time
+- **Cook time** — Passive cooking time (rice cooker, microwave only — no stovetop timing)
+- **Total time** — Combined (must be under 1 hour)
+- **Coverage** — What days/meals the prep covers
+- **Recommended timing** — When to do it
+- **Equipment needed** — Only rice cooker, microwave, and containers. No stovetop or oven.
+- **Step-by-step instructions** — One task at a time. Never require timing multiple components simultaneously. Include time estimate per step.
+- **Storage guidelines** — How long each prepped item lasts in fridge vs freezer. Include safe storage durations.${(() => {
+    const prepApproach = (planningStyle !== undefined && planningStyle <= 2)
+      ? `\n\n**GRAB-AND-GO PREP**: This user selected "Dedicated Meal Prepper" — they want to open the fridge, grab a container, microwave it, and eat. The prep session must assemble COMPLETE meals into individual containers, not just portion ingredients. At meal time, the only steps should be: grab container, microwave 2 minutes, eat. If a meal doesn't reheat well (e.g., wraps go soggy), note it as an exception that gets assembled fresh at meal time in under 2 minutes.`
+      : (planningStyle !== undefined && planningStyle >= 4)
+      ? `\n\n**MINIMAL PREP**: This user prefers deciding at meal time. The prep session should only portion long-life ingredients (nuts, dry oats). All meal assembly happens fresh at meal time using convenience products.`
+      : `\n\n**MODERATE PREP**: Portion and assemble some meals fully into containers, leave others for quick assembly at meal time. Prioritise assembling lunches fully into grab-and-go containers and leave dinners for fresh assembly using convenience items.`;
+    return prepApproach;
+  })()}`;
+  }
+
+  // Tier 4: Standard/Advanced prep (skill 3+ or time 3+)
+  return `
+---
+
+## MEAL PREP SESSION REQUIREMENTS
+
+**IMPORTANT:** Your meal plan should include a structured meal prep session guide. This will be displayed in the app as a step-by-step prep walkthrough.
 
 ${prepGuidance}
 
 Include:
-- **Session name** - e.g., "Sunday Meal Prep" or "Weekly Batch Cook"
-- **Prep time and cook time** - Separate active prep vs passive cooking time
-- **Total time** - Combined duration
-- **Coverage** - What days/meals the prep covers (e.g., "7 days of lunches and dinners")
-- **Recommended timing** - When to do the prep (e.g., "Sunday afternoon")
-- **Equipment needed** - List of equipment required for the prep session
-- **Step-by-step instructions** - Clear, ordered instructions for the full prep session
-- **Storage guidelines** - How long each prepped item lasts in fridge vs freezer${skillTimeGuidance}`;
+- **Session name** — e.g., "Sunday Meal Prep" or "Weekly Batch Cook"
+- **Prep time and cook time** — Separate active prep vs passive cooking time
+- **Total time** — Combined duration
+- **Coverage** — What days/meals the prep covers (e.g., "${planDuration} days of lunches and dinners")
+- **Recommended timing** — When to do the prep (e.g., "Sunday afternoon")
+- **Equipment needed** — List of equipment required for the prep session
+- **Step-by-step instructions** — Clear, ordered instructions for the full prep session. Order for efficiency: start slow items first (oven, rice cooker), do active prep while those run.
+- **Storage guidelines** — How long each prepped item lasts in fridge vs freezer${(() => {
+    const prepApproach = (planningStyle !== undefined && planningStyle <= 2)
+      ? `\n\n**GRAB-AND-GO PREP**: This user selected "Dedicated Meal Prepper" — they want to open the fridge, grab a container, microwave it, and eat. The prep session must assemble COMPLETE meals into individual containers, not just portion ingredients. At meal time, the only steps should be: grab container, microwave 2 minutes, eat. If a meal doesn't reheat well (e.g., wraps go soggy), note it as an exception that gets assembled fresh at meal time in under 2 minutes.`
+      : (planningStyle !== undefined && planningStyle >= 4)
+      ? `\n\n**MINIMAL PREP**: This user prefers deciding at meal time. The prep session should only portion long-life ingredients (nuts, dry oats). All meal assembly happens fresh at meal time using convenience products.`
+      : `\n\n**MODERATE PREP**: Portion and assemble some meals fully into containers, leave others for quick assembly at meal time. Prioritise assembling lunches fully into grab-and-go containers and leave dinners for fresh assembly using convenience items.`;
+    return prepApproach;
+  })()}`;
 };
 
 const getMealPrepSessionGuidance = (planDuration: number): string => {
@@ -887,10 +1054,10 @@ const getDiversityRequirements = (nutritionData: any, budgetData: any): string =
   
   if (!seafoodExcluded && (nutrientVariety === 'moderate' || nutrientVariety === 'high')) {
     diversityText += `
-- **Fish/Omega-3 requirement**: Include at least one fish or seafood meal per week for EPA/DHA omega-3 fatty acids. Prioritize oily fish (salmon, sardines, mackerel) over white fish.`;
+- **Omega-3 considerations**: Include good sources of EPA/DHA omega-3 fatty acids when planning seafood meals. Choose omega-3 rich options when they align with user preferences.`;
   } else if (seafoodExcluded) {
     diversityText += `
-- **Omega-3 compensation**: User has excluded fish/seafood. To compensate for missing EPA/DHA omega-3, include chia seeds, walnuts, or flaxseed in at least 2 meals per week for ALA omega-3.`;
+- **Omega-3 compensation**: User has excluded fish/seafood. Include alternative omega-3 sources (such as walnuts, flaxseed, chia seeds) to provide ALA omega-3 fatty acids.`;
     
     if (hasOmega3Supplement) {
       diversityText += ` User supplements with omega-3 capsules, so dietary omega-3 is less critical but still include ALA sources where natural.`;
@@ -911,7 +1078,7 @@ const getDiversityRequirements = (nutritionData: any, budgetData: any): string =
   
   if (!legumesExcluded && (nutrientVariety === 'moderate' || nutrientVariety === 'high')) {
     diversityText += `
-- **Legume requirement**: Include legumes (lentils, chickpeas, black beans, edamame) in at least 2 meals per week for prebiotic fiber diversity and plant-based protein.`;
+- **Fiber and plant protein diversity**: Include legumes and other fiber-rich plant proteins when they complement the meal plan and user preferences.`;
   } else if (legumesExcluded || nutrientVariety === 'low') {
     diversityText += `
 - **Fiber compensation**: Legumes are excluded or variety is set to low. Ensure fiber target is still met through other sources (oats, chia seeds, vegetables, whole grains).`;
@@ -923,7 +1090,8 @@ const getDiversityRequirements = (nutritionData: any, budgetData: any): string =
 - **High variety enforcement**: All 6 micronutrient categories are HARD requirements (dark leafy greens, cruciferous vegetables, vitamin C sources, omega-3 sources, legumes, whole grains). FAIL the review if 2+ categories are missed.`;
   } else if (nutrientVariety === 'moderate') {
     diversityText += `
-- **Moderate variety targets**: The 6 micronutrient categories are soft targets. Flag misses but don't FAIL the review unless 3+ categories are missed.`;
+- **Moderate variety targets**: The 6 micronutrient categories are soft targets. Flag misses but don't FAIL the review unless 3+ categories are missed.
+**IMPORTANT: The "soft target" exemption applies to micronutrient diversity categories. Ingredient variety should be reasonable for the plan duration and user context, but prioritize meeting macro targets, dietary restrictions, and user preferences over arbitrary ingredient counts.**`;
   } else if (nutrientVariety === 'low') {
     diversityText += `
 - **Simplified approach**: Only enforce protein source diversity (3+ sources) and minimum fiber. Skip micronutrient category checks entirely — user prefers simplicity over variety.`;
@@ -1012,22 +1180,22 @@ const getSkillRequirements = (budgetData: any): string => {
   if (skillConfidence === 1) {
     skillText += `
 **INGREDIENT STYLE for Kitchen Beginner:**
-- **Convenience priority**: Strongly prefer pre-made, ready-to-eat, and convenience products: tinned tuna, tinned baked beans, pre-cooked rice pouches (e.g., SunRice microwave pouches), rotisserie chicken from the deli, pre-washed salad bags, tinned legumes, pre-sliced cheese, yoghurt tubs, protein bars, fruit eaten whole.
-- **Zero prep ingredients**: Avoid any ingredient that requires significant preparation: no raw meat that needs seasoning/cooking to safe temps, no vegetables that need chopping or peeling, no dry grains that need measuring and cooking.
-- **Assembly meals**: A valid 'recipe' at this level is: microwave a rice pouch, open a tin of tuna, combine in a bowl. That counts as a meal.
+- **Convenience priority**: Strongly prefer pre-made, ready-to-eat, and convenience products that require minimal to no preparation. Choose items that are pre-cooked, pre-washed, pre-sliced, or ready-to-eat.
+- **Zero prep ingredients**: Avoid ingredients that require cooking skills or food safety knowledge (no raw meat, no stovetop cooking, no grains from scratch). But whole fruits, pre-washed salads, and frozen vegetables require zero skill — include them freely.
+- **Assembly meals**: Focus on simple combinations of ready-made components. A complete meal can be assembled by opening containers, microwaving pre-cooked items, and combining them together.
 
 **INSTRUCTIONS for Kitchen Beginner:**
 - **Basic techniques only**: Use only basic techniques: microwave, open tin/packet, stir, pour.
-- **No knife work**: No knife skills required. If vegetables are needed, use frozen pre-cut or tinned.
+- **No knife work**: No knife skills required. Prefer vegetables and fruits that can be eaten whole, come pre-washed, or are frozen pre-cut.
 - **Simple combinations**: Maximum 4-5 ingredients per meal including the convenience products.
 - **Single-tasking**: Never require timing multiple components simultaneously.
 - **Ultra-quick**: Each meal should be achievable in under 5 minutes with zero cooking skill.`;
   } else if (skillConfidence === 2) {
     skillText += `
 **INGREDIENT STYLE for Cautious Cook:**
-- **Mixed approach**: Mix of convenience products and simple cooking: pre-cooked rice pouches OR cooking rice in a rice cooker, tinned proteins AND simple pan/air fryer proteins like chicken breast, frozen vegetables that just need microwaving, jarred sauces.
-- **Simple raw preparation**: Raw meat is acceptable but only simple preparations: season with salt/pepper, air fry at a set temperature for a set time.
-- **Sauce shortcuts**: Pre-made sauces and marinades are preferred over making sauces from scratch.
+- **Mixed approach**: Balance convenience products with simple cooking tasks. Use ready-made items where complex, cook simple items where manageable.
+- **Simple raw preparation**: Raw ingredients are acceptable but only for straightforward preparations with clear cooking methods and safety guidelines.
+- **Sauce shortcuts**: Prefer ready-made sauces, marinades, and flavor bases over complex from-scratch preparations.
 
 **INSTRUCTIONS for Cautious Cook:**
 - **Detailed guidance**: Clear step-by-step with exact temperatures, exact times, and visual doneness cues.
@@ -1074,10 +1242,10 @@ const getTimeRequirements = (budgetData: any): string => {
   if (timeInvestment === 1) {
     timeText += `
 - **Speed Cook approach**: Maximum 5 minutes total per meal including any heating.
-- **Zero-cook priority**: Prioritise zero-cook meals: overnight oats, yoghurt bowls, tinned fish + rice pouch, protein shakes, pre-made wraps.
-- **Ultra-fast batch prep**: If batch prep is used, the session should be under 30 minutes and produce the entire week's meals.
+- **Zero-cook priority**: Prioritise meals that require no cooking - only assembly, reheating, or simple preparation steps.
+- **Ultra-fast batch prep**: If batch prep is used, the session should be under 20 minutes and produce the entire week's meals.
 - **Microwave focus**: Microwave reheating is the primary cooking method for prepped meals.
-- **Convenience default**: Pre-cooked and convenience products should be the default: microwave rice pouches, rotisserie chicken, tinned proteins, frozen steam vegetables, pre-washed salad.`;
+- **Convenience default**: Pre-cooked and convenience products should be the default choice. Favor ready-made components that just need reheating or simple assembly.`;
   } else if (timeInvestment === 2) {
     timeText += `
 - **Quick Meals approach**: Maximum 10 minutes active prep per meal. Total time under 20 minutes.
@@ -1104,7 +1272,7 @@ const getTimeRequirements = (budgetData: any): string => {
   // Cross-referencing skill and time
   if (skillConfidence <= 2 && timeInvestment <= 2) {
     timeText += `
-- **Simplest Possible Strategy**: This user needs the simplest possible meals. Think: tin of tuna + microwave rice pouch + frozen vegetables microwaved = done. Overnight oats assembled in a jar = done. Greek yoghurt + protein powder + banana = done. Every meal should be achievable by someone who has never cooked before, in under 10 minutes. Do NOT suggest recipes that require seasoning raw meat, cooking on a stovetop, or managing multiple components. Pre-cooked and convenience products are not shortcuts — they ARE the plan.`;
+- **Simplest Possible Strategy**: This user needs the simplest possible meals. Focus on quick assembly of ready-made components that create complete, balanced meals. Every meal should be achievable by someone who has never cooked before, in under 10 minutes. Do NOT suggest recipes that require seasoning raw meat, cooking on a stovetop, or managing multiple components. Pre-cooked and convenience products are not shortcuts — they ARE the plan.`;
   }
   
   if (skillConfidence >= 4 && timeInvestment >= 4) {
@@ -1158,11 +1326,11 @@ const getVerificationSteps = (mealsPerDay: number = 3, proteinTarget: number = 1
 
 Before presenting the meal plan, complete these checks:
 
-1. **Macro tolerance rules** — Not all macros need the same daily precision. Use these evidence-based rules:
-   - **Protein**: Must be within 10% of target on EVERY individual day. Muscle protein synthesis is a daily process — consistent protein intake matters.
-   - **Calories**: ${periodLabel}-average must be within 5% of target ${periodNote}. Individual days can vary up to ±10%. For weight gain, total energy balance drives results. Additionally, no individual day should deviate more than 150 kcal from any other day. If day types differ by more than this, adjust portion sizes to narrow the gap.
-   - **Carbs & Fat**: ${periodLabel}-average must be within 10% of target ${periodNote}. Individual days can flex more freely (±15%). Day-to-day variation in carbs and fat is normal and even beneficial if it aligns with activity levels.
-   - **Fiber**: Must hit at least 80% of the daily target (e.g., 33.6g if target is 42g) on EVERY day. Gut health benefits require daily consistency.
+1. **Macro guidance principles** — Different macros require different consistency approaches based on research:
+   - **Protein**: Maintain consistent daily intake as muscle protein synthesis is a daily process. Daily consistency provides better results than weekly averaging.
+   - **Calories**: Target ${periodLabel}-average for energy balance goals ${periodNote}. Moderate daily variation is acceptable as total energy balance drives results. Keep daily variations reasonable to support consistent energy levels.
+   - **Carbs & Fat**: Focus on ${periodLabel}-averages with natural daily flexibility. Day-to-day variation in carbs and fat is normal and can be beneficial when aligned with activity levels and meal preferences.
+   - **Fiber**: Emphasize daily adequacy as gut microbiome responds to consistent fiber intake. Daily consistency supports sustained gut health benefits better than sporadic high intake.
 
 2. **Protein distribution** — Check that protein is spread across meals, not loaded into one. ${getProteinDistributionGuidance(mealsPerDay, proteinTarget)}
 
@@ -1176,7 +1344,7 @@ Before presenting the meal plan, complete these checks:
 
 7. **Dietary restriction compliance** — Scan every ingredient across every meal to confirm zero allergens or avoided foods appear.
 
-8. **Ingredient diversity audit** — Count unique protein sources (min 3), vegetables (min 6), carb sources (min 3), and fruits (min 3).
+8. **Ingredient diversity audit** — Ensure reasonable variety across protein sources, vegetables, carbohydrate sources, and fruits. Prioritize nutritional completeness while respecting user preferences, dietary restrictions, and plan duration.
 
 ${diversityRequirements}
 
@@ -1185,8 +1353,8 @@ ${diversityRequirements}
    ${budgetData?.timeInvestment === 2 ? '- **Time limit**: No recipe should exceed 20 minutes total time' : ''}
    ${budgetData?.skillConfidence === 1 ? '- **Skill limit**: No recipe should require knife work, raw meat preparation, or stovetop cooking' : ''}
    ${budgetData?.skillConfidence === 2 ? '- **Skill limit**: Include safety temperatures and exact timing for any raw meat preparation' : ''}
-   ${budgetData?.varietySeeking === 1 ? '- **Variety limit**: 3-4 unique meal templates maximum for the week' : ''}
-   ${budgetData?.varietySeeking === 5 ? '- **Variety target**: 8-10 unique meal templates minimum for the week' : ''}
+   ${budgetData?.varietySeeking === 1 ? '- **Simplicity preference**: User prefers limited variety - focus on repeating successful meal patterns' : ''}
+   ${budgetData?.varietySeeking === 5 ? '- **Variety preference**: User enjoys diverse meals - include different cuisines and ingredients when possible' : ''}
 ${skillTimeChecks}
 
 10. **Fiber target check** — Sum daily fiber for each day and fix if any day falls below 80% of target.
@@ -1199,7 +1367,7 @@ ${skillTimeChecks}
 
 14. **Grocery cost accuracy** — Verify every item is priced at the actual pack size available at the specified store, not the portion used. Sum all item prices and confirm the total matches the stated cost. If the sum doesn't match, fix it. Present the total as a range with a 10% buffer to account for price variation.
 
-15. **Fiber distribution check** — No single meal should contain more than 45% of the day's total fiber. If it does, redistribute fiber sources across other meals (e.g., add legumes to lunch, swap white rice for brown, add seeds to a snack).
+15. **Fiber distribution check** — Ensure fiber is reasonably distributed throughout the day to support digestive tolerance. If one meal contains excessive fiber that might cause discomfort, consider spreading fiber sources across multiple meals for better digestive adaptation.
 
 16. **Meal prep session completeness** — Verify the meal prep guide covers all batch-cooked items mentioned in the recipes.
 
@@ -1241,5 +1409,5 @@ After creating the initial meal plan:
 4. Make any requested adjustments to the meal plan
 5. Only after I'm satisfied with the plan should you ask if I want the JSON conversion
 
-**Do NOT automatically convert to JSON** - I need to approve the meal plan first.`;
+**Do NOT automatically convert to JSON** - I need to review the plan first. After presenting the plan and receiving my feedback, tell me: "When you're happy with the plan, send me the review prompt to run a final quality check before JSON conversion."`;
 };

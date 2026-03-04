@@ -85,6 +85,8 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     allergies: [] as string[],
     avoidFoods: [] as string[],
     planDuration: 7, // Default to recommended 7 days
+    startDate: 'tomorrow', // 'today', 'tomorrow', 'next_monday', 'custom'
+    customStartDate: '', // Date string for custom option
     mealPreferences: '', // 'ai_suggest' or 'include_favorites'
     selectedFavorites: [] as string[], // Array of favorite meal IDs
     customMealRequests: '', // Text input for custom requests
@@ -171,7 +173,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     primaryAlpha30: themeColor + '60',
   };
 
-  const totalSteps = 8;
+  const totalSteps = 9;
 
   const getStoreRecommendation = () => {
     const budget = formData.weeklyBudget;
@@ -1761,6 +1763,21 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   {formData.planDuration} days
                 </Text>
               </Animatable.View>
+              
+              <Animatable.View 
+                animation="slideInRight" 
+                delay={650}
+                duration={300}
+                style={styles.tronDataItem}
+              >
+                <Text style={styles.tronDataLabel}>Start Date</Text>
+                <Text style={[styles.tronDataValue, { color: colors.primary }]}>
+                  {formData.startDate === 'today' && 'Today'}
+                  {formData.startDate === 'tomorrow' && 'Tomorrow'}
+                  {formData.startDate === 'next_monday' && 'Next Monday'}
+                  {formData.startDate === 'custom' && (formData.customStartDate || 'Custom date')}
+                </Text>
+              </Animatable.View>
             </Animatable.View>
 
             <Animatable.View 
@@ -2132,6 +2149,128 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     </View>
   );
 
+  const renderStartDateStep = () => {
+    const startDateOptions = [
+      { id: 'today', title: 'Today', subtitle: 'Start meal planning immediately' },
+      { id: 'tomorrow', title: 'Tomorrow', subtitle: 'Traditional start (recommended)' },
+      { id: 'next_monday', title: 'Next Monday', subtitle: 'Perfect for weekly meal prep' },
+      { id: 'custom', title: 'Custom Date', subtitle: 'Choose your own start date' }
+    ];
+
+    const getNextMonday = () => {
+      const today = new Date();
+      const nextMonday = new Date();
+      const daysUntilMonday = (8 - today.getDay()) % 7 || 7;
+      nextMonday.setDate(today.getDate() + daysUntilMonday);
+      return nextMonday.toLocaleDateString('en-AU', { 
+        weekday: 'long', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    };
+
+    return (
+      <View style={styles.stepContainer}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 120 }}
+        >
+          <View style={[styles.header, { borderBottomColor: colors.primaryAlpha20 }]}>
+            <View style={styles.progressContainer}>
+              <View style={styles.stepIndicator}>
+                <Text style={[styles.stepNumber, { color: colors.primary }]}>
+                  {currentStep + 1}
+                </Text>
+                <Text style={styles.stepTotal}>/{totalSteps}</Text>
+              </View>
+              
+              <View style={[styles.progressTrack, { backgroundColor: colors.primaryAlpha20 }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { 
+                      width: `${((currentStep + 1) / totalSteps) * 100}%`,
+                      backgroundColor: colors.primary 
+                    }
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
+          
+          <Animatable.View
+            animation="fadeInUp"
+            delay={200}
+            style={styles.content}
+          >
+            <Text style={[styles.stepTitle, { color: colors.primary }]}>
+              When should your meal plan start?
+            </Text>
+            
+            <View style={styles.optionsContainer}>
+              {startDateOptions.map((option, index) => (
+                <Animatable.View
+                  key={option.id}
+                  animation="fadeInUp"
+                  delay={300 + (index * 100)}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.optionCard,
+                      formData.startDate === option.id && {
+                        backgroundColor: colors.primaryAlpha20,
+                        borderColor: colors.primary,
+                        borderWidth: 2,
+                      }
+                    ]}
+                    onPress={() => setFormData({ ...formData, startDate: option.id })}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.optionContent}>
+                      <Text style={[
+                        styles.optionTitle,
+                        { 
+                          color: formData.startDate === option.id 
+                            ? colors.primary 
+                            : '#333' 
+                        }
+                      ]}>
+                        {option.title}
+                        {option.id === 'next_monday' && ` (${getNextMonday()})`}
+                      </Text>
+                      <Text style={styles.optionSubtitle}>
+                        {option.subtitle}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </Animatable.View>
+              ))}
+            </View>
+            
+            {formData.startDate === 'custom' && (
+              <Animatable.View
+                animation="fadeInUp"
+                delay={700}
+                style={styles.customInputContainer}
+              >
+                <Text style={[styles.inputLabel, { color: colors.primary }]}>
+                  Choose your start date:
+                </Text>
+                <TextInput
+                  style={[styles.customDateInput, { borderColor: colors.primary }]}
+                  value={formData.customStartDate}
+                  onChangeText={(text) => setFormData({ ...formData, customStartDate: text })}
+                  placeholder="e.g. March 10, 2024"
+                  placeholderTextColor="#999"
+                />
+              </Animatable.View>
+            )}
+          </Animatable.View>
+        </ScrollView>
+      </View>
+    );
+  };
+
   const renderMealPreferencesStep = () => (
     <View style={styles.stepContainer}>
       <ScrollView 
@@ -2498,8 +2637,9 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
       case 3: return renderKitchenPersonalityStep();
       case 4: return renderFoodPreferencesStep(); // This is now the new Eating Patterns step
       case 5: return renderMealPlanDurationStep();
-      case 6: return renderMealPreferencesStep();
-      case 7: return renderCookingEquipmentStep();
+      case 6: return renderStartDateStep();
+      case 7: return renderMealPreferencesStep();
+      case 8: return renderCookingEquipmentStep();
       default: return renderBudgetStep();
     }
   };
@@ -2520,8 +2660,9 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                        formData.skillConfidence > 0;
         case 4: return true; // Eating patterns are optional
         case 5: return formData.planDuration > 0; // Duration must be selected
-        case 6: return formData.mealPreferences !== ''; // Meal preferences must be selected
-        case 7: return formData.cookingEquipment.length > 0; // At least one piece of equipment selected
+        case 6: return formData.startDate !== ''; // Start date must be selected
+        case 7: return formData.mealPreferences !== ''; // Meal preferences must be selected
+        case 8: return formData.cookingEquipment.length > 0; // At least one piece of equipment selected
         default: return false;
       }
     };
@@ -2838,6 +2979,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: '#ffffff',
+  },
+  customDateInput: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#ffffff',
+    marginTop: 8,
+    flex: 1,
   },
   countryPickerButton: {
     backgroundColor: '#1a1a1a',
