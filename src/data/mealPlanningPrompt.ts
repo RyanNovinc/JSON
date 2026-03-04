@@ -206,12 +206,14 @@ ${fridgePantryData.ingredients.map(item => {
   return `• ${item.name}${quantity}${expiryInfo}${notes} [${item.location}]`;
 }).join('\n')}
 
-**CRITICAL: ${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
-  'Build the meal plan around these ingredients as much as possible. These should be the foundation of your meal suggestions.' :
+${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
+  '**CRITICAL: Build the meal plan around these ingredients as much as possible. These should be the foundation of your meal suggestions.**' :
   fridgePantryData.preferences?.primaryApproach === 'expiry' ? 
-  'Prioritize ingredients with expiry dates first, especially those expiring soon. Build meals around expiring items.' :
+  '**CRITICAL: Prioritize ingredients with expiry dates first, especially those expiring soon. Build meals around expiring items.**' :
   'Use these ingredients when they naturally fit into optimal meal plans, but don\'t force them if they don\'t work well.'
-}**` : '- No fridge/pantry inventory provided or user chose not to include existing ingredients'}
+}
+
+**GROCERY LIST ADJUSTMENT:** If the meal plan uses ingredients the user already has, either exclude them from the grocery list entirely or reduce the quantity to only what's additionally needed. Note which items are "already in pantry" so the user knows they don't need to buy them.` : '- No fridge/pantry inventory provided or user chose not to include existing ingredients'}
 
 MEAL PREFERENCES:
 ${budgetData.mealPreferences === 'include_favorites' ? 

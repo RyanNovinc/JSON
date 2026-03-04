@@ -11,6 +11,7 @@ export enum PremiumFeature {
   WORKOUT_TEMPLATES = 'workout_templates',
   PROGRESS_TRACKING = 'progress_tracking',
   EXPORT_DATA = 'export_data',
+  NUTRITION_ACCESS = 'nutrition_access',
 }
 
 // Define which features require premium access
@@ -48,6 +49,11 @@ export const PREMIUM_FEATURES = {
   [PremiumFeature.EXPORT_DATA]: {
     name: 'Export Data',
     description: 'Export your workout data',
+    freeLimit: null,
+  },
+  [PremiumFeature.NUTRITION_ACCESS]: {
+    name: 'Nutrition Planning',
+    description: 'AI-powered meal planning and nutrition tracking',
     freeLimit: null,
   },
 };
