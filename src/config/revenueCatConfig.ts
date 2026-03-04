@@ -10,6 +10,7 @@ export const REVENUECAT_CONFIG = {
   entitlements: {
     // Main pro access entitlement (matches your RevenueCat entitlement)
     json_pro: 'JSON Pro',           // Your entitlement identifier
+    nutrition_access: 'nutrition_access', // Nutrition-specific entitlement
   },
 
   // Offering IDs (these match what you created in RevenueCat)
@@ -30,17 +31,19 @@ export const REVENUECAT_CONFIG = {
 export const PRODUCT_CONFIG = {
   lifetime_pro_tier_1: {
     packageId: REVENUECAT_CONFIG.packages.lifetime_pro_tier_1,
-    title: 'Lifetime Access',
-    description: 'One-time purchase for unlimited access to all premium features',
-    entitlements: [REVENUECAT_CONFIG.entitlements.json_pro],
+    title: 'Nutrition Pro',
+    description: 'One-time purchase for lifetime access to AI nutrition planning',
+    entitlements: [REVENUECAT_CONFIG.entitlements.nutrition_access],
     features: [
-      'Unlimited workout routines',
-      'Advanced analytics', 
-      'Cloud sync',
-      'Lifetime updates',
+      'AI Macro Engine',
+      'Smart Grocery Lists',
+      'Meal Prep Blueprints',
+      'Sleep-Synced Timing',
+      'Skill-Adaptive Recipes',
+      'Pantry Intelligence',
     ],
-    price: '$29.99',
-    originalPrice: '$49.99',
+    price: '$9.99',
+    originalPrice: '$79.99',
   },
 };
 
@@ -53,4 +56,9 @@ export const hasEntitlement = (customerInfo: any, entitlementKey: string): boole
 // Helper to check if user has JSON Pro access
 export const hasJSONProAccess = (customerInfo: any): boolean => {
   return hasEntitlement(customerInfo, REVENUECAT_CONFIG.entitlements.json_pro);
+};
+
+// Helper to check if user has nutrition access
+export const hasNutritionAccess = (customerInfo: any): boolean => {
+  return hasEntitlement(customerInfo, REVENUECAT_CONFIG.entitlements.nutrition_access);
 };

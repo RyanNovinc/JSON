@@ -123,7 +123,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               </Text>
               
               <InfoBox>
-                <Text style={styles.infoBoxText}>
+                <Text style={[styles.infoBoxText, { color: '#ffffff' }]}>
                   <Text style={[styles.emphasis, { color: themeColor }]}>Local Storage Only:</Text> All your workouts, progress tracking, and personal data remain on your device and never leave it.
                 </Text>
               </InfoBox>

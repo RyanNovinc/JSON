@@ -27,7 +27,7 @@ import { WorkoutStorage, NutritionCompletionStatus, MealPlan } from '../utils/st
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMealPlan } from '../types/nutrition';
 import { generateUserMealPlanPrompt } from '../data/generateUserMealPrompt';
-import { PremiumFeatureGate, IfPremium, IfFree } from '../components/PremiumFeatureGate';
+import { NutritionFeatureGate, IfNutritionPro, IfNutritionFree } from '../components/NutritionFeatureGate';
 import { PremiumFeature } from '../utils/premiumFeatures';
 
 type NutritionNavigationProp = StackNavigationProp<RootStackParamList, 'NutritionHome'>;
@@ -1017,7 +1017,7 @@ export default function NutritionHomeScreen({ route }: any) {
 
 
       {/* Add Meal Plan FAB - Bottom Right */}
-      <PremiumFeatureGate
+      <NutritionFeatureGate
         featureName="nutrition planning"
         onUpgradePress={() => navigation.navigate('Payment' as any)}
         fallback={
@@ -1029,7 +1029,7 @@ export default function NutritionHomeScreen({ route }: any) {
             >
               <View style={styles.lockedFabContent}>
                 <Ionicons name="lock-closed" size={20} color="#a1a1aa" />
-                <Text style={styles.lockedFabText}>$14.99</Text>
+                <Text style={styles.lockedFabText}>$9.99</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -1044,7 +1044,7 @@ export default function NutritionHomeScreen({ route }: any) {
             <Ionicons name="add" size={28} color="#0a0a0b" />
           </TouchableOpacity>
         </View>
-      </PremiumFeatureGate>
+      </NutritionFeatureGate>
 
       {/* Action Modal */}
       <Modal

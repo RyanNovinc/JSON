@@ -16,6 +16,7 @@ interface RevenueCatContextType {
   customerInfo: CustomerInfo | null;
   isLoading: boolean;
   hasJSONPro: boolean;
+  hasNutrition: boolean;
   isConfigured: boolean;
 
   // Offerings
@@ -55,6 +56,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({
 
   // Computed values
   const hasJSONPro = customerInfo ? hasJSONProAccess(customerInfo) : false;
+  const hasNutrition = customerInfo ? hasJSONProAccess(customerInfo) : false;
 
   /**
    * Initialize RevenueCat SDK
@@ -217,7 +219,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({
         originalAppUserId: customerInfo?.originalAppUserId || 'free_user',
         entitlements: {
           active: {
-            [REVENUECAT_CONFIG.entitlements.JSON_PRO]: {
+            [REVENUECAT_CONFIG.entitlements.json_pro]: {
               isActive: true,
               willRenew: false,
               periodType: 'lifetime',
@@ -272,6 +274,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({
       console.log('[RevenueCatContext] State updated:', {
         isConfigured,
         hasJSONPro,
+        hasNutrition,
         isLoading,
         hasCustomerInfo: !!customerInfo,
         offeringsCount: offerings.length,
@@ -279,12 +282,13 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({
         error,
       });
     }
-  }, [isConfigured, hasJSONPro, isLoading, customerInfo, offerings, currentOffering, error]);
+  }, [isConfigured, hasJSONPro, hasNutrition, isLoading, customerInfo, offerings, currentOffering, error]);
 
   const contextValue: RevenueCatContextType = {
     customerInfo,
     isLoading,
     hasJSONPro,
+    hasNutrition,
     isConfigured,
     offerings,
     currentOffering,
@@ -322,6 +326,14 @@ export const useRevenueCat = (): RevenueCatContextType => {
 export const useHasJSONPro = (): boolean => {
   const { hasJSONPro } = useRevenueCat();
   return hasJSONPro;
+};
+
+/**
+ * Hook to check if user has nutrition access
+ */
+export const useHasNutritionAccess = (): boolean => {
+  const { hasNutrition } = useRevenueCat();
+  return hasNutrition;
 };
 
 /**
