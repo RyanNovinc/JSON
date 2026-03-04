@@ -581,32 +581,9 @@ export default function HomeScreen({ route }: any) {
   const handleNutritionTransition = () => {
     if (isTransitioning) return;
     
-    setIsTransitioning(true);
-    
-    // Animate out
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Switch mode and navigate
-      setAppMode('nutrition');
-      navigation.navigate('NutritionHome' as any);
-      
-      // Reset animations for when user comes back
-      setTimeout(() => {
-        fadeAnim.setValue(1);
-        scaleAnim.setValue(1);
-        setIsTransitioning(false);
-      }, 100);
-    });
+    // Switch mode and navigate immediately (no animation)
+    setAppMode('nutrition');
+    navigation.navigate('NutritionHome' as any);
   };
 
 

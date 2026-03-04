@@ -4,6 +4,7 @@
 // Working version with proper error handling
 
 import { WorkoutStorage } from '../utils/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const assembleMealPlanningPrompt = async (): Promise<string> => {
   try {
@@ -11,6 +12,11 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
     const nutritionResults = await WorkoutStorage.loadNutritionResults();
     const budgetCookingResults = await WorkoutStorage.loadBudgetCookingResults();
     const sleepResults = await WorkoutStorage.loadSleepOptimizationResults();
+    const fridgePantryResults = await WorkoutStorage.loadFridgePantryResults();
+    
+    // Load favorite meals data for detailed meal information
+    const favoriteMealsData = await AsyncStorage.getItem('@nutrition_favorites');
+    const favoriteMeals = favoriteMealsData ? JSON.parse(favoriteMealsData) : [];
     
     if (!nutritionResults || !budgetCookingResults) {
       throw new Error('Please complete the Nutrition Goals and Budget & Cooking questionnaires first.');
@@ -20,11 +26,32 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
     const budgetData = budgetCookingResults?.formData || {} as any;
     const nutritionData = nutritionResults?.formData || {} as any;
     const sleepData = sleepResults?.formData;
+    const fridgePantryData = fridgePantryResults?.formData;
     
     // Calculate fiber target
     const fiberTarget = macroResults.calories 
       ? Math.min(45, Math.max(25, Math.round((macroResults.calories / 1000) * 14)))
       : 30;
+    
+    // Helper function to format favorite meals details
+    const formatSelectedFavoriteMeals = (selectedFavoriteIds: string[], allFavoriteMeals: any[]) => {
+      if (!selectedFavoriteIds?.length || !allFavoriteMeals?.length) {
+        return '';
+      }
+
+      const selectedMealDetails = selectedFavoriteIds
+        .map(mealId => {
+          const favoriteMeal = allFavoriteMeals.find(fav => fav.mealId === mealId);
+          if (!favoriteMeal?.meal) return null;
+          
+          const meal = favoriteMeal.meal;
+          return `  • ${meal.name || 'Unnamed Meal'}${meal.ingredients?.length ? ` - ${meal.ingredients.slice(0, 5).map(ing => ing.name).join(', ')}${meal.ingredients.length > 5 ? '...' : ''}` : ''}`;
+        })
+        .filter(Boolean)
+        .join('\n\n');
+
+      return selectedMealDetails ? `\n- Selected favorite meals to include in the plan:\n${selectedMealDetails}` : '';
+    };
     
     // Get current date for meal plan start
     const getCurrentDate = (): string => {
@@ -162,10 +189,35 @@ Based on my completed Sleep Optimization questionnaire:
     prompt += `
 
 FRIDGE & PANTRY INVENTORY:
-- No fridge/pantry inventory provided or user chose not to include existing ingredients
+${fridgePantryData && fridgePantryData.wantToUseExistingIngredients && fridgePantryData.ingredients?.length ? `
+**IMPORTANT: I have ingredients at home that I want to use in my meal plan**
+- Usage preference: ${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
+  'MAXIMIZE MY INVENTORY - Plan meals specifically around what I already have' :
+  fridgePantryData.preferences?.primaryApproach === 'expiry' ? 
+  'EXPIRY FOCUSED - Prioritize using items before they expire' :
+  'AI-LED PLANNING - Create optimal meal plans first, naturally incorporate my items when they fit'
+}
+
+Available ingredients:
+${fridgePantryData.ingredients.map(item => {
+  const expiryInfo = item.expiryDate ? ` (expires ${new Date(item.expiryDate).toLocaleDateString()})` : '';
+  const quantity = item.quantity && item.unit ? ` - ${item.quantity} ${item.unit}` : '';
+  const notes = item.notes ? ` (${item.notes})` : '';
+  return `• ${item.name}${quantity}${expiryInfo}${notes} [${item.location}]`;
+}).join('\n')}
+
+**CRITICAL: ${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
+  'Build the meal plan around these ingredients as much as possible. These should be the foundation of your meal suggestions.' :
+  fridgePantryData.preferences?.primaryApproach === 'expiry' ? 
+  'Prioritize ingredients with expiry dates first, especially those expiring soon. Build meals around expiring items.' :
+  'Use these ingredients when they naturally fit into optimal meal plans, but don\'t force them if they don\'t work well.'
+}**` : '- No fridge/pantry inventory provided or user chose not to include existing ingredients'}
 
 MEAL PREFERENCES:
-- User wants AI to suggest all meals based on their profile and preferences
+${budgetData.mealPreferences === 'include_favorites' ? 
+  `- User wants to include their favorite meals in the plan${formatSelectedFavoriteMeals(budgetData.selectedFavorites, favoriteMeals)}${budgetData.customMealRequests ? `\n- Custom requests: ${budgetData.customMealRequests}` : ''}` :
+  '- User wants AI to suggest all meals based on their profile and preferences'
+}
 
 COOKING PREFERENCES:
 - ${getMealPrepStyleText(budgetData.planningStyle, budgetData.skillConfidence, budgetData.timeInvestment)}

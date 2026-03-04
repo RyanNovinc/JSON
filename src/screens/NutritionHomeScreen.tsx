@@ -57,6 +57,52 @@ const convertToLegacyFormat = (simplifiedPlan: SimplifiedMealPlan): MealPlan => 
     }))
   }));
 
+  // Calculate total macros across all days to get proper macro targets
+  let totalMacros = { protein: 0, carbs: 0, fat: 0, calories: 0 };
+  let totalDays = 0;
+  
+  Object.values(simplifiedPlan.dailyMeals).forEach((day: any) => {
+    if (day.meals && day.meals.length > 0) {
+      const dayMacros = day.meals.reduce((dayTotal: any, meal: any) => ({
+        protein: dayTotal.protein + (meal.macros?.protein || 0),
+        carbs: dayTotal.carbs + (meal.macros?.carbs || 0),
+        fat: dayTotal.fat + (meal.macros?.fat || 0),
+        calories: dayTotal.calories + (meal.calories || 0)
+      }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+      
+      totalMacros.protein += dayMacros.protein;
+      totalMacros.carbs += dayMacros.carbs;
+      totalMacros.fat += dayMacros.fat;
+      totalMacros.calories += dayMacros.calories;
+      totalDays++;
+    }
+  });
+  
+  // Calculate average daily macros
+  if (totalDays > 0) {
+    totalMacros.protein /= totalDays;
+    totalMacros.carbs /= totalDays;
+    totalMacros.fat /= totalDays;
+    totalMacros.calories /= totalDays;
+  }
+  
+  // Calculate macro percentages and apply our rounding fix
+  let macroTargets = undefined;
+  if (totalMacros.calories > 0) {
+    const proteinPct = (totalMacros.protein * 4 / totalMacros.calories) * 100;
+    const carbsPct = (totalMacros.carbs * 4 / totalMacros.calories) * 100;
+    const fatPct = (totalMacros.fat * 9 / totalMacros.calories) * 100;
+    
+    // Apply our rounding fix here during conversion
+    const [roundedProtein, roundedCarbs, roundedFat] = roundPercentagesToTotal([proteinPct, carbsPct, fatPct]);
+    
+    macroTargets = {
+      protein_pct: roundedProtein,
+      carbs_pct: roundedCarbs,
+      fat_pct: roundedFat
+    };
+  }
+
   return {
     id: simplifiedPlan.id,
     name: simplifiedPlan.name,
@@ -67,8 +113,35 @@ const convertToLegacyFormat = (simplifiedPlan: SimplifiedMealPlan): MealPlan => 
       days: days,
       // Include metadata for macro calculations
       estimated_cost: simplifiedPlan.metadata.totalCost || 0,
+      // Add the properly rounded macro targets so our fix applies
+      macro_targets: macroTargets
     }
   };
+};
+
+// Helper function to round percentages using largest remainder method
+// Ensures that the sum always equals exactly 100%
+const roundPercentagesToTotal = (percentages: number[], targetTotal: number = 100): number[] => {
+  // Calculate the floor values and their remainders
+  const floors = percentages.map(p => Math.floor(p));
+  const remainders = percentages.map((p, i) => p - floors[i]);
+  
+  // Calculate how many additional points we need to distribute
+  const currentSum = floors.reduce((sum, floor) => sum + floor, 0);
+  const pointsToDistribute = targetTotal - currentSum;
+  
+  // Sort remainders by size (largest first) and keep track of original indices
+  const remainderWithIndex = remainders
+    .map((remainder, index) => ({ remainder, index }))
+    .sort((a, b) => b.remainder - a.remainder);
+  
+  // Distribute the remaining points to values with largest remainders
+  const result = [...floors];
+  for (let i = 0; i < pointsToDistribute && i < remainderWithIndex.length; i++) {
+    result[remainderWithIndex[i].index]++;
+  }
+  
+  return result;
 };
 
 // Helper function to get macro split display
@@ -81,7 +154,10 @@ const getMacroSplitDisplay = (plan: MealPlan) => {
     const protein = macroTargets.protein_pct || macroTargets.protein || 0;
     const carbs = macroTargets.carbs_pct || macroTargets.carbs || 0;
     const fat = macroTargets.fat_pct || macroTargets.fat || 0;
-    return `${protein}P/${carbs}C/${fat}F`;
+    
+    // Apply largest remainder rounding to ensure sum equals 100%
+    const [roundedProtein, roundedCarbs, roundedFat] = roundPercentagesToTotal([protein, carbs, fat]);
+    return `${roundedProtein}P/${roundedCarbs}C/${roundedFat}F`;
   }
   
   // Calculate from daily meals if plan-level targets not available
@@ -97,11 +173,14 @@ const getMacroSplitDisplay = (plan: MealPlan) => {
       }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
       
       if (totalMacros.calories > 0) {
-        // Calculate percentages
-        const proteinPct = Math.round((totalMacros.protein * 4 / totalMacros.calories) * 100);
-        const carbsPct = Math.round((totalMacros.carbs * 4 / totalMacros.calories) * 100);
-        const fatPct = Math.round((totalMacros.fat * 9 / totalMacros.calories) * 100);
-        return `${proteinPct}P/${carbsPct}C/${fatPct}F`;
+        // Calculate percentages (before rounding)
+        const proteinPct = (totalMacros.protein * 4 / totalMacros.calories) * 100;
+        const carbsPct = (totalMacros.carbs * 4 / totalMacros.calories) * 100;
+        const fatPct = (totalMacros.fat * 9 / totalMacros.calories) * 100;
+        
+        // Apply largest remainder rounding to ensure sum equals 100%
+        const [roundedProtein, roundedCarbs, roundedFat] = roundPercentagesToTotal([proteinPct, carbsPct, fatPct]);
+        return `${roundedProtein}P/${roundedCarbs}C/${roundedFat}F`;
       }
     }
   }
@@ -120,10 +199,14 @@ const getMacroSplitDisplay = (plan: MealPlan) => {
         }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
         
         if (totalMacros.calories > 0) {
-          const proteinPct = Math.round((totalMacros.protein * 4 / totalMacros.calories) * 100);
-          const carbsPct = Math.round((totalMacros.carbs * 4 / totalMacros.calories) * 100);
-          const fatPct = Math.round((totalMacros.fat * 9 / totalMacros.calories) * 100);
-          return `${proteinPct}P/${carbsPct}C/${fatPct}F`;
+          // Calculate percentages (before rounding)
+          const proteinPct = (totalMacros.protein * 4 / totalMacros.calories) * 100;
+          const carbsPct = (totalMacros.carbs * 4 / totalMacros.calories) * 100;
+          const fatPct = (totalMacros.fat * 9 / totalMacros.calories) * 100;
+          
+          // Apply largest remainder rounding to ensure sum equals 100%
+          const [roundedProtein, roundedCarbs, roundedFat] = roundPercentagesToTotal([proteinPct, carbsPct, fatPct]);
+          return `${roundedProtein}P/${roundedCarbs}C/${roundedFat}F`;
         }
       }
     }
