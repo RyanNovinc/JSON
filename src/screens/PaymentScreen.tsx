@@ -9,7 +9,7 @@ import {
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import RevenueCatPaywall from '../components/RevenueCatPaywall';
+import NutritionPaywallScreen from '../components/NutritionPaywallScreenSimple';
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 import { useTheme } from '../contexts/ThemeContext';
@@ -39,45 +39,14 @@ export default function PaymentScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="chevron-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        {/* RevenueCat Paywall */}
-        <RevenueCatPaywall
-          onClose={() => navigation.goBack()}
-          onPurchaseSuccess={handlePurchaseSuccess}
-          onRestoreSuccess={handleRestoreSuccess}
-        />
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <View style={styles.footerLinks}>
-            <TouchableOpacity 
-              style={styles.footerLink}
-              onPress={() => setTermsModalVisible(true)}
-            >
-              <Text style={styles.footerLinkText}>Terms of Service</Text>
-            </TouchableOpacity>
-            <Text style={styles.footerSeparator}>•</Text>
-            <TouchableOpacity 
-              style={styles.footerLink}
-              onPress={() => setPrivacyModalVisible(true)}
-            >
-              <Text style={styles.footerLinkText}>Privacy Policy</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+    <>
+      {/* Nutrition Paywall Screen */}
+      <NutritionPaywallScreen
+        onPurchaseSuccess={handlePurchaseSuccess}
+        onRestoreSuccess={handleRestoreSuccess}
+        onTermsPress={() => setTermsModalVisible(true)}
+        onPrivacyPress={() => setPrivacyModalVisible(true)}
+      />
 
       {/* Terms of Service Modal */}
       <TermsOfServiceModal 
@@ -90,7 +59,7 @@ export default function PaymentScreen() {
         visible={privacyModalVisible}
         onClose={() => setPrivacyModalVisible(false)}
       />
-    </View>
+    </>
   );
 }
 
