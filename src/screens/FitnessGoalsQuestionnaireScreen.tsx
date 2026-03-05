@@ -518,6 +518,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   const isValid = () => {
     if (currentStep === 0) {
+      // Step 1: Just primary goal + training frequency
       if (selectedPrimaryGoal === '' || totalTrainingDays <= 0) {
         return false;
       }
@@ -527,6 +528,10 @@ export default function FitnessGoalsQuestionnaireScreen() {
         return false;
       }
       
+      return true;
+    }
+    if (currentStep === 1) {
+      // Step 2: Secondary goals validation
       // Check if custom secondary goal is filled when selected
       if (selectedSecondaryGoals.includes('custom_secondary') && customSecondaryGoal.trim() === '') {
         return false;
@@ -556,15 +561,14 @@ export default function FitnessGoalsQuestionnaireScreen() {
         return false; // Must have at least 1 day for primary goal
       }
       
-      return true;
+      return true; // Step 2 is optional
     }
-    if (currentStep === 1) {
-      return true; // Step 1 is now optional (was training frequency, now training preferences)
+    if (currentStep === 2) {
+      return true; // Step 3 (Training Preferences) is completely optional
     }
     if (currentStep === 3) {
       return programDuration !== '';
     }
-    // Step 2 (Training Preferences) is completely optional
     return true;
   };
 
@@ -575,17 +579,15 @@ export default function FitnessGoalsQuestionnaireScreen() {
           Alert.alert('Required Selection', 'Please select a primary fitness goal.');
         } else if (selectedPrimaryGoal === 'custom_primary' && customPrimaryGoal.trim() === '') {
           Alert.alert('Required Input', 'Please describe your custom fitness goal.');
-        } else if (selectedSecondaryGoals.includes('custom_secondary') && customSecondaryGoal.trim() === '') {
-          Alert.alert('Required Input', 'Please describe your custom focus area.');
         } else if (totalTrainingDays <= 0) {
           Alert.alert('Required Selection', 'Please select how many days per week you want to train.');
-        } else if (selectedSecondaryGoals.length === 0 && gymTrainingDays !== totalTrainingDays) {
-          Alert.alert('Required Selection', `Please set your ${getPrimaryGoalTitle()} days to ${totalTrainingDays} since you haven't selected any additional focus areas.`);
-        } else if (selectedSecondaryGoals.length > 0 && (gymTrainingDays + otherTrainingDays) !== totalTrainingDays) {
-          Alert.alert('Required Selection', 'Please complete your training split - the total must match your training days.');
         }
       } else if (currentStep === 1) {
-        Alert.alert('Required Selection', 'Please select how many days per week you want to train.');
+        if (selectedSecondaryGoals.includes('custom_secondary') && customSecondaryGoal.trim() === '') {
+          Alert.alert('Required Input', 'Please describe your custom focus area.');
+        } else {
+          Alert.alert('Validation Error', 'Please check your secondary goal configuration. Make sure dedicated days are set and don\'t exceed your total training days.');
+        }
       } else if (currentStep === 3) {
         Alert.alert('Required Selection', 'Please select a program duration.');
       }
@@ -593,7 +595,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
     }
     
     if (currentStep === 0) {
-      setCurrentStep(2); // Skip step 1 (now empty) and go directly to step 2
+      setCurrentStep(1);
     } else if (currentStep === 1) {
       setCurrentStep(2);
     } else if (currentStep === 2) {
@@ -605,11 +607,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   const handleBack = () => {
     if (currentStep > 0) {
-      if (currentStep === 2) {
-        setCurrentStep(0); // Skip empty step 1 when going back
-      } else {
-        setCurrentStep(currentStep - 1);
-      }
+      setCurrentStep(currentStep - 1);
     } else {
       navigation.goBack();
     }
@@ -1120,75 +1118,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
         </Animatable.View>
       )}
 
-      {/* Secondary Goals Section */}
-      {selectedPrimaryGoal && (
-        <Animatable.View
-          animation="fadeInUp"
-          delay={500}
-          style={styles.sectionContainer}
-        >
-          <Text style={[styles.sectionTitle, { color: themeColor }]}>
-            Additional Focus Areas
-          </Text>
-          <Text style={styles.sectionSubtitle}>
-            Select any additional areas you'd like to include (optional)
-          </Text>
-          
-          <View style={styles.secondaryGoalsContainer}>
-            {secondaryGoals.map((goal, index) => renderSecondaryGoalOption(goal, index))}
-          </View>
-        </Animatable.View>
-      )}
-
-      {/* Custom Secondary Goal Input */}
-      {selectedSecondaryGoals.includes('custom_secondary') && (
-        <Animatable.View
-          animation="fadeInUp"
-          delay={525}
-          style={styles.sectionContainer}
-        >
-          <Text style={[styles.sectionTitle, { color: themeColor }]}>
-            Custom Focus Area
-          </Text>
-          <Text style={styles.sectionSubtitle}>
-            Describe your additional training focus
-          </Text>
-          
-          <TextInput
-            style={styles.textInput}
-            placeholder="e.g., Balance training, Flexibility for dance, Power for sports..."
-            placeholderTextColor="#71717a"
-            value={customSecondaryGoal}
-            onChangeText={setCustomSecondaryGoal}
-          />
-        </Animatable.View>
-      )}
-
-      {/* Custom Goals Section */}
-      {selectedPrimaryGoal && (
-        <Animatable.View
-          animation="fadeInUp"
-          delay={550}
-          style={styles.sectionContainer}
-        >
-          <Text style={[styles.sectionTitle, { color: themeColor }]}>
-            Additional Notes
-          </Text>
-          <Text style={styles.sectionSubtitle}>
-            Any specific goals or preferences? (optional)
-          </Text>
-          
-          <TextInput
-            style={[styles.textInput, styles.multilineInput]}
-            placeholder="e.g., Focus on lower body, avoid high-impact exercises..."
-            placeholderTextColor="#71717a"
-            value={customGoals}
-            onChangeText={setCustomGoals}
-            multiline
-            numberOfLines={3}
-          />
-        </Animatable.View>
-      )}
 
       {/* Training Frequency - moved from step 1 */}
       {selectedPrimaryGoal && (
@@ -1325,7 +1254,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
         </Animatable.View>
       )}
 
-      {/* Training Summary */}
+      {/* Simple Summary */}
       {selectedPrimaryGoal && totalTrainingDays > 0 && (
         <Animatable.View
           animation="fadeInUp"
@@ -1333,9 +1262,88 @@ export default function FitnessGoalsQuestionnaireScreen() {
           style={styles.sectionContainer}
         >
           <Text style={[styles.sectionTitle, { color: themeColor }]}>
-            Training Schedule
+            Training Summary
+          </Text>
+          <View style={styles.simpleSummaryContainer}>
+            <View style={styles.simpleSummaryItem}>
+              <View style={[styles.summaryIconContainer, { backgroundColor: `${themeColor}20` }]}>
+                <Ionicons name="fitness" size={20} color={themeColor} />
+              </View>
+              <View>
+                <Text style={styles.simpleSummaryTitle}>
+                  {getPrimaryGoalTitle()}
+                </Text>
+                <Text style={styles.simpleSummarySubtitle}>
+                  {totalTrainingDays} day{totalTrainingDays === 1 ? '' : 's'} per week
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Animatable.View>
+      )}
+    </ScrollView>
+  );
+
+  const renderSecondaryGoalsStep = () => (
+    <ScrollView 
+      ref={step1ScrollRef}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 120 }}
+    >
+      {/* Secondary Goals Section */}
+      <Animatable.View
+        animation="fadeInUp"
+        delay={100}
+        style={styles.sectionContainer}
+      >
+        <Text style={[styles.sectionTitle, { color: themeColor }]}>
+          Additional Focus Areas
+        </Text>
+        <Text style={styles.sectionSubtitle}>
+          Select any additional areas you'd like to include (optional)
+        </Text>
+        
+        <View style={styles.secondaryGoalsContainer}>
+          {secondaryGoals.map((goal, index) => renderSecondaryGoalOption(goal, index))}
+        </View>
+      </Animatable.View>
+
+      {/* Custom Secondary Goal Input */}
+      {selectedSecondaryGoals.includes('custom_secondary') && (
+        <Animatable.View
+          animation="fadeInUp"
+          delay={400}
+          style={styles.sectionContainer}
+        >
+          <Text style={[styles.sectionTitle, { color: themeColor }]}>
+            Custom Focus Area
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            Describe your additional training focus
+          </Text>
+          
+          <TextInput
+            style={styles.textInput}
+            placeholder="e.g., Balance training, Flexibility for dance, Power for sports..."
+            placeholderTextColor="#71717a"
+            value={customSecondaryGoal}
+            onChangeText={setCustomSecondaryGoal}
+          />
+        </Animatable.View>
+      )}
+
+      {/* Training Summary with Secondary Goals */}
+      {selectedSecondaryGoals.length > 0 && (
+        <Animatable.View
+          animation="fadeInUp"
+          delay={500}
+          style={styles.sectionContainer}
+        >
+          <Text style={[styles.sectionTitle, { color: themeColor }]}>
+            Your Complete Training Plan
           </Text>
           <View style={styles.trainingSummaryContainer}>
+            {/* Primary Goal */}
             <View style={styles.trainingSummaryItem}>
               <View style={[styles.summaryIconContainer, { backgroundColor: `${themeColor}20` }]}>
                 <Ionicons name="fitness" size={20} color={themeColor} />
@@ -1381,21 +1389,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
           </View>
         </Animatable.View>
       )}
-    </ScrollView>
-  );
-
-  const renderTrainingFrequencyStep = () => (
-    <ScrollView 
-      ref={step1ScrollRef}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120 }}
-    >
-      {/* Empty step - Training Experience moved to Step 4 */}
-      <View style={styles.emptyStepContainer}>
-        <Text style={styles.emptyStepText}>
-          All set! Continue to customize your training preferences.
-        </Text>
-      </View>
     </ScrollView>
   );
 
@@ -2052,7 +2045,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       case 0:
         return renderFitnessGoalsStep();
       case 1:
-        return renderTrainingFrequencyStep();
+        return renderSecondaryGoalsStep();
       case 2:
         return renderTrainingPreferencesStep();
       case 3:
@@ -2482,12 +2475,12 @@ export default function FitnessGoalsQuestionnaireScreen() {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>
             {currentStep === 0 ? 'Goals & Schedule' : 
-             currentStep === 1 ? 'Training Preferences' : 
-             currentStep === 2 ? 'Additional Details' :
-             'Program Preferences'}
+             currentStep === 1 ? 'Additional Focus Areas' : 
+             currentStep === 2 ? 'Training Preferences' :
+             'Program Settings'}
           </Text>
           <Text style={styles.headerSubtitle}>
-            Step {currentStep === 0 ? 1 : currentStep === 2 ? 2 : currentStep === 3 ? 3 : currentStep + 1} of 3
+            Step {currentStep + 1} of 4
           </Text>
         </View>
       </View>
@@ -2500,7 +2493,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
               styles.progressFill, 
               { 
                 backgroundColor: themeColor,
-                width: `${(currentStep === 0 ? 1 : currentStep === 2 ? 2 : currentStep === 3 ? 3 : currentStep + 1) / 3 * 100}%`
+                width: `${(currentStep + 1) / 4 * 100}%`
               }
             ]} 
           />
@@ -4067,6 +4060,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#ffffff',
+  },
+  
+  // Simple summary styles for Step 1
+  simpleSummaryContainer: {
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    padding: 16,
+  },
+  simpleSummaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  simpleSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  simpleSummarySubtitle: {
+    fontSize: 14,
+    color: '#71717a',
   },
   
   // Missing styles
