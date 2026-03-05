@@ -36,11 +36,6 @@ interface SecondaryGoal {
   icon: string;
 }
 
-interface SecondaryGoalPreference {
-  id: string;
-  integrationMethod: 'integrated' | 'dedicated';
-  dedicatedDays?: number;
-}
 
 const primaryGoals: FitnessGoalOption[] = [
   {
@@ -94,52 +89,12 @@ const primaryGoals: FitnessGoalOption[] = [
   },
 ];
 
-const secondaryGoals: SecondaryGoal[] = [
-  {
-    id: 'include_cardio',
-    title: 'Include Cardio',
-    description: 'Add cardiovascular/endurance work',
-    icon: 'walk-outline',
-  },
-  {
-    id: 'maintain_flexibility',
-    title: 'Maintain Flexibility',
-    description: 'Include mobility and stretching work',
-    icon: 'accessibility-outline',
-  },
-  {
-    id: 'athletic_performance',
-    title: 'Athletic Performance',
-    description: 'Improve speed, agility, and power',
-    icon: 'speedometer-outline',
-  },
-  {
-    id: 'injury_prevention',
-    title: 'Injury Prevention',
-    description: 'Focus on corrective exercises and balance',
-    icon: 'shield-checkmark-outline',
-  },
-  {
-    id: 'fun_social',
-    title: 'Fun & Social Activities',
-    description: 'Include enjoyable group activities and recreational sports',
-    icon: 'people-outline',
-  },
-  {
-    id: 'custom_secondary',
-    title: 'Custom Focus Area',
-    description: 'Define your own additional training focus',
-    icon: 'create-outline',
-  },
-];
 
 
 export default function FitnessGoalsQuestionnaireScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { themeColor, themeColorLight } = useTheme();
   const [selectedPrimaryGoal, setSelectedPrimaryGoal] = useState<string>('');
-  const [selectedSecondaryGoals, setSelectedSecondaryGoals] = useState<string[]>([]);
-  const [secondaryGoalPreferences, setSecondaryGoalPreferences] = useState<SecondaryGoalPreference[]>([]);
   const [customPrimaryGoal, setCustomPrimaryGoal] = useState<string>('');
   const [customSecondaryGoal, setCustomSecondaryGoal] = useState<string>('');
   const [specificSport, setSpecificSport] = useState<string>('');
@@ -163,7 +118,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [trainingApproach, setTrainingApproach] = useState<'push_hard' | 'balanced' | 'conservative'>('balanced');
   const [programDuration, setProgramDuration] = useState<string>('');
   const [customDuration, setCustomDuration] = useState<string>('');
-  const [cardioPreferences, setCardioPreferences] = useState<string[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -203,19 +157,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
         
         // Restore all form data
         setSelectedPrimaryGoal(data.primaryGoal || '');
-        setSelectedSecondaryGoals(data.secondaryGoals || []);
-        
-        // Handle new secondary goal preferences format
-        if (data.secondaryGoalPreferences) {
-          setSecondaryGoalPreferences(data.secondaryGoalPreferences);
-        } else if (data.secondaryGoals && data.secondaryGoals.length > 0) {
-          // Convert old format to new format with default integrated method
-          const convertedPreferences: SecondaryGoalPreference[] = data.secondaryGoals.map((goalId: string) => ({
-            id: goalId,
-            integrationMethod: 'integrated' as const
-          }));
-          setSecondaryGoalPreferences(convertedPreferences);
-        }
         setCustomPrimaryGoal(data.customPrimaryGoal || '');
         setCustomSecondaryGoal(data.customSecondaryGoal || '');
         setSpecificSport(data.specificSport || '');
@@ -239,7 +180,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
         setTrainingApproach(data.trainingApproach || 'balanced');
         setProgramDuration(data.programDuration || '');
         setCustomDuration(data.customDuration || '');
-        setCardioPreferences(data.cardioPreferences || []);
         
         // If questionnaire was completed, show summary directly
         // Check multiple indicators of completion
@@ -273,8 +213,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
     try {
       const progressData = {
         primaryGoal: selectedPrimaryGoal,
-        secondaryGoals: selectedSecondaryGoals,
-        secondaryGoalPreferences: secondaryGoalPreferences,
         customPrimaryGoal: customPrimaryGoal,
         customSecondaryGoal: customSecondaryGoal,
         specificSport: specificSport,
@@ -297,7 +235,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
         trainingApproach: trainingApproach,
         programDuration: programDuration,
         customDuration: customDuration,
-        cardioPreferences: cardioPreferences,
         currentStep: currentStep,
         // Note: no completedAt field - this indicates it's in progress
       };
@@ -313,11 +250,11 @@ export default function FitnessGoalsQuestionnaireScreen() {
     if (!isLoading && !isCompleted) {
       saveProgress();
     }
-  }, [selectedPrimaryGoal, selectedSecondaryGoals, specificSport, athleticPerformanceDetails, 
+  }, [selectedPrimaryGoal, specificSport, athleticPerformanceDetails, 
       funSocialDetails, injuryPreventionDetails, flexibilityDetails, priorityMuscleGroups, 
       customMuscleGroup, movementLimitations, customLimitation, trainingStylePreference, 
       customTrainingStyle, totalTrainingDays, customFrequency, gymTrainingDays, 
-      otherTrainingDays, customGoals, trainingExperience, trainingApproach, programDuration, customDuration, cardioPreferences]);
+      otherTrainingDays, customGoals, trainingExperience, trainingApproach, programDuration, customDuration]);
 
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
@@ -332,48 +269,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
     setSelectedPrimaryGoal(goalId);
   };
 
-  const handleSecondaryGoalToggle = (goalId: string) => {
-    setSelectedSecondaryGoals(prev => {
-      if (prev.includes(goalId)) {
-        // Remove from selected and preferences
-        setSecondaryGoalPreferences(prevPrefs => 
-          prevPrefs.filter(pref => pref.id !== goalId)
-        );
-        return prev.filter(id => id !== goalId);
-      } else {
-        // Add to selected with default integrated preference
-        setSecondaryGoalPreferences(prevPrefs => [
-          ...prevPrefs,
-          { 
-            id: goalId, 
-            integrationMethod: 'integrated'
-          }
-        ]);
-        return [...prev, goalId];
-      }
-    });
-  };
-
-  const handleIntegrationMethodChange = (goalId: string, method: 'integrated' | 'dedicated') => {
-    setSecondaryGoalPreferences(prev => 
-      prev.map(pref => 
-        pref.id === goalId 
-          ? { ...pref, integrationMethod: method, dedicatedDays: method === 'integrated' ? undefined : pref.dedicatedDays }
-          : pref
-      )
-    );
-  };
-
-  const handleDedicatedDaysChange = (goalId: string, days: number) => {
-    setSecondaryGoalPreferences(prev => 
-      prev.map(pref => 
-        pref.id === goalId 
-          ? { ...pref, dedicatedDays: days }
-          : pref
-      )
-    );
-  };
-
 
   const handleMuscleGroupToggle = (muscleGroup: string) => {
     setPriorityMuscleGroups(prev => {
@@ -385,15 +280,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
     });
   };
 
-  const handleCardioPreferenceToggle = (activity: string) => {
-    setCardioPreferences(prev => {
-      if (prev.includes(activity)) {
-        return prev.filter(a => a !== activity);
-      } else {
-        return [...prev, activity];
-      }
-    });
-  };
 
   const handleLimitationToggle = (limitation: string) => {
     setMovementLimitations(prev => {
@@ -415,15 +301,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
   };
 
   const getSecondaryGoalTitle = () => {
-    if (selectedSecondaryGoals.length === 0) return 'Other Activities';
-    if (selectedSecondaryGoals.length === 1) {
-      if (selectedSecondaryGoals[0] === 'custom_secondary') {
-        return customSecondaryGoal || 'Custom Focus Area';
-      }
-      const goal = secondaryGoals.find(goal => goal.id === selectedSecondaryGoals[0]);
-      return goal ? goal.title : 'Other Activities';
-    }
-    return 'Other Activities'; // Multiple goals - keep generic
+    return 'Other Activities';
   };
 
   const isValid = () => {
@@ -441,35 +319,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       return true;
     }
     if (currentStep === 1) {
-      // Step 2: Secondary goals validation
-      // Check if custom secondary goal is filled when selected
-      if (selectedSecondaryGoals.includes('custom_secondary') && customSecondaryGoal.trim() === '') {
-        return false;
-      }
       
-      // Validate secondary goal preferences
-      for (const goalId of selectedSecondaryGoals) {
-        const preference = secondaryGoalPreferences.find(p => p.id === goalId);
-        if (!preference) continue;
-        
-        // If dedicated days are selected, they must be specified and valid
-        if (preference.integrationMethod === 'dedicated') {
-          if (!preference.dedicatedDays || preference.dedicatedDays < 1) {
-            return false;
-          }
-        }
-      }
-      
-      // Calculate total dedicated days to ensure it doesn't exceed total training days
-      const totalDedicatedDays = secondaryGoalPreferences
-        .filter(p => p.integrationMethod === 'dedicated')
-        .reduce((sum, p) => sum + (p.dedicatedDays || 0), 0);
-      
-      // Primary goal days + dedicated secondary days should not exceed total training days
-      const primaryDays = totalTrainingDays - totalDedicatedDays;
-      if (primaryDays < 1) {
-        return false; // Must have at least 1 day for primary goal
-      }
       
       return true; // Step 2 is optional
     }
@@ -493,10 +343,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
           Alert.alert('Required Selection', 'Please select how many days per week you want to train.');
         }
       } else if (currentStep === 1) {
-        if (selectedSecondaryGoals.includes('custom_secondary') && customSecondaryGoal.trim() === '') {
-          Alert.alert('Required Input', 'Please describe your custom focus area.');
-        } else {
-          Alert.alert('Validation Error', 'Please check your secondary goal configuration. Make sure dedicated days are set and don\'t exceed your total training days.');
+        {
+          Alert.alert('Validation Error', 'Please check your configuration.');
         }
       } else if (currentStep === 3) {
         Alert.alert('Required Selection', 'Please select a program duration.');
@@ -505,13 +353,11 @@ export default function FitnessGoalsQuestionnaireScreen() {
     }
     
     if (currentStep === 0) {
-      setCurrentStep(1);
+      setCurrentStep(1); // Skip old step 1 (secondary goals), go directly to step 2 (training preferences)
     } else if (currentStep === 1) {
-      setCurrentStep(2);
+      setCurrentStep(2); // Go to step 3 (program settings)
     } else if (currentStep === 2) {
-      setCurrentStep(3);
-    } else if (currentStep === 3) {
-      setShowResults(true);
+      setShowResults(true); // Complete the questionnaire
     }
   };
 
@@ -527,8 +373,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
     try {
       const fitnessGoalsData = {
         primaryGoal: selectedPrimaryGoal,
-        secondaryGoals: selectedSecondaryGoals,
-        secondaryGoalPreferences: secondaryGoalPreferences,
         customPrimaryGoal: customPrimaryGoal,
         customSecondaryGoal: customSecondaryGoal,
         specificSport: specificSport,
@@ -551,7 +395,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
         trainingApproach: trainingApproach,
         programDuration: programDuration,
         customDuration: customDuration,
-        cardioPreferences: cardioPreferences,
         completedAt: new Date().toISOString(),
       };
 
@@ -628,248 +471,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
     );
   };
 
-  const renderSecondaryGoalOption = (goal: SecondaryGoal, index: number) => {
-    const isSelected = selectedSecondaryGoals.includes(goal.id);
-    
-    return (
-      <Animatable.View
-        key={goal.id}
-        animation="fadeInUp"
-        delay={300 + (index * 50)}
-        style={styles.secondaryGoalWrapper}
-      >
-        <TouchableOpacity
-          style={[
-            styles.secondaryGoalCard,
-            isSelected && [
-              styles.selectedSecondaryCard,
-              { borderColor: themeColor, backgroundColor: `${themeColor}10` }
-            ]
-          ]}
-          onPress={() => handleSecondaryGoalToggle(goal.id)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.secondaryGoalContent}>
-            <View style={styles.secondaryIconContainer}>
-              <Ionicons
-                name={goal.icon as any}
-                size={20}
-                color={isSelected ? themeColor : '#71717a'}
-              />
-            </View>
-            
-            <View style={styles.secondaryTextContainer}>
-              <Text style={[styles.secondaryTitle, isSelected && { color: themeColor }]}>
-                {goal.title}
-              </Text>
-              <Text style={styles.secondaryDescription}>
-                {goal.description}
-              </Text>
-            </View>
-            
-            <View style={styles.secondaryCheckContainer}>
-              <View style={[
-                styles.checkbox,
-                isSelected && { backgroundColor: themeColor, borderColor: themeColor }
-              ]}>
-                {isSelected && (
-                  <Ionicons name="checkmark" size={14} color="#000000" />
-                )}
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
 
-        {/* Inline text input for Athletic Performance */}
-        {goal.id === 'athletic_performance' && isSelected && (
-          <Animatable.View
-            animation="slideInDown"
-            duration={300}
-            style={styles.inlineInputContainer}
-          >
-            <Text style={styles.inlineInputLabel}>
-              What specific athletic qualities do you want to improve?
-            </Text>
-            <TextInput
-              style={styles.inlineTextInput}
-              placeholder="e.g., Sprint speed for soccer, vertical jump, explosive power..."
-              placeholderTextColor="#71717a"
-              value={athleticPerformanceDetails}
-              onChangeText={setAthleticPerformanceDetails}
-            />
-          </Animatable.View>
-        )}
-
-        {/* Inline text input for Fun & Social Activities */}
-        {goal.id === 'fun_social' && isSelected && (
-          <Animatable.View
-            animation="slideInDown"
-            duration={300}
-            style={styles.inlineInputContainer}
-          >
-            <Text style={styles.inlineInputLabel}>
-              What activities or sports interest you?
-            </Text>
-            <TextInput
-              style={styles.inlineTextInput}
-              placeholder="e.g., Rock climbing, volleyball, dance classes, running groups..."
-              placeholderTextColor="#71717a"
-              value={funSocialDetails}
-              onChangeText={setFunSocialDetails}
-            />
-          </Animatable.View>
-        )}
-
-        {/* Inline text input for Injury Prevention */}
-        {goal.id === 'injury_prevention' && isSelected && (
-          <Animatable.View
-            animation="slideInDown"
-            duration={300}
-            style={styles.inlineInputContainer}
-          >
-            <Text style={styles.inlineInputLabel}>
-              Any specific areas of concern or previous injuries?
-            </Text>
-            <TextInput
-              style={styles.inlineTextInput}
-              placeholder="e.g., Previous knee injury, lower back pain, shoulder issues..."
-              placeholderTextColor="#71717a"
-              value={injuryPreventionDetails}
-              onChangeText={setInjuryPreventionDetails}
-            />
-          </Animatable.View>
-        )}
-
-        {/* Inline text input for Maintain Flexibility */}
-        {goal.id === 'maintain_flexibility' && isSelected && (
-          <Animatable.View
-            animation="slideInDown"
-            duration={300}
-            style={styles.inlineInputContainer}
-          >
-            <Text style={styles.inlineInputLabel}>
-              Any specific areas you'd like to focus on?
-            </Text>
-            <TextInput
-              style={styles.inlineTextInput}
-              placeholder="e.g., Hip mobility, shoulder flexibility, lower back..."
-              placeholderTextColor="#71717a"
-              value={flexibilityDetails}
-              onChangeText={setFlexibilityDetails}
-            />
-          </Animatable.View>
-        )}
-
-        {/* Integration Method Selection */}
-        {isSelected && (
-          renderIntegrationMethodSelection(goal.id, goal.title)
-        )}
-      </Animatable.View>
-    );
-  };
-
-  const renderIntegrationMethodSelection = (goalId: string, goalTitle: string) => {
-    const preference = secondaryGoalPreferences.find(p => p.id === goalId);
-    if (!preference) return null;
-
-    return (
-      <Animatable.View
-        animation="slideInDown"
-        duration={300}
-        style={styles.integrationMethodContainer}
-      >
-        <Text style={[styles.integrationMethodTitle, { color: themeColor }]}>
-          How would you like to include {goalTitle.toLowerCase()}?
-        </Text>
-        
-        {/* Integration Method Options */}
-        <View style={styles.integrationMethodOptions}>
-          <TouchableOpacity
-            style={[
-              styles.integrationMethodCard,
-              preference.integrationMethod === 'integrated' && [
-                styles.selectedIntegrationCard,
-                { borderColor: themeColor, backgroundColor: `${themeColor}10` }
-              ]
-            ]}
-            onPress={() => handleIntegrationMethodChange(goalId, 'integrated')}
-          >
-            <Ionicons 
-              name="layers-outline" 
-              size={20} 
-              color={preference.integrationMethod === 'integrated' ? themeColor : '#71717a'} 
-            />
-            <Text style={[
-              styles.integrationMethodText,
-              preference.integrationMethod === 'integrated' && { color: themeColor }
-            ]}>
-              Integrated into workouts
-            </Text>
-            <Text style={styles.integrationMethodDesc}>
-              Add to existing sessions
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.integrationMethodCard,
-              preference.integrationMethod === 'dedicated' && [
-                styles.selectedIntegrationCard,
-                { borderColor: themeColor, backgroundColor: `${themeColor}10` }
-              ]
-            ]}
-            onPress={() => handleIntegrationMethodChange(goalId, 'dedicated')}
-          >
-            <Ionicons 
-              name="calendar-outline" 
-              size={20} 
-              color={preference.integrationMethod === 'dedicated' ? themeColor : '#71717a'} 
-            />
-            <Text style={[
-              styles.integrationMethodText,
-              preference.integrationMethod === 'dedicated' && { color: themeColor }
-            ]}>
-              Dedicated sessions
-            </Text>
-            <Text style={styles.integrationMethodDesc}>
-              Separate training days
-            </Text>
-          </TouchableOpacity>
-
-        </View>
-
-
-        {/* Dedicated Days Selection for "dedicated" method */}
-        {preference.integrationMethod === 'dedicated' && (
-          <View style={styles.dedicatedDaysContainer}>
-            <Text style={styles.dedicatedDaysTitle}>How many days per week?</Text>
-            <View style={styles.dedicatedDaysRow}>
-              {[1, 2, 3].map(days => (
-                <TouchableOpacity
-                  key={days}
-                  style={[
-                    styles.dedicatedDayCard,
-                    preference.dedicatedDays === days && [
-                      styles.selectedDedicatedDay,
-                      { borderColor: themeColor, backgroundColor: `${themeColor}15` }
-                    ]
-                  ]}
-                  onPress={() => handleDedicatedDaysChange(goalId, days)}
-                >
-                  <Text style={[
-                    styles.dedicatedDayNumber,
-                    preference.dedicatedDays === days && { color: themeColor }
-                  ]}>
-                    {days}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-      </Animatable.View>
-    );
-  };
 
   // Add data for Step 2
   const muscleGroups = [
@@ -1130,113 +732,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
     </ScrollView>
   );
 
-  const renderSecondaryGoalsStep = () => (
-    <ScrollView 
-      ref={step1ScrollRef}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120 }}
-    >
-      {/* Secondary Goals Section */}
-      <Animatable.View
-        animation="fadeInUp"
-        delay={100}
-        style={styles.sectionContainer}
-      >
-        <Text style={[styles.sectionTitle, { color: themeColor }]}>
-          Additional Focus Areas
-        </Text>
-        <Text style={styles.sectionSubtitle}>
-          Select any additional areas you'd like to include (optional)
-        </Text>
-        
-        <View style={styles.secondaryGoalsContainer}>
-          {secondaryGoals.map((goal, index) => renderSecondaryGoalOption(goal, index))}
-        </View>
-      </Animatable.View>
-
-      {/* Custom Secondary Goal Input */}
-      {selectedSecondaryGoals.includes('custom_secondary') && (
-        <Animatable.View
-          animation="fadeInUp"
-          delay={400}
-          style={styles.sectionContainer}
-        >
-          <Text style={[styles.sectionTitle, { color: themeColor }]}>
-            Custom Focus Area
-          </Text>
-          <Text style={styles.sectionSubtitle}>
-            Describe your additional training focus
-          </Text>
-          
-          <TextInput
-            style={styles.textInput}
-            placeholder="e.g., Balance training, Flexibility for dance, Power for sports..."
-            placeholderTextColor="#71717a"
-            value={customSecondaryGoal}
-            onChangeText={setCustomSecondaryGoal}
-          />
-        </Animatable.View>
-      )}
-
-      {/* Training Summary with Secondary Goals */}
-      {selectedSecondaryGoals.length > 0 && (
-        <Animatable.View
-          animation="fadeInUp"
-          delay={500}
-          style={styles.sectionContainer}
-        >
-          <Text style={[styles.sectionTitle, { color: themeColor }]}>
-            Your Complete Training Plan
-          </Text>
-          <View style={styles.trainingSummaryContainer}>
-            {/* Primary Goal */}
-            <View style={styles.trainingSummaryItem}>
-              <View style={[styles.summaryIconContainer, { backgroundColor: `${themeColor}20` }]}>
-                <Ionicons name="fitness" size={20} color={themeColor} />
-              </View>
-              <Text style={styles.trainingSummaryText}>
-                {totalTrainingDays} days/week • {getPrimaryGoalTitle()}
-              </Text>
-            </View>
-            
-            {/* Show integrated secondary goals */}
-            {secondaryGoalPreferences
-              .filter(p => p.integrationMethod === 'integrated')
-              .map(pref => {
-                const goal = secondaryGoals.find(g => g.id === pref.id);
-                return goal ? (
-                  <View key={pref.id} style={styles.trainingSummaryItem}>
-                    <View style={[styles.summaryIconContainer, { backgroundColor: '#10b98120' }]}>
-                      <Ionicons name={goal.icon as any} size={16} color="#10b981" />
-                    </View>
-                    <Text style={styles.trainingSummaryText}>
-                      + {goal.title} (integrated)
-                    </Text>
-                  </View>
-                ) : null;
-              })}
-            
-            {/* Show dedicated secondary goals */}
-            {secondaryGoalPreferences
-              .filter(p => p.integrationMethod === 'dedicated')
-              .map(pref => {
-                const goal = secondaryGoals.find(g => g.id === pref.id);
-                return goal ? (
-                  <View key={pref.id} style={styles.trainingSummaryItem}>
-                    <View style={[styles.summaryIconContainer, { backgroundColor: '#10b98120' }]}>
-                      <Ionicons name={goal.icon as any} size={16} color="#10b981" />
-                    </View>
-                    <Text style={styles.trainingSummaryText}>
-                      + {goal.title} ({pref.dedicatedDays} day{pref.dedicatedDays === 1 ? '' : 's'}/week)
-                    </Text>
-                  </View>
-                ) : null;
-              })}
-          </View>
-        </Animatable.View>
-      )}
-    </ScrollView>
-  );
 
   const renderTrainingPreferencesStep = () => (
     <ScrollView 
@@ -1423,112 +918,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
       </Animatable.View>
       )}
 
-      {/* Cardio Preferences - Only for users who selected include_cardio */}
-      {selectedSecondaryGoals.includes('include_cardio') && (
-      <Animatable.View
-        animation="fadeInUp"
-        delay={400}
-        style={styles.sectionContainer}
-      >
-        <Text style={[styles.sectionTitle, { color: themeColor }]}>
-          Cardio Preferences
-        </Text>
-        <Text style={styles.sectionSubtitle}>
-          Which cardio activities would you prefer? Select all that apply. (optional)
-        </Text>
-        
-        <View style={styles.cardioPreferencesContainer}>
-          {[
-            {
-              id: 'treadmill',
-              title: 'Treadmill / Indoor Running',
-              icon: 'fitness-outline',
-            },
-            {
-              id: 'stationary_bike',
-              title: 'Stationary Bike / Cycling',
-              icon: 'bicycle-outline',
-            },
-            {
-              id: 'rowing_machine',
-              title: 'Rowing Machine',
-              icon: 'boat-outline',
-            },
-            {
-              id: 'swimming',
-              title: 'Swimming',
-              icon: 'water-outline',
-            },
-            {
-              id: 'stair_climber',
-              title: 'Stair Climber / StepMill',
-              icon: 'trending-up-outline',
-            },
-            {
-              id: 'elliptical',
-              title: 'Elliptical',
-              icon: 'ellipse-outline',
-            },
-            {
-              id: 'jump_rope',
-              title: 'Jump Rope',
-              icon: 'sync-outline',
-            },
-            {
-              id: 'outdoor_running',
-              title: 'Outdoor Running / Walking',
-              icon: 'walk-outline',
-            },
-            {
-              id: 'no_preference',
-              title: 'No Preference (AI chooses)',
-              icon: 'sparkles-outline',
-            },
-          ].map((cardio, index) => {
-            const isSelected = cardioPreferences.includes(cardio.id);
-            return (
-              <TouchableOpacity
-                key={cardio.id}
-                style={[
-                  styles.cardioPreferenceCard,
-                  isSelected && [
-                    styles.selectedCardioCard,
-                    { borderColor: themeColor, backgroundColor: `${themeColor}10` }
-                  ]
-                ]}
-                onPress={() => handleCardioPreferenceToggle(cardio.id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.cardioPreferenceContent}>
-                  <View style={[styles.cardioPreferenceIcon, isSelected && { backgroundColor: themeColor }]}>
-                    <Ionicons
-                      name={cardio.icon as any}
-                      size={18}
-                      color={isSelected ? '#000000' : themeColor}
-                    />
-                  </View>
-                  <View style={styles.cardioPreferenceText}>
-                    <Text style={[
-                      styles.cardioPreferenceTitle,
-                      isSelected && { color: themeColor }
-                    ]}>
-                      {cardio.title}
-                    </Text>
-                  </View>
-                  <View style={styles.cardioPreferenceCheck}>
-                    {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={18} color={themeColor} />
-                    ) : (
-                      <View style={styles.unselectedCircle} />
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </Animatable.View>
-      )}
       
     </ScrollView>
   );
@@ -1891,10 +1280,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
       case 0:
         return renderFitnessGoalsStep();
       case 1:
-        return renderSecondaryGoalsStep();
-      case 2:
         return renderTrainingPreferencesStep();
-      case 3:
+      case 2:
         return renderProgramPreferencesStep();
       default:
         return renderFitnessGoalsStep();
@@ -1914,7 +1301,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   if (showResults) {
     const selectedPrimary = primaryGoals.find(g => g.id === selectedPrimaryGoal);
-    const selectedSecondary = secondaryGoals.filter(g => selectedSecondaryGoals.includes(g.id));
 
     return (
       <View style={styles.container}>
@@ -1996,18 +1382,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
             </View>
 
 
-            {/* Additional Goals */}
-            {selectedSecondary.length > 0 && (
-              <View style={styles.summaryItem}>
-                <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
-                  <Ionicons name="add-circle" size={18} color={themeColor} />
-                </View>
-                <View style={styles.summaryItemContent}>
-                  <Text style={styles.summaryItemLabel}>Additional Focus</Text>
-                  <Text style={styles.summaryItemValue}>{selectedSecondary.map(g => g.title).join(', ')}</Text>
-                </View>
-              </View>
-            )}
           </Animatable.View>
 
           {/* Training Schedule */}
@@ -2164,32 +1538,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
             </Animatable.View>
           )}
 
-          {/* Secondary Goals - Exclude cardio since it has its own dedicated section */}
-          {selectedSecondary.filter(goal => goal.id !== 'include_cardio').length > 0 && (
-            <Animatable.View 
-              animation="fadeInUp" 
-              delay={1700}
-              duration={500}
-              style={styles.summaryCard}
-            >
-              <Text style={styles.summaryCardTitle}>Additional Focus Areas</Text>
-              <View style={styles.secondaryGoalsList}>
-                {selectedSecondary
-                  .filter(goal => goal.id !== 'include_cardio')
-                  .map((goal, index) => (
-                    <Animatable.View 
-                      key={goal.id} 
-                      animation="fadeInRight"
-                      delay={1900 + (index * 100)}
-                      style={styles.secondaryGoalItem}
-                    >
-                      <View style={[styles.goalDot, { backgroundColor: themeColor }]} />
-                      <Text style={styles.secondaryGoalText}>{goal.title}</Text>
-                    </Animatable.View>
-                  ))}
-              </View>
-            </Animatable.View>
-          )}
 
           {/* Specific Details */}
           {(specificSport || athleticPerformanceDetails || funSocialDetails || injuryPreventionDetails || flexibilityDetails || customGoals) && (
@@ -2207,60 +1555,14 @@ export default function FitnessGoalsQuestionnaireScreen() {
                     <Text style={styles.detailValue}>{specificSport}</Text>
                   </View>
                 )}
-                {selectedSecondaryGoals.includes('athletic_performance') && athleticPerformanceDetails && (
-                  <View style={styles.detailItem}>
-                    <Text style={[styles.detailLabel, { color: themeColor }]}>Athletic Performance:</Text>
-                    <Text style={styles.detailValue}>{athleticPerformanceDetails}</Text>
-                  </View>
-                )}
-                {selectedSecondaryGoals.includes('fun_social') && funSocialDetails && (
-                  <View style={styles.detailItem}>
-                    <Text style={[styles.detailLabel, { color: themeColor }]}>Fun & Social:</Text>
-                    <Text style={styles.detailValue}>{funSocialDetails}</Text>
-                  </View>
-                )}
-                {selectedSecondaryGoals.includes('injury_prevention') && injuryPreventionDetails && (
-                  <View style={styles.detailItem}>
-                    <Text style={[styles.detailLabel, { color: themeColor }]}>Injury Prevention:</Text>
-                    <Text style={styles.detailValue}>{injuryPreventionDetails}</Text>
-                  </View>
-                )}
-                {selectedSecondaryGoals.includes('maintain_flexibility') && flexibilityDetails && (
-                  <View style={styles.detailItem}>
-                    <Text style={[styles.detailLabel, { color: themeColor }]}>Flexibility:</Text>
-                    <Text style={styles.detailValue}>{flexibilityDetails}</Text>
-                  </View>
-                )}
                 {customGoals && (
                   <View style={styles.detailItem}>
                     <Text style={[styles.detailLabel, { color: themeColor }]}>Custom Goals:</Text>
                     <Text style={styles.detailValue}>{customGoals}</Text>
                   </View>
                 )}
-                {selectedSecondaryGoals.includes('include_cardio') && cardioPreferences.length > 0 && (
-                  <View style={styles.detailItem}>
-                    <Text style={[styles.detailLabel, { color: themeColor }]}>Cardio Activities:</Text>
-                    <Text style={styles.detailValue}>
-                      {cardioPreferences.map(activity => {
-                        const activityMap: { [key: string]: string } = {
-                          'treadmill': 'Treadmill / Indoor Running',
-                          'stationary_bike': 'Stationary Bike / Cycling',
-                          'rowing_machine': 'Rowing Machine',
-                          'swimming': 'Swimming',
-                          'stair_climber': 'Stair Climber / StepMill',
-                          'elliptical': 'Elliptical',
-                          'jump_rope': 'Jump Rope',
-                          'outdoor_running': 'Outdoor Running / Walking',
-                          'no_preference': 'No Preference (AI chooses)',
-                        };
-                        return activityMap[activity] || activity;
-                      }).join(', ')}
-                    </Text>
-                  </View>
-                )}
               </View>
             </Animatable.View>
-          )}
 
           {/* Save Button */}
           <Animatable.View 
@@ -2321,12 +1623,11 @@ export default function FitnessGoalsQuestionnaireScreen() {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>
             {currentStep === 0 ? 'Goals & Schedule' : 
-             currentStep === 1 ? 'Additional Focus Areas' : 
-             currentStep === 2 ? 'Training Preferences' :
+             currentStep === 1 ? 'Training Preferences' :
              'Program Settings'}
           </Text>
           <Text style={styles.headerSubtitle}>
-            Step {currentStep + 1} of 4
+            Step {currentStep + 1} of 3
           </Text>
         </View>
       </View>
@@ -2339,7 +1640,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
               styles.progressFill, 
               { 
                 backgroundColor: themeColor,
-                width: `${(currentStep + 1) / 4 * 100}%`
+                width: `${(currentStep + 1) / 3 * 100}%`
               }
             ]} 
           />
@@ -2370,7 +1671,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
             styles.navigationButtonText,
             { color: isValid() ? '#000000' : '#71717a' }
           ]}>
-            {currentStep === 3 ? 'Complete' : 'Next'}
+            {currentStep === 2 ? 'Complete' : 'Next'}
           </Text>
           {currentStep === 3 ? (
             <Ionicons name="checkmark" size={20} color={isValid() ? '#000000' : '#71717a'} />
@@ -2498,26 +1799,6 @@ const styles = StyleSheet.create({
     borderColor: '#71717a',
     backgroundColor: 'transparent',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  secondaryGoalsContainer: {
-    gap: 8,
-  },
-  secondaryGoalWrapper: {
-    marginBottom: 4,
-  },
-  secondaryGoalCard: {
-    backgroundColor: '#1a1a1b',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
-    padding: 12,
-  },
-  selectedSecondaryCard: {
-    borderWidth: 2,
-  },
-  secondaryGoalContent: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
   secondaryIconContainer: {
@@ -3535,23 +2816,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  secondaryGoalsList: {
-    gap: 12,
-  },
-  secondaryGoalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  goalDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 12,
-  },
-  secondaryGoalText: {
-    fontSize: 16,
-    color: '#d1d5db',
-  },
   specificDetails: {
     gap: 16,
   },
@@ -3721,126 +2985,7 @@ const styles = StyleSheet.create({
     borderColor: '#3a3a3b',
   },
 
-  // Cardio Preferences Styles
-  cardioPreferencesContainer: {
-    marginTop: 16,
-  },
-  cardioPreferenceCard: {
-    backgroundColor: '#1a1a1b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  selectedCardioCard: {
-    borderWidth: 2,
-  },
-  cardioPreferenceContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  cardioPreferenceIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#27272a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  cardioPreferenceText: {
-    flex: 1,
-  },
-  cardioPreferenceTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  cardioPreferenceCheck: {
-    alignItems: 'center',
-  },
 
-  // New integration method styles
-  integrationMethodContainer: {
-    marginTop: 16,
-    backgroundColor: '#1a1a1b',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  integrationMethodTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#ffffff',
-  },
-  integrationMethodOptions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  integrationMethodCard: {
-    flex: 1,
-    backgroundColor: '#27272a',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333333',
-    minHeight: 80,
-    justifyContent: 'center',
-  },
-  selectedIntegrationCard: {
-    borderWidth: 2,
-  },
-  integrationMethodText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  integrationMethodDesc: {
-    fontSize: 10,
-    color: '#71717a',
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  dedicatedDaysContainer: {
-    marginTop: 12,
-  },
-  dedicatedDaysTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  dedicatedDaysRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  dedicatedDayCard: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    backgroundColor: '#27272a',
-    borderWidth: 1,
-    borderColor: '#333333',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedDedicatedDay: {
-    borderWidth: 2,
-  },
-  dedicatedDayNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
 
   // Training summary styles
   trainingSummaryContainer: {
