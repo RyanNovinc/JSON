@@ -498,7 +498,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
     <ScrollView 
       ref={step0ScrollRef}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: 200 }}
     >
       {/* Primary Goals Section */}
       <Animatable.View
@@ -737,8 +737,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
     <ScrollView 
       ref={step2ScrollRef}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 120 }}
-    >
+      contentContainerStyle={{ paddingBottom: 200 }}
+      keyboardShouldPersistTaps="handled"    >
 
         {/* Priority Muscle Groups */}
         <Animatable.View
@@ -849,7 +849,12 @@ export default function FitnessGoalsQuestionnaireScreen() {
               placeholderTextColor="#71717a"
               value={customLimitation}
               onChangeText={setCustomLimitation}
-            />
+              onFocus={() => {
+                // Scroll to bottom when keyboard appears
+                setTimeout(() => {
+                  step2ScrollRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }}            />
           </Animatable.View>
         )}
       </Animatable.View>
@@ -912,7 +917,12 @@ export default function FitnessGoalsQuestionnaireScreen() {
               placeholderTextColor="#71717a"
               value={customTrainingStyle}
               onChangeText={setCustomTrainingStyle}
-            />
+              onFocus={() => {
+                // Scroll to bottom when keyboard appears
+                setTimeout(() => {
+                  step2ScrollRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }}            />
           </Animatable.View>
         )}
       </Animatable.View>
@@ -1564,7 +1574,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
               </View>
             </Animatable.View>
 
-          {/* Save Button */}
+          )}          {/* Save Button */}
           <Animatable.View 
             animation="slideInUp" 
             delay={2000}
