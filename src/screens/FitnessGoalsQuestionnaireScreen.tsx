@@ -40,14 +40,6 @@ interface SecondaryGoalPreference {
   id: string;
   integrationMethod: 'integrated' | 'dedicated';
   dedicatedDays?: number;
-  integrationDetails?: string;
-}
-
-interface IntegrationOption {
-  id: string;
-  title: string;
-  description: string;
-  timeEstimate: string;
 }
 
 const primaryGoals: FitnessGoalOption[] = [
@@ -141,118 +133,6 @@ const secondaryGoals: SecondaryGoal[] = [
   },
 ];
 
-// Integration options for different secondary goals - separate for integrated vs dedicated
-const integratedOptions: Record<string, IntegrationOption[]> = {
-  include_cardio: [
-    {
-      id: 'post_workout_cardio',
-      title: 'Post-Workout Cardio',
-      description: '10-15 minutes after strength training',
-      timeEstimate: '10-15 min'
-    },
-    {
-      id: 'warmup_cardio', 
-      title: 'Warm-up Cardio',
-      description: '5-10 minutes before workouts',
-      timeEstimate: '5-10 min'
-    },
-    {
-      id: 'cardio_finishers',
-      title: 'Cardio Finishers',
-      description: 'High-intensity circuits at end of workouts',
-      timeEstimate: '5-8 min'
-    }
-  ],
-  maintain_flexibility: [
-    {
-      id: 'post_workout_stretch',
-      title: 'Post-Workout Stretching',
-      description: 'Cool-down stretches after each session',
-      timeEstimate: '10-15 min'
-    },
-    {
-      id: 'mobility_warmup',
-      title: 'Mobility Warm-up',
-      description: 'Dynamic stretches before workouts',
-      timeEstimate: '5-10 min'
-    }
-  ],
-  injury_prevention: [
-    {
-      id: 'corrective_exercises',
-      title: 'Corrective Exercises',
-      description: 'Injury prevention exercises during workouts',
-      timeEstimate: '5-10 min'
-    },
-    {
-      id: 'activation_warmup',
-      title: 'Activation Warm-up',
-      description: 'Muscle activation before training',
-      timeEstimate: '8-12 min'
-    }
-  ],
-  athletic_performance: [
-    {
-      id: 'plyometric_additions',
-      title: 'Plyometric Add-ons',
-      description: 'Explosive exercises added to workouts',
-      timeEstimate: '10-15 min'
-    },
-    {
-      id: 'agility_warmup',
-      title: 'Agility Warm-up',
-      description: 'Speed and agility drills before training',
-      timeEstimate: '8-12 min'
-    }
-  ]
-};
-
-const dedicatedOptions: Record<string, IntegrationOption[]> = {
-  include_cardio: [
-    {
-      id: 'dedicated_cardio_sessions',
-      title: 'Dedicated Cardio Sessions',
-      description: 'Separate days focused on cardiovascular training',
-      timeEstimate: '30-45 min'
-    },
-    {
-      id: 'cardio_recovery_days',
-      title: 'Active Recovery Cardio',
-      description: 'Light cardio on rest days from strength training',
-      timeEstimate: '20-30 min'
-    }
-  ],
-  maintain_flexibility: [
-    {
-      id: 'rest_day_yoga',
-      title: 'Rest Day Mobility',
-      description: 'Light stretching on non-training days',
-      timeEstimate: '15-20 min'
-    },
-    {
-      id: 'dedicated_yoga_sessions',
-      title: 'Yoga/Stretching Sessions',
-      description: 'Full dedicated flexibility training days',
-      timeEstimate: '30-60 min'
-    }
-  ],
-  injury_prevention: [
-    {
-      id: 'prehab_sessions',
-      title: 'Prehab Sessions',
-      description: 'Dedicated injury prevention and mobility work',
-      timeEstimate: '20-30 min'
-    }
-  ],
-  athletic_performance: [
-    {
-      id: 'dedicated_performance_days',
-      title: 'Performance Training Days',
-      description: 'Dedicated speed, agility, and power sessions',
-      timeEstimate: '45-60 min'
-    }
-  ]
-};
 
 export default function FitnessGoalsQuestionnaireScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -332,8 +212,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
           // Convert old format to new format with default integrated method
           const convertedPreferences: SecondaryGoalPreference[] = data.secondaryGoals.map((goalId: string) => ({
             id: goalId,
-            integrationMethod: 'integrated' as const,
-            integrationDetails: ''
+            integrationMethod: 'integrated' as const
           }));
           setSecondaryGoalPreferences(convertedPreferences);
         }
@@ -467,8 +346,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
           ...prevPrefs,
           { 
             id: goalId, 
-            integrationMethod: 'integrated',
-            integrationDetails: ''
+            integrationMethod: 'integrated'
           }
         ]);
         return [...prev, goalId];
@@ -496,15 +374,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
     );
   };
 
-  const handleIntegrationDetailsChange = (goalId: string, details: string) => {
-    setSecondaryGoalPreferences(prev => 
-      prev.map(pref => 
-        pref.id === goalId 
-          ? { ...pref, integrationDetails: details }
-          : pref
-      )
-    );
-  };
 
   const handleMuscleGroupToggle = (muscleGroup: string) => {
     setPriorityMuscleGroups(prev => {
@@ -903,10 +772,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
     const preference = secondaryGoalPreferences.find(p => p.id === goalId);
     if (!preference) return null;
 
-    const availableIntegrations = preference.integrationMethod === 'integrated' 
-      ? integratedOptions[goalId] || []
-      : dedicatedOptions[goalId] || [];
-
     return (
       <Animatable.View
         animation="slideInDown"
@@ -973,43 +838,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
         </View>
 
-        {/* Integration Options for "integrated" method */}
-        {preference.integrationMethod === 'integrated' && availableIntegrations.length > 0 && (
-          <View style={styles.integrationOptionsContainer}>
-            <Text style={styles.integrationOptionsTitle}>Choose your preferred approach:</Text>
-            {availableIntegrations.map((option, index) => (
-              <TouchableOpacity
-                key={option.id}
-                style={[
-                  styles.integrationOptionCard,
-                  preference.integrationDetails === option.id && [
-                    styles.selectedIntegrationOption,
-                    { borderColor: themeColor, backgroundColor: `${themeColor}08` }
-                  ]
-                ]}
-                onPress={() => handleIntegrationDetailsChange(goalId, option.id)}
-              >
-                <View style={styles.integrationOptionContent}>
-                  <Text style={[
-                    styles.integrationOptionTitle,
-                    preference.integrationDetails === option.id && { color: themeColor }
-                  ]}>
-                    {option.title}
-                  </Text>
-                  <Text style={styles.integrationOptionDesc}>
-                    {option.description}
-                  </Text>
-                </View>
-                <Text style={[
-                  styles.integrationOptionTime,
-                  preference.integrationDetails === option.id && { color: themeColor }
-                ]}>
-                  {option.timeEstimate}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
 
         {/* Dedicated Days Selection for "dedicated" method */}
         {preference.integrationMethod === 'dedicated' && (
@@ -3981,46 +3809,6 @@ const styles = StyleSheet.create({
     color: '#71717a',
     textAlign: 'center',
     marginTop: 2,
-  },
-  integrationOptionsContainer: {
-    marginTop: 8,
-  },
-  integrationOptionsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  integrationOptionCard: {
-    backgroundColor: '#27272a',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#333333',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  selectedIntegrationOption: {
-    borderWidth: 2,
-  },
-  integrationOptionContent: {
-    flex: 1,
-  },
-  integrationOptionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  integrationOptionDesc: {
-    fontSize: 12,
-    color: '#71717a',
-  },
-  integrationOptionTime: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#71717a',
   },
   dedicatedDaysContainer: {
     marginTop: 12,
