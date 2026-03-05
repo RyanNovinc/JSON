@@ -141,8 +141,8 @@ const secondaryGoals: SecondaryGoal[] = [
   },
 ];
 
-// Integration options for different secondary goals
-const integrationOptions: Record<string, IntegrationOption[]> = {
+// Integration options for different secondary goals - separate for integrated vs dedicated
+const integratedOptions: Record<string, IntegrationOption[]> = {
   include_cardio: [
     {
       id: 'post_workout_cardio',
@@ -177,10 +177,10 @@ const integrationOptions: Record<string, IntegrationOption[]> = {
       timeEstimate: '5-10 min'
     },
     {
-      id: 'rest_day_yoga',
-      title: 'Rest Day Mobility',
-      description: 'Light stretching on non-training days',
-      timeEstimate: '15-20 min'
+      id: 'mid_workout_mobility',
+      title: 'Between-Set Stretching',
+      description: 'Light mobility work during rest periods',
+      timeEstimate: '2-3 min'
     }
   ],
   injury_prevention: [
@@ -209,6 +209,53 @@ const integrationOptions: Record<string, IntegrationOption[]> = {
       title: 'Agility Warm-up',
       description: 'Speed and agility drills before training',
       timeEstimate: '8-12 min'
+    }
+  ]
+};
+
+const dedicatedOptions: Record<string, IntegrationOption[]> = {
+  include_cardio: [
+    {
+      id: 'dedicated_cardio_sessions',
+      title: 'Dedicated Cardio Sessions',
+      description: 'Separate days focused on cardiovascular training',
+      timeEstimate: '30-45 min'
+    },
+    {
+      id: 'cardio_recovery_days',
+      title: 'Active Recovery Cardio',
+      description: 'Light cardio on rest days from strength training',
+      timeEstimate: '20-30 min'
+    }
+  ],
+  maintain_flexibility: [
+    {
+      id: 'rest_day_yoga',
+      title: 'Rest Day Mobility',
+      description: 'Light stretching on non-training days',
+      timeEstimate: '15-20 min'
+    },
+    {
+      id: 'dedicated_yoga_sessions',
+      title: 'Yoga/Stretching Sessions',
+      description: 'Full dedicated flexibility training days',
+      timeEstimate: '30-60 min'
+    }
+  ],
+  injury_prevention: [
+    {
+      id: 'prehab_sessions',
+      title: 'Prehab Sessions',
+      description: 'Dedicated injury prevention and mobility work',
+      timeEstimate: '20-30 min'
+    }
+  ],
+  athletic_performance: [
+    {
+      id: 'dedicated_performance_days',
+      title: 'Performance Training Days',
+      description: 'Dedicated speed, agility, and power sessions',
+      timeEstimate: '45-60 min'
     }
   ]
 };
@@ -862,7 +909,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
     const preference = secondaryGoalPreferences.find(p => p.id === goalId);
     if (!preference) return null;
 
-    const availableIntegrations = integrationOptions[goalId] || [];
+    const availableIntegrations = preference.integrationMethod === 'integrated' 
+      ? integratedOptions[goalId] || []
+      : dedicatedOptions[goalId] || [];
 
     return (
       <Animatable.View
