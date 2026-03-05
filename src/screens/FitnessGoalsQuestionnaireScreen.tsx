@@ -175,12 +175,6 @@ const integratedOptions: Record<string, IntegrationOption[]> = {
       title: 'Mobility Warm-up',
       description: 'Dynamic stretches before workouts',
       timeEstimate: '5-10 min'
-    },
-    {
-      id: 'mid_workout_mobility',
-      title: 'Between-Set Stretching',
-      description: 'Light mobility work during rest periods',
-      timeEstimate: '2-3 min'
     }
   ],
   injury_prevention: [
