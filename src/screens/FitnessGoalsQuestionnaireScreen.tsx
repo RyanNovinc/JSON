@@ -38,7 +38,7 @@ interface SecondaryGoal {
 
 interface SecondaryGoalPreference {
   id: string;
-  integrationMethod: 'integrated' | 'dedicated' | 'both';
+  integrationMethod: 'integrated' | 'dedicated';
   dedicatedDays?: number;
   integrationDetails?: string;
 }
@@ -435,7 +435,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
     });
   };
 
-  const handleIntegrationMethodChange = (goalId: string, method: 'integrated' | 'dedicated' | 'both') => {
+  const handleIntegrationMethodChange = (goalId: string, method: 'integrated' | 'dedicated') => {
     setSecondaryGoalPreferences(prev => 
       prev.map(pref => 
         pref.id === goalId 
@@ -543,7 +543,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
         if (!preference) continue;
         
         // If dedicated days are selected, they must be specified and valid
-        if (preference.integrationMethod === 'dedicated' || preference.integrationMethod === 'both') {
+        if (preference.integrationMethod === 'dedicated') {
           if (!preference.dedicatedDays || preference.dedicatedDays < 1) {
             return false;
           }
@@ -552,7 +552,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       
       // Calculate total dedicated days to ensure it doesn't exceed total training days
       const totalDedicatedDays = secondaryGoalPreferences
-        .filter(p => p.integrationMethod === 'dedicated' || p.integrationMethod === 'both')
+        .filter(p => p.integrationMethod === 'dedicated')
         .reduce((sum, p) => sum + (p.dedicatedDays || 0), 0);
       
       // Primary goal days + dedicated secondary days should not exceed total training days
@@ -928,35 +928,10 @@ export default function FitnessGoalsQuestionnaireScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.integrationMethodCard,
-              preference.integrationMethod === 'both' && [
-                styles.selectedIntegrationCard,
-                { borderColor: themeColor, backgroundColor: `${themeColor}10` }
-              ]
-            ]}
-            onPress={() => handleIntegrationMethodChange(goalId, 'both')}
-          >
-            <Ionicons 
-              name="duplicate-outline" 
-              size={20} 
-              color={preference.integrationMethod === 'both' ? themeColor : '#71717a'} 
-            />
-            <Text style={[
-              styles.integrationMethodText,
-              preference.integrationMethod === 'both' && { color: themeColor }
-            ]}>
-              Both approaches
-            </Text>
-            <Text style={styles.integrationMethodDesc}>
-              Mix of integrated & dedicated
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Integration Options for "integrated" method */}
-        {(preference.integrationMethod === 'integrated' || preference.integrationMethod === 'both') && availableIntegrations.length > 0 && (
+        {preference.integrationMethod === 'integrated' && availableIntegrations.length > 0 && (
           <View style={styles.integrationOptionsContainer}>
             <Text style={styles.integrationOptionsTitle}>Choose your preferred approach:</Text>
             {availableIntegrations.map((option, index) => (
@@ -994,7 +969,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
         )}
 
         {/* Dedicated Days Selection for "dedicated" method */}
-        {(preference.integrationMethod === 'dedicated' || preference.integrationMethod === 'both') && (
+        {preference.integrationMethod === 'dedicated' && (
           <View style={styles.dedicatedDaysContainer}>
             <Text style={styles.dedicatedDaysTitle}>How many days per week?</Text>
             <View style={styles.dedicatedDaysRow}>
@@ -1372,7 +1347,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
             
             {/* Show dedicated secondary goals */}
             {secondaryGoalPreferences
-              .filter(p => p.integrationMethod === 'dedicated' || p.integrationMethod === 'both')
+              .filter(p => p.integrationMethod === 'dedicated')
               .map(pref => {
                 const goal = secondaryGoals.find(g => g.id === pref.id);
                 return goal ? (
@@ -3934,7 +3909,7 @@ const styles = StyleSheet.create({
   },
   integrationMethodOptions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
     marginBottom: 16,
   },
   integrationMethodCard: {
