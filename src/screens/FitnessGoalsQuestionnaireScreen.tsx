@@ -36,6 +36,20 @@ interface SecondaryGoal {
   icon: string;
 }
 
+interface SecondaryGoalPreference {
+  id: string;
+  integrationMethod: 'integrated' | 'dedicated' | 'both';
+  dedicatedDays?: number;
+  integrationDetails?: string;
+}
+
+interface IntegrationOption {
+  id: string;
+  title: string;
+  description: string;
+  timeEstimate: string;
+}
+
 const primaryGoals: FitnessGoalOption[] = [
   {
     id: 'burn_fat',
@@ -127,11 +141,84 @@ const secondaryGoals: SecondaryGoal[] = [
   },
 ];
 
+// Integration options for different secondary goals
+const integrationOptions: Record<string, IntegrationOption[]> = {
+  include_cardio: [
+    {
+      id: 'post_workout_cardio',
+      title: 'Post-Workout Cardio',
+      description: '10-15 minutes after strength training',
+      timeEstimate: '10-15 min'
+    },
+    {
+      id: 'warmup_cardio', 
+      title: 'Warm-up Cardio',
+      description: '5-10 minutes before workouts',
+      timeEstimate: '5-10 min'
+    },
+    {
+      id: 'cardio_finishers',
+      title: 'Cardio Finishers',
+      description: 'High-intensity circuits at end of workouts',
+      timeEstimate: '5-8 min'
+    }
+  ],
+  maintain_flexibility: [
+    {
+      id: 'post_workout_stretch',
+      title: 'Post-Workout Stretching',
+      description: 'Cool-down stretches after each session',
+      timeEstimate: '10-15 min'
+    },
+    {
+      id: 'mobility_warmup',
+      title: 'Mobility Warm-up',
+      description: 'Dynamic stretches before workouts',
+      timeEstimate: '5-10 min'
+    },
+    {
+      id: 'rest_day_yoga',
+      title: 'Rest Day Mobility',
+      description: 'Light stretching on non-training days',
+      timeEstimate: '15-20 min'
+    }
+  ],
+  injury_prevention: [
+    {
+      id: 'corrective_exercises',
+      title: 'Corrective Exercises',
+      description: 'Injury prevention exercises during workouts',
+      timeEstimate: '5-10 min'
+    },
+    {
+      id: 'activation_warmup',
+      title: 'Activation Warm-up',
+      description: 'Muscle activation before training',
+      timeEstimate: '8-12 min'
+    }
+  ],
+  athletic_performance: [
+    {
+      id: 'plyometric_additions',
+      title: 'Plyometric Add-ons',
+      description: 'Explosive exercises added to workouts',
+      timeEstimate: '10-15 min'
+    },
+    {
+      id: 'agility_warmup',
+      title: 'Agility Warm-up',
+      description: 'Speed and agility drills before training',
+      timeEstimate: '8-12 min'
+    }
+  ]
+};
+
 export default function FitnessGoalsQuestionnaireScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { themeColor, themeColorLight } = useTheme();
   const [selectedPrimaryGoal, setSelectedPrimaryGoal] = useState<string>('');
   const [selectedSecondaryGoals, setSelectedSecondaryGoals] = useState<string[]>([]);
+  const [secondaryGoalPreferences, setSecondaryGoalPreferences] = useState<SecondaryGoalPreference[]>([]);
   const [customPrimaryGoal, setCustomPrimaryGoal] = useState<string>('');
   const [customSecondaryGoal, setCustomSecondaryGoal] = useState<string>('');
   const [specificSport, setSpecificSport] = useState<string>('');
@@ -196,6 +283,19 @@ export default function FitnessGoalsQuestionnaireScreen() {
         // Restore all form data
         setSelectedPrimaryGoal(data.primaryGoal || '');
         setSelectedSecondaryGoals(data.secondaryGoals || []);
+        
+        // Handle new secondary goal preferences format
+        if (data.secondaryGoalPreferences) {
+          setSecondaryGoalPreferences(data.secondaryGoalPreferences);
+        } else if (data.secondaryGoals && data.secondaryGoals.length > 0) {
+          // Convert old format to new format with default integrated method
+          const convertedPreferences: SecondaryGoalPreference[] = data.secondaryGoals.map((goalId: string) => ({
+            id: goalId,
+            integrationMethod: 'integrated' as const,
+            integrationDetails: ''
+          }));
+          setSecondaryGoalPreferences(convertedPreferences);
+        }
         setCustomPrimaryGoal(data.customPrimaryGoal || '');
         setCustomSecondaryGoal(data.customSecondaryGoal || '');
         setSpecificSport(data.specificSport || '');
@@ -254,6 +354,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       const progressData = {
         primaryGoal: selectedPrimaryGoal,
         secondaryGoals: selectedSecondaryGoals,
+        secondaryGoalPreferences: secondaryGoalPreferences,
         customPrimaryGoal: customPrimaryGoal,
         customSecondaryGoal: customSecondaryGoal,
         specificSport: specificSport,
@@ -314,11 +415,54 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const handleSecondaryGoalToggle = (goalId: string) => {
     setSelectedSecondaryGoals(prev => {
       if (prev.includes(goalId)) {
+        // Remove from selected and preferences
+        setSecondaryGoalPreferences(prevPrefs => 
+          prevPrefs.filter(pref => pref.id !== goalId)
+        );
         return prev.filter(id => id !== goalId);
       } else {
+        // Add to selected with default integrated preference
+        setSecondaryGoalPreferences(prevPrefs => [
+          ...prevPrefs,
+          { 
+            id: goalId, 
+            integrationMethod: 'integrated',
+            integrationDetails: ''
+          }
+        ]);
         return [...prev, goalId];
       }
     });
+  };
+
+  const handleIntegrationMethodChange = (goalId: string, method: 'integrated' | 'dedicated' | 'both') => {
+    setSecondaryGoalPreferences(prev => 
+      prev.map(pref => 
+        pref.id === goalId 
+          ? { ...pref, integrationMethod: method, dedicatedDays: method === 'integrated' ? undefined : pref.dedicatedDays }
+          : pref
+      )
+    );
+  };
+
+  const handleDedicatedDaysChange = (goalId: string, days: number) => {
+    setSecondaryGoalPreferences(prev => 
+      prev.map(pref => 
+        pref.id === goalId 
+          ? { ...pref, dedicatedDays: days }
+          : pref
+      )
+    );
+  };
+
+  const handleIntegrationDetailsChange = (goalId: string, details: string) => {
+    setSecondaryGoalPreferences(prev => 
+      prev.map(pref => 
+        pref.id === goalId 
+          ? { ...pref, integrationDetails: details }
+          : pref
+      )
+    );
   };
 
   const handleMuscleGroupToggle = (muscleGroup: string) => {
@@ -388,13 +532,31 @@ export default function FitnessGoalsQuestionnaireScreen() {
         return false;
       }
       
-      // If no secondary goals selected, all days should go to gym
-      if (selectedSecondaryGoals.length === 0) {
-        return gymTrainingDays === totalTrainingDays;
+      // Validate secondary goal preferences
+      for (const goalId of selectedSecondaryGoals) {
+        const preference = secondaryGoalPreferences.find(p => p.id === goalId);
+        if (!preference) continue;
+        
+        // If dedicated days are selected, they must be specified and valid
+        if (preference.integrationMethod === 'dedicated' || preference.integrationMethod === 'both') {
+          if (!preference.dedicatedDays || preference.dedicatedDays < 1) {
+            return false;
+          }
+        }
       }
       
-      // If secondary goals are selected, split must add up to total
-      return (gymTrainingDays + otherTrainingDays) === totalTrainingDays;
+      // Calculate total dedicated days to ensure it doesn't exceed total training days
+      const totalDedicatedDays = secondaryGoalPreferences
+        .filter(p => p.integrationMethod === 'dedicated' || p.integrationMethod === 'both')
+        .reduce((sum, p) => sum + (p.dedicatedDays || 0), 0);
+      
+      // Primary goal days + dedicated secondary days should not exceed total training days
+      const primaryDays = totalTrainingDays - totalDedicatedDays;
+      if (primaryDays < 1) {
+        return false; // Must have at least 1 day for primary goal
+      }
+      
+      return true;
     }
     if (currentStep === 1) {
       return true; // Step 1 is now optional (was training frequency, now training preferences)
@@ -458,6 +620,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       const fitnessGoalsData = {
         primaryGoal: selectedPrimaryGoal,
         secondaryGoals: selectedSecondaryGoals,
+        secondaryGoalPreferences: secondaryGoalPreferences,
         customPrimaryGoal: customPrimaryGoal,
         customSecondaryGoal: customSecondaryGoal,
         specificSport: specificSport,
@@ -687,6 +850,178 @@ export default function FitnessGoalsQuestionnaireScreen() {
               onChangeText={setFlexibilityDetails}
             />
           </Animatable.View>
+        )}
+
+        {/* Integration Method Selection */}
+        {isSelected && (
+          renderIntegrationMethodSelection(goal.id, goal.title)
+        )}
+      </Animatable.View>
+    );
+  };
+
+  const renderIntegrationMethodSelection = (goalId: string, goalTitle: string) => {
+    const preference = secondaryGoalPreferences.find(p => p.id === goalId);
+    if (!preference) return null;
+
+    const availableIntegrations = integrationOptions[goalId] || [];
+
+    return (
+      <Animatable.View
+        animation="slideInDown"
+        duration={300}
+        style={styles.integrationMethodContainer}
+      >
+        <Text style={[styles.integrationMethodTitle, { color: themeColor }]}>
+          How would you like to include {goalTitle.toLowerCase()}?
+        </Text>
+        
+        {/* Integration Method Options */}
+        <View style={styles.integrationMethodOptions}>
+          <TouchableOpacity
+            style={[
+              styles.integrationMethodCard,
+              preference.integrationMethod === 'integrated' && [
+                styles.selectedIntegrationCard,
+                { borderColor: themeColor, backgroundColor: `${themeColor}10` }
+              ]
+            ]}
+            onPress={() => handleIntegrationMethodChange(goalId, 'integrated')}
+          >
+            <Ionicons 
+              name="layers-outline" 
+              size={20} 
+              color={preference.integrationMethod === 'integrated' ? themeColor : '#71717a'} 
+            />
+            <Text style={[
+              styles.integrationMethodText,
+              preference.integrationMethod === 'integrated' && { color: themeColor }
+            ]}>
+              Integrated into workouts
+            </Text>
+            <Text style={styles.integrationMethodDesc}>
+              Add to existing sessions
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.integrationMethodCard,
+              preference.integrationMethod === 'dedicated' && [
+                styles.selectedIntegrationCard,
+                { borderColor: themeColor, backgroundColor: `${themeColor}10` }
+              ]
+            ]}
+            onPress={() => handleIntegrationMethodChange(goalId, 'dedicated')}
+          >
+            <Ionicons 
+              name="calendar-outline" 
+              size={20} 
+              color={preference.integrationMethod === 'dedicated' ? themeColor : '#71717a'} 
+            />
+            <Text style={[
+              styles.integrationMethodText,
+              preference.integrationMethod === 'dedicated' && { color: themeColor }
+            ]}>
+              Dedicated sessions
+            </Text>
+            <Text style={styles.integrationMethodDesc}>
+              Separate training days
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.integrationMethodCard,
+              preference.integrationMethod === 'both' && [
+                styles.selectedIntegrationCard,
+                { borderColor: themeColor, backgroundColor: `${themeColor}10` }
+              ]
+            ]}
+            onPress={() => handleIntegrationMethodChange(goalId, 'both')}
+          >
+            <Ionicons 
+              name="duplicate-outline" 
+              size={20} 
+              color={preference.integrationMethod === 'both' ? themeColor : '#71717a'} 
+            />
+            <Text style={[
+              styles.integrationMethodText,
+              preference.integrationMethod === 'both' && { color: themeColor }
+            ]}>
+              Both approaches
+            </Text>
+            <Text style={styles.integrationMethodDesc}>
+              Mix of integrated & dedicated
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Integration Options for "integrated" method */}
+        {(preference.integrationMethod === 'integrated' || preference.integrationMethod === 'both') && availableIntegrations.length > 0 && (
+          <View style={styles.integrationOptionsContainer}>
+            <Text style={styles.integrationOptionsTitle}>Choose your preferred approach:</Text>
+            {availableIntegrations.map((option, index) => (
+              <TouchableOpacity
+                key={option.id}
+                style={[
+                  styles.integrationOptionCard,
+                  preference.integrationDetails === option.id && [
+                    styles.selectedIntegrationOption,
+                    { borderColor: themeColor, backgroundColor: `${themeColor}08` }
+                  ]
+                ]}
+                onPress={() => handleIntegrationDetailsChange(goalId, option.id)}
+              >
+                <View style={styles.integrationOptionContent}>
+                  <Text style={[
+                    styles.integrationOptionTitle,
+                    preference.integrationDetails === option.id && { color: themeColor }
+                  ]}>
+                    {option.title}
+                  </Text>
+                  <Text style={styles.integrationOptionDesc}>
+                    {option.description}
+                  </Text>
+                </View>
+                <Text style={[
+                  styles.integrationOptionTime,
+                  preference.integrationDetails === option.id && { color: themeColor }
+                ]}>
+                  {option.timeEstimate}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Dedicated Days Selection for "dedicated" method */}
+        {(preference.integrationMethod === 'dedicated' || preference.integrationMethod === 'both') && (
+          <View style={styles.dedicatedDaysContainer}>
+            <Text style={styles.dedicatedDaysTitle}>How many days per week?</Text>
+            <View style={styles.dedicatedDaysRow}>
+              {[1, 2, 3].map(days => (
+                <TouchableOpacity
+                  key={days}
+                  style={[
+                    styles.dedicatedDayCard,
+                    preference.dedicatedDays === days && [
+                      styles.selectedDedicatedDay,
+                      { borderColor: themeColor, backgroundColor: `${themeColor}15` }
+                    ]
+                  ]}
+                  onPress={() => handleDedicatedDaysChange(goalId, days)}
+                >
+                  <Text style={[
+                    styles.dedicatedDayNumber,
+                    preference.dedicatedDays === days && { color: themeColor }
+                  ]}>
+                    {days}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         )}
       </Animatable.View>
     );
@@ -990,7 +1325,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
         </Animatable.View>
       )}
 
-      {/* Training Split - moved from step 1 */}
+      {/* Training Summary */}
       {selectedPrimaryGoal && totalTrainingDays > 0 && (
         <Animatable.View
           animation="fadeInUp"
@@ -998,110 +1333,52 @@ export default function FitnessGoalsQuestionnaireScreen() {
           style={styles.sectionContainer}
         >
           <Text style={[styles.sectionTitle, { color: themeColor }]}>
-            Training Split
+            Training Schedule
           </Text>
-          <Text style={styles.sectionSubtitle}>
-            Divide your {totalTrainingDays} days between gym and other activities
-          </Text>
-          
-          {/* Modern Split Container */}
-          <View style={styles.modernSplitContainer}>
-            {/* Gym Training Section */}
-            <View style={styles.modernSplitSection}>
-              <View style={styles.modernSplitHeader}>
-                <View style={[styles.splitIconContainer, { backgroundColor: `${themeColor}20` }]}>
-                  <Ionicons name="fitness" size={20} color={themeColor} />
-                </View>
-                <Text style={styles.modernSplitLabel}>{getPrimaryGoalTitle()}</Text>
+          <View style={styles.trainingSummaryContainer}>
+            <View style={styles.trainingSummaryItem}>
+              <View style={[styles.summaryIconContainer, { backgroundColor: `${themeColor}20` }]}>
+                <Ionicons name="fitness" size={20} color={themeColor} />
               </View>
-              <View style={styles.modernSplitGrid}>
-                {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => {
-                  const isSelected = gymTrainingDays === days;
-                  const maxAllowed = totalTrainingDays - otherTrainingDays;
-                  const isDisabled = days > maxAllowed;
-                  
-                  return (
-                    <TouchableOpacity
-                      key={`gym-${days}`}
-                      style={[
-                        styles.modernSplitCard,
-                        isSelected && [styles.selectedModernSplitCard, { borderColor: themeColor, backgroundColor: `${themeColor}15` }],
-                        isDisabled && styles.disabledSplitCard
-                      ]}
-                      onPress={() => !isDisabled && setGymTrainingDays(days)}
-                      activeOpacity={isDisabled ? 1 : 0.7}
-                      disabled={isDisabled}
-                    >
-                      <Text style={[
-                        styles.modernSplitNumber,
-                        isSelected && { color: themeColor },
-                        isDisabled && styles.disabledSplitText
-                      ]}>
-                        {days}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Other Activities Section - Only show if user selected secondary goals */}
-            {selectedSecondaryGoals.length > 0 && (
-              <View style={styles.modernSplitSection}>
-                <View style={styles.modernSplitHeader}>
-                  <View style={[styles.splitIconContainer, { backgroundColor: '#10b98120' }]}>
-                    <Ionicons name="walk" size={20} color="#10b981" />
-                  </View>
-                  <Text style={styles.modernSplitLabel}>{getSecondaryGoalTitle()}</Text>
-                </View>
-                <View style={styles.modernSplitGrid}>
-                  {[0, 1, 2, 3, 4, 5, 6, 7].slice(0, totalTrainingDays + 1).map((days) => {
-                    const isSelected = otherTrainingDays === days;
-                    const maxAllowed = totalTrainingDays - gymTrainingDays;
-                    const isDisabled = days > maxAllowed;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={`other-${days}`}
-                        style={[
-                          styles.modernSplitCard,
-                          isSelected && [styles.selectedModernSplitCard, { borderColor: '#10b981', backgroundColor: '#10b98115' }],
-                          isDisabled && styles.disabledSplitCard
-                        ]}
-                        onPress={() => !isDisabled && setOtherTrainingDays(days)}
-                        activeOpacity={isDisabled ? 1 : 0.7}
-                        disabled={isDisabled}
-                      >
-                        <Text style={[
-                          styles.modernSplitNumber,
-                          isSelected && { color: '#10b981' },
-                          isDisabled && styles.disabledSplitText
-                        ]}>
-                          {days}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Split validation warning */}
-          {totalTrainingDays > 0 && (
-            (selectedSecondaryGoals.length === 0 && gymTrainingDays !== totalTrainingDays) ||
-            (selectedSecondaryGoals.length > 0 && (gymTrainingDays + otherTrainingDays) !== totalTrainingDays)
-          ) && (
-            <View style={styles.warningContainer}>
-              <Ionicons name="warning-outline" size={16} color="#f59e0b" />
-              <Text style={styles.warningText}>
-                {selectedSecondaryGoals.length === 0 
-                  ? `Set your ${getPrimaryGoalTitle()} days to ${totalTrainingDays}`
-                  : `Your split (${gymTrainingDays + otherTrainingDays} days) doesn't match your total training days (${totalTrainingDays})`
-                }
+              <Text style={styles.trainingSummaryText}>
+                {totalTrainingDays} days/week • {getPrimaryGoalTitle()}
               </Text>
             </View>
-          )}
+            
+            {/* Show integrated secondary goals */}
+            {secondaryGoalPreferences
+              .filter(p => p.integrationMethod === 'integrated')
+              .map(pref => {
+                const goal = secondaryGoals.find(g => g.id === pref.id);
+                return goal ? (
+                  <View key={pref.id} style={styles.trainingSummaryItem}>
+                    <View style={[styles.summaryIconContainer, { backgroundColor: '#10b98120' }]}>
+                      <Ionicons name={goal.icon as any} size={16} color="#10b981" />
+                    </View>
+                    <Text style={styles.trainingSummaryText}>
+                      + {goal.title} (integrated)
+                    </Text>
+                  </View>
+                ) : null;
+              })}
+            
+            {/* Show dedicated secondary goals */}
+            {secondaryGoalPreferences
+              .filter(p => p.integrationMethod === 'dedicated' || p.integrationMethod === 'both')
+              .map(pref => {
+                const goal = secondaryGoals.find(g => g.id === pref.id);
+                return goal ? (
+                  <View key={pref.id} style={styles.trainingSummaryItem}>
+                    <View style={[styles.summaryIconContainer, { backgroundColor: '#10b98120' }]}>
+                      <Ionicons name={goal.icon as any} size={16} color="#10b981" />
+                    </View>
+                    <Text style={styles.trainingSummaryText}>
+                      + {goal.title} ({pref.dedicatedDays} day{pref.dedicatedDays === 1 ? '' : 's'}/week)
+                    </Text>
+                  </View>
+                ) : null;
+              })}
+          </View>
         </Animatable.View>
       )}
     </ScrollView>
@@ -3124,7 +3401,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  customFrequencyText: {
+  customFrequencySecondaryText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#71717a',
@@ -3645,6 +3922,161 @@ const styles = StyleSheet.create({
   },
   cardioPreferenceCheck: {
     alignItems: 'center',
+  },
+
+  // New integration method styles
+  integrationMethodContainer: {
+    marginTop: 16,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  integrationMethodTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#ffffff',
+  },
+  integrationMethodOptions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  integrationMethodCard: {
+    flex: 1,
+    backgroundColor: '#27272a',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+    minHeight: 80,
+    justifyContent: 'center',
+  },
+  selectedIntegrationCard: {
+    borderWidth: 2,
+  },
+  integrationMethodText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  integrationMethodDesc: {
+    fontSize: 10,
+    color: '#71717a',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  integrationOptionsContainer: {
+    marginTop: 8,
+  },
+  integrationOptionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  integrationOptionCard: {
+    backgroundColor: '#27272a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#333333',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedIntegrationOption: {
+    borderWidth: 2,
+  },
+  integrationOptionContent: {
+    flex: 1,
+  },
+  integrationOptionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  integrationOptionDesc: {
+    fontSize: 12,
+    color: '#71717a',
+  },
+  integrationOptionTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#71717a',
+  },
+  dedicatedDaysContainer: {
+    marginTop: 12,
+  },
+  dedicatedDaysTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  dedicatedDaysRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  dedicatedDayCard: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    backgroundColor: '#27272a',
+    borderWidth: 1,
+    borderColor: '#333333',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedDedicatedDay: {
+    borderWidth: 2,
+  },
+  dedicatedDayNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+
+  // Training summary styles
+  trainingSummaryContainer: {
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  trainingSummaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  summaryIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trainingSummaryText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#ffffff',
+  },
+  
+  // Missing styles
+  unselectedCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#71717a',
+    backgroundColor: 'transparent',
   },
 
 });
