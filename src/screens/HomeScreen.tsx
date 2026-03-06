@@ -241,11 +241,9 @@ export default function HomeScreen({ route }: any) {
     try {
       // Enhanced export with complete state including manual modifications
       let exportData = { ...routine.data };
-      console.log('🔍 Export Debug - Initial exportData._metadata:', exportData._metadata);
       
       // Clean exercisePreferences from sample plans at the source
       if (routine.data?._metadata?.isSamplePlan && exportData._metadata?.exercisePreferences) {
-        console.log('🧹 Cleaning exercisePreferences from sample plan export data');
         delete exportData._metadata.exercisePreferences;
       }
       let programData = null;
@@ -465,17 +463,53 @@ export default function HomeScreen({ route }: any) {
       // Primary check: explicit isSamplePlan flag
       let isSamplePlan = routine.data?._metadata?.isSamplePlan || false;
       
-      // Fallback check: detect sample plans by their IDs (for plans imported before isSamplePlan flag)
+      // Fallback check: detect sample plans by their characteristics (for plans imported before isSamplePlan flag)
       if (!isSamplePlan) {
+        
+        // Check by original sample plan IDs first
         const knownSamplePlanIds = ['sample_quick_start_ppl', 'sample_muscle_builder_52w', 'sample_glute_tone_12w'];
         isSamplePlan = knownSamplePlanIds.includes(routine.data?.id);
-        if (isSamplePlan) {
-          console.log('🎯 Detected legacy sample plan by ID:', routine.data?.id);
+        
+        // If not found by ID, check by workout structure fingerprint
+        if (!isSamplePlan) {
+          // Check for Foundation Builder fingerprint (this specific routine):
+          // - 3 days per week
+          // - 2 blocks 
+          // - Full Body A/B/C structure
+          if (routine.data?.days_per_week === 3 && 
+              routine.data?.blocks?.length === 2 &&
+              routine.data?.blocks?.[0]?.days?.[0]?.day_name === "Full Body A" &&
+              routine.data?.blocks?.[0]?.days?.[1]?.day_name === "Full Body B" &&
+              routine.data?.blocks?.[0]?.days?.[2]?.day_name === "Full Body C") {
+            isSamplePlan = true;
+          }
+          
+          // Check for original Quick Start sample plan fingerprint:
+          // - 3 days per week, 3 blocks, Push/Pull/Legs
+          else if (routine.data?.days_per_week === 3 && 
+                   routine.data?.blocks?.length === 3 &&
+                   routine.data?.blocks?.[0]?.days?.[0]?.day_name === "Push Day" &&
+                   routine.data?.blocks?.[0]?.days?.[1]?.day_name === "Pull Day" &&
+                   routine.data?.blocks?.[0]?.days?.[2]?.day_name === "Leg Day") {
+            isSamplePlan = true;
+          }
+          
+          // Check for Muscle Builder Pro fingerprint:
+          // - 4-6 days per week, many blocks, specific structure
+          else if (routine.data?.blocks?.length >= 10 && 
+                   routine.data?.days_per_week >= 4) {
+            isSamplePlan = true;
+          }
+          
+          // Check for Glute & Tone fingerprint:
+          // - 4 days per week, Lower/Upper pattern
+          else if (routine.data?.days_per_week === 4 &&
+                   routine.data?.blocks?.[0]?.days?.[0]?.day_name === "Lower Body - Glute Focus") {
+            isSamplePlan = true;
+          }
+        }
         }
       }
-      
-      console.log('🔍 Export Debug - isSamplePlan:', isSamplePlan, 'routine.data._metadata:', routine.data?._metadata);
-      console.log('🔍 Export Debug - routine.data already has exercisePreferences?:', !!routine.data?._metadata?.exercisePreferences);
       
       // Simplified metadata with unified mesocycle structure
       const metadata = {
@@ -508,9 +542,6 @@ export default function HomeScreen({ route }: any) {
       exportData.routine_name = routine.name;
       
       // NEW UNIFIED EXPORT: No complex logic, just export everything cleanly
-      console.log(`📤 Export: _customMesocycles in export data:`, exportData._customMesocycles ? `${exportData._customMesocycles.length} custom mesocycles` : 'NOT FOUND');
-      console.log('🔍 Export Debug - Final exportData._metadata.exercisePreferences:', exportData._metadata?.exercisePreferences);
-      console.log('🔍 Export Debug - Final exportData._metadata.isSamplePlan:', exportData._metadata?.isSamplePlan);
       
       const jsonString = JSON.stringify(exportData, null, 2);
       
@@ -2598,7 +2629,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-  deleteCancelButton: {
+  actionCancelButton: {
     width: '100%',
     backgroundColor: '#27272a',
     borderRadius: 16,
