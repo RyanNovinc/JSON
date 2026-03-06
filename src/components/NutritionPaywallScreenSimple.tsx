@@ -268,12 +268,12 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
                 <Text style={[styles.comparisonHeaderText, { color: TEXT_SECONDARY }]}>Dietitian</Text>
               </View>
               {[
-                { feature: 'Personalized macros', us: true, them: true },
-                { feature: 'Unlimited meal plans', us: true, them: false },
-                { feature: 'Available 24/7', us: true, them: false },
-                { feature: 'Ongoing plan adjustments', us: true, them: false },
-                { feature: 'No appointments needed', us: true, them: false },
-                { feature: 'No subscription fees', us: true, them: false },
+                { feature: 'Expert-level personalization', us: true, them: true },
+                { feature: 'Instant access (no waiting)', us: true, them: false },
+                { feature: 'Unlimited plan adjustments', us: true, them: false },
+                { feature: 'Meal prep guidance included', us: true, them: false },
+                { feature: 'Grocery lists with pricing', us: true, them: false },
+                { feature: 'No ongoing fees', us: true, them: false },
                 { feature: 'Typical cost', us: '$9.99 once', them: '$150–300/session' },
               ].map((row, index) => (
                 <View key={index} style={styles.comparisonRow}>
@@ -283,9 +283,9 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
                   </Text>
                   <Text style={[
                     styles.comparisonValue,
-                    { color: row.them === false ? '#FF5A5A' : TEXT_DIM }
+                    { color: row.them === false ? '#FF5A5A' : row.them === true ? CYAN : TEXT_DIM }
                   ]}>
-                    {row.them === false ? '✗' : row.them}
+                    {row.them === false ? '✗' : row.them === true ? '✓' : row.them}
                   </Text>
                 </View>
               ))}
@@ -297,8 +297,11 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
         <View style={styles.priceSection}>
           <Text style={styles.priceStrike}>$150–300/session (dietitians)</Text>
           <View style={styles.priceContainer}>
-            <Text style={styles.priceMain}>$9.99</Text>
-            <Text style={styles.priceCurrency}>USD</Text>
+            <View style={styles.priceMainContainer}>
+              <Text style={styles.priceMain}>$9.99</Text>
+              <Text style={styles.priceCurrency}>USD</Text>
+            </View>
+            <Text style={styles.priceOnce}>once</Text>
           </View>
           <Text style={styles.priceSubtext}>One-time purchase • Own forever</Text>
         </View>
@@ -560,9 +563,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   priceContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  priceMainContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    justifyContent: 'center',
     gap: 8,
   },
   priceMain: {
@@ -576,6 +583,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  priceOnce: {
+    color: TEXT_SECONDARY,
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 4,
   },
   priceSubtext: {
     color: TEXT_SECONDARY,

@@ -146,11 +146,7 @@ export default function WorkoutDashboardScreen() {
         {/* Completion Status Indicator */}
         <View style={styles.statusContainer}>
           {isManagementScreen ? (
-            <Ionicons 
-              name="chevron-forward" 
-              size={24} 
-              color="#71717a"
-            />
+            <View />
           ) : isCompleted ? (
             <Ionicons 
               name="checkmark-circle" 

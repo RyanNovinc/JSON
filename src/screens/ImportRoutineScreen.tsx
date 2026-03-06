@@ -1777,7 +1777,35 @@ export default function ImportRoutineScreen() {
     const primaryLabel = primaryLabelMap[data.primaryGoal || ''] || 'Training';
     lines.push(`- ${primaryLabel} days: ${data.gymTrainingDays || 'Not specified'}`);
     
-    if (data.otherTrainingDays && data.otherTrainingDays > 0) {
+    // Secondary goal integration details
+    if (data.secondaryGoals && data.secondaryGoals.length > 0 && data.integrationMethods) {
+      const integratedGoals = [];
+      const dedicatedGoals = [];
+      
+      data.secondaryGoals.forEach(goal => {
+        const goalLabel = {
+          'include_cardio': 'cardiovascular training',
+          'maintain_flexibility': 'flexibility',
+          'athletic_performance': 'athletic performance',
+          'injury_prevention': 'injury prevention',
+          'fun_social': 'fun & social'
+        }[goal] || goal;
+        
+        if (data.integrationMethods[goal] === 'integrated') {
+          integratedGoals.push(goalLabel);
+        } else if (data.integrationMethods[goal] === 'dedicated') {
+          dedicatedGoals.push(goalLabel);
+        }
+      });
+      
+      if (integratedGoals.length > 0) {
+        lines.push(`- Integrated focus areas: ${integratedGoals.join(', ')}`);
+      }
+      if (dedicatedGoals.length > 0) {
+        lines.push(`- Dedicated focus days: ${dedicatedGoals.join(', ')} (${data.otherTrainingDays || dedicatedGoals.length} ${(data.otherTrainingDays || dedicatedGoals.length) === 1 ? 'day' : 'days'})`);
+      }
+    } else if (data.otherTrainingDays && data.otherTrainingDays > 0) {
+      // Fallback for legacy data without integration methods
       const secondaryLabels = [];
       if (data.secondaryGoals) {
         data.secondaryGoals.forEach(goal => {

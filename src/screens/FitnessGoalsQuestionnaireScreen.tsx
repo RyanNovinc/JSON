@@ -256,6 +256,26 @@ export default function FitnessGoalsQuestionnaireScreen() {
       customTrainingStyle, totalTrainingDays, customFrequency, gymTrainingDays, 
       otherTrainingDays, customGoals, trainingExperience, trainingApproach, programDuration, customDuration]);
 
+  // Calculate otherTrainingDays based on secondary goals with 'dedicated' integration method
+  useEffect(() => {
+    if (secondaryGoals.length > 0 && integrationMethods) {
+      const dedicatedGoalsCount = secondaryGoals.filter(goal => 
+        integrationMethods[goal] === 'dedicated'
+      ).length;
+      
+      // For dedicated secondary goals, estimate 1-2 additional days per goal
+      // For simplicity, use 1 day per dedicated goal (users can adjust if needed)
+      const calculatedOtherDays = dedicatedGoalsCount;
+      
+      if (calculatedOtherDays !== otherTrainingDays) {
+        setOtherTrainingDays(calculatedOtherDays);
+      }
+    } else if (secondaryGoals.length === 0 && otherTrainingDays > 0) {
+      // Reset to 0 if no secondary goals
+      setOtherTrainingDays(0);
+    }
+  }, [secondaryGoals, integrationMethods]);
+
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
     // This way if they accidentally clicked "Retake" they don't lose their progress
@@ -737,7 +757,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
     <ScrollView 
       ref={step2ScrollRef}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 200 }}
+      contentContainerStyle={{ paddingBottom: 400 }}
       keyboardShouldPersistTaps="handled"    >
 
         {/* Priority Muscle Groups */}
@@ -850,9 +870,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
               value={customLimitation}
               onChangeText={setCustomLimitation}
               onFocus={() => {
-                // Scroll to bottom when keyboard appears
+                // Scroll down significantly when keyboard appears
                 setTimeout(() => {
-                  step2ScrollRef.current?.scrollToEnd({ animated: true });
+                  step2ScrollRef.current?.scrollTo({ y: 350, animated: true });
                 }, 100);
               }}            />
           </Animatable.View>
@@ -918,9 +938,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
               value={customTrainingStyle}
               onChangeText={setCustomTrainingStyle}
               onFocus={() => {
-                // Scroll to bottom when keyboard appears
+                // Scroll down significantly when keyboard appears
                 setTimeout(() => {
-                  step2ScrollRef.current?.scrollToEnd({ animated: true });
+                  step2ScrollRef.current?.scrollTo({ y: 350, animated: true });
                 }, 100);
               }}            />
           </Animatable.View>
