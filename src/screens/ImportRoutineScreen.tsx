@@ -2019,79 +2019,118 @@ export default function ImportRoutineScreen() {
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const reviewPrompt = `# Review Training Plan
+                    const reviewPrompt = `# Critical Training Plan Review
 
-Review the training plan above as an experienced coach auditing a program for a client. This is an independent quality gate before generating JSON — verify the plan's logic and completeness.
+You are a skeptical strength coach conducting an independent audit of this training plan. Your job is to find problems and ensure quality. **Be critical and thorough** — many plans have hidden flaws that need fixing.
 
-## Review Checklist
+## Phase 1: Web Search Verification
 
-Work through each check. For each, state PASS or FAIL with a brief note.
+First, verify key claims with current research by searching for:
 
-### 1. Plan Completeness
-Verify the plan addresses the user's profile and goals:
-- All requested equipment constraints are respected
-- Training frequency matches user's availability
-- Exercise selection aligns with user's goals (strength/hypertrophy/etc.)
-- Secondary goals are properly integrated (integrated vs dedicated approach)
-- Movement limitations and injury considerations are addressed
-- Time constraints and session length preferences are respected
-- **FAIL if** the plan ignores key user constraints or doesn't match stated goals
+1. **Volume Standards**: Search "training volume per muscle group hypertrophy 2024" and "weekly sets per muscle research"
+   - Compare the plan's volume targets against current meta-analyses
+   - Flag any muscles with insufficient volume (be strict about minimums)
 
-### 2. Periodization Logic
-Check that the plan's progression and structure make sense:
-- Rep ranges are appropriate for the stated goal (strength vs hypertrophy vs endurance)
-- Block progression shows logical periodization (intensity/volume changes)
-- Exercise selection provides balanced muscle development
-- Training volume is appropriate for user's experience level
-- Deload weeks are included where appropriate for program length
-- **FAIL if** periodization contradicts training science or user's experience level
+2. **Training Frequency**: Search "muscle protein synthesis training frequency optimal"
+   - Verify the frequency (times per week each muscle is trained) matches evidence
+   - Check if rest periods between same-muscle sessions are adequate
 
-### 3. Program Structure
-Verify the overall program design:
-- Training split is logical and balanced (no major muscle groups neglected)
-- Exercise order makes sense (compounds before isolation, opposing muscle balance)
-- Session structure is coherent (warm-up considerations, superset logic)
-- Volume distribution across the week is reasonable
-- Recovery between sessions targeting same muscles is adequate
-- **FAIL if** program structure creates recovery issues or major imbalances
+3. **Periodization Validity**: Search "block periodization hypertrophy effectiveness 2024"
+   - Verify the periodization approach is evidence-based
+   - Check if rep ranges and progression schemes align with current research
 
-### 4. Exercise Selection
-- Exercise choices are appropriate for available equipment
-- Movement patterns are varied and complete (push/pull/squat/hinge balance)
-- Exercise difficulty matches user's experience level
-- Alternatives are provided where equipment may not be available
-- Special considerations (injuries, preferences) are respected
-- **FAIL if** exercises are inappropriate for user's setup or experience
+4. **Session Duration**: Search "workout length muscle building optimal duration"
+   - Verify claimed session durations are realistic and effective
+   - Flag overly long sessions that may impact performance
 
-### 5. Goal Integration
-- Primary goal focus is clearly emphasized in exercise selection and volume
-- Secondary goals are appropriately integrated without compromising primary focus
-- Cardio integration (if requested) is logical and doesn't interfere with strength goals
-- Time constraints are respected in session design
-- **FAIL if** goals are contradictory or poorly integrated
+## Phase 2: Critical Analysis Checklist
 
-### 6. Practical Considerations
-- Session lengths are realistic for the user's time constraints
-- Equipment requirements don't exceed what's available
-- Exercise complexity is appropriate for the training environment
-- Plan accounts for potential equipment conflicts or gym busy times
-- Progression scheme is achievable and measurable
-- **FAIL if** plan is impractical for user's real-world constraints
+After web search verification, work through each check with **high standards**:
 
-## Output
+### 1. User Requirements Verification
+- Equipment constraints: Does EVERY exercise require only available equipment?
+- Training frequency: Exact match to requested days per week?
+- Time constraints: Are session lengths within user's stated limits?
+- Experience level: Is complexity appropriate for user's training background?
+- Goals: Does the plan prioritize the stated primary goal throughout?
+- **FAIL if** ANY user requirement is not perfectly met (no exceptions)
+
+### 2. Volume Analysis (Be Strict)
+- Compare each muscle's weekly volume against research-backed minimums
+- Major muscles (chest, lats, quads, etc.): 12+ sets minimum, 16+ optimal
+- Medium muscles (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
+- **FAIL if** ANY muscle falls below research-backed minimums
+- **FAIL if** "structural constraints" are used to excuse inadequate volume
+
+### 3. Recovery and Fatigue Management
+- Check rest periods between same-muscle training sessions (48-72h minimum)
+- Verify overall weekly volume doesn't exceed recovery capacity
+- Assess session difficulty distribution across the week
+- **FAIL if** recovery between same muscles is inadequate
+- **FAIL if** total weekly stress appears unsustainable
+
+### 4. Exercise Quality and Appropriateness
+- Verify every exercise is appropriate for stated experience level
+- Check movement pattern balance (push/pull ratios, etc.)
+- Assess exercise complexity relative to user's environment
+- **FAIL if** exercises are too advanced or require unavailable equipment
+- **FAIL if** movement patterns are imbalanced or neglect key functions
+
+### 5. Progression and Periodization Logic
+- Verify rep ranges align with stated goals and current research
+- Check if progression scheme is measurable and achievable
+- Assess if periodization phases make scientific sense
+- **FAIL if** progression is unclear or periodization lacks evidence
+- **FAIL if** plan is overly complex for user's experience level
+
+### 6. Practical Implementation Reality Check
+- Are session durations realistic including warm-up, rest, transitions?
+- Is the plan simple enough for consistent execution?
+- Does it account for gym crowding and equipment availability?
+- **FAIL if** plan requires perfect conditions or is overly complicated
+- **FAIL if** estimated session times seem unrealistic
+
+## Critical Red Flags to Watch For
+
+Automatically **FAIL** if you find any of these:
+- Muscle volume below research minimums with weak justifications
+- Overly complex periodization for beginner/intermediate users
+- Unrealistic session time estimates
+- Missing equipment requirements
+- Poor recovery between same-muscle sessions
+- Goal conflicts (e.g., strength + fat loss requiring opposite approaches)
+
+## Output Format
+
+**Web Search Summary:**
+- Key findings from volume research
+- Current training frequency recommendations  
+- Session duration guidelines
+- Any contradictions with the plan
+
+**Critical Review Results:**
+
+For each check, state **PASS** or **FAIL** with specific reasoning:
+
+1. **User Requirements**: [PASS/FAIL] - [specific issues]
+2. **Volume Standards**: [PASS/FAIL] - [which muscles fail minimums]
+3. **Recovery Management**: [PASS/FAIL] - [fatigue concerns]
+4. **Exercise Appropriateness**: [PASS/FAIL] - [complexity/equipment issues]
+5. **Progression Logic**: [PASS/FAIL] - [periodization problems]
+6. **Practical Reality**: [PASS/FAIL] - [implementation concerns]
+
+**Final Decision:**
 
 If ALL checks pass:
-
-> ✅ Plan Reviewed — all checks passed. This plan is ready for JSON generation.
+> ✅ **Plan Approved** — Rigorous review passed. Proceed to **Step 3: Generate Workout**.
 
 If ANY check fails:
-1. List each failure with the check name and what needs to be fixed
-2. Suggest specific improvements to address the issues
-3. Recommend whether the plan should be revised before JSON generation
+> ⚠️ **Plan Needs Revision** — The following issues must be fixed:
+1. [List each failure with specific fix needed]
+2. [Required improvements]
+3. **Recommendation**: Revise plan before JSON generation.
 
----
-
-Once the plan passes review, proceed to **Step 3: Generate Workout** to create the JSON workout files.`;
+**Remember**: Your job is to catch problems, not approve weak plans. Be thorough and demanding.`;
                     await Clipboard.setStringAsync(reviewPrompt);
                     setReviewPromptCopied(true);
                     setTimeout(() => {
