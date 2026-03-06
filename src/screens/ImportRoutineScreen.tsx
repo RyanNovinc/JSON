@@ -2020,127 +2020,117 @@ export default function ImportRoutineScreen() {
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     const reviewPrompt = `# Critical Training Plan Review
+// IMPORTANT: This review checklist must stay synchronized with Step 3 embedded review in workoutPrompt.ts
+// If you update this checklist, update the Step 3 checklist to maintain consistency across the workflow
 
-You are a skeptical strength coach conducting an independent audit of this training plan. Your job is to find problems and ensure quality. **Be critical and thorough** — many plans have hidden flaws that need fixing.
+First, read the workout program you just created so you have the full content in context. Then review it as a skeptical strength coach conducting an independent audit of this training plan. This is an independent quality gate — do not assume your self-check caught everything.
 
-## Phase 1: Web Search Verification
+## CRITICAL INSTRUCTIONS
 
-First, verify key claims with current research by searching for:
+1. **Review the plan** using the checklist below, noting PASS or FAIL for each check.
+2. **If ANY check fails, FIX IT IMMEDIATELY** — do not ask the user for permission to fix. Silently revise the plan to resolve all failures.
+3. **After fixing, re-verify** — run the checklist again on the corrected plan to confirm all checks now pass.
+4. **Present the CORRECTED plan** — output the complete, clean, final version of the workout program with all fixes applied. Do not show the review process, do not show before/after comparisons, do not show your working. Present ONLY the clean corrected plan.
+5. **At the end, provide a brief change log** — a short bullet list of what you changed and why (e.g., "Added 2 sets of lat pulldowns on Day 2 to bring lat volume from 10 to 12 sets weekly").
+6. **Remind the user about JSON conversion** — after presenting the corrected plan, tell the user: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
+7. **USE WEB SEARCH** - If you have web search available, use it during the review to verify current research on volume standards, training frequency, and session duration guidelines.
 
-1. **Volume Standards**: Search "training volume per muscle group hypertrophy 2024" and "weekly sets per muscle research"
-   - Compare the plan's volume targets against current meta-analyses
-   - Flag any muscles with insufficient volume (be strict about minimums)
+## HARD CONSTRAINTS — ZERO TOLERANCE
 
-2. **Training Frequency**: Search "muscle protein synthesis training frequency optimal"
-   - Verify the frequency (times per week each muscle is trained) matches evidence
-   - Check if rest periods between same-muscle sessions are adequate
+These must pass after your fixes. If any of these still fail after revision, you have not finished — go back and fix again.
 
-3. **Periodization Validity**: Search "block periodization hypertrophy effectiveness 2024"
-   - Verify the periodization approach is evidence-based
-   - Check if rep ranges and progression schemes align with current research
+- **User requirements priority** — ALL equipment, frequency, time, and experience constraints must be perfectly met (no exceptions).
+- **Volume minimums** — Major muscles need 12+ sets minimum, medium muscles need 8+ sets minimum based on current research.
+- **Recovery standards** — 48-72h minimum between same-muscle training sessions for optimal protein synthesis.
+- **Practical feasibility** — Session durations must be realistic including warm-up, rest, and transitions.
+- **No draft content** — the output must contain zero working, iteration, or revision commentary.
 
-4. **Session Duration**: Search "workout length muscle building optimal duration"
-   - Verify claimed session durations are realistic and effective
-   - Flag overly long sessions that may impact performance
+## What "Fix" Means for Each Type of Failure
 
-## Phase 2: Critical Analysis Checklist
+- **Volume shortfalls**: Add exercises or sets to meet research minimums. Recalculate and verify totals.
+- **Recovery violations**: Redistribute exercises across days or adjust training split to ensure adequate rest.
+- **Equipment violations**: Replace exercises requiring unavailable equipment with alternatives using only listed equipment.
+- **Time overruns**: Reduce volume, combine exercises, or streamline the program to fit session limits.
+- **Experience mismatches**: Simplify exercise selection or progression schemes to match user's training background.
+- **Draft/working shown**: Remove all iteration, working, and draft content. Present only the final clean version.
 
-After web search verification, work through each check with **high standards**:
+## Review Checklist
+
+Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
 
 ### 1. User Requirements Verification
-- Equipment constraints: Does EVERY exercise require only available equipment?
-- Training frequency: Exact match to requested days per week?
-- Time constraints: Are session lengths within user's stated limits?
-- Experience level: Is complexity appropriate for user's training background?
-- Goals: Does the plan prioritize the stated primary goal throughout?
+- **Equipment constraints**: Does EVERY exercise require only available equipment?
+- **Training frequency**: Exact match to requested days per week?
+- **Time constraints**: Are session lengths within user's stated limits?
+- **Experience level**: Is complexity appropriate for user's training background?
+- **Goals**: Does the plan prioritize the stated primary goal throughout?
 - **FAIL if** ANY user requirement is not perfectly met (no exceptions)
 
-### 2. Volume Analysis (Be Strict)
-- Compare each muscle's weekly volume against research-backed minimums
-- Major muscles (chest, lats, quads, etc.): 12+ sets minimum, 16+ optimal
-- Medium muscles (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
+### 1b. Diff-Based Block Completeness
+For any block described as changes from a prior block (diff format) rather than a full session table:
+- Every diff entry must include: exercise name, set count, rep range
+- It must be unambiguous which exercise is being replaced and what replaces it
+- If a diff says "rotate to fresh variations" without naming them, **FAIL**
+- If a diff is missing set counts for new exercises, **FAIL**
+- If reconstructing the full session from the diff would require guessing any detail, **FAIL**
+
+This check exists because the JSON generator must reconstruct complete exercise lists from diff-based blocks. Ambiguous diffs cause silent errors in JSON output.
+
+### 2. Volume Analysis (Research-Based Standards)
+- **Web search verification**: Use web search to verify current volume research if available
+- **Major muscles** (chest, lats, quads, etc.): 12+ sets minimum, 16+ optimal
+- **Medium muscles** (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
 - **FAIL if** ANY muscle falls below research-backed minimums
 - **FAIL if** "structural constraints" are used to excuse inadequate volume
 
+**Additionally verify:**
+- The program document includes a Muscle Group Coverage Audit section
+- Every muscle group with 0 direct sets has an explicit indirect volume justification
+- **FAIL if** the audit section is missing entirely from the document
+- For every ⚠️ LOW flag in the audit: verify the fix was implemented in the session table. **FAIL if** the audit flags LOW but the session table was not updated
+- For every ⚠️ HIGH flag on a non-priority muscle: verify a reduction was either implemented or explicitly justified as recoverable with specific reasoning (not just "within recoverable range")
+- **FAIL if** any audit flag exists without either a session table fix or an explicit justified exception
+
 ### 3. Recovery and Fatigue Management
-- Check rest periods between same-muscle training sessions (48-72h minimum)
-- Verify overall weekly volume doesn't exceed recovery capacity
-- Assess session difficulty distribution across the week
+- **Same-muscle frequency**: Check 48-72h rest between same-muscle sessions
+- **Weekly volume**: Verify total weekly stress is sustainable for user's experience
+- **Session distribution**: Assess difficulty balance across the week
 - **FAIL if** recovery between same muscles is inadequate
 - **FAIL if** total weekly stress appears unsustainable
 
 ### 4. Exercise Quality and Appropriateness
-- Verify every exercise is appropriate for stated experience level
-- Check movement pattern balance (push/pull ratios, etc.)
-- Assess exercise complexity relative to user's environment
+- **Experience alignment**: Every exercise appropriate for stated training background
+- **Movement balance**: Check push/pull ratios and movement pattern distribution
+- **Practical complexity**: Exercise selection fits user's gym environment
 - **FAIL if** exercises are too advanced or require unavailable equipment
 - **FAIL if** movement patterns are imbalanced or neglect key functions
 
 ### 5. Progression and Periodization Logic
-- Verify rep ranges align with stated goals and current research
-- Check if progression scheme is measurable and achievable
-- Assess if periodization phases make scientific sense
+- **Goal alignment**: Rep ranges align with stated goals and current research
+- **Progression clarity**: Scheme is measurable and achievable
+- **Periodization validity**: Phases make scientific sense and are evidence-based
 - **FAIL if** progression is unclear or periodization lacks evidence
 - **FAIL if** plan is overly complex for user's experience level
 
 ### 6. Practical Implementation Reality Check
-- Are session durations realistic including warm-up, rest, transitions?
-- Is the plan simple enough for consistent execution?
-- Does it account for gym crowding and equipment availability?
+- **Session durations**: Realistic including warm-up, rest, transitions
+- **Execution simplicity**: Plan is practical for consistent implementation
+- **Real-world factors**: Accounts for gym crowding and equipment availability
 - **FAIL if** plan requires perfect conditions or is overly complicated
 - **FAIL if** estimated session times seem unrealistic
 
-## Critical Red Flags to Watch For
-
-Automatically **FAIL** if you find any of these:
-- Muscle volume below research minimums with weak justifications
-- Overly complex periodization for beginner/intermediate users
-- Unrealistic session time estimates
-- Missing equipment requirements
-- Poor recovery between same-muscle sessions
-- Goal conflicts (e.g., strength + fat loss requiring opposite approaches)
-
 ## Output Format
 
-**Web Search Summary:**
-- Key findings from volume research
-- Current training frequency recommendations  
-- Session duration guidelines
-- Any contradictions with the plan
+**If all 6 checks PASS on first review:**
+- State "All checks passed — plan is ready."
+- Present the plan as-is (clean, no changes needed).
+- End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
 
-**Critical Review Results:**
-
-For each check, state **PASS** or **FAIL** with specific reasoning:
-
-1. **User Requirements**: [PASS/FAIL] - [specific issues]
-2. **Volume Standards**: [PASS/FAIL] - [which muscles fail minimums]
-3. **Recovery Management**: [PASS/FAIL] - [fatigue concerns]
-4. **Exercise Appropriateness**: [PASS/FAIL] - [complexity/equipment issues]
-5. **Progression Logic**: [PASS/FAIL] - [periodization problems]
-6. **Practical Reality**: [PASS/FAIL] - [implementation concerns]
-
-**Final Decision:**
-
-If ALL checks pass:
-> ✅ **Plan Approved** — Rigorous review passed. Proceed to **Step 3: Generate Workout**.
-
-If ANY check fails:
-> ⚠️ **Plan Failed Review** — Implementing fixes now:
-
-**IMPORTANT**: Don't just list problems — ACTUALLY FIX THEM. Provide the complete revised plan with all identified issues corrected.
-
-**Required Process:**
-1. **Identify Issues**: List each specific failure (volume shortfalls, recovery problems, etc.)
-2. **Calculate Fixes**: Determine exact changes needed (add X sets to Y exercise on Day Z)
-3. **Implement Changes**: Rewrite the affected sections with corrections applied
-4. **Verify Fixes**: Confirm all issues are resolved and no new problems created
-5. **Present Corrected Plan**: Show the complete updated training plan ready for JSON generation
-
-**Output the full corrected plan**, not just a list of what should be changed. The user should get a revised plan that passes all checks and is ready for Step 3.
-
-> ✅ **Revised Plan Approved** — All issues fixed. Proceed to **Step 3: Generate Workout**.
-
-**Remember**: Your job is to fix problems, not just find them. Deliver a working solution.`;
+**If any checks FAIL:**
+1. Show a brief summary table of PASS/FAIL results (one line per check).
+2. Show a brief change log (bullet list of what you fixed and why).
+3. Present the COMPLETE CORRECTED PLAN — the full workout program document with all fixes applied, formatted cleanly. This must be a complete standalone document, not a diff or partial update.
+4. End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."`;
                     await Clipboard.setStringAsync(reviewPrompt);
                     setReviewPromptCopied(true);
                     setTimeout(() => {

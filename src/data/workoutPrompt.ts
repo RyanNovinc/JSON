@@ -362,9 +362,25 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
 };
 
 export const getAIPrompt = (questionnaireData?: QuestionnaireData) => {
+  // Calculate equipment-specific transition tax
+  const equipment = questionnaireData?.selectedEquipment ?? [];
+  const transitionTax = equipment.includes('commercial_gym') 
+    ? 150  // seconds per exercise
+    : equipment.includes('home_gym') 
+    ? 90 
+    : 60;
+
   return `# Generate Workout Program as JSON
 
-You are given a training plan above. Generate the complete program as JSON files matching the schema below. Build directly to JSON — do not create markdown, documents, or any intermediate format.
+You are given a training plan above that has been reviewed and approved for quality. Generate the complete program as JSON files matching the schema below. Focus on accurate technical implementation rather than plan validation. Build directly to JSON — do not create markdown, documents, or any intermediate format.
+
+## Constraint Reference Block
+
+Before generating, note from the plan:
+- Recommended split and session focus per day
+- Any re-entry protocol requirements
+
+Use these when calculating session durations and validating day structure.
 
 ## Output Instructions
 
@@ -378,7 +394,51 @@ You are given a training plan above. Generate the complete program as JSON files
 Generate one block at a time. After each block:
 1. Provide the download link for that block's JSON file
 2. Output a brief **volume summary** showing total primary-tagged sets per muscle group for that block (training weeks, not deload). This gives the reviewer something to check against.
-3. Say: "Ready to import. Say **next** when you want the next block, or **review** to verify this block first."
+3. Say: "Block 1 JSON ready. Say **next** for Block 2."
+
+**When user says "next" for subsequent blocks:**
+1. Generate the next block directly as JSON format (do not create text version first)
+2. Apply the same JSON schema and structure established above
+3. Write the JSON to a file and provide download link
+4. Output volume summary for the new block
+5. Say: "Block [X] JSON ready. Say **review** to check this block, or **next** for Block [X+1]."
+
+**When user says "review" for any block:**
+1. Read the workout program document from earlier in the conversation
+2. Apply the embedded review checklist below to the specified block  
+3. Generate the corrected JSON version with all fixes applied
+4. Write corrected JSON to file and provide download link
+5. Say: "Block [X] reviewed and updated. Say **next** to continue to Block [X+1]."
+
+### Embedded Review Checklist
+// IMPORTANT: This checklist must stay synchronized with Step 2 review process in ImportRoutineScreen.tsx
+// If you update one checklist, update both to maintain consistency across the workflow
+
+Apply these checks to the block before correcting the JSON:
+
+**Architecture Validation:**
+- [ ] Split structure matches the plan's recommended architecture
+- [ ] Session coherence rules are followed (muscle recovery windows)
+- [ ] Sessions don't exceed calculated duration limits from formula
+
+**Volume Analysis:**
+- [ ] All muscle groups meet minimum weekly set thresholds (12+ major, 8+ medium muscles)
+- [ ] Volume distribution is balanced across training days
+- [ ] The program document includes a Muscle Group Coverage Audit section  
+- [ ] Every muscle group with 0 direct sets has an explicit indirect volume justification
+- [ ] **FAIL if** the audit section is missing entirely from the document
+
+**Programming Quality:**
+- [ ] Exercise selection matches stated goals and experience level
+- [ ] Rep ranges align with block focus (strength/hypertrophy/endurance)
+- [ ] Progression patterns are realistic and appropriate
+- [ ] Rest periods match exercise complexity and training demands
+
+**Implementation Practicality:**
+- [ ] Session complexity is manageable for target audience
+- [ ] Equipment requirements match available resources
+- [ ] Exercise transitions are logical and efficient
+- [ ] Workout flow supports adherence and motivation
 
 Each block should be a complete, standalone JSON file with routine_name, description, days_per_week, and a single block in the blocks array. Keep routine_name and description consistent across all files.
 
@@ -632,7 +692,7 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
 2. **Deload tagging** — if a block has deload weeks, include a \`deload_weeks\` array with the block-relative week numbers (e.g., [5] for a 5-week block with deload on week 5).
 3. **Empty arrays** — if an exercise has no secondary muscles, use \`[]\`. Do not omit the field.
 4. **restQuick** — calculate as ~65% of the \`rest\` value, rounded to a clean number.
-5. **Estimated duration** — use the plan's session estimates. If not provided, calculate using the superset-adjusted formula: \`(straight sets × avg rest) + (straight sets × 45s) + (superset pairs × pair rest × sets per pair) + (superset pairs × 45s × 2 × sets per pair) + 5 min warmup\`.
+5. **Estimated duration** — ALWAYS recalculate using this duration formula instead of trusting plan estimates: \`Straight sets: (sets × 45s) + (sets × rest_seconds) | Superset pairs: (pairs × 90s) + (pairs × rest_seconds) + (pairs × ${transitionTax}s) | Total: exercise_count × ${transitionTax}s + 300s warmup\`. If calculated duration exceeds session target, note the discrepancy but proceed with calculated value.
 6. **Superset rest encoding** — for superset exercises, SS[n]a's \`rest\` field represents the inter-exercise transition rest (60-90s). SS[n]b's \`rest\` field represents the full rest before repeating the pair (compound or isolation default for that exercise type). \`restQuick\` is calculated from each exercise's own \`rest\` value.
 7. **sets vs sets_weekly** — \`sets\` is the default set count for training weeks (used for display). \`sets_weekly\` must be specified for every week in the block: training weeks should match \`sets\`, and deload weeks should show reduced values. Both fields are required for every strength exercise.
 8. **deload_weeks optionality** — omit \`deload_weeks\` entirely for blocks without deloads. Do not include an empty array.
@@ -643,6 +703,14 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
 
 Before presenting each block's download link, silently verify:
 
+**Constraint Validation:**
+- [ ] Session durations match recalculated formula values (not plan estimates)
+- [ ] Split architecture follows plan's recommended structure
+- [ ] Session coherence rules are respected (muscle recovery windows)
+- [ ] Muscle coverage audit exists in source plan before proceeding
+- [ ] Deload patterns match re-entry protocol volume reduction targets
+
+**Schema Compliance:**
 - [ ] Every exercise from the plan appears in the JSON with correct set counts
 - [ ] Exercise names are identical everywhere they appear (across days, notes, superset references)
 - [ ] Superset exercises are adjacent in the array and cross-reference each other in notes

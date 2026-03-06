@@ -11,6 +11,163 @@ export interface ProgramContext {
 }
 
 // ================================
+// CONSTRAINT LAYER FUNCTIONS
+// ================================
+
+function getSplitArchitecture(data: QuestionnaireData): string {
+  const days = data.gymTrainingDays ?? 3;
+  const goal = data.primaryGoal;
+  const exp = data.trainingExperience;
+
+  const splitMap: Record<number, Record<string, string>> = {
+    2: {
+      default: 'Full Body A / Full Body B',
+    },
+    3: {
+      gain_strength: 'Full Body A / Full Body B / Full Body C',
+      default: 'Push / Pull / Legs OR Full Body A / Full Body B / Full Body C',
+    },
+    4: {
+      gain_strength: 'Upper A / Lower A / Upper B / Lower B',
+      default: 'Upper / Lower / Upper / Lower',
+    },
+    5: {
+      gain_strength: 'Upper A / Lower A / Push / Pull / Lower B',
+      default: 'Push / Pull / Legs / Upper / Lower',
+    },
+    6: {
+      default: 'Push / Pull / Legs / Push / Pull / Legs',
+    },
+  };
+
+  // Experience-based adjustments
+  if (days === 5 && exp === 'complete_beginner') {
+    return '**Recommended Split:** Full Body A / Full Body B / Full Body C / Upper / Lower (reduced volume for beginners)';
+  }
+
+  const goalSplits = splitMap[days];
+  const split = goalSplits?.[goal ?? 'default'] ?? goalSplits?.['default'] ?? 'Full Body';
+
+  return `**Recommended Split:** ${split}`;
+}
+
+function getComplementarityRules(data: QuestionnaireData): string {
+  const days = data.gymTrainingDays ?? 3;
+  
+  if (days <= 3) {
+    return `**Session Complementarity:** Full-body split — no recovery conflicts possible. Proceed directly to exercise selection.`;
+  }
+
+  return `**Session Complementarity Pre-Pass (complete before exercise selection):**
+
+Before writing any exercises, generate a Weekly Muscle State Matrix in this format:
+
+Day | Primary Load | Secondary Load | Recovery Check
+----|-------------|----------------|---------------
+[fill for each training day]
+
+**Output this scratchpad inside <scratchpad> tags only. Do not include it in the program document.**
+
+Then validate against these rules:
+- Compounds (Quads, Hamstrings, Glutes, Lats, Upper Back): 72hr minimum between PRIMARY sessions
+- Isolation-dominant groups (Biceps, Triceps, Calves, Rear Delts, Side Delts): 48hr minimum between PRIMARY sessions
+- MAINTENANCE volume permitted within recovery windows
+- MAINTENANCE = isolation exercises only, max 50% of primary day set count
+
+Conflict resolution:
+- Compound group conflict → restructure that day's primary focus
+- Isolation group conflict → downgrade to maintenance volume
+
+The matrix is a scratchpad — do not include it in the final program document.`;
+}
+
+function getTimeFormula(data: QuestionnaireData): string {
+  const equipment = data.selectedEquipment ?? [];
+  
+  const transitionTax = equipment.includes('commercial_gym') 
+    ? 150  // seconds per exercise
+    : equipment.includes('home_gym') 
+    ? 90 
+    : 60;
+
+  return `**Session Duration Formula (mandatory — calculate and enforce):**
+
+Straight sets: (sets × 45s) + (sets × rest_seconds)
+Superset pairs: (pairs × 90s) + (pairs × rest_seconds) + (pairs × ${transitionTax}s setup tax)
+Transition tax: exercise_count × ${transitionTax}s
+Warmup: 300s fixed
+
+If calculated duration exceeds target: remove lowest-priority isolation exercise and recalculate.
+NEVER adjust the formula to match the target.
+ALWAYS adjust exercise selection to match the formula.`;
+}
+
+function getMuscleAudit(data: QuestionnaireData): string {
+  const goal = data.primaryGoal;
+  
+  const auditThreshold = goal === 'gain_strength' 
+    ? 'compound-only groups exempt from isolation audit'
+    : goal === 'burn_fat'
+    ? 'relaxed thresholds apply — see volume rules'
+    : 'full audit applies';
+
+  return `**Muscle Group Coverage Audit (append to program):**
+
+For each muscle group output one of these exact status indicators:
+
+✅ = within target range
+⚠️ LOW = below experience-scaled minimum — MUST fix in session tables before presenting
+⚠️ HIGH = above 20 sets — flag only, no fix required unless priority muscle
+ℹ️ CONSTRAINED = below target but above minimum due to split/equipment/schedule constraints
+
+For CONSTRAINED: specify whether it applies per-block or globally, and explain why.
+For LOW: do not mark as resolved until the session table has been updated to fix it.
+For HIGH: note whether it is a priority muscle. If not, suggest the specific exercise to reduce and implement the reduction in the session table.
+
+If direct sets = 0: justify with specific indirect volume numbers.
+
+Audit threshold: ${auditThreshold}`;
+}
+
+function getReentryProtocol(data: QuestionnaireData): string {
+  const duration = data.programDuration;
+  
+  if (duration === '4_weeks' || duration === '8_weeks') {
+    return ''; // omit entirely
+  }
+
+  const protocols: Record<string, string> = {
+    '12_weeks': `Re-entry points: Week 4, Week 8`,
+    '6_months': `Re-entry at each mesocycle boundary`,
+    '1_year': `Three-scenario re-entry protocol required`,
+  };
+
+  const protocol = protocols[duration ?? '12_weeks'] ?? protocols['12_weeks'];
+
+  return `**Program Interruption Protocol (mandatory):**
+
+Include a Re-entry Guide section in the program document:
+- Missed 1 week: resume current block, reduce load 10%
+- Missed 2–3 weeks: drop back one block, restart week 1 of that block  
+- Missed 4+ weeks: return to program start, treat as new baseline
+
+${protocol}`;
+}
+
+function generateConstraintLayer(data: QuestionnaireData): string {
+  return [
+    '## Program Architecture Constraints',
+    '*(Complete all sections below before exercise selection)*',
+    '',
+    getSplitArchitecture(data),
+    getComplementarityRules(data),
+    getTimeFormula(data),
+    getMuscleAudit(data),
+    getReentryProtocol(data),
+  ].filter(Boolean).join('\n\n');
+}
+
+// ================================
 // STATIC TEXT CONSTANTS
 // ================================
 
@@ -22,27 +179,13 @@ I'm using a fitness app called JSON.fit that supports multiple exercise types (s
 
 ## INSTRUCTIONS
 
-Review my profile and create a complete, structured workout program document. Use a two-phase approach:
-
-**Phase 1: Show Your Reasoning (use "thinking" tags)**
-- Analyze split options and select the best approach for user's goals/schedule
-- Calculate volume targets for each muscle group based on user's experience/approach
-- Work through exercise selection considering equipment and preferences
-- Plan periodization and progression schemes
-- Estimate session durations and verify they fit user constraints
-- Complete the verification steps listed below
-
-**Phase 2: Present Final Program Document**
-- After completing your reasoning, present the complete structured workout program
-- Include all implementation details based on your analysis
-- Do not repeat the reasoning process in the final document
-- Use the PROGRAM DOCUMENT FORMAT provided below
+Review my profile and create a complete, structured workout program document using the PROGRAM DOCUMENT FORMAT provided below.
 
 The user will request changes if they disagree with your choices.
 
 If this conversation contains a completed mesocycle summary and roadmap from a previous phase, use them as context: follow the roadmap's prescribed progression, rotate exercises from the previous phase, and build on the established volume baseline.
 
-During Phase 1 (inside thinking tags), complete these verification steps:
+Before presenting the program, complete these verification steps:
 
 1. **List every exercise per day** with its set count and primary muscle tags.
 2. **Total weekly volume per muscle group** (count only Primary tags).`;
@@ -71,12 +214,12 @@ export const VERIFICATION_STEPS_4_5 = `4. **If any muscle group is below target*
 5. **Check distribution balance** — avoid some muscles maxed out while others sit at the floor of their target range.`;
 
 export const VERIFICATION_STEP_6_WITH_CARDIO = `6. **Estimate session duration** for each day:
-   - **Strength days:** \`(straight sets × avg rest) + (straight sets × 45s) + (superset pairs × pair rest × sets per pair) + (superset pairs × 45s × 2 × sets per pair) + 5 min warmup\`. Count superset pairs as sharing rest periods — don't double-count.
+   - **Strength days:** Use the Session Duration Formula from the Program Architecture Constraints section above — do not recalculate independently.
    - **Cardio days:** Use the prescribed activity duration + 5 min warmup + 5 min cooldown.
    - If the profile specifies a session length, enforce it. If not, use 60-75 minutes as a default and flag any session that exceeds it.`;
 
 export const VERIFICATION_STEP_6_NO_CARDIO = `6. **Estimate session duration** for each day:
-   - **Strength days:** \`(straight sets × avg rest) + (straight sets × 45s) + (superset pairs × pair rest × sets per pair) + (superset pairs × 45s × 2 × sets per pair) + 5 min warmup\`. Count superset pairs as sharing rest periods — don't double-count.
+   - **Strength days:** Use the Session Duration Formula from the Program Architecture Constraints section above — do not recalculate independently.
    - If the profile specifies a session length, enforce it. If not, use 60-75 minutes as a default and flag any session that exceeds it.`;
 
 export const PROGRAM_DOCUMENT_FORMAT = `---
@@ -179,13 +322,15 @@ Create a complete, structured workout program document using this exact format:
 <!-- END PROGRAM DOCUMENT -->
 
 **FORMAT REQUIREMENTS:**
-- Create the program as a structured text document
+- Create the program as a text document (not a formatted document)
+- Use simple text formatting with headers, bullet points, and tables
+- Make it fast to generate and easy to copy/edit
 - **INCLUDE ALL WORKOUT SESSIONS** in the document with complete exercise details
 - **INCLUDE PROGRESSION SCHEDULE** showing week-by-week changes
 - **INCLUDE EXERCISE DATABASE** with alternatives and form guidance  
 - **INCLUDE IMPLEMENTATION GUIDE** with rest periods and protocols
-- Present ONLY the final program document — do not show reasoning, trade-offs, or working
-- Every exercise must have sets, reps, rest periods, muscle tags, and alternatives`;
+- Every exercise must have sets, reps, rest periods, muscle tags, and alternatives
+- Present ONLY the final program document — do not show working, drafts, or iteration`;
 
 export const MUSCLE_TAXONOMY = `---
 
@@ -259,7 +404,7 @@ export const getRule1 = (equipment: string[]): string => {
   }
 };
 
-export const STATIC_RULE_2 = `2. **Stay within session duration** — estimate using the formula in the verification steps (superset-adjusted). If the profile specifies a session length, that is a hard constraint. If it says "Let AI suggest," use 60-75 minutes for hypertrophy/strength, 45-60 minutes for general fitness/fat loss, and note your recommendation.`;
+export const STATIC_RULE_2 = `2. **Stay within session duration** — use the Session Duration Formula from the Program Architecture Constraints section. If the profile specifies a session length, that is a hard constraint. If it says "Let AI suggest," use 60-75 minutes for hypertrophy/strength, 45-60 minutes for general fitness/fat loss, and note your recommendation.`;
 
 // Rule 3 variants by secondary goals
 export const getRule3 = (hasActivityGoals: boolean): string => {
@@ -537,14 +682,23 @@ export const STATIC_STATUS_INDICATORS = `
 
 - ✅ = within target range for the user's approach
 - ⚠️ LOW = below the experience-scaled minimum — **must fix before presenting**
-- ⚠️ HIGH = above 20 sets — diminishing returns unless it's a priority muscle
+- ⚠️ HIGH = above 20 sets for non-priority muscles, or above 22 sets for priority muscles. Diminishing returns for natural lifters
 - ℹ️ CONSTRAINED = above minimum but below target due to split/schedule/equipment. Must explain in Recommendations.
 
 ### Quality Standards
 
 - If any non-exempt muscle is below minimum, **revise the plan before presenting**.
 - If the user's approach targets aren't met and a practical fix exists (add a superset, swap an exercise), **implement it** rather than flagging.
-- After verifying ranges, **check distribution balance** — avoid some muscles maxed out while others sit at the floor.`;
+- After verifying ranges, **check distribution balance** — avoid some muscles maxed out while others sit at the floor.
+
+### HIGH Threshold Handling
+
+When HIGH occurs on a non-priority muscle:
+- Identify the lowest-priority isolation exercise contributing to the excess
+- Reduce it by 1-2 sets in the session table
+- If reduction would drop below target range, leave at target ceiling (16 sets) and note as acceptable overflow
+
+"Recoverable" is not a valid justification for leaving HIGH unfixed. The only valid exception is a priority muscle explicitly named in the user profile.`;
 
 // Quality standards with approach-specific additions
 export const getQualityStandards = (approach: string): string => {
@@ -655,11 +809,9 @@ function calculateMesocycleDefaults(duration: string): {
 }
 
 /**
- * Generate the plan output format with optional mesocycle roadmap section
+ * Generate the plan output format
  */
-function getProgramDocumentFormat(shouldIncludeMesocycleRoadmap: boolean): string {
-  // Always return the complete program document format regardless of mesocycle flag
-  // (mesocycle auto-continuation has been removed for better UX)
+function getProgramDocumentFormat(): string {
   return PROGRAM_DOCUMENT_FORMAT;
 }
 
@@ -712,8 +864,7 @@ export function assemblePlanningPrompt(
   prompt += '\n' + (hasCardio ? VERIFICATION_STEP_6_WITH_CARDIO : VERIFICATION_STEP_6_NO_CARDIO);
   
   // === SECTION 2: Program Document Format ===
-  // Always use complete program document format without mesocycle roadmaps
-  prompt += '\n\n' + getProgramDocumentFormat(false);
+  prompt += '\n\n' + getProgramDocumentFormat();
   
   // === SECTION 3: Profile ===
   prompt += `\n\n---
@@ -721,6 +872,9 @@ export function assemblePlanningPrompt(
 ## MY PROFILE
 
 ${generateProgramSpecs(data)}`;
+
+  // === SECTION 3.5: Constraint Layer ===
+  prompt += '\n\n' + generateConstraintLayer(data);
 
   // Mesocycle auto-continuation logic removed for better UX
   
