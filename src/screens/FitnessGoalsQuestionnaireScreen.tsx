@@ -1282,7 +1282,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
                     </View>
                     <View style={styles.experienceTextContainer}>
                       <Text style={[styles.experienceTitle, isSelected && { color: themeColor }]}>
-                        {approach.title} {approach.subtitle || ''}
+                        {approach.title}{approach.subtitle ? ` ${approach.subtitle}` : ''}
                       </Text>
                       <Text style={[styles.experienceDescription, isSelected && { color: themeColor, opacity: 0.8 }]}>
                         {approach.getSubtitle()}
@@ -1595,7 +1595,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
               </View>
             </Animatable.View>
 
-          )}          {/* Save Button */}
+          )}
+          {/* Save Button */}
           <Animatable.View 
             animation="slideInUp" 
             delay={2000}
