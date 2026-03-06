@@ -1644,7 +1644,6 @@ export default function ImportRoutineScreen() {
         useAISuggestion: equipmentPrefs.useAISuggestion,
         restTimePreference: equipmentPrefs.restTimePreference,
         useAIRestTime: equipmentPrefs.useAIRestTime,
-        hasHeartRateMonitor: equipmentPrefs.hasHeartRateMonitor,
         likedExercises: equipmentPrefs.likedExercises,
         dislikedExercises: equipmentPrefs.dislikedExercises,
         exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
@@ -1783,11 +1782,11 @@ export default function ImportRoutineScreen() {
     lines.push(`- ${primaryLabel} days: ${data.gymTrainingDays || 'Not specified'}`);
     
     // Secondary goal integration details
-    if (data.secondaryGoals && data.secondaryGoals.length > 0 && data.integrationMethods) {
+    if (data.integrationMethods && Object.keys(data.integrationMethods).length > 0) {
       const integratedGoals = [];
       const dedicatedGoals = [];
       
-      data.secondaryGoals.forEach(goal => {
+      Object.keys(data.integrationMethods).forEach(goal => {
         const goalLabel = {
           'include_cardio': 'cardiovascular training',
           'maintain_flexibility': 'flexibility',
@@ -1812,8 +1811,8 @@ export default function ImportRoutineScreen() {
     } else if (data.otherTrainingDays && data.otherTrainingDays > 0) {
       // Fallback for legacy data without integration methods
       const secondaryLabels = [];
-      if (data.secondaryGoals) {
-        data.secondaryGoals.forEach(goal => {
+      if (data.integrationMethods) {
+        Object.keys(data.integrationMethods).forEach(goal => {
           if (goal === 'include_cardio') secondaryLabels.push('cardiovascular training');
           if (goal === 'maintain_flexibility') secondaryLabels.push('flexibility');
           if (goal === 'athletic_performance') secondaryLabels.push('athletic performance');
@@ -1837,7 +1836,7 @@ export default function ImportRoutineScreen() {
     lines.push(`**Program Duration:** ${durationMap[data.programDuration || ''] || 'Not specified'}`);
 
     // Conditional: Cardio activities
-    if (data.secondaryGoals?.includes('include_cardio') && data.cardioPreferences && data.cardioPreferences.length > 0) {
+    if (data.integrationMethods?.hasOwnProperty('include_cardio') && data.cardioPreferences && data.cardioPreferences.length > 0) {
       const activityMap: { [key: string]: string } = {
         'treadmill': 'Treadmill / Indoor Running',
         'stationary_bike': 'Stationary Bike / Cycling', 
@@ -1860,16 +1859,16 @@ export default function ImportRoutineScreen() {
     }
 
     // Conditional: Secondary goal details
-    if (data.athleticPerformanceDetails && data.secondaryGoals?.includes('athletic_performance')) {
+    if (data.athleticPerformanceDetails && data.integrationMethods?.hasOwnProperty('athletic_performance')) {
       lines.push(`**Athletic Performance Focus:** ${data.athleticPerformanceDetails}`);
     }
-    if (data.injuryPreventionDetails && data.secondaryGoals?.includes('injury_prevention')) {
+    if (data.injuryPreventionDetails && data.integrationMethods?.hasOwnProperty('injury_prevention')) {
       lines.push(`**Injury Prevention Focus:** ${data.injuryPreventionDetails}`);
     }
-    if (data.flexibilityDetails && data.secondaryGoals?.includes('maintain_flexibility')) {
+    if (data.flexibilityDetails && data.integrationMethods?.hasOwnProperty('maintain_flexibility')) {
       lines.push(`**Flexibility Focus:** ${data.flexibilityDetails}`);
     }
-    if (data.funSocialDetails && data.secondaryGoals?.includes('fun_social')) {
+    if (data.funSocialDetails && data.integrationMethods?.hasOwnProperty('fun_social')) {
       lines.push(`**Fun & Social Activities:** ${data.funSocialDetails}`);
     }
 
@@ -1896,9 +1895,6 @@ export default function ImportRoutineScreen() {
     const sessionKey = data.useAISuggestion ? 'ai_suggest' : 
                        data.workoutDuration ? data.workoutDuration.toString() : 'custom';
     lines.push(`**Session Length:** ${sessionLengthMap[sessionKey] || 'Not specified'}`);
-
-    // Heart Rate Monitor
-    lines.push(`**Heart Rate Monitor:** ${data.hasHeartRateMonitor ? 'Available' : 'Not available'}`);
 
     // Rest Time Preference
     const restKey = data.useAIRestTime ? 'ai_choose' : data.restTimePreference || 'ai_choose';
