@@ -835,9 +835,9 @@ export function assemblePlanningPrompt(
   const isCustomDuration = duration === 'custom';
   const isLongProgram = ['6_months', '1_year', 'custom'].includes(duration);
   const isShortProgram = ['4_weeks'].includes(duration);
-  const secondaryGoals = data.secondaryGoals || [];
-  const hasCardio = secondaryGoals.includes('include_cardio');
-  const hasActivityGoals = secondaryGoals.some(g => 
+  const integrationMethods = data.integrationMethods || {};
+  const hasCardio = integrationMethods['include_cardio'] !== undefined;
+  const hasActivityGoals = Object.keys(integrationMethods).some(g => 
     ['include_cardio', 'maintain_flexibility', 'fun_social', 'athletic_performance'].includes(g)
   );
   const gymDays = data.gymTrainingDays || 0;

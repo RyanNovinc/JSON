@@ -1608,7 +1608,7 @@ export default function ImportRoutineScreen() {
       const consolidatedData: QuestionnaireData = {
         // From fitnessGoalsData
         primaryGoal: fitnessGoals.primaryGoal,
-        secondaryGoals: fitnessGoals.secondaryGoals,
+        integrationMethods: fitnessGoals.integrationMethods,
         specificSport: fitnessGoals.specificSport,
         athleticPerformanceDetails: fitnessGoals.athleticPerformanceDetails,
         funSocialDetails: fitnessGoals.funSocialDetails,
@@ -1756,8 +1756,8 @@ export default function ImportRoutineScreen() {
     lines.push(`**Primary Goal:** ${goalText}`);
 
     // Secondary Goals
-    if (data.secondaryGoals && data.secondaryGoals.length > 0) {
-      const goalTexts = data.secondaryGoals.map(g => {
+    if (data.integrationMethods && Object.keys(data.integrationMethods).length > 0) {
+      const goalTexts = Object.keys(data.integrationMethods).map(g => {
         if (g === 'custom_secondary') {
           return `Custom Focus — "${data.customGoals || 'No description provided'}"`;
         }

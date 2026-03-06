@@ -9,7 +9,6 @@ export interface QuestionnaireData {
   // Primary Goals
   primaryGoal?: string;
   customPrimaryGoal?: string;
-  secondaryGoals?: string[];
   customSecondaryGoal?: string;
   integrationMethods?: { [goalId: string]: 'integrated' | 'dedicated' };
   specificSport?: string;
@@ -81,8 +80,8 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
     specs += `**Primary Goal:** ${goalMap[data.primaryGoal] || data.primaryGoal}\n`;
   }
 
-  // Secondary Goals
-  if (data.secondaryGoals && data.secondaryGoals.length > 0) {
+  // Secondary Goals - now handled through integrationMethods
+  if (data.integrationMethods) {
     const secondaryMap: { [key: string]: string } = {
       'include_cardio': 'Include Cardiovascular Training',
       'athletic_performance': 'Athletic Performance Enhancement',
@@ -91,30 +90,23 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
       'maintain_flexibility': 'Flexibility & Mobility',
     };
     
-    if (data.integrationMethods) {
-      // New integration-based approach
-      const integratedGoals: string[] = [];
-      const dedicatedGoals: string[] = [];
-      
-      data.secondaryGoals.forEach(goal => {
-        const goalLabel = secondaryMap[goal] || goal;
-        if (data.integrationMethods![goal] === 'integrated') {
-          integratedGoals.push(goalLabel);
-        } else if (data.integrationMethods![goal] === 'dedicated') {
-          dedicatedGoals.push(goalLabel);
-        }
-      });
-      
-      if (integratedGoals.length > 0) {
-        specs += `**Integrated Secondary Goals:** ${integratedGoals.join(', ')} (build these into primary workout sessions)\n`;
+    const integratedGoals: string[] = [];
+    const dedicatedGoals: string[] = [];
+    
+    Object.entries(data.integrationMethods).forEach(([goal, method]) => {
+      const goalLabel = secondaryMap[goal] || goal;
+      if (method === 'integrated') {
+        integratedGoals.push(goalLabel);
+      } else if (method === 'dedicated') {
+        dedicatedGoals.push(goalLabel);
       }
-      if (dedicatedGoals.length > 0) {
-        specs += `**Dedicated Secondary Goals:** ${dedicatedGoals.join(', ')} (separate focused sessions required)\n`;
-      }
-    } else {
-      // Fallback for legacy data
-      const secondaryList = data.secondaryGoals.map(goal => secondaryMap[goal] || goal).join(', ');
-      specs += `**Secondary Goals:** ${secondaryList}\n`;
+    });
+    
+    if (integratedGoals.length > 0) {
+      specs += `**Integrated Secondary Goals:** ${integratedGoals.join(', ')} (build these into primary workout sessions)\n`;
+    }
+    if (dedicatedGoals.length > 0) {
+      specs += `**Dedicated Secondary Goals:** ${dedicatedGoals.join(', ')} (separate focused sessions required)\n`;
     }
   }
 
@@ -149,11 +141,11 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
     }
     
     // Secondary goal integration details
-    if (data.secondaryGoals && data.secondaryGoals.length > 0 && data.integrationMethods) {
+    if (data.integrationMethods) {
       const integratedActivities: string[] = [];
       const dedicatedActivities: string[] = [];
       
-      data.secondaryGoals.forEach(goal => {
+      Object.entries(data.integrationMethods).forEach(([goal, method]) => {
         const activityMap: { [key: string]: string } = {
           'include_cardio': 'cardiovascular training',
           'maintain_flexibility': 'flexibility/mobility work',
@@ -171,9 +163,9 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
         
         const activity = activityMap[goal] || goal;
         
-        if (data.integrationMethods![goal] === 'integrated') {
+        if (method === 'integrated') {
           integratedActivities.push(activity);
-        } else if (data.integrationMethods![goal] === 'dedicated') {
+        } else if (method === 'dedicated') {
           dedicatedActivities.push(activity);
         }
       });
@@ -184,46 +176,6 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
       if (dedicatedActivities.length > 0 && data.otherTrainingDays && data.otherTrainingDays > 0) {
         specs += `- Dedicated focus days: ${dedicatedActivities.join(', ')} (${data.otherTrainingDays} ${data.otherTrainingDays === 1 ? 'day' : 'days'})\n`;
       }
-    } else if (data.otherTrainingDays && data.secondaryGoals && data.secondaryGoals.length > 0) {
-      // Fallback for legacy data without integration methods
-      const secondaryActivities: string[] = [];
-      
-      if (data.secondaryGoals.includes('include_cardio')) {
-        secondaryActivities.push('cardiovascular training');
-      }
-      if (data.secondaryGoals.includes('maintain_flexibility')) {
-        secondaryActivities.push('flexibility/mobility work');
-      }
-      if (data.secondaryGoals.includes('athletic_performance')) {
-        if (data.athleticPerformanceDetails) {
-          secondaryActivities.push(`athletic performance training (${data.athleticPerformanceDetails})`);
-        } else {
-          secondaryActivities.push('athletic performance training');
-        }
-      }
-      if (data.secondaryGoals.includes('injury_prevention')) {
-        if (data.injuryPreventionDetails) {
-          secondaryActivities.push(`injury prevention work (${data.injuryPreventionDetails})`);
-        } else {
-          secondaryActivities.push('injury prevention exercises');
-        }
-      }
-      if (data.secondaryGoals.includes('fun_social')) {
-        if (data.funSocialDetails) {
-          secondaryActivities.push(`recreational activities (${data.funSocialDetails})`);
-        } else {
-          secondaryActivities.push('fun & social activities');
-        }
-      }
-      if (data.secondaryGoals.includes('custom_secondary') && data.customSecondaryGoal) {
-        secondaryActivities.push(data.customSecondaryGoal.toLowerCase());
-      }
-      
-      const activitiesDescription = secondaryActivities.length > 0 
-        ? secondaryActivities.join(', ') 
-        : 'other activities';
-        
-      specs += `- Additional focus days (${activitiesDescription}): ${data.otherTrainingDays}\n`;
     }
     
     if (data.customFrequency) specs += `- Custom frequency notes: ${data.customFrequency}\n`;
@@ -264,7 +216,7 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   }
 
   // Cardio Preferences (only when include_cardio is selected)
-  if (data.secondaryGoals?.includes('include_cardio') && data.cardioPreferences && data.cardioPreferences.length > 0) {
+  if (data.integrationMethods?.['include_cardio'] && data.cardioPreferences && data.cardioPreferences.length > 0) {
     const cardioMap: { [key: string]: string } = {
       'treadmill': 'Treadmill / Indoor Running',
       'stationary_bike': 'Stationary Bike / Cycling',
