@@ -508,7 +508,6 @@ export default function HomeScreen({ route }: any) {
             isSamplePlan = true;
           }
         }
-        }
       }
       
       // Simplified metadata with unified mesocycle structure
