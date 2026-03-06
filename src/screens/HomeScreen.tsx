@@ -546,10 +546,19 @@ export default function HomeScreen({ route }: any) {
       const jsonString = JSON.stringify(exportData, null, 2);
       
       if (action === 'copy') {
+        console.log('📋 Starting clipboard copy...');
         await Clipboard.setStringAsync(jsonString);
+        console.log('📋 Clipboard copy completed');
         setShareModal({ visible: false, routine: null });
+        console.log('📋 Share modal closed');
         setTimeout(() => {
+          console.log('📋 Showing success modal');
           setSuccessModal(true);
+          // Auto-dismiss success modal after 2 seconds
+          setTimeout(() => {
+            console.log('📋 Auto-dismissing success modal');
+            setSuccessModal(false);
+          }, 2000);
         }, 100);
       } else if (action === 'share') {
         await Share.share({
