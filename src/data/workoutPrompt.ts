@@ -11,6 +11,7 @@ export interface QuestionnaireData {
   customPrimaryGoal?: string;
   secondaryGoals?: string[];
   customSecondaryGoal?: string;
+  integrationMethods?: { [goalId: string]: 'integrated' | 'dedicated' };
   specificSport?: string;
   athleticPerformanceDetails?: string;
   funSocialDetails?: string;
@@ -89,8 +90,32 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
       'injury_prevention': 'Injury Prevention',
       'maintain_flexibility': 'Flexibility & Mobility',
     };
-    const secondaryList = data.secondaryGoals.map(goal => secondaryMap[goal] || goal).join(', ');
-    specs += `**Secondary Goals:** ${secondaryList}\n`;
+    
+    if (data.integrationMethods) {
+      // New integration-based approach
+      const integratedGoals: string[] = [];
+      const dedicatedGoals: string[] = [];
+      
+      data.secondaryGoals.forEach(goal => {
+        const goalLabel = secondaryMap[goal] || goal;
+        if (data.integrationMethods![goal] === 'integrated') {
+          integratedGoals.push(goalLabel);
+        } else if (data.integrationMethods![goal] === 'dedicated') {
+          dedicatedGoals.push(goalLabel);
+        }
+      });
+      
+      if (integratedGoals.length > 0) {
+        specs += `**Integrated Secondary Goals:** ${integratedGoals.join(', ')} (build these into primary workout sessions)\n`;
+      }
+      if (dedicatedGoals.length > 0) {
+        specs += `**Dedicated Secondary Goals:** ${dedicatedGoals.join(', ')} (separate focused sessions required)\n`;
+      }
+    } else {
+      // Fallback for legacy data
+      const secondaryList = data.secondaryGoals.map(goal => secondaryMap[goal] || goal).join(', ');
+      specs += `**Secondary Goals:** ${secondaryList}\n`;
+    }
   }
 
   // Specific Details
@@ -123,8 +148,44 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
       specs += `- ${primaryGoalTitle} days: ${data.gymTrainingDays}\n`;
     }
     
-    if (data.otherTrainingDays && data.secondaryGoals && data.secondaryGoals.length > 0) {
-      // Build specific description of what "other activities" includes
+    // Secondary goal integration details
+    if (data.secondaryGoals && data.secondaryGoals.length > 0 && data.integrationMethods) {
+      const integratedActivities: string[] = [];
+      const dedicatedActivities: string[] = [];
+      
+      data.secondaryGoals.forEach(goal => {
+        const activityMap: { [key: string]: string } = {
+          'include_cardio': 'cardiovascular training',
+          'maintain_flexibility': 'flexibility/mobility work',
+          'athletic_performance': data.athleticPerformanceDetails 
+            ? `athletic performance training (${data.athleticPerformanceDetails})` 
+            : 'athletic performance training',
+          'injury_prevention': data.injuryPreventionDetails
+            ? `injury prevention work (${data.injuryPreventionDetails})`
+            : 'injury prevention exercises',
+          'fun_social': data.funSocialDetails
+            ? `recreational activities (${data.funSocialDetails})`
+            : 'fun & social activities',
+          'custom_secondary': data.customSecondaryGoal?.toLowerCase() || 'custom focus'
+        };
+        
+        const activity = activityMap[goal] || goal;
+        
+        if (data.integrationMethods![goal] === 'integrated') {
+          integratedActivities.push(activity);
+        } else if (data.integrationMethods![goal] === 'dedicated') {
+          dedicatedActivities.push(activity);
+        }
+      });
+      
+      if (integratedActivities.length > 0) {
+        specs += `- Integrated focus areas: ${integratedActivities.join(', ')} (build into primary workouts)\n`;
+      }
+      if (dedicatedActivities.length > 0 && data.otherTrainingDays && data.otherTrainingDays > 0) {
+        specs += `- Dedicated focus days: ${dedicatedActivities.join(', ')} (${data.otherTrainingDays} ${data.otherTrainingDays === 1 ? 'day' : 'days'})\n`;
+      }
+    } else if (data.otherTrainingDays && data.secondaryGoals && data.secondaryGoals.length > 0) {
+      // Fallback for legacy data without integration methods
       const secondaryActivities: string[] = [];
       
       if (data.secondaryGoals.includes('include_cardio')) {
