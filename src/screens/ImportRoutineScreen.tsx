@@ -2125,12 +2125,22 @@ If ALL checks pass:
 > ✅ **Plan Approved** — Rigorous review passed. Proceed to **Step 3: Generate Workout**.
 
 If ANY check fails:
-> ⚠️ **Plan Needs Revision** — The following issues must be fixed:
-1. [List each failure with specific fix needed]
-2. [Required improvements]
-3. **Recommendation**: Revise plan before JSON generation.
+> ⚠️ **Plan Failed Review** — Implementing fixes now:
 
-**Remember**: Your job is to catch problems, not approve weak plans. Be thorough and demanding.`;
+**IMPORTANT**: Don't just list problems — ACTUALLY FIX THEM. Provide the complete revised plan with all identified issues corrected.
+
+**Required Process:**
+1. **Identify Issues**: List each specific failure (volume shortfalls, recovery problems, etc.)
+2. **Calculate Fixes**: Determine exact changes needed (add X sets to Y exercise on Day Z)
+3. **Implement Changes**: Rewrite the affected sections with corrections applied
+4. **Verify Fixes**: Confirm all issues are resolved and no new problems created
+5. **Present Corrected Plan**: Show the complete updated training plan ready for JSON generation
+
+**Output the full corrected plan**, not just a list of what should be changed. The user should get a revised plan that passes all checks and is ready for Step 3.
+
+> ✅ **Revised Plan Approved** — All issues fixed. Proceed to **Step 3: Generate Workout**.
+
+**Remember**: Your job is to fix problems, not just find them. Deliver a working solution.`;
                     await Clipboard.setStringAsync(reviewPrompt);
                     setReviewPromptCopied(true);
                     setTimeout(() => {
