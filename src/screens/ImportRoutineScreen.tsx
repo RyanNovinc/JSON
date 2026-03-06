@@ -2011,10 +2011,111 @@ export default function ImportRoutineScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>2</Text>
                   </View>
+                  <Text style={styles.stepCardTitle}>Review & Verify</Text>
+                </View>
+                <Text style={styles.stepCardDescription}>
+                  Have your AI review the training plan for quality
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: themeColor }]}
+                  onPress={async () => {
+                    const reviewPrompt = `# Review Training Plan
+
+Review the training plan above as an experienced coach auditing a program for a client. This is an independent quality gate before generating JSON — verify the plan's logic and completeness.
+
+## Review Checklist
+
+Work through each check. For each, state PASS or FAIL with a brief note.
+
+### 1. Plan Completeness
+Verify the plan addresses the user's profile and goals:
+- All requested equipment constraints are respected
+- Training frequency matches user's availability
+- Exercise selection aligns with user's goals (strength/hypertrophy/etc.)
+- Secondary goals are properly integrated (integrated vs dedicated approach)
+- Movement limitations and injury considerations are addressed
+- Time constraints and session length preferences are respected
+- **FAIL if** the plan ignores key user constraints or doesn't match stated goals
+
+### 2. Periodization Logic
+Check that the plan's progression and structure make sense:
+- Rep ranges are appropriate for the stated goal (strength vs hypertrophy vs endurance)
+- Block progression shows logical periodization (intensity/volume changes)
+- Exercise selection provides balanced muscle development
+- Training volume is appropriate for user's experience level
+- Deload weeks are included where appropriate for program length
+- **FAIL if** periodization contradicts training science or user's experience level
+
+### 3. Program Structure
+Verify the overall program design:
+- Training split is logical and balanced (no major muscle groups neglected)
+- Exercise order makes sense (compounds before isolation, opposing muscle balance)
+- Session structure is coherent (warm-up considerations, superset logic)
+- Volume distribution across the week is reasonable
+- Recovery between sessions targeting same muscles is adequate
+- **FAIL if** program structure creates recovery issues or major imbalances
+
+### 4. Exercise Selection
+- Exercise choices are appropriate for available equipment
+- Movement patterns are varied and complete (push/pull/squat/hinge balance)
+- Exercise difficulty matches user's experience level
+- Alternatives are provided where equipment may not be available
+- Special considerations (injuries, preferences) are respected
+- **FAIL if** exercises are inappropriate for user's setup or experience
+
+### 5. Goal Integration
+- Primary goal focus is clearly emphasized in exercise selection and volume
+- Secondary goals are appropriately integrated without compromising primary focus
+- Cardio integration (if requested) is logical and doesn't interfere with strength goals
+- Time constraints are respected in session design
+- **FAIL if** goals are contradictory or poorly integrated
+
+### 6. Practical Considerations
+- Session lengths are realistic for the user's time constraints
+- Equipment requirements don't exceed what's available
+- Exercise complexity is appropriate for the training environment
+- Plan accounts for potential equipment conflicts or gym busy times
+- Progression scheme is achievable and measurable
+- **FAIL if** plan is impractical for user's real-world constraints
+
+## Output
+
+If ALL checks pass:
+
+> ✅ Plan Reviewed — all checks passed. This plan is ready for JSON generation.
+
+If ANY check fails:
+1. List each failure with the check name and what needs to be fixed
+2. Suggest specific improvements to address the issues
+3. Recommend whether the plan should be revised before JSON generation
+
+---
+
+Once the plan passes review, proceed to generate the JSON workout files using the AI prompt.`;
+                    await Clipboard.setStringAsync(reviewPrompt);
+                    setReviewPromptCopied(true);
+                    setTimeout(() => {
+                      setReviewPromptCopied(false);
+                    }, 2000);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
+                  <Text style={styles.actionButtonText}>
+                    {reviewPromptCopied ? 'Copied!' : 'Copy Review Prompt'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.stepCard}>
+                <View style={styles.stepCardHeader}>
+                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
+                    <Text style={styles.stepBadgeText}>3</Text>
+                  </View>
                   <Text style={styles.stepCardTitle}>Generate Workout</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Send this prompt to convert your plan to a JSON format
+                  Send this prompt to convert your verified plan to JSON format
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -2032,144 +2133,6 @@ export default function ImportRoutineScreen() {
                   <Ionicons name="sparkles" size={18} color="#0a0a0b" />
                   <Text style={styles.actionButtonText}>
                     {aiPromptCopied ? 'Copied!' : 'Copy AI Prompt'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.stepCard}>
-                <View style={styles.stepCardHeader}>
-                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>3</Text>
-                  </View>
-                  <Text style={styles.stepCardTitle}>Review & Verify</Text>
-                </View>
-                <Text style={styles.stepCardDescription}>
-                  Have your AI review each JSON block for quality
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: themeColor }]}
-                  onPress={async () => {
-                    const reviewPrompt = `# Review Block
-
-First, read the JSON file you just created so you have the full content in context. Then review it as an experienced coach auditing a program for a client. This is an independent quality gate — do not assume your self-check caught everything.
-
-## Review Checklist
-
-Work through each check. For each, state PASS or FAIL with a brief note.
-
-### 1. Plan Fidelity
-Compare the JSON against the training plan above:
-- Every exercise listed in the plan for this block appears in the JSON
-- Set counts match the plan
-- Muscle tags (primaryMuscles, secondaryMuscles) match the plan
-- Day structure and exercise order match the plan
-- For diff-based blocks (5+ block programs), verify that all carried-over exercises from the base block are present — not just the swapped ones
-- No exercises were added, removed, or renamed
-- If the plan includes cardio or secondary goal days, the cardio entry matches the plan's Secondary Goal Summary (activities, rotation order, duration)
-- **FAIL if** any exercise is missing, added, or has wrong sets/muscles, or cardio day doesn't match the plan
-
-### 2. Rep Progression Logic
-For each exercise, check reps_weekly across all weeks:
-- Reps change meaningfully across weeks (not "10, 10, 10" every week for every exercise)
-- **Compound exercises should trend flat-to-decreasing** over the block (linear/intensity progression)
-- **Isolation exercises should trend flat-to-increasing** over the block (ascending density)
-- Compound rep ranges match the block's stated focus (e.g., a "Strength: 5-8 reps" block shouldn't have compound exercises at 12-15). Isolation exercises can run 2-4 reps higher than the block's stated range.
-- **FAIL if** more than half the exercises have identical reps every week (flat progression)
-- **FAIL if** compounds trend upward or isolations trend downward (wrong direction)
-- **FAIL if** compound rep ranges don't match the block's focus
-
-### 3. Deload Weeks
-If the block includes a deload week:
-- sets_weekly for the deload week is ~40-50% lower than training weeks
-- Reps in the deload week are 2-3 higher per set than training weeks
-- ALL exercises have reduced volume on the deload week, not just some
-- **FAIL if** deload volume reduction is less than 30% or greater than 60%
-- **FAIL if** any exercise has unchanged volume on the deload week
-
-### 4. Superset Integrity
-- Superset exercises are adjacent in the exercises array
-- Both exercises reference each other by exact name in their notes: "Superset with [name]"
-- The first superset exercise (SS[n]a) has shorter rest (60-90s); the second (SS[n]b) has full rest for its exercise type
-- **FAIL if** superset exercises are separated, cross-references are missing/mismatched, or rest encoding is wrong
-
-### 5. Exercise Name Consistency
-- Each exercise uses the exact same name string everywhere: in the exercise field, in superset notes, and across days if it appears more than once
-- **FAIL if** any name varies (e.g., "Cable Overhead Extension" vs "Overhead Cable Extension")
-
-### 6. Rest Periods
-- Heavy compounds (squat, deadlift, barbell bench, barbell OHP): 150-180s rest
-- Other compounds (rows, lunges, dumbbell presses, pull-ups, dips, leg press): 120-150s rest
-- Isolation exercises: 60-90s rest
-- restQuick ≈ 65% of rest (±5s tolerance)
-- If the plan specifies shorter or minimal rest, verify adjustments are consistent
-- **FAIL if** any heavy compound has rest <150s, any other compound has rest <120s, or any isolation has rest >90s (unless plan specifies non-default rest)
-
-### 7. Muscle Tags
-- All primaryMuscles and secondaryMuscles use exact taxonomy names: Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
-- No exercise has an empty primaryMuscles array
-- Tags follow the compound tagging guide (e.g., rows = Primary Upper Back, Lats | Secondary Biceps, Rear Delts)
-- **FAIL if** any non-taxonomy name appears or primaryMuscles is empty
-
-### 8. Schema Compliance
-- Weekly keys are block-relative (start from "1")
-- deload_weeks array is present and correct if the block has deloads; omitted entirely (not an empty array) if no deloads
-- secondaryMuscles is \`[]\` (not omitted) when empty
-- All required fields are present for each exercise type
-- reps_weekly values are comma-separated per-set targets, not shorthand
-- sets_weekly is present for every week in the block; training weeks match the \`sets\` field; deload weeks show reduced values
-- No warm-up sets included
-- **FAIL if** any schema violation
-
-### 9. Volume Verification
-Cross-reference the volume summary output after the block against the plan's Volume Targets table:
-- Count total primary-tagged sets per muscle group across all days (use training week set counts, not deload)
-- Compare against the volume targets from the plan
-- **FAIL if** any non-exempt muscle group is below its stated minimum
-
-### 10. Alternatives Check
-- Every strength exercise has 2 alternatives (or 1 for bodyweight-only programs)
-- Each alternative includes primaryMuscles and secondaryMuscles (secondaryMuscles can be \`[]\`)
-- Alternatives target the same primary muscles as the main exercise
-- **FAIL if** alternatives are missing, incomplete, or target different primary muscles
-
-### 11. Duration Reasonableness
-Check that estimated_duration values are reasonable:
-- Days with more exercises/sets should have proportionally longer durations
-- No training day should exceed 90 minutes (or 95 for Push Hard programs with heavy compound days) or fall below 30 minutes unless the plan explicitly specifies otherwise
-- Cardio days should roughly match the prescribed activity duration + 10 min for warmup/cooldown
-- **FAIL if** any day's duration seems unreasonable given its exercise count and set total (e.g., 8 exercises at 4 sets each with compound rest shouldn't show 45 minutes)
-
-## Output
-
-If ALL checks pass:
-
-> ✅ Reviewed — all checks passed. [One sentence summary of what was verified.]
-
-Then re-output the JSON file with the download link so the user doesn't need to scroll back to find it.
-
-If ANY check fails:
-1. List each failure with the check name, what's wrong, and what the fix is
-2. Output a corrected JSON file
-3. Say what changed
-
-Then say: "Say **next** to generate the next block. After each block, say **review** to verify it before moving on."
-
-If this is the last block of a mesocycle (not the last mesocycle of the program), also say: "Mesocycle [X] complete. Paste your Planning Prompt in this conversation to plan Mesocycle [X+1]."
-
----
-
-**Remember this review process.** After each future block in this conversation, when the user says "review", run this same checklist. No need to paste these instructions again.`;
-                    await Clipboard.setStringAsync(reviewPrompt);
-                    setReviewPromptCopied(true);
-                    setTimeout(() => {
-                      setReviewPromptCopied(false);
-                    }, 2000);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
-                  <Text style={styles.actionButtonText}>
-                    {reviewPromptCopied ? 'Copied!' : 'Copy Review Prompt'}
                   </Text>
                 </TouchableOpacity>
               </View>
