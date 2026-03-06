@@ -122,6 +122,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [integrationMethods, setIntegrationMethods] = useState<{ [goalId: string]: 'integrated' | 'dedicated' }>({});
 
   // ScrollView refs for auto-scroll to top
   const step0ScrollRef = useRef<ScrollView>(null);
@@ -258,9 +259,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   // Calculate otherTrainingDays based on secondary goals with 'dedicated' integration method
   useEffect(() => {
-    if (secondaryGoals.length > 0 && integrationMethods) {
-      const dedicatedGoalsCount = secondaryGoals.filter(goal => 
-        integrationMethods[goal] === 'dedicated'
+    if (integrationMethods && Object.keys(integrationMethods).length > 0) {
+      const dedicatedGoalsCount = Object.values(integrationMethods).filter(method => 
+        method === 'dedicated'
       ).length;
       
       // For dedicated secondary goals, estimate 1-2 additional days per goal
@@ -270,11 +271,11 @@ export default function FitnessGoalsQuestionnaireScreen() {
       if (calculatedOtherDays !== otherTrainingDays) {
         setOtherTrainingDays(calculatedOtherDays);
       }
-    } else if (secondaryGoals.length === 0 && otherTrainingDays > 0) {
+    } else if ((!integrationMethods || Object.keys(integrationMethods).length === 0) && otherTrainingDays > 0) {
       // Reset to 0 if no secondary goals
       setOtherTrainingDays(0);
     }
-  }, [secondaryGoals, integrationMethods]);
+  }, [integrationMethods, otherTrainingDays]);
 
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
