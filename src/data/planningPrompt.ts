@@ -22,11 +22,27 @@ I'm using a fitness app called JSON.fit that supports multiple exercise types (s
 
 ## INSTRUCTIONS
 
-Review my profile and create a complete, structured workout program document. Work through split selection, volume distribution, and exercise choices, but present only the final program — do not show reasoning, trade-offs, or working. The user will request changes if they disagree.
+Review my profile and create a complete, structured workout program document. Use a two-phase approach:
+
+**Phase 1: Show Your Reasoning (use "thinking" tags)**
+- Analyze split options and select the best approach for user's goals/schedule
+- Calculate volume targets for each muscle group based on user's experience/approach
+- Work through exercise selection considering equipment and preferences
+- Plan periodization and progression schemes
+- Estimate session durations and verify they fit user constraints
+- Complete the verification steps listed below
+
+**Phase 2: Present Final Program Document**
+- After completing your reasoning, present the complete structured workout program
+- Include all implementation details based on your analysis
+- Do not repeat the reasoning process in the final document
+- Use the PROGRAM DOCUMENT FORMAT provided below
+
+The user will request changes if they disagree with your choices.
 
 If this conversation contains a completed mesocycle summary and roadmap from a previous phase, use them as context: follow the roadmap's prescribed progression, rotate exercises from the previous phase, and build on the established volume baseline.
 
-Before presenting the program, complete these verification steps:
+During Phase 1 (inside thinking tags), complete these verification steps:
 
 1. **List every exercise per day** with its set count and primary muscle tags.
 2. **Total weekly volume per muscle group** (count only Primary tags).`;
