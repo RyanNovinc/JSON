@@ -241,6 +241,13 @@ export default function HomeScreen({ route }: any) {
     try {
       // Enhanced export with complete state including manual modifications
       let exportData = { ...routine.data };
+      console.log('🔍 Export Debug - Initial exportData._metadata:', exportData._metadata);
+      
+      // Clean exercisePreferences from sample plans at the source
+      if (routine.data?._metadata?.isSamplePlan && exportData._metadata?.exercisePreferences) {
+        console.log('🧹 Cleaning exercisePreferences from sample plan export data');
+        delete exportData._metadata.exercisePreferences;
+      }
       let programData = null;
       
       // Load program data if available
@@ -456,6 +463,8 @@ export default function HomeScreen({ route }: any) {
       
       // Check if this is a sample plan to exclude exercisePreferences
       const isSamplePlan = routine.data?._metadata?.isSamplePlan || false;
+      console.log('🔍 Export Debug - isSamplePlan:', isSamplePlan, 'routine.data._metadata:', routine.data?._metadata);
+      console.log('🔍 Export Debug - routine.data already has exercisePreferences?:', !!routine.data?._metadata?.exercisePreferences);
       
       // Simplified metadata with unified mesocycle structure
       const metadata = {
@@ -489,6 +498,8 @@ export default function HomeScreen({ route }: any) {
       
       // NEW UNIFIED EXPORT: No complex logic, just export everything cleanly
       console.log(`📤 Export: _customMesocycles in export data:`, exportData._customMesocycles ? `${exportData._customMesocycles.length} custom mesocycles` : 'NOT FOUND');
+      console.log('🔍 Export Debug - Final exportData._metadata.exercisePreferences:', exportData._metadata?.exercisePreferences);
+      console.log('🔍 Export Debug - Final exportData._metadata.isSamplePlan:', exportData._metadata?.isSamplePlan);
       
       const jsonString = JSON.stringify(exportData, null, 2);
       
