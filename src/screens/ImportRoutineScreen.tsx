@@ -1266,7 +1266,10 @@ export default function ImportRoutineScreen() {
       }
       
       // Restore exercise preferences (global, not routine-specific)
-      if (metadata.exercisePreferences && Object.keys(metadata.exercisePreferences).length > 0) {
+      // Skip for sample plans to prevent contaminating user preferences
+      if (metadata.exercisePreferences && 
+          Object.keys(metadata.exercisePreferences).length > 0 &&
+          !metadata.isSamplePlan) {
         try {
           // Load existing preferences
           const existingPreferencesData = await AsyncStorage.getItem('exercise_preferences');
@@ -1282,6 +1285,8 @@ export default function ImportRoutineScreen() {
         } catch (error) {
           console.log('Could not restore exercise preferences:', error);
         }
+      } else if (metadata.isSamplePlan && metadata.exercisePreferences) {
+        console.log('🚫 Skipped applying exercise preferences from sample plan to prevent user preference contamination');
       }
       
       // For complete state imports with multiple mesocycles, create individual mesocycle routines
@@ -2365,6 +2370,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
                 opacity: modalOpacity,
                 borderColor: themeColor,
                 shadowColor: themeColor,
+                maxHeight: showAddMoreMode ? '75%' : '85%',
               }
             ]}
           >
@@ -2815,14 +2821,14 @@ const styles = StyleSheet.create({
   addMoreHeader: {
     alignItems: 'center',
     paddingHorizontal: 28,
-    paddingTop: 32,
-    paddingBottom: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   addMoreTitle: {
     fontSize: 28,
     fontWeight: '800',
     color: '#ffffff',
-    marginBottom: 16,
+    marginBottom: 24,
     letterSpacing: 0.5,
   },
   programPartsBadge: {
@@ -2844,7 +2850,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
-    paddingBottom: 40,
+    paddingBottom: 32,
+    paddingTop: 8,
   },
   modeToggleInModal: {
     width: 44,
@@ -2859,11 +2866,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   addMoreButton: {
     borderRadius: 16,
-    paddingVertical: 32,
+    paddingVertical: 24,
     paddingHorizontal: 48,
     alignItems: 'center',
     width: '100%',
@@ -2896,7 +2903,9 @@ const styles = StyleSheet.create({
     color: '#71717a',
     textAlign: 'center',
     fontStyle: 'italic',
-    marginTop: 8,
+    marginTop: 0,
+    paddingHorizontal: 20,
+    lineHeight: 20,
   },
   instructionsContainer: {
     flex: 1,

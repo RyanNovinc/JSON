@@ -7439,5 +7439,8 @@ export const muscleBuilderProProgram: WorkoutProgram = {
         }
       ]
     }
-  ]
+  ],
+  _metadata: {
+    isSamplePlan: true
+  }
 };

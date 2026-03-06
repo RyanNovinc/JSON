@@ -423,5 +423,8 @@ export const gluteAndToneProgram: WorkoutProgram = {
         }
       ]
     }
-  ]
+  ],
+  _metadata: {
+    isSamplePlan: true
+  }
 };

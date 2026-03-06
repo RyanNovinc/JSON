@@ -600,7 +600,10 @@ export const quickStartProgram: WorkoutProgram = {
         }
       ]
     }
-  ]
+  ],
+  _metadata: {
+    isSamplePlan: true
+  }
 };
 
 // Export all sample workout programs
