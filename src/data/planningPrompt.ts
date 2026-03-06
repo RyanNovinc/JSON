@@ -14,21 +14,19 @@ export interface ProgramContext {
 // STATIC TEXT CONSTANTS
 // ================================
 
-export const INSTRUCTIONS_HEADER = `# Plan a Workout Program
+export const INSTRUCTIONS_HEADER = `# Create a Complete Workout Program
 
-I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help designing a personalized workout program.
+I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help creating a personalized workout program.
 
-**USE WEB SEARCH** - If you have web search available, use it selectively if you think it would help verify current research on volume recommendations, rest periods, exercise effectiveness, or advanced training techniques that might improve this program. Current research can enhance programming decisions when it provides meaningful updates to established principles.
+**USE WEB SEARCH** - If you have web search available, use it selectively to verify current research on volume recommendations, rest periods, exercise effectiveness, or training techniques that might improve this program. Current research can enhance programming decisions when it provides meaningful updates to established principles.
 
 ## INSTRUCTIONS
 
-Review my profile and design a training plan. Show your reasoning — work through split selection, volume distribution, exercise choices, and trade-offs. Make definitive choices and explain your reasoning. The user will request changes if they disagree — do not ask questions or present alternatives to choose from.
+Review my profile and create a complete, structured workout program document. Work through split selection, volume distribution, and exercise choices, but present only the final program — do not show reasoning, trade-offs, or working. The user will request changes if they disagree.
 
 If this conversation contains a completed mesocycle summary and roadmap from a previous phase, use them as context: follow the roadmap's prescribed progression, rotate exercises from the previous phase, and build on the established volume baseline.
 
-Do NOT generate the full program. Only plan.
-
-Before presenting the summary, complete these verification steps:
+Before presenting the program, complete these verification steps:
 
 1. **List every exercise per day** with its set count and primary muscle tags.
 2. **Total weekly volume per muscle group** (count only Primary tags).`;
@@ -65,80 +63,113 @@ export const VERIFICATION_STEP_6_NO_CARDIO = `6. **Estimate session duration** f
    - **Strength days:** \`(straight sets × avg rest) + (straight sets × 45s) + (superset pairs × pair rest × sets per pair) + (superset pairs × 45s × 2 × sets per pair) + 5 min warmup\`. Count superset pairs as sharing rest periods — don't double-count.
    - If the profile specifies a session length, enforce it. If not, use 60-75 minutes as a default and flag any session that exceeds it.`;
 
-export const PLAN_OUTPUT_FORMAT = `---
+export const PROGRAM_DOCUMENT_FORMAT = `---
 
-## PLAN OUTPUT FORMAT
+## PROGRAM DOCUMENT FORMAT
 
-Use this exact structure so the generation prompt can parse it reliably.
+Create a complete, structured workout program document using this exact format:
 
-<!-- BEGIN PLAN — when ready to generate JSON, copy everything from here to END PLAN and paste it above Prompt 2 -->
+<!-- BEGIN PROGRAM DOCUMENT -->
 
-## Your Program Plan
+# [PROGRAM NAME] - Complete Workout Program
 
-**Split:** [split name] — [brief description]
-**Sessions:** [estimated session lengths per day, calculated using the formula above]
-**Blocks:** [block structure, weeks per block, deload timing]
-**Periodization:** [how rep ranges / volume / intensity evolve across blocks over the full program duration]
+**Program Overview:**
+- Duration: [X weeks] 
+- Training Days: [X days per week]
+- Split: [split type and description]
+- Goal: [primary goal focus]
 
-| Day | Session | Focus |
-|-----|---------|-------|
-| 1   | ...     | ...   |
-| ... | ...     | ...   |
+## Daily Workout Sessions
 
-### Volume Targets
+### Block 1: [Block Name] (Weeks 1-[X])
+**Focus:** [rep range and training emphasis, e.g., "Hypertrophy: 8-12 reps"]
 
-| Muscle Group | Sets/Week | Min | Target | Status |
-|---|---|---|---|---|
-| Chest | 16 | 10 | 16-20 | ✅ |
+#### Day 1: [Session Name] (~[X] minutes)
+**Target Muscles:** [primary muscle groups]
 
-(Include all 15 muscle groups. Use status indicators defined in Quality Check.)
+| Exercise | Sets | Reps | Rest | Primary Muscles | Secondary Muscles | Notes |
+|----------|------|------|------|-----------------|-------------------|-------|
+| [Exercise 1] | [X] | [X-X] | [X]s | [muscles] | [muscles] | [form cues or setup] |
+| [Exercise 2] | [X] | [X-X] | [X]s | [muscles] | [muscles] | [form cues or setup] |
 
-### Exercise Selections (Working Sets Only)
+**Alternative Exercises:**
+- [Exercise 1] → [Alternative 1], [Alternative 2]
+- [Exercise 2] → [Alternative 1], [Alternative 2]
 
-For each block, list exercises grouped by training day using this format:
+#### Day 2: [Session Name] (~[X] minutes)
+[Same format as Day 1]
 
-**Block A (Weeks 1-6) — [rep range focus, e.g. "Hypertrophy: 8-12 reps"]**
+[Continue for all training days in the block]
 
-**Day 1 — [Session Name]**
-| # | Exercise | Sets | Primary | Secondary | Notes |
-|---|----------|------|---------|-----------|-------|
-| 1 | Barbell Bench Press | 4 | Chest, Triceps | Front Delts | — |
-| 2 | Incline Dumbbell Press | 3 | Chest, Front Delts | Triceps | — |
-| SS1a | Lateral Raise | 3 | Side Delts | — | Superset with SS1b |
-| SS1b | Face Pull | 3 | Rear Delts | Upper Back | Superset with SS1a |
+### Block 2: [Block Name] (Weeks [X]-[X])
+**Focus:** [rep range and training emphasis]
+[Same format as Block 1, listing all days and exercises]
 
-Superset notation: Use SS[n]a / SS[n]b prefixes. Both exercises in a superset share the same number.
+[Continue for all blocks in the program]
 
-Repeat for every day in the block.
+## Weekly Progression Schedule
 
-**Subsequent blocks:**
-- For programs with **4 or fewer blocks**: list every block in full. Do not write "same as Block A" or "repeat."
-- For programs with **5+ blocks**: list Blocks A and B in full. For subsequent blocks, list only exercises that change from the prior block and note what was swapped. Unchanged exercises can be referenced as "carry over from Block [X]." Always list the full day structure (day names and order) even when referencing carryovers.
+### Block 1 Progression (Weeks 1-[X])
+**Week 1:**
+- All exercises: Start at lower end of rep ranges
 
-Each block header must include its rep range focus. The rep range focus applies primarily to compound exercises — isolation exercises typically run 2-4 reps higher than the stated range (e.g., 10-15 rep isolations in a "6-10 reps" block is good programming).
+**Week 2:**
+- Add 1 rep to all exercises or add weight if available
+
+**Week 3:**
+- Continue progression, aim for upper end of rep ranges
+
+[Continue for all weeks and blocks]
+
+## Exercise Database
+
+### [Exercise Name]
+**Primary Muscles:** [muscles]
+**Secondary Muscles:** [muscles] 
+**Equipment:** [required equipment]
+**Form Cues:** [key technique points]
+**Common Mistakes:** [what to avoid]
+**Alternatives:** [2-3 alternative exercises]
+
+[Include entry for every exercise in the program]
+
+## Implementation Guide
+
+### Rest Periods
+- Heavy Compounds (Squat, Deadlift, Bench): [X] seconds
+- Other Compounds: [X] seconds  
+- Isolation Exercises: [X] seconds
+
+### Deload Protocol
+**When:** Week [X] of each block
+**Method:** Reduce sets by 40% while maintaining rep ranges
+**Purpose:** Recovery and preparation for next block
 
 ### Plateau Management
-[For programs 8 weeks or longer: guidance for when the lifter stalls on a prescribed progression. Since the app doesn't track weight, frame this in terms of rep targets — e.g., "if you can't hit the prescribed reps for 2 consecutive weeks, reduce by 1-2 reps per set and rebuild."]
+**If you stall:** Drop reps by 2 and rebuild progression
+**Exercise Rotation:** Substitute similar movement patterns when needed
 
-### Deload Structure
-[Approach and which weeks are deloads in each block. See Deload Rules below for requirements.]
+### Session Structure
+1. **Warm-up** (5-10 minutes): Dynamic movements and mobility
+2. **Main Work** ([X] minutes): Follow exercise order as written
+3. **Cool-down** (5 minutes): Light stretching and recovery
 
-### Secondary Goal Summary
-[If the profile includes secondary goals with dedicated training days: what activities, how they rotate across weeks, how they progress, and how they fit with the primary training days.]
+## Volume Distribution
 
-### Trade-offs (if any)
-- [1-3 bullets noting meaningful compromises]
+| Muscle Group | Sets/Week | Training Frequency |
+|--------------|-----------|-------------------|
+| [Muscle] | [X] | [X]x per week |
 
-### Recommendation (if applicable)
-If the plan has significant limitations, suggest one clear change. Keep it simple — no jargon. Example: "I'd recommend 5 lifting days + 1 cardio day instead of 4+1. This would solve the volume constraints and keep sessions shorter."
+<!-- END PROGRAM DOCUMENT -->
 
-Each training day has a single primary purpose. Do not suggest combining cardio with lifting sessions.
-
-<!-- END PLAN -->
-
-End with: "Let me know if you want any changes. When you're happy with the plan, you can use it with your JSON import prompt to generate the program files."
-
-The profile represents preferences, not hard constraints. If the user's goals would be significantly better served by a different setup (e.g., more training days, a different split), recommend that clearly. Respect their choices if confirmed, but don't silently accept a suboptimal setup.`;
+**FORMAT REQUIREMENTS:**
+- Create the program as a structured text document
+- **INCLUDE ALL WORKOUT SESSIONS** in the document with complete exercise details
+- **INCLUDE PROGRESSION SCHEDULE** showing week-by-week changes
+- **INCLUDE EXERCISE DATABASE** with alternatives and form guidance  
+- **INCLUDE IMPLEMENTATION GUIDE** with rest periods and protocols
+- Present ONLY the final program document — do not show reasoning, trade-offs, or working
+- Every exercise must have sets, reps, rest periods, muscle tags, and alternatives`;
 
 export const MUSCLE_TAXONOMY = `---
 
@@ -610,51 +641,10 @@ function calculateMesocycleDefaults(duration: string): {
 /**
  * Generate the plan output format with optional mesocycle roadmap section
  */
-function getPlanOutputFormat(shouldIncludeMesocycleRoadmap: boolean): string {
-  const baseFormat = `---
-
-## PLAN OUTPUT FORMAT
-
-Use this exact structure so the generation prompt can parse it reliably.
-
-<!-- BEGIN PLAN — when ready to generate JSON, copy everything from here to END PLAN and paste it above Prompt 2 -->
-
-## Your Program Plan
-
-**Split:** [split name] — [brief description]
-**Sessions:** [estimated session lengths per day, calculated using the formula above]
-**Blocks:** [block structure, weeks per block, deload timing]
-**Periodization:** [how rep ranges / volume / intensity evolve across blocks over the full program duration]
-
-| Day | Session | Focus |
-|-----|---------|-------|
-| 1   | ...     | ...   |
-| ... | ...     | ...   |`;
-
-  const mesocycleSection = shouldIncludeMesocycleRoadmap ? `
-
-### Mesocycle Roadmap
-
-| Mesocycle | Phase | Rep Focus | Emphasis | Weeks | Blocks |
-|---|---|---|---|---|---|
-| 1 | [Phase Name] | [Rep Range] | [Training Emphasis] | [X] | [Y] |
-| ... | ... | ... | ... | ... | ... |` : '';
-
-  const remainingFormat = `
-
-### Volume Targets
-
-| Muscle Group | Sets/Week | Min | Target | Status |
-|---|---|---|---|---|
-| Chest | 16 | 10 | 16-20 | ✅ |
-
-(Include all 15 muscle groups. Use status indicators defined in Quality Check.)
-
-### Exercise Selections (Working Sets Only)
-
-For each block, list exercises grouped by training day using this format:`;
-
-  return baseFormat + mesocycleSection + remainingFormat;
+function getProgramDocumentFormat(shouldIncludeMesocycleRoadmap: boolean): string {
+  // Always return the complete program document format regardless of mesocycle flag
+  // (mesocycle auto-continuation has been removed for better UX)
+  return PROGRAM_DOCUMENT_FORMAT;
 }
 
 // ================================
@@ -705,9 +695,9 @@ export function assemblePlanningPrompt(
   prompt += '\n' + VERIFICATION_STEPS_4_5;
   prompt += '\n' + (hasCardio ? VERIFICATION_STEP_6_WITH_CARDIO : VERIFICATION_STEP_6_NO_CARDIO);
   
-  // === SECTION 2: Plan Output Format ===
-  // Always use simple output format without mesocycle roadmaps
-  prompt += '\n\n' + getPlanOutputFormat(false);
+  // === SECTION 2: Program Document Format ===
+  // Always use complete program document format without mesocycle roadmaps
+  prompt += '\n\n' + getProgramDocumentFormat(false);
   
   // === SECTION 3: Profile ===
   prompt += `\n\n---
