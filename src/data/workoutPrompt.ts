@@ -51,7 +51,6 @@ export interface QuestionnaireData {
   useAISuggestion?: boolean;
   restTimePreference?: string;
   useAIRestTime?: boolean;
-  hasHeartRateMonitor?: boolean;
   
   // Exercise Preferences
   likedExercises?: string[];
@@ -276,9 +275,6 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
     specs += `**Session Length:** Not specified — design session length based on the user's goal, experience level, and number of exercises. For hypertrophy with an advanced lifter, 60-75 minutes is typical.\n`;
   }
   
-  if (data.hasHeartRateMonitor !== undefined) {
-    specs += `**Heart Rate Monitor:** ${data.hasHeartRateMonitor ? 'Available (can use for cardio optimization)' : 'Not available'}\n`;
-  }
   
   // Handle rest time preference (including AI optimization case)
   if (data.restTimePreference) {

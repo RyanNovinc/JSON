@@ -114,7 +114,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const [useAIRestTime, setUseAIRestTime] = useState<boolean>(false);
   const [likedExercises, setLikedExercises] = useState<string>('');
   const [dislikedExercises, setDislikedExercises] = useState<string>('');
-  const [hasHeartRateMonitor, setHasHeartRateMonitor] = useState<boolean>(false);
   const [exerciseNoteDetail, setExerciseNoteDetail] = useState<'detailed' | 'brief' | 'minimal'>('brief');
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
@@ -154,7 +153,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         setShowRestTimeOptions(!(data.useAIRestTime || false));
         setLikedExercises(data.likedExercises || '');
         setDislikedExercises(data.dislikedExercises || '');
-        setHasHeartRateMonitor(data.hasHeartRateMonitor || false);
         setExerciseNoteDetail(data.exerciseNoteDetail || 'brief');
         
         // If questionnaire was completed, show summary directly
@@ -187,7 +185,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         useAIRestTime,
         likedExercises,
         dislikedExercises,
-        hasHeartRateMonitor,
         exerciseNoteDetail,
         currentStep,
         // Note: no completedAt field - this indicates it's in progress
@@ -205,7 +202,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       saveProgress();
     }
   }, [selectedEquipment, specificEquipment, unavailableEquipment, workoutDuration, customDuration, useAISuggestion,
-      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, hasHeartRateMonitor, exerciseNoteDetail]);
+      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, exerciseNoteDetail]);
 
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
@@ -312,7 +309,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         useAIRestTime,
         likedExercises,
         dislikedExercises,
-        hasHeartRateMonitor,
         exerciseNoteDetail,
         completedAt: new Date().toISOString(),
       };
@@ -446,41 +442,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             />
           </Animatable.View>
 
-          {/* Heart Rate Monitor Section */}
-          <Animatable.View
-            animation="fadeInUp"
-            delay={700}
-            style={styles.heartRateSection}
-          >
-            <Text style={[styles.sectionTitle, { color: themeColor, fontSize: 18 }]}>
-              Heart Rate Monitor
-            </Text>
-            <Text style={styles.sectionSubtitle}>
-              Do you have access to a heart rate monitor?
-            </Text>
-            
-            <TouchableOpacity
-              style={[styles.heartRateToggle, hasHeartRateMonitor && { backgroundColor: `${themeColor}10` }]}
-              onPress={() => setHasHeartRateMonitor(!hasHeartRateMonitor)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.heartRateToggleContent}>
-                <View style={[styles.heartRateCheckbox, hasHeartRateMonitor && { backgroundColor: themeColor, borderColor: themeColor }]}>
-                  {hasHeartRateMonitor && (
-                    <Ionicons name="checkmark" size={14} color="#000000" />
-                  )}
-                </View>
-                <View style={styles.heartRateToggleText}>
-                  <Text style={[styles.heartRateToggleTitle, hasHeartRateMonitor && { color: themeColor }]}>
-                    Yes, I have a heart rate monitor
-                  </Text>
-                  <Text style={styles.heartRateToggleSubtitle}>
-                    Includes chest straps, wrist watches, or fitness trackers with HR
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </Animatable.View>
 
         </Animatable.View>
       </ScrollView>
@@ -1114,18 +1075,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               </View>
             )}
 
-            {/* Heart Rate Monitor Row */}
-            <View style={[styles.tronDataRow, { borderBottomColor: `${themeColor}30` }]}>
-              <View style={styles.tronLabelSection}>
-                <View style={[styles.tronLabelIndicator, { backgroundColor: themeColor, shadowColor: themeColor }]} />
-                <Text style={[styles.tronLabel, { color: themeColor }]}>HEART RATE MONITOR</Text>
-              </View>
-              <View style={styles.tronValueSection}>
-                <Text style={styles.tronValue}>
-                  {hasHeartRateMonitor ? '✓ Available for cardio optimization' : '✗ Not available'}
-                </Text>
-              </View>
-            </View>
 
             {/* Exercise Preferences Row */}
             {(likedExercises || dislikedExercises) && (
@@ -2148,48 +2097,6 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // Heart Rate Monitor Styles
-  heartRateSection: {
-    marginTop: 32,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
-  },
-  heartRateToggle: {
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    marginTop: 16,
-  },
-  heartRateToggleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  heartRateCheckbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#3f3f46',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  heartRateToggleText: {
-    flex: 1,
-  },
-  heartRateToggleTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  heartRateToggleSubtitle: {
-    fontSize: 14,
-    color: '#71717a',
-    lineHeight: 18,
   },
   // Exercise Note Detail styles
   optionsList: {
