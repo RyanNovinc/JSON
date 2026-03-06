@@ -23,9 +23,10 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
 import WorkoutCalendar from '../components/WorkoutCalendar';
 import ImportFeedbackModal from '../components/ImportFeedbackModal';
-import OnboardingOverlay from '../components/OnboardingOverlay';
+import OnboardingSlideshow from '../components/OnboardingSlideshow';
 import { useImportFeedback } from '../hooks/useImportFeedback';
 import { useTheme } from '../contexts/ThemeContext';
+import { ENABLE_NUTRITION_PAYWALL } from '../config/revenueCatConfig';
 import { useAppMode } from '../contexts/AppModeContext';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
@@ -112,6 +113,11 @@ export default function HomeScreen({ route }: any) {
   }, []);
 
   const checkOnboarding = async () => {
+    // Reset onboarding in development for easy testing
+    if (__DEV__) {
+      await AsyncStorage.removeItem('onboarding_completed');
+    }
+    
     const isCompleted = await WorkoutStorage.isOnboardingCompleted();
     if (!isCompleted) {
       setShowOnboarding(true);
@@ -448,6 +454,9 @@ export default function HomeScreen({ route }: any) {
       // Sort by mesocycle number
       allMesocycles.sort((a, b) => a.mesocycleNumber - b.mesocycleNumber);
       
+      // Check if this is a sample plan to exclude exercisePreferences
+      const isSamplePlan = routine.data?._metadata?.isSamplePlan || false;
+      
       // Simplified metadata with unified mesocycle structure
       const metadata = {
         exportType: 'unified_mesocycle_structure',
@@ -469,7 +478,10 @@ export default function HomeScreen({ route }: any) {
         exerciseCustomizations: exerciseCustomizations,
         dynamicExercisesData: dynamicExercisesData,
         setsData: setsData,
-        exercisePreferences: exercisePreferences
+        // Only include exercisePreferences for non-sample plans
+        ...(isSamplePlan ? {} : { exercisePreferences: exercisePreferences }),
+        // Preserve isSamplePlan flag if it exists
+        ...(isSamplePlan ? { isSamplePlan: true } : {})
       };
       
       exportData._metadata = metadata;
@@ -568,7 +580,7 @@ export default function HomeScreen({ route }: any) {
     }
   };
 
-  const handleOnboardingDismiss = async () => {
+  const handleOnboardingComplete = async () => {
     setShowOnboarding(false);
     await WorkoutStorage.setOnboardingCompleted();
   };
@@ -581,7 +593,16 @@ export default function HomeScreen({ route }: any) {
   const handleNutritionTransition = () => {
     if (isTransitioning) return;
     
-    // Switch mode and navigate immediately (no animation)
+    // 🚨 MONETIZATION CONTROL: Check if paywall is enabled
+    if (ENABLE_NUTRITION_PAYWALL) {
+      // When paywall is ENABLED: Check if user has purchased
+      // TODO: Add nutrition entitlement check here when paywall is enabled
+      // For now, always show paywall when enabled
+      navigation.navigate('PaymentScreen' as any);
+      return;
+    }
+    
+    // When paywall is DISABLED: Direct access to nutrition (FREE)
     setAppMode('nutrition');
     navigation.navigate('NutritionHome' as any);
   };
@@ -777,6 +798,14 @@ export default function HomeScreen({ route }: any) {
   // Handle nutrition mode navigation
   useEffect(() => {
     if (isNutritionMode) {
+      // 🚨 MONETIZATION CONTROL: Check if paywall is enabled
+      if (ENABLE_NUTRITION_PAYWALL) {
+        // When paywall is ENABLED: Show paywall instead of direct access
+        navigation.navigate('PaymentScreen' as any);
+        return;
+      }
+      
+      // When paywall is DISABLED: Direct access to nutrition (FREE)
       navigation.navigate('NutritionHome' as any);
     }
   }, [isNutritionMode, navigation]);
@@ -1110,7 +1139,7 @@ export default function HomeScreen({ route }: any) {
           style={styles.buttonInner}
           onPress={() => {
             if (showOnboarding) {
-              handleOnboardingDismiss();
+              handleOnboardingComplete();
             }
             navigation.navigate('ImportRoutine' as any);
           }}
@@ -1235,7 +1264,7 @@ export default function HomeScreen({ route }: any) {
             onPress={() => setDeleteModal({ visible: false, routine: null })}
           />
           
-          <View style={styles.actionSheet}>
+          <View style={[styles.actionSheet, { borderColor: themeColor }]}>
             {/* Handle Bar */}
             <View style={styles.handleBar} />
             
@@ -1381,10 +1410,10 @@ export default function HomeScreen({ route }: any) {
       </Modal>
 
 
-      {/* Onboarding Overlay */}
-      <OnboardingOverlay
+      {/* Onboarding Slideshow */}
+      <OnboardingSlideshow
         visible={showOnboarding}
-        onDismiss={handleOnboardingDismiss}
+        onComplete={handleOnboardingComplete}
       />
     </View>
   );
@@ -2470,7 +2499,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 2,
     borderLeftWidth: 2,
     borderRightWidth: 2,
-    borderColor: '#22d3ee',
+    borderColor: '#22d3ee', // Default color, overridden by inline style
   },
   handleBar: {
     width: 40,
