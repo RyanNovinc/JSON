@@ -462,7 +462,18 @@ export default function HomeScreen({ route }: any) {
       allMesocycles.sort((a, b) => a.mesocycleNumber - b.mesocycleNumber);
       
       // Check if this is a sample plan to exclude exercisePreferences
-      const isSamplePlan = routine.data?._metadata?.isSamplePlan || false;
+      // Primary check: explicit isSamplePlan flag
+      let isSamplePlan = routine.data?._metadata?.isSamplePlan || false;
+      
+      // Fallback check: detect sample plans by their IDs (for plans imported before isSamplePlan flag)
+      if (!isSamplePlan) {
+        const knownSamplePlanIds = ['sample_quick_start_ppl', 'sample_muscle_builder_52w', 'sample_glute_tone_12w'];
+        isSamplePlan = knownSamplePlanIds.includes(routine.data?.id);
+        if (isSamplePlan) {
+          console.log('🎯 Detected legacy sample plan by ID:', routine.data?.id);
+        }
+      }
+      
       console.log('🔍 Export Debug - isSamplePlan:', isSamplePlan, 'routine.data._metadata:', routine.data?._metadata);
       console.log('🔍 Export Debug - routine.data already has exercisePreferences?:', !!routine.data?._metadata?.exercisePreferences);
       
