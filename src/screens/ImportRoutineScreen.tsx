@@ -2091,7 +2091,7 @@ If ANY check fails:
 
 ---
 
-Once the plan passes review, proceed to generate the JSON workout files using the AI prompt.`;
+Once the plan passes review, proceed to **Step 3: Generate Workout** to create the JSON workout files.`;
                     await Clipboard.setStringAsync(reviewPrompt);
                     setReviewPromptCopied(true);
                     setTimeout(() => {
