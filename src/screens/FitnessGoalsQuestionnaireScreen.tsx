@@ -128,7 +128,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const step0ScrollRef = useRef<ScrollView>(null);
   const step1ScrollRef = useRef<ScrollView>(null);
   const step2ScrollRef = useRef<ScrollView>(null);
-  const step3ScrollRef = useRef<ScrollView>(null);
 
   // Load saved questionnaire data on component mount
   useEffect(() => {
@@ -138,7 +137,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
   // Scroll to top when step changes
   useEffect(() => {
     const scrollToTop = () => {
-      const refs = [step0ScrollRef, step1ScrollRef, step2ScrollRef, step3ScrollRef];
+      const refs = [step0ScrollRef, step1ScrollRef, step2ScrollRef];
       const currentRef = refs[currentStep];
       if (currentRef?.current) {
         currentRef.current.scrollTo({ y: 0, animated: true });
@@ -756,7 +755,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   const renderTrainingPreferencesStep = () => (
     <ScrollView 
-      ref={step2ScrollRef}
+      ref={step1ScrollRef}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 400 }}
       keyboardShouldPersistTaps="handled"    >
@@ -873,7 +872,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
               onFocus={() => {
                 // Scroll down significantly when keyboard appears
                 setTimeout(() => {
-                  step2ScrollRef.current?.scrollTo({ y: 350, animated: true });
+                  step1ScrollRef.current?.scrollTo({ y: 350, animated: true });
                 }, 100);
               }}            />
           </Animatable.View>
@@ -941,7 +940,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
               onFocus={() => {
                 // Scroll down significantly when keyboard appears
                 setTimeout(() => {
-                  step2ScrollRef.current?.scrollTo({ y: 350, animated: true });
+                  step1ScrollRef.current?.scrollTo({ y: 350, animated: true });
                 }, 100);
               }}            />
           </Animatable.View>
@@ -955,7 +954,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   const renderProgramPreferencesStep = () => (
     <ScrollView 
-      ref={step3ScrollRef}
+      ref={step2ScrollRef}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 350 }}
       keyboardShouldPersistTaps="handled"
