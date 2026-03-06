@@ -1989,7 +1989,7 @@ export default function ImportRoutineScreen() {
                       }
                     })();
                     
-                    const planningPrompt = assemblePlanningPrompt(questionnaireData, mesocycleContext || undefined);
+                    const planningPrompt = assemblePlanningPrompt(questionnaireData);
                     
                     await Clipboard.setStringAsync(planningPrompt);
                     setPlanningPromptCopied(true);

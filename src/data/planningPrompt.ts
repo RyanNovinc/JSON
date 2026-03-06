@@ -662,8 +662,7 @@ For each block, list exercises grouped by training day using this format:`;
 // ================================
 
 export function assemblePlanningPrompt(
-  data: QuestionnaireData, 
-  programContext?: ProgramContext
+  data: QuestionnaireData
 ): string {
   // Derive trigger values
   const goal = data.primaryGoal || 'build_muscle';
@@ -696,10 +695,7 @@ export function assemblePlanningPrompt(
   const beginnerShortProgram = expTier === 'beginner' && ['4_weeks', '8_weeks'].includes(duration);
   const deloadsNeeded = !beginnerShortProgram;
 
-  // Mesocycle context logic
-  const isLongProgramWithContext = isLongProgram && programContext;
-  const mesocycleDefaults = isLongProgram ? calculateMesocycleDefaults(duration) : null;
-  const shouldUseMesocycles = isLongProgram && (programContext || mesocycleDefaults);
+  // Always generate fresh prompts without mesocycle auto-continuation
   
   let prompt = '';
   
@@ -710,8 +706,8 @@ export function assemblePlanningPrompt(
   prompt += '\n' + (hasCardio ? VERIFICATION_STEP_6_WITH_CARDIO : VERIFICATION_STEP_6_NO_CARDIO);
   
   // === SECTION 2: Plan Output Format ===
-  const includeRoadmapInFormat = shouldUseMesocycles && (!programContext || programContext.currentMesocycle === 1);
-  prompt += '\n\n' + getPlanOutputFormat(includeRoadmapInFormat);
+  // Always use simple output format without mesocycle roadmaps
+  prompt += '\n\n' + getPlanOutputFormat(false);
   
   // === SECTION 3: Profile ===
   prompt += `\n\n---
@@ -720,76 +716,7 @@ export function assemblePlanningPrompt(
 
 ${generateProgramSpecs(data)}`;
 
-  // Add mesocycle context if applicable
-  if (shouldUseMesocycles) {
-    const context = programContext || {
-      totalMesocycles: mesocycleDefaults!.totalMesocycles,
-      currentMesocycle: 1,
-      mesocycleWeeks: mesocycleDefaults!.mesocycleWeeks,
-      mesocycleBlocks: mesocycleDefaults!.mesocycleBlocks
-    };
-
-    if (context.currentMesocycle === 1) {
-      // Mesocycle 1 logic
-      const durationMap: Record<string, string> = {
-        '6_months': '6 months',
-        '1_year': '1 year',
-        'custom': 'long-term'
-      };
-      const durationText = durationMap[duration] || duration;
-
-      prompt += `
-
-**Program Structure:** This is a ${durationText} program divided into ${context.totalMesocycles} mesocycles. You are planning Mesocycle 1 of ${context.totalMesocycles} (~${context.mesocycleWeeks} weeks, ${context.mesocycleBlocks} blocks).
-
-Design this mesocycle AND provide a Mesocycle Roadmap describing the training emphasis for all ${context.totalMesocycles} mesocycles. The roadmap should show how rep ranges, volume, intensity, and exercise focus evolve across the full program.`;
-
-    } else {
-      // Mesocycle 2+ logic  
-      const durationMap: Record<string, string> = {
-        '6_months': '6 months',
-        '1_year': '1 year', 
-        'custom': 'long-term'
-      };
-      const durationText = durationMap[duration] || duration;
-      const prevMesocycle = context.currentMesocycle - 1;
-      const prevSummary = context.previousMesocycleSummary;
-
-      prompt += `
-
-**Program Structure:** This is a ${durationText} program divided into ${context.totalMesocycles} mesocycles. You are planning Mesocycle ${context.currentMesocycle} of ${context.totalMesocycles} (~${context.mesocycleWeeks} weeks, ${context.mesocycleBlocks} blocks).`;
-
-      if (prevSummary) {
-        prompt += `
-
-### Previous Mesocycle Summary
-**Mesocycle ${prevMesocycle} — ${prevSummary.phaseName}**
-**Split:** ${prevSummary.splitStructure}
-**Rep Range Focus:** ${prevSummary.repRangeFocus}
-**Volume Achieved:**
-| Muscle Group | Sets/Week |
-|---|---|`;
-        
-        Object.entries(prevSummary.volumePerMuscle).forEach(([muscle, sets]) => {
-          prompt += `
-| ${muscle} | ${sets} |`;
-        });
-
-        prompt += `
-
-**Exercises Used:** ${prevSummary.exercisesUsed.join(', ')}`;
-      }
-
-      if (context.mesocycleRoadmapText) {
-        prompt += `
-
-### Mesocycle Roadmap
-${context.mesocycleRoadmapText}
-
-Design Mesocycle ${context.currentMesocycle} following the roadmap above. Rotate exercises from the previous mesocycle — keep movement patterns but use different variations. Build on the previous phase's emphasis as described in the roadmap.`;
-      }
-    }
-  }
+  // Mesocycle auto-continuation logic removed for better UX
   
   // === SECTION 4: Muscle Taxonomy + Tagging ===
   prompt += '\n\n' + MUSCLE_TAXONOMY;
@@ -815,28 +742,12 @@ Design Mesocycle ${context.currentMesocycle} following the roadmap above. Rotate
   if (hasActivityGoals) prompt += '\n' + RULE_9;
   if (!isShortProgram) prompt += '\n' + RULE_10;
   
-  // Use mesocycle-specific rules if applicable
-  if (shouldUseMesocycles) {
-    const context = programContext || {
-      totalMesocycles: mesocycleDefaults!.totalMesocycles,
-      currentMesocycle: 1,
-      mesocycleBlocks: mesocycleDefaults!.mesocycleBlocks,
-      mesocycleWeeks: mesocycleDefaults!.mesocycleWeeks
-    };
-    
-    prompt += `\n11. **Describe the full mesocycle progression in the Mesocycle Roadmap section.**`;
-    prompt += '\n' + BLOCK_STRUCTURE_HEADER;
-    prompt += '\n' + getRule12(expTier);
-    prompt += `\n13. **Program duration → block count:** Plan ${context.mesocycleBlocks} blocks within this ~${context.N || mesocycleDefaults!.mesocycleWeeks} week mesocycle.`;
-    prompt += `\n14. **Follow the mesocycle progression you define in the Mesocycle Roadmap.**`;
-  } else {
-    // Use original rules for non-mesocycle programs
-    if (isLongProgram) prompt += '\n' + RULE_11;
-    prompt += '\n' + BLOCK_STRUCTURE_HEADER;
-    prompt += '\n' + getRule12(expTier);
-    prompt += '\n' + getRule13(duration);
-    if (isLongProgram) prompt += '\n' + RULE_14;
-  }
+  // Use simple rules without mesocycle auto-continuation
+  if (isLongProgram) prompt += '\n' + RULE_11;
+  prompt += '\n' + BLOCK_STRUCTURE_HEADER;
+  prompt += '\n' + getRule12(expTier);
+  prompt += '\n' + getRule13(duration);
+  if (isLongProgram) prompt += '\n' + RULE_14;
   
   prompt += '\n' + RECOVERY_PROGRESSION_HEADER;
   prompt += '\n' + getRule15(expTier, duration);
