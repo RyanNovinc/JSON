@@ -172,6 +172,7 @@ function generateConstraintLayer(data: QuestionnaireData): string {
 // ================================
 
 export const INSTRUCTIONS_HEADER = `# Create a Complete Workout Program
+// PROMPT 1: Planning Prompt - Creates initial workout program plans
 
 I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help creating a personalized workout program.
 
@@ -496,7 +497,16 @@ export const getRule13 = (duration: string): string => {
   }
 };
 
-export const RULE_14 = `14. **Mesocycle structure for programs 6+ months:** Group blocks into mesocycles (e.g., 3 blocks per mesocycle). Each mesocycle shifts emphasis — e.g., Mesocycle 1: Hypertrophy (8-12 reps), Mesocycle 2: Strength-Hypertrophy (6-10 reps), Mesocycle 3: Metabolic/Intensity (10-15 reps + advanced techniques). Describe the full mesocycle plan, then detail exercises for the first mesocycle's blocks.`;
+export const RULE_14 = `14. **Mesocycle structure for programs 13+ weeks:** Any program longer than 12 weeks must be organised into mesocycles. Each mesocycle is typically 12-13 weeks (2-3 blocks). Each mesocycle shifts training emphasis — e.g., Mesocycle 1: Hypertrophy (8-12 reps), Mesocycle 2: Strength-Hypertrophy (6-10 reps), Mesocycle 3: Metabolic/Intensity (10-15 reps + advanced techniques).
+
+**Declare the full mesocycle structure upfront** before detailing any exercises — output a Mesocycle Roadmap table in this format:
+
+| Mesocycle | Phase Name | Rep Focus | Emphasis | Weeks | Blocks |
+|-----------|-----------|-----------|----------|-------|--------|
+| 1 | [name] | [e.g. 8-12] | [e.g. Hypertrophy] | [X] | [X] |
+| 2 | [name] | [e.g. 6-10] | [e.g. Strength-Hypertrophy] | [X] | [X] |
+
+Then detail exercises for Mesocycle 1's blocks only. Prompts 2 and 3 will handle subsequent mesocycles using this roadmap as their reference.`;
 
 export const RECOVERY_PROGRESSION_HEADER = `
 ### Recovery and Progression`;

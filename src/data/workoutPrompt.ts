@@ -319,6 +319,7 @@ export const getAIPrompt = (questionnaireData?: QuestionnaireData) => {
     : 60;
 
   return `# Generate Workout Program as JSON
+// PROMPT 3: JSON Generation Prompt - Converts verified workout plans to JSON format
 
 You are given a training plan above that has been reviewed and approved for quality. Generate the complete program as JSON files matching the schema below. Focus on accurate technical implementation rather than plan validation. Build directly to JSON — do not create markdown, documents, or any intermediate format.
 
@@ -342,21 +343,23 @@ Use these when calculating session durations and validating day structure.
 Generate one block at a time. After each block:
 1. Provide the download link for that block's JSON file
 2. Output a brief **volume summary** showing total primary-tagged sets per muscle group for that block (training weeks, not deload). This gives the reviewer something to check against.
-3. Say: "Block 1 JSON ready. Say **next** for Block 2."
+3. Say: "Block 1 complete. Say 'review' to validate this block before continuing, or 'next' to generate Block 2 directly."
+4. **STOP and wait for user input.** Do not proceed to the next block until the user responds.
 
 **When user says "next" for subsequent blocks:**
 1. Generate the next block directly as JSON format (do not create text version first)
 2. Apply the same JSON schema and structure established above
 3. Write the JSON to a file and provide download link
 4. Output volume summary for the new block
-5. Say: "Block [X] JSON ready. Say **review** to check this block, or **next** for Block [X+1]."
+5. Say: "Block [X] complete. Say 'review' to validate this block before continuing, or 'next' to generate Block [X+1] directly."
+6. **STOP and wait for user input.** Do not proceed to the next block until the user responds.
 
 **When user says "review" for any block:**
 1. Read the workout program document from earlier in the conversation
 2. Apply the embedded review checklist below to the specified block  
 3. Generate the corrected JSON version with all fixes applied
 4. Write corrected JSON to file and provide download link
-5. Say: "Block [X] reviewed and updated. Say **next** to continue to Block [X+1]."
+5. Say: "Block [X] reviewed and updated. Say 'next' to continue to Block [X+1]."
 
 ### Embedded Review Checklist
 // IMPORTANT: This checklist must stay synchronized with Step 2 review process in ImportRoutineScreen.tsx
@@ -411,7 +414,7 @@ The plan is fully self-contained: it lists all exercise pools, block structures,
 
 ## Translation Principles
 
-1. **The plan is authoritative** — use the exercise names, sets, muscle tags, superset pairings, and day structure exactly as specified. Do not add, remove, or rename exercises.
+1. **The plan is authoritative** — use the exercise names, sets, muscle tags, superset pairings, and day structure exactly as specified. Do not add, remove, or rename exercises. If the plan declares a mesocycle structure, append \`- Mesocycle X\` to the routine_name in every JSON file for that mesocycle (e.g., \`"Iron Year - Mesocycle 1"\`). This is required for the app to correctly associate imported blocks with the right mesocycle.
 2. **Treat exercise names as identifiers** — use the exact same string for the same exercise across all blocks, days, notes, and superset references. Never vary naming (e.g., always "Overhead Cable Extension", never "Cable Overhead Extension").
 3. **Design what the plan doesn't specify** — you are responsible for rep progressions, rest periods, alternative exercises, and technique notes. The plan provides structure; you provide programming detail.
 4. **Only program working sets** — do not include warm-up sets. The app tracks working sets only.

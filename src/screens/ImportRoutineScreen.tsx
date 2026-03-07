@@ -2021,6 +2021,7 @@ export default function ImportRoutineScreen() {
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     const reviewPrompt = `# Critical Training Plan Review
+// PROMPT 2: Review Prompt - Reviews and fixes workout plans before JSON conversion
 // IMPORTANT: This review checklist must stay synchronized with Step 3 embedded review in workoutPrompt.ts
 // If you update this checklist, update the Step 3 checklist to maintain consistency across the workflow
 
@@ -2048,7 +2049,7 @@ These must pass after your fixes. If any of these still fail after revision, you
 
 ## What "Fix" Means for Each Type of Failure
 
-- **Volume shortfalls**: Add exercises or sets to meet research minimums. Recalculate and verify totals.
+- **Volume shortfalls**: Attempt a fix first — add sets to an existing exercise, swap a lower-priority isolation, or add a superset. Only after a genuine attempt fails may you accept CONSTRAINED, and you must state the exact structural reason. Show what you tried and why it couldn't work. Recalculate and verify totals.
 - **Recovery violations**: Redistribute exercises across days or adjust training split to ensure adequate rest.
 - **Equipment violations**: Replace exercises requiring unavailable equipment with alternatives using only listed equipment.
 - **Time overruns**: Reduce volume, combine exercises, or streamline the program to fit session limits.
@@ -2083,6 +2084,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
 - **Medium muscles** (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
 - **FAIL if** ANY muscle falls below research-backed minimums
 - **FAIL if** "structural constraints" are used to excuse inadequate volume
+- **Attempt-first rule**: Before accepting any shortfall as CONSTRAINED or exempt, you must attempt a concrete fix: add sets to an existing exercise, swap a lower-priority isolation for one covering the deficient muscle, or add a superset without materially extending session duration. Only accept CONSTRAINED if you can state the exact structural blocker (e.g., "Adding Hamstring sets to any day would exceed the 75-min cap"). A vague "split doesn't allow it" is not acceptable.
 
 **Additionally verify:**
 - The program document includes a Muscle Group Coverage Audit section
