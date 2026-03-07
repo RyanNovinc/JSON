@@ -3748,7 +3748,7 @@ const styles = StyleSheet.create({
     elevation: 8,
     transform: [{ scale: 1.02 }],
   },
-  weekLabel: {
+  weekLabelHeader: {
     fontSize: 14,
     fontWeight: '700',
     color: '#a1a1aa',
@@ -5003,54 +5003,6 @@ const styles = StyleSheet.create({
   },
   tabContent: {
     flex: 1,
-  },
-  
-  // Notes styles
-  notesList: {
-    marginBottom: 20,
-  },
-  noteItem: {
-    backgroundColor: '#27272a',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  noteText: {
-    fontSize: 14,
-    color: '#e4e4e7',
-    flex: 1,
-    lineHeight: 20,
-  },
-  deleteNoteButton: {
-    marginLeft: 8,
-    padding: 2,
-  },
-  addNoteContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-end',
-  },
-  addNoteInput: {
-    flex: 1,
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: '#ffffff',
-    maxHeight: 100,
-  },
-  addNoteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   
   // Rep scheme editing modal styles

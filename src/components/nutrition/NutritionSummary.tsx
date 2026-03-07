@@ -87,7 +87,7 @@ export const NutritionSummary: React.FC<Props> = ({
     console.log('🔥 Slider changed to:', percentage, '%');
     setTargetRatePercentage(percentage);
     // Calculate kg rate from percentage
-    const kgRate = formData.weight ? (formData.weight * percentage) / 100 : percentage;
+    const kgRate = (formData.weight * percentage) / 100;
     setTargetRate(kgRate);
     const newCalories = calculateCaloriesFromSlider(kgRate);
     console.log('🔥 New calories:', newCalories, 'for rate:', kgRate, 'kg (', percentage, '%)');

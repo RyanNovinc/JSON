@@ -1,8 +1,6 @@
-import { WorkoutProgram } from '../types/workout';
-
-export const gluteAndToneProgram: WorkoutProgram = {
+{
   "id": "17728448668640.uf0en2ohf08",
-  "routine_name": "Glute & Tone",
+  "routine_name": "JSON.fit Hypertrophy Program",
   "description": "12-week hypertrophy program prioritising Glutes and Hamstrings. Full body 4x/week split alternating lower-biased and upper-biased sessions. Two blocks of 6 weeks (5 training + 1 deload each).",
   "days_per_week": 4,
   "blocks": [
@@ -2453,5 +2451,31 @@ export const gluteAndToneProgram: WorkoutProgram = {
         }
       ]
     }
-  ]
-};
+  ],
+  "_metadata": {
+    "exportType": "unified_mesocycle_structure",
+    "totalMesocycles": 0,
+    "allMesocycles": [],
+    "exportedAt": "2026-03-07T00:54:35.804Z",
+    "routineId": "1772844871223",
+    "routineName": "JSON.fit Hypertrophy Program",
+    "currentDisplayName": "JSON.fit Hypertrophy Program",
+    "originalDaysPerWeek": 4,
+    "manualBlocks": [],
+    "completionStatus": {},
+    "workoutHistory": [],
+    "activeBlock": null,
+    "weekProgress": null,
+    "exerciseCustomizations": {},
+    "dynamicExercisesData": {},
+    "setsData": {},
+    "exercisePreferences": {
+      "0": {
+        "programId": "52-Week Advanced Hypertrophy Program",
+        "blockName": "Block 1 - Foundation Volume (Accumulation)",
+        "primaryExercise": "Barbell Bench Press",
+        "preferredExercise": "Dumbbell Bench Press"
+      }
+    }
+  }
+}

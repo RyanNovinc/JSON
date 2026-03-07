@@ -1,0 +1,138 @@
+MEAL PLANNING PROMPTS (GOLD STANDARD)
+
+==============================================
+STEP 1 - MEAL PLANNING PROMPT (assembleMealPlanningPrompt)
+==============================================
+
+I'm using a nutrition planning app called JSON.fit and need help creating a personalized meal plan.
+
+**QUICK CREATION INSTRUCTIONS:**
+1. **STANDARD KNOWLEDGE** - Use your existing knowledge base for common foods and recipes
+2. **ESTIMATED PRICING** - Use typical pricing patterns for [STORE] in [COUNTRY]
+3. **USE WEB SEARCH** - If you have web search available, use it to improve the plan — verifying prices, checking product availability, confirming nutritional info, etc. Current, real-world data produces a better plan than estimates from training data.
+
+**CONSTRAINT CONFLICT HANDLING:**
+
+Sometimes the user's preferences will conflict — for example, a very low budget combined with beginner skill level and high calorie targets, or maximum variety with dedicated meal prep. When constraints cannot all be satisfied simultaneously:
+
+1. **PRIORITISE** in this order: food safety > calorie/macro targets > budget > dietary restrictions > skill/time level > variety > micronutrient diversity
+2. **ACKNOWLEDGE** the trade-off in the plan notes — tell the user which constraint you relaxed and why. For example: "Your moderate budget target is difficult to hit at 3000 kcal/day with convenience products. This plan uses some from-scratch cooking (rice cooker instead of microwave pouches) to bring costs closer to your budget. If you prefer fully no-cook meals, expect the weekly cost to be higher."
+3. **NEVER** silently ignore a constraint. If you can't meet it, say so.
+
+**NUTRITION TARGETS:**
+- Daily calories: [USER_CALORIES]
+- Protein: [USER_PROTEIN]g | Carbs: [USER_CARBS]g | Fat: [USER_FAT]g
+- Daily fiber target: [USER_FIBER]g
+- [USER_MEALS] meals per day
+- Plan duration: [USER_DURATION] days
+
+[... continues with detailed user profile data, requirements, constraints, etc ...]
+
+==============================================
+STEP 2 - MEAL PLAN REVIEW PROMPT (getMealPlanReviewPrompt)
+==============================================
+
+# Review and Fix Meal Plan
+
+First, read the meal plan you just created so you have the full content in context. Then review it as an experienced nutritionist and meal planning expert auditing a plan for a client. This is an independent quality gate — do not assume your self-check caught everything.
+
+## CRITICAL INSTRUCTIONS
+
+1. **Review the plan** using the checklist below, noting PASS or FAIL for each check.
+2. **If ANY check fails, FIX IT IMMEDIATELY** — do not ask the user for permission to fix. Silently revise the plan to resolve all failures.
+3. **After fixing, re-verify** — run the checklist again on the corrected plan to confirm all checks now pass.
+4. **Present the CORRECTED plan** — output the complete, clean, final version of the meal plan with all fixes applied. Do not show the review process, do not show before/after comparisons, do not show your working. Present ONLY the clean corrected plan.
+5. **At the end, provide a brief change log** — a short bullet list of what you changed and why (e.g., "Reduced rice from 100g to 80g dry to bring carbs within 10% of target").
+6. **Remind the user about JSON conversion** — after presenting the corrected plan, tell the user: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."
+7. **USE WEB SEARCH** - If you have web search available, use it during the review to verify grocery pricing, confirm product availability, and check nutritional claims against real data.
+
+## HARD CONSTRAINTS — ZERO TOLERANCE
+
+These must pass after your fixes. If any of these still fail after revision, you have not finished — go back and fix again.
+
+- **Protein priority** — aim to keep protein within 10% of [TARGET]g target daily for optimal results.
+- **Weekly average calories** — target within 5% of target (averaged across the full plan).
+- **Weekly average carbs and fat** — aim for within 10% of target (averaged across the full plan).
+- **Fiber priority** — target at least [MINIMUM]g daily for digestive health.
+- **Equipment compatibility** — design recipes using only the user's listed equipment.
+- **No draft content** — the output must contain zero working, iteration, or revision commentary.
+
+## What "Fix" Means for Each Type of Failure
+
+- **Nutrition targets off**: Adjust portion sizes, swap ingredients, or rebalance meals. Recalculate and verify.
+- **Budget exceeded**: Swap premium ingredients for budget alternatives, reduce expensive protein frequency, adjust quantities.
+- **Equipment violation**: Replace recipes requiring unavailable equipment with alternatives using only listed equipment.
+- **Eating window wrong**: Shift meal times to fit the specified window. Recalculate gaps.
+- **Grocery list errors**: Add missing items, correct quantities, fix prices.
+- **Meal prep incomplete**: Add missing steps, equipment, or storage guidelines.
+- **Draft/working shown**: Remove all iteration, working, and draft content. Present only the final clean version.
+- **Internal contradictions**: Resolve all mismatches between overview tables, daily schedules, grocery lists, and recipes.
+
+## Review Checklist
+
+Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
+
+### 1. Nutrition Target Verification
+[Detailed nutrition checking with specific tolerances]
+
+### 2. Budget Compliance
+[Budget verification against user constraints]
+
+### 3. Meal Prep Style Alignment
+[Verify prep style matches user preferences]
+
+### 4. Dietary Restrictions & Preferences
+[Check compliance with restrictions]
+
+### 5. Cooking Feasibility
+[Skill-appropriate recipe complexity checks]
+
+### 6. Location & Ingredient Availability
+[Verify local availability]
+
+### 7. Sleep Optimization Compliance
+[Meal timing checks if applicable]
+
+### 8. Practical Implementation
+[Overall feasibility assessment]
+
+### 9. Nutritional Quality & Balance
+[Nutritional completeness evaluation]
+
+### 10. Grocery List Completeness & Accuracy
+[Complete grocery verification]
+
+### 11. Meal Prep Session Completeness
+[Prep session validation with skill alignment]
+
+### 12. Overall Coherence
+[Final quality assessment]
+
+## Output Format
+
+**If all 12 checks PASS on first review:**
+- State "All checks passed — plan is ready."
+- Present the plan as-is (clean, no changes needed).
+- End with: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."
+
+**If any checks FAIL:**
+1. Show a brief summary table of PASS/FAIL results (one line per check).
+2. Show a brief change log (bullet list of what you fixed and why).
+3. Present the COMPLETE CORRECTED PLAN — the full meal plan document with all fixes applied, formatted cleanly. This must be a complete standalone document, not a diff or partial update.
+4. End with: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."
+
+==============================================
+KEY DIFFERENCES IN MEAL SYSTEM:
+==============================================
+
+1. **STEP 1 CREATES STRUCTURED DOCUMENT**: The meal planning prompt creates a complete meal plan document with specific format sections (daily meals, grocery list, prep session)
+
+2. **STEP 2 READS AND MODIFIES THE DOCUMENT**: The review prompt explicitly instructs the AI to "read the meal plan you just created" and then "present the COMPLETE CORRECTED PLAN — the full meal plan document with all fixes applied"
+
+3. **HARD CONSTRAINTS WITH FIXES**: Clear definitions of what each type of failure means and exactly how to fix it
+
+4. **FORCED REVISION CYCLE**: "If ANY check fails, FIX IT IMMEDIATELY" - no option to just list problems
+
+5. **COMPLETE DOCUMENT OUTPUT**: Always outputs the full corrected document, never just diffs or change lists
+
+6. **STRUCTURED FORMAT**: Both prompts work with a consistent document structure that can be read and modified

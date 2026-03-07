@@ -91,7 +91,6 @@ export interface WorkoutProgram {
       exercises: Array<Exercise>;   // Uses the Exercise union type above
     }>;
   }>;
-  id?: string;
 }
 
 export interface SampleWorkout {

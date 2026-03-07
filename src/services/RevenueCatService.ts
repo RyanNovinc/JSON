@@ -108,6 +108,18 @@ class RevenueCatService {
       await this.refreshCustomerInfo();
       await this.loadOfferings();
       
+      // CRITICAL: Auto-restore purchases on app start to fix entitlement persistence
+      // This fixes the issue where entitlements don't persist across app reloads
+      if (__DEV__) {
+        console.log('[RevenueCat] Auto-restoring purchases for Test Store...');
+        try {
+          await this.restorePurchases();
+          console.log('[RevenueCat] Auto-restore completed successfully');
+        } catch (restoreError) {
+          console.log('[RevenueCat] Auto-restore failed (this is normal if no purchases exist):', restoreError);
+        }
+      }
+      
     } catch (error) {
       console.error('[RevenueCat] Configuration failed:', error);
       
@@ -130,6 +142,10 @@ class RevenueCatService {
   async refreshCustomerInfo(): Promise<void> {
     try {
       if (!this.isConfigured || !Purchases) return;
+      
+      // CRITICAL: Invalidate cache to ensure fresh entitlements data
+      // This fixes entitlement persistence issues across app reloads
+      await Purchases.invalidateCustomerInfoCache();
       
       this.customerInfo = await Purchases.getCustomerInfo();
       this.customerInfoUpdateCallbacks.forEach(callback => callback(this.customerInfo));

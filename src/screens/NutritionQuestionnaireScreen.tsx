@@ -371,7 +371,8 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
     
     const proteinGrams = Math.round((targetCalories * macroRatios.protein / 100) / 4);
     const carbsGrams = Math.round((targetCalories * macroRatios.carbs / 100) / 4);
-    const fatGrams = Math.round((targetCalories * macroRatios.fat / 100) / 9);
+    const remainingCalories = targetCalories - (proteinGrams * 4) - (carbsGrams * 4);
+    const fatGrams = Math.round(remainingCalories / 9);
 
     const results: MacroResults = {
       bmr: Math.round(bmr),
@@ -435,7 +436,8 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
     
     const proteinGrams = Math.round((validCalories * macroRatios.protein / 100) / 4);
     const carbsGrams = Math.round((validCalories * macroRatios.carbs / 100) / 4);
-    const fatGrams = Math.round((validCalories * macroRatios.fat / 100) / 9);
+    const remainingCalories = validCalories - (proteinGrams * 4) - (carbsGrams * 4);
+    const fatGrams = Math.round(remainingCalories / 9);
 
     console.log('Recalculating macros:', {
       validCalories,

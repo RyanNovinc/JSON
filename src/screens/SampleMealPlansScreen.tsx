@@ -192,7 +192,7 @@ export default function SampleMealPlansScreen() {
                     <View style={styles.details}>
                       <Text style={styles.detailText}>Muscle Building & Performance</Text>
                       <Text style={styles.macros}>7 days • 30P/39C/31F</Text>
-                      <Text style={styles.calories}>2,500 calories per day</Text>
+                      <Text style={[styles.calories, { color: themeColor }]}>2,500 calories per day</Text>
                     </View>
                   </View>
 
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
   },
   calories: {
     fontSize: 14,
-    color: '#22d3ee',
+    color: '#22d3ee', // Default color, overridden by inline style
     fontWeight: '600',
     marginTop: 4,
   },

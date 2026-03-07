@@ -1,0 +1,228 @@
+WORKOUT PROMPTS (NEED FIXING)
+
+==============================================
+STEP 1 - WORKOUT PLANNING PROMPT (assemblePlanningPrompt)
+==============================================
+
+# Plan a Workout Program
+
+I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help designing a personalized workout program.
+
+**USE WEB SEARCH** - If you have web search available, use it selectively if you think it would help verify current research on volume recommendations, rest periods, exercise effectiveness, or advanced training techniques that might improve this program. Current research can enhance programming decisions when it provides meaningful updates to established principles.
+
+## INSTRUCTIONS
+
+Review my profile and design a training plan. Show your reasoning — work through split selection, volume distribution, exercise choices, and trade-offs. Make definitive choices and explain your reasoning. The user will request changes if they disagree — do not ask questions or present alternatives to choose from.
+
+Do NOT generate the full program. Only plan.
+
+Before presenting the summary, complete these verification steps:
+
+1. **List every exercise per day** with its set count and primary muscle tags.
+2. **Total weekly volume per muscle group** (count only Primary tags).
+3. **Look up this user's targets** — cross-reference their Training Approach against the Volume Targets table, and their Training Experience against the Experience-Scaled Minimums table. These are the numbers you must hit.
+4. **If any muscle group is below target**, revise exercise selections and recount. Do not present the summary until all targets are met or explicitly flagged as constrained.
+5. **Check distribution balance** — avoid some muscles maxed out while others sit at the floor of their target range.
+6. **Estimate session duration** for each day using the formula provided.
+
+## PLAN OUTPUT FORMAT
+
+Use this exact structure so the generation prompt can parse it reliably.
+
+<!-- BEGIN PLAN — when ready to generate JSON, copy everything from here to END PLAN and paste it above Prompt 2 -->
+
+## Your Program Plan
+
+**Split:** [split name] — [brief description]
+**Sessions:** [estimated session lengths per day, calculated using the formula above]
+**Blocks:** [block structure, weeks per block, deload timing]
+**Periodization:** [how rep ranges / volume / intensity evolve across blocks over the full program duration]
+
+| Day | Session | Focus |
+|-----|---------|-------|
+| 1   | ...     | ...   |
+| ... | ...     | ...   |
+
+### Volume Targets
+
+| Muscle Group | Sets/Week | Min | Target | Status |
+|---|---|---|---|---|
+| Chest | 16 | 10 | 16-20 | ✅ |
+
+(Include all 15 muscle groups. Use status indicators defined in Quality Check.)
+
+### Exercise Selections (Working Sets Only)
+
+For each block, list exercises grouped by training day using this format:
+
+**Block A (Weeks 1-6) — [rep range focus, e.g. "Hypertrophy: 8-12 reps"]**
+
+**Day 1 — [Session Name]**
+| # | Exercise | Sets | Primary | Secondary | Notes |
+|---|----------|------|---------|-----------|-------|
+| 1 | Barbell Bench Press | 4 | Chest, Triceps | Front Delts | — |
+| 2 | Incline Dumbbell Press | 3 | Chest, Front Delts | Triceps | — |
+
+[... continues with detailed exercise programming ...]
+
+### Plateau Management
+[Guidance for stalls]
+
+### Deload Structure
+[Deload approach and timing]
+
+### Trade-offs (if any)
+- [1-3 bullets noting meaningful compromises]
+
+### Recommendation (if applicable)
+[Clear suggestions for improvement]
+
+<!-- END PLAN -->
+
+[... continues with muscle taxonomy, planning rules, volume targets, etc ...]
+
+==============================================
+STEP 2 - WORKOUT REVIEW PROMPT (from ImportRoutineScreen.tsx)
+==============================================
+
+# Critical Training Plan Review
+
+You are a skeptical strength coach conducting an independent audit of this training plan. Your job is to find problems and ensure quality. **Be critical and thorough** — many plans have hidden flaws that need fixing.
+
+## Phase 1: Web Search Verification
+
+First, verify key claims with current research by searching for:
+
+1. **Volume Standards**: Search "training volume per muscle group hypertrophy 2024" and "weekly sets per muscle research"
+   - Compare the plan's volume targets against current meta-analyses
+   - Flag any muscles with insufficient volume (be strict about minimums)
+
+2. **Training Frequency**: Search "muscle protein synthesis training frequency optimal"
+   - Verify the frequency (times per week each muscle is trained) matches evidence
+   - Check if rest periods between same-muscle sessions are adequate
+
+3. **Periodization Validity**: Search "block periodization hypertrophy effectiveness 2024"
+   - Verify the periodization approach is evidence-based
+   - Check if rep ranges and progression schemes align with current research
+
+4. **Session Duration**: Search "workout length muscle building optimal duration"
+   - Verify claimed session durations are realistic and effective
+   - Flag overly long sessions that may impact performance
+
+## Phase 2: Critical Analysis Checklist
+
+After web search verification, work through each check with **high standards**:
+
+### 1. User Requirements Verification
+- Equipment constraints: Does EVERY exercise require only available equipment?
+- Training frequency: Exact match to requested days per week?
+- Time constraints: Are session lengths within user's stated limits?
+- Experience level: Is complexity appropriate for user's training background?
+- Goals: Does the plan prioritize the stated primary goal throughout?
+- **FAIL if** ANY user requirement is not perfectly met (no exceptions)
+
+### 2. Volume Analysis (Be Strict)
+- Compare each muscle's weekly volume against research-backed minimums
+- Major muscles (chest, lats, quads, etc.): 12+ sets minimum, 16+ optimal
+- Medium muscles (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
+- **FAIL if** ANY muscle falls below research-backed minimums
+- **FAIL if** "structural constraints" are used to excuse inadequate volume
+
+### 3. Recovery and Fatigue Management
+- Check rest periods between same-muscle training sessions (48-72h minimum)
+- Verify overall weekly volume doesn't exceed recovery capacity
+- Assess session difficulty distribution across the week
+- **FAIL if** recovery between same muscles is inadequate
+- **FAIL if** total weekly stress appears unsustainable
+
+### 4. Exercise Quality and Appropriateness
+- Verify every exercise is appropriate for stated experience level
+- Check movement pattern balance (push/pull ratios, etc.)
+- Assess exercise complexity relative to user's environment
+- **FAIL if** exercises are too advanced or require unavailable equipment
+- **FAIL if** movement patterns are imbalanced or neglect key functions
+
+### 5. Progression and Periodization Logic
+- Verify rep ranges align with stated goals and current research
+- Check if progression scheme is measurable and achievable
+- Assess if periodization phases make scientific sense
+- **FAIL if** progression is unclear or periodization lacks evidence
+- **FAIL if** plan is overly complex for user's experience level
+
+### 6. Practical Implementation Reality Check
+- Are session durations realistic including warm-up, rest, transitions?
+- Is the plan simple enough for consistent execution?
+- Does it account for gym crowding and equipment availability?
+- **FAIL if** plan requires perfect conditions or is overly complicated
+- **FAIL if** estimated session times seem unrealistic
+
+## Critical Red Flags to Watch For
+
+Automatically **FAIL** if you find any of these:
+- Muscle volume below research minimums with weak justifications
+- Overly complex periodization for beginner/intermediate users
+- Unrealistic session time estimates
+- Missing equipment requirements
+- Poor recovery between same-muscle sessions
+- Goal conflicts (e.g., strength + fat loss requiring opposite approaches)
+
+## Output Format
+
+**Web Search Summary:**
+- Key findings from volume research
+- Current training frequency recommendations  
+- Session duration guidelines
+- Any contradictions with the plan
+
+**Critical Review Results:**
+
+For each check, state **PASS** or **FAIL** with specific reasoning:
+
+1. **User Requirements**: [PASS/FAIL] - [specific issues]
+2. **Volume Standards**: [PASS/FAIL] - [which muscles fail minimums]
+3. **Recovery Management**: [PASS/FAIL] - [fatigue concerns]
+4. **Exercise Appropriateness**: [PASS/FAIL] - [complexity/equipment issues]
+5. **Progression Logic**: [PASS/FAIL] - [periodization problems]
+6. **Practical Reality**: [PASS/FAIL] - [implementation concerns]
+
+**Final Decision:**
+
+If ALL checks pass:
+> ✅ **Plan Approved** — Rigorous review passed. Proceed to **Step 3: Generate Workout**.
+
+If ANY check fails:
+> ⚠️ **Plan Failed Review** — Implementing fixes now:
+
+**IMPORTANT**: Don't just list problems — ACTUALLY FIX THEM. Provide the complete revised plan with all identified issues corrected.
+
+**Required Process:**
+1. **Identify Issues**: List each specific failure (volume shortfalls, recovery problems, etc.)
+2. **Calculate Fixes**: Determine exact changes needed (add X sets to Y exercise on Day Z)
+3. **Implement Changes**: Rewrite the affected sections with corrections applied
+4. **Verify Fixes**: Confirm all issues are resolved and no new problems created
+5. **Present Corrected Plan**: Show the complete updated training plan ready for JSON generation
+
+**Output the full corrected plan**, not just a list of what should be changed. The user should get a revised plan that passes all checks and is ready for Step 3.
+
+> ✅ **Revised Plan Approved** — All issues fixed. Proceed to **Step 3: Generate Workout**.
+
+**Remember**: Your job is to fix problems, not just find them. Deliver a working solution.
+
+==============================================
+PROBLEMS WITH WORKOUT SYSTEM:
+==============================================
+
+1. **STEP 1 CREATES TEXT NOT STRUCTURED DOCUMENT**: The workout planning prompt creates a plan but it's just explanatory text, not a structured document that can be easily modified
+
+2. **STEP 2 GIVES FEEDBACK NOT FIXES**: Despite the "ACTUALLY FIX THEM" instruction, the review prompt doesn't have access to the original structured plan to modify - it can only critique the text
+
+3. **NO DOCUMENT CONTINUITY**: Unlike meals, there's no structured format that gets passed from Step 1 to Step 2 for modification
+
+4. **HARD TO MODIFY**: The workout plan format is more complex (exercise tables, volume calculations, etc.) making it harder to read and modify programmatically
+
+5. **REVIEW CAN'T ACCESS PLAN STRUCTURE**: The review happens in a separate context and can't easily parse and modify the complex workout plan format
+
+NEEDED FIXES:
+- Step 1 should create a structured, parseable workout plan document
+- Step 2 should be able to read and modify that structured document
+- Need consistent format that works for both planning and review

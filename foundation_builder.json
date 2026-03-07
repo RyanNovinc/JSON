@@ -1,8 +1,4 @@
-import { WorkoutProgram } from '../types/workout';
-import { muscleBuilderProProgram } from './muscleBuilderPro';
-import { gluteAndToneProgram } from './gluteAndTone';
-
-export const foundationBuilderProgram: WorkoutProgram = {
+{
   "id": "17727999117880.yd7ak19i9k",
   "routine_name": "Foundation Builder",
   "description": "12-week full body general fitness program for beginners. Three days per week using antagonist supersets to maximise volume within 45-minute sessions. Block 1 builds movement quality and a base of fitness across 10–15 rep ranges.",
@@ -922,10 +918,24 @@ export const foundationBuilderProgram: WorkoutProgram = {
         }
       ]
     }
-  ]
-};
-
-// Export all sample workout programs
-export { muscleBuilderProProgram, gluteAndToneProgram };
-
-// The complete 52-week Muscle Builder Pro program is now in muscleBuilderPro.ts
+  ],
+  "_metadata": {
+    "exportType": "unified_mesocycle_structure",
+    "totalMesocycles": 0,
+    "allMesocycles": [],
+    "exportedAt": "2026-03-06T13:31:03.189Z",
+    "routineId": "1772799913345",
+    "routineName": "Foundation Builder",
+    "currentDisplayName": "Foundation Builder",
+    "originalDaysPerWeek": 3,
+    "manualBlocks": [],
+    "completionStatus": {},
+    "workoutHistory": [],
+    "activeBlock": null,
+    "weekProgress": null,
+    "exerciseCustomizations": {},
+    "dynamicExercisesData": {},
+    "setsData": {},
+    "isSamplePlan": true
+  }
+}

@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.RyanNovinc.JSONfit",
+      "bundleIdentifier": "com.RyanNovinc.JSON",
       "buildNumber": "3",
       "infoPlist": {
         "CFBundleDisplayName": "JSON.fit",
@@ -26,7 +26,7 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0f0f0f"
       },
-      "package": "com.RyanNovinc.JSONfit",
+      "package": "com.RyanNovinc.JSON",
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,

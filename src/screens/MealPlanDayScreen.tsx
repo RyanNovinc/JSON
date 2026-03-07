@@ -1646,7 +1646,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  macroDot: {
+  compactMacroDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -1686,7 +1686,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  macroDot: {
+  macroItemDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -1839,7 +1839,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  macroDot: {
+  macroChipDot: {
     width: 8,
     height: 8,
     borderRadius: 4,

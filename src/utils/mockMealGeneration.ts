@@ -72,7 +72,7 @@ const MOCK_MEALS: Meal[] = [
     cookTime: 8,
     servings: 1,
     youtubeSearchQuery: 'avocado toast poached eggs',
-    tags: ['delicious', 'healthy', 'vegetarian'],
+    tags: ['delicious', 'easy', 'vegetarian'],
     isFavorite: false,
   },
   // Lunch meals
@@ -111,7 +111,7 @@ const MOCK_MEALS: Meal[] = [
     cookTime: 25,
     servings: 1,
     youtubeSearchQuery: 'grilled chicken quinoa bowl recipe',
-    tags: ['delicious', 'high_protein', 'balanced', 'gluten_free'],
+    tags: ['delicious', 'high_protein', 'meal_prep', 'gluten_free'],
     isFavorite: false,
   },
   {
@@ -189,7 +189,7 @@ const MOCK_MEALS: Meal[] = [
     cookTime: 27,
     servings: 1,
     youtubeSearchQuery: 'baked salmon sweet potato recipe',
-    tags: ['delicious', 'high_protein', 'omega_3', 'gluten_free'],
+    tags: ['delicious', 'high_protein', 'easy', 'gluten_free'],
     isFavorite: false,
   },
   // Snack meals

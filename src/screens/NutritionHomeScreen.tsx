@@ -1060,7 +1060,7 @@ export default function NutritionHomeScreen({ route }: any) {
             onPress={() => setDeleteModal({ visible: false, plan: null })}
           />
           
-          <View style={styles.actionSheet}>
+          <View style={[styles.actionSheet, { borderColor: themeColor }]}>
             {/* Handle Bar */}
             <View style={styles.handleBar} />
             

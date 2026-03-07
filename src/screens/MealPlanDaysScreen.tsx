@@ -1635,7 +1635,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  groceryIcon: {
+  groceryHeaderIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -1653,7 +1653,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 2,
   },
-  grocerySubtext: {
+  groceryTotalSubtext: {
     fontSize: 14,
     color: '#a1a1aa',
   },

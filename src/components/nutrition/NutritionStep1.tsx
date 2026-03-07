@@ -91,7 +91,7 @@ export const NutritionStep1: React.FC<Props> = ({
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={goal.gradient}
+                  colors={goal.gradient as any}
                   style={styles.goalGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}

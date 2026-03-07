@@ -15,7 +15,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { SampleWorkout } from '../types/workout';
-import { quickStartProgram } from '../data/sampleWorkouts';
+import { foundationBuilderProgram } from '../data/sampleWorkouts';
 import { muscleBuilderProProgram } from '../data/muscleBuilderPro';
 import { gluteAndToneProgram } from '../data/gluteAndTone';
 import * as Clipboard from 'expo-clipboard';
@@ -127,27 +127,27 @@ export default function SampleWorkoutsScreen() {
 
   const sampleWorkouts: SampleWorkout[] = [
     {
-      id: 'quick-start',
-      title: 'Quick Start - Push Pull Legs',
+      id: 'foundation-builder',
+      title: 'Foundation Builder',
       description: 'Perfect starter routine',
-      duration: '3 days/week • 10 weeks',
+      duration: '3 days/week • 12 weeks',
       difficulty: 'Beginner',
       focus: 'General Fitness',
-      program: quickStartProgram,
+      program: foundationBuilderProgram,
       detailInfo: {
-        overview: 'A comprehensive 10-week beginner Push/Pull/Legs program with structured progression from bodyweight basics to barbell compound movements.',
+        overview: '12-week full body general fitness program for beginners. Three days per week using antagonist supersets to maximise volume within 45-minute sessions.',
         highlights: [
-          '10 weeks of progressive overload',
-          'Weekly rep progression built-in',
-          'Gradual exercise complexity increase',
-          'Proper beginner exercise selection',
-          'Foundation → Strength → Advanced phases',
-          'Alternative exercises for all levels'
+          '12 weeks of progressive overload',
+          'Antagonist supersets for efficiency',
+          'Full body training 3x per week',
+          'Movement quality focus in Block 1',
+          'Foundation → Development phases',
+          '45-minute time-efficient sessions'
         ],
-        targetMuscles: 'Full body development with balanced push/pull/legs split covering chest, shoulders, triceps, back, biceps, quads, hamstrings, glutes, and calves',
-        restPeriods: '60-210 seconds optimized for strength and muscle growth progression',
-        progression: '3 structured blocks: Foundation Building (weeks 1-3), Strength Building (weeks 4-6), Advanced Development (weeks 7-10)',
-        equipment: 'Progressive equipment needs: dumbbells → barbells → full gym access by week 7'
+        targetMuscles: 'Full body development with balanced training covering all major muscle groups through compound and isolation exercises',
+        restPeriods: '75-120 seconds optimized for strength and muscle growth with superset pairings',
+        progression: '2 structured blocks: Foundation (weeks 1-6), Development (weeks 7-12)',
+        equipment: 'Full gym access required (barbells, dumbbells, machines, cables)'
       }
     },
     {
@@ -563,18 +563,60 @@ export default function SampleWorkoutsScreen() {
             
             <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
               <Text style={styles.modalDescription}>
-                Program structure and organization for your custom workout plan.
+                {selectedWorkout?.detailInfo?.overview || 'Program structure and organization for your custom workout plan.'}
               </Text>
               
               {selectedWorkout && (
                 <View style={styles.nutritionInfo}>
-                  <Text style={styles.nutritionTitle}>Program Structure:</Text>
+                  <Text style={styles.nutritionTitle}>Program Details:</Text>
                   <View style={styles.nutritionRow}>
-                    <Text style={styles.nutritionLabel}>Structure:</Text>
+                    <Text style={styles.nutritionLabel}>Duration:</Text>
                     <Text style={[styles.nutritionValue, { color: themeColor }]}>
                       {selectedWorkout.duration}
                     </Text>
                   </View>
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionLabel}>Difficulty:</Text>
+                    <Text style={[styles.nutritionValue, { color: themeColor }]}>
+                      {selectedWorkout.difficulty}
+                    </Text>
+                  </View>
+                  <View style={styles.nutritionRow}>
+                    <Text style={styles.nutritionLabel}>Focus:</Text>
+                    <Text style={[styles.nutritionValue, { color: themeColor }]}>
+                      {selectedWorkout.focus}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {selectedWorkout?.detailInfo?.highlights && (
+                <View style={styles.features}>
+                  <Text style={styles.featuresTitle}>Program Highlights:</Text>
+                  {selectedWorkout.detailInfo.highlights.map((highlight, index) => (
+                    <Text key={index} style={styles.featureItem}>• {highlight}</Text>
+                  ))}
+                </View>
+              )}
+
+              {selectedWorkout?.detailInfo?.targetMuscles && (
+                <View style={styles.features}>
+                  <Text style={styles.featuresTitle}>Target Muscles:</Text>
+                  <Text style={styles.featureItem}>{selectedWorkout.detailInfo.targetMuscles}</Text>
+                </View>
+              )}
+
+              {selectedWorkout?.detailInfo?.progression && (
+                <View style={styles.features}>
+                  <Text style={styles.featuresTitle}>Progression:</Text>
+                  <Text style={styles.featureItem}>{selectedWorkout.detailInfo.progression}</Text>
+                </View>
+              )}
+
+              {selectedWorkout?.detailInfo?.equipment && (
+                <View style={styles.features}>
+                  <Text style={styles.featuresTitle}>Equipment Required:</Text>
+                  <Text style={styles.featureItem}>{selectedWorkout.detailInfo.equipment}</Text>
                 </View>
               )}
               
@@ -583,7 +625,7 @@ export default function SampleWorkoutsScreen() {
                 <Text style={styles.featureItem}>• Tap the card to copy JSON data</Text>
                 <Text style={styles.featureItem}>• Share with other users</Text>
                 <Text style={styles.featureItem}>• Use in workout planning apps</Text>
-                <Text style={styles.featureItem}>• Delete when no longer needed</Text>
+                <Text style={styles.featureItem}>• Import into your routine library</Text>
               </View>
             </ScrollView>
           </View>

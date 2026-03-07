@@ -559,9 +559,14 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
         }
       ]
     }
-  ]
+  ],
+  "_metadata": {
+    "isSamplePlan": true (for sample plans only — prevents contaminating user exercise preferences)
+  }
 }
 \`\`\`
+
+**For sample plan generation only:** Include \`"_metadata": {"isSamplePlan": true}\` at the root level to prevent the plan from overwriting users' saved exercise preferences when imported.
 
 ### Strength Exercise
 \`\`\`json
@@ -644,6 +649,7 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
 6. **Superset rest encoding** — for superset exercises, SS[n]a's \`rest\` field represents the inter-exercise transition rest (60-90s). SS[n]b's \`rest\` field represents the full rest before repeating the pair (compound or isolation default for that exercise type). \`restQuick\` is calculated from each exercise's own \`rest\` value.
 7. **sets vs sets_weekly** — \`sets\` is the default set count for training weeks (used for display). \`sets_weekly\` must be specified for every week in the block: training weeks should match \`sets\`, and deload weeks should show reduced values. Both fields are required for every strength exercise.
 8. **deload_weeks optionality** — omit \`deload_weeks\` entirely for blocks without deloads. Do not include an empty array.
+9. **Sample plan protection** — for sample plans only, include \`"_metadata": {"isSamplePlan": true}\` at the root level to prevent overwriting users' exercise preferences during import.
 
 ---
 

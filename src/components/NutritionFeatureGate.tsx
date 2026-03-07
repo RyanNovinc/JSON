@@ -4,7 +4,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useEntitlement } from '../hooks/useJSONPro';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
-import { REVENUECAT_CONFIG } from '../config/revenueCatConfig';
+import { REVENUECAT_CONFIG, ENABLE_NUTRITION_PAYWALL, hasNutritionAccess } from '../config/revenueCatConfig';
 
 interface NutritionFeatureGateProps {
   children: React.ReactNode;
@@ -25,8 +25,10 @@ export const NutritionFeatureGate: React.FC<NutritionFeatureGateProps> = ({
   onUpgradePress,
   featureName = 'nutrition planning',
 }) => {
-  const { isLoading } = useRevenueCat();
-  const hasNutritionAccess = useEntitlement(REVENUECAT_CONFIG.entitlements.json_pro);
+  const { isLoading, customerInfo } = useRevenueCat();
+  
+  // 🚨 MONETIZATION CONTROL: Use paywall flag instead of just entitlement check
+  const userHasNutritionAccess = hasNutritionAccess(customerInfo);
 
   // Show loading state
   if (isLoading) {
@@ -38,7 +40,7 @@ export const NutritionFeatureGate: React.FC<NutritionFeatureGateProps> = ({
   }
 
   // User has access - show premium content
-  if (hasNutritionAccess) {
+  if (userHasNutritionAccess) {
     return <>{children}</>;
   }
 
@@ -73,16 +75,20 @@ export const NutritionFeatureGate: React.FC<NutritionFeatureGateProps> = ({
  * Simple conditional wrapper for nutrition features
  */
 export const IfNutritionPro: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const hasNutritionAccess = useEntitlement(REVENUECAT_CONFIG.entitlements.json_pro);
-  return hasNutritionAccess ? <>{children}</> : null;
+  const { customerInfo } = useRevenueCat();
+  // 🚨 MONETIZATION CONTROL: Uses paywall flag for access control
+  const userHasAccess = hasNutritionAccess(customerInfo);
+  return userHasAccess ? <>{children}</> : null;
 };
 
 /**
  * Simple conditional wrapper for non-nutrition users
  */
 export const IfNutritionFree: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const hasNutritionAccess = useEntitlement(REVENUECAT_CONFIG.entitlements.json_pro);
-  return !hasNutritionAccess ? <>{children}</> : null;
+  const { customerInfo } = useRevenueCat();
+  // 🚨 MONETIZATION CONTROL: Uses paywall flag for access control
+  const userHasAccess = hasNutritionAccess(customerInfo);
+  return !userHasAccess ? <>{children}</> : null;
 };
 
 const styles = StyleSheet.create({
