@@ -43,7 +43,6 @@ export default function ImportRoutineScreen() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
-  const [reviewPromptCopied, setReviewPromptCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sampleCopied, setSampleCopied] = useState(false);
   const [modalScale] = useState(new Animated.Value(0));
@@ -2012,148 +2011,6 @@ export default function ImportRoutineScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>2</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Review & Verify</Text>
-                </View>
-                <Text style={styles.stepCardDescription}>
-                  Have your AI review the training plan for quality
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: themeColor }]}
-                  onPress={async () => {
-                    const reviewPrompt = `# Critical Training Plan Review
-// PROMPT 2: Review Prompt - Reviews and fixes workout plans before JSON conversion
-// IMPORTANT: This review checklist must stay synchronized with Step 3 embedded review in workoutPrompt.ts
-// If you update this checklist, update the Step 3 checklist to maintain consistency across the workflow
-
-First, read the workout program you just created so you have the full content in context. Then review it as a skeptical strength coach conducting an independent audit of this training plan. This is an independent quality gate — do not assume your self-check caught everything.
-
-## CRITICAL INSTRUCTIONS
-
-1. **Review the plan** using the checklist below, noting PASS or FAIL for each check.
-2. **If ANY check fails, FIX IT IMMEDIATELY** — do not ask the user for permission to fix. Silently revise the plan to resolve all failures.
-3. **After fixing, re-verify** — run the checklist again on the corrected plan to confirm all checks now pass.
-4. **Present the CORRECTED plan** — output the complete, clean, final version of the workout program with all fixes applied. Do not show the review process, do not show before/after comparisons, do not show your working. Present ONLY the clean corrected plan.
-5. **At the end, provide a brief change log** — a short bullet list of what you changed and why (e.g., "Added 2 sets of lat pulldowns on Day 2 to bring lat volume from 10 to 12 sets weekly").
-6. **Remind the user about JSON conversion** — after presenting the corrected plan, tell the user: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
-7. **USE WEB SEARCH** - If you have web search available, use it during the review to verify current research on volume standards, training frequency, and session duration guidelines.
-
-## HARD CONSTRAINTS — ZERO TOLERANCE
-
-These must pass after your fixes. If any of these still fail after revision, you have not finished — go back and fix again.
-
-- **User requirements priority** — ALL equipment, frequency, time, and experience constraints must be perfectly met (no exceptions).
-- **Volume minimums** — Major muscles need 12+ sets minimum, medium muscles need 8+ sets minimum based on current research.
-- **Recovery standards** — 48-72h minimum between same-muscle training sessions for optimal protein synthesis.
-- **Practical feasibility** — Session durations must be realistic including warm-up, rest, and transitions.
-- **No draft content** — the output must contain zero working, iteration, or revision commentary.
-
-## What "Fix" Means for Each Type of Failure
-
-- **Volume shortfalls**: Attempt a fix first — add sets to an existing exercise, swap a lower-priority isolation, or add a superset. Only after a genuine attempt fails may you accept CONSTRAINED, and you must state the exact structural reason. Show what you tried and why it couldn't work. Recalculate and verify totals.
-- **Recovery violations**: Redistribute exercises across days or adjust training split to ensure adequate rest.
-- **Equipment violations**: Replace exercises requiring unavailable equipment with alternatives using only listed equipment.
-- **Time overruns**: Reduce volume, combine exercises, or streamline the program to fit session limits.
-- **Experience mismatches**: Simplify exercise selection or progression schemes to match user's training background.
-- **Draft/working shown**: Remove all iteration, working, and draft content. Present only the final clean version.
-
-## Review Checklist
-
-Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
-
-### 1. User Requirements Verification
-- **Equipment constraints**: Does EVERY exercise require only available equipment?
-- **Training frequency**: Exact match to requested days per week?
-- **Time constraints**: Are session lengths within user's stated limits?
-- **Experience level**: Is complexity appropriate for user's training background?
-- **Goals**: Does the plan prioritize the stated primary goal throughout?
-- **FAIL if** ANY user requirement is not perfectly met (no exceptions)
-
-### 1b. Diff-Based Block Completeness
-For any block described as changes from a prior block (diff format) rather than a full session table:
-- Every diff entry must include: exercise name, set count, rep range
-- It must be unambiguous which exercise is being replaced and what replaces it
-- If a diff says "rotate to fresh variations" without naming them, **FAIL**
-- If a diff is missing set counts for new exercises, **FAIL**
-- If reconstructing the full session from the diff would require guessing any detail, **FAIL**
-
-This check exists because the JSON generator must reconstruct complete exercise lists from diff-based blocks. Ambiguous diffs cause silent errors in JSON output.
-
-### 2. Volume Analysis (Research-Based Standards)
-- **Web search verification**: Use web search to verify current volume research if available
-- **Major muscles** (chest, lats, quads, etc.): 12+ sets minimum, 16+ optimal
-- **Medium muscles** (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
-- **FAIL if** ANY muscle falls below research-backed minimums
-- **FAIL if** "structural constraints" are used to excuse inadequate volume
-- **Attempt-first rule**: Before accepting any shortfall as CONSTRAINED or exempt, you must attempt a concrete fix: add sets to an existing exercise, swap a lower-priority isolation for one covering the deficient muscle, or add a superset without materially extending session duration. Only accept CONSTRAINED if you can state the exact structural blocker (e.g., "Adding Hamstring sets to any day would exceed the 75-min cap"). A vague "split doesn't allow it" is not acceptable.
-
-**Additionally verify:**
-- The program document includes a Muscle Group Coverage Audit section
-- Every muscle group with 0 direct sets has an explicit indirect volume justification
-- **FAIL if** the audit section is missing entirely from the document
-- For every ⚠️ LOW flag in the audit: verify the fix was implemented in the session table. **FAIL if** the audit flags LOW but the session table was not updated
-- For every ⚠️ HIGH flag on a non-priority muscle: verify a reduction was either implemented or explicitly justified as recoverable with specific reasoning (not just "within recoverable range")
-- **FAIL if** any audit flag exists without either a session table fix or an explicit justified exception
-
-### 3. Recovery and Fatigue Management
-- **Same-muscle frequency**: Check 48-72h rest between same-muscle sessions
-- **Weekly volume**: Verify total weekly stress is sustainable for user's experience
-- **Session distribution**: Assess difficulty balance across the week
-- **FAIL if** recovery between same muscles is inadequate
-- **FAIL if** total weekly stress appears unsustainable
-
-### 4. Exercise Quality and Appropriateness
-- **Experience alignment**: Every exercise appropriate for stated training background
-- **Movement balance**: Check push/pull ratios and movement pattern distribution
-- **Practical complexity**: Exercise selection fits user's gym environment
-- **FAIL if** exercises are too advanced or require unavailable equipment
-- **FAIL if** movement patterns are imbalanced or neglect key functions
-
-### 5. Progression and Periodization Logic
-- **Goal alignment**: Rep ranges align with stated goals and current research
-- **Progression clarity**: Scheme is measurable and achievable
-- **Periodization validity**: Phases make scientific sense and are evidence-based
-- **FAIL if** progression is unclear or periodization lacks evidence
-- **FAIL if** plan is overly complex for user's experience level
-
-### 6. Practical Implementation Reality Check
-- **Session durations**: Realistic including warm-up, rest, transitions
-- **Execution simplicity**: Plan is practical for consistent implementation
-- **Real-world factors**: Accounts for gym crowding and equipment availability
-- **FAIL if** plan requires perfect conditions or is overly complicated
-- **FAIL if** estimated session times seem unrealistic
-
-## Output Format
-
-**If all 6 checks PASS on first review:**
-- State "All checks passed — plan is ready."
-- Present the plan as-is (clean, no changes needed).
-- End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
-
-**If any checks FAIL:**
-1. Show a brief summary table of PASS/FAIL results (one line per check).
-2. Show a brief change log (bullet list of what you fixed and why).
-3. Present the COMPLETE CORRECTED PLAN — the full workout program document with all fixes applied, formatted cleanly. This must be a complete standalone document, not a diff or partial update.
-4. End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."`;
-                    await Clipboard.setStringAsync(reviewPrompt);
-                    setReviewPromptCopied(true);
-                    setTimeout(() => {
-                      setReviewPromptCopied(false);
-                    }, 2000);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
-                  <Text style={styles.actionButtonText}>
-                    {reviewPromptCopied ? 'Copied!' : 'Copy Review Prompt'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.stepCard}>
-                <View style={styles.stepCardHeader}>
-                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>3</Text>
-                  </View>
                   <Text style={styles.stepCardTitle}>Generate Workout</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
@@ -2182,7 +2039,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>4</Text>
+                    <Text style={styles.stepBadgeText}>3</Text>
                   </View>
                   <Text style={styles.stepCardTitle}>Import & Train</Text>
                 </View>

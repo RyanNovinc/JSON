@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 // 🚨 IMPORTANT: MONETIZATION CONTROL 🚨
 // ============================================================================
 // Set this to TRUE when you want to start charging for nutrition features
-export const ENABLE_NUTRITION_PAYWALL = false; // 🔴 CHANGE THIS TO TRUE TO START CHARGING
+export const ENABLE_NUTRITION_PAYWALL = true; // 🔴 CHANGE THIS TO TRUE TO START CHARGING
 
 // When ENABLE_NUTRITION_PAYWALL = false: Nutrition is FREE for everyone
 // When ENABLE_NUTRITION_PAYWALL = true:  Nutrition requires purchase

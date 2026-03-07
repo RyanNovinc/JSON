@@ -28,6 +28,7 @@ import { useImportFeedback } from '../hooks/useImportFeedback';
 import { useTheme } from '../contexts/ThemeContext';
 import { ENABLE_NUTRITION_PAYWALL } from '../config/revenueCatConfig';
 import { useAppMode } from '../contexts/AppModeContext';
+import { useHasNutritionAccess } from '../contexts/RevenueCatContext';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -92,6 +93,7 @@ export default function HomeScreen({ route }: any) {
   const { showFeedbackModal, submitFeedback, skipFeedback, triggerFeedbackModal } = useImportFeedback();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
+  const hasNutritionAccess = useHasNutritionAccess();
 
   // Load routines from storage on component mount
   useEffect(() => {
@@ -654,16 +656,7 @@ export default function HomeScreen({ route }: any) {
   const handleNutritionTransition = () => {
     if (isTransitioning) return;
     
-    // 🚨 MONETIZATION CONTROL: Check if paywall is enabled
-    if (ENABLE_NUTRITION_PAYWALL) {
-      // When paywall is ENABLED: Check if user has purchased
-      // TODO: Add nutrition entitlement check here when paywall is enabled
-      // For now, always show paywall when enabled
-      navigation.navigate('PaymentScreen' as any);
-      return;
-    }
-    
-    // When paywall is DISABLED: Direct access to nutrition (FREE)
+    // Always go to NutritionHome first - paywall logic should be in individual nutrition features
     setAppMode('nutrition');
     navigation.navigate('NutritionHome' as any);
   };
@@ -859,14 +852,7 @@ export default function HomeScreen({ route }: any) {
   // Handle nutrition mode navigation
   useEffect(() => {
     if (isNutritionMode) {
-      // 🚨 MONETIZATION CONTROL: Check if paywall is enabled
-      if (ENABLE_NUTRITION_PAYWALL) {
-        // When paywall is ENABLED: Show paywall instead of direct access
-        navigation.navigate('PaymentScreen' as any);
-        return;
-      }
-      
-      // When paywall is DISABLED: Direct access to nutrition (FREE)
+      // Always navigate to nutrition home - paywall logic is handled in individual nutrition features
       navigation.navigate('NutritionHome' as any);
     }
   }, [isNutritionMode, navigation]);
