@@ -53,24 +53,27 @@ const COLORS = {
 const SLIDES: OnboardingSlide[] = [
   {
     icon: 'clipboard-outline',
-    title: 'Set Your Goals',
-    description:
-      'Answer the questionnaires in the bottom left for your workout goals and nutrition goals.',
-    highlight: 'Questionnaires help us build the perfect prompt for your needs',
+    title: 'Fill Out Questionnaire',
+    description: 'Answer questions about your goals and equipment.',
+    highlight: '',
   },
   {
     icon: 'bulb-outline',
-    title: 'Generate Your Program',
-    description:
-      'Copy your personalised prompt into any AI — ChatGPT, Claude, Gemini, or whatever you prefer.',
-    highlight: 'No locked-in AI. Use whichever one you like best',
+    title: 'Send Your Prompt to AI',
+    description: 'Copy your custom prompt to any AI service.',
+    highlight: '',
   },
   {
     icon: 'download-outline',
-    title: 'Import & Track',
-    description:
-      'Import the JSON file back into the app and follow your optimised workout and meal plans.',
-    highlight: 'Personalised programs built specifically for you',
+    title: 'Paste Into JSON.fit',
+    description: 'Import the JSON file to access your programs.',
+    highlight: '',
+  },
+  {
+    icon: 'checkmark-circle-outline',
+    title: 'Enjoy Perfect Programs',
+    description: 'Follow your tailored workout routines and meal plans.',
+    highlight: '',
   },
 ];
 
@@ -258,17 +261,6 @@ const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({
 
                 {/* Description */}
                 <Text style={styles.description}>{slide.description}</Text>
-
-                {/* Highlight card */}
-                <View style={styles.highlightCard}>
-                  <Ionicons
-                    name="sparkles"
-                    size={16}
-                    color={COLORS.accent}
-                    style={styles.highlightIcon}
-                  />
-                  <Text style={styles.highlightText}>{slide.highlight}</Text>
-                </View>
               </Animated.View>
             </View>
           ))}
@@ -441,27 +433,6 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     maxWidth: 300,
     alignSelf: 'center',
-  },
-  highlightCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    alignSelf: 'center',
-    maxWidth: 320,
-  },
-  highlightIcon: {
-    marginRight: 10,
-  },
-  highlightText: {
-    color: COLORS.textTertiary,
-    fontSize: 13,
-    lineHeight: 18,
-    flex: 1,
   },
   bottomSection: {
     paddingHorizontal: 20,

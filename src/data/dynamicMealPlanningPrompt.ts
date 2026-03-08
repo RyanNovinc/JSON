@@ -579,7 +579,7 @@ const mapSleepData = (sleepResults: any): Partial<MealPlanPromptData> => {
 };
 
 const mapFridgePantryData = (fridgeResults: any): Partial<MealPlanPromptData> => {
-  if (!fridgeResults?.formData?.ingredients?.length) {
+  if (!fridgeResults?.formData?.ingredients?.length || !fridgeResults?.formData?.wantToUseExistingIngredients) {
     return { pantryInventory: { enabled: false, items: [] } };
   }
   

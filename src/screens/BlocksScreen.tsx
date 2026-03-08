@@ -1156,16 +1156,19 @@ export default function BlocksScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={handleBack}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.programLabel}>PROGRAM</Text>
-          <Text style={styles.programName}>{routine.name}</Text>
+        <View style={styles.headerContent}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={handleBack}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <View style={styles.titleContainer}>
+            <Text style={styles.programLabel}>PROGRAM</Text>
+            <Text style={styles.programName}>{routine.name}</Text>
+          </View>
+          <View style={styles.placeholder} />
         </View>
       </View>
 
@@ -1592,13 +1595,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0b',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#27272a',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButton: {
     width: 40,
@@ -1609,7 +1613,10 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     alignItems: 'center',
-    paddingRight: 40,
+  },
+  placeholder: {
+    width: 40,
+    height: 40,
   },
   programLabel: {
     fontSize: 14,
@@ -1618,11 +1625,15 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.5,
     marginBottom: 2,
+    textAlign: 'center',
+    width: '100%',
   },
   programName: {
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
+    textAlign: 'center',
+    width: '100%',
   },
   listContent: {
     paddingHorizontal: 16,

@@ -812,30 +812,9 @@ export default function GroceryListScreen() {
 
   const CategorySection = ({ category }: { category: FoodCategory }) => {
     const items = groupedItems[category];
-    const purchasedInCategory = items.filter(item => item.isPurchased).length;
-    const categoryTotal = items.reduce((sum, item) => sum + (item.isFromInventory ? 0 : item.estimatedCost), 0);
 
     return (
       <View style={styles.categorySection}>
-        <View style={styles.categoryHeader}>
-          <View style={styles.categoryTitleRow}>
-            <Ionicons
-              name={CATEGORY_ICONS[category]}
-              size={20}
-              color={themeColor}
-            />
-            <Text style={styles.categoryTitle}>{CATEGORY_NAMES[category]}</Text>
-            <View style={styles.categoryStats}>
-              <Text style={styles.categoryStatsText}>
-                {purchasedInCategory}/{items.length}
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.categoryTotal}>
-            ${categoryTotal.toFixed(2)}
-          </Text>
-        </View>
-
         <View style={styles.categoryItems}>
           {items.map((item, index) => (
             <GroceryItemRow key={`${item.id || 'no_id'}_${index}_${Date.now()}`} item={item} />
@@ -912,27 +891,6 @@ export default function GroceryListScreen() {
           </View>
         </View>
 
-        {/* Sort Options */}
-        <View style={styles.sortContainer}>
-          <Text style={styles.sortLabel}>Sort by:</Text>
-          {(['category', 'price'] as const).map((option) => (
-            <TouchableOpacity
-              key={option}
-              style={[
-                styles.sortButton,
-                sortBy === option && { backgroundColor: themeColor }
-              ]}
-              onPress={() => setSortBy(option)}
-            >
-              <Text style={[
-                styles.sortButtonText,
-                sortBy === option && { color: '#0a0a0b' }
-              ]}>
-                {option.charAt(0).toUpperCase() + option.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {filteredCategories.map((category) => (
           <CategorySection key={category} category={category} />

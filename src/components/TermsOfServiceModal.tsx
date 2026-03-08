@@ -110,47 +110,82 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({
           >
             <Section title="1. Application Services">
               <Text style={styles.sectionText}>
-                JSON is a fitness application that helps you import, manage, and track workout routines. All your data is stored locally on your device.
+                JSON is a comprehensive fitness and nutrition application that helps you import, manage, and track workout routines, create personalized meal plans, and manage nutritional goals. All your data is stored locally on your device.
               </Text>
+              
+              <View style={styles.bulletContainer}>
+                <Text style={styles.bulletText}>• Workout routine import, management, and tracking</Text>
+                <Text style={styles.bulletText}>• Personalized nutrition planning and meal generation</Text>
+                <Text style={styles.bulletText}>• Health-conscious meal planning with dietary restrictions</Text>
+                <Text style={styles.bulletText}>• Grocery list generation with local pricing estimates</Text>
+                <Text style={styles.bulletText}>• Weight tracking and macro goal management</Text>
+                <Text style={styles.bulletText}>• Meal prep guidance and cooking instructions</Text>
+              </View>
             </Section>
 
             <Section title="2. Data Storage">
               <Text style={styles.sectionText}>
-                All your workout routines, progress, and personal data are stored locally on your device. We do not collect, store, or transmit your personal workout data to external servers.
+                All your workout routines, meal plans, health information, and personal data are stored locally on your device. We do not collect, store, or transmit your personal fitness, nutrition, or health data to external servers.
+              </Text>
+              
+              <Text style={styles.sectionText}>
+                This includes sensitive information such as dietary restrictions, health conditions, weight tracking, nutritional goals, meal preferences, and grocery shopping data.
               </Text>
             </Section>
 
             <Section title="3. Pro Access Purchase">
               <Text style={styles.sectionText}>
-                Pro Access is a one-time purchase that unlocks premium features. This is not a subscription - you pay once and own the features forever.
+                Pro Access is a one-time purchase that unlocks premium nutrition and advanced fitness features. This is not a subscription - you pay once and own the features forever.
               </Text>
               <View style={styles.bulletContainer}>
-                <Text style={styles.bulletText}>• Unlimited workout routines</Text>
-                <Text style={styles.bulletText}>• Advanced analytics</Text>
-                <Text style={styles.bulletText}>• Cloud sync (when available)</Text>
+                <Text style={styles.bulletText}>• Complete nutrition planning and meal generation</Text>
+                <Text style={styles.bulletText}>• Personalized meal plans with dietary restrictions</Text>
+                <Text style={styles.bulletText}>• Grocery lists with local pricing estimates</Text>
+                <Text style={styles.bulletText}>• Meal prep guidance and cooking instructions</Text>
+                <Text style={styles.bulletText}>• Advanced health and macro tracking</Text>
+                <Text style={styles.bulletText}>• Unlimited workout routines and analytics</Text>
                 <Text style={styles.bulletText}>• No recurring charges</Text>
               </View>
             </Section>
 
-            <Section title="4. Acceptable Use">
+            <Section title="4. Health and Nutrition Disclaimers">
               <Text style={styles.sectionText}>
-                You agree to use the app for personal fitness purposes only. Do not attempt to reverse engineer, modify, or distribute the application.
+                <Text style={styles.emphasis}>IMPORTANT HEALTH NOTICE:</Text> This app provides general nutrition and fitness information for educational purposes only. It is not intended to replace professional medical advice, diagnosis, or treatment.
+              </Text>
+              
+              <View style={styles.bulletContainer}>
+                <Text style={styles.bulletText}>• Always consult healthcare professionals before making significant dietary changes</Text>
+                <Text style={styles.bulletText}>• Meal plans are estimates and may not meet all nutritional needs</Text>
+                <Text style={styles.bulletText}>• Food allergies and medical conditions require professional supervision</Text>
+                <Text style={styles.bulletText}>• Calorie and macro calculations are approximations</Text>
+                <Text style={styles.bulletText}>• Not suitable for pregnant/nursing mothers without medical approval</Text>
+                <Text style={styles.bulletText}>• Stop use and consult a doctor if adverse reactions occur</Text>
+              </View>
+            </Section>
+
+            <Section title="5. Acceptable Use">
+              <Text style={styles.sectionText}>
+                You agree to use the app for personal fitness and nutrition purposes only. Do not attempt to reverse engineer, modify, or distribute the application.
               </Text>
             </Section>
 
-            <Section title="5. Limitation of Liability">
+            <Section title="6. Limitation of Liability">
               <Text style={styles.sectionText}>
-                The app is provided "as is" for fitness tracking purposes. Always consult healthcare professionals before starting new workout routines. We are not liable for any injuries or health issues resulting from workouts.
+                The app is provided "as is" for fitness tracking and nutrition planning purposes. Always consult healthcare professionals before starting new workout routines or making significant dietary changes. We are not liable for any injuries, health issues, allergic reactions, or nutritional deficiencies resulting from use of our recommendations.
+              </Text>
+              
+              <Text style={styles.sectionText}>
+                You acknowledge that nutrition and fitness needs are highly individual and that our recommendations may not be suitable for your specific health conditions, goals, or circumstances.
               </Text>
             </Section>
 
-            <Section title="6. Updates and Changes">
+            <Section title="7. Updates and Changes">
               <Text style={styles.sectionText}>
                 We may update these terms occasionally. Continued use of the app constitutes acceptance of updated terms. Major changes will be communicated through app updates.
               </Text>
             </Section>
 
-            <Section title="7. Contact Information">
+            <Section title="8. Contact Information">
               <Text style={styles.sectionText}>
                 Questions about these terms? Contact us through the app's feedback feature or via the App Store.
               </Text>
@@ -251,6 +286,9 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: '#71717a',
+  },
+  emphasis: {
+    fontWeight: '700',
   },
 });
 

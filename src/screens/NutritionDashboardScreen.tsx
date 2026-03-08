@@ -256,7 +256,7 @@ export default function NutritionDashboardScreen() {
             </Text>
             
             {/* Toggle for Fridge & Pantry */}
-            {isFridgePantry && isCompleted && (
+            {isFridgePantry && (
               <View style={styles.toggleContainer}>
                 <Text style={styles.toggleLabel}>Include in meal planning</Text>
                 <Switch

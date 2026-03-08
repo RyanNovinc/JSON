@@ -186,19 +186,21 @@ The JSON must be ready to paste directly into the app import function.`;
           </Text>
         </View>
 
-        {/* Need Help Section */}
-        <View style={styles.helpSection}>
-          <Text style={styles.helpTitle}>Need Help?</Text>
-          
-          <TouchableOpacity 
-            style={[styles.tutorialButton, { backgroundColor: themeColor }]}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="play" size={20} color="#000000" />
-            <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
-            <Text style={styles.tutorialDuration}>30 seconds</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Need Help Section - Only shown in development */}
+        {__DEV__ && (
+          <View style={styles.helpSection}>
+            <Text style={styles.helpTitle}>Need Help?</Text>
+            
+            <TouchableOpacity 
+              style={[styles.tutorialButton, { backgroundColor: themeColor }]}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="play" size={20} color="#000000" />
+              <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
+              <Text style={styles.tutorialDuration}>30 seconds</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>

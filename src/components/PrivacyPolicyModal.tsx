@@ -119,26 +119,56 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           >
             <Section title="1. Data Collection Overview">
               <Text style={styles.sectionText}>
-                JSON prioritizes your privacy by storing all personal data locally on your device. We do NOT collect, store, or transmit your workout routines, progress, or personal information to external servers.
+                JSON is a comprehensive fitness and nutrition app that prioritizes your privacy by storing all personal data locally on your device. We do NOT collect, store, or transmit your workout routines, meal plans, health data, or personal information to external servers.
               </Text>
               
               <InfoBox>
                 <Text style={[styles.infoBoxText, { color: '#ffffff' }]}>
-                  <Text style={[styles.emphasis, { color: themeColor }]}>Local Storage Only:</Text> All your workouts, progress tracking, and personal data remain on your device and never leave it.
+                  <Text style={[styles.emphasis, { color: themeColor }]}>Local Storage Only:</Text> All your workouts, nutrition plans, health information, and personal data remain on your device and never leave it.
                 </Text>
               </InfoBox>
+
+              <Text style={styles.sectionText}>
+                This includes sensitive health information such as dietary restrictions, medical conditions, weight tracking, and nutritional goals - all stored securely on your device only.
+              </Text>
             </Section>
 
             <Section title="2. What Data We Store Locally">
               <Text style={styles.sectionText}>
                 The following information is stored exclusively on your device:
               </Text>
+              
+              <Text style={[styles.sectionSubheading, { color: themeColor, marginTop: 16, marginBottom: 8 }]}>
+                Fitness & Workout Data:
+              </Text>
               <View style={styles.bulletContainer}>
                 <Text style={styles.bulletText}>• Imported workout routines</Text>
                 <Text style={styles.bulletText}>• Exercise progress and logs</Text>
-                <Text style={styles.bulletText}>• App preferences and settings</Text>
                 <Text style={styles.bulletText}>• Workout calendar data</Text>
                 <Text style={styles.bulletText}>• Personal notes and customizations</Text>
+              </View>
+
+              <Text style={[styles.sectionSubheading, { color: themeColor, marginTop: 16, marginBottom: 8 }]}>
+                Nutrition & Health Data:
+              </Text>
+              <View style={styles.bulletContainer}>
+                <Text style={styles.bulletText}>• Personal nutrition goals and macro targets</Text>
+                <Text style={styles.bulletText}>• Health conditions and dietary restrictions</Text>
+                <Text style={styles.bulletText}>• Weight tracking history and measurements</Text>
+                <Text style={styles.bulletText}>• Meal plans, recipes, and cooking instructions</Text>
+                <Text style={styles.bulletText}>• Food inventory and grocery shopping lists</Text>
+                <Text style={styles.bulletText}>• Budget information and location for pricing</Text>
+                <Text style={styles.bulletText}>• Supplement intake and nutrient deficiency tracking</Text>
+                <Text style={styles.bulletText}>• Meal timing schedules and food preferences</Text>
+                <Text style={styles.bulletText}>• Meal prep sessions and cooking instructions</Text>
+              </View>
+
+              <Text style={[styles.sectionSubheading, { color: themeColor, marginTop: 16, marginBottom: 8 }]}>
+                General App Data:
+              </Text>
+              <View style={styles.bulletContainer}>
+                <Text style={styles.bulletText}>• App preferences and settings</Text>
+                <Text style={styles.bulletText}>• Purchase history for Pro Access features</Text>
               </View>
             </Section>
 
@@ -155,7 +185,31 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               </View>
             </Section>
 
-            <Section title="4. App Store Purchases">
+            <Section title="4. Health Data and Nutrition Information">
+              <Text style={styles.sectionText}>
+                Our app collects and processes sensitive health and nutrition information to provide personalized meal planning and dietary guidance. This includes:
+              </Text>
+              
+              <InfoBox>
+                <Text style={[styles.infoBoxText, { color: '#ffffff' }]}>
+                  <Text style={[styles.emphasis, { color: themeColor }]}>Health Data Sensitivity:</Text> We treat your health information with the highest level of privacy protection by keeping it exclusively on your device.
+                </Text>
+              </InfoBox>
+
+              <View style={styles.bulletContainer}>
+                <Text style={styles.bulletText}>• Medical conditions that affect nutrition (diabetes, hypertension, etc.)</Text>
+                <Text style={styles.bulletText}>• Known nutrient deficiencies and supplementation</Text>
+                <Text style={styles.bulletText}>• Pregnancy, breastfeeding, or other life stage considerations</Text>
+                <Text style={styles.bulletText}>• Digestive issues and food absorption concerns</Text>
+                <Text style={styles.bulletText}>• Energy levels and metabolic patterns</Text>
+              </View>
+
+              <Text style={styles.sectionText}>
+                <Text style={[styles.emphasis, { color: themeColor }]}>Important:</Text> This app is not a substitute for professional medical advice. Always consult healthcare providers for medical nutrition therapy or if you have serious health conditions.
+              </Text>
+            </Section>
+
+            <Section title="5. App Store Purchases">
               <Text style={styles.sectionText}>
                 When you purchase Pro Access through the App Store, Apple handles all payment processing. We receive only basic purchase confirmation to unlock premium features. No payment details are stored by our app.
               </Text>
@@ -267,6 +321,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
     marginBottom: 12,
+  },
+  sectionSubheading: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   sectionText: {
     fontSize: 15,
