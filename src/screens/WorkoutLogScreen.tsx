@@ -67,6 +67,37 @@ function getCurrentWeekReps(reps: string, weekNumber: number = 1): string {
   return reps;
 }
 
+// Extract target rep number for a specific set from the rep scheme
+function getTargetRepForSet(reps: string, weekNumber: number = 1, setIndex: number = 0): string {
+  const currentWeekReps = getCurrentWeekReps(reps, weekNumber);
+  
+  // Clean up any parenthetical notes
+  const cleanReps = currentWeekReps.replace(/\s*\(.*?\)/, '');
+  
+  // Check if it's a comma-separated list of reps per set (like "12, 12, 10, 10")
+  if (cleanReps.includes(',')) {
+    const repsList = cleanReps.split(',').map(r => r.trim());
+    
+    // If we have a specific rep for this set index, use it
+    if (setIndex < repsList.length) {
+      return repsList[setIndex];
+    }
+    
+    // If user adds more sets than defined, repeat the last rep value
+    if (repsList.length > 0) {
+      return repsList[repsList.length - 1];
+    }
+  }
+  
+  // If it's a range like "8-12", return the lower number
+  if (cleanReps.includes('-')) {
+    return cleanReps.split('-')[0];
+  }
+  
+  // Single number or fallback
+  return cleanReps || '8';
+}
+
 type WorkoutLogScreenNavigationProp = StackNavigationProp<RootStackParamList, 'WorkoutLog'>;
 type WorkoutLogScreenRouteProp = RouteProp<RootStackParamList, 'WorkoutLog'>;
 
@@ -721,7 +752,7 @@ function ExerciseCard({
                     onInteractionAttempt && onInteractionAttempt();
                   }
                 }}
-                placeholder={getCurrentWeekReps(targetRepsString).split('-')[0]}
+                placeholder={getTargetRepForSet(targetRepsString, currentWeek, setIndex)}
                 placeholderTextColor="#52525b"
                 keyboardType="number-pad"
                 editable={!setData.completed}
@@ -1209,11 +1240,15 @@ export default function WorkoutLogScreen() {
       const initialData = dynamicExercises.map(exercise => {
         // Use weekly sets if available, otherwise fall back to regular sets
         const currentSets = exercise.sets_weekly?.[currentWeek.toString()] || exercise.sets;
+        
+        // Get target reps for auto-filling
+        const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
+        
         return Array.from({ length: currentSets }, (_, index) => ({
           exercise: exercise.exercise, // This will be the primary exercise name
           setNumber: index + 1,
           weight: '',
-          reps: '',
+          reps: getTargetRepForSet(targetReps, currentWeek, index), // Pre-fill with set-specific rep number
           completed: false,
           selectedExerciseIndex: 0, // Start with primary exercise
           exerciseData: {}, // Initialize storage for each exercise variant
@@ -1433,11 +1468,15 @@ export default function WorkoutLogScreen() {
     
     // Initialize sets data for the new exercise
     const newExerciseIndex = dynamicExercises.length;
+    
+    // Get target reps for auto-filling
+    const targetReps = (newExercise.reps_weekly?.[currentWeek.toString()] || newExercise.reps || '').replace(/\s*\(.*?\)/, '');
+    
     const newSetsData = Array.from({ length: newExercise.sets }, (_, index) => ({
       exercise: newExercise.exercise,
       setNumber: index + 1,
       weight: '',
-      reps: '',
+      reps: getTargetRepForSet(targetReps, currentWeek, index), // Pre-fill with set-specific rep number
       completed: false,
       selectedExerciseIndex: 0, // Start with primary exercise
       exerciseData: {}, // Initialize storage for each exercise variant
@@ -1498,12 +1537,20 @@ export default function WorkoutLogScreen() {
   const handleAddSet = (exerciseIndex: number) => {
     const newData = [...allSetsData];
     const exerciseSets = newData[exerciseIndex];
+    const exercise = dynamicExercises[exerciseIndex];
+    
+    // Calculate the set index for the new set (0-based)
+    const newSetIndex = exerciseSets.length;
+    
+    // Get target reps for auto-filling based on the new set's position
+    const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
+    const targetRepNumber = getTargetRepForSet(targetReps, currentWeek, newSetIndex);
     
     // Create new set based on the last set or default values
     const lastSet = exerciseSets[exerciseSets.length - 1];
     const newSet = {
       weight: lastSet?.weight || '',
-      reps: lastSet?.reps || '',
+      reps: targetRepNumber, // Pre-fill with set-specific rep number
       completed: false,
       unit: lastSet?.unit || getExerciseUnit(exerciseIndex),
       isDropSet: false
@@ -1930,9 +1977,12 @@ export default function WorkoutLogScreen() {
           setData.isDropSet = setData.exerciseData[selectedExerciseIndex].isDropSet;
           setData.drops = setData.exerciseData[selectedExerciseIndex].drops ? [...setData.exerciseData[selectedExerciseIndex].drops] : undefined;
         } else {
-          // First time selecting this exercise - start fresh
+          // First time selecting this exercise - start fresh with set-specific target reps
+          const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
+          const targetRepNumber = getTargetRepForSet(targetReps, currentWeek, i); // Use the set index (i)
+          
           setData.weight = '';
-          setData.reps = '';
+          setData.reps = targetRepNumber; // Pre-fill with set-specific rep number
           setData.completed = false;
           setData.isDropSet = false;
           setData.drops = undefined;
