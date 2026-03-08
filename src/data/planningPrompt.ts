@@ -15,70 +15,46 @@ export interface ProgramContext {
 // ================================
 
 function getSplitArchitecture(data: QuestionnaireData): string {
-  const days = data.gymTrainingDays ?? 3;
-  const goal = data.primaryGoal;
-  const exp = data.trainingExperience;
+  return `**Split Selection Guidelines:**
 
-  const splitMap: Record<number, Record<string, string>> = {
-    2: {
-      default: 'Full Body A / Full Body B',
-    },
-    3: {
-      gain_strength: 'Full Body A / Full Body B / Full Body C',
-      default: 'Push / Pull / Legs OR Full Body A / Full Body B / Full Body C',
-    },
-    4: {
-      gain_strength: 'Upper A / Lower A / Upper B / Lower B',
-      default: 'Upper / Lower / Upper / Lower',
-    },
-    5: {
-      gain_strength: 'Upper A / Lower A / Push / Pull / Lower B',
-      default: 'Push / Pull / Legs / Upper / Lower',
-    },
-    6: {
-      default: 'Push / Pull / Legs / Push / Pull / Legs',
-    },
-  };
+Choose the most appropriate training split based on the user's training frequency, primary goal, and experience level:
 
-  // Experience-based adjustments
-  if (days === 5 && exp === 'complete_beginner') {
-    return '**Recommended Split:** Full Body A / Full Body B / Full Body C / Upper / Lower (reduced volume for beginners)';
-  }
+**By Training Days:**
+- 2 days: Full Body A/B alternating
+- 3 days: Full Body A/B/C OR Push/Pull/Legs  
+- 4 days: Upper/Lower/Upper/Lower OR Push/Pull/Legs + Upper
+- 5 days: Push/Pull/Legs/Upper/Lower OR Upper/Lower/Push/Pull/Legs
+- 6+ days: Push/Pull/Legs repeated OR specialized splits
 
-  const goalSplits = splitMap[days];
-  const split = goalSplits?.[goal ?? 'default'] ?? goalSplits?.['default'] ?? 'Full Body';
+**Goal Considerations:**
+- Strength training: Favor full body or upper/lower splits for higher frequency on main lifts
+- Hypertrophy: Push/Pull/Legs works well for moderate frequency with higher volume
+- Beginners: Full body splits allow skill practice and recovery
 
-  return `**Recommended Split:** ${split}`;
+**Experience Adjustments:**
+- Complete beginners: Favor full body splits regardless of days available
+- Advanced trainees: Can handle higher frequency and more complex splits
+
+Select the split that best matches the user's profile and explain your reasoning.`;
 }
 
 function getComplementarityRules(data: QuestionnaireData): string {
-  const days = data.gymTrainingDays ?? 3;
-  
-  if (days <= 3) {
-    return `**Session Complementarity:** Full-body split — no recovery conflicts possible. Proceed directly to exercise selection.`;
-  }
+  return `**Recovery and Session Planning Guidelines:**
 
-  return `**Session Complementarity Pre-Pass (complete before exercise selection):**
+For programs with 4+ training days, ensure adequate recovery between muscle groups:
 
-Before writing any exercises, generate a Weekly Muscle State Matrix in this format:
+**Recovery Requirements:**
+- Major compound muscles (Quads, Hamstrings, Glutes, Lats, Upper Back): 72hr minimum between primary training sessions
+- Smaller muscle groups (Biceps, Triceps, Calves, Delts): 48hr minimum between primary sessions
+- Maintenance work (light isolation, <50% of primary volume) can be done within recovery windows
 
-Day | Primary Load | Secondary Load | Recovery Check
-----|-------------|----------------|---------------
-[fill for each training day]
+**Session Planning Process:**
+1. First assign primary muscle focus for each training day based on your chosen split
+2. Check for recovery conflicts between days
+3. If conflicts exist, either adjust the split structure or downgrade conflicting work to maintenance volume
+4. Secondary/assistance muscles can overlap if they're not the primary focus
 
-**Output this scratchpad inside <scratchpad> tags only. Do not include it in the program document.**
-
-Then validate against these rules:
-- Compounds (Quads, Hamstrings, Glutes, Lats, Upper Back): 72hr minimum between PRIMARY sessions
-- Isolation-dominant groups (Biceps, Triceps, Calves, Rear Delts, Side Delts): 48hr minimum between PRIMARY sessions
-- MAINTENANCE volume permitted within recovery windows
-- MAINTENANCE = isolation exercises only, max 50% of primary day set count
-
-Conflict resolution:
-- Compound group conflict → restructure that day's primary focus
-- Isolation group conflict → downgrade to maintenance volume
-
-The matrix is a scratchpad — do not include it in the final program document.`;
+**Validation Rule:** No muscle group should be primarily trained again before meeting its minimum recovery window. Plan your week accordingly before writing specific exercises.`;
 }
 
 function getTimeFormula(data: QuestionnaireData): string {
@@ -90,68 +66,78 @@ function getTimeFormula(data: QuestionnaireData): string {
     ? 90 
     : 60;
 
-  return `**Session Duration Formula (mandatory — calculate and enforce):**
+  return `**Session Duration Calculation Guidelines:**
 
-Straight sets: (sets × 45s) + (sets × rest_seconds)
-Superset pairs: (pairs × 90s) + (pairs × rest_seconds) + (pairs × ${transitionTax}s setup tax)
-Transition tax: exercise_count × ${transitionTax}s
-Warmup: 300s fixed
+Use this formula to estimate and validate session duration:
 
-If calculated duration exceeds target: remove lowest-priority isolation exercise and recalculate.
-NEVER adjust the formula to match the target.
-ALWAYS adjust exercise selection to match the formula.`;
+**Time Components:**
+- Straight sets: (sets × 45s execution) + (sets × rest_seconds)
+- Superset pairs: (pairs × 90s execution) + (pairs × rest_seconds) + (pairs × transition_time setup)
+- Equipment transitions: exercise_count × transition_time (use equipment-appropriate value from table below)
+- Warmup/cooldown: 300s fixed
+
+**Duration Management:**
+- Calculate total time for each session using the formula above
+- If session exceeds the user's stated time preference, reduce exercise count or use supersets
+- Prioritize compound movements — remove isolation exercises if time is tight
+- The formula is non-negotiable; adjust exercise selection to meet time constraints, not the other way around
+
+**Equipment-Specific Transition Times:**
+- Commercial gym: 150s
+- Home gym: 90s
+- Bodyweight/basic: 60s`;
 }
 
 function getMuscleAudit(data: QuestionnaireData): string {
-  const goal = data.primaryGoal;
-  
-  const auditThreshold = goal === 'gain_strength' 
-    ? 'compound-only groups exempt from isolation audit'
-    : goal === 'burn_fat'
-    ? 'relaxed thresholds apply — see volume rules'
-    : 'full audit applies';
+  return `**Volume Verification Requirements:**
 
-  return `**Muscle Group Coverage Audit (append to program):**
+After completing your program, create a Muscle Group Coverage Audit section that reviews weekly volume for each muscle group:
 
-For each muscle group output one of these exact status indicators:
+**Status Indicators (use exactly these):**
+- ✅ = within target range for user's training approach
+- ⚠️ LOW = below experience-scaled minimum (must be fixed before presenting)
+- ⚠️ HIGH = above 20 sets/week (flag for review)
+- ℹ️ CONSTRAINED = below target but above minimum due to legitimate constraints
 
-✅ = within target range
-⚠️ LOW = below experience-scaled minimum — MUST fix in session tables before presenting
-⚠️ HIGH = above 20 sets — flag only, no fix required unless priority muscle
-ℹ️ CONSTRAINED = below target but above minimum due to split/equipment/schedule constraints
+**Audit Process:**
+1. Count total weekly sets where each muscle is tagged as PRIMARY
+2. Compare against volume targets from the user's training approach and experience level
+3. For any muscle with 0 direct sets: justify with specific indirect volume from compounds
+4. For CONSTRAINED status: explain the specific structural limitation (split, equipment, time)
+5. For LOW status: immediately revise the program to add volume before presenting
+6. When fixing a LOW muscle: add sets to the day where that muscle is already trained, or add a second training day for that muscle. Do not add leg exercises to upper body days or upper body exercises to leg days.
+7. If the profile says "Direct Core Work: No", do not add core exercises to any session. Core is exempt from volume requirements for this program. If the profile says "Direct Core Work: Yes" or is silent on this setting, include 2–3 sets of direct core work per week distributed across 1–2 sessions. Suitable exercises: Cable Crunch, Ab Wheel Rollout, Hanging Leg Raise, Plank variations. Core does not count toward any muscle group's volume target and will not trigger a LOW flag.
 
-For CONSTRAINED: specify whether it applies per-block or globally, and explain why.
-For LOW: do not mark as resolved until the session table has been updated to fix it.
-For HIGH: note whether it is a priority muscle. If not, suggest the specific exercise to reduce and implement the reduction in the session table.
+**Goal-Specific Considerations:**
+- Strength programs: Focus audit on compound movement muscles; isolation volume can be lower
+- Fat loss programs: Slightly relaxed volume standards acceptable if adherence is prioritized  
+- Hypertrophy programs: Apply full volume standards strictly
 
-If direct sets = 0: justify with specific indirect volume numbers.
-
-Audit threshold: ${auditThreshold}`;
+Include this audit as a section in your final program document.`;
 }
 
 function getReentryProtocol(data: QuestionnaireData): string {
   const duration = data.programDuration;
   
   if (duration === '4_weeks' || duration === '8_weeks') {
-    return ''; // omit entirely
+    return ''; // omit entirely for short programs
   }
 
-  const protocols: Record<string, string> = {
-    '12_weeks': `Re-entry points: Week 4, Week 8`,
-    '6_months': `Re-entry at each mesocycle boundary`,
-    '1_year': `Three-scenario re-entry protocol required`,
-  };
+  return `**Program Interruption Guidelines:**
 
-  const protocol = protocols[duration ?? '12_weeks'] ?? protocols['12_weeks'];
+For programs 12+ weeks, include a Re-entry Protocol section that addresses training gaps:
 
-  return `**Program Interruption Protocol (mandatory):**
+**Standard Re-entry Framework:**
+- Missed 1 week: Resume current week/block with 10% load reduction
+- Missed 2-3 weeks: Drop back one block, restart from week 1 of that block
+- Missed 4+ weeks: Return to program beginning, treat as new baseline
 
-Include a Re-entry Guide section in the program document:
-- Missed 1 week: resume current block, reduce load 10%
-- Missed 2–3 weeks: drop back one block, restart week 1 of that block  
-- Missed 4+ weeks: return to program start, treat as new baseline
+**Program-Specific Considerations:**
+- 12-week programs: Suggest re-entry points at weeks 4 and 8
+- 6+ month programs: Align re-entry with mesocycle boundaries  
+- 1-year programs: Provide detailed scenarios for different interruption lengths
 
-${protocol}`;
+Adapt these guidelines to your specific program structure and include this section in your final program document.`;
 }
 
 function generateConstraintLayer(data: QuestionnaireData): string {
@@ -172,7 +158,6 @@ function generateConstraintLayer(data: QuestionnaireData): string {
 // ================================
 
 export const INSTRUCTIONS_HEADER = `# Create a Complete Workout Program
-// PROMPT 1: Planning Prompt - Creates initial workout program plans
 
 I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help creating a personalized workout program.
 
@@ -225,113 +210,19 @@ export const VERIFICATION_STEP_6_NO_CARDIO = `6. **Estimate session duration** f
 
 export const PROGRAM_DOCUMENT_FORMAT = `---
 
-## PROGRAM DOCUMENT FORMAT
+## OUTPUT FORMAT
 
-Create a complete, structured workout program document using this exact format:
+Present the complete program clearly so the user can review and iterate before converting to JSON. Include:
 
-<!-- BEGIN PROGRAM DOCUMENT -->
+- Program overview (duration, days per week, split, goal)
+- All training sessions with exercises, sets, rep ranges (e.g. "8-12" or "10-15" — always a range, never a single number), rest periods, and muscle tags (Primary and Secondary). Exception: single-joint arm exercises (all curl variations, all triceps isolation) always use an isolation rep range of 10–15, regardless of the block's stated rep focus. These are never compound movements.
+- Direct core work: if the profile says 'Direct Core Work: Yes' or is silent on this setting, include 2–3 sets distributed across 1–2 sessions (suitable exercises: Cable Crunch, Ab Wheel Rollout, Hanging Leg Raise, Plank variations). Core sets do not count toward any muscle group's volume target.
+- Alternative exercises for each movement
+- Weekly progression guidance
+- Deload protocol
+- Volume distribution summary by muscle group
 
-# [PROGRAM NAME] - Complete Workout Program
-
-**Program Overview:**
-- Duration: [X weeks] 
-- Training Days: [X days per week]
-- Split: [split type and description]
-- Goal: [primary goal focus]
-
-## Daily Workout Sessions
-
-### Block 1: [Block Name] (Weeks 1-[X])
-**Focus:** [rep range and training emphasis, e.g., "Hypertrophy: 8-12 reps"]
-
-#### Day 1: [Session Name] (~[X] minutes)
-**Target Muscles:** [primary muscle groups]
-
-| Exercise | Sets | Reps | Rest | Primary Muscles | Secondary Muscles | Notes |
-|----------|------|------|------|-----------------|-------------------|-------|
-| [Exercise 1] | [X] | [X-X] | [X]s | [muscles] | [muscles] | [form cues or setup] |
-| [Exercise 2] | [X] | [X-X] | [X]s | [muscles] | [muscles] | [form cues or setup] |
-
-**Alternative Exercises:**
-- [Exercise 1] → [Alternative 1], [Alternative 2]
-- [Exercise 2] → [Alternative 1], [Alternative 2]
-
-#### Day 2: [Session Name] (~[X] minutes)
-[Same format as Day 1]
-
-[Continue for all training days in the block]
-
-### Block 2: [Block Name] (Weeks [X]-[X])
-**Focus:** [rep range and training emphasis]
-[Same format as Block 1, listing all days and exercises]
-
-[Continue for all blocks in the program]
-
-## Weekly Progression Schedule
-
-### Block 1 Progression (Weeks 1-[X])
-**Week 1:**
-- All exercises: Start at lower end of rep ranges
-
-**Week 2:**
-- Add 1 rep to all exercises or add weight if available
-
-**Week 3:**
-- Continue progression, aim for upper end of rep ranges
-
-[Continue for all weeks and blocks]
-
-## Exercise Database
-
-### [Exercise Name]
-**Primary Muscles:** [muscles]
-**Secondary Muscles:** [muscles] 
-**Equipment:** [required equipment]
-**Form Cues:** [key technique points]
-**Common Mistakes:** [what to avoid]
-**Alternatives:** [2-3 alternative exercises]
-
-[Include entry for every exercise in the program]
-
-## Implementation Guide
-
-### Rest Periods
-- Heavy Compounds (Squat, Deadlift, Bench): [X] seconds
-- Other Compounds: [X] seconds  
-- Isolation Exercises: [X] seconds
-
-### Deload Protocol
-**When:** Week [X] of each block
-**Method:** Reduce sets by 40% while maintaining rep ranges
-**Purpose:** Recovery and preparation for next block
-
-### Plateau Management
-**If you stall:** Drop reps by 2 and rebuild progression
-**Exercise Rotation:** Substitute similar movement patterns when needed
-
-### Session Structure
-1. **Warm-up** (5-10 minutes): Dynamic movements and mobility
-2. **Main Work** ([X] minutes): Follow exercise order as written
-3. **Cool-down** (5 minutes): Light stretching and recovery
-
-## Volume Distribution
-
-| Muscle Group | Sets/Week | Training Frequency |
-|--------------|-----------|-------------------|
-| [Muscle] | [X] | [X]x per week |
-
-<!-- END PROGRAM DOCUMENT -->
-
-**FORMAT REQUIREMENTS:**
-- Create the program as a text document (not a formatted document)
-- Use simple text formatting with headers, bullet points, and tables
-- Make it fast to generate and easy to copy/edit
-- **INCLUDE ALL WORKOUT SESSIONS** in the document with complete exercise details
-- **INCLUDE PROGRESSION SCHEDULE** showing week-by-week changes
-- **INCLUDE EXERCISE DATABASE** with alternatives and form guidance  
-- **INCLUDE IMPLEMENTATION GUIDE** with rest periods and protocols
-- Every exercise must have sets, reps, rest periods, muscle tags, and alternatives
-- Present ONLY the final program document — do not show working, drafts, or iteration`;
+Write naturally — this is a planning conversation, not a final document. The user will request changes before moving to JSON conversion.`;
 
 export const MUSCLE_TAXONOMY = `---
 
@@ -419,57 +310,59 @@ export const getRule3 = (hasActivityGoals: boolean): string => {
 export const STATIC_RULES_4_5_6_7 = `4. **Treat exercise names as identifiers** — once an exercise name appears in the plan, use that exact string everywhere (across blocks, in superset references, in notes). No variation.
 5. **Make definitive choices** — explain reasoning and trade-offs, but commit to a plan. The user will tell you what to change.
 6. **Respect exercise preferences** — if the profile lists liked exercises, incorporate them where they fit the plan. If it lists disliked exercises, avoid them and use alternatives for that movement pattern.
-7. **Only program working sets** — do not include warm-up sets in the plan. The app tracks working sets only.`;
+7. **Only program working sets** — do not include warm-up sets in the plan. The app tracks working sets only.
+8. **Exercise placement** — place exercises on days that match their movement pattern. Leg exercises (isolation or compound) belong on Legs or Lower days only. Do not place them on Upper or Push/Pull days to solve a volume shortfall.
+9. **Volume distribution** — when a muscle group is below target, distribute additional sets across multiple days to achieve at least 2x weekly frequency. Never stack all sets for a muscle onto a single day just to hit a weekly number.`;
 
-// Rule 8 variants by goal
+// Rule 10 variants by goal
 export const getRule8 = (goal: string): string => {
   if (goal === 'build_muscle' || goal === 'body_recomposition' || goal === 'burn_fat') {
-    return `8. **Exercise count per session** — aim for 6-10 exercises per session. Supersets count as 2 exercises.`;
+    return `10. **Exercise count per session** — aim for 6-10 exercises per session. Supersets count as 2 exercises.`;
   } else if (goal === 'gain_strength' || goal === 'sport_specific') {
-    return `8. **Exercise count per session** — aim for 4-7 exercises per session. Fewer exercises with more sets on primary lifts. Supersets count as 2 exercises.`;
+    return `10. **Exercise count per session** — aim for 4-7 exercises per session. Fewer exercises with more sets on primary lifts. Supersets count as 2 exercises.`;
   } else if (goal === 'general_fitness') {
-    return `8. **Exercise count per session** — aim for 5-8 exercises per session. Supersets count as 2 exercises.`;
+    return `10. **Exercise count per session** — aim for 5-8 exercises per session. Supersets count as 2 exercises.`;
   } else {
     // custom_primary - show all ranges
-    return `8. **Exercise count per session** — aim for 6-10 exercises per session for hypertrophy programs, 4-7 for strength programs, and 5-8 for general fitness. These are guidelines, not hard limits — supersets count as 2 exercises.`;
+    return `10. **Exercise count per session** — aim for 6-10 exercises per session for hypertrophy programs, 4-7 for strength programs, and 5-8 for general fitness. These are guidelines, not hard limits — supersets count as 2 exercises.`;
   }
 };
 
 export const ROTATION_PERIODIZATION_HEADER = `
 ### Rotation and Periodization`;
 
-export const RULE_9 = `9. **Rotate secondary goal activities** — if the user has preferred activities (cardio types, sports, flexibility work, etc.), rotate through them across weeks. Every preferred activity should appear at least once per block.`;
+export const RULE_11 = `11. **Rotate secondary goal activities** — if the user has preferred activities (cardio types, sports, flexibility work, etc.), rotate through them across weeks. Every preferred activity should appear at least once per block.`;
 
-export const RULE_10 = `10. **Rotate exercises between blocks** — change exercise variations while keeping movement patterns. Longer programs need more distinct exercise pools to prevent staleness.`;
+export const RULE_12 = `12. **Rotate exercises between blocks** — change exercise variations while keeping movement patterns. Longer programs need more distinct exercise pools to prevent staleness.`;
 
-export const RULE_11 = `11. **Long-term periodization** — for programs longer than 16 weeks, describe how training evolves across repeated cycles. Don't just rotate exercises — show how rep ranges, volume, or intensity shift over the course of the program.`;
+export const RULE_13 = `13. **Long-term periodization** — for programs longer than 16 weeks, describe how training evolves across repeated cycles. Don't just rotate exercises — show how rep ranges, volume, or intensity shift over the course of the program.`;
 
 export const BLOCK_STRUCTURE_HEADER = `
 ### Block Structure`;
 
-// Rule 12 variants by experience
+// Rule 14 variants by experience
 export const getRule12 = (expTier: string): string => {
   if (expTier === 'beginner') {
-    return `12. **Preferred block length by experience:**
+    return `14. **Preferred block length by experience:**
     - **Beginner:** 4-6 weeks per block (including deload if applicable).`;
   } else if (expTier === 'intermediate') {
-    return `12. **Preferred block length by experience:**
+    return `14. **Preferred block length by experience:**
     - **Intermediate:** 5-6 weeks per block (4-5 training weeks + 1 deload).`;
   } else if (expTier === 'advanced') {
-    return `12. **Preferred block length by experience:**
+    return `14. **Preferred block length by experience:**
     - **Advanced:** 5-6 weeks per block (4-5 training weeks + 1 deload).`;
   } else {
     // Fallback
-    return `12. **Preferred block length by experience:**
+    return `14. **Preferred block length by experience:**
     - **Beginner:** 4-6 weeks per block (including deload if applicable).
     - **Intermediate:** 5-6 weeks per block (4-5 training weeks + 1 deload).
     - **Advanced:** 5-6 weeks per block (4-5 training weeks + 1 deload).`;
   }
 };
 
-// Rule 13 variants by duration
+// Rule 15 variants by duration
 export const getRule13 = (duration: string): string => {
-  const rule13Header = `13. **Program duration → block count:**`;
+  const rule13Header = `15. **Program duration → block count:**`;
   
   if (duration === '4_weeks') {
     return `${rule13Header}
@@ -497,7 +390,7 @@ export const getRule13 = (duration: string): string => {
   }
 };
 
-export const RULE_14 = `14. **Mesocycle structure for programs 13+ weeks:** Any program longer than 12 weeks must be organised into mesocycles. Each mesocycle is typically 12-13 weeks (2-3 blocks). Each mesocycle shifts training emphasis — e.g., Mesocycle 1: Hypertrophy (8-12 reps), Mesocycle 2: Strength-Hypertrophy (6-10 reps), Mesocycle 3: Metabolic/Intensity (10-15 reps + advanced techniques).
+export const RULE_16 = `16. **Mesocycle structure for programs 13+ weeks:** Any program longer than 12 weeks must be organised into mesocycles. Each mesocycle is typically 12-13 weeks (2-3 blocks). Each mesocycle shifts training emphasis — e.g., Mesocycle 1: Hypertrophy (8-12 reps), Mesocycle 2: Strength-Hypertrophy (6-10 reps), Mesocycle 3: Metabolic/Intensity (10-15 reps + advanced techniques).
 
 **Declare the full mesocycle structure upfront** before detailing any exercises — output a Mesocycle Roadmap table in this format:
 
@@ -506,7 +399,7 @@ export const RULE_14 = `14. **Mesocycle structure for programs 13+ weeks:** Any 
 | 1 | [name] | [e.g. 8-12] | [e.g. Hypertrophy] | [X] | [X] |
 | 2 | [name] | [e.g. 6-10] | [e.g. Strength-Hypertrophy] | [X] | [X] |
 
-Then detail exercises for Mesocycle 1's blocks only. Prompts 2 and 3 will handle subsequent mesocycles using this roadmap as their reference.`;
+Then detail exercises for **Block 1 of Mesocycle 1 only**. The user will approve each block before requesting the next. Do not generate Block 2 or any subsequent blocks until asked.`;
 
 export const RECOVERY_PROGRESSION_HEADER = `
 ### Recovery and Progression`;
@@ -536,16 +429,16 @@ export const getRule15 = (expTier: string, duration: string): string => {
   }
 };
 
-export const RULE_16 = `16. **Deload structure** — deload weeks reduce total sets by ~40-50% while maintaining movement patterns. Rep ranges increase by 2-3 reps per set. The app does not track weight — do not reference load reductions.`;
+export const RULE_17 = `17. **Deload structure** — deload weeks reduce total sets by ~40-50% while maintaining movement patterns. Rep ranges increase by 2-3 reps per set. The app does not track weight — do not reference load reductions.`;
 
-export const RULE_17 = `17. **Plateau management** — for programs 8 weeks or longer, include guidance for when the lifter stalls on a prescribed progression. Frame in terms of rep targets, not weight.`;
+export const RULE_18 = `18. **Plateau management** — for programs 8 weeks or longer, include guidance for when the lifter stalls on a prescribed progression. Frame in terms of rep targets, not weight.`;
 
 export const BALANCE_HEADER = `
 ### Balance`;
 
-export const STATIC_RULE_18 = `18. **Pull movement balance** — vertical pulls (pulldowns, pull-ups) should make up at least one-third of total back volume.`;
+export const STATIC_RULE_19 = `19. **Pull movement balance** — vertical pulls (pulldowns, pull-ups) should make up at least one-third of total back volume.`;
 
-export const RULE_19 = `19. **Complete block coverage** — the plan must explicitly cover every block (with the diff-based exception for 5+ block programs as described in the output format).`;
+export const RULE_20 = `20. **Complete block coverage** — the plan must explicitly cover every block (with the diff-based exception for 5+ block programs as described in the output format).`;
 
 // ================================
 // REST TIME DEFAULTS
@@ -664,7 +557,7 @@ If the profile specifies priority muscles, increase those toward 16-22 sets/week
 
 ### Exempt Muscles (Can Show 0 Direct Sets)
 
-Front Delts, Traps, Rear Delts, Forearms — these get sufficient indirect work from compounds. Core may be exempt for short programs (under 12 weeks) but should be included in longer programs.`;
+Front Delts, Traps, Rear Delts, Forearms — these get sufficient indirect work from compounds. Core inclusion is controlled by the Direct Core Work setting in the user's profile — see point 7 in the Volume Verification Requirements above. Do not apply length-based core exemption rules. **Note:** Core being exempt from volume targets means it does not trigger a LOW flag and does not count toward any muscle group's set tally — it does not mean skip core entirely. Whether to include core exercises is determined solely by the Direct Core Work setting.`;
 
 // Exempt muscles with conditional rear delt recommendation
 export const getExemptMuscles = (approach: string, gymDays: number): string => {
@@ -698,6 +591,7 @@ export const STATIC_STATUS_INDICATORS = `
 ### Quality Standards
 
 - If any non-exempt muscle is below minimum, **revise the plan before presenting**.
+- Soft justifications such as 'compound pulling provides sufficient stimulus', 'close enough to floor', or 'mechanical overlap covers the deficit' are not valid reasons to leave a LOW status unfixed. If a muscle is below its experience-scaled floor, add a set — do not rationalise the gap.
 - If the user's approach targets aren't met and a practical fix exists (add a superset, swap an exercise), **implement it** rather than flagging.
 - After verifying ranges, **check distribution balance** — avoid some muscles maxed out while others sit at the floor.
 
@@ -830,7 +724,8 @@ function getProgramDocumentFormat(): string {
 // ================================
 
 export function assemblePlanningPrompt(
-  data: QuestionnaireData
+  data: QuestionnaireData,
+  mesocycleContext?: ProgramContext
 ): string {
   // Derive trigger values
   const goal = data.primaryGoal || 'build_muscle';
@@ -883,10 +778,24 @@ export function assemblePlanningPrompt(
 
 ${generateProgramSpecs(data)}`;
 
+  // Inject mesocycle context if continuing from a previous phase
+  if (mesocycleContext?.previousMesocycleSummary || mesocycleContext?.mesocycleRoadmapText) {
+    prompt += `\n\n---\n\n## MESOCYCLE CONTEXT\n\nThis program is a continuation of a longer plan.\n`;
+    if (mesocycleContext.mesocycleRoadmapText) {
+      prompt += `\n**Mesocycle Roadmap:**\n${mesocycleContext.mesocycleRoadmapText}\n`;
+    }
+    if (mesocycleContext.previousMesocycleSummary) {
+      const s = mesocycleContext.previousMesocycleSummary;
+      prompt += `\n**Previous Mesocycle Summary (Mesocycle ${s.mesocycleNumber} — ${s.phaseName}):**\n`;
+      prompt += `- Split: ${s.splitStructure}\n`;
+      prompt += `- Rep focus: ${s.repRangeFocus}\n`;
+      prompt += `- Key exercises used: ${s.exercisesUsed?.join(', ') || 'not recorded'}\n`;
+      prompt += `\nRotate exercises from the previous phase and build on the established volume baseline.\n`;
+    }
+  }
+
   // === SECTION 3.5: Constraint Layer ===
   prompt += '\n\n' + generateConstraintLayer(data);
-
-  // Mesocycle auto-continuation logic removed for better UX
   
   // === SECTION 4: Muscle Taxonomy + Tagging ===
   prompt += '\n\n' + MUSCLE_TAXONOMY;
@@ -909,24 +818,25 @@ ${generateProgramSpecs(data)}`;
   prompt += '\n' + getRule8(goal);
   
   prompt += '\n' + ROTATION_PERIODIZATION_HEADER;
-  if (hasActivityGoals) prompt += '\n' + RULE_9;
-  if (!isShortProgram) prompt += '\n' + RULE_10;
+  if (hasActivityGoals) prompt += '\n' + RULE_11;
+  if (!isShortProgram) prompt += '\n' + RULE_12;
   
   // Use simple rules without mesocycle auto-continuation
-  if (isLongProgram) prompt += '\n' + RULE_11;
+  if (isLongProgram) prompt += '\n' + RULE_13;
   prompt += '\n' + BLOCK_STRUCTURE_HEADER;
   prompt += '\n' + getRule12(expTier);
   prompt += '\n' + getRule13(duration);
-  if (isLongProgram) prompt += '\n' + RULE_14;
+  const needsMesocycleStructure = isLongProgram || duration === '12_weeks';
+  if (needsMesocycleStructure) prompt += '\n' + RULE_16;
   
   prompt += '\n' + RECOVERY_PROGRESSION_HEADER;
   prompt += '\n' + getRule15(expTier, duration);
-  if (deloadsNeeded) prompt += '\n' + RULE_16;
-  if (duration !== '4_weeks') prompt += '\n' + RULE_17;
+  if (deloadsNeeded) prompt += '\n' + RULE_17;
+  if (duration !== '4_weeks') prompt += '\n' + RULE_18;
   
   prompt += '\n' + BALANCE_HEADER;
-  prompt += '\n' + STATIC_RULE_18;
-  if (!isShortProgram) prompt += '\n' + RULE_19;
+  prompt += '\n' + STATIC_RULE_19;
+  if (!isShortProgram) prompt += '\n' + RULE_20;
   
   // === SECTION 6: Rest Time Defaults ===
   prompt += '\n\n' + REST_SECTION_HEADER;
@@ -945,5 +855,7 @@ ${generateProgramSpecs(data)}`;
   // === SECTION 8: Goal-Specific Guidance ===
   prompt += '\n\n' + getGoalGuidance(goal);
   
+  prompt += `\n\n---\n\n## NEXT STEP\n\nOnce you have presented the program document, end your response with exactly this message:\n\n"Program complete. **Next step:** Paste the Review Prompt from the app into this conversation to verify this plan before generating JSON."`;
+
   return prompt;
 }

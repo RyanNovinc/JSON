@@ -115,6 +115,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const [likedExercises, setLikedExercises] = useState<string>('');
   const [dislikedExercises, setDislikedExercises] = useState<string>('');
   const [exerciseNoteDetail, setExerciseNoteDetail] = useState<'detailed' | 'brief' | 'minimal'>('brief');
+  const [includeDirectCore, setIncludeDirectCore] = useState<boolean>(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -154,6 +155,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         setLikedExercises(data.likedExercises || '');
         setDislikedExercises(data.dislikedExercises || '');
         setExerciseNoteDetail(data.exerciseNoteDetail || 'brief');
+        setIncludeDirectCore(data.includeDirectCore !== undefined ? data.includeDirectCore : true);
         
         // If questionnaire was completed, show summary directly
         if (data.completedAt) {
@@ -186,6 +188,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         likedExercises,
         dislikedExercises,
         exerciseNoteDetail,
+        includeDirectCore,
         currentStep,
         // Note: no completedAt field - this indicates it's in progress
       };
@@ -202,7 +205,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       saveProgress();
     }
   }, [selectedEquipment, specificEquipment, unavailableEquipment, workoutDuration, customDuration, useAISuggestion,
-      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, exerciseNoteDetail]);
+      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, exerciseNoteDetail, includeDirectCore]);
 
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
@@ -310,6 +313,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         likedExercises,
         dislikedExercises,
         exerciseNoteDetail,
+        includeDirectCore,
         completedAt: new Date().toISOString(),
       };
 
@@ -861,6 +865,40 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             Help us personalize your workouts (all fields are optional)
           </Text>
 
+          {/* Direct Core Work Toggle */}
+          <Animatable.View animation="fadeInUp" delay={75} style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Include direct core work?</Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {[
+                { id: true, label: 'Yes', subtitle: 'Planks, ab work, cable crunches' },
+                { id: false, label: 'No', subtitle: 'Core trained via compounds only' },
+              ].map((option) => {
+                const isSelected = includeDirectCore === option.id;
+                return (
+                  <TouchableOpacity
+                    key={String(option.id)}
+                    style={[
+                      styles.optionItem,
+                      { flex: 1 },
+                      isSelected && { backgroundColor: `${themeColor}10`, borderColor: themeColor }
+                    ]}
+                    onPress={() => setIncludeDirectCore(option.id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.optionHeader}>
+                      <Text style={[styles.optionTitle, isSelected && { color: themeColor }]}>
+                        {option.label}
+                      </Text>
+                      <View style={[styles.radioCircle, isSelected && { borderColor: themeColor, backgroundColor: themeColor }]}>
+                        {isSelected && <View style={styles.radioInner} />}
+                      </View>
+                    </View>
+                    <Text style={styles.optionSubtitle}>{option.subtitle}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Animatable.View>
           
           {/* Liked Exercises */}
           <Animatable.View
@@ -1075,6 +1113,18 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               </View>
             )}
 
+            
+            <View style={[styles.tronDataRow, { borderBottomColor: `${themeColor}30` }]}>
+              <View style={styles.tronLabelSection}>
+                <View style={[styles.tronLabelIndicator, { backgroundColor: themeColor, shadowColor: themeColor }]} />
+                <Text style={[styles.tronLabel, { color: themeColor }]}>CORE WORK</Text>
+              </View>
+              <View style={styles.tronValueSection}>
+                <Text style={styles.tronValue}>
+                  {includeDirectCore ? 'Direct core exercises included' : 'Core via compounds only'}
+                </Text>
+              </View>
+            </View>
 
             {/* Exercise Preferences Row */}
             {(likedExercises || dislikedExercises) && (

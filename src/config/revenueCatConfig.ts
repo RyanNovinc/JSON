@@ -35,7 +35,7 @@ export const REVENUECAT_CONFIG = {
 
   // Package IDs within offerings (Test Store has built-in packages)
   packages: {
-    lifetime_pro_tier_1: __DEV__ ? '$rc_lifetime' : 'lifetime_pro_tier_1', // Test Store package
+    lifetime_pro_tier_1: '$rc_lifetime', // Use same package ID for both dev and production
   },
   
   // Debug mode

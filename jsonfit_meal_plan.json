@@ -1,12 +1,12 @@
 {
   "id": "mp_20250308_ryan_bulk",
-  "name": "Quick Prep Muscle Fuel",
+  "name": "7-Day Bulk Meal Plan — Assembly Only",
   "startDate": "2025-03-08",
   "endDate": "2025-03-14",
   "dailyMeals": {
     "2025-03-08": {
       "date": "2025-03-08",
-      "dayName": "Saturday",
+      "dayName": "Sunday",
       "meals": [
         {
           "id": "meal_20250308_breakfast",
@@ -112,7 +112,7 @@
     },
     "2025-03-09": {
       "date": "2025-03-09",
-      "dayName": "Sunday",
+      "dayName": "Monday",
       "meals": [
         {
           "id": "meal_20250309_breakfast",
@@ -218,7 +218,7 @@
     },
     "2025-03-10": {
       "date": "2025-03-10",
-      "dayName": "Monday",
+      "dayName": "Tuesday",
       "meals": [
         {
           "id": "meal_20250310_breakfast",
@@ -324,7 +324,7 @@
     },
     "2025-03-11": {
       "date": "2025-03-11",
-      "dayName": "Tuesday",
+      "dayName": "Wednesday",
       "meals": [
         {
           "id": "meal_20250311_breakfast",
@@ -430,7 +430,7 @@
     },
     "2025-03-12": {
       "date": "2025-03-12",
-      "dayName": "Wednesday",
+      "dayName": "Thursday",
       "meals": [
         {
           "id": "meal_20250312_breakfast",
@@ -536,7 +536,7 @@
     },
     "2025-03-13": {
       "date": "2025-03-13",
-      "dayName": "Thursday",
+      "dayName": "Friday",
       "meals": [
         {
           "id": "meal_20250313_breakfast",
@@ -642,7 +642,7 @@
     },
     "2025-03-14": {
       "date": "2025-03-14",
-      "dayName": "Friday",
+      "dayName": "Saturday",
       "meals": [
         {
           "id": "meal_20250314_breakfast",

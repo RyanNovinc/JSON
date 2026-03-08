@@ -56,6 +56,7 @@ export interface QuestionnaireData {
   likedExercises?: string[];
   dislikedExercises?: string[];
   exerciseNoteDetail?: 'detailed' | 'brief' | 'minimal';
+  includeDirectCore?: boolean;
 }
 
 export const generateProgramSpecs = (data?: QuestionnaireData): string => {
@@ -306,6 +307,10 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
     specs += `**Exercise Note Detail:** ${detailLabels[data.exerciseNoteDetail]}\n`;
   }
 
+  if (data.includeDirectCore !== undefined) {
+    specs += `**Direct Core Work:** ${data.includeDirectCore ? 'Yes — include dedicated core exercises' : 'No — omit direct core work'}\n`;
+  }
+
   return specs;
 };
 
@@ -393,7 +398,7 @@ Apply these checks to the block before correcting the JSON:
 
 Each block should be a complete, standalone JSON file with routine_name, description, days_per_week, and a single block in the blocks array. Keep routine_name and description consistent across all files.
 
-**Long programs (5+ blocks):** After every 3rd block, suggest the user start a fresh chat to maintain output quality. Say: "For best results on long programs, I recommend starting a fresh chat for the next batch of blocks. Paste your plan + this generation prompt and say 'Generate Block [next letter].' The plan contains everything needed — no prior conversation context is required."
+**Long programs (5+ blocks):** Continue generating blocks in this same conversation. Do not suggest starting a fresh chat.
 
 **Mesocycle-based programs:** If the plan states this is Mesocycle [X] of [N], after generating and delivering the FINAL block of this mesocycle:
 
@@ -404,7 +409,7 @@ If X < N:
    - Rep range focus
    - Volume per muscle group (sets/week from your volume summaries)
    - Key exercises used across all blocks
-2. Then say: "Mesocycle [X] complete. Paste your Planning Prompt to plan Mesocycle [X+1] — I'll use the summary above and the roadmap from your plan to design the next phase."
+2. Then say: "Mesocycle [X] complete. When you're ready to continue, just ask me to generate Mesocycle [X+1] — I'll use the roadmap and summary above to design the next phase in this same conversation."
 
 If X equals N, say: "That completes your full program — all [N] mesocycles are done. Enjoy your training!"
 
@@ -414,9 +419,9 @@ The plan is fully self-contained: it lists all exercise pools, block structures,
 
 ## Translation Principles
 
-1. **The plan is authoritative** — use the exercise names, sets, muscle tags, superset pairings, and day structure exactly as specified. Do not add, remove, or rename exercises. If the plan declares a mesocycle structure, append \`- Mesocycle X\` to the routine_name in every JSON file for that mesocycle (e.g., \`"Iron Year - Mesocycle 1"\`). This is required for the app to correctly associate imported blocks with the right mesocycle.
+1. **The plan is authoritative** — use the exercise names, sets, muscle tags, superset pairings, and day structure exactly as specified. Do not add, remove, or rename exercises. If the plan declares a mesocycle structure, append \`- Mesocycle X\` to the routine_name in every JSON file for that mesocycle (e.g., \`"Iron Year - Mesocycle 1"\`). This is required for the app to correctly associate imported blocks with the right mesocycle. The reviewed plan is authoritative on set counts and exercise selection — do not add, remove, or reduce sets on any exercise to fix volume calculations. If your volume recalculation produces a HIGH or LOW flag that differs from the reviewed plan's audit, note the discrepancy in your volume summary but proceed with the reviewed plan's set counts unchanged.
 2. **Treat exercise names as identifiers** — use the exact same string for the same exercise across all blocks, days, notes, and superset references. Never vary naming (e.g., always "Overhead Cable Extension", never "Cable Overhead Extension").
-3. **Design what the plan doesn't specify** — you are responsible for rep progressions, rest periods, alternative exercises, and technique notes. The plan provides structure; you provide programming detail.
+3. **Design what the plan doesn't specify** — you are responsible for rest periods, alternative exercises, and technique notes. For rep progressions: if the plan states a progression scheme, follow it exactly. If the plan is silent on progressions, use the defaults below. The plan provides structure; you provide programming detail.
 4. **Only program working sets** — do not include warm-up sets. The app tracks working sets only.
 5. **The plan is self-contained** — it contains every exercise pool, block structure, and periodization detail needed to generate any block. Always reference the plan for exercise names and structure — never rely on memory of prior blocks in the conversation. If the plan uses a diff-based format for later blocks (referencing carryovers from earlier blocks), first reconstruct the complete exercise list by applying the stated changes to the referenced base block, then generate JSON from that complete list. Every block's JSON must contain all exercises for all days.
 
@@ -427,6 +432,10 @@ The plan is fully self-contained: it lists all exercise pools, block structures,
 ### Rep Progressions
 
 For each exercise, design a weekly rep progression across the block. Since the app doesn't track weight, progressions are expressed entirely through rep targets — the user manages their own load increases.
+
+**Starting point rule:**
+- **Compounds:** Start at the TOP of the prescribed range in Week 1, reduce across the block. The rep ceiling is Week 1; the floor is the final training week before deload. This signals increasing load week over week.
+- **Isolations:** Start at the BOTTOM of the prescribed range in Week 1, climb toward the ceiling across the block. Never start at the ceiling — leave room to progress.
 
 **Linear progression (default for compounds):**
 Maintain rep targets in early weeks. Slight rep reduction in later weeks signals that the lifter should be using heavier loads.

@@ -149,14 +149,9 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({
       console.error('[RevenueCatContext] Purchase failed:', err);
       setError(err.message || 'Purchase failed');
       
-      // Show user-friendly error
-      Alert.alert(
-        'Purchase Failed',
-        'We encountered an issue processing your purchase. Please try again.',
-        [{ text: 'OK' }]
-      );
-      
-      return false;
+      // Don't show alert here - let the calling component handle it
+      // This allows us to show detailed production errors
+      throw err;
     }
   }, []);
 
@@ -173,11 +168,6 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({
         setCustomerInfo(result.customerInfo);
         
         if (result.restoredCount > 0) {
-          Alert.alert(
-            'Purchases Restored',
-            `Successfully restored ${result.restoredCount} purchase${result.restoredCount === 1 ? '' : 's'}.`,
-            [{ text: 'OK' }]
-          );
           console.log('[RevenueCatContext] Purchases restored successfully');
           return true;
         } else {

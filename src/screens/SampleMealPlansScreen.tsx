@@ -97,10 +97,58 @@ export default function SampleMealPlansScreen() {
     setShowMealPlanInfo(true);
   };
 
+  const generateDynamicMealPlan = () => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dynamicMealPlan = { ...muscleGainMealPlanData };
+    
+    // Generate 7 days starting from tomorrow
+    const newDailyMeals: any = {};
+    const oldDates = Object.keys(muscleGainMealPlanData.dailyMeals).sort();
+    
+    for (let i = 0; i < 7; i++) {
+      const currentDate = new Date(tomorrow);
+      currentDate.setDate(tomorrow.getDate() + i);
+      
+      const dateString = currentDate.toISOString().split('T')[0];
+      const dayName = dayNames[currentDate.getDay()];
+      const oldDateKey = oldDates[i];
+      
+      if (muscleGainMealPlanData.dailyMeals[oldDateKey]) {
+        newDailyMeals[dateString] = {
+          ...muscleGainMealPlanData.dailyMeals[oldDateKey],
+          date: dateString,
+          dayName: dayName
+        };
+        
+        // Update meal IDs and timestamps
+        newDailyMeals[dateString].meals = newDailyMeals[dateString].meals.map((meal: any) => ({
+          ...meal,
+          id: meal.id.replace(/\d{8}/, dateString.replace(/-/g, '')),
+          addedAt: `${dateString}T${meal.time.includes('AM') ? '0' : '1'}${meal.time.slice(0, 1)}:${meal.time.slice(2, 4)}:00.000Z`
+        }));
+      }
+    }
+    
+    // Update dates and daily meals
+    dynamicMealPlan.startDate = tomorrow.toISOString().split('T')[0];
+    const endDate = new Date(tomorrow);
+    endDate.setDate(tomorrow.getDate() + 6);
+    dynamicMealPlan.endDate = endDate.toISOString().split('T')[0];
+    dynamicMealPlan.dailyMeals = newDailyMeals;
+    dynamicMealPlan.metadata.generatedAt = new Date().toISOString();
+    
+    return dynamicMealPlan;
+  };
+
   const handleSelectMealPlan = async () => {
     try {
-      // Copy JSON to clipboard
-      const jsonString = JSON.stringify(muscleGainMealPlanData, null, 2);
+      // Generate meal plan with dynamic dates
+      const dynamicMealPlan = generateDynamicMealPlan();
+      const jsonString = JSON.stringify(dynamicMealPlan, null, 2);
       await Clipboard.setStringAsync(jsonString);
       
       // Show copied overlay
@@ -186,13 +234,13 @@ export default function SampleMealPlansScreen() {
 
                   {/* Content */}
                   <View style={styles.content}>
-                    <Text style={styles.title}>Muscle Gain Pro</Text>
-                    <Text style={styles.subtitle}>High-protein muscle building</Text>
+                    <Text style={styles.title}>Quick Prep Muscle Fuel</Text>
+                    <Text style={styles.subtitle}>Assembly-only high-protein plan</Text>
                     
                     <View style={styles.details}>
-                      <Text style={styles.detailText}>Muscle Building & Performance</Text>
-                      <Text style={styles.macros}>7 days • 30P/39C/31F</Text>
-                      <Text style={[styles.calories, { color: themeColor }]}>2,500 calories per day</Text>
+                      <Text style={styles.detailText}>Assembly-Only Meal Prep</Text>
+                      <Text style={styles.macros}>7 days • 253P/291C/70F</Text>
+                      <Text style={[styles.calories, { color: themeColor }]}>2,857 calories per day</Text>
                     </View>
                   </View>
 
@@ -217,7 +265,7 @@ export default function SampleMealPlansScreen() {
                     <View style={styles.copiedContent}>
                       <Ionicons name="checkmark-circle" size={60} color="#ffffff" />
                       <Text style={styles.copiedTitle}>Copied!</Text>
-                      <Text style={styles.copiedSubtitle}>Muscle Gain Pro is ready to import</Text>
+                      <Text style={styles.copiedSubtitle}>Quick Prep Muscle Fuel is ready to import</Text>
                     </View>
                   </LinearGradient>
                 </View>
@@ -306,7 +354,7 @@ export default function SampleMealPlansScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Muscle Gain Pro</Text>
+              <Text style={styles.modalTitle}>Quick Prep Muscle Fuel</Text>
               <TouchableOpacity
                 onPress={() => setShowInfo(false)}
                 style={styles.closeButton}
@@ -317,36 +365,36 @@ export default function SampleMealPlansScreen() {
             
             <View style={styles.modalContent}>
               <Text style={styles.modalDescription}>
-                This high-protein meal plan is designed specifically for muscle building and performance enhancement. Each recipe includes detailed nutritional information and preparation instructions.
+                This assembly-only meal plan requires minimal cooking - just microwave, assembly, and simple prep. Perfect for busy lifestyles while maximizing muscle-building nutrition.
               </Text>
               
               <View style={styles.nutritionInfo}>
                 <Text style={styles.nutritionTitle}>Daily Nutrition Targets:</Text>
                 <View style={styles.nutritionRow}>
                   <Text style={styles.nutritionLabel}>Calories:</Text>
-                  <Text style={[styles.nutritionValue, { color: themeColor }]}>2,500</Text>
+                  <Text style={[styles.nutritionValue, { color: themeColor }]}>2,857</Text>
                 </View>
                 <View style={styles.nutritionRow}>
                   <Text style={styles.nutritionLabel}>Protein:</Text>
-                  <Text style={[styles.nutritionValue, { color: themeColor }]}>30%</Text>
+                  <Text style={[styles.nutritionValue, { color: themeColor }]}>253g</Text>
                 </View>
                 <View style={styles.nutritionRow}>
                   <Text style={styles.nutritionLabel}>Carbs:</Text>
-                  <Text style={[styles.nutritionValue, { color: themeColor }]}>39%</Text>
+                  <Text style={[styles.nutritionValue, { color: themeColor }]}>291g</Text>
                 </View>
                 <View style={styles.nutritionRow}>
                   <Text style={styles.nutritionLabel}>Fat:</Text>
-                  <Text style={[styles.nutritionValue, { color: themeColor }]}>31%</Text>
+                  <Text style={[styles.nutritionValue, { color: themeColor }]}>70g</Text>
                 </View>
               </View>
               
               <View style={styles.features}>
                 <Text style={styles.featuresTitle}>Features:</Text>
-                <Text style={styles.featureItem}>• 10 high-protein recipes</Text>
-                <Text style={styles.featureItem}>• 7-day meal prep schedule</Text>
-                <Text style={styles.featureItem}>• Detailed nutritional breakdown</Text>
-                <Text style={styles.featureItem}>• Shopping lists included</Text>
-                <Text style={styles.featureItem}>• Preparation instructions</Text>
+                <Text style={styles.featureItem}>• Assembly-only meals (no cooking)</Text>
+                <Text style={styles.featureItem}>• 15-minute weekly prep session</Text>
+                <Text style={styles.featureItem}>• Grocery list with real pricing ($224.50)</Text>
+                <Text style={styles.featureItem}>• Pre-portioned ingredients</Text>
+                <Text style={styles.featureItem}>• 253g protein per day</Text>
               </View>
             </View>
           </View>

@@ -17,6 +17,7 @@ interface PurchaseResult {
   productIdentifier?: string;
   transaction?: any;
   errorCode?: string;
+  originalError?: string;
 }
 
 interface RestoreResult {
@@ -60,7 +61,11 @@ class RevenueCatService {
       // Get the appropriate API key based on environment
       const apiKey = getRevenueCatAPIKey();
       console.log(`[RevenueCat] Using API key: ${apiKey.substring(0, 8)}... (${__DEV__ ? 'Test Store' : 'Production'})`);
-      console.log(`[RevenueCat] Full API key for debugging: ${apiKey}`);
+      if (!__DEV__) {
+        console.log(`[RevenueCat] Production mode - using Apple App Store`);
+        console.log(`[RevenueCat] Expected offering: ${REVENUECAT_CONFIG.offerings.lifetime_pro}`);
+        console.log(`[RevenueCat] Expected package: ${REVENUECAT_CONFIG.packages.lifetime_pro_tier_1}`);
+      }
       
       // Configure SDK with LifeCompass-proven settings
       const config = {
@@ -278,15 +283,36 @@ class RevenueCatService {
       // Get the specific package from offering
       const offering = this.offerings.all[offeringId];
       if (!offering) {
-        console.error('Available offerings:', Object.keys(this.offerings.all));
-        throw new Error(`Offering ${offeringId} not found`);
+        const availableOfferings = Object.keys(this.offerings.all);
+        console.error('❌ [RevenueCat] Offering not found:', {
+          requested: offeringId,
+          available: availableOfferings,
+          isProduction: !__DEV__
+        });
+        
+        if (!__DEV__) {
+          throw new Error(`Production offering "${offeringId}" not found in RevenueCat dashboard. Available: ${availableOfferings.join(', ')}`);
+        } else {
+          throw new Error(`Offering ${offeringId} not found`);
+        }
       }
 
       const packageToPurchase = offering.availablePackages.find(pkg => pkg.identifier === packageId);
       
       if (!packageToPurchase) {
-        console.error('Available packages:', offering.availablePackages.map(p => p.identifier));
-        throw new Error(`Package ${packageId} not found in offering ${offeringId}`);
+        const availablePackages = offering.availablePackages.map(p => p.identifier);
+        console.error('❌ [RevenueCat] Package not found:', {
+          requested: packageId,
+          offering: offeringId,
+          available: availablePackages,
+          isProduction: !__DEV__
+        });
+        
+        if (!__DEV__) {
+          throw new Error(`Production package "${packageId}" not found in offering "${offeringId}". Available packages: ${availablePackages.join(', ')}. Check App Store Connect product setup.`);
+        } else {
+          throw new Error(`Package ${packageId} not found in offering ${offeringId}`);
+        }
       }
 
       // CRITICAL: Validate package data before purchase (prevents silent failures)
@@ -350,16 +376,89 @@ class RevenueCatService {
     } catch (error: any) {
       console.error('❌ [RevenueCat] Purchase failed:', error);
       
+      // Enhanced error logging for production debugging with EXTENSIVE details
+      const apiKey = getRevenueCatAPIKey();
+      const bundleId = Platform.select({
+        ios: 'com.ryannovinc.JSONfit',
+        android: 'com.ryannovinc.JSONfit',
+        default: 'unknown'
+      });
+      
+      const detailedError = {
+        message: error.message,
+        code: error.code,
+        domain: error.domain,
+        userInfo: error.userInfo,
+        underlyingError: error.underlyingError?.message || error.underlyingError,
+        stack: error.stack,
+        offering: offeringId,
+        package: packageId,
+        isProduction: !__DEV__,
+        platform: Platform.OS,
+        apiKey: apiKey,
+        bundleId: bundleId,
+        storeKitVersion: Platform.OS === 'ios' ? 'StoreKit 2' : 'N/A',
+        purchasesVersion: '5.x' // Update this to actual version
+      };
+      
+      const configState = {
+        isConfigured: this.isConfigured,
+        hasOfferings: !!this.offerings,
+        offeringsAvailable: this.offerings ? Object.keys(this.offerings.all) : [],
+        packageRequested: `${offeringId}.${packageId}`,
+        totalOfferingsCount: this.offerings ? Object.keys(this.offerings.all).length : 0,
+        currentOfferingId: this.offerings?.current?.identifier || 'None',
+        offeringsDetails: this.offerings ? Object.entries(this.offerings.all).map(([id, offering]) => ({
+          id,
+          packageCount: offering.availablePackages?.length || 0,
+          packages: offering.availablePackages?.map(pkg => ({
+            id: pkg.identifier,
+            productId: pkg.product?.identifier,
+            price: pkg.product?.priceString,
+            available: !!pkg.product
+          })) || []
+        })) : []
+      };
+      
+      console.error('🔍 [RevenueCat] Detailed error info:', detailedError);
+      console.error('🔍 [RevenueCat] Config state:', configState);
+      
+      // Create enhanced error object with debug info
+      const enhancedError = new Error(error.message || 'Purchase failed');
+      enhancedError.code = error.code;
+      enhancedError.debugInfo = {
+        ...detailedError,
+        ...configState
+      };
+      
       // Handle user cancelled purchase
       if (error.userCancelled) {
         return { success: false, userCancelled: true };
       }
       
-      return { 
-        success: false, 
-        error: error.message,
-        errorCode: error.code 
-      };
+      // Handle specific error codes
+      let userFriendlyMessage = 'Purchase failed. Please try again.';
+      
+      if (error.code === 'PURCHASE_NOT_ALLOWED') {
+        userFriendlyMessage = 'Purchases are not allowed on this device. Please check your device settings.';
+      } else if (error.code === 'PAYMENT_PENDING') {
+        userFriendlyMessage = 'Payment is pending approval. Please check your App Store account.';
+      } else if (error.code === 'PRODUCT_NOT_AVAILABLE') {
+        userFriendlyMessage = 'This product is temporarily unavailable. Please try again later.';
+      } else if (error.code === 'STOREFRONT_COUNTRY_CHANGED') {
+        userFriendlyMessage = 'Your App Store country has changed. Please try again.';
+      } else if (error.code === 'NETWORK_ERROR') {
+        userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.code === 'RECEIPT_ALREADY_IN_USE') {
+        userFriendlyMessage = 'This purchase has already been processed. Please restore purchases instead.';
+      }
+      
+      // Add debug info to enhanced error for production debugging
+      enhancedError.userFriendlyMessage = userFriendlyMessage;
+      enhancedError.originalCode = error.code;
+      
+      // Throw enhanced error so calling component can show debug details
+      throw enhancedError;
     }
   }
 
