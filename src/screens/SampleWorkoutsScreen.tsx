@@ -177,24 +177,25 @@ export default function SampleWorkoutsScreen() {
     {
       id: 'hypertrophy-52',
       title: 'Muscle Builder Pro',
-      description: 'Full year muscle growth',
-      duration: '5 days/week • 52 weeks',
+      description: 'Complete 1-year hypertrophy program',
+      duration: '5 days/week • 48 weeks',
       difficulty: 'Advanced',
-      focus: 'Hypertrophy & Strength',
+      focus: 'Advanced Hypertrophy Training',
       program: muscleBuilderProProgram,
       detailInfo: {
-        overview: 'A comprehensive 52-week periodized program using Lower/Push/Pull/Lower/Upper splits with strategic volume and intensity cycling.',
+        overview: 'Complete 48-week advanced 5-day Push/Pull/Legs/Upper/Lower hypertrophy program. 4 mesocycles of 2 blocks each, progressing through Hypertrophy Foundation, Strength-Hypertrophy, Metabolic Intensification, and Peak & Consolidation phases.',
         highlights: [
-          'Hits muscle groups 2x per week',
-          'Optimized rest periods for growth',
-          'Weekly rep progression',
-          'Periodized training blocks',
-          'Advanced exercise selection'
+          '4 mesocycles with progressive rep schemes',
+          'Push/Pull/Legs/Upper/Lower 5-day split',
+          'Hypertrophy Foundation (8-12 reps) → Peak & Consolidation (6-8 reps)',
+          'Metabolic Intensification and Strength-Hypertrophy phases',
+          '48-week structured progression',
+          'Designed for advanced commercial gym lifters'
         ],
-        targetMuscles: 'Prioritizes legs and calves while building balanced physique',
-        restPeriods: '90-210 seconds optimized for muscle growth',
-        progression: '4-week mesocycles: Accumulation → Intensification → Deload',
-        equipment: 'Full gym access required (barbells, cables, machines)'
+        targetMuscles: 'Complete physique development with Push/Pull/Legs/Upper/Lower split targeting all major muscle groups',
+        restPeriods: 'Optimized for hypertrophy and strength gains across different training phases',
+        progression: '4 mesocycles: Hypertrophy Foundation → Strength-Hypertrophy → Metabolic Intensification → Peak & Consolidation',
+        equipment: 'Commercial gym required (full range of barbells, dumbbells, machines, cables)'
       }
     }
   ];

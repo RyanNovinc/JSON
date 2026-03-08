@@ -312,7 +312,8 @@ export const STATIC_RULES_4_5_6_7 = `4. **Treat exercise names as identifiers** 
 6. **Respect exercise preferences** — if the profile lists liked exercises, incorporate them where they fit the plan. If it lists disliked exercises, avoid them and use alternatives for that movement pattern.
 7. **Only program working sets** — do not include warm-up sets in the plan. The app tracks working sets only.
 8. **Exercise placement** — place exercises on days that match their movement pattern. Leg exercises (isolation or compound) belong on Legs or Lower days only. Do not place them on Upper or Push/Pull days to solve a volume shortfall.
-9. **Volume distribution** — when a muscle group is below target, distribute additional sets across multiple days to achieve at least 2x weekly frequency. Never stack all sets for a muscle onto a single day just to hit a weekly number.`;
+9. **Volume distribution** — when a muscle group is below target, distribute additional sets across multiple days to achieve at least 2x weekly frequency. Never stack all sets for a muscle onto a single day just to hit a weekly number.
+10. **Sets per exercise cap** — do not exceed 5 sets of any single isolation exercise in one session. If volume targets require more sets than this allows, distribute across a second exercise or a second training day rather than stacking onto one exercise.`;
 
 // Rule 10 variants by goal
 export const getRule8 = (goal: string): string => {
