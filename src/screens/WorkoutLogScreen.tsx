@@ -2656,13 +2656,13 @@ export default function WorkoutLogScreen() {
               <Text style={styles.title}>{day?.day_name || 'Workout'}</Text>
               {(() => {
                 // Parse the block weeks to get total week count
-                const weeksRange = block.weeks || '1-4';
+                const weeksRange = block?.weeks || '1-4';
                 const totalWeeks = weeksRange.includes('-') 
                   ? parseInt(weeksRange.split('-')[1]) - parseInt(weeksRange.split('-')[0]) + 1
                   : 1;
                 
                 // Check if current week is a deload week
-                const isDeloadWeek = block.deload_weeks?.includes(currentWeek) || false;
+                const isDeloadWeek = block?.deload_weeks?.includes(currentWeek) || false;
                 const weekDisplay = `WEEK ${currentWeek} / ${totalWeeks}`;
                 const deloadLabel = isDeloadWeek ? ' — DELOAD' : '';
                 
@@ -2679,11 +2679,11 @@ export default function WorkoutLogScreen() {
             </View>
             <View style={styles.headerButtons}>
               {/* Deload Info Button */}
-          {block.deload_weeks?.includes(currentWeek) && (
+          {block?.deload_weeks?.includes(currentWeek) && (
             <TouchableOpacity 
               style={[styles.deloadHeaderButton, { borderColor: themeColor }]}
               onPress={() => {
-                const deloadGuidance = block.deload_guidance;
+                const deloadGuidance = block?.deload_guidance;
                 const previousWeek = currentWeek - 1;
                 
                 let message = '';
@@ -2781,7 +2781,7 @@ export default function WorkoutLogScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
       
-      {/* Minimized Timer or Start Timer Button */}
+      {/* Minimized Timer or Start Timer Button - Outside KeyboardAvoidingView */}
       {activeTimer && timerMinimized ? (
         <TouchableOpacity 
           style={styles.minimizedTimer}
@@ -3114,28 +3114,33 @@ export default function WorkoutLogScreen() {
         onRequestClose={() => setShowStartModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmModalContainer}>
-            <Ionicons name="play-circle" size={48} color={themeColor} />
-            <Text style={styles.confirmModalTitle}>Begin Workout?</Text>
-            <Text style={styles.confirmModalMessage}>
-              Start "{day?.day_name || 'workout'}" workout session?
-            </Text>
+          <View style={styles.newConfirmModalContainer}>
+            <View style={styles.newConfirmModalHeader}>
+              <View style={[styles.newConfirmModalIconContainer, { backgroundColor: `${themeColor}20` }]}>
+                <Ionicons name="play-circle" size={32} color={themeColor} />
+              </View>
+              <Text style={styles.newConfirmModalTitle}>Ready to Start?</Text>
+              <Text style={styles.newConfirmModalSubtitle}>
+                {day?.day_name || 'Workout'} • Week {currentWeek}
+              </Text>
+            </View>
             
-            <View style={styles.confirmModalButtons}>
+            <View style={styles.newConfirmModalButtons}>
               <TouchableOpacity
-                style={[styles.confirmModalButton, styles.confirmModalCancelButton]}
+                style={styles.newConfirmModalCancelButton}
                 onPress={() => setShowStartModal(false)}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <Text style={styles.confirmModalCancelText}>Cancel</Text>
+                <Text style={styles.newConfirmModalCancelText}>Not Yet</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.confirmModalButton, styles.confirmModalConfirmButton, { backgroundColor: themeColor }]}
+                style={[styles.newConfirmModalStartButton, { backgroundColor: themeColor }]}
                 onPress={confirmStartWorkout}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <Text style={styles.confirmModalConfirmText}>Start</Text>
+                <Ionicons name="play" size={18} color="white" style={styles.newConfirmModalStartIcon} />
+                <Text style={styles.newConfirmModalStartText}>Start Workout</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3330,7 +3335,7 @@ export default function WorkoutLogScreen() {
             </View>
             
             {(() => {
-              const deloadGuidance = block.deload_guidance;
+              const deloadGuidance = block?.deload_guidance;
               const previousWeek = currentWeek - 1;
               
               if (deloadGuidance) {
@@ -4465,6 +4470,82 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  // New modal styles
+  newConfirmModalContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 0,
+    width: '100%',
+    maxWidth: 320,
+    overflow: 'hidden',
+  },
+  newConfirmModalHeader: {
+    alignItems: 'center',
+    paddingTop: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  newConfirmModalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  newConfirmModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  newConfirmModalSubtitle: {
+    fontSize: 15,
+    color: '#71717a',
+    textAlign: 'center',
+  },
+  newConfirmModalButtons: {
+    flexDirection: 'column',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  newConfirmModalCancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#3f3f46',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  newConfirmModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a1a1aa',
+  },
+  newConfirmModalStartButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  newConfirmModalStartIcon: {
+    marginRight: 4,
+  },
+  newConfirmModalStartText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   confirmModalDescription: {
     fontSize: 15,
