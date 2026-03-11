@@ -20,6 +20,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import AsyncStorageDebugger from '../utils/asyncStorageDebug';
+import RobustStorage from '../utils/robustStorage';
 import { useTheme } from '../contexts/ThemeContext';
 
 type DaysScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Days'>;
@@ -567,15 +569,88 @@ export default function DaysScreen() {
   const loadCompletedWorkouts = async () => {
     try {
       const key = `completed_${localBlock.block_name}_week${currentWeek}`;
-      const completed = await AsyncStorage.getItem(key);
+      console.log('🔍 [LOAD-COMPLETION] Loading completed workouts with ROBUST STORAGE...');
+      console.log('🔍 [LOAD-COMPLETION] Key:', key);
+      console.log('🔍 [LOAD-COMPLETION] Block name:', localBlock.block_name);
+      console.log('🔍 [LOAD-COMPLETION] Current week:', currentWeek);
+      
+      // Run health check and auto-repair if needed
+      const healthCheck = await RobustStorage.healthCheck();
+      console.log('🔍 [LOAD-COMPLETION] Storage health check:', healthCheck);
+      
+      if (healthCheck.repaired > 0) {
+        console.log(`🔍 [LOAD-COMPLETION] 🔧 Auto-repaired ${healthCheck.repaired} corrupted entries`);
+      }
+      
+      // Get storage stats for debugging
+      const stats = await RobustStorage.getStats();
+      console.log('🔍 [LOAD-COMPLETION] Storage stats:', stats);
+      
+      // Try robust storage first
+      let completed = await RobustStorage.getItem(key, true);
+      let dataSource = 'robust';
+      
+      if (!completed) {
+        // Fallback: try legacy storage methods
+        console.log('🔍 [LOAD-COMPLETION] No data in robust storage, checking legacy storage...');
+        completed = await AsyncStorageDebugger.getItem(key);
+        dataSource = 'legacy';
+        
+        if (!completed) {
+          // Emergency fallback: check for emergency backup keys
+          console.log('🔍 [LOAD-COMPLETION] Checking emergency backup keys...');
+          const emergencyKeys = [
+            `${key}_emergency`,
+            `workout_completion_${localBlock.block_name.replace(/[^a-zA-Z0-9]/g, '_')}_week${currentWeek}`
+          ];
+          
+          for (const emergencyKey of emergencyKeys) {
+            const emergencyData = await AsyncStorage.getItem(emergencyKey);
+            if (emergencyData) {
+              completed = emergencyData;
+              dataSource = `emergency:${emergencyKey}`;
+              console.log(`🔍 [LOAD-COMPLETION] Found data in emergency key: ${emergencyKey}`);
+              
+              // Migrate emergency data back to robust storage
+              await RobustStorage.setItem(key, emergencyData, true);
+              console.log('🔍 [LOAD-COMPLETION] 🔄 Migrated emergency data to robust storage');
+              break;
+            }
+          }
+        } else if (completed) {
+          // Migrate legacy data to robust storage
+          console.log('🔍 [LOAD-COMPLETION] 🔄 Migrating legacy data to robust storage...');
+          await RobustStorage.setItem(key, completed, true);
+        }
+      }
+      
       if (completed) {
         const parsedCompleted = JSON.parse(completed);
+        console.log(`🔍 [LOAD-COMPLETION] Found completed workouts (${dataSource}):`, parsedCompleted);
         setCompletedWorkouts(new Set(parsedCompleted));
+        
+        // If we found data, verify it's properly stored in robust storage
+        if (dataSource !== 'robust') {
+          setTimeout(async () => {
+            const verification = await RobustStorage.getItem(key, true);
+            if (verification) {
+              console.log('🔍 [LOAD-COMPLETION] ✅ Data successfully migrated to robust storage');
+            } else {
+              console.error('🔍 [LOAD-COMPLETION] ❌ Failed to migrate data to robust storage');
+            }
+          }, 1000);
+        }
       } else {
+        console.log('🔍 [LOAD-COMPLETION] No completed workouts found for this week (checked all sources)');
         setCompletedWorkouts(new Set());
       }
+      
+      // Print debug summary after loading
+      AsyncStorageDebugger.printSummary();
+      
     } catch (error) {
-      console.error('Failed to load completed workouts:', error);
+      console.error('🔍 [LOAD-COMPLETION] Failed to load completed workouts:', error);
+      setCompletedWorkouts(new Set());
     }
   };
 

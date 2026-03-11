@@ -19,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
+import AsyncStorageDebugger from '../utils/asyncStorageDebug';
+import RobustStorage from '../utils/robustStorage';
 import { TimerNotifications, SOUND_OPTIONS, TimerSettings } from '../utils/timerNotifications';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -1161,6 +1163,7 @@ export default function WorkoutLogScreen() {
   const [showStartModal, setShowStartModal] = useState(false);
   const [showStartReminderModal, setShowStartReminderModal] = useState(false);
   const [showActiveWorkoutModal, setShowActiveWorkoutModal] = useState(false);
+  const [isFinishingWorkout, setIsFinishingWorkout] = useState(false);
   const [shakeAnimation] = useState(new Animated.Value(0));
   
   // Workout completion state
@@ -2153,6 +2156,9 @@ export default function WorkoutLogScreen() {
       console.log('blockName:', blockName);
       console.log('day.day_name:', day?.day_name);
       
+      // Set finishing flag to prevent auto-save race condition
+      setIsFinishingWorkout(true);
+      
       // Clear workout timer by resetting start time
       setWorkoutStartTime(null);
       
@@ -2167,13 +2173,57 @@ export default function WorkoutLogScreen() {
       const workoutKey = `${day?.day_name || 'unknown'}_week${weekString}`;
       console.log('Saving for workoutKey:', workoutKey, 'blockName:', blockName, 'currentWeek:', weekString);
       
-      // Save that this workout is completed
+      // Save that this workout is completed using ROBUST STORAGE
       const completedKey = `completed_${blockName}_week${weekString}`;
-      const completed = await AsyncStorage.getItem(completedKey);
+      console.log('🎯 [COMPLETION] Starting ROBUST completion save process...');
+      console.log('🎯 [COMPLETION] Completed key:', completedKey);
+      console.log('🎯 [COMPLETION] Workout key:', workoutKey);
+      
+      // Run health check before critical operation
+      const healthCheck = await RobustStorage.healthCheck();
+      console.log('🎯 [COMPLETION] Storage health check:', healthCheck);
+      
+      // Get existing completions using robust storage
+      const completed = await RobustStorage.getItem(completedKey, true);
       const completedSet = completed ? new Set(JSON.parse(completed)) : new Set();
       completedSet.add(workoutKey);
-      await AsyncStorage.setItem(completedKey, JSON.stringify(Array.from(completedSet)));
-      console.log('Saved completed workouts:', Array.from(completedSet));
+      
+      const completedData = JSON.stringify(Array.from(completedSet));
+      console.log('🎯 [COMPLETION] Data to save:', completedData);
+      
+      // Save using robust storage with redundancy
+      const saveSuccess = await RobustStorage.setItem(completedKey, completedData, true);
+      console.log('🎯 [COMPLETION] ROBUST save result:', saveSuccess ? '✅ SUCCESS' : '❌ FAILED');
+      
+      if (!saveSuccess) {
+        console.error('🎯 [COMPLETION] ❌ CRITICAL: ROBUST save failed! Trying emergency fallback...');
+        
+        // Emergency fallback: try saving with multiple different key formats
+        const emergencyKeys = [
+          `${completedKey}_emergency`,
+          `workout_completion_${blockName.replace(/[^a-zA-Z0-9]/g, '_')}_week${weekString}`,
+          `completion_backup_${Date.now()}`
+        ];
+        
+        for (const emergencyKey of emergencyKeys) {
+          try {
+            await AsyncStorage.setItem(emergencyKey, completedData);
+            console.log(`🎯 [COMPLETION] ✅ Emergency save succeeded with key: ${emergencyKey}`);
+            break;
+          } catch (emergencyError) {
+            console.error(`🎯 [COMPLETION] ❌ Emergency save failed for ${emergencyKey}:`, emergencyError);
+          }
+        }
+      }
+      
+      // Immediate verification
+      const verification = await RobustStorage.getItem(completedKey, true);
+      const verificationSuccess = verification === completedData;
+      console.log('🎯 [COMPLETION] Immediate verification:', verificationSuccess ? '✅ SUCCESS' : '❌ FAILED');
+      
+      if (!verificationSuccess) {
+        console.error('🎯 [COMPLETION] ❌ CRITICAL: Data verification failed immediately after save!');
+      }
       
       // Save the completion stats
       const statsKey = `completionStats_${blockName}_week${weekString}`;
@@ -2204,6 +2254,9 @@ export default function WorkoutLogScreen() {
     } catch (error) {
       console.error('Error in confirmFinishWorkout:', error);
       console.error('Error stack:', error.stack);
+    } finally {
+      // Always reset the finishing flag, even if there's an error
+      setIsFinishingWorkout(false);
     }
   };
 
@@ -2317,6 +2370,13 @@ export default function WorkoutLogScreen() {
     console.log('💾 AUTO-SAVE: workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
     console.log('💾 AUTO-SAVE: workoutDuration =', workoutDuration);
     console.log('💾 AUTO-SAVE: dataLoaded =', dataLoaded);
+    console.log('💾 AUTO-SAVE: isFinishingWorkout =', isFinishingWorkout);
+    
+    // Skip auto-save when finishing workout to prevent race condition with completion saving
+    if (isFinishingWorkout) {
+      console.log('💾 AUTO-SAVE: Skipping save - workout is being finished');
+      return;
+    }
     
     // Only save if we have sets data AND data loading is complete
     // This prevents overwriting good data during component remount
@@ -2326,7 +2386,7 @@ export default function WorkoutLogScreen() {
     } else {
       console.log('💾 AUTO-SAVE: Skipping save - either no sets data or data not yet loaded');
     }
-  }, [allSetsData, exerciseNotes, workoutStartTime, workoutDuration, dataLoaded]);
+  }, [allSetsData, exerciseNotes, workoutStartTime, workoutDuration, dataLoaded, isFinishingWorkout]);
 
   // No cleanup needed - timer is based on workoutStartTime
 
@@ -3600,13 +3660,6 @@ export default function WorkoutLogScreen() {
               <View style={[styles.preferenceModalIconContainer, { backgroundColor: themeColor + '15' }]}>
                 <Ionicons name="star" size={24} color={themeColor} />
               </View>
-              <TouchableOpacity 
-                style={styles.preferenceModalClose}
-                onPress={cancelExercisePreference}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close" size={20} color="#71717a" />
-              </TouchableOpacity>
             </View>
 
             {/* Content */}
@@ -4908,85 +4961,74 @@ const styles = StyleSheet.create({
   // New preference modal styles
   preferenceModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 60,
+    paddingHorizontal: 20,
+    paddingVertical: 50,
   },
   preferenceModalContainer: {
     backgroundColor: '#18181b',
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#27272a',
     width: '100%',
-    maxWidth: 360,
-    maxHeight: '80%',
+    maxWidth: 340,
     shadowOffset: {
       width: 0,
-      height: 20,
+      height: 10,
     },
-    shadowOpacity: 0.4,
-    shadowRadius: 25,
-    elevation: 25,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
   },
   preferenceModalHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 24,
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272a',
   },
   preferenceModalIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  preferenceModalClose: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#27272a',
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 12,
   },
   preferenceModalContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    flex: 1,
+    padding: 20,
   },
   preferenceModalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 16,
-    textAlign: 'left',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   preferenceModalExerciseCard: {
     backgroundColor: '#27272a',
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    padding: 16,
     marginBottom: 16,
-    flexDirection: 'column',
-    gap: 12,
+    alignItems: 'center',
   },
   preferenceModalExerciseName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   preferenceModalBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    alignSelf: 'flex-start',
   },
   preferenceModalBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -4995,22 +5037,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#a1a1aa',
     lineHeight: 20,
-    marginBottom: 0,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   preferenceModalHighlight: {
     fontWeight: '600',
   },
   preferenceModalActions: {
-    flexDirection: 'column',
     paddingHorizontal: 20,
     paddingBottom: 20,
-    paddingTop: 20,
     gap: 12,
-    backgroundColor: '#141417',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
   },
   preferenceModalButton: {
     flexDirection: 'row',
@@ -5018,23 +5054,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 12,
-    width: '100%',
+    minHeight: 52,
+  },
+  preferenceModalCancelButton: {
+    backgroundColor: '#27272a',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  preferenceModalConfirmButton: {
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  preferenceModalCancelButton: {
-    backgroundColor: '#27272a',
-    borderWidth: 1.5,
-    borderColor: '#3f3f46',
-  },
-  preferenceModalConfirmButton: {
     shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowRadius: 8,
     elevation: 8,
   },
   preferenceModalCancelText: {
