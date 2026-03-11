@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from '../utils/robustStorage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -151,7 +152,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   const loadSavedData = async () => {
     try {
-      const savedData = await AsyncStorage.getItem('fitnessGoalsData');
+      const savedData = await RobustStorage.getItem('fitnessGoalsData', true) || await AsyncStorage.getItem('fitnessGoalsData');
       if (savedData) {
         const data = JSON.parse(savedData);
         
@@ -239,7 +240,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
         // Note: no completedAt field - this indicates it's in progress
       };
 
-      await AsyncStorage.setItem('fitnessGoalsData', JSON.stringify(progressData));
+      const saveSuccess = await RobustStorage.setItem('fitnessGoalsData', JSON.stringify(progressData), true);
+      if (!saveSuccess) await AsyncStorage.setItem('fitnessGoalsData', JSON.stringify(progressData));
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
@@ -344,7 +346,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
       return true; // Step 2 is optional
     }
     if (currentStep === 2) {
-      return true; // Step 3 (Training Preferences) is completely optional
+      // Step 3: Require both program duration and training approach
+      return programDuration !== '' && trainingApproach !== '';
     }
     if (currentStep === 3) {
       return programDuration !== '';
@@ -365,6 +368,12 @@ export default function FitnessGoalsQuestionnaireScreen() {
       } else if (currentStep === 1) {
         {
           Alert.alert('Validation Error', 'Please check your configuration.');
+        }
+      } else if (currentStep === 2) {
+        if (programDuration === '') {
+          Alert.alert('Required Selection', 'Please select a program duration.');
+        } else if (trainingApproach === '') {
+          Alert.alert('Required Selection', 'Please select how hard you want to train.');
         }
       } else if (currentStep === 3) {
         Alert.alert('Required Selection', 'Please select a program duration.');
@@ -419,7 +428,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
       };
 
       // Save to AsyncStorage
-      await AsyncStorage.setItem('fitnessGoalsData', JSON.stringify(fitnessGoalsData));
+      const saveSuccess = await RobustStorage.setItem('fitnessGoalsData', JSON.stringify(fitnessGoalsData), true);
+      if (!saveSuccess) await AsyncStorage.setItem('fitnessGoalsData', JSON.stringify(fitnessGoalsData));
       console.log('Fitness Goals Data saved:', fitnessGoalsData);
       
       // Mark as completed

@@ -14,6 +14,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from '../utils/robustStorage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -84,7 +85,7 @@ export default function WorkoutDashboardScreen() {
   const loadCompletionStatus = async () => {
     try {
       // Check if fitness goals questionnaire is completed
-      const fitnessGoalsDataString = await AsyncStorage.getItem('fitnessGoalsData');
+      const fitnessGoalsDataString = await RobustStorage.getItem('fitnessGoalsData', true) || await AsyncStorage.getItem('fitnessGoalsData');
       let fitnessGoalsCompleted = false;
       
       if (fitnessGoalsDataString) {
@@ -93,7 +94,7 @@ export default function WorkoutDashboardScreen() {
       }
 
       // Check if equipment preferences questionnaire is completed
-      const equipmentPreferencesDataString = await AsyncStorage.getItem('equipmentPreferencesData');
+      const equipmentPreferencesDataString = await RobustStorage.getItem('equipmentPreferencesData', true) || await AsyncStorage.getItem('equipmentPreferencesData');
       let equipmentPreferencesCompleted = false;
       
       if (equipmentPreferencesDataString) {

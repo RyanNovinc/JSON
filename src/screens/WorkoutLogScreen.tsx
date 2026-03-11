@@ -219,7 +219,7 @@ function ExerciseCard({
   React.useEffect(() => {
     const checkFavoriteStatus = async () => {
       try {
-        const existingData = await AsyncStorage.getItem('favoriteExercises');
+        const existingData = await RobustStorage.getItem('favoriteExercises', true) || await AsyncStorage.getItem('favoriteExercises');
         const existingExercises = existingData ? JSON.parse(existingData) : [];
         const isAlreadyFavorited = existingExercises.some(ex => ex.name.toLowerCase() === exercise.exercise.toLowerCase());
         setIsFavorited(isAlreadyFavorited);
@@ -508,13 +508,14 @@ function ExerciseCard({
               onPress={async () => {
                 try {
                   // Get existing favorites
-                  const existingData = await AsyncStorage.getItem('favoriteExercises');
+                  const existingData = await RobustStorage.getItem('favoriteExercises', true) || await AsyncStorage.getItem('favoriteExercises');
                   const existingExercises = existingData ? JSON.parse(existingData) : [];
                   
                   if (isFavorited) {
                     // Remove from favorites
                     const updatedExercises = existingExercises.filter(ex => ex.name.toLowerCase() !== exercise.exercise.toLowerCase());
-                    await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
+                    const saveSuccess = await RobustStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises), true);
+                    if (!saveSuccess) await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
                     setIsFavorited(false);
                   } else {
                     // Create completely clean favorite object with only primitive values
@@ -546,7 +547,8 @@ function ExerciseCard({
                     console.log('Clean favorite object:', favoriteExercise);
                     
                     const updatedExercises = [favoriteExercise, ...existingExercises];
-                    await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
+                    const saveSuccess = await RobustStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises), true);
+                    if (!saveSuccess) await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
                     setIsFavorited(true);
                   }
                   

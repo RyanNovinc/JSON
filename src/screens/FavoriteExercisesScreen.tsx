@@ -13,6 +13,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from '../utils/robustStorage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -63,10 +64,31 @@ export default function FavoriteExercisesScreen() {
   const loadFavoriteExercises = async () => {
     try {
       console.log('=== FAVORITES SCREEN LOAD START ===');
-      console.log('Attempting to load favorite exercises...');
+      console.log('🏋️ [FAVORITES] Loading favorite exercises with ROBUST STORAGE...');
       
-      const savedData = await AsyncStorage.getItem('favoriteExercises');
-      console.log('Raw data from storage:', savedData);
+      // Run health check first
+      const healthCheck = await RobustStorage.healthCheck();
+      console.log('🏋️ [FAVORITES] Storage health check:', healthCheck);
+      
+      // Try robust storage first
+      let savedData = await RobustStorage.getItem('favoriteExercises', true);
+      let dataSource = 'robust';
+      
+      if (!savedData) {
+        // Fallback to legacy storage for migration
+        console.log('🏋️ [FAVORITES] No data in robust storage, checking legacy storage...');
+        savedData = await AsyncStorage.getItem('favoriteExercises');
+        dataSource = 'legacy';
+        
+        if (savedData) {
+          // Migrate to robust storage
+          console.log('🏋️ [FAVORITES] 🔄 Migrating legacy data to robust storage...');
+          await RobustStorage.setItem('favoriteExercises', savedData, true);
+          dataSource = 'migrated';
+        }
+      }
+      
+      console.log(`🏋️ [FAVORITES] Data source: ${dataSource}`);
       console.log('Data type:', typeof savedData);
       console.log('Data length:', savedData ? savedData.length : 'null');
       
@@ -103,8 +125,8 @@ export default function FavoriteExercisesScreen() {
           
           // Save cleaned data back if we made changes
           if (JSON.stringify(exercises) !== JSON.stringify(uniqueExercises)) {
-            console.log('Saving cleaned exercise data back to storage');
-            await AsyncStorage.setItem('favoriteExercises', JSON.stringify(uniqueExercises));
+            console.log('🏋️ [FAVORITES] 🧹 Saving cleaned exercise data back to robust storage');
+            await RobustStorage.setItem('favoriteExercises', JSON.stringify(uniqueExercises), true);
           }
           
           if (uniqueExercises.length > 0) {
@@ -140,7 +162,14 @@ export default function FavoriteExercisesScreen() {
 
   const saveFavoriteExercises = async (exercises: FavoriteExercise[]) => {
     try {
-      await AsyncStorage.setItem('favoriteExercises', JSON.stringify(exercises));
+      console.log('🏋️ [FAVORITES] 💾 Saving favorite exercises with robust storage...');
+      const saveSuccess = await RobustStorage.setItem('favoriteExercises', JSON.stringify(exercises), true);
+      console.log(`🏋️ [FAVORITES] Save result: ${saveSuccess ? '✅ SUCCESS' : '❌ FAILED'}`);
+      
+      if (!saveSuccess) {
+        console.error('🏋️ [FAVORITES] ❌ Robust save failed, trying emergency fallback...');
+        await AsyncStorage.setItem('favoriteExercises', JSON.stringify(exercises));
+      }
     } catch (error) {
       console.error('Failed to save favorite exercises:', error);
     }

@@ -16,6 +16,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from '../utils/robustStorage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -79,7 +80,7 @@ export default function ExerciseDetailScreen() {
     React.useCallback(() => {
       const reloadExerciseData = async () => {
         try {
-          const savedData = await AsyncStorage.getItem('favoriteExercises');
+          const savedData = await RobustStorage.getItem('favoriteExercises', true) || await AsyncStorage.getItem('favoriteExercises');
           if (savedData) {
             const exercises: FavoriteExercise[] = JSON.parse(savedData);
             const updatedExercise = exercises.find(ex => ex.id === currentExercise?.id);
@@ -157,13 +158,14 @@ export default function ExerciseDetailScreen() {
 
   const handleFavoriteToggle = async () => {
     try {
-      const existingData = await AsyncStorage.getItem('favoriteExercises');
+      const existingData = await RobustStorage.getItem('favoriteExercises', true) || await AsyncStorage.getItem('favoriteExercises');
       const existingExercises: FavoriteExercise[] = existingData ? JSON.parse(existingData) : [];
       
       if (isFavorite) {
         // Remove from favorites
         const updatedExercises = existingExercises.filter(ex => ex.id !== exercise.id);
-        await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
+        const saveSuccess = await RobustStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises), true);
+        if (!saveSuccess) await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
         setIsFavorite(false);
         
         Alert.alert(
@@ -173,7 +175,8 @@ export default function ExerciseDetailScreen() {
       } else {
         // Add to favorites
         const updatedExercises = [exercise, ...existingExercises];
-        await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
+        const saveSuccess = await RobustStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises), true);
+        if (!saveSuccess) await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
         setIsFavorite(true);
         
         Alert.alert('Added to Favorites', `"${exercise.name}" has been added to your favorites.`);

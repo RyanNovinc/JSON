@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from './robustStorage';
 
 export interface WorkoutRoutine {
   id: string;
@@ -142,7 +143,10 @@ export class WorkoutStorage {
   // Routine management
   static async saveRoutines(routines: WorkoutRoutine[]): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines));
+      const saveSuccess = await RobustStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines), true);
+      if (!saveSuccess) {
+        await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines));
+      }
     } catch (error) {
       console.error('Failed to save routines:', error);
     }
@@ -150,7 +154,7 @@ export class WorkoutStorage {
 
   static async loadRoutines(): Promise<WorkoutRoutine[]> {
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
+      const data = await RobustStorage.getItem(STORAGE_KEYS.ROUTINES, true) || await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
       return data ? JSON.parse(data) : [];
     } catch (error) {
       console.error('Failed to load routines:', error);
@@ -182,7 +186,10 @@ export class WorkoutStorage {
   // My Routines management (saved collection)
   static async saveMyRoutines(routines: WorkoutRoutine[]): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.MY_ROUTINES, JSON.stringify(routines));
+      const saveSuccess = await RobustStorage.setItem(STORAGE_KEYS.MY_ROUTINES, JSON.stringify(routines), true);
+      if (!saveSuccess) {
+        await AsyncStorage.setItem(STORAGE_KEYS.MY_ROUTINES, JSON.stringify(routines));
+      }
     } catch (error) {
       console.error('Failed to save my routines:', error);
     }
@@ -190,7 +197,7 @@ export class WorkoutStorage {
 
   static async loadMyRoutines(): Promise<WorkoutRoutine[]> {
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.MY_ROUTINES);
+      const data = await RobustStorage.getItem(STORAGE_KEYS.MY_ROUTINES, true) || await AsyncStorage.getItem(STORAGE_KEYS.MY_ROUTINES);
       return data ? JSON.parse(data) : [];
     } catch (error) {
       console.error('Failed to load my routines:', error);

@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from '../utils/robustStorage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -136,7 +137,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
 
   const loadSavedData = async () => {
     try {
-      const savedData = await AsyncStorage.getItem('equipmentPreferencesData');
+      const savedData = await RobustStorage.getItem('equipmentPreferencesData', true) || await AsyncStorage.getItem('equipmentPreferencesData');
       if (savedData) {
         const data = JSON.parse(savedData);
         
@@ -193,7 +194,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         // Note: no completedAt field - this indicates it's in progress
       };
 
-      await AsyncStorage.setItem('equipmentPreferencesData', JSON.stringify(progressData));
+      const saveSuccess = await RobustStorage.setItem('equipmentPreferencesData', JSON.stringify(progressData), true);
+      if (!saveSuccess) await AsyncStorage.setItem('equipmentPreferencesData', JSON.stringify(progressData));
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
@@ -318,7 +320,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       };
 
       // Save to AsyncStorage
-      await AsyncStorage.setItem('equipmentPreferencesData', JSON.stringify(equipmentPreferencesData));
+      const saveSuccess = await RobustStorage.setItem('equipmentPreferencesData', JSON.stringify(equipmentPreferencesData), true);
+      if (!saveSuccess) await AsyncStorage.setItem('equipmentPreferencesData', JSON.stringify(equipmentPreferencesData));
       console.log('Equipment Preferences Data saved:', equipmentPreferencesData);
       
       // Mark as completed
