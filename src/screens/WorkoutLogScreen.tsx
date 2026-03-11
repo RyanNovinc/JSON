@@ -23,6 +23,7 @@ import { TimerNotifications, SOUND_OPTIONS, TimerSettings } from '../utils/timer
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
+import { navigate } from '../utils/navigationRef';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -932,10 +933,14 @@ function SupersetLinkButton({ isActive, themeColor, onPress }: SupersetLinkButto
         }
       ]}
     >
-      <TouchableOpacity onPress={onPress} style={styles.supersetLinkButtonTouchable}>
+      <TouchableOpacity 
+        onPress={onPress} 
+        style={styles.supersetLinkButtonTouchable}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
         <Ionicons 
           name="link" 
-          size={16} 
+          size={20} 
           color={iconColor}
         />
       </TouchableOpacity>
@@ -985,16 +990,16 @@ export default function WorkoutLogScreen() {
   const { themeColor } = useTheme();
   const { globalUnit, getExerciseUnit, setExerciseUnit, setGlobalUnit, formatWeight, convertWeight } = useWeightUnit();
   const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
-  const { setActiveWorkout } = useActiveWorkout();
+  const { activeWorkout, setActiveWorkout } = useActiveWorkout();
   
   // Debug logging
-  console.log('=== WORKOUT LOG SCREEN RENDER ===');
-  console.log('Route params:', route.params);
-  console.log('Day available:', !!day);
-  console.log('BlockName available:', !!blockName);
+  console.log('🏋️ WORKOUT SCREEN: === COMPONENT RENDER/MOUNT ===');
+  console.log('🏋️ WORKOUT SCREEN: Route params:', route.params);
+  console.log('🏋️ WORKOUT SCREEN: Day available:', !!day);
+  console.log('🏋️ WORKOUT SCREEN: BlockName available:', !!blockName);
   if (day) {
-    console.log('Day name:', day.day_name);
-    console.log('Day exercises count:', day.exercises?.length);
+    console.log('🏋️ WORKOUT SCREEN: Day name:', day.day_name);
+    console.log('🏋️ WORKOUT SCREEN: Day exercises count:', day.exercises?.length);
   }
   
   // Early return if required data is not available
@@ -1143,11 +1148,19 @@ export default function WorkoutLogScreen() {
   // Workout session timer
   const [workoutStartTime, setWorkoutStartTime] = useState<Date | null>(null);
   const [workoutDuration, setWorkoutDuration] = useState(0); // in seconds
+  const [dataLoaded, setDataLoaded] = useState(false);
+  
+  // Debug timer state changes
+  React.useEffect(() => {
+    console.log('⏱️ TIMER STATE: workoutStartTime changed:', workoutStartTime ? workoutStartTime.toISOString() : 'null');
+    console.log('⏱️ TIMER STATE: workoutDuration:', workoutDuration);
+  }, [workoutStartTime, workoutDuration]);
   
   // Workout start requirement state
   const [interactionAttempts, setInteractionAttempts] = useState(0);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showStartReminderModal, setShowStartReminderModal] = useState(false);
+  const [showActiveWorkoutModal, setShowActiveWorkoutModal] = useState(false);
   const [shakeAnimation] = useState(new Animated.Value(0));
   
   // Workout completion state
@@ -1226,7 +1239,14 @@ export default function WorkoutLogScreen() {
           
           // Validate that saved data matches current exercise count
           if (savedSetsData.length === dynamicExercises.length) {
-            setAllSetsData(savedSetsData);
+            // Clear reps from saved data to show placeholders instead of pre-filled values
+            const migratedSetsData = savedSetsData.map(exerciseSets => 
+              exerciseSets.map(setData => ({
+                ...setData,
+                reps: '' // Clear reps to show placeholder text
+              }))
+            );
+            setAllSetsData(migratedSetsData);
             return;
           } else {
             console.log('Saved sets data length mismatch, reinitializing');
@@ -1248,7 +1268,7 @@ export default function WorkoutLogScreen() {
           exercise: exercise.exercise, // This will be the primary exercise name
           setNumber: index + 1,
           weight: '',
-          reps: getTargetRepForSet(targetReps, currentWeek, index), // Pre-fill with set-specific rep number
+          reps: '', // Leave empty to show placeholder instead
           completed: false,
           selectedExerciseIndex: 0, // Start with primary exercise
           exerciseData: {}, // Initialize storage for each exercise variant
@@ -1312,23 +1332,32 @@ export default function WorkoutLogScreen() {
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     
+    console.log('⏰ TIMER UPDATE: Timer effect triggered, workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
+    
     if (workoutStartTime) {
       // Update duration every second based on elapsed time
       const updateDuration = () => {
         const now = Date.now();
         const elapsed = Math.floor((now - workoutStartTime.getTime()) / 1000);
+        console.log('⏰ TIMER UPDATE: Updating duration from', workoutDuration, 'to', elapsed);
         setWorkoutDuration(elapsed);
       };
       
+      console.log('⏰ TIMER UPDATE: Starting timer interval for workout started at:', workoutStartTime.toISOString());
       // Update immediately
       updateDuration();
       
       // Then update every second
       interval = setInterval(updateDuration, 1000);
+    } else {
+      console.log('⏰ TIMER UPDATE: No workout start time, not starting timer');
     }
     
     return () => {
-      if (interval) clearInterval(interval);
+      if (interval) {
+        console.log('⏰ TIMER UPDATE: Clearing timer interval');
+        clearInterval(interval);
+      }
     };
   }, [workoutStartTime]);
   
@@ -1402,7 +1431,7 @@ export default function WorkoutLogScreen() {
     }
     
     return () => clearInterval(interval);
-  }, [activeTimer?.isRunning, activeTimer?.timeLeft, activeTimer?.countdownRunning, timerSettings.countUp]);
+  }, [activeTimer?.isRunning, activeTimer?.countdownRunning, timerSettings.countUp]);
   
   // Handle selected exercise from FavoriteExercisesScreen
   useFocusEffect(
@@ -1476,7 +1505,7 @@ export default function WorkoutLogScreen() {
       exercise: newExercise.exercise,
       setNumber: index + 1,
       weight: '',
-      reps: getTargetRepForSet(targetReps, currentWeek, index), // Pre-fill with set-specific rep number
+      reps: '', // Leave empty to show placeholder instead
       completed: false,
       selectedExerciseIndex: 0, // Start with primary exercise
       exerciseData: {}, // Initialize storage for each exercise variant
@@ -1550,7 +1579,7 @@ export default function WorkoutLogScreen() {
     const lastSet = exerciseSets[exerciseSets.length - 1];
     const newSet = {
       weight: lastSet?.weight || '',
-      reps: targetRepNumber, // Pre-fill with set-specific rep number
+      reps: '', // Leave empty to show placeholder instead
       completed: false,
       unit: lastSet?.unit || getExerciseUnit(exerciseIndex),
       isDropSet: false
@@ -1972,7 +2001,7 @@ export default function WorkoutLogScreen() {
         // Restore previous data for this exercise if it exists
         if (setData.exerciseData[selectedExerciseIndex]) {
           setData.weight = setData.exerciseData[selectedExerciseIndex].weight;
-          setData.reps = setData.exerciseData[selectedExerciseIndex].reps;
+          setData.reps = ''; // Always use placeholder instead of saved reps
           setData.completed = setData.exerciseData[selectedExerciseIndex].completed;
           setData.isDropSet = setData.exerciseData[selectedExerciseIndex].isDropSet;
           setData.drops = setData.exerciseData[selectedExerciseIndex].drops ? [...setData.exerciseData[selectedExerciseIndex].drops] : undefined;
@@ -1982,7 +2011,7 @@ export default function WorkoutLogScreen() {
           const targetRepNumber = getTargetRepForSet(targetReps, currentWeek, i); // Use the set index (i)
           
           setData.weight = '';
-          setData.reps = targetRepNumber; // Pre-fill with set-specific rep number
+          setData.reps = ''; // Leave empty to show placeholder instead
           setData.completed = false;
           setData.isDropSet = false;
           setData.drops = undefined;
@@ -2021,12 +2050,26 @@ export default function WorkoutLogScreen() {
   };
 
   const handleStartWorkout = () => {
+    // Check if there's already an active workout from a different screen
+    if (activeWorkout) {
+      const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
+                                   activeWorkout.routeParams?.blockName === blockName;
+      
+      if (!currentWorkoutMatches) {
+        console.log('🚫 START WORKOUT: Another workout is already active, showing warning modal');
+        setShowActiveWorkoutModal(true);
+        return;
+      }
+    }
+    
     setShowStartModal(true);
   };
 
   const confirmStartWorkout = () => {
+    console.log('🚀 START WORKOUT: User confirmed workout start');
     setShowStartModal(false);
     const now = new Date();
+    console.log('🚀 START WORKOUT: Setting workout start time to:', now.toISOString());
     setWorkoutStartTime(now);
     setWorkoutDuration(0);
     setInteractionAttempts(0); // Reset attempts
@@ -2257,69 +2300,209 @@ export default function WorkoutLogScreen() {
       workoutDuration,
       timestamp: Date.now(),
     };
+    console.log('💾 SAVING: Saving workout progress with data:', {
+      hasDay: !!progressData.day,
+      blockName: progressData.blockName,
+      setsDataLength: progressData.allSetsData.length,
+      workoutStartTime: progressData.workoutStartTime ? progressData.workoutStartTime.toISOString() : 'null',
+      workoutDuration: progressData.workoutDuration
+    });
     await WorkoutStorage.saveCurrentWorkout(progressData);
+    console.log('💾 SAVING: Save completed');
   };
 
   // Auto-save when sets data, notes, or workout state changes
   useEffect(() => {
-    if (allSetsData.length > 0) {
+    console.log('💾 AUTO-SAVE: Effect triggered. allSetsData.length =', allSetsData.length);
+    console.log('💾 AUTO-SAVE: workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
+    console.log('💾 AUTO-SAVE: workoutDuration =', workoutDuration);
+    console.log('💾 AUTO-SAVE: dataLoaded =', dataLoaded);
+    
+    // Only save if we have sets data AND data loading is complete
+    // This prevents overwriting good data during component remount
+    if (allSetsData.length > 0 && dataLoaded) {
+      console.log('💾 AUTO-SAVE: Triggering saveWorkoutProgress...');
       saveWorkoutProgress();
+    } else {
+      console.log('💾 AUTO-SAVE: Skipping save - either no sets data or data not yet loaded');
     }
-  }, [allSetsData, exerciseNotes, workoutStartTime, workoutDuration]);
+  }, [allSetsData, exerciseNotes, workoutStartTime, workoutDuration, dataLoaded]);
 
   // No cleanup needed - timer is based on workoutStartTime
 
   // Load saved progress and timer settings on mount
   useEffect(() => {
     const loadSavedData = async () => {
+      console.log('💾 DATA LOADING: Starting loadSavedData...');
+      
       // Load exercise preferences
+      console.log('💾 DATA LOADING: Loading exercise preferences...');
       await loadExercisePreferences();
       
       // Load workout progress
+      console.log('💾 DATA LOADING: Loading workout progress for:', day?.day_name, blockName);
       const savedWorkout = await WorkoutStorage.loadCurrentWorkout(day?.day_name || '', blockName);
+      console.log('💾 DATA LOADING: Saved workout data:', savedWorkout);
+      
       if (savedWorkout && 
           savedWorkout.day?.day_name === day?.day_name && 
           savedWorkout.blockName === blockName) {
-        setAllSetsData(savedWorkout.allSetsData);
+        console.log('💾 DATA LOADING: Found matching saved workout, restoring data...');
+        console.log('💾 DATA LOADING: Saved workout start time:', savedWorkout.workoutStartTime);
+        
+        // Clear reps from saved workout data to show placeholders
+        const migratedWorkoutSetsData = savedWorkout.allSetsData.map(exerciseSets => 
+          exerciseSets.map(setData => ({
+            ...setData,
+            reps: '' // Clear reps to show placeholder text
+          }))
+        );
+        setAllSetsData(migratedWorkoutSetsData);
         if (savedWorkout.exerciseNotes) {
           setExerciseNotes(savedWorkout.exerciseNotes);
         }
         
         // Restore workout timer state if it was active
         if (savedWorkout.workoutStartTime) {
+          console.log('💾 DATA LOADING: Restoring workout timer with start time:', savedWorkout.workoutStartTime);
           const startTime = new Date(savedWorkout.workoutStartTime);
+          console.log('💾 DATA LOADING: Parsed start time:', startTime.toISOString());
           setWorkoutStartTime(startTime);
           
           // Duration will be automatically calculated by the useEffect based on start time
           // Context will be updated by useEffect below
+        } else {
+          console.log('💾 DATA LOADING: No saved workout start time found');
+          
+          // Check if there's an active workout context for this screen that has a timer
+          if (activeWorkout) {
+            const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
+                                         activeWorkout.routeParams?.blockName === blockName;
+            const contextHasTimer = activeWorkout.duration > 0;
+            
+            console.log('💾 DATA LOADING: Checking active workout context for timer restoration');
+            console.log('💾 DATA LOADING: Current workout matches active workout?', currentWorkoutMatches);
+            console.log('💾 DATA LOADING: Context has timer (duration > 0)?', contextHasTimer);
+            
+            if (currentWorkoutMatches && contextHasTimer) {
+              // Calculate what the start time should be based on current duration
+              const estimatedStartTime = new Date(Date.now() - (activeWorkout.duration * 1000));
+              console.log('💾 DATA LOADING: Restoring timer from context. Estimated start time:', estimatedStartTime.toISOString());
+              setWorkoutStartTime(estimatedStartTime);
+            }
+          }
+        }
+      } else {
+        console.log('💾 DATA LOADING: No matching saved workout found');
+        
+        // Even without saved data, check if there's an active workout context for this screen
+        if (activeWorkout) {
+          const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
+                                       activeWorkout.routeParams?.blockName === blockName;
+          const contextHasTimer = activeWorkout.duration > 0;
+          
+          console.log('💾 DATA LOADING: No saved data, checking active workout context');
+          console.log('💾 DATA LOADING: Current workout matches active workout?', currentWorkoutMatches);
+          console.log('💾 DATA LOADING: Context has timer (duration > 0)?', contextHasTimer);
+          
+          if (currentWorkoutMatches && contextHasTimer) {
+            // Calculate what the start time should be based on current duration
+            const estimatedStartTime = new Date(Date.now() - (activeWorkout.duration * 1000));
+            console.log('💾 DATA LOADING: Restoring timer from context (no saved data). Estimated start time:', estimatedStartTime.toISOString());
+            setWorkoutStartTime(estimatedStartTime);
+          }
         }
       }
       
       // Load timer settings
+      console.log('💾 DATA LOADING: Loading timer settings...');
       const settings = await TimerNotifications.loadSettings();
       setTimerSettings(settings);
+      
+      // Mark data loading as complete
+      console.log('💾 DATA LOADING: Data loading complete, setting dataLoaded = true');
+      setDataLoaded(true);
     };
     
+    console.log('💾 DATA LOADING: useEffect triggered, calling loadSavedData...');
     loadSavedData();
   }, []);
 
-  // Clear stale active workout on mount if no workout is started
+  // Restore timer from active workout context when navigating back to active workout
   useEffect(() => {
-    if (!workoutStartTime) {
-      console.log('Clearing any stale active workout');
-      setActiveWorkout(null);
+    // Only try to restore if data is loaded, we don't have a timer, but context has a timer
+    if (dataLoaded && !workoutStartTime && activeWorkout) {
+      const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
+                                   activeWorkout.routeParams?.blockName === blockName;
+      const contextHasTimer = activeWorkout.duration > 0;
+      
+      console.log('🔄 TIMER RESTORATION: Checking if timer should be restored from context');
+      console.log('🔄 TIMER RESTORATION: Data loaded?', dataLoaded, 'No local timer?', !workoutStartTime);
+      console.log('🔄 TIMER RESTORATION: Current workout matches active workout?', currentWorkoutMatches);
+      console.log('🔄 TIMER RESTORATION: Context has timer (duration > 0)?', contextHasTimer);
+      
+      if (currentWorkoutMatches && contextHasTimer) {
+        // Calculate what the start time should be based on current duration
+        const estimatedStartTime = new Date(Date.now() - (activeWorkout.duration * 1000));
+        console.log('🔄 TIMER RESTORATION: Restoring timer! Estimated start time:', estimatedStartTime.toISOString());
+        setWorkoutStartTime(estimatedStartTime);
+      }
     }
-  }, []);
+  }, [dataLoaded, workoutStartTime, activeWorkout, day?.day_name, blockName]);
+
+  // Clear stale active workout only if it belongs to this screen and has no timer
+  useEffect(() => {
+    console.log('🧹 CLEANUP CHECK: dataLoaded =', dataLoaded, 'workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
+    
+    if (dataLoaded && !workoutStartTime) {
+      // Only clear active workout if it belongs to this specific workout screen
+      const currentWorkoutMatches = activeWorkout && 
+        activeWorkout.routeParams?.day?.day_name === day?.day_name &&
+        activeWorkout.routeParams?.blockName === blockName;
+        
+      console.log('🧹 CLEANUP: Active workout day/block:', activeWorkout?.routeParams?.day?.day_name, '/', activeWorkout?.routeParams?.blockName);
+      console.log('🧹 CLEANUP: Current screen day/block:', day?.day_name, '/', blockName);
+      console.log('🧹 CLEANUP: Current workout matches?', currentWorkoutMatches);
+        
+      if (currentWorkoutMatches) {
+        // Check if the active workout context indicates there should be a timer (duration > 0)
+        // If so, don't clear it - the timer will be restored when saved data loads
+        const contextHasTimer = activeWorkout.duration > 0;
+        console.log('🧹 CLEANUP: Context has active timer (duration > 0)?', contextHasTimer);
+        
+        if (!contextHasTimer) {
+          console.log('🧹 CLEANUP: No active timer in context for THIS workout, clearing active workout');
+          setActiveWorkout(null);
+        } else {
+          console.log('🧹 CLEANUP: Active workout has timer in context, keeping it (timer will be restored)');
+        }
+      } else {
+        console.log('🧹 CLEANUP: No timer for this workout, but active workout belongs to different workout - keeping it');
+      }
+    } else if (dataLoaded && workoutStartTime) {
+      console.log('🧹 CLEANUP: Active workout found after loading, keeping it');
+    } else {
+      console.log('🧹 CLEANUP: Data not yet loaded, waiting...');
+    }
+  }, [dataLoaded, workoutStartTime, day?.day_name, blockName, activeWorkout]);
 
   // Update active workout context when workout timer state changes
   useEffect(() => {
+    console.log('🎯 CONTEXT UPDATE: workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
+    console.log('🎯 CONTEXT UPDATE: workoutDuration =', workoutDuration);
+    
     if (workoutStartTime) {
-      setActiveWorkout({
+      console.log('🎯 CONTEXT UPDATE: Setting active workout context');
+      const contextData = {
         dayName: day?.day_name || '',
         blockName,
         duration: workoutDuration,
-        routeParams: { day, blockName, currentWeek }
-      });
+        routeParams: { day, blockName, currentWeek, block, routineName }
+      };
+      console.log('🎯 CONTEXT UPDATE: Context data:', contextData);
+      setActiveWorkout(contextData);
+    } else {
+      console.log('🎯 CONTEXT UPDATE: No workout start time, not setting context');
     }
     // Don't clear the active workout when workoutStartTime is null
     // Only clear it when explicitly finishing the workout
@@ -2781,46 +2964,158 @@ export default function WorkoutLogScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
       
-      {/* Minimized Timer or Start Timer Button - Outside KeyboardAvoidingView */}
-      {activeTimer && timerMinimized ? (
-        <TouchableOpacity 
-          style={styles.minimizedTimer}
-          onPress={() => setTimerMinimized(false)}
-        >
-          <Text style={styles.minimizedTimerText}>
-            {getDisplayTime(activeTimer).minutes}:{getDisplayTime(activeTimer).seconds.toString().padStart(2, '0')}
-          </Text>
-        </TouchableOpacity>
-      ) : !activeTimer ? (
-        <TouchableOpacity 
-          style={styles.startTimerButton}
-          onPress={() => {
-            // Start a manual timer
-            const defaultRest = 120; // Default 2 minutes
-            setActiveTimer({
-              exerciseIndex: 0,
-              setIndex: 0,
-              timeLeft: timerSettings.countUp ? 3600 : defaultRest,
-              originalDuration: timerSettings.countUp ? 0 : defaultRest,
-              isRunning: false,
-              isQuickMode: false,
-              completed: false,
-            });
-            setTimerMinimized(false); // Open full screen instead of minimized
+      {/* BRAND NEW TIMER SYSTEM */}
+      {!activeTimer && (
+        <View 
+          style={{
+            position: 'absolute',
+            bottom: 34,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            zIndex: 99999,
+            pointerEvents: 'box-none'
           }}
         >
-          <Ionicons name="timer-outline" size={20} color={themeColor} />
-          <Text style={[styles.startTimerText, { color: themeColor }]}>Start Timer</Text>
-        </TouchableOpacity>
-      ) : null}
+          <TouchableOpacity 
+            style={{
+              backgroundColor: '#18181b',
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: '#27272a',
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+            onPress={() => {
+              console.log('🚀 Start Timer pressed!');
+              const defaultRest = 120;
+              setActiveTimer({
+                exerciseIndex: 0,
+                setIndex: 0,
+                timeLeft: timerSettings.countUp ? 3600 : defaultRest,
+                originalDuration: timerSettings.countUp ? 0 : defaultRest,
+                isRunning: false,
+                isQuickMode: false,
+                completed: false,
+              });
+              setTimerMinimized(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="timer-outline" size={20} color={themeColor} />
+            <Text style={{
+              fontSize: 15,
+              fontWeight: '600',
+              color: themeColor
+            }}>Start Timer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {activeTimer && !timerMinimized && (
-        <TouchableOpacity 
-          style={styles.timerOverlay}
-          activeOpacity={1}
-          onPress={() => setTimerMinimized(true)}
+      {/* SMALL COUNTDOWN TIMER */}
+      {activeTimer && timerMinimized && (
+        <View 
+          style={{
+            position: 'absolute',
+            bottom: 34,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            zIndex: 99999,
+            pointerEvents: 'box-none'
+          }}
         >
-          <View style={styles.timerCard}>
+          <TouchableOpacity 
+            style={{
+              backgroundColor: '#18181b',
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: '#27272a',
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+            onPress={() => {
+              console.log('🎯 Timer countdown tapped - opening EXISTING modal!');
+              setTimerMinimized(false);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="timer-outline" size={18} color={themeColor} />
+            <Text style={{
+              fontSize: 15,
+              fontWeight: '600',
+              color: themeColor
+            }}>
+              {getDisplayTime(activeTimer).minutes}:{getDisplayTime(activeTimer).seconds.toString().padStart(2, '0')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {(() => {
+        const shouldShow = activeTimer && !timerMinimized;
+        console.log('🔥 MODAL CHECK - activeTimer:', !!activeTimer, 'timerMinimized:', timerMinimized, 'shouldShow:', shouldShow);
+        if (shouldShow) {
+          console.log('🚀 MODAL IS RENDERING NOW!');
+        }
+        return shouldShow;
+      })() && (
+        <View
+          style={{ 
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 99999,
+          }}
+        >
+          <TouchableOpacity 
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
+            }}
+            activeOpacity={1}
+            onPress={() => {
+              console.log('Full timer modal tapped - minimizing');
+              setTimerMinimized(true);
+            }}
+          />
+          
+          <View style={[styles.timerCard, {
+            backgroundColor: '#18181b',
+            borderRadius: 20,
+            padding: 20,
+            marginHorizontal: 20,
+            marginVertical: 40, // Add top/bottom margin to prevent cutoff
+            borderWidth: 1,
+            borderColor: '#27272a',
+            maxWidth: 350,
+            width: '90%',
+            maxHeight: '80%', // Limit height to 80% of screen
+          }]}>
             {/* Header */}
             <View style={styles.timerHeader}>
               <Text style={styles.timerTitle}>Rest Timer</Text>
@@ -2975,7 +3270,9 @@ export default function WorkoutLogScreen() {
                         onPress={() => {
                           setActiveTimer(prev => prev ? {
                             ...prev,
-                            timeLeft: Math.max(0, prev.timeLeft - 15)
+                            timeLeft: timerSettings.countUp 
+                              ? Math.min(3600, prev.timeLeft + 15)  // In count-up mode, adding time means going forward
+                              : Math.max(0, prev.timeLeft - 15)     // In count-down mode, subtracting time
                           } : null);
                         }}
                       >
@@ -2998,7 +3295,9 @@ export default function WorkoutLogScreen() {
                         onPress={() => {
                           setActiveTimer(prev => prev ? {
                             ...prev,
-                            timeLeft: prev.timeLeft + 15
+                            timeLeft: timerSettings.countUp 
+                              ? Math.max(0, prev.timeLeft - 15)     // In count-up mode, subtracting time means going backward
+                              : prev.timeLeft + 15                 // In count-down mode, adding time
                           } : null);
                         }}
                       >
@@ -3027,7 +3326,7 @@ export default function WorkoutLogScreen() {
                         // Reset stopwatch to 0:00
                         setActiveTimer(prev => prev ? {
                           ...prev,
-                          timeLeft: 3600,
+                          timeLeft: 3600,  // Reset to max value for count-up display of 0:00
                           isRunning: false,
                           completed: false
                         } : null);
@@ -3102,9 +3401,8 @@ export default function WorkoutLogScreen() {
               </View>
             )}
           </View>
-        </TouchableOpacity>
+        </View>
       )}
-
 
       {/* Start Workout Confirmation Modal */}
       <Modal
@@ -3141,6 +3439,50 @@ export default function WorkoutLogScreen() {
               >
                 <Ionicons name="play" size={18} color="white" style={styles.newConfirmModalStartIcon} />
                 <Text style={styles.newConfirmModalStartText}>Start Workout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Active Workout Warning Modal */}
+      <Modal
+        visible={showActiveWorkoutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowActiveWorkoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.newConfirmModalContainer}>
+            <View style={styles.newConfirmModalHeader}>
+              <View style={[styles.newConfirmModalIconContainer, { backgroundColor: '#ef444415' }]}>
+                <Ionicons name="warning" size={32} color="#ef4444" />
+              </View>
+              <Text style={styles.newConfirmModalTitle}>Workout In Progress</Text>
+              <Text style={styles.newConfirmModalSubtitle}>
+                You have an active workout: {activeWorkout?.dayName}
+              </Text>
+            </View>
+            
+            <View style={styles.newConfirmModalButtons}>
+              <TouchableOpacity
+                style={styles.newConfirmModalCancelButton}
+                onPress={() => setShowActiveWorkoutModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.newConfirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.newConfirmModalStartButton, { backgroundColor: '#ef4444' }]}
+                onPress={() => {
+                  setShowActiveWorkoutModal(false);
+                  navigate('WorkoutLog', activeWorkout!.routeParams);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-forward" size={18} color="white" style={styles.newConfirmModalStartIcon} />
+                <Text style={styles.newConfirmModalStartText}>Go to Active</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3491,6 +3833,7 @@ export default function WorkoutLogScreen() {
         </Modal>
       )}
 
+
     </SafeAreaView>
   );
 }
@@ -3551,6 +3894,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
     textAlign: 'center',
+    color: '#ffffff',
   },
   deloadLabel: {
     fontWeight: '700',
@@ -4564,10 +4908,11 @@ const styles = StyleSheet.create({
   // New preference modal styles
   preferenceModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 60,
   },
   preferenceModalContainer: {
     backgroundColor: '#18181b',
@@ -4575,7 +4920,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27272a',
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 360,
+    maxHeight: '80%',
     shadowOffset: {
       width: 0,
       height: 20,
@@ -4588,9 +4934,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
   },
   preferenceModalIconContainer: {
     width: 48,
@@ -4600,22 +4946,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   preferenceModalClose: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#27272a',
     alignItems: 'center',
     justifyContent: 'center',
   },
   preferenceModalContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    flex: 1,
   },
   preferenceModalTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 20,
+    marginBottom: 16,
     textAlign: 'left',
   },
   preferenceModalExerciseCard: {
@@ -4624,21 +4971,19 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    gap: 12,
   },
   preferenceModalExerciseName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
-    flex: 1,
   },
   preferenceModalBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginLeft: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
   preferenceModalBadgeText: {
     fontSize: 11,
@@ -4647,28 +4992,33 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   preferenceModalDescription: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#a1a1aa',
-    lineHeight: 22,
-    marginBottom: 24,
+    lineHeight: 20,
+    marginBottom: 0,
   },
   preferenceModalHighlight: {
     fontWeight: '600',
   },
   preferenceModalActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    paddingTop: 8,
+    flexDirection: 'column',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 20,
     gap: 12,
+    backgroundColor: '#141417',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
   },
   preferenceModalButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 12,
+    width: '100%',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -4679,7 +5029,7 @@ const styles = StyleSheet.create({
   },
   preferenceModalCancelButton: {
     backgroundColor: '#27272a',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#3f3f46',
   },
   preferenceModalConfirmButton: {
@@ -4874,9 +5224,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   supersetLinkButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#27272a',
     justifyContent: 'center',
     alignItems: 'center',
@@ -4888,8 +5238,8 @@ const styles = StyleSheet.create({
     // borderColor will be set inline
   },
   supersetLinkButtonTouchable: {
-    width: '100%',
-    height: '100%',
+    width: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
