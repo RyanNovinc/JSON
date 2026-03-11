@@ -1,522 +1,423 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  
-  Alert,
-  Modal,
   TextInput,
-  Dimensions,
+  Alert,
+  Platform,
+  Modal,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { useMealPlanning } from '../contexts/MealPlanningContext';
-import { useWeightUnit } from '../contexts/WeightUnitContext';
-import { WeightEntry } from '../types/nutrition';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WorkoutStorage } from '../utils/storage';
+import RobustStorage from '../utils/robustStorage';
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+interface WeightEntry {
+  id: string;
+  weight: number;
+  unit: 'kg' | 'lbs';
+  date: string;
+  notes?: string;
+}
 
-const { width } = Dimensions.get('window');
-
-export default function WeightTrackerScreen() {
-  const navigation = useNavigation<NavigationProp>();
+const WeightTrackerScreen: React.FC = () => {
+  const navigation = useNavigation();
   const { themeColor, themeColorLight } = useTheme();
-  const { 
-    addWeightEntry, 
-    weightEntries, 
-    userProfile,
-    updateMacrosBasedOnWeight,
-    getLatestWeight,
-  } = useMealPlanning();
-  const { globalUnit, convertWeight } = useWeightUnit();
+  
+  const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
+  const [currentWeight, setCurrentWeight] = useState('');
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+  const [notes, setNotes] = useState('');
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newWeight, setNewWeight] = useState('');
-  const [newNotes, setNewNotes] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedUnit, setSelectedUnit] = useState<'kg' | 'lbs'>(globalUnit);
-  const [viewPeriod, setViewPeriod] = useState<'week' | 'month' | 'all'>('month');
+  useEffect(() => {
+    loadWeightHistory();
+    loadUserSettings();
+  }, []);
 
-  // Filter entries based on view period
-  const getFilteredEntries = () => {
-    const now = new Date();
-    const entries = [...weightEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    switch (viewPeriod) {
-      case 'week':
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return entries.filter(entry => new Date(entry.date) >= weekAgo);
-      case 'month':
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        return entries.filter(entry => new Date(entry.date) >= monthAgo);
-      default:
-        return entries;
+  const loadWeightHistory = async () => {
+    try {
+      console.log('⚖️ [WEIGHT] Loading weight history with ROBUST STORAGE...');
+      
+      // Run health check first
+      const healthCheck = await RobustStorage.healthCheck();
+      console.log('⚖️ [WEIGHT] Storage health check:', healthCheck);
+      
+      // Try robust storage first
+      let stored = await RobustStorage.getItem('@weight_history', true);
+      let dataSource = 'robust';
+      
+      if (!stored) {
+        // Fallback to legacy storage for migration
+        console.log('⚖️ [WEIGHT] No data in robust storage, checking legacy storage...');
+        stored = await AsyncStorage.getItem('@weight_history');
+        dataSource = 'legacy';
+        
+        if (stored) {
+          // Migrate to robust storage
+          console.log('⚖️ [WEIGHT] 🔄 Migrating legacy weight data to robust storage...');
+          await RobustStorage.setItem('@weight_history', stored, true);
+          dataSource = 'migrated';
+        }
+      }
+      
+      if (stored) {
+        const history: WeightEntry[] = JSON.parse(stored);
+        console.log(`⚖️ [WEIGHT] Loaded ${history.length} weight entries from ${dataSource} storage`);
+        setWeightHistory(history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      } else {
+        console.log('⚖️ [WEIGHT] No weight history found');
+      }
+    } catch (error) {
+      console.error('Failed to load weight history:', error);
     }
   };
 
-  const filteredEntries = getFilteredEntries();
-  const latestEntry = getLatestWeight();
-
-  // Calculate weight change
-  const getWeightChange = () => {
-    if (filteredEntries.length < 2) return null;
-    
-    const latest = filteredEntries[0];
-    const previous = filteredEntries[1];
-    
-    const latestWeight = convertWeight(latest.weight, latest.unit, globalUnit);
-    const previousWeight = convertWeight(previous.weight, previous.unit, globalUnit);
-    
-    const change = latestWeight - previousWeight;
-    const days = Math.max(1, Math.floor((new Date(latest.date).getTime() - new Date(previous.date).getTime()) / (1000 * 60 * 60 * 24)));
-    
-    return {
-      change,
-      changePerWeek: (change * 7) / days,
-      isGain: change > 0,
-      days,
-    };
+  const loadUserSettings = async () => {
+    try {
+      const nutritionResults = await WorkoutStorage.loadNutritionResults();
+      if (nutritionResults?.formData?.weightUnit) {
+        setWeightUnit(nutritionResults.formData.weightUnit);
+      }
+    } catch (error) {
+      console.error('Failed to load user settings:', error);
+    }
   };
 
-  const weightChange = getWeightChange();
-
-  // Get progress towards goal
-  const getGoalProgress = () => {
-    if (!userProfile?.goals.targetWeight || !latestEntry) return null;
-    
-    const currentWeight = convertWeight(latestEntry.weight, latestEntry.unit, globalUnit);
-    const targetWeight = userProfile.goals.targetWeight;
-    const startWeight = weightEntries.length > 0 
-      ? convertWeight(weightEntries[weightEntries.length - 1].weight, weightEntries[weightEntries.length - 1].unit, globalUnit)
-      : currentWeight;
-    
-    const totalNeeded = Math.abs(targetWeight - startWeight);
-    const achieved = Math.abs(currentWeight - startWeight);
-    const remaining = Math.abs(targetWeight - currentWeight);
-    
-    const isLossGoal = userProfile.goals.primaryGoal === 'weight_loss';
-    const progressPercentage = totalNeeded > 0 ? Math.min((achieved / totalNeeded) * 100, 100) : 0;
-    
-    return {
-      currentWeight,
-      targetWeight,
-      startWeight,
-      remaining,
-      progressPercentage,
-      isLossGoal,
-      isOnTrack: isLossGoal ? currentWeight < startWeight : currentWeight > startWeight,
-    };
-  };
-
-  const goalProgress = getGoalProgress();
-
-  const addWeight = async () => {
-    if (!newWeight.trim()) {
-      Alert.alert('Error', 'Please enter a weight');
+  const saveWeight = async () => {
+    if (!currentWeight.trim()) {
+      Alert.alert('Error', 'Please enter your weight');
       return;
     }
 
-    const weight = parseFloat(newWeight);
-    if (isNaN(weight) || weight <= 0 || weight > 1000) {
+    const weightValue = parseFloat(currentWeight);
+    if (isNaN(weightValue) || weightValue <= 0) {
       Alert.alert('Error', 'Please enter a valid weight');
       return;
     }
 
-    try {
-      const entry: WeightEntry = {
-        date: selectedDate,
-        weight,
-        unit: selectedUnit,
-        notes: newNotes.trim() || undefined,
-      };
+    const newEntry: WeightEntry = {
+      id: Date.now().toString(),
+      weight: weightValue,
+      unit: weightUnit,
+      date: new Date().toISOString(),
+      notes: notes.trim() || undefined,
+    };
 
-      await addWeightEntry(entry);
-      setShowAddModal(false);
-      setNewWeight('');
-      setNewNotes('');
-      setSelectedDate(new Date().toISOString().split('T')[0]);
+    try {
+      const updatedHistory = [newEntry, ...weightHistory];
       
-      Alert.alert('Success', 'Weight entry added');
+      console.log('⚖️ [WEIGHT] 💾 Saving weight entry with robust storage...');
+      console.log('⚖️ [WEIGHT] New entry:', { weight: newEntry.weight, unit: newEntry.unit, date: newEntry.date });
+      
+      // Save using robust storage with redundancy
+      const saveSuccess = await RobustStorage.setItem('@weight_history', JSON.stringify(updatedHistory), true);
+      console.log(`⚖️ [WEIGHT] Robust save result: ${saveSuccess ? '✅ SUCCESS' : '❌ FAILED'}`);
+      
+      if (!saveSuccess) {
+        console.error('⚖️ [WEIGHT] ❌ Robust save failed, trying emergency fallback...');
+        await AsyncStorage.setItem('@weight_history', JSON.stringify(updatedHistory));
+      }
+      
+      setWeightHistory(updatedHistory);
+      
+      // Update nutrition results with latest weight
+      await updateNutritionWeight(weightValue);
+      
+      setCurrentWeight('');
+      setNotes('');
+      setShowUpdateModal(false);
+      
+      Alert.alert('Weight Updated', 'Your weight has been saved with enhanced protection and will be used for future meal plan calculations.');
     } catch (error) {
-      Alert.alert('Error', 'Failed to add weight entry');
+      console.error('Failed to save weight:', error);
+      Alert.alert('Error', 'Failed to save weight. Please try again.');
     }
   };
 
-  const forceUpdateMacros = async () => {
+  const updateNutritionWeight = async (newWeight: number) => {
     try {
-      await updateMacrosBasedOnWeight();
-      Alert.alert('Updated', 'Macros have been adjusted based on your progress');
+      const nutritionResults = await WorkoutStorage.loadNutritionResults();
+      if (nutritionResults) {
+        const updatedResults = {
+          ...nutritionResults,
+          formData: {
+            ...nutritionResults.formData,
+            weight: newWeight.toString(),
+          },
+        };
+        await WorkoutStorage.saveNutritionResults(updatedResults);
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to update macros');
+      console.error('Failed to update nutrition weight:', error);
     }
   };
 
-  const WeightChart = () => {
-    if (filteredEntries.length === 0) return null;
-
-    const chartEntries = filteredEntries.slice(0, 10).reverse(); // Show last 10 entries
-    const weights = chartEntries.map(entry => convertWeight(entry.weight, entry.unit, globalUnit));
-    const minWeight = Math.min(...weights) * 0.98;
-    const maxWeight = Math.max(...weights) * 1.02;
-    const weightRange = maxWeight - minWeight || 1;
-
-    return (
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Weight Trend</Text>
-        <View style={styles.chartArea}>
-          <View style={styles.chartGrid}>
-            {/* Y-axis labels */}
-            <View style={styles.yAxisLabels}>
-              <Text style={styles.yAxisLabel}>{maxWeight.toFixed(1)}</Text>
-              <Text style={styles.yAxisLabel}>{((maxWeight + minWeight) / 2).toFixed(1)}</Text>
-              <Text style={styles.yAxisLabel}>{minWeight.toFixed(1)}</Text>
-            </View>
-            
-            {/* Chart lines */}
-            <View style={styles.chartLines}>
-              {chartEntries.map((entry, index) => {
-                const weight = convertWeight(entry.weight, entry.unit, globalUnit);
-                const x = (index / Math.max(1, chartEntries.length - 1)) * 100;
-                const y = ((maxWeight - weight) / weightRange) * 100;
-                
-                return (
-                  <View key={entry.date} style={styles.chartColumn}>
-                    <View
-                      style={[
-                        styles.chartPoint,
-                        {
-                          left: `${x}%`,
-                          top: `${y}%`,
-                          backgroundColor: themeColor,
-                        }
-                      ]}
-                    />
-                    {index < chartEntries.length - 1 && (
-                      <View
-                        style={[
-                          styles.chartLine,
-                          {
-                            left: `${x}%`,
-                            top: `${y}%`,
-                            width: `${100 / (chartEntries.length - 1)}%`,
-                            backgroundColor: themeColor,
-                          }
-                        ]}
-                      />
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-          
-          {/* X-axis labels */}
-          <View style={styles.xAxisLabels}>
-            {chartEntries.map((entry, index) => (
-              index % Math.ceil(chartEntries.length / 4) === 0 && (
-                <Text key={entry.date} style={styles.xAxisLabel}>
-                  {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </Text>
-              )
-            ))}
-          </View>
-        </View>
-      </View>
-    );
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-AU', { 
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
-  const WeightEntryCard = ({ entry, isLatest }: { entry: WeightEntry; isLatest: boolean }) => {
-    const displayWeight = convertWeight(entry.weight, entry.unit, globalUnit);
+  const getWeightDifference = () => {
+    if (weightHistory.length < 2) return null;
     
-    return (
-      <View style={[styles.entryCard, isLatest && { borderColor: themeColor }]}>
-        <View style={styles.entryHeader}>
-          <View style={styles.entryDateRow}>
-            <Text style={styles.entryDate}>
-              {new Date(entry.date).toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric'
-              })}
-            </Text>
-            {isLatest && (
-              <View style={[styles.latestBadge, { backgroundColor: themeColor }]}>
-                <Text style={styles.latestBadgeText}>Latest</Text>
-              </View>
-            )}
-          </View>
-          
-          <Text style={[styles.entryWeight, isLatest && { color: themeColor }]}>
-            {displayWeight.toFixed(1)} {globalUnit}
-          </Text>
-        </View>
-
-        {entry.notes && (
-          <Text style={styles.entryNotes}>{entry.notes}</Text>
-        )}
-      </View>
-    );
+    const latest = weightHistory[0];
+    const previous = weightHistory[1];
+    
+    let latestWeight = latest.weight;
+    let previousWeight = previous.weight;
+    
+    if (latest.unit !== previous.unit) {
+      if (latest.unit === 'kg' && previous.unit === 'lbs') {
+        previousWeight = previousWeight * 0.453592;
+      } else if (latest.unit === 'lbs' && previous.unit === 'kg') {
+        previousWeight = previousWeight * 2.20462;
+      }
+    }
+    
+    const diff = latestWeight - previousWeight;
+    
+    return {
+      value: Math.abs(diff),
+      unit: latest.unit,
+      isPositive: diff > 0,
+    };
   };
 
+  const weightDiff = getWeightDifference();
+  const latestEntry = weightHistory[0];
+
+  // History View
+  if (showHistory) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setShowHistory(false)} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={24} color={themeColor} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: '#ffffff' }]}>Weight History</Text>
+          <View style={{ width: 44 }} />
+        </View>
+
+        <View style={styles.historyContainer}>
+          {weightHistory.length > 0 ? (
+            weightHistory.map((entry) => (
+              <View key={entry.id} style={[styles.historyItem, { borderColor: themeColor + '30' }]}>
+                <View style={styles.historyLeft}>
+                  <Text style={styles.historyWeight}>{entry.weight} {entry.unit}</Text>
+                  <Text style={styles.historyDate}>{formatDate(entry.date)}</Text>
+                </View>
+                {entry.notes && (
+                  <Text style={styles.historyNotes}>{entry.notes}</Text>
+                )}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noHistoryText}>No weight history yet</Text>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  // Main Weight Display
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+          <Ionicons name="arrow-back" size={24} color={themeColor} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Weight Tracker</Text>
-        <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.addButton}>
-          <Ionicons name="add" size={24} color="#ffffff" />
+        <Text style={[styles.headerTitle, { color: '#ffffff' }]}>Weight Tracker</Text>
+        {weightHistory.length > 0 && (
+          <TouchableOpacity onPress={() => setShowHistory(true)} style={styles.headerButton}>
+            <Ionicons name="time-outline" size={24} color={themeColor} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* AI Info Banner */}
+      <View style={[styles.infoBanner, { backgroundColor: themeColor + '20', borderColor: themeColor + '30' }]}>
+        <Ionicons name="bulb-outline" size={20} color={themeColor} />
+        <Text style={[styles.infoText, { color: '#ffffff' }]}>
+          Your weight helps the AI create accurate meal plans with proper calories and macros
+        </Text>
+      </View>
+
+      {/* Main Weight Display */}
+      <View style={styles.weightDisplayContainer}>
+        {latestEntry ? (
+          <View style={[styles.weightCard, { 
+            borderColor: themeColor + '30',
+            shadowColor: themeColor,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 16,
+            elevation: 16,
+          }]}>
+            <Text style={styles.weightLabel}>Current Weight</Text>
+            <View style={styles.weightValueContainer}>
+              <Text style={[styles.weightValue, { color: themeColor, textShadowColor: themeColorLight }]}>
+                {latestEntry.weight}
+              </Text>
+              <Text style={[styles.weightUnit, { color: themeColor }]}>
+                {latestEntry.unit}
+              </Text>
+            </View>
+            <Text style={styles.lastUpdated}>
+              Last updated {formatDate(latestEntry.date)}
+            </Text>
+            
+            {weightDiff && (
+              <View style={styles.changeContainer}>
+                <View style={[styles.changeBadge, { 
+                  backgroundColor: weightDiff.isPositive ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)' 
+                }]}>
+                  <Ionicons 
+                    name={weightDiff.isPositive ? "trending-up" : "trending-down"} 
+                    size={16} 
+                    color={weightDiff.isPositive ? "#ef4444" : "#22c55e"} 
+                  />
+                  <Text style={[styles.changeText, { 
+                    color: weightDiff.isPositive ? "#ef4444" : "#22c55e" 
+                  }]}>
+                    {weightDiff.isPositive ? '+' : '-'}{weightDiff.value.toFixed(1)} {weightDiff.unit}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            <View style={styles.emptyStateIcon}>
+              <Ionicons name="fitness" size={64} color={themeColor + '40'} />
+            </View>
+            <Text style={styles.emptyStateTitle}>Track Your Weight</Text>
+            <Text style={styles.emptyStateSubtitle}>
+              Add your weight to help the AI create personalized meal plans
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Update Button */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={[styles.updateButton, { 
+            backgroundColor: themeColor,
+            shadowColor: themeColor 
+          }]}
+          onPress={() => setShowUpdateModal(true)}
+        >
+          <Ionicons name="add" size={20} color="#0a0a0b" />
+          <Text style={styles.updateButtonText}>
+            {latestEntry ? 'Update Weight' : 'Add First Weight'}
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Current Stats */}
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Current Stats</Text>
-          
-          <View style={styles.currentWeight}>
-            <Text style={[styles.currentWeightValue, { color: themeColor }]}>
-              {latestEntry 
-                ? `${convertWeight(latestEntry.weight, latestEntry.unit, globalUnit).toFixed(1)} ${globalUnit}`
-                : 'No entries yet'
-              }
-            </Text>
-            <Text style={styles.currentWeightLabel}>Current Weight</Text>
-          </View>
-
-          {weightChange && (
-            <View style={styles.changeStats}>
-              <View style={styles.changeStat}>
-                <Text style={[
-                  styles.changeValue,
-                  { color: weightChange.isGain ? '#ef4444' : '#22c55e' }
-                ]}>
-                  {weightChange.isGain ? '+' : ''}{weightChange.change.toFixed(1)} {globalUnit}
-                </Text>
-                <Text style={styles.changeLabel}>
-                  Last {weightChange.days} day{weightChange.days !== 1 ? 's' : ''}
-                </Text>
-              </View>
-              
-              <View style={styles.changeStat}>
-                <Text style={[
-                  styles.changeValue,
-                  { color: weightChange.isGain ? '#ef4444' : '#22c55e' }
-                ]}>
-                  {weightChange.isGain ? '+' : ''}{weightChange.changePerWeek.toFixed(1)} {globalUnit}/week
-                </Text>
-                <Text style={styles.changeLabel}>Weekly Rate</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Goal Progress */}
-          {goalProgress && (
-            <View style={styles.goalProgress}>
-              <View style={styles.goalHeader}>
-                <Text style={styles.goalTitle}>Goal Progress</Text>
-                <Text style={styles.goalTarget}>
-                  Target: {goalProgress.targetWeight} {globalUnit}
-                </Text>
-              </View>
-              
-              <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${goalProgress.progressPercentage}%`,
-                      backgroundColor: goalProgress.isOnTrack ? '#22c55e' : '#f59e0b'
-                    }
-                  ]}
-                />
-              </View>
-              
-              <View style={styles.progressStats}>
-                <Text style={styles.progressText}>
-                  {goalProgress.progressPercentage.toFixed(1)}% complete
-                </Text>
-                <Text style={styles.remainingText}>
-                  {goalProgress.remaining.toFixed(1)} {globalUnit} remaining
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* Auto-adjust button */}
-          {userProfile?.macros.autoAdjust && weightEntries.length > 1 && (
-            <TouchableOpacity
-              style={[styles.adjustButton, { borderColor: themeColor }]}
-              onPress={forceUpdateMacros}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="refresh-outline" size={16} color={themeColor} />
-              <Text style={[styles.adjustButtonText, { color: themeColor }]}>
-                Update Macros Based on Progress
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Period Filter */}
-        <View style={styles.filterSection}>
-          <Text style={styles.filterLabel}>View Period:</Text>
-          <View style={styles.filterButtons}>
-            {(['week', 'month', 'all'] as const).map((period) => (
-              <TouchableOpacity
-                key={period}
-                style={[
-                  styles.filterButton,
-                  viewPeriod === period && { backgroundColor: themeColor }
-                ]}
-                onPress={() => setViewPeriod(period)}
-              >
-                <Text style={[
-                  styles.filterButtonText,
-                  viewPeriod === period && { color: '#0a0a0b' }
-                ]}>
-                  {period.charAt(0).toUpperCase() + period.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Weight Chart */}
-        {filteredEntries.length > 1 && <WeightChart />}
-
-        {/* Weight History */}
-        <View style={styles.historySection}>
-          <Text style={styles.historyTitle}>
-            Weight History ({filteredEntries.length} entries)
-          </Text>
-          
-          {filteredEntries.length === 0 ? (
-            <View style={styles.emptyHistory}>
-              <Text style={styles.emptyHistoryText}>No entries for this period</Text>
-            </View>
-          ) : (
-            <View style={styles.entriesList}>
-              {filteredEntries.map((entry, index) => (
-                <WeightEntryCard 
-                  key={entry.date} 
-                  entry={entry} 
-                  isLatest={index === 0 && viewPeriod === 'all'}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.bottomPadding} />
-      </ScrollView>
-
-      {/* Add Weight Modal */}
+      {/* Update Modal */}
       <Modal
-        visible={showAddModal}
+        visible={showUpdateModal}
         transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowAddModal(false)}
+        animationType="fade"
+        onRequestClose={() => setShowUpdateModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <View style={[styles.modalContainer, { borderColor: themeColor + '30' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Weight Entry</Text>
-              <TouchableOpacity
-                onPress={() => setShowAddModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color="#ffffff" />
+              <Text style={[styles.modalTitle, { color: '#ffffff' }]}>Update Weight</Text>
+              <TouchableOpacity onPress={() => setShowUpdateModal(false)}>
+                <Ionicons name="close" size={24} color="#a1a1aa" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalContent}>
-              <View style={styles.inputSection}>
-                <Text style={styles.inputLabel}>Weight</Text>
-                <View style={styles.weightInputRow}>
-                  <TextInput
-                    style={styles.weightInput}
-                    value={newWeight}
-                    onChangeText={setNewWeight}
-                    placeholder="70.5"
-                    placeholderTextColor="#71717a"
-                    keyboardType="decimal-pad"
-                  />
-                  
-                  <View style={styles.unitSelector}>
-                    {(['kg', 'lbs'] as const).map((unit) => (
-                      <TouchableOpacity
-                        key={unit}
-                        style={[
-                          styles.unitButton,
-                          selectedUnit === unit && { backgroundColor: themeColor }
-                        ]}
-                        onPress={() => setSelectedUnit(unit)}
-                      >
-                        <Text style={[
-                          styles.unitButtonText,
-                          selectedUnit === unit && { color: '#0a0a0b' }
-                        ]}>
-                          {unit}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+            <ScrollView 
+              style={styles.modalContent}
+              contentContainerStyle={styles.modalContentContainer}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.weightInputRow}>
+                <TextInput
+                  style={[styles.weightInput, { color: '#ffffff', borderColor: themeColor + '30' }]}
+                  value={currentWeight}
+                  onChangeText={setCurrentWeight}
+                  placeholder={`Enter weight in ${weightUnit}`}
+                  placeholderTextColor="#71717a"
+                  keyboardType="numeric"
+                  autoFocus
+                />
+                
+                <View style={styles.unitSelector}>
+                  <TouchableOpacity
+                    style={[
+                      styles.unitButton,
+                      weightUnit === 'kg' && { backgroundColor: themeColor }
+                    ]}
+                    onPress={() => setWeightUnit('kg')}
+                  >
+                    <Text style={[
+                      styles.unitButtonText,
+                      { color: weightUnit === 'kg' ? '#0a0a0b' : '#ffffff' }
+                    ]}>kg</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.unitButton,
+                      weightUnit === 'lbs' && { backgroundColor: themeColor }
+                    ]}
+                    onPress={() => setWeightUnit('lbs')}
+                  >
+                    <Text style={[
+                      styles.unitButtonText,
+                      { color: weightUnit === 'lbs' ? '#0a0a0b' : '#ffffff' }
+                    ]}>lbs</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
-              <View style={styles.inputSection}>
-                <Text style={styles.inputLabel}>Date</Text>
-                <TouchableOpacity style={styles.dateInput}>
-                  <Text style={styles.dateInputText}>
-                    {new Date(selectedDate).toLocaleDateString()}
-                  </Text>
-                  <Ionicons name="calendar-outline" size={20} color={themeColor} />
-                </TouchableOpacity>
-              </View>
+              <TextInput
+                style={[styles.notesInput, { color: '#ffffff', borderColor: themeColor + '30' }]}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Optional notes (e.g., morning weigh-in, after workout)"
+                placeholderTextColor="#71717a"
+                multiline
+                numberOfLines={3}
+              />
 
-              <View style={styles.inputSection}>
-                <Text style={styles.inputLabel}>Notes (optional)</Text>
-                <TextInput
-                  style={styles.notesInput}
-                  value={newNotes}
-                  onChangeText={setNewNotes}
-                  placeholder="How are you feeling? Any observations..."
-                  placeholderTextColor="#71717a"
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-            </View>
-
-            <View style={styles.modalActions}>
               <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowAddModal(false)}
+                style={[styles.saveButton, { 
+                  backgroundColor: themeColor,
+                  shadowColor: themeColor 
+                }]}
+                onPress={saveWeight}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.saveButtonText}>Save Weight</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSaveButton, { backgroundColor: themeColor }]}
-                onPress={addWeight}
-              >
-                <Text style={styles.modalSaveText}>Save Entry</Text>
-              </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -527,420 +428,283 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  backButton: {
+  headerButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: '#18181b',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#18181b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    flex: 1,
-  },
-  statsCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 20,
-  },
-  currentWeight: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  currentWeightValue: {
-    fontSize: 36,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  currentWeightLabel: {
-    fontSize: 14,
-    color: '#71717a',
-  },
-  changeStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
-  },
-  changeStat: {
-    alignItems: 'center',
-  },
-  changeValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  changeLabel: {
-    fontSize: 12,
-    color: '#71717a',
-  },
-  goalProgress: {
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
-    paddingTop: 16,
-    marginBottom: 16,
-  },
-  goalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  goalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  goalTarget: {
-    fontSize: 14,
-    color: '#71717a',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#27272a',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  remainingText: {
-    fontSize: 12,
-    color: '#71717a',
-  },
-  adjustButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  adjustButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  filterSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  filterLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 12,
-  },
-  filterButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  filterButton: {
-    backgroundColor: '#27272a',
-    borderRadius: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  chartContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  chartTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 16,
-  },
-  chartArea: {
-    height: 200,
-  },
-  chartGrid: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  yAxisLabels: {
-    width: 40,
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  yAxisLabel: {
-    fontSize: 10,
-    color: '#71717a',
-    textAlign: 'right',
-  },
-  chartLines: {
-    flex: 1,
-    position: 'relative',
-  },
-  chartColumn: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  chartPoint: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: -3,
-    marginLeft: -3,
-  },
-  chartLine: {
-    position: 'absolute',
-    height: 2,
-    marginTop: -1,
-  },
-  xAxisLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingLeft: 40,
-  },
-  xAxisLabel: {
-    fontSize: 10,
-    color: '#71717a',
-  },
-  historySection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  historyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 16,
-  },
-  emptyHistory: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyHistoryText: {
-    fontSize: 16,
-    color: '#71717a',
-  },
-  entriesList: {
-    gap: 12,
-  },
-  entryCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 16,
-  },
-  entryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  entryDateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  entryDate: {
-    fontSize: 14,
-    color: '#71717a',
-  },
-  latestBadge: {
-    borderRadius: 8,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-  },
-  latestBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#0a0a0b',
-  },
-  entryWeight: {
     fontSize: 20,
     fontWeight: '700',
     color: '#ffffff',
   },
-  entryNotes: {
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  infoText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  weightDisplayContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  weightCard: {
+    alignItems: 'center',
+    backgroundColor: '#18181b',
+    borderRadius: 20,
+    padding: 40,
+    width: '100%',
+    maxWidth: 340,
+    borderWidth: 2,
+  },
+  weightLabel: {
+    fontSize: 16,
+    color: '#a1a1aa',
+    marginBottom: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  weightValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 20,
+    justifyContent: 'center',
+  },
+  weightValue: {
+    fontSize: 72,
+    fontWeight: '800',
+    lineHeight: 72,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  weightUnit: {
+    fontSize: 28,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  lastUpdated: {
+    fontSize: 14,
+    color: '#71717a',
+    marginBottom: 16,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  changeContainer: {
+    alignItems: 'center',
+  },
+  changeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  changeText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    maxWidth: 280,
+  },
+  emptyStateIcon: {
+    marginBottom: 24,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  emptyStateSubtitle: {
+    fontSize: 16,
+    color: '#a1a1aa',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  buttonContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  updateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  updateButtonText: {
+    color: '#0a0a0b',
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  
+  // History styles
+  historyContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  historyLeft: {
+    flex: 1,
+  },
+  historyWeight: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  historyDate: {
     fontSize: 14,
     color: '#a1a1aa',
+  },
+  historyNotes: {
+    fontSize: 12,
+    color: '#71717a',
     fontStyle: 'italic',
-    lineHeight: 18,
+    maxWidth: 120,
+    textAlign: 'right',
   },
-  bottomPadding: {
-    height: 40,
+  noHistoryText: {
+    fontSize: 16,
+    color: '#71717a',
+    textAlign: 'center',
+    marginTop: 60,
   },
+  
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
+    justifyContent: 'flex-end',
   },
   modalContainer: {
     backgroundColor: '#18181b',
-    borderRadius: 16,
-    overflow: 'hidden',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    maxHeight: '85%',
+    minHeight: 400,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#ffffff',
-  },
-  modalCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#27272a',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   modalContent: {
-    padding: 20,
+    flex: 1,
   },
-  inputSection: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 8,
+  modalContentContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
   weightInputRow: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    marginBottom: 20,
   },
   weightInput: {
     flex: 1,
-    backgroundColor: '#27272a',
-    borderRadius: 8,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 16,
+    marginRight: 12,
+    borderWidth: 1,
     color: '#ffffff',
   },
   unitSelector: {
     flexDirection: 'row',
-    backgroundColor: '#27272a',
-    borderRadius: 8,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
   },
   unitButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
   },
   unitButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
   },
-  dateInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#27272a',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  dateInputText: {
-    fontSize: 16,
-    color: '#ffffff',
-  },
   notesInput: {
-    backgroundColor: '#27272a',
-    borderRadius: 8,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 14,
-    color: '#ffffff',
+    marginBottom: 30,
     minHeight: 80,
     textAlignVertical: 'top',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 12,
-  },
-  modalCancelButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#3f3f46',
-    borderRadius: 8,
-    paddingVertical: 12,
+    color: '#ffffff',
+  },
+  saveButton: {
+    paddingVertical: 18,
+    borderRadius: 12,
     alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  modalCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-  },
-  modalSaveButton: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  modalSaveText: {
-    fontSize: 16,
-    fontWeight: '600',
+  saveButtonText: {
     color: '#0a0a0b',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
+
+export default WeightTrackerScreen;
