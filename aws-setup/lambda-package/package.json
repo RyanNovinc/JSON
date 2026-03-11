@@ -1,0 +1,9 @@
+{
+  "name": "json-app-feedback-handler",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1000.0",
+    "uuid": "^9.0.0"
+  }
+}
