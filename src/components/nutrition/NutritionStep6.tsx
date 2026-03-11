@@ -18,6 +18,7 @@ interface Props {
   nextStep: () => void;
   previousStep: () => void;
   colors: any;
+  scrollViewRef?: React.RefObject<ScrollView>;
 }
 
 export const NutritionStep6: React.FC<Props> = ({
@@ -26,6 +27,7 @@ export const NutritionStep6: React.FC<Props> = ({
   nextStep,
   previousStep,
   colors,
+  scrollViewRef,
 }) => {
   const commonRestrictions = [
     { id: 'vegetarian', label: 'Vegetarian', icon: 'leaf' },
@@ -71,7 +73,8 @@ export const NutritionStep6: React.FC<Props> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollViewRef} style={styles.content} showsVerticalScrollIndicator={false}>
         <Animatable.View animation="fadeInDown" delay={200}>
           <View style={styles.header}>
             <TouchableOpacity 

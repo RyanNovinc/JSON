@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, StatusBar } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { View, StyleSheet, StatusBar, ScrollView } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { WorkoutStorage } from '../utils/storage';
@@ -96,6 +96,7 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
   const [macroResults, setMacroResults] = useState<MacroResults | null>(null);
   const [displayCalories, setDisplayCalories] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Calculate targetRate whenever weight or targetRatePercentage changes
   useEffect(() => {
@@ -292,6 +293,8 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
         nextStepNumber = 3;
       }
       setCurrentStep(nextStepNumber);
+      // Scroll to top when moving to next step
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     } else {
       // Calculate results and show summary
       calculateMacros();
@@ -306,6 +309,8 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
         prevStepNumber = 1;
       }
       setCurrentStep(prevStepNumber);
+      // Scroll to top when moving to previous step
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }
   }, [currentStep, formData.goal]);
 
@@ -557,6 +562,7 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
       nextStep,
       previousStep,
       colors,
+      scrollViewRef,
     };
 
     switch (currentStep) {

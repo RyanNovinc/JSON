@@ -108,7 +108,7 @@ Sometimes the user's preferences will conflict — for example, a very low budge
 - Daily calories: ${macroResults.calories || 2000}
 - Protein: ${macroResults.protein || 150}g | Carbs: ${macroResults.carbs || 200}g | Fat: ${macroResults.fat || 67}g
 - Daily fiber target: ${fiberTarget}g (aim for ${fiberTarget - 5}–${fiberTarget + 5}g range)
-- ${budgetData.mealsPerDay || 3} meals per day
+- ${budgetData.mealsPerDay || 3} eating occasions per day (includes both main meals and snacks)
 - Plan duration: ${budgetData.planDuration || 7} days
 - Snacking style: ${budgetData.snackingStyle || 'Occasional snacker'}
 - Goal: ${nutritionData.goal || 'maintain'} at ${nutritionData.rate || 'moderate'} rate
@@ -123,6 +123,10 @@ Sometimes the user's preferences will conflict — for example, a very low budge
 ${getVarietyRequirements(budgetData, budgetData.skillConfidence, budgetData.timeInvestment)}${getSkillRequirements(budgetData)}${getTimeRequirements(budgetData)}
 
 ${getMealStructure(budgetData.mealsPerDay || 3, macroResults.protein || 150)}
+
+**SNACKING GUIDANCE BASED ON USER PREFERENCE:**
+Based on snacking style "${budgetData.snackingStyle}":
+${getSnackingGuidance(budgetData.snackingStyle, budgetData.mealsPerDay || 3)}
 
 **KEY RULE FOR JSON OUTPUT:** Use ONLY these meal types: breakfast, lunch, dinner, snack. If you have multiple snacks, they all use type "snack" — differentiate them by name (e.g., "Morning Protein Snack", "Afternoon Energy Snack").
 
@@ -562,54 +566,123 @@ const getCurrencySymbol = (countryCode: string): string => {
 const getMealStructure = (mealsPerDay: number, proteinTarget: number): string => {
   switch (mealsPerDay) {
     case 2:
-      return `MEAL STRUCTURE (2 meals per day):
-- Meal 1: breakfast
-- Meal 2: dinner
+      return `MEAL STRUCTURE (2 main meals):
+- Meal 1: breakfast (substantial meal)
+- Meal 2: dinner (substantial meal)
+- Distribute daily calories roughly evenly across both meals (flexibility is fine)
 - Distribute ${proteinTarget}g protein appropriately across both meals`;
     
     case 3:
-      return `MEAL STRUCTURE (3 meals per day):
-- Meal 1: breakfast
-- Meal 2: lunch
-- Meal 3: dinner
+      return `MEAL STRUCTURE (3 main meals):
+- Meal 1: breakfast (substantial meal)
+- Meal 2: lunch (substantial meal)  
+- Meal 3: dinner (substantial meal)
+- Distribute daily calories roughly evenly across meals (flexibility is fine - aim for balanced portions)
 - Distribute ${proteinTarget}g protein appropriately across all meals`;
     
     case 4:
-      return `MEAL STRUCTURE (4 meals per day):
-- Meal 1: breakfast
-- Meal 2: lunch  
-- Meal 3: snack
-- Meal 4: dinner
-- Distribute ${proteinTarget}g protein appropriately, with main meals contributing most and snack contributing naturally based on food choices`;
+      return `MEAL STRUCTURE (4 eating occasions):
+- Meal 1: breakfast (substantial meal)
+- Meal 2: lunch (substantial meal)  
+- Meal 3: dinner (substantial meal)
+- Meal 4: Choose based on user's snacking preference:
+  • If user likes substantial meals: 4th main meal like "supper" or "second lunch" (similar size to other meals, type: "dinner" or "lunch")
+  • If user prefers lighter eating: snack between meals (much smaller than meals, type: "snack")
+- Distribute daily calories appropriately across all eating occasions (flexibility is fine)
+- Distribute ${proteinTarget}g protein appropriately, with main meals carrying most protein`;
     
     case 5:
-      return `MEAL STRUCTURE (5 meals per day):
-- Meal 1: breakfast
-- Meal 2: snack (morning)
-- Meal 3: lunch
-- Meal 4: snack (afternoon)
-- Meal 5: dinner
-- In the JSON, both snacks use type: "snack"
-- Distribute ${proteinTarget}g protein appropriately across all meals and snacks`;
+      return `MEAL STRUCTURE (5 eating occasions):
+Choose structure based on user's snacking preference:
+
+**OPTION A - If user prefers substantial meals (e.g., "I don't snack"):**
+- Meal 1: breakfast (substantial meal, type: "breakfast")
+- Meal 2: brunch (substantial meal, type: "lunch") 
+- Meal 3: lunch (substantial meal, type: "lunch")
+- Meal 4: dinner (substantial meal, type: "dinner")
+- Meal 5: supper (substantial meal, type: "dinner")
+- Distribute daily calories roughly evenly across all 5 meals (flexibility is fine)
+- All meals are substantial with balanced macros
+
+**OPTION B - If user enjoys snacking:**
+- Meal 1: breakfast (substantial meal, type: "breakfast")
+- Snack 1: mid-morning (light snack, type: "snack")
+- Meal 2: lunch (substantial meal, type: "lunch")
+- Snack 2: afternoon (light snack, type: "snack")
+- Meal 3: dinner (substantial meal, type: "dinner")
+- Distribute calories with main meals being substantial and snacks being lighter (flexibility is fine)
+- Main meals provide most protein, snacks are lighter contributions`;
     
     case 6:
-      return `MEAL STRUCTURE (6 meals per day):
-- Meal 1: breakfast
-- Meal 2: snack (mid-morning)
-- Meal 3: lunch
-- Meal 4: snack (afternoon)
-- Meal 5: dinner
-- Meal 6: snack (evening — must respect last-meal-before-bed timing)
-- In the JSON, all snacks use type: "snack"
-- Distribute ${proteinTarget}g protein appropriately across all meals and snacks`;
+      return `MEAL STRUCTURE (6 eating occasions):
+Choose structure based on user's snacking preference:
+
+**OPTION A - If user prefers substantial meals (e.g., "I don't snack"):**
+- Meal 1: breakfast (substantial meal, type: "breakfast")
+- Meal 2: brunch (substantial meal, type: "lunch")
+- Meal 3: lunch (substantial meal, type: "lunch") 
+- Meal 4: afternoon meal (substantial meal, type: "lunch")
+- Meal 5: dinner (substantial meal, type: "dinner")
+- Meal 6: supper (substantial meal, type: "dinner")
+- Distribute daily calories roughly evenly across all 6 meals (flexibility is fine)
+- All 6 meals are substantial with balanced macros
+
+**OPTION B - If user enjoys snacking:**
+- Meal 1: breakfast (substantial meal, type: "breakfast")
+- Snack 1: mid-morning (light snack, type: "snack")
+- Meal 2: lunch (substantial meal, type: "lunch")
+- Snack 2: afternoon (light snack, type: "snack")
+- Meal 3: dinner (substantial meal, type: "dinner")
+- Snack 3: evening (light snack, type: "snack", respect bedtime timing)
+- Distribute calories with main meals being substantial and snacks being lighter (flexibility is fine)
+- Main meals provide most protein, snacks are lighter contributions`;
     
     default: // fallback to 3
-      return `MEAL STRUCTURE (3 meals per day):
-- Meal 1: breakfast
-- Meal 2: lunch
-- Meal 3: dinner
+      return `MEAL STRUCTURE (3 main meals):
+- Meal 1: breakfast (substantial meal)
+- Meal 2: lunch (substantial meal)
+- Meal 3: dinner (substantial meal)
+- Distribute daily calories roughly evenly across meals (flexibility is fine - aim for balanced portions)
 - Distribute ${proteinTarget}g protein appropriately across all meals`;
   }
+};
+
+const getSnackingGuidance = (snackingStyle: string, mealsPerDay: number): string => {
+  const style = snackingStyle?.toLowerCase() || 'occasional snacker';
+  
+  if (style.includes("don't snack") || style.includes("i don't snack")) {
+    return `- MINIMAL SNACKING: User prefers not to snack. For 4+ eating occasions, treat them as main meals rather than snacks.
+- Focus on making meals substantial and satisfying. Use names like "brunch", "supper", "second lunch" for 4th+ meals.
+- Only add light snacks if gaps between meals exceed 5-6 hours for practical hunger management.`;
+  }
+  
+  if (style.includes('love snacking') || style.includes('frequent')) {
+    return `- SNACK-FRIENDLY: User enjoys snacking frequently. Include appropriate snacks between meals.
+- Make snacks nutritious and balanced (combine protein + carbs/fat when possible).
+- Examples: Greek yogurt with berries, apple with almond butter, hummus with vegetables, mixed nuts with fruit.`;
+  }
+  
+  if (style.includes('need healthy snacks')) {
+    return `- HEALTHY FOCUS: User wants nutritious snack options that support their health goals.
+- Prioritize whole food snacks with good nutritional density.
+- Examples: vegetables with healthy dips, fruit with protein, nuts and seeds, homemade energy balls.`;
+  }
+  
+  if (style.includes('sweet tooth')) {
+    return `- SWEET PREFERENCES: User enjoys sweet snacks - provide healthier sweet options.
+- Examples: fruit with yogurt, dark chocolate with nuts, homemade fruit smoothies, dates stuffed with nut butter.
+- Balance sweetness with protein/fiber to avoid energy crashes.`;
+  }
+  
+  if (style.includes('savory')) {
+    return `- SAVORY PREFERENCES: User prefers savory snack options over sweet ones.
+- Examples: vegetable sticks with hummus, nuts and seeds, cheese with crackers, olives, roasted chickpeas.`;
+  }
+  
+  // Default for "occasional snacker" or unrecognized styles
+  return `- MODERATE SNACKING: Include 1-2 moderate snacks if meal timing creates gaps longer than 4-5 hours.
+- Keep snacks balanced and proportionate to overall daily calorie needs.
+- Examples: mixed nuts, fruit with yogurt, vegetable sticks with protein-rich dips.`;
 };
 
 const getProteinDistributionGuidance = (mealsPerDay: number, proteinTarget: number): string => {

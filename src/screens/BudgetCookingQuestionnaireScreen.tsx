@@ -96,6 +96,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const [customAllergy, setCustomAllergy] = useState('');
   const [customAvoidFood, setCustomAvoidFood] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Get favorite meals
   const favoriteMeals = getFavoriteMeals();
@@ -568,6 +569,8 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const nextStep = () => {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
+      // Scroll to top when moving to next step
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     } else {
       // Show results page after completing all steps
       setShowResults(true);
@@ -577,6 +580,8 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const prevStep = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      // Scroll to top when moving to previous step
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     } else {
       onBack();
     }
@@ -586,6 +591,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const renderBudgetStep = () => (
     <View style={styles.stepContainer}>
       <ScrollView 
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -692,6 +698,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView 
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
@@ -791,6 +798,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView 
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
@@ -857,6 +865,8 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                 withFlag
                 withCallingCode={false}
                 withEmoji={true}
+                withFilter={true}
+                withAlphaFilter={true}
                 countryCode={formData.countryCode as any}
                 theme={{
                   backgroundColor: '#000000',
@@ -927,6 +937,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const renderCookingStyleStep = () => (
     <View style={styles.stepContainer}>
       <ScrollView 
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -1085,6 +1096,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     return (
       <View style={styles.stepContainer}>
         <ScrollView 
+          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 120 }}
         >
@@ -1186,6 +1198,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const renderFoodPreferencesStep = () => (
     <View style={styles.stepContainer}>
       <ScrollView 
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -1580,8 +1593,6 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     </View>
   );
 
-  const scrollViewRef = React.useRef<ScrollView>(null);
-  
   // Scroll to top when results screen loads
   React.useEffect(() => {
     if (showResults && scrollViewRef.current) {
@@ -2022,6 +2033,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const renderMealPlanDurationStep = () => (
     <View style={styles.stepContainer}>
       <ScrollView 
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -2172,6 +2184,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     return (
       <View style={styles.stepContainer}>
         <ScrollView 
+          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 120 }}
         >
@@ -2274,6 +2287,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const renderMealPreferencesStep = () => (
     <View style={styles.stepContainer}>
       <ScrollView 
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
@@ -2515,6 +2529,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     return (
       <View style={styles.stepContainer}>
         <ScrollView 
+          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 120 }}
         >

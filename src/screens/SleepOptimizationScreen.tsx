@@ -97,6 +97,8 @@ export default function SleepOptimizationScreen() {
   const handleNext = () => {
     if (currentStep < 2) {
       setCurrentStep(prev => prev + 1);
+      // Scroll to top when moving to next step
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     } else {
       handleComplete();
     }
@@ -105,6 +107,8 @@ export default function SleepOptimizationScreen() {
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
+      // Scroll to top when moving to previous step
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     } else {
       navigation.goBack();
     }
@@ -650,6 +654,7 @@ export default function SleepOptimizationScreen() {
 
       {/* Content */}
       <ScrollView 
+        ref={scrollViewRef}
         style={styles.researchScreenScroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.researchScrollContent}

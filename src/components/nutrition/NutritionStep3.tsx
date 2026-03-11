@@ -7,6 +7,8 @@ import {
   SafeAreaView,
   TextInput,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +21,7 @@ interface Props {
   nextStep: () => void;
   previousStep: () => void;
   colors: any;
+  scrollViewRef?: React.RefObject<ScrollView>;
 }
 
 export const NutritionStep3: React.FC<Props> = ({
@@ -27,6 +30,7 @@ export const NutritionStep3: React.FC<Props> = ({
   nextStep,
   previousStep,
   colors,
+  scrollViewRef,
 }) => {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
@@ -43,7 +47,12 @@ export const NutritionStep3: React.FC<Props> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView ref={scrollViewRef} style={styles.content} showsVerticalScrollIndicator={false}>
         <Animatable.View animation="fadeInDown" delay={200}>
           <View style={styles.header}>
             <TouchableOpacity 
@@ -200,7 +209,8 @@ export const NutritionStep3: React.FC<Props> = ({
             <Text style={styles.progressText}>Step 3 of 6</Text>
           </View>
         </Animatable.View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

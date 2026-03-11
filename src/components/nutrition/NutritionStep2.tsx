@@ -19,6 +19,7 @@ interface Props {
   nextStep: () => void;
   previousStep: () => void;
   colors: any;
+  scrollViewRef?: React.RefObject<ScrollView>;
 }
 
 export const NutritionStep2: React.FC<Props> = ({
@@ -27,6 +28,7 @@ export const NutritionStep2: React.FC<Props> = ({
   nextStep,
   previousStep,
   colors,
+  scrollViewRef,
 }) => {
   // This component should not render for maintain goals - handled by navigation logic
 
@@ -66,7 +68,8 @@ export const NutritionStep2: React.FC<Props> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
+        ref={scrollViewRef} 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}

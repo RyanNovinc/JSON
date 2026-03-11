@@ -98,6 +98,7 @@ export default function NutritionDashboardScreen() {
   // Reload data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
+      loadCompletionStatus();
       loadFridgePantryCount();
       loadUseFridgePantryToggle();
     }, [])
