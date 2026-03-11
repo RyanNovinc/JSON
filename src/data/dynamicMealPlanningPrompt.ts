@@ -342,8 +342,9 @@ Include:
 - **Session name** - e.g., "Sunday Meal Prep" or "Weekly Batch Cook"
 - **Prep time and cook time** - Separate active prep vs passive cooking time
 - **Total time** - Combined duration
-- **Coverage** - What days/meals the prep covers (e.g., "7 days of lunches and dinners")
+- **Coverage** - What days/meals the prep covers - MUST be concise (max 6 words): "21 meals across 7 days" or "Days 1-4" or "All week"
 - **Recommended timing** - When to do the prep (e.g., "Sunday afternoon")
+- **Recommended date** - Actual calendar date in YYYY-MM-DD format when the prep should be done
 - **Equipment needed** - List of equipment required for the prep session
 - **Step-by-step instructions** - Clear, ordered instructions for the full prep session
 - **Storage guidelines** - How long each prepped item lasts in fridge vs freezer`;
@@ -938,7 +939,8 @@ Verify the meal prep guide is functional:
 - **Equipment list** matches what's actually needed for the prep
 - **Storage guidelines** are included with realistic fridge/freezer times
 - **Time estimates** are realistic (prep time + cook time = total time)
-- **Coverage statement** accurately describes what the prep covers
+- **Coverage statement** is concise (max 6 words): "21 meals across 7 days" format
+- **Recommended date** is included in YYYY-MM-DD format for each prep session
 - **FAIL if** meal prep session is missing, incomplete, or doesn't match the actual recipes
 - **FIX**: Add missing prep steps, correct equipment list, add storage guidelines, fix time estimates.
 
@@ -1063,6 +1065,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
     "total_time": number,
     "covers": "string",
     "recommended_timing": "string",
+    "recommended_date": "YYYY-MM-DD",
     "equipment_needed": ["string array"],
     "instructions": ["string array"],
     "storage_guidelines": {
@@ -1149,8 +1152,9 @@ This JSON format is designed to work directly with the app's simplified meal pla
 | **prep_time** | Yes | Number | Active prep time in minutes |
 | **cook_time** | Yes | Number | Passive cooking time in minutes |
 | **total_time** | Yes | Number | prep_time + cook_time |
-| **covers** | Yes | String | What the prep covers |
+| **covers** | Yes | String | Concise description (max 6 words): "21 meals across 7 days" format |
 | **recommended_timing** | Yes | String | When to do the prep |
+| **recommended_date** | Yes | String | Calendar date in YYYY-MM-DD format |
 | **equipment_needed** | Yes | Array | Required equipment |
 | **instructions** | Yes | Array | Step-by-step prep instructions |
 | **storage_guidelines** | Yes | Object | How long items last |

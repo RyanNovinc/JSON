@@ -29,9 +29,32 @@ export function FloatingWorkoutIndicator() {
     }
   }, [activeWorkout?.duration]);
 
-  // Don't show on the WorkoutLog screen itself
+  // Don't show on the WorkoutLog screen if it's the SAME workout as the active one
   const currentRoute = getCurrentRoute();
-  if (!activeWorkout || currentRoute?.name === 'WorkoutLog') return null;
+  if (!activeWorkout) return null;
+  
+  // If we're on a WorkoutLog screen, check if it's the same workout as the active one
+  if (currentRoute?.name === 'WorkoutLog' && currentRoute?.params) {
+    const currentParams = currentRoute.params as any;
+    const activeParams = activeWorkout.routeParams;
+    
+    // Compare day name and block name to determine if it's the same workout
+    const isSameWorkout = currentParams?.day?.day_name === activeParams?.day?.day_name &&
+                         currentParams?.blockName === activeParams?.blockName;
+    
+    console.log('🔍 FLOATING INDICATOR: On WorkoutLog screen');
+    console.log('🔍 FLOATING INDICATOR: Current workout:', currentParams?.day?.day_name, '|', currentParams?.blockName);
+    console.log('🔍 FLOATING INDICATOR: Active workout:', activeParams?.day?.day_name, '|', activeParams?.blockName);
+    console.log('🔍 FLOATING INDICATOR: Same workout?', isSameWorkout);
+    
+    // Only hide if it's the same workout
+    if (isSameWorkout) {
+      console.log('🔍 FLOATING INDICATOR: Hiding - same workout');
+      return null;
+    } else {
+      console.log('🔍 FLOATING INDICATOR: Showing - different workout');
+    }
+  }
 
   const formatDuration = (seconds: number): string => {
     const hrs = Math.floor(seconds / 3600);
@@ -45,6 +68,20 @@ export function FloatingWorkoutIndicator() {
   };
 
   const handlePress = () => {
+    console.log('🚀 FLOATING INDICATOR: User tapped floating workout indicator');
+    console.log('🚀 FLOATING INDICATOR: Active workout state:', {
+      dayName: activeWorkout?.dayName,
+      duration: activeWorkout?.duration,
+      routeParams: activeWorkout?.routeParams
+    });
+    
+    // Ensure all required route params are present to prevent crashes
+    if (!activeWorkout?.routeParams?.day || !activeWorkout?.routeParams?.blockName) {
+      console.warn('🚀 FLOATING INDICATOR: Incomplete route params for workout navigation:', activeWorkout?.routeParams);
+      return;
+    }
+    
+    console.log('🚀 FLOATING INDICATOR: Navigating to WorkoutLog with params:', activeWorkout.routeParams);
     navigate('WorkoutLog', activeWorkout.routeParams);
   };
 

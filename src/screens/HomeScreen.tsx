@@ -65,7 +65,7 @@ function RoutineCard({ routine, onExport, onPress, onLongPress, isPinkTheme, the
   );
 }
 
-export default function HomeScreen({ route }: any) {
+export default function HomeScreen({ route, transitionProgress }: any) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
   const [shareModal, setShareModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null }>({
@@ -86,13 +86,12 @@ export default function HomeScreen({ route }: any) {
   });
   const [calendarModal, setCalendarModal] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   
   const { showFeedbackModal, submitFeedback, skipFeedback, triggerFeedbackModal } = useImportFeedback();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
-  const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
+  const { appMode, setAppMode, isTrainingMode, isNutritionMode, isTransitioning, setIsTransitioning } = useAppMode();
   const hasNutritionAccess = useHasNutritionAccess();
 
   // Load routines from storage on component mount
@@ -227,8 +226,18 @@ export default function HomeScreen({ route }: any) {
   };
 
   const addRoutine = async (routine: WorkoutRoutine) => {
-    await WorkoutStorage.addRoutine(routine);
-    setRoutines(prev => [...prev, routine]);
+    try {
+      await WorkoutStorage.addRoutine(routine);
+      setRoutines(prev => [...prev, routine]);
+      console.log(`✅ Routine added to HomeScreen state: ${routine.name}`);
+    } catch (error) {
+      console.error('❌ Failed to add routine in HomeScreen:', error);
+      Alert.alert(
+        'Import Failed',
+        'Failed to save your workout routine. Please check your device storage and try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleExport = (routine: WorkoutRoutine) => {
@@ -656,10 +665,10 @@ export default function HomeScreen({ route }: any) {
   const handleNutritionTransition = () => {
     if (isTransitioning) return;
     
-    // Always go to NutritionHome first - paywall logic should be in individual nutrition features
+    // Just switch the app mode, the container will handle the animation
     setAppMode('nutrition');
-    navigation.navigate('NutritionHome' as any);
   };
+
 
 
   const handleGoToTodayWorkout = async () => {
@@ -849,20 +858,8 @@ export default function HomeScreen({ route }: any) {
     }
   };
 
-  // Handle nutrition mode navigation
-  useEffect(() => {
-    if (isNutritionMode) {
-      // Always navigate to nutrition home - paywall logic is handled in individual nutrition features
-      navigation.navigate('NutritionHome' as any);
-    }
-  }, [isNutritionMode, navigation]);
 
   const renderContent = () => {
-    // If in nutrition mode, don't render workout content - navigation happens in useEffect above
-    if (isNutritionMode) {
-      return null; // Don't render anything while navigating to nutrition screen
-    }
-
     if (routines.length === 0) {
       return (
         <View style={styles.emptyState}>
@@ -1110,18 +1107,6 @@ export default function HomeScreen({ route }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Go to Today Button - Bottom Left (Nutrition Mode Only) */}
-      {isNutritionMode && (
-        <View style={[styles.todayButton, { backgroundColor: themeColor }]}>
-          <TouchableOpacity
-            style={styles.buttonInner}
-            onPress={handleGoToToday}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="today-outline" size={24} color="#0a0a0b" />
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Questionnaire Button - Bottom Center */}
       <View style={[styles.questionnaireButton, { backgroundColor: themeColor }]}>
@@ -1136,47 +1121,75 @@ export default function HomeScreen({ route }: any) {
 
       {/* App Mode Toggle - Centered at Top */}
       <View style={styles.centralToggleContainer}>
-        <TouchableOpacity
-          style={[
-            styles.centralModeToggle, 
-            isTrainingMode && { backgroundColor: themeColor, borderColor: themeColor }
-          ]}
-          onPress={() => setAppMode('training')}
-          activeOpacity={0.8}
-        >
-          <Ionicons 
-            name="barbell" 
-            size={20} 
-            color={isTrainingMode ? "#0a0a0b" : themeColor} 
-          />
-          <Text style={[
-            styles.centralToggleText,
-            { color: isTrainingMode ? "#0a0a0b" : themeColor }
-          ]}>
-            Workouts
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.centralModeToggle, 
-            isNutritionMode && { backgroundColor: themeColor, borderColor: themeColor }
-          ]}
-          onPress={handleNutritionTransition}
-          activeOpacity={0.8}
-        >
-          <Ionicons 
-            name="restaurant" 
-            size={20} 
-            color={isNutritionMode ? "#0a0a0b" : themeColor} 
-          />
-          <Text style={[
-            styles.centralToggleText,
-            { color: isNutritionMode ? "#0a0a0b" : themeColor }
-          ]}>
-            Nutrition
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.centralToggleInner}>
+          <Animated.View
+            style={[
+              styles.centralModeToggle,
+              {
+                backgroundColor: transitionProgress ? transitionProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [themeColor, 'transparent']
+                }) : (isTrainingMode ? themeColor : 'transparent'),
+                borderColor: transitionProgress ? transitionProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [themeColor, '#3f3f46']
+                }) : (isTrainingMode ? themeColor : '#3f3f46')
+              }
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.centralModeToggleInner}
+              onPress={() => setAppMode('training')}
+              activeOpacity={0.8}
+            >
+              <Ionicons 
+                name="barbell" 
+                size={20} 
+                color={isTrainingMode ? "#0a0a0b" : themeColor}
+              />
+              <Text style={[
+                styles.centralToggleText,
+                { color: isTrainingMode ? "#0a0a0b" : themeColor }
+              ]}>
+                Workouts
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+          
+          <Animated.View
+            style={[
+              styles.centralModeToggle,
+              {
+                backgroundColor: transitionProgress ? transitionProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['transparent', themeColor]
+                }) : (isNutritionMode ? themeColor : 'transparent'),
+                borderColor: transitionProgress ? transitionProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['#3f3f46', themeColor]
+                }) : (isNutritionMode ? themeColor : '#3f3f46')
+              }
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.centralModeToggleInner}
+              onPress={handleNutritionTransition}
+              activeOpacity={0.8}
+            >
+              <Ionicons 
+                name="restaurant" 
+                size={20} 
+                color={isNutritionMode ? "#0a0a0b" : themeColor}
+              />
+              <Text style={[
+                styles.centralToggleText,
+                { color: isNutritionMode ? "#0a0a0b" : themeColor }
+              ]}>
+                Nutrition
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
       </View>
 
 
@@ -1301,7 +1314,7 @@ export default function HomeScreen({ route }: any) {
       <Modal
         visible={deleteModal.visible}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setDeleteModal({ visible: false, routine: null })}
       >
         <View style={styles.actionModalOverlay}>
@@ -2179,17 +2192,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#22d3ee',
   },
   
-  // Today button styles (positioned next to calendar button)
-  todayButton: {
-    position: 'absolute',
-    left: '50%',
-    bottom: 96, // Above the calendar button
-    marginLeft: -28, // Half of width to center
-    width: 56,
-    height: 56,
-    borderRadius: 4,
-    backgroundColor: '#22d3ee',
-  },
   
   
   // Questionnaire button styles
@@ -2376,8 +2378,14 @@ const styles = StyleSheet.create({
   centralToggleContainer: {
     position: 'absolute',
     top: 54,
-    left: '50%',
-    marginLeft: -120, // Half of the total width (240px / 2)
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    zIndex: 1000,
+  },
+  centralToggleInner: {
     flexDirection: 'row',
     gap: 8,
     backgroundColor: '#18181b',
@@ -2402,6 +2410,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+  },
+  centralModeToggleInner: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    height: '100%',
     paddingHorizontal: 12,
   },
   centralToggleText: {

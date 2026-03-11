@@ -1002,7 +1002,7 @@ export default function DaysScreen() {
         <Modal
           visible={showAddDayModal}
           transparent={true}
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setShowAddDayModal(false)}
         >
           <View style={styles.overlay}>

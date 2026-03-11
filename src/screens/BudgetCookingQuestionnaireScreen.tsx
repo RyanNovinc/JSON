@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import CountryPicker from 'react-native-country-picker-modal';
@@ -87,6 +88,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     planDuration: 7, // Default to recommended 7 days
     startDate: 'tomorrow', // 'today', 'tomorrow', 'next_monday', 'custom'
     customStartDate: '', // Date string for custom option
+    customStartDateObj: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // Date object for date picker (default: 3 days from now)
     mealPreferences: '', // 'ai_suggest' or 'include_favorites'
     selectedFavorites: [] as string[], // Array of favorite meal IDs
     customMealRequests: '', // Text input for custom requests
@@ -97,6 +99,16 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const [customAvoidFood, setCustomAvoidFood] = useState('');
   const [showResults, setShowResults] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Initialize custom date object if not set
+  React.useEffect(() => {
+    if (!formData.customStartDateObj) {
+      setFormData(prev => ({
+        ...prev,
+        customStartDateObj: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+      }));
+    }
+  }, []);
 
   // Get favorite meals
   const favoriteMeals = getFavoriteMeals();
@@ -589,7 +601,11 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
 
 
   const renderBudgetStep = () => (
-    <View style={styles.stepContainer}>
+    <KeyboardAvoidingView 
+      style={styles.stepContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <ScrollView 
         ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
@@ -688,7 +704,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
           </View>
         </Animatable.View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 
   const renderBudgetRangeStep = () => (
@@ -1196,7 +1212,11 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   };
 
   const renderFoodPreferencesStep = () => (
-    <View style={styles.stepContainer}>
+    <KeyboardAvoidingView 
+      style={styles.stepContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <ScrollView 
         ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
@@ -1590,7 +1610,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
           </View>
         </Animatable.View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 
   // Scroll to top when results screen loads
@@ -1776,10 +1796,9 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               </Animatable.View>
               
               <Animatable.View 
-                animation="slideInRight" 
+                style={styles.tronDataRow}
+                animation="fadeInRight"
                 delay={650}
-                duration={300}
-                style={styles.tronDataItem}
               >
                 <Text style={styles.tronDataLabel}>Start Date</Text>
                 <Text style={[styles.tronDataValue, { color: colors.primary }]}>
@@ -2163,10 +2182,10 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
 
   const renderStartDateStep = () => {
     const startDateOptions = [
-      { id: 'today', title: 'Today', subtitle: 'Start meal planning immediately' },
-      { id: 'tomorrow', title: 'Tomorrow', subtitle: 'Traditional start (recommended)' },
-      { id: 'next_monday', title: 'Next Monday', subtitle: 'Perfect for weekly meal prep' },
-      { id: 'custom', title: 'Custom Date', subtitle: 'Choose your own start date' }
+      { id: 'today', title: 'Today', subtitle: 'Start meal planning immediately', emoji: '🚀', gradient: ['#FF6B6B', '#FF8E53'] },
+      { id: 'tomorrow', title: 'Tomorrow', subtitle: 'Traditional start (recommended)', emoji: '📅', gradient: ['#4ECDC4', '#44A08D'] },
+      { id: 'next_monday', title: 'Next Monday', subtitle: 'Perfect for weekly meal prep', emoji: '📋', gradient: ['#A8E6CF', '#3AB19B'] },
+      { id: 'custom', title: 'Custom Date', subtitle: 'Choose your own start date', emoji: '🎯', gradient: ['#FFD93D', '#FF8C42'] }
     ];
 
     const getNextMonday = () => {
@@ -2230,31 +2249,40 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   <TouchableOpacity
                     style={[
                       styles.optionCard,
-                      formData.startDate === option.id && {
-                        backgroundColor: colors.primaryAlpha20,
-                        borderColor: colors.primary,
-                        borderWidth: 2,
-                      }
+                      formData.startDate === option.id && styles.selectedCard
                     ]}
                     onPress={() => setFormData({ ...formData, startDate: option.id })}
-                    activeOpacity={0.7}
+                    activeOpacity={0.8}
                   >
-                    <View style={styles.optionContent}>
-                      <Text style={[
-                        styles.optionTitle,
-                        { 
-                          color: formData.startDate === option.id 
-                            ? colors.primary 
-                            : '#333' 
-                        }
-                      ]}>
-                        {option.title}
-                        {option.id === 'next_monday' && ` (${getNextMonday()})`}
-                      </Text>
-                      <Text style={styles.optionSubtitle}>
-                        {option.subtitle}
-                      </Text>
-                    </View>
+                    <LinearGradient
+                      colors={formData.startDate === option.id ? [colors.primary, colors.primaryAlpha20] : option.gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.optionGradient}
+                    >
+                      <Text style={styles.optionEmoji}>{option.emoji}</Text>
+                      <View style={styles.optionTextContainer}>
+                        <Text style={[
+                          styles.optionTitle,
+                          { 
+                            color: formData.startDate === option.id 
+                              ? '#ffffff' 
+                              : '#ffffff' 
+                          }
+                        ]}>
+                          {option.title}
+                          {option.id === 'next_monday' && ` (${getNextMonday()})`}
+                        </Text>
+                        <Text style={styles.optionSubtitle}>
+                          {option.subtitle}
+                        </Text>
+                      </View>
+                      {formData.startDate === option.id && (
+                        <View style={styles.selectedIndicator}>
+                          <Text style={styles.checkmark}>✓</Text>
+                        </View>
+                      )}
+                    </LinearGradient>
                   </TouchableOpacity>
                 </Animatable.View>
               ))}
@@ -2264,18 +2292,54 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               <Animatable.View
                 animation="fadeInUp"
                 delay={700}
-                style={styles.customInputContainer}
+                style={styles.customDateContainer}
               >
-                <Text style={[styles.inputLabel, { color: colors.primary }]}>
-                  Choose your start date:
-                </Text>
-                <TextInput
-                  style={[styles.customDateInput, { borderColor: colors.primary }]}
-                  value={formData.customStartDate}
-                  onChangeText={(text) => setFormData({ ...formData, customStartDate: text })}
-                  placeholder="e.g. March 10, 2024"
-                  placeholderTextColor="#999"
-                />
+                <View style={[styles.customDateCard, { borderColor: colors.primary, shadowColor: colors.primary }]}>
+                  <Text style={[styles.customDateLabel, { color: colors.primary }]}>
+                    📅 Choose your start date:
+                  </Text>
+                  
+                  {/* Selected Date Display */}
+                  <View style={[styles.selectedDateDisplay, { backgroundColor: colors.primaryAlpha10, borderColor: colors.primaryAlpha20 }]}>
+                    <Text style={[styles.selectedDateText, { color: colors.primary }]}>
+                      {formData.customStartDateObj ? formData.customStartDateObj.toLocaleDateString('en-AU', { 
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      }) : 'Select a date'}
+                    </Text>
+                  </View>
+
+                  {/* Date Picker Wheel */}
+                  <View style={styles.datePickerContainer}>
+                    <DateTimePicker
+                      value={formData.customStartDateObj || new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={(event, selectedDate) => {
+                        if (selectedDate) {
+                          const dateString = selectedDate.toLocaleDateString('en-AU', { 
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          });
+                          setFormData({ 
+                            ...formData, 
+                            customStartDateObj: selectedDate,
+                            customStartDate: dateString
+                          });
+                        }
+                      }}
+                      minimumDate={new Date()}
+                      maximumDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)} // 1 year from now
+                      textColor="#ffffff"
+                      themeVariant="dark"
+                      style={styles.datePicker}
+                    />
+                  </View>
+                </View>
               </Animatable.View>
             )}
           </Animatable.View>
@@ -2285,7 +2349,11 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   };
 
   const renderMealPreferencesStep = () => (
-    <View style={styles.stepContainer}>
+    <KeyboardAvoidingView 
+      style={styles.stepContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       <ScrollView 
         ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
@@ -2509,7 +2577,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
           </View>
         </Animatable.View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 
   const renderCookingEquipmentStep = () => {
@@ -2844,6 +2912,58 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     opacity: 0.9,
   },
+  selectedIndicator: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmark: {
+    fontSize: 20,
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  customDateContainer: {
+    marginTop: 20,
+  },
+  customDateCard: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  customDateLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  selectedDateDisplay: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  selectedDateText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  datePickerContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  datePicker: {
+    backgroundColor: 'transparent',
+    height: 200,
+  },
   optionDescription: {
     fontSize: 12,
     color: '#ffffff',
@@ -2996,11 +3116,10 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   customDateInput: {
-    backgroundColor: '#1a1a1a',
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     fontSize: 16,
     color: '#ffffff',
     marginTop: 8,

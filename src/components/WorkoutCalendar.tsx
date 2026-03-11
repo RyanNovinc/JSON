@@ -335,13 +335,16 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
     <Modal
       visible={visible}
       transparent={true}
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#71717a" />
+            </TouchableOpacity>
             {!isCurrentMonth() ? (
               <TouchableOpacity 
                 style={styles.todayButton}
@@ -352,9 +355,6 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
             ) : (
               <View />
             )}
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#71717a" />
-            </TouchableOpacity>
           </View>
 
           <ScrollView 

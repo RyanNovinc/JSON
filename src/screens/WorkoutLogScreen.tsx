@@ -3774,7 +3774,7 @@ export default function WorkoutLogScreen() {
       <Modal
         visible={showAddExerciseModal}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowAddExerciseModal(false)}
       >
         <View style={styles.modalOverlay}>

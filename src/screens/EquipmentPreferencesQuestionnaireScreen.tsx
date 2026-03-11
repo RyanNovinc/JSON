@@ -8,6 +8,8 @@ import {
   SafeAreaView,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
@@ -342,6 +344,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         ref={equipmentScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
       >
         <Animatable.View
           animation="fadeInUp"
@@ -418,15 +421,20 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             <Text style={styles.inputLabel}>
               Specific equipment you have (optional):
             </Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g., Olympic barbell, kettlebells, pull-up bar..."
-              placeholderTextColor="#71717a"
-              value={specificEquipment}
-              onChangeText={setSpecificEquipment}
-              multiline
-              numberOfLines={3}
-            />
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+            >
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g., Olympic barbell, kettlebells, pull-up bar..."
+                placeholderTextColor="#71717a"
+                value={specificEquipment}
+                onChangeText={setSpecificEquipment}
+                multiline
+                numberOfLines={3}
+              />
+            </KeyboardAvoidingView>
           </Animatable.View>
 
           {/* Unavailable Equipment Input */}
@@ -438,15 +446,20 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             <Text style={styles.inputLabel}>
               Equipment you don't have access to (optional):
             </Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g., squat rack, cable machine, treadmill..."
-              placeholderTextColor="#71717a"
-              value={unavailableEquipment}
-              onChangeText={setUnavailableEquipment}
-              multiline
-              numberOfLines={3}
-            />
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+            >
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g., squat rack, cable machine, treadmill..."
+                placeholderTextColor="#71717a"
+                value={unavailableEquipment}
+                onChangeText={setUnavailableEquipment}
+                multiline
+                numberOfLines={3}
+              />
+            </KeyboardAvoidingView>
           </Animatable.View>
 
 
@@ -462,6 +475,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         ref={timeScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
       >
         <Animatable.View
           animation="fadeInUp"
@@ -614,18 +628,23 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
                     delay={200}
                     style={styles.customTimeContainer}
                   >
-                    <TextInput
-                      style={styles.customTimeInput}
-                      placeholder="Enter duration in minutes"
-                      placeholderTextColor="#71717a"
-                      value={customDuration}
-                      onChangeText={(text) => {
-                        // Only allow numbers
-                        const numericValue = text.replace(/[^0-9]/g, '');
-                        setCustomDuration(numericValue);
-                      }}
-                      keyboardType="numeric"
-                    />
+                    <KeyboardAvoidingView 
+                      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+                    >
+                      <TextInput
+                        style={styles.customTimeInput}
+                        placeholder="Enter duration in minutes"
+                        placeholderTextColor="#71717a"
+                        value={customDuration}
+                        onChangeText={(text) => {
+                          // Only allow numbers
+                          const numericValue = text.replace(/[^0-9]/g, '');
+                          setCustomDuration(numericValue);
+                        }}
+                        keyboardType="numeric"
+                      />
+                    </KeyboardAvoidingView>
                   </Animatable.View>
                 )}
               </Animatable.View>
@@ -855,6 +874,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         ref={exerciseScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
       >
         <Animatable.View
           animation="fadeInUp"
@@ -912,15 +932,20 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             <Text style={styles.inputLabel}>
               Exercises you love (optional):
             </Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Optional: e.g., deadlifts, bench press, squats, pull-ups..."
-              placeholderTextColor="#71717a"
-              value={likedExercises}
-              onChangeText={setLikedExercises}
-              multiline
-              numberOfLines={3}
-            />
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+            >
+              <TextInput
+                style={styles.textInput}
+                placeholder="Optional: e.g., deadlifts, bench press, squats, pull-ups..."
+                placeholderTextColor="#71717a"
+                value={likedExercises}
+                onChangeText={setLikedExercises}
+                multiline
+                numberOfLines={3}
+              />
+            </KeyboardAvoidingView>
           </Animatable.View>
 
           {/* Disliked Exercises */}
@@ -932,15 +957,20 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             <Text style={styles.inputLabel}>
               Exercises you want to avoid (optional):
             </Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Optional: e.g., overhead press, leg extensions, bicep curls..."
-              placeholderTextColor="#71717a"
-              value={dislikedExercises}
-              onChangeText={setDislikedExercises}
-              multiline
-              numberOfLines={3}
-            />
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+            >
+              <TextInput
+                style={styles.textInput}
+                placeholder="Optional: e.g., overhead press, leg extensions, bicep curls..."
+                placeholderTextColor="#71717a"
+                value={dislikedExercises}
+                onChangeText={setDislikedExercises}
+                multiline
+                numberOfLines={3}
+              />
+            </KeyboardAvoidingView>
           </Animatable.View>
 
           {/* Exercise Note Detail */}

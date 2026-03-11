@@ -289,7 +289,7 @@ export default function MealCalendarScreen() {
       <Modal
         visible={showDayModal}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowDayModal(false)}
       >
         <View style={styles.modalOverlay}>

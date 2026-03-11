@@ -717,17 +717,23 @@ const WeightTrackerScreen: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowUpdateModal(false)}
       >
+        <View style={styles.modalOverlay}>
         <KeyboardAvoidingView 
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingContainer}
+          behavior={Platform.OS === 'ios' ? 'position' : 'height'}
           keyboardVerticalOffset={0}
         >
           <View style={[styles.modalContainer, { borderColor: themeColor + '30' }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: '#ffffff' }]}>Update Weight</Text>
-              <TouchableOpacity onPress={() => setShowUpdateModal(false)}>
-                <Ionicons name="close" size={24} color="#a1a1aa" />
-              </TouchableOpacity>
+              <View style={styles.modalHeaderLeft}>
+                <TouchableOpacity onPress={() => setShowUpdateModal(false)}>
+                  <Ionicons name="close" size={24} color="#a1a1aa" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.modalHeaderCenter}>
+                <Text style={[styles.modalTitle, { color: '#ffffff' }]}>Update Weight</Text>
+              </View>
+              <View style={styles.modalHeaderRight} />
             </View>
 
             <ScrollView 
@@ -959,6 +965,7 @@ const WeightTrackerScreen: React.FC = () => {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Simple Testimonial Modal */}
@@ -1572,6 +1579,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoidingContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   modalContainer: {
     backgroundColor: '#18181b',
     borderTopLeftRadius: 20,
@@ -1584,12 +1595,22 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalHeaderLeft: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  modalHeaderCenter: {
+    flex: 2,
+    alignItems: 'center',
+  },
+  modalHeaderRight: {
+    flex: 1,
   },
   modalTitle: {
     fontSize: 18,

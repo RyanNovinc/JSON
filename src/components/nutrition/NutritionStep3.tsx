@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,18 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NutritionFormData } from '../../screens/NutritionQuestionnaireScreen';
+import RobustStorage from '../../utils/robustStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface WeightEntry {
+  id: string;
+  weight: number;
+  unit: 'kg' | 'lbs';
+  date: string;
+  notes?: string;
+}
 
 interface Props {
   formData: NutritionFormData;
@@ -32,11 +43,70 @@ export const NutritionStep3: React.FC<Props> = ({
   colors,
   scrollViewRef,
 }) => {
+  const navigation = useNavigation();
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [currentWeight, setCurrentWeight] = useState<number | null>(null);
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+
+  useEffect(() => {
+    loadCurrentWeight();
+  }, []);
+
+  // Reload weight when returning from WeightTracker
+  useFocusEffect(
+    React.useCallback(() => {
+      loadCurrentWeight();
+    }, [])
+  );
+
+  const loadCurrentWeight = async () => {
+    try {
+      console.log('🏃‍♂️ [NUTRITION STEP3] Loading current weight from tracker...');
+      
+      // Try robust storage first
+      let stored = await RobustStorage.getItem('@weight_history', true);
+      
+      if (!stored) {
+        // Fallback to legacy storage
+        stored = await AsyncStorage.getItem('@weight_history');
+      }
+      
+      if (stored) {
+        const history: WeightEntry[] = JSON.parse(stored);
+        const sortedHistory = history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        if (sortedHistory.length > 0) {
+          const latestEntry = sortedHistory[0];
+          console.log('🏃‍♂️ [NUTRITION STEP3] Found latest weight:', latestEntry.weight, latestEntry.unit);
+          
+          setCurrentWeight(latestEntry.weight);
+          setWeightUnit(latestEntry.unit);
+          
+          // Auto-populate form data if not already set
+          if (!formData.weight) {
+            updateFormData({ weight: latestEntry.weight });
+          }
+        }
+      } else {
+        console.log('🏃‍♂️ [NUTRITION STEP3] No weight history found');
+      }
+    } catch (error) {
+      console.error('Failed to load current weight:', error);
+    }
+  };
+
+  const handleWeightTrackerNavigation = () => {
+    console.log('🏃‍♂️ [NUTRITION STEP3] Navigating to WeightTracker for weight update');
+    // Store current step context for return navigation
+    AsyncStorage.setItem('@nutrition_return_context', 'NutritionQuestionnaireStep3');
+    (navigation as any).navigate('WeightTracker');
+  };
 
   const isFormValid = () => {
-    return formData.age && formData.gender && formData.height && formData.weight &&
-           formData.age > 0 && formData.height > 0 && formData.weight > 0;
+    // Require all fields including weight (from tracker or form data)
+    const hasWeight = currentWeight || (formData.weight && formData.weight > 0);
+    return formData.age && formData.gender && formData.height && hasWeight &&
+           formData.age > 0 && formData.height > 0;
   };
 
   const handleNext = () => {
@@ -161,26 +231,38 @@ export const NutritionStep3: React.FC<Props> = ({
             </View>
           </Animatable.View>
 
-          {/* Weight Input */}
+          {/* Weight Display with Change Button */}
           <Animatable.View animation="fadeInUp" delay={700}>
             <Text style={styles.fieldLabel}>Current Weight</Text>
-            <View style={[
-              styles.inputContainer,
-              focusedField === 'weight' && { borderColor: colors.primary }
-            ]}>
-              <TextInput
-                style={styles.textInput}
-                value={formData.weight ? String(formData.weight) : ''}
-                onChangeText={(text) => updateFormData({ weight: parseFloat(text) || null })}
-                onFocus={() => setFocusedField('weight')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="Enter your weight"
-                placeholderTextColor="#666"
-                keyboardType="decimal-pad"
-                maxLength={6}
-              />
-              <Text style={styles.inputUnit}>kg</Text>
-            </View>
+            {currentWeight ? (
+              <View style={styles.weightDisplayContainer}>
+                <View style={styles.weightDisplay}>
+                  <Text style={styles.weightValue}>{currentWeight}</Text>
+                  <Text style={styles.weightUnitDisplay}>{weightUnit}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.changeWeightButton, { borderColor: colors.primary }]}
+                  onPress={handleWeightTrackerNavigation}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="create-outline" size={16} color={colors.primary} />
+                  <Text style={[styles.changeWeightText, { color: colors.primary }]}>
+                    Change
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.addWeightButton, { borderColor: colors.primary }]}
+                onPress={handleWeightTrackerNavigation}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                <Text style={[styles.addWeightText, { color: colors.primary }]}>
+                  Add Your Weight
+                </Text>
+              </TouchableOpacity>
+            )}
           </Animatable.View>
         </View>
 
@@ -312,6 +394,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
     marginLeft: 8,
+  },
+  weightDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  weightDisplay: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flex: 1,
+  },
+  weightValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  weightUnitDisplay: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginLeft: 8,
+  },
+  changeWeightButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  changeWeightText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addWeightButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    gap: 8,
+  },
+  addWeightText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   nextButton: {
     flexDirection: 'row',

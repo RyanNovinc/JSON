@@ -7,6 +7,9 @@ interface ActiveWorkout {
   routeParams: {
     day: any;
     blockName: string;
+    currentWeek: number;
+    block?: any;
+    routineName?: string;
   };
 }
 

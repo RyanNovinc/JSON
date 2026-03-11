@@ -192,7 +192,7 @@ export default function SimplifiedMealPlanDayScreen() {
   );
 
   const renderActionSheet = () => (
-    <Modal visible={showActionSheet} transparent={true} animationType="slide">
+    <Modal visible={showActionSheet} transparent={true} animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={[styles.actionSheet, { backgroundColor: 'white' }]}>
           <Text style={styles.actionSheetTitle}>
@@ -274,7 +274,7 @@ export default function SimplifiedMealPlanDayScreen() {
   );
 
   const renderAddMealModal = () => (
-    <Modal visible={showAddMealModal} transparent={true} animationType="slide">
+    <Modal visible={showAddMealModal} transparent={true} animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={[styles.addMealModal, { backgroundColor: 'white' }]}>
           <Text style={styles.addMealTitle}>Add New Meal</Text>

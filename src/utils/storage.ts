@@ -143,12 +143,30 @@ export class WorkoutStorage {
   // Routine management
   static async saveRoutines(routines: WorkoutRoutine[]): Promise<void> {
     try {
-      const saveSuccess = await RobustStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines), true);
+      const routinesJson = JSON.stringify(routines);
+      
+      // Try robust storage first
+      let saveSuccess = await RobustStorage.setItem(STORAGE_KEYS.ROUTINES, routinesJson, true);
+      
       if (!saveSuccess) {
-        await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines));
+        console.warn('RobustStorage failed, retrying with regular AsyncStorage...');
+        
+        // Retry with regular AsyncStorage
+        await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, routinesJson);
+        
+        // Verify the save worked by reading it back
+        const verification = await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
+        if (verification !== routinesJson) {
+          throw new Error('Storage verification failed - data may not have been saved correctly');
+        }
+        
+        console.log('✅ Routines saved successfully with AsyncStorage fallback');
+      } else {
+        console.log('✅ Routines saved successfully with RobustStorage');
       }
     } catch (error) {
-      console.error('Failed to save routines:', error);
+      console.error('❌ Critical error: Failed to save routines:', error);
+      throw error; // Re-throw to let caller handle the error
     }
   }
 
@@ -163,9 +181,15 @@ export class WorkoutStorage {
   }
 
   static async addRoutine(routine: WorkoutRoutine): Promise<void> {
-    const routines = await this.loadRoutines();
-    routines.push(routine);
-    await this.saveRoutines(routines);
+    try {
+      const routines = await this.loadRoutines();
+      routines.push(routine);
+      await this.saveRoutines(routines);
+      console.log(`✅ Successfully added routine: ${routine.name}`);
+    } catch (error) {
+      console.error(`❌ Failed to add routine: ${routine.name}`, error);
+      throw new Error(`Failed to save workout routine. Please check your device storage and try again.`);
+    }
   }
 
   static async removeRoutine(routineId: string): Promise<void> {

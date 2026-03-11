@@ -124,94 +124,29 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
       setPurchasing(true);
       clearError();
 
-      console.log('🚀 Starting purchase attempt');
       const result = await purchasePackage(
         REVENUECAT_CONFIG.offerings.lifetime_pro, 
         REVENUECAT_CONFIG.packages.lifetime_pro_tier_1
       );
       
       if (result) {
-        console.log('🎉 Purchase succeeded, showing custom modal');
-        console.log('🎯 Setting justPurchased=true, showSuccessModal=true');
         setJustPurchased(true);
         setShowSuccessModal(true);
-        console.log('✅ Custom modal state updated');
       } else {
-        console.log('❌ Purchase returned false');
         throw new Error('Purchase failed');
       }
       
     } catch (err: any) {
-      console.error('Purchase error:', err);
       
       // Show detailed error in production for debugging
       let errorMessage = 'Something went wrong with your purchase. Please try again.';
       
-      if (!__DEV__) {
-        // Show EXTENSIVE debug information for production
-        const debugInfo = err.debugInfo || {};
-        const apiKey = debugInfo.apiKey || 'Unknown';
-        
-        console.error('💥 Purchase failed, showing error dialog');
-        
-        errorMessage = `🚨 PRODUCTION ERROR DEBUG - SCREENSHOT THIS 🚨
-
-=== PURCHASE ATTEMPT ===
-Offering Requested: ${REVENUECAT_CONFIG.offerings.lifetime_pro}
-Package Requested: ${REVENUECAT_CONFIG.packages.lifetime_pro_tier_1}
-Full Request: ${debugInfo.packageRequested || 'N/A'}
-
-=== ERROR DETAILS ===
-Primary Error: ${err.message || 'Unknown error'}
-Error Code: ${err.code || err.originalCode || 'N/A'}
-Error Domain: ${debugInfo.domain || 'N/A'}
-User Info: ${JSON.stringify(debugInfo.userInfo || {})}
-Underlying Error: ${debugInfo.underlyingError || 'None'}
-
-=== REVENUECAT STATUS ===
-SDK Configured: ${debugInfo.isConfigured ? 'YES' : 'NO'}
-Has Offerings: ${debugInfo.hasOfferings ? 'YES' : 'NO'}
-Total Offerings: ${debugInfo.totalOfferingsCount || 0}
-Current Offering: ${debugInfo.currentOfferingId || 'None'}
-Available Offerings: [${debugInfo.offeringsAvailable?.join(', ') || 'NONE FOUND'}]
-
-=== OFFERING DETAILS ===
-${debugInfo.offeringsDetails?.map(offering => 
-  `${offering.id}: ${offering.packageCount} packages
-  Packages: ${offering.packages.map(pkg => `${pkg.id}(${pkg.productId})`).join(', ')}`
-).join('\n') || 'No offering details available'}
-
-=== API CONFIGURATION ===
-Using API Key: ${apiKey.substring(0, 12)}...
-Platform: ${debugInfo.platform || 'Unknown'}
-Is Production: ${debugInfo.isProduction ? 'YES' : 'NO'}
-Bundle ID: ${debugInfo.bundleId || 'Unknown'}
-
-=== SDK INFO ===
-StoreKit Version: ${debugInfo.storeKitVersion || 'Unknown'}
-Purchases Version: ${debugInfo.purchasesVersion || 'Unknown'}
-
-=== COMPONENT STATE DEBUG ===
-hasNutrition: ${hasNutrition ? 'YES' : 'NO'}
-justPurchased: ${justPurchased ? 'YES' : 'NO'}
-showSuccessModal: ${showSuccessModal ? 'YES' : 'NO'}
-purchasing: ${purchasing ? 'YES' : 'NO'}
-
-=== WHAT THIS TELLS US ===
-If "Available Offerings" is empty: RevenueCat dashboard not configured
-If offering exists but wrong packages: Package naming mismatch
-If "SDK Configured" is NO: API key or network issue
-If error code specific: Apple/StoreKit issue
-
-=== NEXT STEPS FOR DEVELOPER ===
-1. Check if logs show "🚀 Starting purchase attempt"
-2. Check if logs show "🎉 Purchase succeeded, showing custom modal"
-3. Check if logs show "🎭 PurchaseSuccessModal should be visible now"
-4. If purchase succeeds but modal doesn't show: UI state issue
-5. If system alerts appear: RevenueCat/iOS interference
-
-Send this FULL screenshot to developer immediately.`;
-      }
+      // Keep debug info in logs for developer investigation
+      console.error('Purchase failed:', {
+        error: err.message,
+        code: err.code || err.originalCode,
+        debugInfo: err.debugInfo
+      });
       
       Alert.alert(
         'Purchase Failed',
@@ -234,7 +169,6 @@ Send this FULL screenshot to developer immediately.`;
         onRestoreSuccess?.();
       }
     } catch (err) {
-      console.error('Restore error:', err);
     } finally {
       setRestoring(false);
     }
@@ -382,6 +316,11 @@ Send this FULL screenshot to developer immediately.`;
             <Text style={styles.priceOnce}>once</Text>
           </View>
           <Text style={styles.priceSubtext}>One-time purchase • Own forever</Text>
+          
+          {/* Limited Time Offer Badge */}
+          <View style={styles.limitedOfferBadge}>
+            <Text style={styles.limitedOfferText}>⚡ Limited Time: Launch Pricing</Text>
+          </View>
         </View>
 
         {/* CTA Button */}
@@ -442,16 +381,12 @@ Send this FULL screenshot to developer immediately.`;
       <PurchaseSuccessModal
         visible={showSuccessModal}
         onClose={() => {
-          console.log('🎭 Custom success modal closed by user');
           setShowSuccessModal(false);
           setJustPurchased(false);
           onPurchaseSuccess?.();
           navigation.goBack();
         }}
       />
-      
-      {/* Debug: Log modal state changes */}
-      {showSuccessModal && console.log('🎭 PurchaseSuccessModal should be visible now')}
     </SafeAreaView>
   );
 }
@@ -467,7 +402,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 10,
   },
@@ -677,6 +612,22 @@ const styles = StyleSheet.create({
     color: TEXT_SECONDARY,
     fontSize: 13,
     marginTop: 2,
+  },
+  limitedOfferBadge: {
+    backgroundColor: 'rgba(255, 165, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 165, 0, 0.3)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    alignSelf: 'center',
+  },
+  limitedOfferText: {
+    color: '#FFA500',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   ctaSection: {
     paddingHorizontal: 20,

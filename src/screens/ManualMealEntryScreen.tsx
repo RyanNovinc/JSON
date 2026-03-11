@@ -661,7 +661,7 @@ export default function ManualMealEntryScreen() {
 
       {/* Time Picker Modal */}
       {showTimePicker && (
-        <Modal transparent animationType="slide" visible={showTimePicker}>
+        <Modal transparent animationType="fade" visible={showTimePicker}>
           <View style={styles.timePickerModalOverlay}>
             <View style={styles.timePickerModal}>
               <View style={styles.timePickerHeader}>

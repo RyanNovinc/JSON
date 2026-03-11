@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   closeButtonWrapper: {
     position: 'absolute',
     top: 50,
-    right: 20,
+    left: 20,
     width: 40,
     height: 40,
     zIndex: 1,

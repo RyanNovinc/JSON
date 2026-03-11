@@ -104,7 +104,7 @@ const FridgePantryPreferencesModal: React.FC<FridgePantryPreferencesModalProps> 
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView 

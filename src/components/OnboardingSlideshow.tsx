@@ -53,26 +53,26 @@ const COLORS = {
 const SLIDES: OnboardingSlide[] = [
   {
     icon: 'clipboard-outline',
-    title: 'Fill Out Questionnaire',
-    description: 'Answer questions about your goals and equipment.',
+    title: 'Quick Setup',
+    description: 'Answer a few questions about your goals',
     highlight: '',
   },
   {
-    icon: 'bulb-outline',
-    title: 'Send Your Prompt to AI',
-    description: 'Copy your custom prompt to any AI service.',
+    icon: 'sparkles',
+    title: 'We Build Your Perfect Prompt',
+    description: 'Customized for your exact needs and preferences',
     highlight: '',
   },
   {
-    icon: 'download-outline',
-    title: 'Paste Into JSON.fit',
-    description: 'Import the JSON file to access your programs.',
+    icon: 'send-outline',
+    title: 'Send It to Any AI',
+    description: 'ChatGPT, Claude, Gemini - whatever you like',
     highlight: '',
   },
   {
-    icon: 'checkmark-circle-outline',
-    title: 'Enjoy Perfect Programs',
-    description: 'Follow your tailored workout routines and meal plans.',
+    icon: 'rocket-outline',
+    title: 'Import and Start Training',
+    description: 'Just paste or upload the result',
     highlight: '',
   },
 ];

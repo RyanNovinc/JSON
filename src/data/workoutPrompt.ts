@@ -483,7 +483,7 @@ Only include non-obvious technique tips or specific setup instructions. Do not a
 
 ### Supersets
 
-Place superset exercises adjacent in the exercises array. Include "Superset with [exact exercise name]" in both exercises' notes field. The plan marks supersets with SS[n]a/SS[n]b notation — translate these to adjacent array entries.
+Place superset exercises adjacent in the exercises array. Include "Superset with [exact exercise name]" in both exercises' notes field. Add "superset_group": "ss1" (or "ss2", "ss3" etc.) to both exercises in the pair — use the same string value for both. The plan marks supersets with SS[n]a/SS[n]b notation — translate these to adjacent array entries with matching superset_group values.
 
 ### Cardio Rotation
 
@@ -591,6 +591,7 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
   "restQuick": number (seconds — ~65% of rest, rounded),
   "primaryMuscles": ["from taxonomy"],
   "secondaryMuscles": ["from taxonomy, or empty array"],
+  "superset_group": "string (optional — e.g. 'ss1'; same value on two exercises links them as a superset)",
   "reps_weekly": { "1": "string", "2": "string", ... },
   "sets_weekly": { "1": number, "2": number, ... },
   "notes": "string (optional — omit if not needed)",
@@ -681,6 +682,7 @@ Before presenting each block's download link, silently verify:
 - [ ] Exercise names are identical everywhere they appear (across days, notes, superset references)
 - [ ] Superset exercises are adjacent in the array and cross-reference each other in notes
 - [ ] Superset rest is correctly encoded (SS[n]a gets short rest, SS[n]b gets full rest)
+- [ ] Superset pairs both have a matching superset_group field with the same value (e.g. "ss1")
 - [ ] Rep progressions change meaningfully across weeks (not identical every week for all exercises)
 - [ ] Compounds trend flat-to-decreasing reps; isolations trend flat-to-increasing
 - [ ] Deload weeks show reduced sets_weekly (~40-50% fewer) and increased reps

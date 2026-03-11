@@ -15,6 +15,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
+import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
+import { navigate } from '../utils/navigationRef';
 
 type WorkoutReviewScreenNavigationProp = StackNavigationProp<RootStackParamList, 'WorkoutReview'>;
 type WorkoutReviewScreenRouteProp = RouteProp<RootStackParamList, 'WorkoutReview'>;
@@ -41,12 +43,14 @@ interface CompletionStats {
 
 export default function WorkoutReviewScreen() {
   const { themeColor } = useTheme();
+  const { activeWorkout } = useActiveWorkout();
   const navigation = useNavigation<WorkoutReviewScreenNavigationProp>();
   const route = useRoute<WorkoutReviewScreenRouteProp>();
   const { day, blockName, completionStats, currentWeek } = route.params;
   
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistory[]>([]);
   const [showRedoModal, setShowRedoModal] = useState(false);
+  const [showActiveWorkoutModal, setShowActiveWorkoutModal] = useState(false);
   
   useEffect(() => {
     loadWorkoutHistory();
@@ -67,6 +71,18 @@ export default function WorkoutReviewScreen() {
   };
   
   const handleRedo = () => {
+    // Check if there's already an active workout from a different screen
+    if (activeWorkout) {
+      const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
+                                   activeWorkout.routeParams?.blockName === blockName;
+      
+      if (!currentWorkoutMatches) {
+        console.log('🚫 REDO WORKOUT: Another workout is already active, showing warning modal');
+        setShowActiveWorkoutModal(true);
+        return;
+      }
+    }
+    
     setShowRedoModal(true);
   };
   
@@ -207,6 +223,50 @@ export default function WorkoutReviewScreen() {
         </View>
       </ScrollView>
       
+      {/* Active Workout Warning Modal */}
+      <Modal
+        visible={showActiveWorkoutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowActiveWorkoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.newModalContainer}>
+            <View style={styles.newModalHeader}>
+              <View style={[styles.newModalIconContainer, { backgroundColor: '#ef444415' }]}>
+                <Ionicons name="warning" size={28} color="#ef4444" />
+              </View>
+              <Text style={styles.newModalTitle}>Workout In Progress</Text>
+              <Text style={styles.newModalSubtitle}>
+                You have an active workout: {activeWorkout?.dayName}
+              </Text>
+            </View>
+            
+            <View style={styles.newModalButtons}>
+              <TouchableOpacity
+                style={styles.newModalCancelButton}
+                onPress={() => setShowActiveWorkoutModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.newModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.newModalConfirmButton}
+                onPress={() => {
+                  setShowActiveWorkoutModal(false);
+                  navigate('WorkoutLog', activeWorkout!.routeParams);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-forward" size={18} color="white" style={styles.newModalConfirmIcon} />
+                <Text style={styles.newModalConfirmText}>Go to Active</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      
       {/* Custom Redo Modal */}
       <Modal
         visible={showRedoModal}
@@ -215,31 +275,33 @@ export default function WorkoutReviewScreen() {
         onRequestClose={() => setShowRedoModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIcon}>
-              <Ionicons name="refresh-circle" size={48} color="#ef4444" />
+          <View style={styles.newModalContainer}>
+            <View style={styles.newModalHeader}>
+              <View style={styles.newModalIconContainer}>
+                <Ionicons name="refresh" size={28} color="#ef4444" />
+              </View>
+              <Text style={styles.newModalTitle}>Start Fresh?</Text>
+              <Text style={styles.newModalSubtitle}>
+                Clear previous data and start a new session
+              </Text>
             </View>
             
-            <Text style={styles.modalTitle}>Start New Session?</Text>
-            <Text style={styles.modalMessage}>
-              This will clear your previous workout data and start a fresh session.
-            </Text>
-            
-            <View style={styles.modalButtons}>
+            <View style={styles.newModalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={styles.newModalCancelButton}
                 onPress={() => setShowRedoModal(false)}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.newModalCancelText}>Keep Data</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
+                style={styles.newModalConfirmButton}
                 onPress={handleConfirmRedo}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <Text style={styles.confirmButtonText}>Start New</Text>
+                <Ionicons name="refresh" size={18} color="white" style={styles.newModalConfirmIcon} />
+                <Text style={styles.newModalConfirmText}>Start Fresh</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -499,6 +561,84 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#ffffff',
+  },
+  // New modal styles
+  newModalContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 0,
+    width: '100%',
+    maxWidth: 320,
+    overflow: 'hidden',
+  },
+  newModalHeader: {
+    alignItems: 'center',
+    paddingTop: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  newModalIconContainer: {
+    width: 64,
+    height: 64,
+    backgroundColor: '#ef444415',
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  newModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  newModalSubtitle: {
+    fontSize: 15,
+    color: '#71717a',
+    textAlign: 'center',
+  },
+  newModalButtons: {
+    flexDirection: 'column',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  newModalCancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#3f3f46',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  newModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#a1a1aa',
+  },
+  newModalConfirmButton: {
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  newModalConfirmIcon: {
+    marginRight: 4,
+  },
+  newModalConfirmText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#ffffff',
   },
 });

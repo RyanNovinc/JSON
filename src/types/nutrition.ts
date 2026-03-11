@@ -164,6 +164,7 @@ export interface SimplifiedMealPlan {
     total_time: number;
     covers: string;
     recommended_timing: string;
+    recommended_date?: string;
     equipment_needed: string[];
     instructions: string[];
     storage_guidelines: Record<string, string>;
@@ -206,6 +207,7 @@ export interface SimplifiedMealPlan {
     total_time: number;
     covers: string;
     recommended_timing: string;
+    recommended_date?: string;
     equipment_needed: string[];
     instructions: string[];
     storage_guidelines: {

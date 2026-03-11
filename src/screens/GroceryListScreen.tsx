@@ -47,6 +47,18 @@ const CATEGORY_ICONS: Record<FoodCategory, keyof typeof Ionicons.glyphMap> = {
   other: 'bag',
 };
 
+const CATEGORY_COLORS: Record<FoodCategory, string> = {
+  protein: '#ef4444', // Red - meat/fish
+  dairy: '#3b82f6', // Blue - milk/dairy
+  vegetables: '#22c55e', // Green - fresh vegetables
+  fruits: '#f59e0b', // Orange/Yellow - colorful fruits
+  grains: '#a855f7', // Purple - grains/cereals
+  pantry: '#8b5cf6', // Violet - pantry staples
+  spices: '#f97316', // Orange - warm spices
+  frozen: '#06b6d4', // Cyan - cold/frozen
+  other: '#6b7280', // Gray - miscellaneous
+};
+
 const CATEGORY_NAMES: Record<FoodCategory, string> = {
   protein: 'Protein',
   dairy: 'Dairy',
@@ -812,9 +824,29 @@ export default function GroceryListScreen() {
 
   const CategorySection = ({ category }: { category: FoodCategory }) => {
     const items = groupedItems[category];
+    const categoryTotal = items.reduce((sum, item) => sum + (item.estimatedCost || item.estimated_price || 0), 0);
+    const purchasedInCategory = items.filter(item => item.isPurchased).length;
 
     return (
       <View style={styles.categorySection}>
+        <View style={styles.categoryHeader}>
+          <View style={styles.categoryTitleRow}>
+            <Ionicons
+              name={CATEGORY_ICONS[category]}
+              size={18}
+              color={CATEGORY_COLORS[category]}
+            />
+            <Text style={styles.categoryTitle}>{CATEGORY_NAMES[category]}</Text>
+            <View style={styles.categoryStats}>
+              <Text style={styles.categoryStatsText}>
+                {purchasedInCategory}/{items.length}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.categoryTotal}>
+            ${categoryTotal.toFixed(2)}
+          </Text>
+        </View>
         <View style={styles.categoryItems}>
           {items.map((item, index) => (
             <GroceryItemRow key={`${item.id || 'no_id'}_${index}_${Date.now()}`} item={item} />
@@ -1017,7 +1049,7 @@ export default function GroceryListScreen() {
                     <Ionicons
                       name={CATEGORY_ICONS[category]}
                       size={18}
-                      color={newItemCategory === category ? themeColor : '#9ca3af'}
+                      color={newItemCategory === category ? CATEGORY_COLORS[category] : '#9ca3af'}
                     />
                     <Text style={[
                       styles.categoryOptionText,

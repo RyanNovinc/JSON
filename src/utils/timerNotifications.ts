@@ -74,28 +74,45 @@ export class TimerNotifications {
         this.sound = null;
       }
 
-      // For now, we'll use a system sound approach
-      // In a real app, you'd load actual audio files here
-      console.log(`Playing sound: ${soundId} at volume ${volume}`);
+      console.log(`🔊 Playing timer sound: ${soundId} at volume ${volume}`);
       
-      // Placeholder: Create a brief tone using system audio
-      // This would be replaced with actual sound files
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav' },
-        { 
-          volume,
-          shouldPlay: true,
-          isLooping: false,
-        }
-      ).catch(() => {
-        // If external sound fails, just log
-        console.log('External sound failed, using haptic feedback only');
-        return { sound: null };
-      });
+      // Since we don't have sound files, use different haptic patterns for different "sounds"
+      let hapticType: HapticPattern;
       
-      this.sound = sound;
+      switch (soundId) {
+        case 'beep':
+          hapticType = 'medium';
+          break;
+        case 'chime':
+          hapticType = 'light';
+          break;
+        case 'bell':
+          hapticType = 'heavy';
+          break;
+        case 'ding':
+          hapticType = 'success';
+          break;
+        default:
+          hapticType = 'medium';
+      }
+
+      // Play multiple haptic pulses to simulate sound
+      console.log(`🔊 Playing ${soundId} as haptic pattern: ${hapticType}`);
+      
+      // Play primary haptic
+      await this.triggerHaptic(hapticType);
+      
+      // For some sounds, add a second pulse after a brief delay
+      if (soundId === 'bell' || soundId === 'chime') {
+        setTimeout(async () => {
+          await this.triggerHaptic('light');
+        }, 200);
+      }
+      
     } catch (error) {
       console.error('Failed to play sound:', error);
+      // Fallback to haptic
+      await this.triggerHaptic('success');
     }
   }
 
@@ -128,17 +145,23 @@ export class TimerNotifications {
 
   // Play complete timer notification
   static async playTimerComplete(): Promise<void> {
+    console.log('🎉 TIMER COMPLETED - Playing notification!');
     const settings = await this.loadSettings();
+    console.log('🔊 Settings:', { soundEnabled: settings.soundEnabled, hapticEnabled: settings.hapticEnabled });
     
     // Play sound if enabled
     if (settings.soundEnabled) {
+      console.log('🔊 Playing timer completion sound');
       await this.playSound(settings.selectedSound, settings.volume);
     }
     
     // Play haptic if enabled
     if (settings.hapticEnabled) {
+      console.log('📱 Playing timer completion haptic');
       await this.triggerHaptic(settings.hapticPattern);
     }
+    
+    console.log('✅ Timer notification complete');
   }
 
   // Test notification (for settings)

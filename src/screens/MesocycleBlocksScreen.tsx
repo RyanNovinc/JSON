@@ -1479,7 +1479,7 @@ export default function MesocycleBlocksScreen() {
         <Modal
           visible={showAddBlockModal}
           transparent={true}
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setShowAddBlockModal(false)}
         >
           <View style={styles.overlay}>

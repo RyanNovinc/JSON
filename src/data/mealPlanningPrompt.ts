@@ -538,6 +538,24 @@ The JSON structure includes dailyMeals with date-keyed objects, grocery_list wit
 - If the meal plan has a mid-week restock or second prep day, make it a separate session object in the array.
 - Example: A 7-day plan with a mid-week restock should have 2 sessions in the array.
 
+**COVERS FIELD REQUIREMENT:**
+- The \`covers\` field MUST be clean and concise - maximum 6 words
+- Use format: "X meals across Y days" or "Days 1-3" or "All week"
+- NEVER include verbose explanations, timings, or specific meal details
+- Examples:
+  • Good: "21 meals across 7 days"
+  • Good: "Days 1-4"  
+  • Good: "All week"
+  • Bad: "All 7 days across all 4 meals. Chicken Batch 1 covers Days 1-4 lunch. Mid-week restock on Wednesday covers Days 5-7."
+
+**RECOMMENDED DATE REQUIREMENT:**
+- Each meal prep session MUST include a \`recommended_date\` field in YYYY-MM-DD format
+- Calculate the actual date based on the meal plan start date and when the prep should be done
+- For multiple prep sessions, use different dates (e.g., Sunday prep + Wednesday restock)
+- Examples:
+  • If plan starts 2026-03-12 and prep is "Sunday before": recommended_date: "2026-03-09"
+  • If plan starts 2026-03-12 and mid-week restock is "Wednesday": recommended_date: "2026-03-14"
+
 Start the conversion now and create the JSON file.`;
 };
 

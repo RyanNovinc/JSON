@@ -1355,20 +1355,31 @@ export default function MealPlanDaysScreen() {
                       </View>
                     </View>
                     
-                    <View style={styles.prepDateSection}>
+                    {/* Date when to do the prep */}
+                    {session.recommended_date && (
                       <Text style={styles.prepDateText}>
-                        {session.recommended_date}
+                        {new Date(session.recommended_date).toLocaleDateString('en', { 
+                          weekday: 'long', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
                       </Text>
-                      {session.recommended_timing && (
-                        <Text style={styles.prepTimingText}>
-                          {session.recommended_timing}
-                        </Text>
-                      )}
-                    </View>
+                    )}
                     
-                    <Text style={styles.prepMealsText}>
-                      {session.covers || 'Meal prep recipes'}
+                    {/* Clean summary line */}
+                    <Text style={styles.prepSummaryText}>
+                      {session.covers ? session.covers.split(':')[0] : 'Meal prep & portioning'}
                     </Text>
+                    
+                    {/* Icon-based info row */}
+                    <View style={styles.prepIconRow}>
+                      <View style={styles.prepIconItem}>
+                        <Ionicons name="restaurant-outline" size={16} color="#94a3b8" />
+                        <Text style={styles.prepIconText}>
+                          {session.covers ? session.covers.match(/\d+/) ? session.covers.match(/\d+/)[0] + ' meals' : '4 meals' : '4 meals'}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                   
                   <View style={styles.prepArrowContainer}>
@@ -1993,27 +2004,33 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.2,
   },
-  prepDateSection: {
-    marginBottom: 12,
-  },
   prepDateText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 2,
-    letterSpacing: -0.3,
+    fontSize: 15,
+    color: '#f1f5f9',
+    fontWeight: '600',
+    marginBottom: 8,
+    letterSpacing: -0.2,
   },
-  prepTimingText: {
-    fontSize: 13,
-    color: '#a1a1aa',
+  prepSummaryText: {
+    fontSize: 14,
+    color: '#d1d5db',
     fontWeight: '500',
     lineHeight: 18,
+    marginBottom: 12,
   },
-  prepMealsText: {
-    fontSize: 14,
-    color: '#71717a',
+  prepIconRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  prepIconItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  prepIconText: {
+    fontSize: 13,
+    color: '#94a3b8',
     fontWeight: '500',
-    lineHeight: 20,
   },
   prepArrowContainer: {
     marginLeft: 12,

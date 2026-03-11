@@ -250,10 +250,10 @@ function MealPlanCard({ plan, onExport, onPress, onLongPress }: {
 
 // No scaling - meal plans are used exactly as designed
 
-export default function NutritionHomeScreen({ route }: any) {
+export default function NutritionHomeScreen({ route, transitionProgress }: any) {
   const navigation = useNavigation<NutritionNavigationProp>();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
-  const { appMode, setAppMode, isTrainingMode, isNutritionMode } = useAppMode();
+  const { appMode, setAppMode, isTrainingMode, isNutritionMode, isTransitioning, setIsTransitioning } = useAppMode();
   const { mealPlans, currentPlan, setCurrentPlan, deleteMealPlan, saveMealPlan } = useSimplifiedMealPlanning();
   
   // For compatibility with existing code
@@ -282,7 +282,6 @@ export default function NutritionHomeScreen({ route }: any) {
     newName: '',
   });
   const [preferencesModal, setPreferencesModal] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const [showMigration, setShowMigration] = useState(false);
   const [savedMealPlans, setSavedMealPlans] = useState<Set<string>>(new Set());
@@ -478,105 +477,47 @@ export default function NutritionHomeScreen({ route }: any) {
   };
 
   const handleJumpToToday = (plan: MealPlan) => {
-    // Check if today exists in the meal plan using actual dates
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const checkTodayInPlan = () => {
-      // For JSON.fit format plans with dailyMeals
-      if (plan.data?.dailyMeals) {
-        const todayDateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-        return plan.data.dailyMeals[todayDateString] !== undefined;
-      }
+    try {
+      // Use clean navigation utilities
+      const { 
+        findBestTodayDate, 
+        navigateToMealDay, 
+        navigateToMealPlanDays 
+      } = require('../utils/cleanMealPlanNavigation');
+
+      // Find the best date for "today"
+      const bestTodayDate = findBestTodayDate(currentPlan);
       
-      // For plans with startDate and endDate
-      if (plan.data?.startDate && plan.data?.endDate) {
-        const startDate = new Date(plan.data.startDate);
-        const endDate = new Date(plan.data.endDate);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(0, 0, 0, 0);
-        
-        return today >= startDate && today <= endDate;
+      if (bestTodayDate) {
+        // Navigate directly to the day
+        navigateToMealDay(navigation, bestTodayDate, {
+          id: currentPlan.id || plan.id || 'unknown',
+          name: plan.name
+        });
+      } else {
+        // Navigate to plan overview
+        navigateToMealPlanDays(navigation, {
+          id: currentPlan.id || plan.id || 'unknown',
+          name: plan.name
+        });
       }
-      
-      return false;
-    };
-    
-    const navigateToToday = () => {
-      // For JSON.fit format plans
-      if (plan.data?.dailyMeals) {
-        const todayDateString = today.toISOString().split('T')[0];
-        const todayData = plan.data.dailyMeals[todayDateString];
-        
-        if (todayData) {
-          const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-          const actualDayName = dayNames[today.getDay()];
-          
-          navigation.navigate('MealPlanDay' as any, {
-            day: todayData,
-            weekNumber: 1,
-            mealPlanName: plan.name,
-            dayIndex: 0,
-            calculatedDayName: actualDayName,
-          });
-          return true;
-        }
-      }
-      
-      return false;
-    };
-    
-    // Check if today exists in the plan and navigate if it does
-    if (checkTodayInPlan() && navigateToToday()) {
-      return;
+    } catch (error) {
+      console.error('❌ Today button navigation failed:', error);
+      // Fallback to plan overview
+      navigation.navigate('MealPlanDays' as any, {
+        planId: currentPlan.id || plan.id || 'unknown',
+        planName: plan.name
+      });
     }
-    
-    // If today doesn't exist in the plan, navigate to the meal plan overview
-    navigation.navigate('MealPlanDays' as any, { 
-      mealPlan: plan.data,
-      mealPlanName: plan.name 
-    });
   };
 
   const handleTrainingTransition = () => {
     if (isTransitioning) return;
     
-    setIsTransitioning(true);
-    
-    // Animate out
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Switch to training mode and navigate to workout screen
-      setAppMode('training');
-      navigation.navigate('Main' as any);
-      
-      // Animate back in
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setIsTransitioning(false);
-      });
-    });
+    // Just switch the app mode, the container will handle the animation
+    setAppMode('training');
   };
+
 
   // Check if plan is already saved
   const isPlanSaved = (plan: MealPlan): boolean => {
@@ -957,6 +898,17 @@ export default function NutritionHomeScreen({ route }: any) {
         </TouchableOpacity>
       </View>
 
+      {/* Weight Tracker Button - Bottom Center */}
+      <View style={[styles.weightButton, { backgroundColor: themeColor }]}>
+        <TouchableOpacity
+          style={styles.buttonInner}
+          onPress={() => navigation.navigate('WeightTracker' as any)}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="scale-outline" size={24} color="#0a0a0b" />
+        </TouchableOpacity>
+      </View>
+
       {/* App Mode Toggle - Centered at Top */}
       <View style={styles.centralToggleContainer}>
         <TouchableOpacity
@@ -1050,7 +1002,7 @@ export default function NutritionHomeScreen({ route }: any) {
       <Modal
         visible={deleteModal.visible}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setDeleteModal({ visible: false, plan: null })}
       >
         <View style={styles.actionModalOverlay}>
@@ -2059,6 +2011,16 @@ const styles = StyleSheet.create({
   calendarButton: {
     position: 'absolute',
     left: 16,
+    bottom: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 4,
+    backgroundColor: '#22d3ee',
+  },
+  weightButton: {
+    position: 'absolute',
+    left: '50%',
+    marginLeft: -28, // Half of width to center
     bottom: 32,
     width: 56,
     height: 56,

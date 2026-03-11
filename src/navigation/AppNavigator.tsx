@@ -11,6 +11,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import ModeTransitionContainer from '../components/ModeTransitionContainer';
 import CreateCountdownScreen from '../screens/CreateCountdownScreen';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
@@ -63,6 +64,16 @@ import ManualExerciseEntryScreen from '../screens/ManualExerciseEntryScreen';
 import ExerciseHelpScreen from '../screens/ExerciseHelpScreen';
 import WeightTrackerScreen from '../screens/WeightTrackerScreen';
 
+// Clean meal plan navigation types
+interface CleanMealPlanNavigationParams {
+  targetDate: string; // Always YYYY-MM-DD format
+  planId: string;
+  planName: string;
+  // Optional display helpers (derived from targetDate)
+  dayName?: string;
+  displayDate?: string;
+}
+
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
@@ -109,6 +120,7 @@ export type RootStackParamList = {
     todayBlockIndex?: number;
     todayWeek?: number;
   };
+  // Legacy meal plan navigation (keeping for compatibility during transition)
   MealPlanWeeks: {
     mealPlan: {
       id: string;
@@ -119,20 +131,11 @@ export type RootStackParamList = {
     };
   };
   MealPlanDays: {
-    week: any;
-    mealPlanName: string;
-    mealPrepSession?: any;
-    allMealPrepSessions?: any[];
-    groceryList?: any;
+    planId: string;
+    planName: string;
   };
-  MealPlanDay: {
-    day: any;
-    weekNumber: number;
-    mealPlanName: string;
-    dayIndex: number;
-    calculatedDayName: string;
-    calculatedDateString?: string; // Add the calculated date string
-  };
+  // New clean meal plan day navigation
+  MealPlanDay: CleanMealPlanNavigationParams;
   MealPlanMealDetail: {
     meal: any;
     dayName: string;
@@ -239,7 +242,7 @@ function MainNavigator() {
         tabBarInactiveTintColor: 'gray',
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Home" component={ModeTransitionContainer} options={{ headerShown: false }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
   );

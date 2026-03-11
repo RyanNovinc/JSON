@@ -637,7 +637,7 @@ export default function ImportMealPlanScreen() {
             </TouchableOpacity>
             <View style={styles.headerContent}>
               <Text style={styles.headerTitle}>How It Works</Text>
-              <Text style={styles.headerSubtitle}>4 simple steps to create custom meals</Text>
+              <Text style={styles.headerSubtitle}>3 simple steps to your perfect meal plan</Text>
             </View>
           </View>
           
@@ -654,10 +654,10 @@ export default function ImportMealPlanScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>1</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Plan Your Meals</Text>
+                  <Text style={styles.stepCardTitle}>We Build Your Perfect Prompt</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Send this prompt to your AI of choice for quick meal planning
+                  Customized nutrition plan based on your preferences
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -681,7 +681,7 @@ export default function ImportMealPlanScreen() {
                 >
                   <Ionicons name="copy-outline" size={18} color="#0a0a0b" />
                   <Text style={styles.actionButtonText}>
-                    {planningPromptCopied ? 'Copied!' : 'Copy Planning Prompt'}
+                    {planningPromptCopied ? 'Copied!' : 'Copy Your Prompt'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -691,10 +691,10 @@ export default function ImportMealPlanScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>2</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Review & Verify</Text>
+                  <Text style={styles.stepCardTitle}>Send to Any AI</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Have your AI review the meal plan for quality and compliance
+                  Paste into ChatGPT, Claude, Gemini - whatever you use
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -715,7 +715,7 @@ export default function ImportMealPlanScreen() {
                 >
                   <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
                   <Text style={styles.actionButtonText}>
-                    {reviewPromptCopied ? 'Copied!' : 'Copy Review Prompt'}
+                    {reviewPromptCopied ? 'Review Copied!' : 'Optional: Copy Review Check'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -725,10 +725,10 @@ export default function ImportMealPlanScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>3</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Generate Meal Plan</Text>
+                  <Text style={styles.stepCardTitle}>Get Your Final Plan</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Send this prompt to convert your plan to a JSON format
+                  Ask the AI to format it for the app
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -744,7 +744,7 @@ export default function ImportMealPlanScreen() {
                 >
                   <Ionicons name="sparkles" size={18} color="#0a0a0b" />
                   <Text style={styles.actionButtonText}>
-                    {aiPromptCopied ? 'Copied!' : 'Copy AI Prompt'}
+                    {aiPromptCopied ? 'Copied!' : 'Copy Format Request'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -754,10 +754,10 @@ export default function ImportMealPlanScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>4</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Import & Enjoy</Text>
+                  <Text style={styles.stepCardTitle}>Import and Start Eating</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Copy the JSON file your AI created and paste it in
+                  Just paste or upload what the AI created
                 </Text>
               </View>
             </View>
@@ -859,10 +859,10 @@ export default function ImportMealPlanScreen() {
               color="#0a0a0b" 
             />
             <Text style={styles.mainButtonText}>
-              {uploadMode ? "Upload File" : "Paste & Import"}
+              {uploadMode ? "Upload Your Plan" : "Paste Your Plan"}
             </Text>
             <Text style={styles.mainButtonSubtext}>
-              {uploadMode ? "Choose JSON file from device" : "Paste your meal plan JSON"}
+              {uploadMode ? "Import the AI's file" : "Paste what the AI created"}
             </Text>
           </TouchableOpacity>
 
@@ -1006,7 +1006,7 @@ const styles = StyleSheet.create({
   closeButtonWrapper: {
     position: 'absolute',
     top: 20,
-    right: 20,
+    left: 20,
     width: 40,
     height: 40,
     zIndex: 1,

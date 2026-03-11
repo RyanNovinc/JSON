@@ -7,6 +7,8 @@ interface AppModeContextType {
   setAppMode: (mode: AppMode) => void;
   isTrainingMode: boolean;
   isNutritionMode: boolean;
+  isTransitioning: boolean;
+  setIsTransitioning: (transitioning: boolean) => void;
 }
 
 const AppModeContext = createContext<AppModeContextType | undefined>(undefined);
@@ -17,6 +19,7 @@ interface AppModeProviderProps {
 
 export const AppModeProvider: React.FC<AppModeProviderProps> = ({ children }) => {
   const [appMode, setAppMode] = useState<AppMode>('training'); // Default to training
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const isTrainingMode = appMode === 'training';
   const isNutritionMode = appMode === 'nutrition';
@@ -27,7 +30,9 @@ export const AppModeProvider: React.FC<AppModeProviderProps> = ({ children }) =>
         appMode,
         setAppMode,
         isTrainingMode,
-        isNutritionMode
+        isNutritionMode,
+        isTransitioning,
+        setIsTransitioning
       }}
     >
       {children}

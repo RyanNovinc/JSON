@@ -448,7 +448,7 @@ export default function SampleWorkoutsScreen() {
       <Modal
         visible={showDetailModal}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowDetailModal(false)}
       >
         <View style={styles.actionModalOverlay}>

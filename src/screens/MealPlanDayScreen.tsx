@@ -23,7 +23,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NUTRITION_STORAGE_KEYS, SimplifiedMeal } from '../types/nutrition';
+import { NUTRITION_STORAGE_KEYS, SimplifiedMeal, SimplifiedMealPlanDay } from '../types/nutrition';
 
 type MealPlanDayScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MealPlanDay'>;
 type MealPlanDayScreenRouteProp = RouteProp<RootStackParamList, 'MealPlanDay'>;
@@ -35,13 +35,14 @@ interface MealCardProps {
   meal: SimplifiedMeal;
   onPress: () => void;
   onLongPress: () => void;
+  onToggleComplete: () => void;
   themeColor: string;
   mealIcon: string;
   mealColor: string;
   isCompleted: boolean;
 }
 
-function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor, isCompleted }: MealCardProps) {
+function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, mealIcon, mealColor, isCompleted }: MealCardProps) {
   // SimplifiedMeal doesn't have prep/cook time, so we'll skip that calculation
   
   return (
@@ -73,11 +74,19 @@ function MealCard({ meal, onPress, onLongPress, themeColor, mealIcon, mealColor,
           </View>
         </View>
         <View style={styles.headerRight}>
-          {isCompleted && (
-            <View style={[styles.completedBadge, { backgroundColor: '#22c55e' }]}>
+          <TouchableOpacity 
+            style={[
+              styles.completionCheckbox, 
+              isCompleted && { backgroundColor: '#22c55e' },
+              !isCompleted && { borderColor: '#71717a', borderWidth: 2 }
+            ]}
+            onPress={onToggleComplete}
+            activeOpacity={0.7}
+          >
+            {isCompleted && (
               <Ionicons name="checkmark" size={16} color="#ffffff" />
-            </View>
-          )}
+            )}
+          </TouchableOpacity>
           <Ionicons name="chevron-forward" size={20} color={themeColor} />
         </View>
       </View>
@@ -116,10 +125,61 @@ export default function MealPlanDayScreen() {
   const { getFavoriteMeals } = useMealPlanning();
   const favoriteMeals = getFavoriteMeals();
 
-  const { day, weekNumber, mealPlanName, dayIndex, calculatedDayName, calculatedDateString } = route.params;
-  const [allMeals, setAllMeals] = useState(day.meals || []);
+  // Clean parameter extraction with fallback support
+  const cleanParams = route.params as any;
+  
+  // New clean navigation parameters
+  const targetDate = cleanParams.targetDate;
+  const planId = cleanParams.planId;
+  const planName = cleanParams.planName || cleanParams.mealPlanName;
+  const dayName = cleanParams.dayName;
+  const displayDate = cleanParams.displayDate;
+
+  // Legacy parameter support (for gradual migration)
+  const legacyDay = cleanParams.day;
+  const legacyDayIndex = cleanParams.dayIndex;
+  const legacyCalculatedDateString = cleanParams.calculatedDateString;
+  const legacyCalculatedDayName = cleanParams.calculatedDayName;
+  const legacyWeekNumber = cleanParams.weekNumber;
+  const legacyMealPlanName = cleanParams.mealPlanName;
+
+  // Determine the actual date to use
+  const viewingDate = targetDate || legacyCalculatedDateString || legacyDay?.date;
+  
+  console.log('🔍 MealPlanDayScreen using clean navigation:', {
+    targetDate,
+    planName,
+    viewingDate,
+    hasLegacyParams: !!legacyDay
+  });
+
+  const [allMeals, setAllMeals] = useState(legacyDay?.meals || []);
   const [isMigrated, setIsMigrated] = useState(false);
-  const meals = allMeals;
+  
+  // For display purposes, generate clean display values
+  const displayInfo = React.useMemo(() => {
+    if (targetDate) {
+      // New clean navigation - calculate display from targetDate
+      const date = new Date(targetDate + 'T00:00:00.000Z');
+      return {
+        dayName: dayName || date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
+        displayDate: displayDate || date.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'short', 
+          day: 'numeric',
+          timeZone: 'UTC' 
+        }),
+        planName: planName || 'Meal Plan'
+      };
+    } else {
+      // Legacy fallback
+      return {
+        dayName: legacyCalculatedDayName || 'Day',
+        displayDate: legacyCalculatedDayName || 'Unknown Date',
+        planName: legacyMealPlanName || 'Meal Plan'
+      };
+    }
+  }, [targetDate, dayName, displayDate, planName, legacyCalculatedDayName, legacyMealPlanName]);
 
   // Auto-migrate legacy data on component mount
   useEffect(() => {
@@ -158,9 +218,9 @@ export default function MealPlanDayScreen() {
     }
   }, [isMigrated, currentPlan]);
 
-  // Function to load current day's meals from storage
-  // Helper function to convert day_name to a proper date string
-  const parseDayNameToDate = (dayName: string): string | null => {
+  // Legacy function - no longer needed with clean navigation but kept for compatibility
+  const parseDayNameToDate = (dayName?: string): string | null => {
+    if (!dayName) return null;
     try {
       // Parse "Friday 20 Feb" format
       const parts = dayName.split(' ');
@@ -191,67 +251,33 @@ export default function MealPlanDayScreen() {
 
   const loadCurrentDayMeals = useCallback(() => {
     try {
-      console.log('🔍 MealPlanDayScreen: Loading meals for day via context');
-      console.log('🔍 MealPlanDayScreen: Route params:', {
-        dayName: calculatedDayName,
-        originalDayName: day.day_name,
-        dayDate: day.date,
-        calculatedDateString,
-        dayIndex,
-        weekNumber,
-        mealPlanName
-      });
+      console.log('🔍 MealPlanDayScreen: Loading meals with clean navigation');
+      console.log('📅 Target date:', viewingDate);
       
-      // NEW APPROACH: Map dayIndex to actual plan dates
-      let currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
-      
-      // If we have a currentPlan, map the dayIndex to the correct date from the plan
-      if (currentPlan && typeof dayIndex === 'number') {
-        const availableDates = Object.keys(currentPlan.dailyMeals).sort();
-        if (dayIndex >= 0 && dayIndex < availableDates.length) {
-          currentViewingDate = availableDates[dayIndex];
-          console.log(`📅 MealPlanDayScreen: Mapped dayIndex ${dayIndex} to plan date ${currentViewingDate}`);
-        }
-      }
-      
-      console.log(`📅 MealPlanDayScreen: Date calculation:`, {
-        calculatedDateString,
-        dayDate: day.date,
-        parsedDayName: parseDayNameToDate(day.day_name),
-        dayIndex,
-        availableDatesFromPlan: currentPlan ? Object.keys(currentPlan.dailyMeals).sort() : [],
-        finalViewingDate: currentViewingDate
-      });
-      
-      if (!currentViewingDate) {
-        console.log('⚠️ No viewing date available, using original meals');
-        setAllMeals(day.meals || []);
+      // Validate viewing date
+      if (!viewingDate) {
+        console.error('❌ No viewing date available');
+        setAllMeals(legacyDay?.meals || []);
         return;
       }
       
-      // Use simplified context to get meals for this date
-      const mealsForDay = getMealsForDate(currentViewingDate);
-      console.log('🔍 Simplified Context returned meals:', mealsForDay.length);
+      // Use simplified context to get meals for this clean date
+      const mealsForDay = getMealsForDate(viewingDate);
+      console.log('🔍 Context returned:', mealsForDay.length, 'meals for', viewingDate);
       
-      // Debug: Check each meal for required properties
-      mealsForDay.forEach((meal, index) => {
-        console.log(`🔍 Screen Meal ${index}:`, {
-          name: meal.name,
-          type: meal.type,
-          hasName: meal.name !== undefined && meal.name !== null,
-          hasType: meal.type !== undefined && meal.type !== null
-        });
-      });
+      if (mealsForDay.length > 0) {
+        console.log('✅ Using context meals');
+        setAllMeals(mealsForDay);
+      } else {
+        console.log('⚠️ No context meals, using legacy fallback');
+        setAllMeals(legacyDay?.meals || []);
+      }
       
-      // Always use context data - simplified system is reliable
-      setAllMeals(mealsForDay);
-      console.log('✅ Screen: Using simplified context meals directly');
     } catch (error) {
-      console.error('❌ Error loading meals from context:', error);
-      // Fallback to original meals on error
-      setAllMeals(day.meals || []);
+      console.error('❌ Error loading meals:', error);
+      setAllMeals(legacyDay?.meals || []);
     }
-  }, [day.date, day.day_name, getMealsForDate]); // Removed day.meals dependency to prevent stale data
+  }, [getMealsForDate, viewingDate, legacyDay]); // Removed day.meals dependency to prevent stale data
 
   // Load meals when screen mounts
   React.useEffect(() => {
@@ -265,6 +291,13 @@ export default function MealPlanDayScreen() {
       loadCurrentDayMeals();
     }, [loadCurrentDayMeals])
   );
+
+  // Load meal completions when viewing date changes
+  useEffect(() => {
+    if (viewingDate) {
+      loadMealCompletions(viewingDate);
+    }
+  }, [viewingDate]);
 
   // Add meal modal state
   const [showAddMealModal, setShowAddMealModal] = useState(false);
@@ -288,6 +321,38 @@ export default function MealPlanDayScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<{ meal: Meal; index: number; mealId: string; isCompleted: boolean } | null>(null);
   
+  // Meal completion tracking
+  const [completedMeals, setCompletedMeals] = useState<Record<string, boolean>>({});
+  
+  // Load and save meal completion state
+  const loadMealCompletions = async (date: string) => {
+    try {
+      const key = `meal_completions_${date}`;
+      const stored = await AsyncStorage.getItem(key);
+      if (stored) {
+        const completions = JSON.parse(stored);
+        setCompletedMeals(completions);
+        console.log('✅ Loaded meal completions for', date, ':', Object.keys(completions).length, 'entries');
+      } else {
+        setCompletedMeals({});
+        console.log('📋 No saved meal completions for', date);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load meal completions:', error);
+      setCompletedMeals({});
+    }
+  };
+
+  const saveMealCompletions = async (date: string, completions: Record<string, boolean>) => {
+    try {
+      const key = `meal_completions_${date}`;
+      await AsyncStorage.setItem(key, JSON.stringify(completions));
+      console.log('💾 Saved meal completions for', date, ':', Object.keys(completions).length, 'entries');
+    } catch (error) {
+      console.error('❌ Failed to save meal completions:', error);
+    }
+  };
+  
   // Note: Favorite meals functionality can be added later if needed
   // For now we focus on the core deletion functionality
 
@@ -296,8 +361,8 @@ export default function MealPlanDayScreen() {
     try {
       console.log('🚀 Adding meal via context:', meal?.name, 'at', time);
       
-      // Get the viewing date
-      const viewingDate = day.date || parseDayNameToDate(day.day_name);
+      // Get the viewing date using clean navigation
+      const currentViewingDate = viewingDate;
       
       if (!viewingDate) {
         Alert.alert('Error', 'Could not determine the day date for adding meal.');
@@ -434,20 +499,18 @@ export default function MealPlanDayScreen() {
 
   // Debug function to gather all relevant data
   const generateDebugInfo = async () => {
-    const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+    const currentViewingDate = viewingDate;
     const contextMeals = getMealsForDate(currentViewingDate);
     
     const debugInfo = {
       timestamp: new Date().toISOString(),
       screenInfo: {
-        dayName: calculatedDayName,
-        originalDayName: day.day_name,
-        dayDate: day.date,
-        calculatedDateString,
+        targetDate,
+        planName,
+        dayName: displayInfo.dayName,
+        displayDate: displayInfo.displayDate,
         currentViewingDate,
-        dayIndex,
-        weekNumber,
-        mealPlanName
+        hasLegacyParams: !!legacyDay
       },
       mealData: {
         allMealsCount: allMeals.length,
@@ -514,19 +577,10 @@ export default function MealPlanDayScreen() {
     try {
       console.log('🗑️ Attempting to delete meal via context:', meal.name);
       
-      // Use the same date mapping logic as loadCurrentDayMeals
-      let currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+      // Use the clean viewing date
+      const currentViewingDate = viewingDate;
       
-      // Map dayIndex to actual plan dates (same as display logic)
-      if (currentPlan && typeof dayIndex === 'number') {
-        const availableDates = Object.keys(currentPlan.dailyMeals).sort();
-        if (dayIndex >= 0 && dayIndex < availableDates.length) {
-          currentViewingDate = availableDates[dayIndex];
-          console.log(`🗑️ Deletion: Mapped dayIndex ${dayIndex} to plan date ${currentViewingDate}`);
-        }
-      }
-      
-      console.log(`📅 Deletion: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
+      console.log(`📅 Deletion: Using clean date ${currentViewingDate}`);
       
       if (!currentViewingDate) {
         Alert.alert('Error', 'Could not determine the day date for deletion.');
@@ -567,7 +621,8 @@ export default function MealPlanDayScreen() {
   // Handle long press to show custom action sheet
   const handleMealLongPress = async (meal: Meal, index: number) => {
     const mealId = generateMealId(meal, index);
-    const isCurrentlyCompleted = false; // Simplified: completion tracking disabled
+    const mealKey = `${index}_${meal.id || meal.name}`;
+    const isCurrentlyCompleted = completedMeals[mealKey] || false;
     
     console.log('Long press:', { 
       mealName: meal.name, 
@@ -597,9 +652,23 @@ export default function MealPlanDayScreen() {
     if (action === 'complete') {
       // Toggle completion
       try {
-        // Meal completion functionality disabled for simplified system
-        console.log('Meal completion feature temporarily disabled');
-        console.log('Meal completion updated successfully');
+        if (!viewingDate) {
+          console.error('No viewing date available for meal completion');
+          return;
+        }
+        
+        const mealKey = `${selectedMeal.index}_${selectedMeal.meal.id || selectedMeal.meal.name}`;
+        const newCompletionState = !selectedMeal.isCompleted;
+        
+        const updatedCompletions = {
+          ...completedMeals,
+          [mealKey]: newCompletionState
+        };
+        
+        setCompletedMeals(updatedCompletions);
+        saveMealCompletions(viewingDate, updatedCompletions);
+        
+        console.log('✅ Meal completion toggled:', selectedMeal.meal.name, '→', newCompletionState ? 'completed' : 'incomplete');
       } catch (error) {
         console.error('Failed to toggle meal completion:', error);
       }
@@ -667,9 +736,9 @@ export default function MealPlanDayScreen() {
       if (success) {
         console.log('🔄 Screen: Forcing immediate meal reload...');
         
-        // Get the viewing date - prioritize calculatedDateString from navigation
-        const currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
-        console.log(`📅 Reload: Using date ${currentViewingDate} (calculated: ${calculatedDateString}, day.date: ${day.date})`);
+        // Get the viewing date using clean navigation
+        const currentViewingDate = viewingDate;
+        console.log(`📅 Reload: Using clean date ${currentViewingDate}`);
         if (currentViewingDate) {
           // Use simplified context for force reload
           const updatedMeals = getMealsForDate(currentViewingDate);
@@ -689,8 +758,34 @@ export default function MealPlanDayScreen() {
     // Keep selectedMeal for action sheet return
   };
 
+  // Quick toggle meal completion (for checkbox)
+  const quickToggleMealCompletion = async (meal: Meal, index: number) => {
+    try {
+      if (!viewingDate) {
+        console.error('No viewing date available for meal completion');
+        return;
+      }
+      
+      const mealKey = `${index}_${meal.id || meal.name}`;
+      const currentCompletionState = completedMeals[mealKey] || false;
+      const newCompletionState = !currentCompletionState;
+      
+      const updatedCompletions = {
+        ...completedMeals,
+        [mealKey]: newCompletionState
+      };
+      
+      setCompletedMeals(updatedCompletions);
+      saveMealCompletions(viewingDate, updatedCompletions);
+      
+      console.log('✅ Quick meal completion toggled:', meal.name, '→', newCompletionState ? 'completed' : 'incomplete');
+    } catch (error) {
+      console.error('Failed to quickly toggle meal completion:', error);
+    }
+  };
+
   // Calculate daily totals
-  const dailyTotals = meals.reduce((totals, meal) => {
+  const dailyTotals = allMeals.reduce((totals, meal) => {
     return {
       calories: totals.calories + (meal.calories || 0),
       protein: totals.protein + (meal.macros?.protein || 0),
@@ -702,12 +797,12 @@ export default function MealPlanDayScreen() {
   }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, prepTime: 0 });
 
   // Calculate completion progress (simplified - completion tracking can be added later)
-  const completedMealsCount = meals.filter((meal, index) => {
-    const mealId = generateMealId(meal, index);
-    const isCompleted = false; // Simplified: all meals show as not completed for now
+  const completedMealsCount = allMeals.filter((meal, index) => {
+    const mealKey = `${index}_${meal.id || meal.name}`;
+    const isCompleted = completedMeals[mealKey] || false;
     console.log('Progress check:', { 
       mealName: meal.name, 
-      mealId, 
+      mealKey, 
       index, 
       isCompleted 
     });
@@ -715,9 +810,9 @@ export default function MealPlanDayScreen() {
   }).length;
   
   // Calculate nutrition from completed meals only (simplified)
-  const completedNutrition = meals.reduce((totals, meal, index) => {
-    const mealId = generateMealId(meal, index);
-    const isCompleted = false; // Simplified: completion tracking disabled for now
+  const completedNutrition = allMeals.reduce((totals, meal, index) => {
+    const mealKey = `${index}_${meal.id || meal.name}`;
+    const isCompleted = completedMeals[mealKey] || false;
     
     if (isCompleted) {
       return {
@@ -730,11 +825,11 @@ export default function MealPlanDayScreen() {
     return totals;
   }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
   
-  const progressPercentage = meals.length > 0 ? (completedMealsCount / meals.length) * 100 : 0;
+  const progressPercentage = allMeals.length > 0 ? (completedMealsCount / allMeals.length) * 100 : 0;
   
   console.log('Progress summary:', {
     completedMealsCount,
-    totalMeals: meals.length,
+    totalMeals: allMeals.length,
     progressPercentage
   });
 
@@ -760,7 +855,7 @@ export default function MealPlanDayScreen() {
 
   const handleMealPress = (meal: Meal) => {
     // Calculate the current viewing date using the same logic as loadCurrentDayMeals
-    let currentViewingDate = calculatedDateString || day.date || parseDayNameToDate(day.day_name);
+    let currentViewingDate = legacyCalculatedDateString || legacyDay?.date || parseDayNameToDate(legacyDay?.day_name);
     
     // Map dayIndex to actual plan dates (same as display logic)
     if (currentPlan && typeof dayIndex === 'number') {
@@ -772,9 +867,9 @@ export default function MealPlanDayScreen() {
     
     navigation.navigate('MealPlanMealDetail', {
       meal,
-      dayName: calculatedDayName,
-      weekNumber,
-      mealPlanName,
+      dayName: legacyCalculatedDayName,
+      weekNumber: legacyWeekNumber,
+      mealPlanName: legacyMealPlanName,
       dateString: currentViewingDate, // Add the date for refreshing
     });
   };
@@ -810,7 +905,7 @@ export default function MealPlanDayScreen() {
 
   // Sort meals chronologically by recommended_time, fallback to meal type order
   const mealTypeOrder = { 'breakfast': 0, 'snack': 1, 'lunch': 2, 'dinner': 3 };
-  const sortedMeals = meals.sort((a, b) => {
+  const sortedMeals = allMeals.sort((a, b) => {
     const timeA = a.time ? timeToMinutes(a.time) : (mealTypeOrder[a.type] || 0) * 360; // 6-hour gaps as fallback
     const timeB = b.time ? timeToMinutes(b.time) : (mealTypeOrder[b.type] || 0) * 360;
     
@@ -833,8 +928,8 @@ export default function MealPlanDayScreen() {
             <Ionicons name="chevron-back" size={24} color="#ffffff" />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <Text style={styles.dayTitle}>{calculatedDayName.split(',')[0]}</Text>
-            <Text style={styles.dateSubtitle}>{getDayDate().split(' ').slice(1).join(' ')}</Text>
+            <Text style={styles.dayTitle}>{displayInfo.dayName}</Text>
+            <Text style={styles.dateSubtitle}>{displayInfo.displayDate}</Text>
           </View>
           <TouchableOpacity 
             onPress={() => setShowAddMealModal(true)} 
@@ -851,7 +946,7 @@ export default function MealPlanDayScreen() {
               <View>
                 <Text style={styles.modernProgressTitle}>Today's Progress</Text>
                 <Text style={styles.modernProgressSubtitle}>
-                  {completedMealsCount} of {meals.length} meals completed
+                  {completedMealsCount} of {allMeals.length} meals completed
                 </Text>
               </View>
               <View style={[styles.percentageCircle, { borderColor: themeColor }]}>
@@ -908,12 +1003,13 @@ export default function MealPlanDayScreen() {
           <View style={styles.mealSectionHeader}>
             <Ionicons name="time" size={20} color={themeColor} />
             <Text style={[styles.mealSectionTitle, { color: themeColor }]}>Your Daily Timeline</Text>
-            <Text style={styles.mealCount}>{meals.length} meal{meals.length > 1 ? 's' : ''}</Text>
+            <Text style={styles.mealCount}>{allMeals.length} meal{allMeals.length > 1 ? 's' : ''}</Text>
           </View>
           
           {sortedMeals.map((meal, index) => {
             const mealId = generateMealId(meal, index);
-            const isCompleted = false; // Simplified: completion tracking disabled
+            const mealKey = `${index}_${meal.id || meal.name}`;
+            const isCompleted = completedMeals[mealKey] || false;
             
             return (
               <MealCard
@@ -921,6 +1017,7 @@ export default function MealPlanDayScreen() {
                 meal={meal}
                 onPress={() => handleMealPress(meal)}
                 onLongPress={() => handleMealLongPress(meal, index)}
+                onToggleComplete={() => quickToggleMealCompletion(meal, index)}
                 themeColor={themeColor}
                 mealIcon={getMealIcon(meal.type)}
                 mealColor={getMealColor(meal.type)}
@@ -930,7 +1027,7 @@ export default function MealPlanDayScreen() {
           })}
         </View>
 
-        {meals.length === 0 && (
+        {allMeals.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="restaurant-outline" size={64} color="#3f3f46" />
             <Text style={styles.emptyTitle}>No Meals Planned</Text>
@@ -1291,7 +1388,7 @@ export default function MealPlanDayScreen() {
                       
                       // Simple approach: Extract the same date the screen is currently viewing
                       // This is the date that loadCurrentDayMeals successfully found meals for
-                      let targetDate = calculatedDateString || day.date;
+                      let targetDate = legacyCalculatedDateString || legacyDay?.date;
                       
                       // Map dayIndex to plan dates if we have currentPlan
                       if (currentPlan && typeof dayIndex === 'number') {
@@ -1345,7 +1442,7 @@ export default function MealPlanDayScreen() {
         <Modal
           visible={showTimePicker}
           transparent={true}
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setShowTimePicker(false)}
         >
           <View style={styles.timePickerOverlay}>
@@ -1416,7 +1513,7 @@ export default function MealPlanDayScreen() {
       <Modal
         visible={showActionSheet}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => handleActionSheetAction('cancel')}
       >
         <View style={styles.actionSheetOverlay}>
@@ -1805,6 +1902,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  completionCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    marginRight: 8,
   },
   mealStats: {
     flexDirection: 'row',
