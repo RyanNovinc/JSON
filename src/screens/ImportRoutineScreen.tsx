@@ -2572,7 +2572,7 @@ const styles = StyleSheet.create({
   },
   closeButtonWrapper: {
     position: 'absolute',
-    top: 20,
+    top: 50,
     left: 20,
     zIndex: 1,
   },

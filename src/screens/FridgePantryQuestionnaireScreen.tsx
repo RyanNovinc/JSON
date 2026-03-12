@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Switch } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { WorkoutStorage } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
@@ -27,6 +28,7 @@ interface IngredientItem {
   location: 'fridge' | 'pantry' | 'freezer';
   expiryDate?: string;
   notes?: string;
+  includeInMealPlan?: boolean;
 }
 
 interface FridgePantryPreferences {
@@ -81,9 +83,20 @@ const FridgePantryQuestionnaireScreen: React.FC<FridgePantryQuestionnaireProps> 
     const item: IngredientItem = {
       id: Date.now().toString(),
       ...newItemData,
+      includeInMealPlan: newItemData.includeInMealPlan ?? true,
     };
 
     const updatedIngredients = [...ingredients, item];
+    setIngredients(updatedIngredients);
+    saveData(updatedIngredients);
+  };
+
+  const handleToggleInclude = (id: string) => {
+    const updatedIngredients = ingredients.map(item => 
+      item.id === id 
+        ? { ...item, includeInMealPlan: !item.includeInMealPlan }
+        : item
+    );
     setIngredients(updatedIngredients);
     saveData(updatedIngredients);
   };
@@ -175,39 +188,74 @@ const FridgePantryQuestionnaireScreen: React.FC<FridgePantryQuestionnaireProps> 
     return expiry.toLocaleDateString();
   };
 
-  const renderIngredientCard = (item: IngredientItem) => (
-    <View key={item.id} style={[styles.ingredientCard, { borderColor: themeColor + '20' }]}>
-      <View style={styles.ingredientContent}>
-        <View style={styles.ingredientHeader}>
-          <Text style={styles.ingredientName}>{item.name}</Text>
-          <TouchableOpacity
-            onPress={() => handleDeleteItem(item.id)}
-            style={styles.deleteButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="close-circle" size={20} color="#ef4444" />
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.ingredientDetails}>
-          <Text style={styles.quantityText}>
-            {item.quantity} {item.unit}
-          </Text>
-          {item.expiryDate && (
-            <Text style={[styles.expiryText, { color: getExpiryColor(item.expiryDate) }]}>
-              {formatExpiryDate(item.expiryDate)}
+  const renderIngredientCard = (item: IngredientItem) => {
+    const isIncluded = item.includeInMealPlan !== false;
+    
+    return (
+      <View key={item.id} style={[
+        styles.ingredientCard, 
+        { 
+          borderColor: isIncluded ? themeColor + '20' : '#27272a',
+          opacity: isIncluded ? 1 : 0.6
+        }
+      ]}>
+        <View style={styles.ingredientContent}>
+          <View style={styles.ingredientHeader}>
+            <View style={styles.ingredientTitleRow}>
+              <Text style={[
+                styles.ingredientName,
+                !isIncluded && styles.disabledText
+              ]}>{item.name}</Text>
+              {!isIncluded && (
+                <View style={styles.excludedBadge}>
+                  <Text style={styles.excludedBadgeText}>Excluded</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.ingredientActions}>
+              <Switch
+                value={isIncluded}
+                onValueChange={() => handleToggleInclude(item.id)}
+                trackColor={{ false: '#3f3f46', true: themeColor + '60' }}
+                thumbColor={isIncluded ? themeColor : '#71717a'}
+                style={styles.toggleSwitch}
+              />
+              <TouchableOpacity
+                onPress={() => handleDeleteItem(item.id)}
+                style={styles.deleteButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <View style={styles.ingredientDetails}>
+            <Text style={[
+              styles.quantityText,
+              !isIncluded && styles.disabledText
+            ]}>
+              {item.quantity} {item.unit}
+            </Text>
+            {item.expiryDate && (
+              <Text style={[styles.expiryText, { color: getExpiryColor(item.expiryDate) }]}>
+                {formatExpiryDate(item.expiryDate)}
+              </Text>
+            )}
+          </View>
+          
+          {item.notes && (
+            <Text style={[
+              styles.notesText,
+              !isIncluded && styles.disabledText
+            ]} numberOfLines={1}>
+              {item.notes}
             </Text>
           )}
         </View>
-        
-        {item.notes && (
-          <Text style={styles.notesText} numberOfLines={1}>
-            {item.notes}
-          </Text>
-        )}
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -418,14 +466,42 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
+  ingredientTitleRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   ingredientName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
-    flex: 1,
+  },
+  ingredientActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleSwitch: {
+    transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }],
   },
   deleteButton: {
     padding: 4,
+  },
+  excludedBadge: {
+    backgroundColor: '#27272a',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  excludedBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#71717a',
+    textTransform: 'uppercase',
+  },
+  disabledText: {
+    color: '#71717a',
   },
   ingredientDetails: {
     flexDirection: 'row',

@@ -353,10 +353,26 @@ export default function ImportMealPlanScreen() {
 
   const validateAndParseJSON = (input: string): SimplifiedMealPlan | null => {
     try {
+      // First, try to extract JSON from the input text
+      let text = input.trim();
+      
+      // Try to find JSON content by looking for opening and closing braces
+      const jsonStartIndex = text.indexOf('{');
+      const jsonEndIndex = text.lastIndexOf('}');
+      
+      if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+        // Extract just the JSON portion
+        text = text.substring(jsonStartIndex, jsonEndIndex + 1);
+        console.log("📎 Extracted JSON from text");
+      }
+      
       // Normalize smart quotes to straight quotes before parsing
-      let text = input;
       text = text.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');  // curly double quotes
       text = text.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");  // curly single quotes
+      
+      // Remove any potential BOM or zero-width characters
+      text = text.replace(/^\uFEFF/, '');
+      text = text.replace(/[\u200B-\u200D\uFEFF]/g, '');
       
       const parsed = JSON.parse(text);
       console.log("📥 Parsed JSON successfully");
@@ -402,7 +418,20 @@ export default function ImportMealPlanScreen() {
       
     } catch (jsonError) {
       const error = jsonError as Error;
-      setErrorMessage(`❌ JSON Parse Error: ${error.message}`);
+      // Provide more helpful error messages based on common issues
+      if (error.message.includes('Unexpected token') || error.message.includes('Unexpected character')) {
+        // Try to identify what character was unexpected
+        const match = error.message.match(/Unexpected (?:token |character:? ?)([^\s]+)/);
+        if (match && match[1]) {
+          setErrorMessage(`❌ JSON Parse Error: Found unexpected "${match[1]}". Make sure you're copying only the JSON data from the AI, not any surrounding text.`);
+        } else {
+          setErrorMessage(`❌ JSON Parse Error: Invalid JSON format. Please ensure you're copying only the JSON data (starting with { and ending with }) from the AI response.`);
+        }
+      } else if (error.message.includes('JSON at position')) {
+        setErrorMessage(`❌ JSON Parse Error: Invalid JSON structure. Please ensure the AI generated valid JSON format.`);
+      } else {
+        setErrorMessage(`❌ JSON Parse Error: ${error.message}`);
+      }
       return null;
     }
   };
@@ -1005,7 +1034,7 @@ const styles = StyleSheet.create({
   },
   closeButtonWrapper: {
     position: 'absolute',
-    top: 20,
+    top: 50,
     left: 20,
     width: 40,
     height: 40,

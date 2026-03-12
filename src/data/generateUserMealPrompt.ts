@@ -258,7 +258,17 @@ Based on my completed Sleep Optimization questionnaire:
 - PROVIDE SPECIFIC TIMES: For each meal in your plan, specify the recommended time (e.g., "7:45 AM", "12:30 PM", "6:00 PM") and briefly explain why that timing supports better sleep and metabolism` : ''}
 
 FRIDGE & PANTRY INVENTORY:
-${fridgePantryData && fridgePantryData.wantToUseExistingIngredients && fridgePantryData.ingredients?.length ? `
+${fridgePantryData && fridgePantryData.wantToUseExistingIngredients && fridgePantryData.ingredients?.length ? (() => {
+  // Filter out items that are excluded from meal planning
+  const includedIngredients = fridgePantryData.ingredients.filter(item => 
+    item.includeInMealPlan !== false
+  );
+  
+  if (includedIngredients.length === 0) {
+    return '- User has ingredients at home but all are currently excluded from meal planning';
+  }
+  
+  return `
 **IMPORTANT: I have ingredients at home that I want to use in my meal plan**
 - Usage preference: ${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
   'MAXIMIZE MY INVENTORY - Plan meals specifically around what I already have' :
@@ -268,12 +278,13 @@ ${fridgePantryData && fridgePantryData.wantToUseExistingIngredients && fridgePan
 }
 
 Available ingredients:
-${fridgePantryData.ingredients.map(item => {
+${includedIngredients.map(item => {
   const expiryInfo = item.expiryDate ? ` (expires ${new Date(item.expiryDate).toLocaleDateString()})` : '';
   const quantity = item.quantity && item.unit ? ` - ${item.quantity} ${item.unit}` : '';
   const notes = item.notes ? ` (${item.notes})` : '';
   return `• ${item.name}${quantity}${expiryInfo}${notes} [${item.location}]`;
-}).join('\n')}
+}).join('\n')}`;
+})()}
 
 **CRITICAL: ${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
   'Build the meal plan around these ingredients as much as possible. These should be the foundation of your meal suggestions.' :

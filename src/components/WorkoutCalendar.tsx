@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Modal,
+  Animated,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +35,22 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
   const [allWorkoutSessions, setAllWorkoutSessions] = useState<string[]>([]);
   const [totalVolumeLifted, setTotalVolumeLifted] = useState(0);
   const [monthlyVolumeLifted, setMonthlyVolumeLifted] = useState(0);
+  
+  // Add fade animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Animate on visibility change
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      fadeAnim.setValue(0);
+    }
+  }, [visible]);
 
   const isCurrentMonth = () => {
     const now = new Date();
@@ -335,10 +352,10 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
     <Modal
       visible={visible}
       transparent={true}
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
@@ -430,7 +447,7 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
             </View>
           </ScrollView>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Day Detail Modal */}
       <Modal

@@ -239,8 +239,8 @@ export default function SampleMealPlansScreen() {
                     
                     <View style={styles.details}>
                       <Text style={styles.detailText}>Assembly-Only Meal Prep</Text>
-                      <Text style={styles.macros}>7 days • 253P/291C/70F</Text>
-                      <Text style={[styles.calories, { color: themeColor }]}>2,857 calories per day</Text>
+                      <Text style={styles.macros}>7 days • 227P/305C/82F</Text>
+                      <Text style={[styles.calories, { color: themeColor }]}>2,875 calories per day</Text>
                     </View>
                   </View>
 
@@ -363,28 +363,39 @@ export default function SampleMealPlansScreen() {
               </TouchableOpacity>
             </View>
             
-            <View style={styles.modalContent}>
+            <ScrollView 
+              style={styles.modalContent}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={styles.modalDescription}>
                 This assembly-only meal plan requires minimal cooking - just microwave, assembly, and simple prep. Perfect for busy lifestyles while maximizing muscle-building nutrition.
               </Text>
+              
+              <View style={styles.pricingNote}>
+                <Ionicons name="information-circle" size={16} color="#71717a" />
+                <Text style={styles.pricingNoteText}>
+                  Pricing is in AUD for shopping at Coles supermarkets
+                </Text>
+              </View>
               
               <View style={styles.nutritionInfo}>
                 <Text style={styles.nutritionTitle}>Daily Nutrition Targets:</Text>
                 <View style={styles.nutritionRow}>
                   <Text style={styles.nutritionLabel}>Calories:</Text>
-                  <Text style={[styles.nutritionValue, { color: themeColor }]}>2,857</Text>
+                  <Text style={[styles.nutritionValue, { color: themeColor }]}>2,875</Text>
                 </View>
                 <View style={styles.nutritionRow}>
                   <Text style={styles.nutritionLabel}>Protein:</Text>
-                  <Text style={[styles.nutritionValue, { color: themeColor }]}>253g</Text>
+                  <Text style={[styles.nutritionValue, { color: themeColor }]}>227g</Text>
                 </View>
                 <View style={styles.nutritionRow}>
                   <Text style={styles.nutritionLabel}>Carbs:</Text>
-                  <Text style={[styles.nutritionValue, { color: themeColor }]}>291g</Text>
+                  <Text style={[styles.nutritionValue, { color: themeColor }]}>305g</Text>
                 </View>
                 <View style={styles.nutritionRow}>
                   <Text style={styles.nutritionLabel}>Fat:</Text>
-                  <Text style={[styles.nutritionValue, { color: themeColor }]}>70g</Text>
+                  <Text style={[styles.nutritionValue, { color: themeColor }]}>82g</Text>
                 </View>
               </View>
               
@@ -392,11 +403,11 @@ export default function SampleMealPlansScreen() {
                 <Text style={styles.featuresTitle}>Features:</Text>
                 <Text style={styles.featureItem}>• Assembly-only meals (no cooking)</Text>
                 <Text style={styles.featureItem}>• 15-minute weekly prep session</Text>
-                <Text style={styles.featureItem}>• Grocery list with real pricing ($224.50)</Text>
+                <Text style={styles.featureItem}>• Complete Coles grocery list ($243.25 AUD)</Text>
                 <Text style={styles.featureItem}>• Pre-portioned ingredients</Text>
-                <Text style={styles.featureItem}>• 253g protein per day</Text>
+                <Text style={styles.featureItem}>• 227g protein per day</Text>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -680,7 +691,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+},
+  modalScrollContent: {
     padding: 20,
+    paddingBottom: 30,
   },
   modalDescription: {
     fontSize: 16,
@@ -729,6 +745,21 @@ const styles = StyleSheet.create({
     color: '#a1a1aa',
     marginBottom: 6,
     lineHeight: 20,
+  },
+  pricingNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(113, 113, 122, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  pricingNoteText: {
+    fontSize: 13,
+    color: '#71717a',
+    fontWeight: '500',
+    flex: 1,
   },
   tabContainer: {
     flexDirection: 'row',

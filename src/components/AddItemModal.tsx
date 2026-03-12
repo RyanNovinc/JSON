@@ -23,6 +23,7 @@ interface IngredientItem {
   location: 'fridge' | 'pantry' | 'freezer';
   expiryDate?: string;
   notes?: string;
+  includeInMealPlan?: boolean;
 }
 
 interface AddItemModalProps {
@@ -78,6 +79,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
       location,
       expiryDate: expiryDate || undefined,
       notes: notes.trim() || undefined,
+      includeInMealPlan: true,
     };
 
     onAddItem(item);

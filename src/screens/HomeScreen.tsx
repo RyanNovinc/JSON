@@ -65,7 +65,7 @@ function RoutineCard({ routine, onExport, onPress, onLongPress, isPinkTheme, the
   );
 }
 
-export default function HomeScreen({ route, transitionProgress }: any) {
+export default function HomeScreen({ route }: any) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
   const [shareModal, setShareModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null }>({
@@ -665,8 +665,41 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   const handleNutritionTransition = () => {
     if (isTransitioning) return;
     
-    // Just switch the app mode, the container will handle the animation
-    setAppMode('nutrition');
+    setIsTransitioning(true);
+    
+    // Animate out
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Switch to nutrition mode and navigate to nutrition screen
+      setAppMode('nutrition');
+      navigation.navigate('NutritionHome' as any);
+      
+      // Animate back in
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setIsTransitioning(false);
+      });
+    });
   };
 
 
@@ -1121,75 +1154,47 @@ export default function HomeScreen({ route, transitionProgress }: any) {
 
       {/* App Mode Toggle - Centered at Top */}
       <View style={styles.centralToggleContainer}>
-        <View style={styles.centralToggleInner}>
-          <Animated.View
-            style={[
-              styles.centralModeToggle,
-              {
-                backgroundColor: transitionProgress ? transitionProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [themeColor, 'transparent']
-                }) : (isTrainingMode ? themeColor : 'transparent'),
-                borderColor: transitionProgress ? transitionProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [themeColor, '#3f3f46']
-                }) : (isTrainingMode ? themeColor : '#3f3f46')
-              }
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.centralModeToggleInner}
-              onPress={() => setAppMode('training')}
-              activeOpacity={0.8}
-            >
-              <Ionicons 
-                name="barbell" 
-                size={20} 
-                color={isTrainingMode ? "#0a0a0b" : themeColor}
-              />
-              <Text style={[
-                styles.centralToggleText,
-                { color: isTrainingMode ? "#0a0a0b" : themeColor }
-              ]}>
-                Workouts
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-          
-          <Animated.View
-            style={[
-              styles.centralModeToggle,
-              {
-                backgroundColor: transitionProgress ? transitionProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['transparent', themeColor]
-                }) : (isNutritionMode ? themeColor : 'transparent'),
-                borderColor: transitionProgress ? transitionProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['#3f3f46', themeColor]
-                }) : (isNutritionMode ? themeColor : '#3f3f46')
-              }
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.centralModeToggleInner}
-              onPress={handleNutritionTransition}
-              activeOpacity={0.8}
-            >
-              <Ionicons 
-                name="restaurant" 
-                size={20} 
-                color={isNutritionMode ? "#0a0a0b" : themeColor}
-              />
-              <Text style={[
-                styles.centralToggleText,
-                { color: isNutritionMode ? "#0a0a0b" : themeColor }
-              ]}>
-                Nutrition
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.centralModeToggle, 
+            isTrainingMode && { backgroundColor: themeColor, borderColor: themeColor }
+          ]}
+          onPress={() => setAppMode('training')}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="barbell" 
+            size={20} 
+            color={isTrainingMode ? "#0a0a0b" : themeColor} 
+          />
+          <Text style={[
+            styles.centralToggleText,
+            { color: isTrainingMode ? "#0a0a0b" : themeColor }
+          ]}>
+            Workouts
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.centralModeToggle, 
+            isNutritionMode && { backgroundColor: themeColor, borderColor: themeColor }
+          ]}
+          onPress={handleNutritionTransition}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="restaurant" 
+            size={20} 
+            color={isNutritionMode ? "#0a0a0b" : themeColor} 
+          />
+          <Text style={[
+            styles.centralToggleText,
+            { color: isNutritionMode ? "#0a0a0b" : themeColor }
+          ]}>
+            Nutrition
+          </Text>
+        </TouchableOpacity>
       </View>
 
 
@@ -2378,14 +2383,8 @@ const styles = StyleSheet.create({
   centralToggleContainer: {
     position: 'absolute',
     top: 54,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    zIndex: 1000,
-  },
-  centralToggleInner: {
+    left: '50%',
+    marginLeft: -120, // Half of the total width (240px / 2)
     flexDirection: 'row',
     gap: 8,
     backgroundColor: '#18181b',
@@ -2410,14 +2409,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-  },
-  centralModeToggleInner: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    width: '100%',
-    height: '100%',
     paddingHorizontal: 12,
   },
   centralToggleText: {

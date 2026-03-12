@@ -117,7 +117,11 @@ export default function NutritionDashboardScreen() {
     try {
       const results = await WorkoutStorage.loadFridgePantryResults();
       if (results && results.formData.ingredients) {
-        setFridgePantryCount(results.formData.ingredients.length);
+        // Count only items that are included in meal planning (default to true for backwards compatibility)
+        const includedCount = results.formData.ingredients.filter((item: any) => 
+          item.includeInMealPlan !== false
+        ).length;
+        setFridgePantryCount(includedCount);
       }
       if (results && results.formData.preferences) {
         setFridgePantryPreferences(results.formData.preferences);

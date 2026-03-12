@@ -717,12 +717,12 @@ const WeightTrackerScreen: React.FC = () => {
         animationType="fade"
         onRequestClose={() => setShowUpdateModal(false)}
       >
-        <View style={styles.modalOverlay}>
         <KeyboardAvoidingView 
-          style={styles.keyboardAvoidingContainer}
-          behavior={Platform.OS === 'ios' ? 'position' : 'height'}
-          keyboardVerticalOffset={0}
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
         >
+          <View style={styles.modalInnerContainer}>
           <View style={[styles.modalContainer, { borderColor: themeColor + '30' }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
@@ -964,8 +964,8 @@ const WeightTrackerScreen: React.FC = () => {
               </TouchableOpacity>
             </ScrollView>
           </View>
+          </View>
         </KeyboardAvoidingView>
-        </View>
       </Modal>
 
       {/* Simple Testimonial Modal */}
@@ -1577,9 +1577,8 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'flex-end',
   },
-  keyboardAvoidingContainer: {
+  modalInnerContainer: {
     flex: 1,
     justifyContent: 'flex-end',
   },
@@ -1589,6 +1588,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderTopWidth: 2,
     borderLeftWidth: 2,
+    maxHeight: '70%',
     borderRightWidth: 2,
     maxHeight: '95%',
     minHeight: 600,
@@ -1618,7 +1618,8 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   modalContent: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
   },
   modalContentContainer: {
     paddingHorizontal: 20,

@@ -250,7 +250,7 @@ function MealPlanCard({ plan, onExport, onPress, onLongPress }: {
 
 // No scaling - meal plans are used exactly as designed
 
-export default function NutritionHomeScreen({ route, transitionProgress }: any) {
+export default function NutritionHomeScreen({ route }: any) {
   const navigation = useNavigation<NutritionNavigationProp>();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode, isTransitioning, setIsTransitioning } = useAppMode();
@@ -514,8 +514,41 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
   const handleTrainingTransition = () => {
     if (isTransitioning) return;
     
-    // Just switch the app mode, the container will handle the animation
-    setAppMode('training');
+    setIsTransitioning(true);
+    
+    // Animate out
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Switch to training mode and navigate to workout screen
+      setAppMode('training');
+      navigation.navigate('Main' as any);
+      
+      // Animate back in
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setIsTransitioning(false);
+      });
+    });
   };
 
 
