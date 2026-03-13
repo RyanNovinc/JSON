@@ -11,7 +11,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { settingsService } from '../services/api';
+// Removed unused settingsService import
 import { useJSONPro } from '../hooks/useJSONPro';
 import { CustomerCenter } from '../components/CustomerCenter';
 import { useNavigation } from '@react-navigation/native';
@@ -25,17 +25,11 @@ export default function SettingsScreen() {
   const queryClient = useQueryClient();
   const [showCustomerCenter, setShowCustomerCenter] = useState(false);
 
-  const { data: settings } = useQuery({
-    queryKey: ['userSettings'],
-    queryFn: settingsService.getUserSettings,
-  });
-
-  const togglePremiumMutation = useMutation({
-    mutationFn: settingsService.togglePremium,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userSettings'] });
-    },
-  });
+  // Removed unused settings queries - app doesn't use backend settings
+  const settings = null;
+  const togglePremiumMutation = {
+    mutate: () => {} // No-op
+  };
 
   const handleLogout = () => {
     Alert.alert(
