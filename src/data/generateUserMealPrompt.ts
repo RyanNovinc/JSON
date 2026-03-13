@@ -283,15 +283,15 @@ ${includedIngredients.map(item => {
   const quantity = item.quantity && item.unit ? ` - ${item.quantity} ${item.unit}` : '';
   const notes = item.notes ? ` (${item.notes})` : '';
   return `• ${item.name}${quantity}${expiryInfo}${notes} [${item.location}]`;
-}).join('\n')}`;
-})()}
+}).join('\n')}
 
 **CRITICAL: ${fridgePantryData.preferences?.primaryApproach === 'maximize' ? 
   'Build the meal plan around these ingredients as much as possible. These should be the foundation of your meal suggestions.' :
   fridgePantryData.preferences?.primaryApproach === 'expiry' ? 
   'Prioritize ingredients with expiry dates first, especially those expiring soon. Build meals around expiring items.' :
   'Use these ingredients when they naturally fit into optimal meal plans, but don\'t force them if they don\'t work well.'
-}**` : '- No fridge/pantry inventory provided or user chose not to include existing ingredients'}
+}**`;
+})() : '- No fridge/pantry inventory provided or user chose not to include existing ingredients'}
 
 MEAL PREFERENCES:
 ${budgetData.mealPreferences === 'include_favorites' ? 

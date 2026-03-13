@@ -14,7 +14,7 @@ import {
   ScrollView,
   PanResponder,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigationState } from '@react-navigation/native';
@@ -29,7 +29,7 @@ const DISTANCE_THRESHOLD = 50;
 type TabType = 'rating' | 'bug' | 'feature';
 
 export function FeedbackTab() {
-  const { themeColor, isPinkTheme, setIsPinkTheme } = useTheme();
+  const { themeColor } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('rating');
   const [feedback, setFeedback] = useState('');
@@ -319,21 +319,9 @@ export function FeedbackTab() {
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>Feedback</Text>
-              <View style={styles.headerActions}>
-                <TouchableOpacity 
-                  onPress={() => setIsPinkTheme(!isPinkTheme)} 
-                  style={[styles.colorToggle, { backgroundColor: themeColor }]}
-                >
-                  <Ionicons 
-                    name={isPinkTheme ? "woman" : "man"} 
-                    size={20} 
-                    color="#0a0a0b" 
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={closePanel} style={styles.closeButton}>
-                  <Ionicons name="close" size={24} color="#71717a" />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity onPress={closePanel} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color="#71717a" />
+              </TouchableOpacity>
             </View>
 
             {/* Tabs */}
@@ -415,22 +403,14 @@ export function FeedbackTab() {
                   )}
 
                   <TouchableOpacity
-                    style={{
-                      paddingVertical: 16,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      marginTop: 'auto',
-                      backgroundColor: rating === 0 ? '#18181b' : themeColor,
-                      opacity: rating === 0 ? 0.3 : 1,
-                    }}
+                    style={[
+                      styles.button,
+                      rating === 0 ? styles.buttonDisabled : { backgroundColor: themeColor }
+                    ]}
                     onPress={handleRatingSubmit}
                     disabled={rating === 0}
                   >
-                    <Text style={{
-                      fontSize: 16,
-                      fontWeight: '600',
-                      color: rating === 0 ? '#52525b' : '#ffffff',
-                    }}>
+                    <Text style={styles.buttonText}>
                       {rating === 5 ? 'Rate on App Store' : 'Submit Feedback'}
                     </Text>
                   </TouchableOpacity>
@@ -462,22 +442,14 @@ export function FeedbackTab() {
                   <Text style={styles.charCount}>{feedback.length} / 500</Text>
 
                   <TouchableOpacity
-                    style={{
-                      paddingVertical: 16,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      marginTop: 'auto',
-                      backgroundColor: !feedback.trim() ? '#18181b' : themeColor,
-                      opacity: !feedback.trim() ? 0.3 : 1,
-                    }}
+                    style={[
+                      styles.button,
+                      !feedback.trim() ? styles.buttonDisabled : { backgroundColor: themeColor }
+                    ]}
                     onPress={handleFeedbackSubmit}
                     disabled={!feedback.trim()}
                   >
-                    <Text style={{
-                      fontSize: 16,
-                      fontWeight: '600',
-                      color: !feedback.trim() ? '#52525b' : '#ffffff',
-                    }}>
+                    <Text style={styles.buttonText}>
                       Submit {activeTab === 'bug' ? 'Bug Report' : 'Feature Request'}
                     </Text>
                   </TouchableOpacity>
@@ -543,18 +515,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  colorToggle: {
-    width: 36,
-    height: 36,
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   title: {
     fontSize: 24,
@@ -656,18 +616,12 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: '#18181b',
-    opacity: 0.3,
-  },
-  buttonEnabled: {
-    opacity: 1,
+    opacity: 0.5,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
-  },
-  buttonTextDisabled: {
-    color: '#52525b',
+    color: '#0a0a0b',
   },
   overlay: {
     position: 'absolute',

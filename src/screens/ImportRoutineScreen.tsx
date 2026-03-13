@@ -111,62 +111,11 @@ export default function ImportRoutineScreen() {
           console.log('Schema migration: cleared old format data:', keysToDelete);
         }
         
-        // Clean up Programs with invalid mesocycle counts (from before recent fixes)
-        await cleanupInvalidPrograms();
-        
         // Set new schema version
         await AsyncStorage.setItem('schemaVersion', '2.0');
       }
     } catch (error) {
       console.error('Schema migration failed:', error);
-    }
-  };
-
-  // Clean up Programs with invalid mesocycle counts from before recent fixes
-  const cleanupInvalidPrograms = async () => {
-    try {
-      const programs = await ProgramStorage.loadPrograms();
-      let cleaned = false;
-      
-      for (const program of programs) {
-        if (program.totalMesocycles > 5) {
-          // Fix or delete programs with excessive mesocycle counts
-          let correctedCount: number;
-          
-          switch (program.programDuration) {
-            case '1_year':
-              correctedCount = 3;
-              break;
-            case '6_months':
-              correctedCount = 2;
-              break;
-            case 'custom':
-              correctedCount = 3;
-              break;
-            default:
-              // Delete programs with unknown durations
-              await ProgramStorage.deleteProgram(program.id);
-              console.log(`Deleted invalid program: ${program.id} (duration: ${program.programDuration})`);
-              cleaned = true;
-              continue;
-          }
-          
-          // Update program with corrected mesocycle count
-          await ProgramStorage.updateProgram(program.id, {
-            totalMesocycles: correctedCount,
-            // Also reset current mesocycle if it exceeds the new total
-            currentMesocycle: Math.min(program.currentMesocycle, correctedCount)
-          });
-          console.log(`Fixed program ${program.id}: ${program.totalMesocycles} → ${correctedCount} mesocycles`);
-          cleaned = true;
-        }
-      }
-      
-      if (cleaned) {
-        console.log('Program cleanup completed');
-      }
-    } catch (error) {
-      console.error('Program cleanup failed:', error);
     }
   };
 
@@ -838,10 +787,7 @@ export default function ImportRoutineScreen() {
             
             navigation.navigate('Main', { 
               screen: 'Home',
-              params: { 
-                importedProgram: parsedProgram,
-                refreshRoutines: true // Force refresh to load new mesocycle routines
-              }
+              params: { importedProgram: parsedProgram }
             } as any);
           });
         }, 500);
@@ -852,10 +798,7 @@ export default function ImportRoutineScreen() {
         // Continue with normal import flow
         navigation.navigate('Main', { 
           screen: 'Home',
-          params: { 
-            importedProgram: parsedProgram,
-            refreshRoutines: true // Force refresh to load new mesocycle routines
-          }
+          params: { importedProgram: parsedProgram }
         } as any);
       }
     }
@@ -903,11 +846,7 @@ export default function ImportRoutineScreen() {
       if (isLongProgram) {
         // Find existing program for this user based on duration
         const programs = await ProgramStorage.loadPrograms();
-        // Find the most recently created program for this duration to avoid duplicates
-        const matchingPrograms = programs.filter(p => p.programDuration === duration);
-        const existingProgram = matchingPrograms.length > 0 ? 
-          matchingPrograms.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] : 
-          null;
+        const existingProgram = programs.find(p => p.programDuration === duration);
         
         if (existingProgram) {
           setCurrentProgram(existingProgram);
@@ -966,11 +905,8 @@ export default function ImportRoutineScreen() {
       
       const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell);
       if (cells.length >= 6) {
-        const mesocycleNum = parseInt(cells[0]);
-        if (isNaN(mesocycleNum) || mesocycleNum <= 0) return; // Skip bad rows
-        
         roadmapData.push({
-          mesocycleNumber: mesocycleNum,
+          mesocycleNumber: parseInt(cells[0]) || index,
           phaseName: cells[1],
           repFocus: cells[2],
           emphasis: cells[3],
@@ -1009,7 +945,7 @@ export default function ImportRoutineScreen() {
           name: `${duration} Mesocycle Program`,
           createdAt: new Date().toISOString(),
           programDuration: duration,
-          totalMesocycles: Math.min(roadmapData.length, 5) || calculateDefaultMesocycles(duration),
+          totalMesocycles: roadmapData.length || calculateDefaultMesocycles(duration),
           currentMesocycle: 1,
           mesocycleRoadmap: roadmapData,
           mesocycleRoadmapText: roadmapText,
@@ -1037,301 +973,6 @@ export default function ImportRoutineScreen() {
     }
   };
 
-  // Extract mesocycle info from routine name
-  const createMesocycleRoutines = async (importedProgram: WorkoutProgram, metadata: any, baseRoutineId: string) => {
-    try {
-      console.log('🚨 IMPORT TRIGGERED - createMesocycleRoutines called');
-      console.log('🔄 IMPORT DEBUG - Creating individual mesocycle routines from complete state...');
-      
-      const totalBlocks = importedProgram.blocks.length;
-      const blocksPerMesocycle = Math.ceil(totalBlocks / metadata.totalMesocycles);
-      
-      console.log('🔍 IMPORT DEBUG - Distribution plan:', {
-        totalBlocks,
-        totalMesocycles: metadata.totalMesocycles,
-        blocksPerMesocycle,
-        routineName: metadata.currentDisplayName || importedProgram.routine_name
-      });
-      
-      for (let i = 0; i < metadata.totalMesocycles; i++) {
-        const mesocycleNumber = i + 1;
-        const mesocycleName = metadata.mesocycleRoadmap?.[i]?.phaseName || `Mesocycle ${mesocycleNumber}`;
-        
-        // Distribute blocks across mesocycles
-        const startIdx = i * blocksPerMesocycle;
-        const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
-        const mesocycleBlocks = importedProgram.blocks.slice(startIdx, endIdx);
-        
-        if (mesocycleBlocks.length === 0) continue;
-        
-        // Create routine for this mesocycle
-        const mesocycleRoutine = {
-          id: `${baseRoutineId}_meso_${mesocycleNumber}`,
-          name: `${metadata.currentDisplayName || importedProgram.routine_name}`,
-          days: importedProgram.days_per_week,
-          blocks: mesocycleBlocks.length,
-          data: {
-            ...importedProgram,
-            routine_name: `${metadata.currentDisplayName || importedProgram.routine_name} — ${mesocycleName}`,
-            blocks: mesocycleBlocks // This should override the imported blocks
-          },
-          programId: metadata.originalProgramId, // Use current program ID
-          mesocycleNumber: mesocycleNumber // Explicitly set mesocycle number
-        };
-        
-        // Add this mesocycle routine to storage
-        console.log('💾 SAVING MESOCYCLE ROUTINE:', mesocycleRoutine.id, mesocycleRoutine.name);
-        await WorkoutStorage.addRoutine(mesocycleRoutine);
-        console.log('✅ SAVED MESOCYCLE ROUTINE SUCCESSFULLY');
-        
-        // DEBUG: Check what routines are now in storage
-        const allRoutines = await WorkoutStorage.loadRoutines();
-        console.log('📋 ALL ROUTINES IN STORAGE:', allRoutines.map(r => ({ id: r.id, name: r.name })));
-        console.log(`📦 IMPORT DEBUG - Created routine for ${mesocycleName}:`, {
-          routineId: mesocycleRoutine.id,
-          mesocycleNumber,
-          blocksInThisMesocycle: mesocycleBlocks.length,
-          blockRange: `${startIdx}-${endIdx-1}`,
-          programId: mesocycleRoutine.programId,
-          displayName: mesocycleRoutine.name,
-          actualBlocksInData: mesocycleRoutine.data.blocks.length,
-          blockNamesInData: mesocycleRoutine.data.blocks.map(b => b.block_name)
-        });
-        
-        // Restore mesocycle-specific data with new routine ID
-        await restoreCompleteStateForMesocycle(mesocycleRoutine.id, metadata, mesocycleNumber);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error creating mesocycle routines:', error);
-      throw error;
-    }
-  };
-
-  const restoreCompleteStateForMesocycle = async (routineId: string, metadata: any, mesocycleNumber: number) => {
-    try {
-      // Restore manual blocks for this specific mesocycle
-      if (metadata.manualBlocks) {
-        const mesocycleManualBlocks = metadata.manualBlocks.filter(
-          block => block.mesocycleNumber === mesocycleNumber
-        );
-        
-        if (mesocycleManualBlocks.length > 0) {
-          const storageKey = `manual_blocks_mesocycle_${mesocycleNumber}`;
-          const cleanBlocks = mesocycleManualBlocks.map(block => {
-            const cleanBlock = { ...block };
-            delete cleanBlock.mesocycleNumber;
-            return cleanBlock;
-          });
-          await AsyncStorage.setItem(storageKey, JSON.stringify(cleanBlocks));
-          console.log(`📦 Restored ${cleanBlocks.length} manual blocks for mesocycle ${mesocycleNumber}`);
-        }
-      }
-      
-      // Restore completion status
-      if (metadata.completionStatus) {
-        const completionKey = `completion_${routineId}`;
-        await AsyncStorage.setItem(completionKey, JSON.stringify(metadata.completionStatus));
-      }
-      
-      // Restore workout history
-      if (metadata.workoutHistory) {
-        const historyKey = `workoutHistory_${routineId}`;
-        await AsyncStorage.setItem(historyKey, JSON.stringify(metadata.workoutHistory));
-      }
-      
-      // Restore exercise customizations, dynamic exercises, sets data
-      const dataCategories = [
-        { source: 'exerciseCustomizations', prefix: 'day_customization_' },
-        { source: 'dynamicExercisesData', prefix: 'workout_' },
-        { source: 'setsData', prefix: 'workout_' }
-      ];
-      
-      for (const category of dataCategories) {
-        const sourceData = metadata[category.source];
-        if (sourceData) {
-          for (const [originalKey, data] of Object.entries(sourceData)) {
-            // Only restore data that belongs to this mesocycle's blocks
-            const newKey = originalKey.replace(metadata.routineId, routineId);
-            await AsyncStorage.setItem(newKey, JSON.stringify(data));
-          }
-        }
-      }
-      
-    } catch (error) {
-      console.log(`Could not restore data for mesocycle ${mesocycleNumber}:`, error);
-    }
-  };
-
-  const restoreCompleteState = async (importedProgram: WorkoutProgram, metadata: any) => {
-    try {
-      console.log('🔄 Restoring complete state from export...');
-      
-      // Generate new routine ID to avoid conflicts
-      const newRoutineId = Date.now().toString() + Math.random().toString(36);
-      
-      // Restore manual blocks
-      if (metadata.manualBlocks && metadata.manualBlocks.length > 0) {
-        const manualBlocksByMesocycle = {};
-        
-        for (const block of metadata.manualBlocks) {
-          if (block.mesocycleNumber) {
-            // Multi-mesocycle manual block
-            const mesocycleNum = block.mesocycleNumber;
-            if (!manualBlocksByMesocycle[mesocycleNum]) {
-              manualBlocksByMesocycle[mesocycleNum] = [];
-            }
-            
-            // Remove mesocycle metadata from the block before storing
-            const cleanBlock = { ...block };
-            delete cleanBlock.mesocycleNumber;
-            manualBlocksByMesocycle[mesocycleNum].push(cleanBlock);
-          } else if (block.customMesocycleId) {
-            // Custom mesocycle manual block - will be handled with custom mesocycles
-            continue;
-          } else {
-            // Single routine manual block
-            if (!manualBlocksByMesocycle.single) {
-              manualBlocksByMesocycle.single = [];
-            }
-            manualBlocksByMesocycle.single.push(block);
-          }
-        }
-        
-        // Store manual blocks for each mesocycle
-        for (const [mesocycleKey, blocks] of Object.entries(manualBlocksByMesocycle)) {
-          const storageKey = mesocycleKey === 'single' 
-            ? `manual_blocks_${newRoutineId}`
-            : `manual_blocks_mesocycle_${mesocycleKey}`;
-          
-          await AsyncStorage.setItem(storageKey, JSON.stringify(blocks));
-          console.log(`📦 Restored ${blocks.length} manual blocks for ${mesocycleKey}`);
-        }
-      }
-      
-      // Restore completion status (with new routine ID)
-      if (metadata.completionStatus && Object.keys(metadata.completionStatus).length > 0) {
-        const completionKey = `completion_${newRoutineId}`;
-        await AsyncStorage.setItem(completionKey, JSON.stringify(metadata.completionStatus));
-        console.log('✅ Restored completion status');
-      }
-      
-      // Restore workout history (with new routine ID)
-      if (metadata.workoutHistory && metadata.workoutHistory.length > 0) {
-        const historyKey = `workoutHistory_${newRoutineId}`;
-        await AsyncStorage.setItem(historyKey, JSON.stringify(metadata.workoutHistory));
-        console.log(`📈 Restored ${metadata.workoutHistory.length} workout history entries`);
-      }
-      
-      // Restore active block
-      if (metadata.activeBlock !== null && metadata.activeBlock !== undefined) {
-        const activeBlockKey = `activeBlock_${newRoutineId}`;
-        await AsyncStorage.setItem(activeBlockKey, metadata.activeBlock.toString());
-        console.log(`🎯 Restored active block: ${metadata.activeBlock}`);
-      }
-      
-      // Restore week progress
-      if (metadata.weekProgress) {
-        const weekProgressKey = `weekProgress_${newRoutineId}`;
-        await AsyncStorage.setItem(weekProgressKey, JSON.stringify(metadata.weekProgress));
-        console.log('📅 Restored week progress');
-      }
-      
-      // Restore exercise customizations
-      if (metadata.exerciseCustomizations && Object.keys(metadata.exerciseCustomizations).length > 0) {
-        for (const [originalKey, customizationData] of Object.entries(metadata.exerciseCustomizations)) {
-          // Update key to use new routine ID if needed
-          const newKey = originalKey.replace(metadata.routineId, newRoutineId);
-          await AsyncStorage.setItem(newKey, JSON.stringify(customizationData));
-        }
-        console.log(`🎨 Restored ${Object.keys(metadata.exerciseCustomizations).length} exercise customizations`);
-      }
-      
-      // Restore dynamic exercises
-      if (metadata.dynamicExercisesData && Object.keys(metadata.dynamicExercisesData).length > 0) {
-        for (const [originalKey, dynamicData] of Object.entries(metadata.dynamicExercisesData)) {
-          const newKey = originalKey.replace(metadata.routineId, newRoutineId);
-          await AsyncStorage.setItem(newKey, JSON.stringify(dynamicData));
-        }
-        console.log(`💪 Restored ${Object.keys(metadata.dynamicExercisesData).length} dynamic exercise sets`);
-      }
-      
-      // Restore sets data
-      if (metadata.setsData && Object.keys(metadata.setsData).length > 0) {
-        for (const [originalKey, setsInfo] of Object.entries(metadata.setsData)) {
-          const newKey = originalKey.replace(metadata.routineId, newRoutineId);
-          await AsyncStorage.setItem(newKey, JSON.stringify(setsInfo));
-        }
-        console.log(`📊 Restored ${Object.keys(metadata.setsData).length} sets data records`);
-      }
-      
-      // Restore exercise preferences (global, not routine-specific)
-      // Skip for sample plans to prevent contaminating user preferences
-      if (metadata.exercisePreferences && 
-          Object.keys(metadata.exercisePreferences).length > 0 &&
-          !metadata.isSamplePlan) {
-        try {
-          // Load existing preferences
-          const existingPreferencesData = await AsyncStorage.getItem('exercise_preferences');
-          let existingPreferences = {};
-          if (existingPreferencesData) {
-            existingPreferences = JSON.parse(existingPreferencesData);
-          }
-          
-          // Merge with imported preferences (imported preferences take priority)
-          const mergedPreferences = { ...existingPreferences, ...metadata.exercisePreferences };
-          await AsyncStorage.setItem('exercise_preferences', JSON.stringify(mergedPreferences));
-          console.log('🏋️ Restored exercise preferences');
-        } catch (error) {
-          console.log('Could not restore exercise preferences:', error);
-        }
-      } else if (metadata.isSamplePlan && metadata.exercisePreferences) {
-        console.log('🚫 Skipped applying exercise preferences from sample plan to prevent user preference contamination');
-      }
-      
-      // For complete state imports with multiple mesocycles, create individual mesocycle routines
-      if (metadata.exportType === 'complete_state' && metadata.totalMesocycles > 1) {
-        console.log('🔥 FIRST BRANCH - About to call createMesocycleRoutines');
-        await createMesocycleRoutines(importedProgram, metadata, newRoutineId);
-        console.log(`🎯 FIRST BRANCH - Complete state: created ${metadata.totalMesocycles} individual mesocycle routines`);
-        return; // Exit early since we've created separate routines
-      }
-      
-      // Update the imported program's ID to the new one
-      importedProgram.id = newRoutineId;
-      
-      console.log('✨ Complete state restoration finished');
-      
-    } catch (error) {
-      console.error('❌ Error restoring complete state:', error);
-      // Don't throw - let import continue with basic functionality
-    }
-  };
-
-  const extractMesocycleInfo = (routineName: string): { mesocycleNumber: number; totalMesocycles: number } | null => {
-    // Try to match patterns like "Mesocycle 3", "Mesocycle 2 of 3", "— Mesocycle 3", etc.
-    const mesocycleMatch = routineName.match(/mesocycle\s+(\d+)(?:\s+of\s+(\d+))?/i);
-    
-    if (mesocycleMatch) {
-      const currentMesocycle = parseInt(mesocycleMatch[1]);
-      let totalMesocycles = mesocycleMatch[2] ? parseInt(mesocycleMatch[2]) : null;
-      
-      // If no explicit total, infer from context
-      if (!totalMesocycles) {
-        // If we see "Mesocycle 3", assume it's likely a 3-mesocycle program
-        // This is heuristic-based but reasonable for most programs
-        totalMesocycles = Math.max(currentMesocycle, 3); // At least 3, could be more
-      }
-      
-      return {
-        mesocycleNumber: currentMesocycle,
-        totalMesocycles: Math.min(totalMesocycles, 5) // Cap at 5 for safety
-      };
-    }
-    
-    return null;
-  };
-
   const calculateDefaultMesocycles = (duration: string): number => {
     switch (duration) {
       case '6_months': return 2;
@@ -1343,197 +984,43 @@ export default function ImportRoutineScreen() {
 
   const handleMesocycleProgramAssociation = async (importedProgram: WorkoutProgram) => {
     try {
-      const metadata = (importedProgram as any)._metadata;
+      const questionnaireData = await loadQuestionnaireData();
+      const duration = questionnaireData.programDuration || '12_weeks';
+      const isLongProgram = ['6_months', '1_year', 'custom'].includes(duration);
       
-      
-      // Check if this is a new unified export
-      if (metadata && metadata.exportType === 'unified_mesocycle_structure') {
-        return await handleUnifiedMesocycleImport(importedProgram, metadata);
+      if (!isLongProgram) {
+        return; // No mesocycle handling for short programs
       }
-      
-      // Fall back to legacy import logic for old exports
-      return await handleLegacyMesocycleImport(importedProgram, metadata);
-    } catch (error) {
-      console.error('Error in mesocycle import:', error);
-      Alert.alert('Import Error', 'Failed to import mesocycle data. The routine will be imported without mesocycle structure.');
-    }
-  };
-
-  // NEW: Handle unified mesocycle structure imports
-  const handleUnifiedMesocycleImport = async (importedProgram: WorkoutProgram, metadata: any) => {
-    try {
-      const allMesocycles = metadata.allMesocycles || [];
-      
 
       let program = currentProgram;
       
-      // Separate program and custom mesocycles
-      const programMesocycles = allMesocycles.filter(m => !m.isCustom);
-      const customMesocycles = allMesocycles.filter(m => m.isCustom);
-      
-      // Create program if needed
-      if (!program && programMesocycles.length > 0) {
-        const mesocycleRoadmap = programMesocycles.map(m => ({
-          mesocycleNumber: m.mesocycleNumber,
-          phaseName: m.phaseName,
-          repFocus: m.repFocus,
-          emphasis: m.emphasis,
-          weeks: m.weeks,
-          blocks: m.blocks
-        }));
-        
-        program = await ProgramStorage.createProgram({
-          name: importedProgram.routine_name,
-          totalMesocycles: programMesocycles.length,
+      // Create program if it doesn't exist
+      if (!program) {
+        program = {
+          id: Date.now().toString(),
+          name: `${duration} Mesocycle Program`,
+          createdAt: new Date().toISOString(),
+          programDuration: duration,
+          totalMesocycles: calculateDefaultMesocycles(duration),
           currentMesocycle: 1,
-          mesocycleRoadmap: mesocycleRoadmap
-        });
+          mesocycleRoadmap: [],
+          mesocycleRoadmapText: '',
+          completedMesocycles: [],
+          routineIds: []
+        };
         
+        await ProgramStorage.addProgram(program);
+        setCurrentProgram(program);
       }
-      
-      // Create the routine (always without mesocycleNumber for unified imports)
-      const newRoutineId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-      const newRoutine: WorkoutRoutine = {
-        id: newRoutineId,
-        name: metadata.currentDisplayName || importedProgram.routine_name,
-        days: metadata.originalDaysPerWeek || importedProgram.days_per_week || 5,
-        blocks: importedProgram.blocks?.length || 0,
-        data: importedProgram,
-        programId: program?.id
-        // NO mesocycleNumber - this ensures unified handling in BlocksScreen
-      };
-      
-      
-      // Save the routine
-      const existingRoutines = await WorkoutStorage.loadRoutines();
-      existingRoutines.push(newRoutine);
-      await WorkoutStorage.saveRoutines(existingRoutines);
-      
-      // Handle custom mesocycles if any
-      if (customMesocycles.length > 0) {
-        const customMesocyclesKey = `custom_mesocycles_${newRoutineId}`;
-        const customMesocycleData = customMesocycles.map(m => ({
-          mesocycleNumber: m.mesocycleNumber,
-          phase: {
-            mesocycleNumber: m.mesocycleNumber,
-            phaseName: m.phaseName,
-            repFocus: m.repFocus,
-            emphasis: m.emphasis,
-            weeks: m.weeks,
-            blocks: m.blocks
-          },
-          blocksInMesocycle: [],
-          completedBlocks: 0,
-          totalBlocks: 0,
-          isCompleted: false,
-          isActive: false,
-          isCustomMesocycle: true,
-          customId: Date.now().toString() + Math.random().toString(36).substr(2, 9).substr(2, 9)
-        }));
-        
-        await AsyncStorage.setItem(customMesocyclesKey, JSON.stringify(customMesocycleData));
-      }
-      
-      // Restore all the additional state data (exercise customizations, etc.)
-      // Pass importedProgram through metadata as a workaround to access _customMesocycles
-      const enhancedMetadata = { ...metadata, importedProgram };
-      await restoreCompleteStateForUnified(enhancedMetadata, newRoutineId);
-      
-      return newRoutine;
+
+      // Associate the imported routine with the program
+      // We need to wait for HomeScreen to create the routine, then link it
+      // For now, we'll mark the imported program with the programId
+      importedProgram.programId = program.id;
       
     } catch (error) {
-      console.error('Error in unified import:', error);
+      console.error('Error in mesocycle program association:', error);
       throw error;
-    }
-  };
-  
-  // NEW: Legacy fallback for old export formats
-  const handleLegacyMesocycleImport = async (importedProgram: WorkoutProgram, metadata: any) => {
-    // For now, just log that we're using legacy import
-    console.log('⚠️ Using legacy import - consider re-exporting with new format');
-    
-    // Insert the old complex logic here if needed, but for now let's keep it simple
-    return null; // Will implement legacy fallback if needed
-  };
-  
-  // Helper function to restore complete state for unified imports
-  const restoreCompleteStateForUnified = async (metadata: any, newRoutineId: string) => {
-    if (!metadata) return;
-    
-    try {
-      // Restore all the state data (completion status, workout history, etc.)
-      if (metadata.completionStatus) {
-        // Handle completion status restoration logic here
-        console.log('📊 Restoring completion status');
-      }
-      
-      if (metadata.workoutHistory) {
-        // Handle workout history restoration logic here
-        console.log('📚 Restoring workout history');
-      }
-      
-      if (metadata.exerciseCustomizations) {
-        // Handle exercise customizations restoration logic here
-        console.log('🎯 Restoring exercise customizations');
-      }
-      
-      // Add other state restoration as needed
-      
-      // ⚠️ TEMPORARILY PASS importedProgram THROUGH metadata TO ACCESS _customMesocycles
-      // This is a workaround until we refactor the function signature
-      if (metadata.importedProgram) {
-        console.log('🔍 Debug: About to check for custom mesocycles restoration');
-        
-        // Restore custom mesocycles
-        const customMesocycles = (metadata.importedProgram as any)._customMesocycles;
-        console.log(`📥 Import: _customMesocycles in import data:`, customMesocycles ? `${customMesocycles.length} custom mesocycles` : 'NOT FOUND');
-        if (customMesocycles && customMesocycles.length > 0) {
-          const customMesocyclesKey = `custom_mesocycles_${newRoutineId}`;
-          
-          // Update custom mesocycle IDs to avoid conflicts
-          const updatedCustomMesocycles = customMesocycles.map(mesocycle => ({
-            ...mesocycle,
-            customId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
-          }));
-          
-          await AsyncStorage.setItem(customMesocyclesKey, JSON.stringify(updatedCustomMesocycles));
-          console.log(`🎯 Restored ${customMesocycles.length} custom mesocycles`);
-          
-          // Restore manual blocks for custom mesocycles
-          console.log(`📥 Import: Processing ${customMesocycles.length} custom mesocycles for manual blocks`);
-          console.log(`📥 Import: Total manual blocks in metadata: ${metadata.manualBlocks?.length || 0}`);
-          
-          for (let i = 0; i < customMesocycles.length; i++) {
-            const originalCustomId = customMesocycles[i].customId;
-            const newCustomId = updatedCustomMesocycles[i].customId;
-            
-            console.log(`📥 Import: Checking custom mesocycle ${originalCustomId} -> ${newCustomId}`);
-            
-            const customManualBlocks = metadata.manualBlocks?.filter(
-              block => block.customMesocycleId === originalCustomId
-            );
-            
-            console.log(`📥 Import: Found ${customManualBlocks?.length || 0} manual blocks for custom mesocycle ${originalCustomId}`);
-            
-            if (customManualBlocks && customManualBlocks.length > 0) {
-              const cleanBlocks = customManualBlocks.map(block => {
-                const cleanBlock = { ...block };
-                delete cleanBlock.customMesocycleId;
-                return cleanBlock;
-              });
-              
-              const customManualBlocksKey = `manual_blocks_${newCustomId}`;
-              await AsyncStorage.setItem(customManualBlocksKey, JSON.stringify(cleanBlocks));
-              console.log(`📥 Import: Restored ${cleanBlocks.length} manual blocks for custom mesocycle ${newCustomId}`);
-            }
-          }
-        }
-      }
-      
-      console.log('✅ Complete state restored for routine:', newRoutineId);
-      
-    } catch (error) {
-      console.error('Error restoring complete state:', error);
     }
   };
 
@@ -1613,7 +1100,7 @@ export default function ImportRoutineScreen() {
       const consolidatedData: QuestionnaireData = {
         // From fitnessGoalsData
         primaryGoal: fitnessGoals.primaryGoal,
-        integrationMethods: fitnessGoals.integrationMethods,
+        secondaryGoals: fitnessGoals.secondaryGoals,
         specificSport: fitnessGoals.specificSport,
         athleticPerformanceDetails: fitnessGoals.athleticPerformanceDetails,
         funSocialDetails: fitnessGoals.funSocialDetails,
@@ -1644,6 +1131,7 @@ export default function ImportRoutineScreen() {
         useAISuggestion: equipmentPrefs.useAISuggestion,
         restTimePreference: equipmentPrefs.restTimePreference,
         useAIRestTime: equipmentPrefs.useAIRestTime,
+        hasHeartRateMonitor: equipmentPrefs.hasHeartRateMonitor,
         likedExercises: equipmentPrefs.likedExercises,
         dislikedExercises: equipmentPrefs.dislikedExercises,
         exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
@@ -1760,8 +1248,8 @@ export default function ImportRoutineScreen() {
     lines.push(`**Primary Goal:** ${goalText}`);
 
     // Secondary Goals
-    if (data.integrationMethods && Object.keys(data.integrationMethods).length > 0) {
-      const goalTexts = Object.keys(data.integrationMethods).map(g => {
+    if (data.secondaryGoals && data.secondaryGoals.length > 0) {
+      const goalTexts = data.secondaryGoals.map(g => {
         if (g === 'custom_secondary') {
           return `Custom Focus — "${data.customGoals || 'No description provided'}"`;
         }
@@ -1781,38 +1269,10 @@ export default function ImportRoutineScreen() {
     const primaryLabel = primaryLabelMap[data.primaryGoal || ''] || 'Training';
     lines.push(`- ${primaryLabel} days: ${data.gymTrainingDays || 'Not specified'}`);
     
-    // Secondary goal integration details
-    if (data.integrationMethods && Object.keys(data.integrationMethods).length > 0) {
-      const integratedGoals = [];
-      const dedicatedGoals = [];
-      
-      Object.keys(data.integrationMethods).forEach(goal => {
-        const goalLabel = {
-          'include_cardio': 'cardiovascular training',
-          'maintain_flexibility': 'flexibility',
-          'athletic_performance': 'athletic performance',
-          'injury_prevention': 'injury prevention',
-          'fun_social': 'fun & social'
-        }[goal] || goal;
-        
-        if (data.integrationMethods[goal] === 'integrated') {
-          integratedGoals.push(goalLabel);
-        } else if (data.integrationMethods[goal] === 'dedicated') {
-          dedicatedGoals.push(goalLabel);
-        }
-      });
-      
-      if (integratedGoals.length > 0) {
-        lines.push(`- Integrated focus areas: ${integratedGoals.join(', ')}`);
-      }
-      if (dedicatedGoals.length > 0) {
-        lines.push(`- Dedicated focus days: ${dedicatedGoals.join(', ')} (${data.otherTrainingDays || dedicatedGoals.length} ${(data.otherTrainingDays || dedicatedGoals.length) === 1 ? 'day' : 'days'})`);
-      }
-    } else if (data.otherTrainingDays && data.otherTrainingDays > 0) {
-      // Fallback for legacy data without integration methods
+    if (data.otherTrainingDays && data.otherTrainingDays > 0) {
       const secondaryLabels = [];
-      if (data.integrationMethods) {
-        Object.keys(data.integrationMethods).forEach(goal => {
+      if (data.secondaryGoals) {
+        data.secondaryGoals.forEach(goal => {
           if (goal === 'include_cardio') secondaryLabels.push('cardiovascular training');
           if (goal === 'maintain_flexibility') secondaryLabels.push('flexibility');
           if (goal === 'athletic_performance') secondaryLabels.push('athletic performance');
@@ -1836,7 +1296,7 @@ export default function ImportRoutineScreen() {
     lines.push(`**Program Duration:** ${durationMap[data.programDuration || ''] || 'Not specified'}`);
 
     // Conditional: Cardio activities
-    if (data.integrationMethods?.hasOwnProperty('include_cardio') && data.cardioPreferences && data.cardioPreferences.length > 0) {
+    if (data.secondaryGoals?.includes('include_cardio') && data.cardioPreferences && data.cardioPreferences.length > 0) {
       const activityMap: { [key: string]: string } = {
         'treadmill': 'Treadmill / Indoor Running',
         'stationary_bike': 'Stationary Bike / Cycling', 
@@ -1859,16 +1319,16 @@ export default function ImportRoutineScreen() {
     }
 
     // Conditional: Secondary goal details
-    if (data.athleticPerformanceDetails && data.integrationMethods?.hasOwnProperty('athletic_performance')) {
+    if (data.athleticPerformanceDetails && data.secondaryGoals?.includes('athletic_performance')) {
       lines.push(`**Athletic Performance Focus:** ${data.athleticPerformanceDetails}`);
     }
-    if (data.injuryPreventionDetails && data.integrationMethods?.hasOwnProperty('injury_prevention')) {
+    if (data.injuryPreventionDetails && data.secondaryGoals?.includes('injury_prevention')) {
       lines.push(`**Injury Prevention Focus:** ${data.injuryPreventionDetails}`);
     }
-    if (data.flexibilityDetails && data.integrationMethods?.hasOwnProperty('maintain_flexibility')) {
+    if (data.flexibilityDetails && data.secondaryGoals?.includes('maintain_flexibility')) {
       lines.push(`**Flexibility Focus:** ${data.flexibilityDetails}`);
     }
-    if (data.funSocialDetails && data.integrationMethods?.hasOwnProperty('fun_social')) {
+    if (data.funSocialDetails && data.secondaryGoals?.includes('fun_social')) {
       lines.push(`**Fun & Social Activities:** ${data.funSocialDetails}`);
     }
 
@@ -1895,6 +1355,9 @@ export default function ImportRoutineScreen() {
     const sessionKey = data.useAISuggestion ? 'ai_suggest' : 
                        data.workoutDuration ? data.workoutDuration.toString() : 'custom';
     lines.push(`**Session Length:** ${sessionLengthMap[sessionKey] || 'Not specified'}`);
+
+    // Heart Rate Monitor
+    lines.push(`**Heart Rate Monitor:** ${data.hasHeartRateMonitor ? 'Available' : 'Not available'}`);
 
     // Rest Time Preference
     const restKey = data.useAIRestTime ? 'ai_choose' : data.restTimePreference || 'ai_choose';
@@ -1934,11 +1397,7 @@ export default function ImportRoutineScreen() {
 
 
   const handleCancel = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation.navigate('Main' as any);
-    }
+    navigation.goBack();
   };
 
   if (isLoading) {
@@ -1964,7 +1423,7 @@ export default function ImportRoutineScreen() {
             </TouchableOpacity>
             <View style={styles.headerContent}>
               <Text style={styles.headerTitle}>How It Works</Text>
-              <Text style={styles.headerSubtitle}>3 simple steps to your perfect workout</Text>
+              <Text style={styles.headerSubtitle}>3 simple steps to create custom programs</Text>
             </View>
           </View>
             <View style={styles.stepsContainer}>
@@ -1973,10 +1432,10 @@ export default function ImportRoutineScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>1</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>We Build Your Perfect Prompt</Text>
+                  <Text style={styles.stepCardTitle}>Plan Your Program</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Customized based on your questionnaire answers
+                  Send this prompt to your AI of choice
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -1994,7 +1453,7 @@ export default function ImportRoutineScreen() {
                       }
                     })();
                     
-                    const planningPrompt = assemblePlanningPrompt(questionnaireData);
+                    const planningPrompt = assemblePlanningPrompt(questionnaireData, mesocycleContext || undefined);
                     
                     await Clipboard.setStringAsync(planningPrompt);
                     setPlanningPromptCopied(true);
@@ -2006,7 +1465,7 @@ export default function ImportRoutineScreen() {
                 >
                   <Ionicons name="copy-outline" size={18} color="#0a0a0b" />
                   <Text style={styles.actionButtonText}>
-                    {planningPromptCopied ? 'Copied!' : 'Copy Your Prompt'}
+                    {planningPromptCopied ? 'Copied!' : 'Copy Planning Prompt'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -2016,152 +1475,10 @@ export default function ImportRoutineScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>2</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Send to Any AI</Text>
+                  <Text style={styles.stepCardTitle}>Generate Workout</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Paste into ChatGPT, Claude, Gemini - whatever you use
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: themeColor }]}
-                  onPress={async () => {
-                    const reviewPrompt = `# Critical Training Plan Review
-// PROMPT 2: Review Prompt - Reviews and fixes workout plans before JSON conversion
-// IMPORTANT: This review checklist must stay synchronized with Step 3 embedded review in workoutPrompt.ts
-// If you update this checklist, update the Step 3 checklist to maintain consistency across the workflow
-
-First, read the workout program you just created so you have the full content in context. Then review it as a skeptical strength coach conducting an independent audit of this training plan. This is an independent quality gate — do not assume your self-check caught everything.
-
-## CRITICAL INSTRUCTIONS
-
-1. **Review the plan** using the checklist below, noting PASS or FAIL for each check.
-2. **If ANY check fails, FIX IT IMMEDIATELY** — do not ask the user for permission to fix. Silently revise the plan to resolve all failures.
-3. **After fixing, re-verify** — run the checklist again on the corrected plan to confirm all checks now pass.
-4. **Present the CORRECTED plan** — output the complete, clean, final version of the workout program with all fixes applied. Do not show the review process, do not show before/after comparisons, do not show your working. Present ONLY the clean corrected plan.
-5. **At the end, provide a brief change log** — a short bullet list of what you changed and why (e.g., "Added 2 sets of lat pulldowns on Day 2 to bring lat volume from 10 to 12 sets weekly").
-6. **Remind the user about JSON conversion** — after presenting the corrected plan, tell the user: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
-7. **USE WEB SEARCH** - If you have web search available, use it during the review to verify current research on volume standards, training frequency, and session duration guidelines.
-
-## HARD CONSTRAINTS — ZERO TOLERANCE
-
-These must pass after your fixes. If any of these still fail after revision, you have not finished — go back and fix again.
-
-- **User requirements priority** — ALL equipment, frequency, time, and experience constraints must be perfectly met (no exceptions).
-- **Volume minimums** — Major muscles need 12+ sets minimum, medium muscles need 8+ sets minimum based on current research.
-- **Recovery standards** — 48-72h minimum between same-muscle training sessions for optimal protein synthesis.
-- **Practical feasibility** — Session durations must be realistic including warm-up, rest, and transitions.
-- **No draft content** — the output must contain zero working, iteration, or revision commentary.
-
-## What "Fix" Means for Each Type of Failure
-
-- **Volume shortfalls**: Attempt a fix first — add sets to an existing exercise, swap a lower-priority isolation, or add a superset. Only after a genuine attempt fails may you accept CONSTRAINED, and you must state the exact structural reason. Show what you tried and why it couldn't work. Recalculate and verify totals.
-- **Recovery violations**: Redistribute exercises across days or adjust training split to ensure adequate rest.
-- **Equipment violations**: Replace exercises requiring unavailable equipment with alternatives using only listed equipment.
-- **Time overruns**: Reduce volume, combine exercises, or streamline the program to fit session limits.
-- **Experience mismatches**: Simplify exercise selection or progression schemes to match user's training background.
-- **Draft/working shown**: Remove all iteration, working, and draft content. Present only the final clean version.
-
-## Review Checklist
-
-Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
-
-### 1. User Requirements Verification
-- **Equipment constraints**: Does EVERY exercise require only available equipment?
-- **Training frequency**: Exact match to requested days per week?
-- **Time constraints**: Are session lengths within user's stated limits?
-- **Experience level**: Is complexity appropriate for user's training background?
-- **Goals**: Does the plan prioritize the stated primary goal throughout?
-- **FAIL if** ANY user requirement is not perfectly met (no exceptions)
-
-### 1b. Diff-Based Block Completeness
-For any block described as changes from a prior block (diff format) rather than a full session table:
-- Every diff entry must include: exercise name, set count, rep range
-- It must be unambiguous which exercise is being replaced and what replaces it
-- If a diff says "rotate to fresh variations" without naming them, **FAIL**
-- If a diff is missing set counts for new exercises, **FAIL**
-- If reconstructing the full session from the diff would require guessing any detail, **FAIL**
-
-This check exists because the JSON generator must reconstruct complete exercise lists from diff-based blocks. Ambiguous diffs cause silent errors in JSON output.
-
-### 2. Volume Analysis (Research-Based Standards)
-- **Web search verification**: Use web search to verify current volume research if available
-- **Major muscles** (chest, lats, quads, etc.): 12+ sets minimum, 16+ optimal
-- **Medium muscles** (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
-- **FAIL if** ANY muscle falls below research-backed minimums
-- **FAIL if** "structural constraints" are used to excuse inadequate volume
-- **Attempt-first rule**: Before accepting any shortfall as CONSTRAINED or exempt, you must attempt a concrete fix: add sets to an existing exercise, swap a lower-priority isolation for one covering the deficient muscle, or add a superset without materially extending session duration. Only accept CONSTRAINED if you can state the exact structural blocker (e.g., "Adding Hamstring sets to any day would exceed the 75-min cap"). A vague "split doesn't allow it" is not acceptable.
-
-**Additionally verify:**
-- The program document includes a Muscle Group Coverage Audit section
-- Every muscle group with 0 direct sets has an explicit indirect volume justification
-- **FAIL if** the audit section is missing entirely from the document
-- For every ⚠️ LOW flag in the audit: verify the fix was implemented in the session table. **FAIL if** the audit flags LOW but the session table was not updated
-- For every ⚠️ HIGH flag on a non-priority muscle: verify a reduction was either implemented or explicitly justified as recoverable with specific reasoning (not just "within recoverable range")
-- **FAIL if** any audit flag exists without either a session table fix or an explicit justified exception
-
-### 3. Recovery and Fatigue Management
-- **Same-muscle frequency**: Check 48-72h rest between same-muscle sessions
-- **Weekly volume**: Verify total weekly stress is sustainable for user's experience
-- **Session distribution**: Assess difficulty balance across the week
-- **FAIL if** recovery between same muscles is inadequate
-- **FAIL if** total weekly stress appears unsustainable
-
-### 4. Exercise Quality and Appropriateness
-- **Experience alignment**: Every exercise appropriate for stated training background
-- **Movement balance**: Check push/pull ratios and movement pattern distribution
-- **Practical complexity**: Exercise selection fits user's gym environment
-- **FAIL if** exercises are too advanced or require unavailable equipment
-- **FAIL if** movement patterns are imbalanced or neglect key functions
-
-### 5. Progression and Periodization Logic
-- **Goal alignment**: Rep ranges align with stated goals and current research
-- **Progression clarity**: Scheme is measurable and achievable
-- **Periodization validity**: Phases make scientific sense and are evidence-based
-- **FAIL if** progression is unclear or periodization lacks evidence
-- **FAIL if** plan is overly complex for user's experience level
-
-### 6. Practical Implementation Reality Check
-- **Session durations**: Realistic including warm-up, rest, transitions
-- **Execution simplicity**: Plan is practical for consistent implementation
-- **Real-world factors**: Accounts for gym crowding and equipment availability
-- **FAIL if** plan requires perfect conditions or is overly complicated
-- **FAIL if** estimated session times seem unrealistic
-
-## Output Format
-
-**If all 6 checks PASS on first review:**
-- State "All checks passed — plan is ready."
-- Present the plan as-is (clean, no changes needed).
-- End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
-
-**If any checks FAIL:**
-1. Show a brief summary table of PASS/FAIL results (one line per check).
-2. Show a brief change log (bullet list of what you fixed and why).
-3. Present the COMPLETE CORRECTED PLAN — the full workout program document with all fixes applied, formatted cleanly. This must be a complete standalone document, not a diff or partial update.
-4. End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."`;
-                    await Clipboard.setStringAsync(reviewPrompt);
-                    setReviewPromptCopied(true);
-                    setTimeout(() => {
-                      setReviewPromptCopied(false);
-                    }, 2000);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
-                  <Text style={styles.actionButtonText}>
-                    {reviewPromptCopied ? 'Review Copied!' : 'Optional: Copy Review Check'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.stepCard}>
-                <View style={styles.stepCardHeader}>
-                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>3</Text>
-                  </View>
-                  <Text style={styles.stepCardTitle}>Get Your Final Plan</Text>
-                </View>
-                <Text style={styles.stepCardDescription}>
-                  Ask the AI to format it for the app
+                  Send this prompt to convert your plan to a JSON format
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -2178,7 +1495,145 @@ This check exists because the JSON generator must reconstruct complete exercise 
                 >
                   <Ionicons name="sparkles" size={18} color="#0a0a0b" />
                   <Text style={styles.actionButtonText}>
-                    {aiPromptCopied ? 'Copied!' : 'Copy Format Request'}
+                    {aiPromptCopied ? 'Copied!' : 'Copy AI Prompt'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.stepCard}>
+                <View style={styles.stepCardHeader}>
+                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
+                    <Text style={styles.stepBadgeText}>3</Text>
+                  </View>
+                  <Text style={styles.stepCardTitle}>Review & Verify</Text>
+                </View>
+                <Text style={styles.stepCardDescription}>
+                  Have your AI review each JSON block for quality
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: themeColor }]}
+                  onPress={async () => {
+                    const reviewPrompt = `# Review Block
+
+First, read the JSON file you just created so you have the full content in context. Then review it as an experienced coach auditing a program for a client. This is an independent quality gate — do not assume your self-check caught everything.
+
+## Review Checklist
+
+Work through each check. For each, state PASS or FAIL with a brief note.
+
+### 1. Plan Fidelity
+Compare the JSON against the training plan above:
+- Every exercise listed in the plan for this block appears in the JSON
+- Set counts match the plan
+- Muscle tags (primaryMuscles, secondaryMuscles) match the plan
+- Day structure and exercise order match the plan
+- For diff-based blocks (5+ block programs), verify that all carried-over exercises from the base block are present — not just the swapped ones
+- No exercises were added, removed, or renamed
+- If the plan includes cardio or secondary goal days, the cardio entry matches the plan's Secondary Goal Summary (activities, rotation order, duration)
+- **FAIL if** any exercise is missing, added, or has wrong sets/muscles, or cardio day doesn't match the plan
+
+### 2. Rep Progression Logic
+For each exercise, check reps_weekly across all weeks:
+- Reps change meaningfully across weeks (not "10, 10, 10" every week for every exercise)
+- **Compound exercises should trend flat-to-decreasing** over the block (linear/intensity progression)
+- **Isolation exercises should trend flat-to-increasing** over the block (ascending density)
+- Compound rep ranges match the block's stated focus (e.g., a "Strength: 5-8 reps" block shouldn't have compound exercises at 12-15). Isolation exercises can run 2-4 reps higher than the block's stated range.
+- **FAIL if** more than half the exercises have identical reps every week (flat progression)
+- **FAIL if** compounds trend upward or isolations trend downward (wrong direction)
+- **FAIL if** compound rep ranges don't match the block's focus
+
+### 3. Deload Weeks
+If the block includes a deload week:
+- sets_weekly for the deload week is ~40-50% lower than training weeks
+- Reps in the deload week are 2-3 higher per set than training weeks
+- ALL exercises have reduced volume on the deload week, not just some
+- **FAIL if** deload volume reduction is less than 30% or greater than 60%
+- **FAIL if** any exercise has unchanged volume on the deload week
+
+### 4. Superset Integrity
+- Superset exercises are adjacent in the exercises array
+- Both exercises reference each other by exact name in their notes: "Superset with [name]"
+- The first superset exercise (SS[n]a) has shorter rest (60-90s); the second (SS[n]b) has full rest for its exercise type
+- **FAIL if** superset exercises are separated, cross-references are missing/mismatched, or rest encoding is wrong
+
+### 5. Exercise Name Consistency
+- Each exercise uses the exact same name string everywhere: in the exercise field, in superset notes, and across days if it appears more than once
+- **FAIL if** any name varies (e.g., "Cable Overhead Extension" vs "Overhead Cable Extension")
+
+### 6. Rest Periods
+- Heavy compounds (squat, deadlift, barbell bench, barbell OHP): 150-180s rest
+- Other compounds (rows, lunges, dumbbell presses, pull-ups, dips, leg press): 120-150s rest
+- Isolation exercises: 60-90s rest
+- restQuick ≈ 65% of rest (±5s tolerance)
+- If the plan specifies shorter or minimal rest, verify adjustments are consistent
+- **FAIL if** any heavy compound has rest <150s, any other compound has rest <120s, or any isolation has rest >90s (unless plan specifies non-default rest)
+
+### 7. Muscle Tags
+- All primaryMuscles and secondaryMuscles use exact taxonomy names: Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
+- No exercise has an empty primaryMuscles array
+- Tags follow the compound tagging guide (e.g., rows = Primary Upper Back, Lats | Secondary Biceps, Rear Delts)
+- **FAIL if** any non-taxonomy name appears or primaryMuscles is empty
+
+### 8. Schema Compliance
+- Weekly keys are block-relative (start from "1")
+- deload_weeks array is present and correct if the block has deloads; omitted entirely (not an empty array) if no deloads
+- secondaryMuscles is \`[]\` (not omitted) when empty
+- All required fields are present for each exercise type
+- reps_weekly values are comma-separated per-set targets, not shorthand
+- sets_weekly is present for every week in the block; training weeks match the \`sets\` field; deload weeks show reduced values
+- No warm-up sets included
+- **FAIL if** any schema violation
+
+### 9. Volume Verification
+Cross-reference the volume summary output after the block against the plan's Volume Targets table:
+- Count total primary-tagged sets per muscle group across all days (use training week set counts, not deload)
+- Compare against the volume targets from the plan
+- **FAIL if** any non-exempt muscle group is below its stated minimum
+
+### 10. Alternatives Check
+- Every strength exercise has 2 alternatives (or 1 for bodyweight-only programs)
+- Each alternative includes primaryMuscles and secondaryMuscles (secondaryMuscles can be \`[]\`)
+- Alternatives target the same primary muscles as the main exercise
+- **FAIL if** alternatives are missing, incomplete, or target different primary muscles
+
+### 11. Duration Reasonableness
+Check that estimated_duration values are reasonable:
+- Days with more exercises/sets should have proportionally longer durations
+- No training day should exceed 90 minutes (or 95 for Push Hard programs with heavy compound days) or fall below 30 minutes unless the plan explicitly specifies otherwise
+- Cardio days should roughly match the prescribed activity duration + 10 min for warmup/cooldown
+- **FAIL if** any day's duration seems unreasonable given its exercise count and set total (e.g., 8 exercises at 4 sets each with compound rest shouldn't show 45 minutes)
+
+## Output
+
+If ALL checks pass:
+
+> ✅ Reviewed — all checks passed. [One sentence summary of what was verified.]
+
+Then re-output the JSON file with the download link so the user doesn't need to scroll back to find it.
+
+If ANY check fails:
+1. List each failure with the check name, what's wrong, and what the fix is
+2. Output a corrected JSON file
+3. Say what changed
+
+Then say: "Say **next** to generate the next block. After each block, say **review** to verify it before moving on."
+
+If this is the last block of a mesocycle (not the last mesocycle of the program), also say: "Mesocycle [X] complete. Paste your Planning Prompt in this conversation to plan Mesocycle [X+1]."
+
+---
+
+**Remember this review process.** After each future block in this conversation, when the user says "review", run this same checklist. No need to paste these instructions again.`;
+                    await Clipboard.setStringAsync(reviewPrompt);
+                    setReviewPromptCopied(true);
+                    setTimeout(() => {
+                      setReviewPromptCopied(false);
+                    }, 2000);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
+                  <Text style={styles.actionButtonText}>
+                    {reviewPromptCopied ? 'Copied!' : 'Copy Review Prompt'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -2188,36 +1643,33 @@ This check exists because the JSON generator must reconstruct complete exercise 
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>4</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Import and Start Training</Text>
+                  <Text style={styles.stepCardTitle}>Import & Train</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Just paste or upload what the AI created
+                  Copy the verified JSON file and paste it in
                 </Text>
               </View>
-
-            {/* Need Help Section - Only shown in development */}
-            {__DEV__ && (
-              <View style={styles.helpSection}>
-                <Text style={styles.helpTitle}>Need Help?</Text>
-                
-                <TouchableOpacity 
-                  style={[styles.tutorialButton, { backgroundColor: themeColor }]}
-                  onPress={() => {
-                    // Open YouTube tutorial
-                    const url = 'https://youtube.com/shorts/_l6E9sX-9QQ';
-                    Linking.openURL(url);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="play" size={20} color="#000000" />
-                  <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
-                  <Text style={styles.tutorialDuration}>30 seconds</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <View style={styles.bottomPadding} />
             </View>
+          
+          {/* Separator */}
+          <View style={styles.sectionSeparator} />
+          
+          <View style={styles.tutorialSection}>
+            <Text style={styles.tutorialSectionTitle}>Need Help?</Text>
+            <TouchableOpacity 
+              style={[styles.tutorialButton, { backgroundColor: themeColor }]}
+              onPress={() => {
+                // Open YouTube tutorial
+                const url = 'https://youtube.com/shorts/_l6E9sX-9QQ';
+                Linking.openURL(url);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="play" size={18} color="#ffffff" />
+              <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
+              <Text style={styles.tutorialButtonSubtext}>30 seconds</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </SafeAreaView>
     );
@@ -2295,10 +1747,10 @@ This check exists because the JSON generator must reconstruct complete exercise 
               color="#0a0a0b" 
             />
             <Text style={styles.mainButtonText}>
-              {uploadMode ? "Upload Your Plan" : "Paste Your Plan"}
+              {uploadMode ? "Upload File" : "Paste & Import"}
             </Text>
             <Text style={styles.mainButtonSubtext}>
-              {uploadMode ? "Import the AI's file" : "Paste what the AI created"}
+              {uploadMode ? "Choose JSON file from device" : "Paste your workout JSON"}
             </Text>
           </TouchableOpacity>
 
@@ -2374,7 +1826,6 @@ This check exists because the JSON generator must reconstruct complete exercise 
                 opacity: modalOpacity,
                 borderColor: themeColor,
                 shadowColor: themeColor,
-                maxHeight: showAddMoreMode ? '75%' : '85%',
               }
             ]}
           >
@@ -2427,7 +1878,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
                         color="#0a0a0b" 
                       />
                       <Text style={styles.addMoreButtonText}>
-                        {uploadMode ? "Upload Your Plan" : "Paste Your Plan"}
+                        {uploadMode ? "Upload File" : "Paste & Import"}
                       </Text>
                       <Text style={styles.addMoreButtonSubtext}>
                         {uploadMode ? "Choose JSON file from device" : "Paste your next workout JSON"}
@@ -2572,8 +2023,8 @@ const styles = StyleSheet.create({
   },
   closeButtonWrapper: {
     position: 'absolute',
-    top: 50,
-    left: 20,
+    top: 20,
+    right: 20,
     zIndex: 1,
   },
   backButtonWrapper: {
@@ -2825,14 +2276,14 @@ const styles = StyleSheet.create({
   addMoreHeader: {
     alignItems: 'center',
     paddingHorizontal: 28,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingTop: 32,
+    paddingBottom: 20,
   },
   addMoreTitle: {
     fontSize: 28,
     fontWeight: '800',
     color: '#ffffff',
-    marginBottom: 24,
+    marginBottom: 16,
     letterSpacing: 0.5,
   },
   programPartsBadge: {
@@ -2854,8 +2305,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
-    paddingBottom: 32,
-    paddingTop: 8,
+    paddingBottom: 40,
   },
   modeToggleInModal: {
     width: 44,
@@ -2870,11 +2320,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   addMoreButton: {
     borderRadius: 16,
-    paddingVertical: 24,
+    paddingVertical: 32,
     paddingHorizontal: 48,
     alignItems: 'center',
     width: '100%',
@@ -2907,9 +2357,7 @@ const styles = StyleSheet.create({
     color: '#71717a',
     textAlign: 'center',
     fontStyle: 'italic',
-    marginTop: 0,
-    paddingHorizontal: 20,
-    lineHeight: 20,
+    marginTop: 8,
   },
   instructionsContainer: {
     flex: 1,
@@ -2999,43 +2447,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  helpSection: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  helpTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 20,
-  },
   tutorialButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     gap: 8,
   },
   tutorialButtonText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  tutorialDuration: {
-    fontSize: 14,
-    color: '#000000',
-    opacity: 0.8,
-    marginLeft: 8,
+    color: '#0a0a0b',
+    fontWeight: '600',
   },
   tutorialButtonSubtext: {
     fontSize: 12,
     color: '#0a0a0b',
     opacity: 0.7,
     marginLeft: 4,
-  },
-  bottomPadding: {
-    height: 40,
   },
   errorContainer: {
     flex: 1,
