@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './smartStorage';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 

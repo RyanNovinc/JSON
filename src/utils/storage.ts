@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './smartStorage';
 import RobustStorage from './robustStorage';
 
 export interface WorkoutRoutine {

@@ -1,5 +1,5 @@
 import { WorkoutStorage } from '../utils/storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 
 export const generateUserMealPlanPrompt = async (researchMode: boolean = false) => {
   try {

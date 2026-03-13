@@ -1,6 +1,6 @@
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './smartStorage';
 
 export type SoundOption = {
   id: string;

@@ -23,7 +23,7 @@ import { assemblePlanningPrompt, ProgramContext } from '../data/planningPrompt';
 import { ProgramStorage, Program, MesocyclePhase } from '../data/programStorage';
 import { extractMesocycleSummary } from '../data/mesocycleExtractor';
 import { WorkoutStorage } from '../utils/storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 // import * as Crypto from 'expo-crypto';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutProgram, Exercise } from '../types/workout';

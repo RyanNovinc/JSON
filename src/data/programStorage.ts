@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 
 export interface MesocyclePhase {
   mesocycleNumber: number;

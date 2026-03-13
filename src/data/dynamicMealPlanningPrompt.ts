@@ -4,7 +4,7 @@
 // Replaces hardcoded prompts with dynamic templates based on user questionnaire data
 
 import { WorkoutStorage } from '../utils/storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 
 // ================================
 // TYPE DEFINITIONS

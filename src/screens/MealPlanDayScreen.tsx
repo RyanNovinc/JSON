@@ -22,7 +22,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMeal, SimplifiedMealPlanDay } from '../types/nutrition';
 
 type MealPlanDayScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MealPlanDay'>;

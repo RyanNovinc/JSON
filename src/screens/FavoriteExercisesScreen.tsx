@@ -12,7 +12,7 @@ import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/nativ
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 import RobustStorage from '../utils/robustStorage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;

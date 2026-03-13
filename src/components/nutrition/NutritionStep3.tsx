@@ -16,7 +16,7 @@ import * as Animatable from 'react-native-animatable';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NutritionFormData } from '../../screens/NutritionQuestionnaireScreen';
 import RobustStorage from '../../utils/robustStorage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../../utils/smartStorage';
 
 interface WeightEntry {
   id: string;

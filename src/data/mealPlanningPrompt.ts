@@ -4,7 +4,7 @@
 // Working version with proper error handling
 
 import { WorkoutStorage } from '../utils/storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 
 export const assembleMealPlanningPrompt = async (): Promise<string> => {
   try {

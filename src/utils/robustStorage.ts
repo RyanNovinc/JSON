@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './smartStorage';
 import AsyncStorageDebugger from './asyncStorageDebug';
 import CrossSessionStorage from './crossSessionStorage';
 

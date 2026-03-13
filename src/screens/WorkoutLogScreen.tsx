@@ -16,7 +16,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
 import AsyncStorageDebugger from '../utils/asyncStorageDebug';

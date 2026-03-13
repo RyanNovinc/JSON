@@ -23,7 +23,7 @@ import { generateJsonConversionPrompt } from '../data/generateJsonConversionProm
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;

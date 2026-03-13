@@ -18,7 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
 import WorkoutCalendar from '../components/WorkoutCalendar';

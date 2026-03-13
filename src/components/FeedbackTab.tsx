@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 import { useNavigationState } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { sendRatingFeedback, sendBugReport, sendFeatureRequest } from '../services/feedbackApi';

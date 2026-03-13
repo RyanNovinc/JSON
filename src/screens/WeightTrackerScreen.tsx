@@ -19,7 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 import { WorkoutStorage } from '../utils/storage';
 import RobustStorage from '../utils/robustStorage';
 import { sendTestimonial } from '../services/feedbackApi';

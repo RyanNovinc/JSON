@@ -18,7 +18,7 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import AsyncStorageDebugger from '../utils/asyncStorageDebug';
 import RobustStorage from '../utils/robustStorage';

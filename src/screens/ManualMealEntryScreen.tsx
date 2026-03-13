@@ -19,7 +19,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/smartStorage';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
