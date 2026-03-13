@@ -11,7 +11,6 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import CreateCountdownScreen from '../screens/CreateCountdownScreen';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
 import SampleWorkoutsScreen from '../screens/SampleWorkoutsScreen';
@@ -76,7 +75,6 @@ interface CleanMealPlanNavigationParams {
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
-  CreateCountdown: undefined;
   ImportRoutine: undefined;
   ImportMealPlan: undefined;
   SampleWorkouts: undefined;
@@ -189,6 +187,7 @@ export type RootStackParamList = {
   MealPlanHelp: undefined;
   MealPlanTest: undefined;
   FavoriteExercises: undefined;
+  ExerciseDetail: undefined;
   AddExercise: undefined;
   ManualExerciseEntry: undefined;
   ExerciseHelp: undefined;
@@ -281,15 +280,6 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
           ) : (
             <>
               <RootStack.Screen name="Main" component={MainNavigator} />
-              <RootStack.Screen 
-                name="CreateCountdown" 
-                component={CreateCountdownScreen}
-                options={{
-                  headerShown: true,
-                  headerTitle: 'Create Countdown',
-                  presentation: 'modal'
-                }}
-              />
               <RootStack.Screen 
                 name="ImportRoutine" 
                 component={ImportRoutineScreen}
@@ -645,7 +635,6 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 options={{
                   headerShown: false,
                   presentation: 'transparentModal',
-                  animation: 'fade',
                 }}
               />
             </>
