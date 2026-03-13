@@ -71,6 +71,7 @@ export interface NutritionQuestionnaireResults {
     weightUnit: string;
     activityLevel: string;
     jobType: string;
+    dietType?: string;
   };
   macroResults: {
     protein: number;
@@ -109,6 +110,12 @@ export interface BudgetCookingQuestionnaireResults {
     eatingChallenges: string[];
     allergies: string[];
     avoidFoods: string[];
+    customBudgetAmount?: string;
+    planDuration?: number;
+    mealPreferences?: string;
+    cookingEquipment?: string[];
+    selectedFavorites?: string[];
+    customMealRequests?: string;
   };
   completedAt: string;
 }
