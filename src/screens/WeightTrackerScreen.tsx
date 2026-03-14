@@ -710,95 +710,106 @@ const WeightTrackerScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Update Modal */}
+      {/* Update Modal - Completely Rewritten for Better Keyboard Handling */}
       <Modal
         visible={showUpdateModal}
         transparent={true}
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="pageSheet"
         onRequestClose={() => setShowUpdateModal(false)}
       >
-        <View style={styles.modalOverlay}>
-        <KeyboardAvoidingView 
-          style={styles.keyboardAvoidingContainer}
-          behavior={Platform.OS === 'ios' ? 'position' : 'height'}
-          keyboardVerticalOffset={0}
-        >
-          <View style={[styles.modalContainer, { borderColor: themeColor + '30' }]}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderLeft}>
-                <TouchableOpacity onPress={() => setShowUpdateModal(false)}>
-                  <Ionicons name="close" size={24} color="#a1a1aa" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.modalHeaderCenter}>
-                <Text style={[styles.modalTitle, { color: '#ffffff' }]}>Update Weight</Text>
-              </View>
-              <View style={styles.modalHeaderRight} />
-            </View>
+        <View style={styles.newModalContainer}>
+          {/* Fixed Header */}
+          <View style={[styles.newModalHeader, { borderBottomColor: themeColor + '20' }]}>
+            <TouchableOpacity 
+              onPress={() => setShowUpdateModal(false)}
+              style={styles.newModalCloseButton}
+            >
+              <Ionicons name="close" size={24} color="#a1a1aa" />
+            </TouchableOpacity>
+            <Text style={styles.newModalTitle}>Update Weight</Text>
+            <View style={{ width: 44 }} />
+          </View>
 
+          {/* Keyboard Avoiding Content */}
+          <KeyboardAvoidingView 
+            style={styles.newModalKeyboardView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
+          >
             <ScrollView 
-              style={styles.modalContent}
-              contentContainerStyle={styles.modalContentContainer}
+              style={styles.newModalScrollView}
+              contentContainerStyle={styles.newModalScrollContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
+              bounces={false}
             >
-              <View style={styles.weightInputRow}>
-                <TextInput
-                  style={[styles.weightInput, { color: '#ffffff', borderColor: themeColor + '30' }]}
-                  value={currentWeight}
-                  onChangeText={setCurrentWeight}
-                  placeholder={`Enter weight in ${weightUnit}`}
-                  placeholderTextColor="#71717a"
-                  keyboardType="numeric"
-                  autoFocus
-                />
-                
-                <View style={styles.unitSelector}>
-                  <TouchableOpacity
-                    style={[
-                      styles.unitButton,
-                      weightUnit === 'kg' && { backgroundColor: themeColor }
-                    ]}
-                    onPress={() => setWeightUnit('kg')}
-                  >
-                    <Text style={[
-                      styles.unitButtonText,
-                      { color: weightUnit === 'kg' ? '#0a0a0b' : '#ffffff' }
-                    ]}>kg</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.unitButton,
-                      weightUnit === 'lbs' && { backgroundColor: themeColor }
-                    ]}
-                    onPress={() => setWeightUnit('lbs')}
-                  >
-                    <Text style={[
-                      styles.unitButtonText,
-                      { color: weightUnit === 'lbs' ? '#0a0a0b' : '#ffffff' }
-                    ]}>lbs</Text>
-                  </TouchableOpacity>
+              {/* Weight Input Section */}
+              <View style={styles.newWeightInputSection}>
+                <View style={styles.newWeightInputRow}>
+                  <TextInput
+                    style={[styles.newWeightInput, { borderColor: themeColor + '30' }]}
+                    value={currentWeight}
+                    onChangeText={setCurrentWeight}
+                    placeholder={`Enter weight in ${weightUnit}`}
+                    placeholderTextColor="#71717a"
+                    keyboardType="numeric"
+                    autoFocus={false}
+                    returnKeyType="done"
+                  />
+                  
+                  <View style={styles.newUnitSelector}>
+                    <TouchableOpacity
+                      style={[
+                        styles.newUnitButton,
+                        weightUnit === 'kg' && { backgroundColor: themeColor }
+                      ]}
+                      onPress={() => setWeightUnit('kg')}
+                    >
+                      <Text style={[
+                        styles.newUnitButtonText,
+                        { color: weightUnit === 'kg' ? '#0a0a0b' : '#ffffff' }
+                      ]}>kg</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.newUnitButton,
+                        weightUnit === 'lbs' && { backgroundColor: themeColor }
+                      ]}
+                      onPress={() => setWeightUnit('lbs')}
+                    >
+                      <Text style={[
+                        styles.newUnitButtonText,
+                        { color: weightUnit === 'lbs' ? '#0a0a0b' : '#ffffff' }
+                      ]}>lbs</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
 
-              <TextInput
-                style={[styles.notesInput, { color: '#ffffff', borderColor: themeColor + '30' }]}
-                value={notes}
-                onChangeText={setNotes}
-                placeholder="Optional notes (e.g., morning weigh-in, after workout)"
-                placeholderTextColor="#71717a"
-                multiline
-                numberOfLines={3}
-              />
+              {/* Notes Input Section */}
+              <View style={styles.newNotesSection}>
+                <TextInput
+                  style={[styles.newNotesInput, { borderColor: themeColor + '30' }]}
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Optional notes (e.g., morning weigh-in, after workout)"
+                  placeholderTextColor="#71717a"
+                  multiline
+                  numberOfLines={3}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                />
+              </View>
 
               {/* Progress Photos Section */}
-              <View style={styles.photoSection}>
+              <View style={styles.newPhotoSection}>
                 <TouchableOpacity 
-                  style={styles.photoSectionHeader}
+                  style={styles.newPhotoSectionHeader}
                   onPress={() => setShowPhotoSection(!showPhotoSection)}
                 >
                   <Ionicons name="camera" size={20} color={themeColor} />
-                  <Text style={styles.photoSectionTitle}>
+                  <Text style={[styles.newPhotoSectionTitle, { color: '#ffffff' }]}>
                     Progress Photos {progressPhotos.length > 0 && `(${progressPhotos.length})`}
                   </Text>
                   <Ionicons 
@@ -809,162 +820,164 @@ const WeightTrackerScreen: React.FC = () => {
                 </TouchableOpacity>
 
                 {showPhotoSection && (
-                  <View style={styles.photoGrid}>
+                  <View style={styles.newPhotoGrid}>
                     {/* Front Photo */}
-                    <View style={styles.photoSlot}>
+                    <View style={styles.newPhotoSlot}>
                       <TouchableOpacity 
-                        style={styles.photoButton}
+                        style={styles.newPhotoButton}
                         onPress={() => selectPhoto('front')}
                       >
                         {getPhotoByType('front') ? (
-                          <View style={styles.photoContainer}>
+                          <View style={styles.newPhotoContainer}>
                             <Image 
                               source={{ uri: getPhotoByType('front')?.uri }} 
-                              style={styles.progressPhoto}
+                              style={styles.newProgressPhoto}
                             />
                             <TouchableOpacity 
-                              style={styles.removePhotoButton}
+                              style={styles.newRemovePhotoButton}
                               onPress={() => removePhoto('front')}
                             >
                               <Ionicons name="close-circle" size={20} color="#ef4444" />
                             </TouchableOpacity>
                           </View>
                         ) : (
-                          <View style={styles.emptyPhotoSlot}>
+                          <View style={styles.newEmptyPhotoSlot}>
                             <Ionicons name="camera-outline" size={24} color="#71717a" />
                           </View>
                         )}
                       </TouchableOpacity>
-                      <Text style={styles.photoLabel}>Front</Text>
+                      <Text style={styles.newPhotoLabel}>Front</Text>
                     </View>
 
                     {/* Side Left Photo */}
-                    <View style={styles.photoSlot}>
+                    <View style={styles.newPhotoSlot}>
                       <TouchableOpacity 
-                        style={styles.photoButton}
+                        style={styles.newPhotoButton}
                         onPress={() => selectPhoto('side_left')}
                       >
                         {getPhotoByType('side_left') ? (
-                          <View style={styles.photoContainer}>
+                          <View style={styles.newPhotoContainer}>
                             <Image 
                               source={{ uri: getPhotoByType('side_left')?.uri }} 
-                              style={styles.progressPhoto}
+                              style={styles.newProgressPhoto}
                             />
                             <TouchableOpacity 
-                              style={styles.removePhotoButton}
+                              style={styles.newRemovePhotoButton}
                               onPress={() => removePhoto('side_left')}
                             >
                               <Ionicons name="close-circle" size={20} color="#ef4444" />
                             </TouchableOpacity>
                           </View>
                         ) : (
-                          <View style={styles.emptyPhotoSlot}>
+                          <View style={styles.newEmptyPhotoSlot}>
                             <Ionicons name="camera-outline" size={24} color="#71717a" />
                           </View>
                         )}
                       </TouchableOpacity>
-                      <Text style={styles.photoLabel}>Side L</Text>
+                      <Text style={styles.newPhotoLabel}>Side L</Text>
                     </View>
 
                     {/* Back Photo */}
-                    <View style={styles.photoSlot}>
+                    <View style={styles.newPhotoSlot}>
                       <TouchableOpacity 
-                        style={styles.photoButton}
+                        style={styles.newPhotoButton}
                         onPress={() => selectPhoto('back')}
                       >
                         {getPhotoByType('back') ? (
-                          <View style={styles.photoContainer}>
+                          <View style={styles.newPhotoContainer}>
                             <Image 
                               source={{ uri: getPhotoByType('back')?.uri }} 
-                              style={styles.progressPhoto}
+                              style={styles.newProgressPhoto}
                             />
                             <TouchableOpacity 
-                              style={styles.removePhotoButton}
+                              style={styles.newRemovePhotoButton}
                               onPress={() => removePhoto('back')}
                             >
                               <Ionicons name="close-circle" size={20} color="#ef4444" />
                             </TouchableOpacity>
                           </View>
                         ) : (
-                          <View style={styles.emptyPhotoSlot}>
+                          <View style={styles.newEmptyPhotoSlot}>
                             <Ionicons name="camera-outline" size={24} color="#71717a" />
                           </View>
                         )}
                       </TouchableOpacity>
-                      <Text style={styles.photoLabel}>Back</Text>
+                      <Text style={styles.newPhotoLabel}>Back</Text>
                     </View>
 
                     {/* Side Right Photo */}
-                    <View style={styles.photoSlot}>
+                    <View style={styles.newPhotoSlot}>
                       <TouchableOpacity 
-                        style={styles.photoButton}
+                        style={styles.newPhotoButton}
                         onPress={() => selectPhoto('side_right')}
                       >
                         {getPhotoByType('side_right') ? (
-                          <View style={styles.photoContainer}>
+                          <View style={styles.newPhotoContainer}>
                             <Image 
                               source={{ uri: getPhotoByType('side_right')?.uri }} 
-                              style={styles.progressPhoto}
+                              style={styles.newProgressPhoto}
                             />
                             <TouchableOpacity 
-                              style={styles.removePhotoButton}
+                              style={styles.newRemovePhotoButton}
                               onPress={() => removePhoto('side_right')}
                             >
                               <Ionicons name="close-circle" size={20} color="#ef4444" />
                             </TouchableOpacity>
                           </View>
                         ) : (
-                          <View style={styles.emptyPhotoSlot}>
+                          <View style={styles.newEmptyPhotoSlot}>
                             <Ionicons name="camera-outline" size={24} color="#71717a" />
                           </View>
                         )}
                       </TouchableOpacity>
-                      <Text style={styles.photoLabel}>Side R</Text>
+                      <Text style={styles.newPhotoLabel}>Side R</Text>
                     </View>
 
                     {/* Extra Photo */}
-                    <View style={styles.photoSlot}>
+                    <View style={styles.newPhotoSlot}>
                       <TouchableOpacity 
-                        style={styles.photoButton}
+                        style={styles.newPhotoButton}
                         onPress={() => selectPhoto('extra')}
                       >
                         {getPhotoByType('extra') ? (
-                          <View style={styles.photoContainer}>
+                          <View style={styles.newPhotoContainer}>
                             <Image 
                               source={{ uri: getPhotoByType('extra')?.uri }} 
-                              style={styles.progressPhoto}
+                              style={styles.newProgressPhoto}
                             />
                             <TouchableOpacity 
-                              style={styles.removePhotoButton}
+                              style={styles.newRemovePhotoButton}
                               onPress={() => removePhoto('extra')}
                             >
                               <Ionicons name="close-circle" size={20} color="#ef4444" />
                             </TouchableOpacity>
                           </View>
                         ) : (
-                          <View style={styles.emptyPhotoSlot}>
+                          <View style={styles.newEmptyPhotoSlot}>
                             <Ionicons name="camera-outline" size={24} color="#71717a" />
                           </View>
                         )}
                       </TouchableOpacity>
-                      <Text style={styles.photoLabel}>Extra</Text>
+                      <Text style={styles.newPhotoLabel}>Extra</Text>
                     </View>
                   </View>
                 )}
               </View>
+            </ScrollView>
 
+            {/* Fixed Save Button */}
+            <View style={styles.newSaveButtonContainer}>
               <TouchableOpacity
-                style={[styles.saveButton, { 
+                style={[styles.newSaveButton, { 
                   backgroundColor: themeColor,
                   shadowColor: themeColor 
                 }]}
                 onPress={saveWeight}
               >
-                <Text style={styles.saveButtonText}>Save Weight</Text>
+                <Text style={styles.newSaveButtonText}>Save Weight</Text>
               </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -2343,6 +2356,192 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
+  },
+  
+  // New Modal Styles - Completely Rewritten for Better Keyboard Handling
+  newModalContainer: {
+    flex: 1,
+    backgroundColor: '#0a0a0b',
+  },
+  newModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    borderBottomWidth: 1,
+    backgroundColor: '#0a0a0b',
+  },
+  newModalCloseButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  newModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  newModalKeyboardView: {
+    flex: 1,
+  },
+  newModalScrollView: {
+    flex: 1,
+  },
+  newModalScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  newWeightInputSection: {
+    marginBottom: 24,
+  },
+  newWeightInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  newWeightInput: {
+    flex: 1,
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 18,
+    color: '#ffffff',
+    borderWidth: 1,
+    fontWeight: '500',
+  },
+  newUnitSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  newUnitButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  newUnitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  newNotesSection: {
+    marginBottom: 24,
+  },
+  newNotesInput: {
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#ffffff',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+  },
+  newPhotoSection: {
+    marginBottom: 20,
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  newPhotoSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  newPhotoSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+    marginLeft: 12,
+  },
+  newPhotoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  newPhotoSlot: {
+    alignItems: 'center',
+    width: '18%',
+    marginBottom: 16,
+  },
+  newPhotoButton: {
+    width: 60,
+    height: 80,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  newPhotoContainer: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+  },
+  newProgressPhoto: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  newEmptyPhotoSlot: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#27272a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newRemovePhotoButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 10,
+  },
+  newPhotoLabel: {
+    fontSize: 12,
+    color: '#a1a1aa',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  newSaveButtonContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    paddingTop: 16,
+    backgroundColor: '#0a0a0b',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  newSaveButton: {
+    paddingVertical: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  newSaveButtonText: {
+    color: '#0a0a0b',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 
