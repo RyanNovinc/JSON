@@ -296,7 +296,22 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={ImportRoutineScreen}
                 options={{
                   headerShown: false,
-                  presentation: 'modal'
+                  animationTypeForReplace: 'push',
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    };
+                  },
                 }}
               />
               <RootStack.Screen 
@@ -304,7 +319,22 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={ImportMealPlanScreen}
                 options={{
                   headerShown: false,
-                  presentation: 'modal'
+                  animationTypeForReplace: 'push',
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    };
+                  },
                 }}
               />
               <RootStack.Screen 
@@ -452,7 +482,22 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={NutritionDashboardScreen}
                 options={{
                   headerShown: false,
-                  presentation: 'modal',
+                  animationTypeForReplace: 'push',
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [-layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    };
+                  },
                 }}
               />
               <RootStack.Screen 
@@ -460,7 +505,22 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={WorkoutDashboardScreen}
                 options={{
                   headerShown: false,
-                  presentation: 'modal',
+                  animationTypeForReplace: 'push',
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [-layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    };
+                  },
                 }}
               />
               <RootStack.Screen 
@@ -585,6 +645,16 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={WeightTrackerScreen}
                 options={{
                   headerShown: false,
+                  cardStyleInterpolator: ({ current }) => {
+                    return {
+                      cardStyle: {
+                        opacity: current.progress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 1],
+                        }),
+                      },
+                    };
+                  },
                 }}
               />
             </>

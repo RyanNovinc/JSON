@@ -162,6 +162,7 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
         onHandlerStateChange={onHandlerStateChange}
         activeOffsetX={[-10, 10]}
         failOffsetY={[-30, 30]}
+        enabled={false}
       >
         <Animated.View
           style={[
