@@ -38,7 +38,7 @@ const questionnaires: QuestionnaireCard[] = [
     id: 'fitnessGoals',
     title: 'Fitness Goals',
     subtitle: 'Set your objectives',
-    description: 'Weight loss, muscle gain, strength, etc.',
+    description: 'Set your objectives',
     icon: 'trophy-outline',
     navigationTarget: 'FitnessGoalsQuestionnaire',
     completionKey: 'fitnessGoals',
@@ -47,7 +47,7 @@ const questionnaires: QuestionnaireCard[] = [
     id: 'equipmentPreferences',
     title: 'Equipment & Preferences',
     subtitle: 'Setup & exercise preferences',
-    description: 'Equipment, time, exercise likes/dislikes',
+    description: 'Setup & exercise preferences',
     icon: 'barbell-outline',
     navigationTarget: 'EquipmentPreferencesQuestionnaire',
     completionKey: 'equipmentPreferences',
@@ -144,21 +144,6 @@ export default function WorkoutDashboardScreen() {
         activeOpacity={0.8}
         onPress={() => handleQuestionnairePress(questionnaire)}
       >
-        {/* Completion Status Indicator */}
-        <View style={styles.statusContainer}>
-          {isManagementScreen ? (
-            <View />
-          ) : isCompleted ? (
-            <Ionicons 
-              name="checkmark-circle" 
-              size={24} 
-              color={themeColor}
-            />
-          ) : (
-            <View style={[styles.incompleteCircle, { borderColor: '#71717a' }]} />
-          )}
-        </View>
-        
         <View style={styles.cardContent}>
           <View style={styles.iconContainer}>
             <Ionicons 
@@ -172,9 +157,6 @@ export default function WorkoutDashboardScreen() {
             <Text style={[styles.cardTitle, { textShadowColor: themeColorLight }]}>
               {questionnaire.title}
             </Text>
-            <Text style={styles.cardSubtitle}>
-              {questionnaire.subtitle}
-            </Text>
             <Text style={[styles.cardDescription, { color: isCompleted ? themeColor : '#71717a' }]}>
               {isManagementScreen ? questionnaire.description : 
                isCompleted ? 'Completed' : questionnaire.description}
@@ -182,11 +164,19 @@ export default function WorkoutDashboardScreen() {
           </View>
           
           <View style={styles.arrowContainer}>
-            <Ionicons 
-              name="chevron-forward" 
-              size={24} 
-              color="#71717a"
-            />
+            {isManagementScreen || !isCompleted ? (
+              <Ionicons 
+                name="chevron-forward" 
+                size={24} 
+                color="#71717a"
+              />
+            ) : (
+              <Ionicons 
+                name="checkmark-circle" 
+                size={24} 
+                color={themeColor}
+              />
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -211,26 +201,30 @@ export default function WorkoutDashboardScreen() {
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Workout Setup</Text>
-            <Text style={styles.headerSubtitle}>
-              {completedCount}/{totalQuestionnaires} questionnaires completed
-            </Text>
+            {completedCount < totalQuestionnaires && (
+              <Text style={styles.headerSubtitle}>
+                {completedCount}/{totalQuestionnaires} questionnaires completed
+              </Text>
+            )}
           </View>
         </View>
 
         {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBackground}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { 
-                  backgroundColor: themeColor,
-                  width: `${(completedCount / totalQuestionnaires) * 100}%`
-                }
-              ]} 
-            />
+        {completedCount < totalQuestionnaires && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBackground}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  { 
+                    backgroundColor: themeColor,
+                    width: `${(completedCount / totalQuestionnaires) * 100}%`
+                  }
+                ]} 
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Questionnaire Cards */}
         <View style={styles.cardsContainer}>

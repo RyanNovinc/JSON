@@ -216,6 +216,15 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   const loadMyRoutines = async () => {
     console.log('📥 Loading my routines...');
     const myRoutinesList = await WorkoutStorage.loadMyRoutines();
+    
+    // Add defensive check for corrupted storage
+    if (!Array.isArray(myRoutinesList)) {
+      console.warn('⚠️ My routines data is corrupted, resetting to empty array');
+      setMyRoutines([]);
+      setSavedWorkoutRoutines(new Set());
+      return;
+    }
+    
     console.log('📥 Loaded', myRoutinesList.length, 'saved routines');
     setMyRoutines(myRoutinesList);
     
@@ -1166,8 +1175,8 @@ export default function HomeScreen({ route, transitionProgress }: any) {
                 }) : (isNutritionMode ? themeColor : 'transparent'),
                 borderColor: transitionProgress ? transitionProgress.interpolate({
                   inputRange: [0, 1],
-                  outputRange: ['#3f3f46', themeColor]
-                }) : (isNutritionMode ? themeColor : '#3f3f46')
+                  outputRange: ['transparent', themeColor]
+                }) : (isNutritionMode ? themeColor : 'transparent')
               }
             ]}
           >

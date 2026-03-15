@@ -222,7 +222,13 @@ export class WorkoutStorage {
   static async loadMyRoutines(): Promise<WorkoutRoutine[]> {
     try {
       const data = await RobustStorage.getItem(STORAGE_KEYS.MY_ROUTINES, true) || await AsyncStorage.getItem(STORAGE_KEYS.MY_ROUTINES);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed)) {
+        console.warn('⚠️ My routines storage corrupted, returning empty array');
+        return [];
+      }
+      return parsed;
     } catch (error) {
       console.error('Failed to load my routines:', error);
       return [];
@@ -231,12 +237,23 @@ export class WorkoutStorage {
 
   static async addMyRoutine(routine: WorkoutRoutine): Promise<void> {
     const myRoutines = await this.loadMyRoutines();
+    if (!Array.isArray(myRoutines)) {
+      console.warn('⚠️ My routines data corrupted in addMyRoutine, creating new array');
+      const safeRoutines = [routine];
+      await this.saveMyRoutines(safeRoutines);
+      return;
+    }
     myRoutines.push(routine);
     await this.saveMyRoutines(myRoutines);
   }
 
   static async removeMyRoutine(routineId: string): Promise<void> {
     const myRoutines = await this.loadMyRoutines();
+    if (!Array.isArray(myRoutines)) {
+      console.warn('⚠️ My routines data corrupted in removeMyRoutine, resetting to empty array');
+      await this.saveMyRoutines([]);
+      return;
+    }
     const filtered = myRoutines.filter(r => r.id !== routineId && r.fingerprint !== routineId);
     await this.saveMyRoutines(filtered);
   }

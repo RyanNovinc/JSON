@@ -97,6 +97,14 @@ export default function FavoriteExercisesScreen() {
           const exercises = JSON.parse(savedData);
           console.log('Successfully parsed exercises:', JSON.stringify(exercises, null, 2));
           console.log('Exercises is array?:', Array.isArray(exercises));
+          
+          // Add defensive check for corrupted storage
+          if (!Array.isArray(exercises)) {
+            console.warn('⚠️ Favorite exercises data is corrupted, resetting to empty array');
+            setFavoriteExercises([]);
+            return;
+          }
+          
           console.log('Number of exercises loaded:', exercises.length);
           
           // Fix any duplicate IDs

@@ -384,7 +384,8 @@ export default function DaysScreen() {
         return week;
       }
       
-      const completedSet = new Set(JSON.parse(weekCompleted));
+      const parsed = JSON.parse(weekCompleted);
+      const completedSet = new Set(Array.isArray(parsed) ? parsed : []);
       // Check if all days in this week are completed
       const allDaysCompleted = localBlock.days.every(day => 
         completedSet.has(`${day.day_name || 'unknown'}_week${week}`)
@@ -627,7 +628,8 @@ export default function DaysScreen() {
       if (completed) {
         const parsedCompleted = JSON.parse(completed);
         console.log(`🔍 [LOAD-COMPLETION] Found completed workouts (${dataSource}):`, parsedCompleted);
-        setCompletedWorkouts(new Set(parsedCompleted));
+        const validArray = Array.isArray(parsedCompleted) ? parsedCompleted : [];
+        setCompletedWorkouts(new Set(validArray));
         
         // If we found data, verify it's properly stored in robust storage
         if (dataSource !== 'robust') {

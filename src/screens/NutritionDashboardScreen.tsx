@@ -32,7 +32,7 @@ const questionnaires: QuestionnairCard[] = [
     id: 'nutrition',
     title: 'Nutrition Goals',
     subtitle: 'Set your macro targets',
-    description: 'Calculate BMR, TDEE & macro targets',
+    description: 'Set your macro targets',
     icon: 'nutrition-outline',
     navigationTarget: 'NutritionQuestionnaire',
     completionKey: 'nutritionGoals',
@@ -41,7 +41,7 @@ const questionnaires: QuestionnairCard[] = [
     id: 'budget',
     title: 'Budget Cooking',
     subtitle: 'Meal planning preferences',
-    description: 'Budget, cooking style & preferences',
+    description: 'Meal planning preferences',
     icon: 'restaurant-outline',
     navigationTarget: 'BudgetCookingQuestionnaire',
     completionKey: 'budgetCooking',
@@ -50,7 +50,7 @@ const questionnaires: QuestionnairCard[] = [
     id: 'sleep',
     title: 'Sleep Optimization',
     subtitle: 'Meal timing & sleep',
-    description: 'Set meal timing around your sleep schedule',
+    description: 'Meal timing & sleep',
     icon: 'moon-outline',
     navigationTarget: 'SleepOptimizationScreen',
     completionKey: 'sleepOptimization',
@@ -213,21 +213,6 @@ export default function NutritionDashboardScreen() {
         activeOpacity={0.8}
         onPress={() => handleQuestionnairePress(questionnaire)}
       >
-        {/* Completion Status Indicator - Hide for favorites and fridgePantry */}
-        {!isFavorites && !isFridgePantry && (
-          <View style={styles.statusContainer}>
-            {isCompleted ? (
-              <View style={[styles.statusBadge, { backgroundColor: themeColor }]}>
-                <Ionicons name="checkmark" size={16} color="#0a0a0b" />
-              </View>
-            ) : (
-              <View style={[styles.statusBadge, styles.statusBadgeIncomplete]}>
-                <Text style={styles.statusNumber}>{index + 1}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
         {/* Fridge Pantry Item Count */}
         {isFridgePantry && fridgePantryCount > 0 && (
           <View style={[styles.itemCountContainer, { backgroundColor: useFridgePantry ? themeColor : '#71717a' }]}>
@@ -249,9 +234,6 @@ export default function NutritionDashboardScreen() {
             <Text style={[styles.cardTitle, { textShadowColor: themeColorLight }]}>
               {questionnaire.title}
             </Text>
-            <Text style={styles.cardSubtitle}>
-              {questionnaire.subtitle}
-            </Text>
             <Text style={[styles.cardDescription, { color: isFavorites ? themeColor : (isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : isCompleted ? themeColor : '#71717a') }]}>
               {isFavorites ? questionnaire.description : (isFridgePantry && isCompleted ? getFridgePantryDisplayText() : isCompleted ? 'Completed' : questionnaire.description)}
             </Text>
@@ -271,13 +253,21 @@ export default function NutritionDashboardScreen() {
             )}
           </View>
 
-          {/* Chevron */}
+          {/* Chevron or Checkmark */}
           <View style={styles.chevronContainer}>
-            <Ionicons 
-              name="chevron-forward" 
-              size={24} 
-              color={isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : isCompleted ? themeColor : '#71717a'} 
-            />
+            {isFavorites || !isCompleted || (isFridgePantry && !isCompleted) ? (
+              <Ionicons 
+                name="chevron-forward" 
+                size={24} 
+                color="#71717a"
+              />
+            ) : (
+              <Ionicons 
+                name="checkmark-circle" 
+                size={24} 
+                color={isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor}
+              />
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -313,26 +303,30 @@ export default function NutritionDashboardScreen() {
           
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Nutrition Setup</Text>
-            <Text style={styles.headerSubtitle}>
-              {completedCount}/{totalQuestionnaires} questionnaires completed
-            </Text>
+            {completedCount < totalQuestionnaires && (
+              <Text style={styles.headerSubtitle}>
+                {completedCount}/{totalQuestionnaires} questionnaires completed
+              </Text>
+            )}
           </View>
         </View>
 
         {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { 
-                  backgroundColor: themeColor,
-                  width: `${(completedCount / totalQuestionnaires) * 100}%`
-                }
-              ]} 
-            />
+        {completedCount < totalQuestionnaires && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  { 
+                    backgroundColor: themeColor,
+                    width: `${(completedCount / totalQuestionnaires) * 100}%`
+                  }
+                ]} 
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Questionnaire Cards */}
         <View style={styles.cardsContainer}>
