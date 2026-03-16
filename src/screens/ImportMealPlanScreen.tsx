@@ -9,6 +9,7 @@ import {
   Modal,
   Linking,
   Animated,
+  SafeAreaView,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
@@ -628,7 +629,7 @@ export default function ImportMealPlanScreen() {
 
   if (showInstructions) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.instructionsContainer}>
           {/* Header */}
           <View style={styles.header}>
@@ -664,11 +665,22 @@ export default function ImportMealPlanScreen() {
                   onPress={async () => {
                     try {
                       const planningPrompt = await assembleMealPlanningPrompt();
-                      await Clipboard.setStringAsync(planningPrompt);
-                      setPlanningPromptCopied(true);
-                      setTimeout(() => {
-                        setPlanningPromptCopied(false);
-                      }, 2000);
+                      
+                      // Try to copy to clipboard with better error handling
+                      try {
+                        await Clipboard.setStringAsync(planningPrompt);
+                        setPlanningPromptCopied(true);
+                        setTimeout(() => {
+                          setPlanningPromptCopied(false);
+                        }, 2000);
+                      } catch (clipboardError) {
+                        console.error('Clipboard error:', clipboardError);
+                        Alert.alert(
+                          'Copy Failed',
+                          'Unable to copy to clipboard. Please try again or copy manually from the generated prompt.',
+                          [{ text: 'OK' }]
+                        );
+                      }
                     } catch (error) {
                       Alert.alert(
                         'Missing Data',
@@ -701,14 +713,28 @@ export default function ImportMealPlanScreen() {
                   onPress={async () => {
                     try {
                       const reviewPrompt = await getMealPlanReviewPrompt();
-                      await Clipboard.setStringAsync(reviewPrompt);
-                      setReviewPromptCopied(true);
-                      setTimeout(() => {
-                        setReviewPromptCopied(false);
-                      }, 2000);
+                      
+                      try {
+                        await Clipboard.setStringAsync(reviewPrompt);
+                        setReviewPromptCopied(true);
+                        setTimeout(() => {
+                          setReviewPromptCopied(false);
+                        }, 2000);
+                      } catch (clipboardError) {
+                        console.error('Clipboard error:', clipboardError);
+                        Alert.alert(
+                          'Copy Failed',
+                          'Unable to copy review prompt to clipboard. Please try again.',
+                          [{ text: 'OK' }]
+                        );
+                      }
                     } catch (error) {
                       console.error('Error generating review prompt:', error);
-                      // Optionally show an error message to the user
+                      Alert.alert(
+                        'Error',
+                        'Unable to generate review prompt. Please try again.',
+                        [{ text: 'OK' }]
+                      );
                     }
                   }}
                   activeOpacity={0.8}
@@ -733,12 +759,21 @@ export default function ImportMealPlanScreen() {
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const prompt = generateJsonConversionPrompt();
-                    await Clipboard.setStringAsync(prompt);
-                    setAiPromptCopied(true);
-                    setTimeout(() => {
-                      setAiPromptCopied(false);
-                    }, 2000);
+                    try {
+                      const prompt = generateJsonConversionPrompt();
+                      await Clipboard.setStringAsync(prompt);
+                      setAiPromptCopied(true);
+                      setTimeout(() => {
+                        setAiPromptCopied(false);
+                      }, 2000);
+                    } catch (clipboardError) {
+                      console.error('Clipboard error:', clipboardError);
+                      Alert.alert(
+                        'Copy Failed',
+                        'Unable to copy format request to clipboard. Please try again.',
+                        [{ text: 'OK' }]
+                      );
+                    }
                   }}
                   activeOpacity={0.8}
                 >
@@ -786,7 +821,7 @@ export default function ImportMealPlanScreen() {
             <View style={styles.bottomPadding} />
           </ScrollView>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -1435,7 +1470,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 20,
-    paddingTop: 10,
+    paddingTop: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#18181b',
   },

@@ -112,9 +112,21 @@ const WeightTrackerScreen: React.FC = () => {
       }
       
       if (stored) {
-        const history: WeightEntry[] = JSON.parse(stored);
-        console.log(`⚖️ [WEIGHT] Loaded ${history.length} weight entries from ${dataSource} storage`);
-        setWeightHistory(history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        try {
+          const history: WeightEntry[] = JSON.parse(stored);
+          
+          // Ensure history is an array before calling sort
+          if (Array.isArray(history)) {
+            console.log(`⚖️ [WEIGHT] Loaded ${history.length} weight entries from ${dataSource} storage`);
+            setWeightHistory(history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+          } else {
+            console.log('⚖️ [WEIGHT] Invalid weight history format - resetting to empty array');
+            setWeightHistory([]);
+          }
+        } catch (parseError) {
+          console.log('⚖️ [WEIGHT] Failed to parse weight history - resetting to empty array');
+          setWeightHistory([]);
+        }
       } else {
         console.log('⚖️ [WEIGHT] No weight history found');
       }

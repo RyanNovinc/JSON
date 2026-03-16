@@ -209,8 +209,21 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   }, [route?.params?.importedProgram, triggerFeedbackModal]);
 
   const loadRoutines = async () => {
-    const storedRoutines = await WorkoutStorage.loadRoutines();
-    setRoutines(storedRoutines);
+    console.log('📚 [HOMESCREEN] Loading routines from storage...');
+    try {
+      const storedRoutines = await WorkoutStorage.loadRoutines();
+      console.log('📚 [HOMESCREEN] Loaded routines:', storedRoutines.length);
+      setRoutines(storedRoutines);
+      
+      // If we have routines but they're not showing, this helps debug
+      if (storedRoutines.length > 0) {
+        console.log('📚 [HOMESCREEN] Routine names:', storedRoutines.map(r => r.name));
+      }
+    } catch (error) {
+      console.error('📚 [HOMESCREEN] Failed to load routines:', error);
+      // Ensure we set an empty array so UI renders properly
+      setRoutines([]);
+    }
   };
 
   const loadMyRoutines = async () => {
@@ -869,9 +882,12 @@ export default function HomeScreen({ route, transitionProgress }: any) {
 
 
   const renderContent = () => {
+    console.log('🎨 [HOMESCREEN] renderContent called, routines.length:', routines.length);
+    
     if (routines.length === 0) {
+      console.log('🎨 [HOMESCREEN] Rendering empty state');
       return (
-        <View style={styles.emptyState}>
+        <View style={[styles.emptyState, { backgroundColor: '#0a0a0b' }]}>
           <Ionicons name="barbell-outline" size={64} color="#3f3f46" />
           <Text style={styles.emptyTitle}>No Routines Yet</Text>
           <Text style={styles.emptyDescription}>

@@ -187,7 +187,21 @@ export class WorkoutStorage {
       await this.saveRoutines(routines);
       console.log(`✅ Successfully added routine: ${routine.name}`);
     } catch (error) {
-      console.error(`❌ Failed to add routine: ${routine.name}`, error);
+      console.error(`❌ Failed to add routine with RobustStorage: ${routine.name}`, error);
+      
+      // FALLBACK: Try simple AsyncStorage directly
+      try {
+        console.log('🔄 Attempting simple AsyncStorage fallback...');
+        const simpleRoutines = await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
+        const parsed = simpleRoutines ? JSON.parse(simpleRoutines) : [];
+        parsed.push(routine);
+        await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(parsed));
+        console.log(`✅ Successfully saved routine with simple storage fallback: ${routine.name}`);
+        return;
+      } catch (fallbackError) {
+        console.error('❌ Even simple storage failed:', fallbackError);
+      }
+      
       throw new Error(`Failed to save workout routine. Please check your device storage and try again.`);
     }
   }

@@ -1605,9 +1605,23 @@ export default function ImportRoutineScreen() {
         AsyncStorage.getItem('equipmentPreferencesData'),
       ]);
 
-      // Parse the JSON data
-      const fitnessGoals = fitnessGoalsData ? JSON.parse(fitnessGoalsData) : {};
-      const equipmentPrefs = equipmentPreferencesData ? JSON.parse(equipmentPreferencesData) : {};
+      // Parse the JSON data with better error handling
+      let fitnessGoals = {};
+      let equipmentPrefs = {};
+      
+      try {
+        fitnessGoals = fitnessGoalsData ? JSON.parse(fitnessGoalsData) : {};
+      } catch (parseError) {
+        console.error('Error parsing fitnessGoalsData:', parseError);
+        fitnessGoals = {};
+      }
+      
+      try {
+        equipmentPrefs = equipmentPreferencesData ? JSON.parse(equipmentPreferencesData) : {};
+      } catch (parseError) {
+        console.error('Error parsing equipmentPreferencesData:', parseError);
+        equipmentPrefs = {};
+      }
 
       // Consolidate all data into the expected QuestionnaireData format
       const consolidatedData: QuestionnaireData = {
@@ -1649,17 +1663,40 @@ export default function ImportRoutineScreen() {
         exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
       };
 
-      // Filter out undefined/null values
+      // Filter out undefined/null values and ensure data integrity
       const cleanedData = Object.fromEntries(
-        Object.entries(consolidatedData).filter(([key, value]) => value !== undefined && value !== null && value !== '')
+        Object.entries(consolidatedData).filter(([key, value]) => {
+          // More robust filtering for production
+          return value !== undefined && 
+                 value !== null && 
+                 value !== '' && 
+                 !(Array.isArray(value) && value.length === 0) &&
+                 !(typeof value === 'object' && Object.keys(value).length === 0);
+        })
       );
 
-      console.log('Consolidated questionnaire data:', cleanedData);
+      // Add basic defaults if critical data is missing
+      if (!cleanedData.primaryGoal) {
+        cleanedData.primaryGoal = 'build_muscle';
+      }
+      if (!cleanedData.selectedEquipment) {
+        cleanedData.selectedEquipment = ['commercial_gym'];
+      }
+      if (!cleanedData.trainingExperience) {
+        cleanedData.trainingExperience = 'intermediate';
+      }
+
       return cleanedData;
     } catch (error) {
       console.error('Error loading questionnaire data:', error);
-      // Return empty object if loading fails
-      return {};
+      // Return minimal viable data instead of empty object for production
+      return {
+        primaryGoal: 'build_muscle',
+        selectedEquipment: ['commercial_gym'],
+        trainingExperience: 'intermediate',
+        trainingApproach: 'balanced',
+        programDuration: '12_weeks'
+      };
     }
   };
 
@@ -1981,26 +2018,80 @@ export default function ImportRoutineScreen() {
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const questionnaireData = await loadQuestionnaireData();
-                    
-                    const notesInstruction = (() => {
-                      const detail = questionnaireData?.exerciseNoteDetail || 'brief';
-                      if (detail === 'detailed') {
-                        return '- Include detailed step-by-step form instructions for EVERY exercise in the notes field';
-                      } else if (detail === 'brief') {
-                        return '- Include brief coaching cues in the notes field for compound lifts only';
-                      } else {
-                        return '- Keep notes minimal — only include non-obvious technique tips or specific setup instructions';
+                    try {
+                      const questionnaireData = await loadQuestionnaireData();
+                      
+                      // Check if user has actually completed questionnaires (not just defaults)
+                      const hasRealData = questionnaireData && (
+                        (questionnaireData.primaryGoal && questionnaireData.primaryGoal !== 'build_muscle') ||
+                        (questionnaireData.selectedEquipment && !questionnaireData.selectedEquipment.includes('commercial_gym')) ||
+                        (questionnaireData.trainingExperience && questionnaireData.trainingExperience !== 'intermediate') ||
+                        questionnaireData.totalTrainingDays ||
+                        questionnaireData.workoutDuration ||
+                        questionnaireData.restTimePreference ||
+                        questionnaireData.programDuration && questionnaireData.programDuration !== '12_weeks'
+                      );
+                      
+                      if (!hasRealData) {
+                        Alert.alert(
+                          'Missing Data',
+                          'Please complete the fitness questionnaire first to generate a personalized workout prompt.',
+                          [{ text: 'OK' }]
+                        );
+                        return;
                       }
-                    })();
-                    
-                    const planningPrompt = assemblePlanningPrompt(questionnaireData);
-                    
-                    await Clipboard.setStringAsync(planningPrompt);
-                    setPlanningPromptCopied(true);
-                    setTimeout(() => {
-                      setPlanningPromptCopied(false);
-                    }, 2000);
+                      
+                      const notesInstruction = (() => {
+                        const detail = questionnaireData?.exerciseNoteDetail || 'brief';
+                        if (detail === 'detailed') {
+                          return '- Include detailed step-by-step form instructions for EVERY exercise in the notes field';
+                        } else if (detail === 'brief') {
+                          return '- Include brief coaching cues in the notes field for compound lifts only';
+                        } else {
+                          return '- Keep notes minimal — only include non-obvious technique tips or specific setup instructions';
+                        }
+                      })();
+                      
+                      let planningPrompt;
+                      try {
+                        planningPrompt = assemblePlanningPrompt(questionnaireData);
+                      } catch (promptError) {
+                        console.error('Error in assemblePlanningPrompt:', promptError);
+                        // Fallback: use basic prompt if advanced prompt fails
+                        planningPrompt = `# Basic Workout Planning Prompt
+
+Create a workout program based on the following information:
+- Goal: ${questionnaireData.primaryGoal || 'muscle building'}
+- Experience: ${questionnaireData.trainingExperience || 'intermediate'}
+- Equipment: ${(questionnaireData.selectedEquipment || ['commercial_gym']).join(', ')}
+- Training Approach: ${questionnaireData.trainingApproach || 'balanced'}
+
+Please design a complete workout program with exercises, sets, reps, and rest periods.`;
+                      }
+                      
+                      try {
+                        await Clipboard.setStringAsync(planningPrompt);
+                        setPlanningPromptCopied(true);
+                        setTimeout(() => {
+                          setPlanningPromptCopied(false);
+                        }, 2000);
+                      } catch (clipboardError) {
+                        console.error('Clipboard error:', clipboardError);
+                        Alert.alert(
+                          'Copy Failed',
+                          'Unable to copy to clipboard. Please try again or copy manually from the generated prompt.',
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    } catch (error) {
+                      console.error('Error generating prompt:', error);
+                      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                      Alert.alert(
+                        'Prompt Generation Error',
+                        `Failed to generate workout prompt: ${errorMessage}`,
+                        [{ text: 'OK' }]
+                      );
+                    }
                   }}
                   activeOpacity={0.8}
                 >
@@ -2138,11 +2229,20 @@ This check exists because the JSON generator must reconstruct complete exercise 
 2. Show a brief change log (bullet list of what you fixed and why).
 3. Present the COMPLETE CORRECTED PLAN — the full workout program document with all fixes applied, formatted cleanly. This must be a complete standalone document, not a diff or partial update.
 4. End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."`;
-                    await Clipboard.setStringAsync(reviewPrompt);
-                    setReviewPromptCopied(true);
-                    setTimeout(() => {
-                      setReviewPromptCopied(false);
-                    }, 2000);
+                    try {
+                      await Clipboard.setStringAsync(reviewPrompt);
+                      setReviewPromptCopied(true);
+                      setTimeout(() => {
+                        setReviewPromptCopied(false);
+                      }, 2000);
+                    } catch (clipboardError) {
+                      console.error('Clipboard error:', clipboardError);
+                      Alert.alert(
+                        'Copy Failed',
+                        'Unable to copy review prompt to clipboard. Please try again.',
+                        [{ text: 'OK' }]
+                      );
+                    }
                   }}
                   activeOpacity={0.8}
                 >
@@ -2166,13 +2266,32 @@ This check exists because the JSON generator must reconstruct complete exercise 
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
-                    const questionnaireData = await loadQuestionnaireData();
-                    const prompt = getAIPrompt(questionnaireData);
-                    await Clipboard.setStringAsync(prompt);
-                    setAiPromptCopied(true);
-                    setTimeout(() => {
-                      setAiPromptCopied(false);
-                    }, 2000);
+                    try {
+                      const questionnaireData = await loadQuestionnaireData();
+                      const prompt = getAIPrompt(questionnaireData);
+                      
+                      try {
+                        await Clipboard.setStringAsync(prompt);
+                        setAiPromptCopied(true);
+                        setTimeout(() => {
+                          setAiPromptCopied(false);
+                        }, 2000);
+                      } catch (clipboardError) {
+                        console.error('Clipboard error:', clipboardError);
+                        Alert.alert(
+                          'Copy Failed',
+                          'Unable to copy format request to clipboard. Please try again.',
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    } catch (error) {
+                      console.error('Error generating prompt:', error);
+                      Alert.alert(
+                        'Error',
+                        'Unable to generate format prompt. Please try again.',
+                        [{ text: 'OK' }]
+                      );
+                    }
                   }}
                   activeOpacity={0.8}
                 >

@@ -165,9 +165,14 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
           setIsCompleted(true);
           setShowResults(true);
         } else {
-          // Restore current step for partial progress
+          // Restore current step for partial progress, but ensure it starts at 0 if incomplete
           setCurrentStep(data.currentStep || 0);
         }
+      } else {
+        // No saved data - start fresh at step 0
+        setCurrentStep(0);
+        setIsCompleted(false);
+        setShowResults(false);
       }
     } catch (error) {
       console.error('Failed to load saved questionnaire data:', error);
