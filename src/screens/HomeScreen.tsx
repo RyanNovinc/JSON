@@ -12,6 +12,7 @@ import {
   Image,
   Dimensions,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
