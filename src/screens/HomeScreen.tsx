@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -85,10 +85,10 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   const [debugLogsCopied, setDebugLogsCopied] = useState(false);
   
   // Debug logging function that captures logs for production debugging
-  const debugLog = (message: string) => {
+  const debugLog = useCallback((message: string) => {
     console.log(message);
     setDebugLogs(prev => prev + `${new Date().toISOString()}: ${message}\n`);
-  };
+  }, []);
   const [savedWorkoutRoutines, setSavedWorkoutRoutines] = useState<Set<string>>(new Set());
   const [myRoutines, setMyRoutines] = useState<WorkoutRoutine[]>([]);
   const [renameModal, setRenameModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null; newName: string }>({
@@ -897,8 +897,17 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   };
 
 
+  const lastRenderRef = useRef({ routinesCount: -1, timestamp: 0 });
+  
   const renderContent = () => {
-    debugLog(`🎨 [HOMESCREEN] renderContent called, routines.length: ${routines.length}`);
+    const now = Date.now();
+    const routinesCount = routines.length;
+    
+    // Only log if routines count changed or it's been more than 5 seconds
+    if (lastRenderRef.current.routinesCount !== routinesCount || now - lastRenderRef.current.timestamp > 5000) {
+      debugLog(`🎨 [HOMESCREEN] renderContent called, routines.length: ${routinesCount}`);
+      lastRenderRef.current = { routinesCount, timestamp: now };
+    }
     
     if (routines.length === 0) {
       debugLog('🎨 [HOMESCREEN] Rendering empty state');
