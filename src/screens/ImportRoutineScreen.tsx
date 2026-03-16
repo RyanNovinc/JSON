@@ -2067,22 +2067,60 @@ export default function ImportRoutineScreen() {
                         console.error('Error stack:', promptError?.stack);
                         
                         // Capture error details for on-screen display
-                        const errorDetails = `PRODUCTION PROMPT GENERATION ERROR:
+                        const createErrorDetails = async () => {
+                          try {
+                            const rawFitnessData = await AsyncStorage.getItem('fitnessGoalsData');
+                            const rawEquipmentData = await AsyncStorage.getItem('equipmentPreferencesData');
+                            
+                            return `PRODUCTION PROMPT GENERATION ERROR:
 
 ERROR: ${promptError?.message || 'Unknown error'}
+ERROR TYPE: ${promptError?.name || 'Unknown'}
 
 ERROR STACK:
 ${promptError?.stack || 'No stack trace available'}
 
-QUESTIONNAIRE DATA:
+QUESTIONNAIRE DATA STRUCTURE:
 ${JSON.stringify(questionnaireData, null, 2)}
+
+QUESTIONNAIRE DATA VALIDATION:
+- primaryGoal type: ${typeof questionnaireData?.primaryGoal} (value: ${questionnaireData?.primaryGoal})
+- selectedEquipment type: ${typeof questionnaireData?.selectedEquipment}, isArray: ${Array.isArray(questionnaireData?.selectedEquipment)}
+- selectedEquipment value: ${JSON.stringify(questionnaireData?.selectedEquipment)}
+- integrationMethods type: ${typeof questionnaireData?.integrationMethods}
+- integrationMethods value: ${JSON.stringify(questionnaireData?.integrationMethods)}
+- cardioPreferences type: ${typeof questionnaireData?.cardioPreferences}, isArray: ${Array.isArray(questionnaireData?.cardioPreferences)}
+- priorityMuscleGroups type: ${typeof questionnaireData?.priorityMuscleGroups}, isArray: ${Array.isArray(questionnaireData?.priorityMuscleGroups)}
+- movementLimitations type: ${typeof questionnaireData?.movementLimitations}, isArray: ${Array.isArray(questionnaireData?.movementLimitations)}
+- likedExercises type: ${typeof questionnaireData?.likedExercises}, isArray: ${Array.isArray(questionnaireData?.likedExercises)}
+- dislikedExercises type: ${typeof questionnaireData?.dislikedExercises}, isArray: ${Array.isArray(questionnaireData?.dislikedExercises)}
+
+ASYNCSTORAGE RAW DATA:
+- fitnessGoalsData: ${rawFitnessData}
+- equipmentPreferencesData: ${rawEquipmentData}
 
 SYSTEM INFO:
 Platform: ${Platform.OS}
-Time: ${new Date().toISOString()}`;
+Version: ${Platform.Version}
+Time: ${new Date().toISOString()}
+Locale: ${Intl.DateTimeFormat().resolvedOptions().locale}`;
+                          } catch (logError) {
+                            return `PRODUCTION PROMPT GENERATION ERROR (LOGGING FAILED):
+
+ERROR: ${promptError?.message || 'Unknown error'}
+ERROR TYPE: ${promptError?.name || 'Unknown'}
+
+LOGGING ERROR: ${logError?.message}
+
+BASIC QUESTIONNAIRE DATA:
+${JSON.stringify(questionnaireData, null, 2)}`;
+                          }
+                        };
                         
-                        setErrorLogs(errorDetails);
-                        setShowErrorModal(true);
+                        createErrorDetails().then(errorDetails => {
+                          setErrorLogs(errorDetails);
+                          setShowErrorModal(true);
+                        });
                         
                         // Fallback: use basic prompt if advanced prompt fails
                         planningPrompt = `# Basic Workout Planning Prompt
