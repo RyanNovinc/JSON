@@ -77,6 +77,17 @@ export default function HomeScreen({ route, transitionProgress }: any) {
     visible: false,
     routine: null,
   });
+  
+  // Debug modal for production debugging
+  const [debugModal, setDebugModal] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string>('');
+  const [debugLogsCopied, setDebugLogsCopied] = useState(false);
+  
+  // Debug logging function that captures logs for production debugging
+  const debugLog = (message: string) => {
+    console.log(message);
+    setDebugLogs(prev => prev + `${new Date().toISOString()}: ${message}\n`);
+  };
   const [savedWorkoutRoutines, setSavedWorkoutRoutines] = useState<Set<string>>(new Set());
   const [myRoutines, setMyRoutines] = useState<WorkoutRoutine[]>([]);
   const [renameModal, setRenameModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null; newName: string }>({
@@ -209,18 +220,22 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   }, [route?.params?.importedProgram, triggerFeedbackModal]);
 
   const loadRoutines = async () => {
-    console.log('📚 [HOMESCREEN] Loading routines from storage...');
+    debugLog('📚 [HOMESCREEN] Loading routines from storage...');
     try {
       const storedRoutines = await WorkoutStorage.loadRoutines();
-      console.log('📚 [HOMESCREEN] Loaded routines:', storedRoutines.length);
+      debugLog(`📚 [HOMESCREEN] Loaded routines: ${storedRoutines.length}`);
+      debugLog(`📚 [HOMESCREEN] Routines data: ${JSON.stringify(storedRoutines, null, 2)}`);
       setRoutines(storedRoutines);
       
       // If we have routines but they're not showing, this helps debug
       if (storedRoutines.length > 0) {
-        console.log('📚 [HOMESCREEN] Routine names:', storedRoutines.map(r => r.name));
+        debugLog(`📚 [HOMESCREEN] Routine names: ${storedRoutines.map(r => r.name).join(', ')}`);
+      } else {
+        debugLog('📚 [HOMESCREEN] No routines found - should show empty state');
       }
     } catch (error) {
-      console.error('📚 [HOMESCREEN] Failed to load routines:', error);
+      debugLog(`📚 [HOMESCREEN] Failed to load routines: ${error?.message}`);
+      debugLog(`📚 [HOMESCREEN] Error stack: ${error?.stack}`);
       // Ensure we set an empty array so UI renders properly
       setRoutines([]);
     }
@@ -882,10 +897,10 @@ export default function HomeScreen({ route, transitionProgress }: any) {
 
 
   const renderContent = () => {
-    console.log('🎨 [HOMESCREEN] renderContent called, routines.length:', routines.length);
+    debugLog(`🎨 [HOMESCREEN] renderContent called, routines.length: ${routines.length}`);
     
     if (routines.length === 0) {
-      console.log('🎨 [HOMESCREEN] Rendering empty state');
+      debugLog('🎨 [HOMESCREEN] Rendering empty state');
       return (
         <View style={[styles.emptyState, { backgroundColor: '#0a0a0b' }]}>
           <Ionicons name="barbell-outline" size={64} color="#3f3f46" />
@@ -1120,6 +1135,20 @@ export default function HomeScreen({ route, transitionProgress }: any) {
       >
         {renderContent()}
       </Animated.View>
+
+      {/* Debug Button - Above Calendar Button */}
+      <View style={[styles.debugButton, { backgroundColor: '#ff6b6b' }]}>
+        <TouchableOpacity
+          style={styles.buttonInner}
+          onPress={() => {
+            debugLog('🐛 [DEBUG] Debug button pressed, opening debug modal...');
+            setDebugModal(true);
+          }}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="bug-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       {/* Calendar Button - Bottom Left */}
       <View style={[styles.calendarButton, { backgroundColor: themeColor }]}>
@@ -1494,6 +1523,66 @@ export default function HomeScreen({ route, transitionProgress }: any) {
         </View>
       </Modal>
 
+      {/* Debug Modal for Production Debugging */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={debugModal}
+        onRequestClose={() => setDebugModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.debugModalContainer}>
+            <View style={styles.debugModalHeader}>
+              <Text style={styles.debugModalTitle}>Production Debug Logs</Text>
+              <TouchableOpacity 
+                onPress={() => setDebugModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={28} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.debugLogsContainer}>
+              <Text style={styles.debugLogsText}>{debugLogs || 'No logs captured yet...'}</Text>
+            </ScrollView>
+            
+            <View style={styles.debugButtonsRow}>
+              <TouchableOpacity 
+                style={[styles.debugModalButton, { backgroundColor: '#10b981' }]}
+                onPress={() => {
+                  debugLog('🔄 [DEBUG] Manually triggering loadRoutines...');
+                  loadRoutines();
+                }}
+              >
+                <Ionicons name="refresh" size={20} color="#fff" />
+                <Text style={styles.debugButtonText}>Reload Data</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.debugModalButton, { backgroundColor: debugLogsCopied ? '#10b981' : '#3b82f6' }]}
+                onPress={async () => {
+                  try {
+                    await Clipboard.setStringAsync(debugLogs);
+                    setDebugLogsCopied(true);
+                    setTimeout(() => setDebugLogsCopied(false), 2000);
+                  } catch (error) {
+                    debugLog(`❌ Failed to copy logs: ${error?.message}`);
+                  }
+                }}
+              >
+                <Ionicons 
+                  name={debugLogsCopied ? "checkmark" : "copy-outline"} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <Text style={styles.debugButtonText}>
+                  {debugLogsCopied ? 'Copied!' : 'Copy Logs'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Onboarding Slideshow */}
       <OnboardingSlideshow
@@ -2792,5 +2881,94 @@ const styles = StyleSheet.create({
     color: '#71717a',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  
+  // Debug styles
+  debugButton: {
+    position: 'absolute',
+    bottom: 150, // Above the calendar button (which is at bottom: 80)
+    left: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  
+  debugModalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    margin: 20,
+    maxHeight: '80%',
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  
+  debugModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  
+  debugModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0a0a0b',
+  },
+  
+  debugLogsContainer: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 20,
+    maxHeight: 400,
+  },
+  
+  debugLogsText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    color: '#0a0a0b',
+    lineHeight: 14,
+  },
+  
+  debugButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  
+  debugModalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  
+  debugButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
