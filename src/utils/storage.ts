@@ -172,10 +172,21 @@ export class WorkoutStorage {
 
   static async loadRoutines(): Promise<WorkoutRoutine[]> {
     try {
-      const data = await RobustStorage.getItem(STORAGE_KEYS.ROUTINES, true) || await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
-      return data ? JSON.parse(data) : [];
+      console.log('🔄 [STORAGE] Attempting to load routines...');
+      const robustData = await RobustStorage.getItem(STORAGE_KEYS.ROUTINES, true);
+      console.log('🔄 [STORAGE] RobustStorage result:', robustData ? 'Has data' : 'No data');
+      
+      const fallbackData = await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
+      console.log('🔄 [STORAGE] AsyncStorage fallback result:', fallbackData ? 'Has data' : 'No data');
+      
+      const data = robustData || fallbackData;
+      console.log('🔄 [STORAGE] Final data to parse:', data ? 'Has data' : 'No data');
+      
+      const result = data ? JSON.parse(data) : [];
+      console.log('🔄 [STORAGE] Parsed routines count:', result.length);
+      return result;
     } catch (error) {
-      console.error('Failed to load routines:', error);
+      console.error('❌ [STORAGE] Failed to load routines:', error);
       return [];
     }
   }
