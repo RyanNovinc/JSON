@@ -1134,21 +1134,23 @@ export default function HomeScreen({ route, transitionProgress }: any) {
         {renderContent()}
       </Animated.View>
 
-      {/* Debug Button - Above Calendar Button */}
-      <View style={[styles.debugButton, { backgroundColor: '#ff6b6b' }]}>
-        <TouchableOpacity
-          style={styles.buttonInner}
-          onPress={() => {
-            debugLog('🐛 [DEBUG] Debug button pressed, opening debug modal...');
-            debugLog(`🎨 [HOMESCREEN] Current routines.length: ${routines.length}`);
-            debugLog(`🎨 [HOMESCREEN] Current state: ${routines.length === 0 ? 'Should show empty state' : `${routines.length} routines loaded`}`);
-            setDebugModal(true);
-          }}
-          activeOpacity={0.9}
-        >
-          <Ionicons name="bug-outline" size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {/* Debug Button - Above Calendar Button (Development Only) */}
+      {__DEV__ && (
+        <View style={[styles.debugButton, { backgroundColor: '#ff6b6b' }]}>
+          <TouchableOpacity
+            style={styles.buttonInner}
+            onPress={() => {
+              debugLog('🐛 [DEBUG] Debug button pressed, opening debug modal...');
+              debugLog(`🎨 [HOMESCREEN] Current routines.length: ${routines.length}`);
+              debugLog(`🎨 [HOMESCREEN] Current state: ${routines.length === 0 ? 'Should show empty state' : `${routines.length} routines loaded`}`);
+              setDebugModal(true);
+            }}
+            activeOpacity={0.9}
+          >
+            <Ionicons name="bug-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Calendar Button - Bottom Left */}
       <View style={[styles.calendarButton, { backgroundColor: themeColor }]}>
