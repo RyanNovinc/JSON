@@ -1526,70 +1526,81 @@ export default function HomeScreen({ route, transitionProgress }: any) {
       {/* Debug Modal for Production Debugging */}
       <Modal
         animationType="slide"
-        transparent={true}
+        transparent={false}
         visible={debugModal}
         onRequestClose={() => setDebugModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.debugModalContainer}>
-            <View style={styles.debugModalHeader}>
-              <Text style={styles.debugModalTitle}>Production Debug Logs</Text>
-              <TouchableOpacity 
-                onPress={() => setDebugModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={28} color="#71717a" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.debugLogsContainer}>
-              <Text style={styles.debugLogsText}>{debugLogs || 'No logs captured yet...'}</Text>
-            </ScrollView>
-            
-            <View style={styles.debugButtonsRow}>
-              <TouchableOpacity 
-                style={[styles.debugModalButton, { backgroundColor: '#10b981' }]}
-                onPress={async () => {
-                  debugLog('🔄 [DEBUG] Manually triggering loadRoutines...');
-                  debugLog(`🔄 [DEBUG] Before reload - routines.length: ${routines.length}`);
-                  
-                  // Clear current state first
-                  setRoutines([]);
-                  debugLog('🔄 [DEBUG] Cleared routines state');
-                  
-                  // Trigger reload
-                  await loadRoutines();
-                  
-                  debugLog(`🔄 [DEBUG] After reload - routines.length: ${routines.length}`);
-                  debugLog('🔄 [DEBUG] Manual reload completed');
-                }}
-              >
-                <Ionicons name="refresh" size={20} color="#fff" />
-                <Text style={styles.debugButtonText}>Reload Data</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.debugModalButton, { backgroundColor: debugLogsCopied ? '#10b981' : '#3b82f6' }]}
-                onPress={async () => {
-                  try {
-                    await Clipboard.setStringAsync(debugLogs);
-                    setDebugLogsCopied(true);
-                    setTimeout(() => setDebugLogsCopied(false), 2000);
-                  } catch (error) {
-                    debugLog(`❌ Failed to copy logs: ${error?.message}`);
-                  }
-                }}
-              >
-                <Ionicons 
-                  name={debugLogsCopied ? "checkmark" : "copy-outline"} 
-                  size={20} 
-                  color="#fff" 
-                />
-                <Text style={styles.debugButtonText}>
-                  {debugLogsCopied ? 'Copied!' : 'Copy Logs'}
+        <View style={styles.debugFullscreenContainer}>
+          {/* Header */}
+          <View style={styles.debugHeader}>
+            <Text style={styles.debugHeaderTitle}>Debug Console</Text>
+            <TouchableOpacity 
+              onPress={() => setDebugModal(false)}
+              style={styles.debugCloseButton}
+            >
+              <Ionicons name="close" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Content */}
+          <View style={styles.debugContent}>
+            <View style={styles.debugSection}>
+              <Text style={styles.debugSectionTitle}>Production Logs</Text>
+              <ScrollView style={styles.debugScrollContainer}>
+                <Text style={styles.debugText}>
+                  {debugLogs || 'No logs captured yet. Tap "Reload Data" to capture storage logs.'}
                 </Text>
-              </TouchableOpacity>
+              </ScrollView>
             </View>
+          </View>
+          
+          {/* Actions */}
+          <View style={styles.debugActions}>
+            <TouchableOpacity 
+              style={styles.debugReloadButton}
+              onPress={async () => {
+                debugLog('🔄 [DEBUG] Manually triggering loadRoutines...');
+                debugLog(`🔄 [DEBUG] Before reload - routines.length: ${routines.length}`);
+                
+                // Clear current state first
+                setRoutines([]);
+                debugLog('🔄 [DEBUG] Cleared routines state');
+                
+                // Trigger reload
+                await loadRoutines();
+                
+                debugLog(`🔄 [DEBUG] After reload - routines.length: ${routines.length}`);
+                debugLog('🔄 [DEBUG] Manual reload completed');
+              }}
+            >
+              <Ionicons name="refresh" size={18} color="#ffffff" />
+              <Text style={styles.debugButtonLabel}>Reload Data</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.debugCopyButton,
+                { backgroundColor: debugLogsCopied ? '#10b981' : '#3b82f6' }
+              ]}
+              onPress={async () => {
+                try {
+                  await Clipboard.setStringAsync(debugLogs);
+                  setDebugLogsCopied(true);
+                  setTimeout(() => setDebugLogsCopied(false), 2000);
+                } catch (error) {
+                  debugLog(`❌ Failed to copy logs: ${error?.message}`);
+                }
+              }}
+            >
+              <Ionicons 
+                name={debugLogsCopied ? "checkmark" : "copy-outline"} 
+                size={18} 
+                color="#ffffff" 
+              />
+              <Text style={styles.debugButtonLabel}>
+                {debugLogsCopied ? 'Copied!' : 'Copy Logs'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -2910,75 +2921,100 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   
-  modalOverlay: {
+  debugFullscreenContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: '#1a1a1a',
   },
   
-  debugModalContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    margin: 20,
-    maxHeight: '80%',
-    width: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  
-  debugModalHeader: {
+  debugHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: '#2a2a2a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3a3a3a',
   },
   
-  debugModalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0a0a0b',
+  debugHeaderTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   
-  debugLogsContainer: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
+  debugCloseButton: {
+    padding: 8,
+    backgroundColor: '#404040',
     borderRadius: 8,
-    padding: 15,
-    marginBottom: 20,
-    maxHeight: 400,
   },
   
-  debugLogsText: {
-    fontSize: 10,
-    fontFamily: 'monospace',
-    color: '#0a0a0b',
-    lineHeight: 14,
+  debugContent: {
+    flex: 1,
+    padding: 20,
   },
   
-  debugButtonsRow: {
+  debugSection: {
+    flex: 1,
+  },
+  
+  debugSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#cccccc',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  
+  debugScrollContainer: {
+    flex: 1,
+    backgroundColor: '#0f0f0f',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  
+  debugText: {
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#00ff00',
+    lineHeight: 18,
+  },
+  
+  debugActions: {
     flexDirection: 'row',
-    gap: 10,
+    padding: 20,
+    paddingTop: 0,
+    gap: 12,
   },
   
-  debugModalButton: {
+  debugReloadButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    backgroundColor: '#10b981',
+    paddingVertical: 16,
+    borderRadius: 12,
     gap: 8,
   },
   
-  debugButtonText: {
-    fontSize: 14,
+  debugCopyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  
+  debugButtonLabel: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: '#ffffff',
   },
 });
