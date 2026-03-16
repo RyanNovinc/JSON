@@ -897,20 +897,8 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   };
 
 
-  const lastRenderRef = useRef({ routinesCount: -1, timestamp: 0 });
-  
   const renderContent = () => {
-    const now = Date.now();
-    const routinesCount = routines.length;
-    
-    // Only log if routines count changed or it's been more than 5 seconds
-    if (lastRenderRef.current.routinesCount !== routinesCount || now - lastRenderRef.current.timestamp > 5000) {
-      debugLog(`🎨 [HOMESCREEN] renderContent called, routines.length: ${routinesCount}`);
-      lastRenderRef.current = { routinesCount, timestamp: now };
-    }
-    
     if (routines.length === 0) {
-      debugLog('🎨 [HOMESCREEN] Rendering empty state');
       return (
         <View style={[styles.emptyState, { backgroundColor: '#0a0a0b' }]}>
           <Ionicons name="barbell-outline" size={64} color="#3f3f46" />
@@ -1152,6 +1140,8 @@ export default function HomeScreen({ route, transitionProgress }: any) {
           style={styles.buttonInner}
           onPress={() => {
             debugLog('🐛 [DEBUG] Debug button pressed, opening debug modal...');
+            debugLog(`🎨 [HOMESCREEN] Current routines.length: ${routines.length}`);
+            debugLog(`🎨 [HOMESCREEN] Current state: ${routines.length === 0 ? 'Should show empty state' : `${routines.length} routines loaded`}`);
             setDebugModal(true);
           }}
           activeOpacity={0.9}
@@ -1559,9 +1549,19 @@ export default function HomeScreen({ route, transitionProgress }: any) {
             <View style={styles.debugButtonsRow}>
               <TouchableOpacity 
                 style={[styles.debugModalButton, { backgroundColor: '#10b981' }]}
-                onPress={() => {
+                onPress={async () => {
                   debugLog('🔄 [DEBUG] Manually triggering loadRoutines...');
-                  loadRoutines();
+                  debugLog(`🔄 [DEBUG] Before reload - routines.length: ${routines.length}`);
+                  
+                  // Clear current state first
+                  setRoutines([]);
+                  debugLog('🔄 [DEBUG] Cleared routines state');
+                  
+                  // Trigger reload
+                  await loadRoutines();
+                  
+                  debugLog(`🔄 [DEBUG] After reload - routines.length: ${routines.length}`);
+                  debugLog('🔄 [DEBUG] Manual reload completed');
                 }}
               >
                 <Ionicons name="refresh" size={20} color="#fff" />
