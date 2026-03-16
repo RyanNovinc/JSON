@@ -10,6 +10,7 @@ import {
   Animated,
   Linking,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
@@ -60,6 +61,11 @@ export default function ImportRoutineScreen() {
   const [showPlanInput, setShowPlanInput] = useState(false);
   const [planInputCopied, setPlanInputCopied] = useState(false);
   const [roadmapSaved, setRoadmapSaved] = useState(false);
+
+  // Error logging modal state
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorLogs, setErrorLogs] = useState<string>('');
+  const [errorLogsCopied, setErrorLogsCopied] = useState(false);
 
   // Handle schema version migration on component mount
   useEffect(() => {
@@ -2059,6 +2065,25 @@ export default function ImportRoutineScreen() {
                         console.error('Error in assemblePlanningPrompt:', promptError);
                         console.error('QuestionnaireData that caused error:', JSON.stringify(questionnaireData, null, 2));
                         console.error('Error stack:', promptError?.stack);
+                        
+                        // Capture error details for on-screen display
+                        const errorDetails = `PRODUCTION PROMPT GENERATION ERROR:
+
+ERROR: ${promptError?.message || 'Unknown error'}
+
+ERROR STACK:
+${promptError?.stack || 'No stack trace available'}
+
+QUESTIONNAIRE DATA:
+${JSON.stringify(questionnaireData, null, 2)}
+
+SYSTEM INFO:
+Platform: ${Platform.OS}
+Time: ${new Date().toISOString()}`;
+                        
+                        setErrorLogs(errorDetails);
+                        setShowErrorModal(true);
+                        
                         // Fallback: use basic prompt if advanced prompt fails
                         planningPrompt = `# Basic Workout Planning Prompt
 
@@ -2653,6 +2678,54 @@ This check exists because the JSON generator must reconstruct complete exercise 
           </Animated.View>
         </Animated.View>
       </Modal>
+
+      {/* Error Logs Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showErrorModal}
+        onRequestClose={() => setShowErrorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.errorModalContainer}>
+            <View style={styles.errorModalHeader}>
+              <Text style={styles.errorModalTitle}>Production Error Logs</Text>
+              <TouchableOpacity 
+                onPress={() => setShowErrorModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={28} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.errorLogsContainer}>
+              <Text style={styles.errorLogsText}>{errorLogs}</Text>
+            </ScrollView>
+            
+            <TouchableOpacity 
+              style={[styles.copyButton, { backgroundColor: errorLogsCopied ? '#10b981' : themeColor }]}
+              onPress={async () => {
+                try {
+                  await Clipboard.setStringAsync(errorLogs);
+                  setErrorLogsCopied(true);
+                  setTimeout(() => setErrorLogsCopied(false), 2000);
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to copy error logs');
+                }
+              }}
+            >
+              <Ionicons 
+                name={errorLogsCopied ? "checkmark" : "copy-outline"} 
+                size={20} 
+                color="#fff" 
+              />
+              <Text style={styles.copyButtonText}>
+                {errorLogsCopied ? 'Copied!' : 'Copy Error Logs'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -3209,5 +3282,64 @@ const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 14,
     color: '#a1a1aa',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  errorModalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    margin: 20,
+    maxHeight: '80%',
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  errorModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  errorModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0a0a0b',
+  },
+  errorLogsContainer: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 20,
+    maxHeight: 400,
+  },
+  errorLogsText: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: '#0a0a0b',
+    lineHeight: 18,
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    gap: 8,
+  },
+  copyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
