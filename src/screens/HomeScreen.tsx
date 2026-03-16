@@ -30,6 +30,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { ENABLE_NUTRITION_PAYWALL } from '../config/revenueCatConfig';
 import { useAppMode } from '../contexts/AppModeContext';
 import { useHasNutritionAccess } from '../contexts/RevenueCatContext';
+import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -68,7 +69,10 @@ function RoutineCard({ routine, onExport, onPress, onLongPress, isPinkTheme, the
 
 export default function HomeScreen({ route, transitionProgress }: any) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const [routines, setRoutines] = useState<WorkoutRoutine[]>([]);
+  
+  // NEW: Use WorkoutRoutineContext instead of local state
+  const { routines, isLoading, saveRoutine, deleteRoutine: deleteRoutineFromContext, loadRoutines } = useWorkoutRoutines();
+  
   const [shareModal, setShareModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null }>({
     visible: false,
     routine: null,
@@ -112,8 +116,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
       // Clean up any corrupted completion data on app start
       await WorkoutStorage.cleanupCorruptedCompletionData();
       
-      // Load app data
-      loadRoutines();
+      // Load my routines (context handles main routines automatically)
       loadMyRoutines();
     };
     
@@ -193,7 +196,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
           programId: program.programId, // Link to mesocycle program if applicable
           mesocycleNumber, // which mesocycle this routine belongs to
         };
-        addRoutine(newRoutine);
+        await saveRoutine(newRoutine);
         
         // If this routine is part of a mesocycle program, update the program's routine list
         if (program.programId) {
@@ -220,27 +223,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
     handleImportedProgram();
   }, [route?.params?.importedProgram, triggerFeedbackModal]);
 
-  const loadRoutines = async () => {
-    debugLog('📚 [HOMESCREEN] Loading routines from storage...');
-    try {
-      const storedRoutines = await WorkoutStorage.loadRoutines();
-      debugLog(`📚 [HOMESCREEN] Loaded routines: ${storedRoutines.length}`);
-      debugLog(`📚 [HOMESCREEN] Routines data: ${JSON.stringify(storedRoutines, null, 2)}`);
-      setRoutines(storedRoutines);
-      
-      // If we have routines but they're not showing, this helps debug
-      if (storedRoutines.length > 0) {
-        debugLog(`📚 [HOMESCREEN] Routine names: ${storedRoutines.map(r => r.name).join(', ')}`);
-      } else {
-        debugLog('📚 [HOMESCREEN] No routines found - should show empty state');
-      }
-    } catch (error) {
-      debugLog(`📚 [HOMESCREEN] Failed to load routines: ${error?.message}`);
-      debugLog(`📚 [HOMESCREEN] Error stack: ${error?.stack}`);
-      // Ensure we set an empty array so UI renders properly
-      setRoutines([]);
-    }
-  };
+  // loadRoutines function removed - now handled by WorkoutRoutineContext
 
   const loadMyRoutines = async () => {
     console.log('📥 Loading my routines...');
@@ -263,20 +246,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
     console.log('📥 Saved routine IDs:', Array.from(routineIds));
   };
 
-  const addRoutine = async (routine: WorkoutRoutine) => {
-    try {
-      await WorkoutStorage.addRoutine(routine);
-      setRoutines(prev => [...prev, routine]);
-      console.log(`✅ Routine added to HomeScreen state: ${routine.name}`);
-    } catch (error) {
-      console.error('❌ Failed to add routine in HomeScreen:', error);
-      Alert.alert(
-        'Import Failed',
-        'Failed to save your workout routine. Please check your device storage and try again.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
+  // addRoutine function removed - now using saveRoutine from context directly
 
   const handleExport = (routine: WorkoutRoutine) => {
     if (!routine.data) return;
@@ -662,8 +632,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
     if (!routine) return;
 
     try {
-      await WorkoutStorage.removeRoutine(routine.id);
-      setRoutines(prev => prev.filter(r => r.id !== routine.id));
+      await deleteRoutineFromContext(routine.id);
       setDeleteModal({ visible: false, routine: null });
     } catch (error) {
       console.error('Failed to delete routine:', error);
@@ -1561,18 +1530,14 @@ export default function HomeScreen({ route, transitionProgress }: any) {
             <TouchableOpacity 
               style={styles.debugReloadButton}
               onPress={async () => {
-                debugLog('🔄 [DEBUG] Manually triggering loadRoutines...');
+                debugLog('🔄 [DEBUG] Manually triggering context loadRoutines...');
                 debugLog(`🔄 [DEBUG] Before reload - routines.length: ${routines.length}`);
                 
-                // Clear current state first
-                setRoutines([]);
-                debugLog('🔄 [DEBUG] Cleared routines state');
-                
-                // Trigger reload
+                // Trigger context reload
                 await loadRoutines();
                 
                 debugLog(`🔄 [DEBUG] After reload - routines.length: ${routines.length}`);
-                debugLog('🔄 [DEBUG] Manual reload completed');
+                debugLog('🔄 [DEBUG] Context reload completed');
               }}
             >
               <Ionicons name="refresh" size={18} color="#ffffff" />
