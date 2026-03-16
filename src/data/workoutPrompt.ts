@@ -111,12 +111,12 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   }
 
   // Specific Details
-  if (data.specificSport) specs += `**Specific Sport:** ${data.specificSport}\n`;
-  if (data.athleticPerformanceDetails) specs += `**Athletic Performance Focus:** ${data.athleticPerformanceDetails}\n`;
-  if (data.funSocialDetails) specs += `**Fun/Social Activities:** ${data.funSocialDetails}\n`;
-  if (data.injuryPreventionDetails) specs += `**Injury Prevention Focus:** ${data.injuryPreventionDetails}\n`;
-  if (data.flexibilityDetails) specs += `**Flexibility Goals:** ${data.flexibilityDetails}\n`;
-  if (data.customGoals) specs += `**Additional Goals:** ${data.customGoals}\n`;
+  if (data.specificSport && typeof data.specificSport === 'string') specs += `**Specific Sport:** ${data.specificSport}\n`;
+  if (data.athleticPerformanceDetails && typeof data.athleticPerformanceDetails === 'string') specs += `**Athletic Performance Focus:** ${data.athleticPerformanceDetails}\n`;
+  if (data.funSocialDetails && typeof data.funSocialDetails === 'string') specs += `**Fun/Social Activities:** ${data.funSocialDetails}\n`;
+  if (data.injuryPreventionDetails && typeof data.injuryPreventionDetails === 'string') specs += `**Injury Prevention Focus:** ${data.injuryPreventionDetails}\n`;
+  if (data.flexibilityDetails && typeof data.flexibilityDetails === 'string') specs += `**Flexibility Goals:** ${data.flexibilityDetails}\n`;
+  if (data.customGoals && typeof data.customGoals === 'string') specs += `**Additional Goals:** ${data.customGoals}\n`;
 
   // Training Schedule
   if (data.totalTrainingDays) {
@@ -149,13 +149,13 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
         const activityMap: { [key: string]: string } = {
           'include_cardio': 'cardiovascular training',
           'maintain_flexibility': 'flexibility/mobility work',
-          'athletic_performance': data.athleticPerformanceDetails 
+          'athletic_performance': data.athleticPerformanceDetails && typeof data.athleticPerformanceDetails === 'string'
             ? `athletic performance training (${data.athleticPerformanceDetails})` 
             : 'athletic performance training',
-          'injury_prevention': data.injuryPreventionDetails
+          'injury_prevention': data.injuryPreventionDetails && typeof data.injuryPreventionDetails === 'string'
             ? `injury prevention work (${data.injuryPreventionDetails})`
             : 'injury prevention exercises',
-          'fun_social': data.funSocialDetails
+          'fun_social': data.funSocialDetails && typeof data.funSocialDetails === 'string'
             ? `recreational activities (${data.funSocialDetails})`
             : 'fun & social activities',
           'custom_secondary': data.customSecondaryGoal?.toLowerCase() || 'custom focus'
@@ -216,7 +216,7 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   }
 
   // Cardio Preferences (only when include_cardio is selected)
-  if (data.integrationMethods?.['include_cardio'] && data.cardioPreferences && data.cardioPreferences.length > 0) {
+  if (data.integrationMethods?.['include_cardio'] && data.cardioPreferences && Array.isArray(data.cardioPreferences) && data.cardioPreferences.length > 0) {
     const cardioMap: { [key: string]: string } = {
       'treadmill': 'Treadmill / Indoor Running',
       'stationary_bike': 'Stationary Bike / Cycling',
@@ -233,29 +233,29 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   }
 
   // Priority Muscle Groups
-  if (data.priorityMuscleGroups && data.priorityMuscleGroups.length > 0) {
+  if (data.priorityMuscleGroups && Array.isArray(data.priorityMuscleGroups) && data.priorityMuscleGroups.length > 0) {
     specs += `\n**Priority Muscle Groups:** ${data.priorityMuscleGroups.join(', ')}\n`;
-    if (data.customMuscleGroup) specs += `**Custom Muscle Group:** ${data.customMuscleGroup}\n`;
+    if (data.customMuscleGroup && typeof data.customMuscleGroup === 'string') specs += `**Custom Muscle Group:** ${data.customMuscleGroup}\n`;
   }
 
   // Movement Limitations
-  if (data.movementLimitations && data.movementLimitations.length > 0) {
+  if (data.movementLimitations && Array.isArray(data.movementLimitations) && data.movementLimitations.length > 0) {
     // Filter out "Other" since custom limitation field captures the specific details
     const filteredLimitations = data.movementLimitations.filter(limitation => limitation !== 'Other');
     if (filteredLimitations.length > 0) {
       specs += `\n**Movements to Avoid:** ${filteredLimitations.join(', ')}\n`;
     }
-    if (data.customLimitation) specs += `**Custom Limitation to Avoid:** ${data.customLimitation}\n`;
+    if (data.customLimitation && typeof data.customLimitation === 'string') specs += `**Custom Limitation to Avoid:** ${data.customLimitation}\n`;
   }
 
   // Training style preference (if provided)
-  if (data.trainingStylePreference) specs += `**Training Style:** ${data.trainingStylePreference}\n`;
+  if (data.trainingStylePreference && typeof data.trainingStylePreference === 'string') specs += `**Training Style:** ${data.trainingStylePreference}\n`;
   
   // Custom training style details (if provided)
-  if (data.customTrainingStyle) specs += `**Custom Training Style:** ${data.customTrainingStyle}\n`;
+  if (data.customTrainingStyle && typeof data.customTrainingStyle === 'string') specs += `**Custom Training Style:** ${data.customTrainingStyle}\n`;
 
   // Equipment & Session Preferences
-  if (data.selectedEquipment && data.selectedEquipment.length > 0) {
+  if (data.selectedEquipment && Array.isArray(data.selectedEquipment) && data.selectedEquipment.length > 0) {
     const equipmentMap: { [key: string]: string } = {
       'commercial_gym': 'Commercial Gym (full equipment access including barbells, dumbbells, cables, machines)',
       'home_gym': 'Home Gym (personal equipment setup)',
@@ -265,8 +265,8 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
     const mappedEquipment = data.selectedEquipment.map(eq => equipmentMap[eq] || eq);
     specs += `\n**Available Equipment:** ${mappedEquipment.join(', ')}\n`;
   }
-  if (data.specificEquipment) specs += `**Specific Equipment Notes:** ${data.specificEquipment}\n`;
-  if (data.unavailableEquipment && data.unavailableEquipment.length > 0) {
+  if (data.specificEquipment && typeof data.specificEquipment === 'string') specs += `**Specific Equipment Notes:** ${data.specificEquipment}\n`;
+  if (data.unavailableEquipment && Array.isArray(data.unavailableEquipment) && data.unavailableEquipment.length > 0) {
     specs += `**Equipment to Avoid:** ${data.unavailableEquipment.join(', ')}\n`;
   }
   // Handle workout duration (including AI optimization case)
@@ -290,21 +290,21 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   }
 
   // Exercise Preferences
-  if (data.likedExercises && data.likedExercises.length > 0) {
+  if (data.likedExercises && Array.isArray(data.likedExercises) && data.likedExercises.length > 0) {
     specs += `\n**Preferred Exercises:** ${data.likedExercises.join(', ')}\n`;
   }
-  if (data.dislikedExercises && data.dislikedExercises.length > 0) {
+  if (data.dislikedExercises && Array.isArray(data.dislikedExercises) && data.dislikedExercises.length > 0) {
     specs += `**Exercises to Avoid:** ${data.dislikedExercises.join(', ')}\n`;
   }
 
   // Exercise Note Detail
-  if (data.exerciseNoteDetail) {
-    const detailLabels = {
+  if (data.exerciseNoteDetail && typeof data.exerciseNoteDetail === 'string') {
+    const detailLabels: { [key: string]: string } = {
       'detailed': 'Include detailed step-by-step form instructions for every exercise',
       'brief': 'Include brief coaching cues for compound lifts only',
       'minimal': 'Only include non-obvious technique tips or specific setup instructions — do not explain standard exercises'
     };
-    specs += `**Exercise Note Detail:** ${detailLabels[data.exerciseNoteDetail]}\n`;
+    specs += `**Exercise Note Detail:** ${detailLabels[data.exerciseNoteDetail] || data.exerciseNoteDetail}\n`;
   }
 
   if (data.includeDirectCore !== undefined) {

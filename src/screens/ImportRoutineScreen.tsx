@@ -2057,6 +2057,8 @@ export default function ImportRoutineScreen() {
                         planningPrompt = assemblePlanningPrompt(questionnaireData);
                       } catch (promptError) {
                         console.error('Error in assemblePlanningPrompt:', promptError);
+                        console.error('QuestionnaireData that caused error:', JSON.stringify(questionnaireData, null, 2));
+                        console.error('Error stack:', promptError?.stack);
                         // Fallback: use basic prompt if advanced prompt fails
                         planningPrompt = `# Basic Workout Planning Prompt
 
