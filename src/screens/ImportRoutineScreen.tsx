@@ -25,6 +25,7 @@ import { ProgramStorage, Program, MesocyclePhase } from '../data/programStorage'
 import { extractMesocycleSummary } from '../data/mesocycleExtractor';
 import { WorkoutStorage } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from '../utils/robustStorage';
 // import * as Crypto from 'expo-crypto';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutProgram, Exercise } from '../types/workout';
@@ -52,6 +53,7 @@ export default function ImportRoutineScreen() {
   const [successScale] = useState(new Animated.Value(0));
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
+  const [outputPreference, setOutputPreference] = useState<'copy_paste' | 'save_import'>('copy_paste');
   const [uploadMode, setUploadMode] = useState(false);
 
   // Mesocycle state
@@ -70,6 +72,26 @@ export default function ImportRoutineScreen() {
   // Handle schema version migration on component mount
   useEffect(() => {
     handleSchemaMigration();
+  }, []);
+
+  // Load output preference or auto-detect based on platform
+  useEffect(() => {
+    const loadOutputPreference = async () => {
+      try {
+        const savedData = await RobustStorage.getItem('outputPreference', true) || await AsyncStorage.getItem('outputPreference');
+        if (savedData) {
+          setOutputPreference(savedData as 'copy_paste' | 'save_import');
+        } else {
+          // Default to copy_paste for all platforms (works everywhere, especially good for mobile)
+          setOutputPreference('copy_paste');
+        }
+      } catch (error) {
+        console.error('Error loading output preference:', error);
+        // Default to copy_paste on error since it works on all platforms
+        setOutputPreference('copy_paste');
+      }
+    };
+    loadOutputPreference();
   }, []);
 
   // Load current program and mesocycle context
@@ -934,6 +956,16 @@ export default function ImportRoutineScreen() {
       }
     } catch (error) {
       console.error('Failed to load mesocycle context:', error);
+    }
+  };
+
+  // Save output preference
+  const saveOutputPreference = async (preference: 'copy_paste' | 'save_import') => {
+    try {
+      await RobustStorage.setItem('outputPreference', preference);
+      setOutputPreference(preference);
+    } catch (error) {
+      console.error('Error saving output preference:', error);
     }
   };
 
@@ -2006,8 +2038,7 @@ export default function ImportRoutineScreen() {
               <Ionicons name="close" size={24} color="#ffffff" />
             </TouchableOpacity>
             <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>How It Works</Text>
-              <Text style={styles.headerSubtitle}>3 simple steps to your perfect workout</Text>
+              <Text style={styles.headerTitle}>Workout Generator</Text>
             </View>
           </View>
             <View style={styles.stepsContainer}>
@@ -2172,10 +2203,10 @@ Please design a complete workout program with exercises, sets, reps, and rest pe
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>2</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Send to Any AI</Text>
+                  <Text style={styles.stepCardTitle}>Quality Check Review</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Paste into ChatGPT, Claude, Gemini - whatever you use
+                  Ask AI to review and improve the workout plan quality
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -2328,12 +2359,34 @@ This check exists because the JSON generator must reconstruct complete exercise 
                 <Text style={styles.stepCardDescription}>
                   Ask the AI to format it for the app
                 </Text>
+                
+                {/* Output preference toggle */}
+                <View style={styles.outputPreferenceContainer}>
+                  <TouchableOpacity
+                    style={[styles.preferenceOption, outputPreference === 'copy_paste' && { backgroundColor: themeColor + '20' }]}
+                    onPress={() => saveOutputPreference('copy_paste')}
+                  >
+                    <Text style={[styles.preferenceText, outputPreference === 'copy_paste' && { color: themeColor }]}>
+                      Copy & Paste
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.preferenceSeparator}>|</Text>
+                  <TouchableOpacity
+                    style={[styles.preferenceOption, outputPreference === 'save_import' && { backgroundColor: themeColor + '20' }]}
+                    onPress={() => saveOutputPreference('save_import')}
+                  >
+                    <Text style={[styles.preferenceText, outputPreference === 'save_import' && { color: themeColor }]}>
+                      Save & Import
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
                       const questionnaireData = await loadQuestionnaireData();
-                      const prompt = getAIPrompt(questionnaireData);
+                      const prompt = getAIPrompt(questionnaireData, outputPreference);
                       
                       try {
                         await Clipboard.setStringAsync(prompt);
@@ -3379,5 +3432,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  outputPreferenceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  preferenceOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  preferenceText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#71717a',
+  },
+  preferenceSeparator: {
+    fontSize: 13,
+    color: '#3f3f46',
+    marginHorizontal: 4,
   },
 });

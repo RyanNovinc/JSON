@@ -25,6 +25,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from '../utils/robustStorage';
+import { Platform } from 'react-native';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
@@ -50,6 +52,7 @@ export default function ImportMealPlanScreen() {
   const [parsedMealPlan, setParsedMealPlan] = useState<SimplifiedMealPlan | null>(null);
   const [modalScale] = useState(new Animated.Value(0));
   const [modalOpacity] = useState(new Animated.Value(0));
+  const [outputPreference, setOutputPreference] = useState<'copy_paste' | 'save_import'>('copy_paste');
 
   const getCurrentDate = (): string => {
     const today = new Date();
@@ -67,6 +70,36 @@ export default function ImportMealPlanScreen() {
     const today = new Date();
     const targetDate = new Date(today.getTime() + ((n + 1) * 24 * 60 * 60 * 1000));
     return targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+  };
+
+  // Load output preference or default to copy_paste
+  useEffect(() => {
+    const loadOutputPreference = async () => {
+      try {
+        const savedData = await RobustStorage.getItem('outputPreference', true) || await AsyncStorage.getItem('outputPreference');
+        if (savedData) {
+          setOutputPreference(savedData as 'copy_paste' | 'save_import');
+        } else {
+          // Default to copy_paste for all platforms (works everywhere, especially good for mobile)
+          setOutputPreference('copy_paste');
+        }
+      } catch (error) {
+        console.error('Error loading output preference:', error);
+        // Default to copy_paste on error since it works on all platforms
+        setOutputPreference('copy_paste');
+      }
+    };
+    loadOutputPreference();
+  }, []);
+
+  // Save output preference
+  const saveOutputPreference = async (preference: 'copy_paste' | 'save_import') => {
+    try {
+      await RobustStorage.setItem('outputPreference', preference);
+      setOutputPreference(preference);
+    } catch (error) {
+      console.error('Error saving output preference:', error);
+    }
   };
 
   const sampleMealPlan = {
@@ -637,8 +670,7 @@ export default function ImportMealPlanScreen() {
               <Ionicons name="close" size={24} color="#ffffff" />
             </TouchableOpacity>
             <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>How It Works</Text>
-              <Text style={styles.headerSubtitle}>3 simple steps to your perfect meal plan</Text>
+              <Text style={styles.headerTitle}>Meal Plan Generator</Text>
             </View>
           </View>
           
@@ -658,7 +690,7 @@ export default function ImportMealPlanScreen() {
                   <Text style={styles.stepCardTitle}>We Build Your Perfect Prompt</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Customized nutrition plan based on your preferences
+                  Customized based on your questionnaire answers
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -703,10 +735,10 @@ export default function ImportMealPlanScreen() {
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
                     <Text style={styles.stepBadgeText}>2</Text>
                   </View>
-                  <Text style={styles.stepCardTitle}>Send to Any AI</Text>
+                  <Text style={styles.stepCardTitle}>Quality Check Review</Text>
                 </View>
                 <Text style={styles.stepCardDescription}>
-                  Paste into ChatGPT, Claude, Gemini - whatever you use
+                  Ask AI to review and improve the meal plan quality
                 </Text>
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
@@ -756,11 +788,33 @@ export default function ImportMealPlanScreen() {
                 <Text style={styles.stepCardDescription}>
                   Ask the AI to format it for the app
                 </Text>
+                
+                {/* Output preference toggle */}
+                <View style={styles.outputPreferenceContainer}>
+                  <TouchableOpacity
+                    style={[styles.preferenceOption, outputPreference === 'copy_paste' && { backgroundColor: themeColor + '20' }]}
+                    onPress={() => saveOutputPreference('copy_paste')}
+                  >
+                    <Text style={[styles.preferenceText, outputPreference === 'copy_paste' && { color: themeColor }]}>
+                      Copy & Paste
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.preferenceSeparator}>|</Text>
+                  <TouchableOpacity
+                    style={[styles.preferenceOption, outputPreference === 'save_import' && { backgroundColor: themeColor + '20' }]}
+                    onPress={() => saveOutputPreference('save_import')}
+                  >
+                    <Text style={[styles.preferenceText, outputPreference === 'save_import' && { color: themeColor }]}>
+                      Save & Import
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
-                      const prompt = generateJsonConversionPrompt();
+                      const prompt = generateJsonConversionPrompt(outputPreference);
                       await Clipboard.setStringAsync(prompt);
                       setAiPromptCopied(true);
                       setTimeout(() => {
@@ -1612,5 +1666,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#27272a',
+  },
+  outputPreferenceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  preferenceOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  preferenceText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#71717a',
+  },
+  preferenceSeparator: {
+    fontSize: 13,
+    color: '#3f3f46',
+    marginHorizontal: 4,
   },
 });
