@@ -1222,20 +1222,57 @@ export default function WorkoutLogScreen() {
     detectSupersets();
   }, [dynamicExercises]);
   
-  // Rest timer state - now tracks both countdown and stopwatch separately
+  // Rest timer state - completely rewritten for clean countdown/countup separation  
   const [activeTimer, setActiveTimer] = useState<{
     exerciseIndex: number;
     setIndex: number;
-    timeLeft: number;
-    originalDuration: number;
     isRunning: boolean;
     isQuickMode: boolean;
     completed: boolean;
-    stopwatchTime?: number; // Separate stopwatch time
-    countdownTime?: number; // Preserve countdown time when switching
-    countdownRunning?: boolean; // Track if countdown was running
     startTime?: Date; // Track when timer actually started for background support
+    // Countdown mode fields
+    countdownTimeLeft?: number; // Time remaining in countdown
+    countdownDuration?: number; // Original countdown duration
+    // Countup mode fields  
+    countupElapsed?: number; // Elapsed time in countup (seconds from 0)
+    // Background countdown for countup mode
+    backgroundCountdownTime?: number;
+    backgroundCountdownRunning?: boolean;
   } | null>(null);
+  
+  // Helper function to get display time based on current mode
+  const getDisplayTime = (timer: typeof activeTimer, isCountUp?: boolean): number => {
+    if (!timer) return 0;
+    const useCountUp = isCountUp !== undefined ? isCountUp : timerSettings.countUp;
+    if (useCountUp) {
+      return timer.countupElapsed || 0; // Show elapsed time in countup mode
+    } else {
+      return timer.countdownTimeLeft || 0; // Show remaining time in countdown mode
+    }
+  };
+
+  // Format display time for UI components
+  const formatDisplayTime = (timer: typeof activeTimer) => {
+    if (!timer) return { minutes: 0, seconds: 0, isOvertime: false };
+    
+    const displayTime = getDisplayTime(timer);
+    
+    return {
+      minutes: Math.floor(Math.abs(displayTime) / 60),
+      seconds: Math.abs(displayTime) % 60,
+      isOvertime: false
+    };
+  };
+  
+  // Helper function to get timer duration for progress calculation
+  const getTimerDuration = (timer: typeof activeTimer): number => {
+    if (!timer) return 0;
+    if (timerSettings.countUp) {
+      return 3600; // Max display for countup (1 hour)
+    } else {
+      return timer.countdownDuration || 0; // Original duration for countdown
+    }
+  };
   
   useEffect(() => {
     const loadSetsData = async () => {
@@ -1385,20 +1422,20 @@ export default function WorkoutLogScreen() {
           if (!prev) return null;
           
           if (timerSettings.countUp) {
-            // Stopwatch mode - add elapsed time
-            const newTimeLeft = Math.max(0, 3600 - elapsedSeconds);
-            return { ...prev, timeLeft: newTimeLeft };
+            // Countup mode - set elapsed time based on how long timer has been running
+            return { ...prev, countupElapsed: elapsedSeconds };
           } else {
-            // Countdown mode - subtract elapsed time
-            const newTimeLeft = Math.max(0, prev.originalDuration - elapsedSeconds);
+            // Countdown mode - subtract elapsed time from original duration
+            const originalDuration = prev.countdownDuration || 120;
+            const newTimeLeft = Math.max(0, originalDuration - elapsedSeconds);
             
             // Check if timer should have completed while away
             if (newTimeLeft === 0 && !prev.completed) {
               TimerNotifications.playTimerComplete();
-              return { ...prev, timeLeft: 0, isRunning: false, completed: true };
+              return { ...prev, countdownTimeLeft: 0, isRunning: false, completed: true };
             }
             
-            return { ...prev, timeLeft: newTimeLeft };
+            return { ...prev, countdownTimeLeft: newTimeLeft };
           }
         });
       }
@@ -1408,7 +1445,7 @@ export default function WorkoutLogScreen() {
     return () => subscription?.remove();
   }, [activeTimer?.isRunning, activeTimer?.startTime, timerSettings.countUp]);
   
-  // Timer countdown effect - handles both countdown and stopwatch
+  // Timer countdown effect - handles both countdown and countup modes separately
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
@@ -1417,80 +1454,61 @@ export default function WorkoutLogScreen() {
         setActiveTimer(prev => {
           if (!prev) return null;
           
-          // Update the appropriate timer based on current mode
           if (timerSettings.countUp) {
-            // Stopwatch mode - count up (increase timeLeft from 0)
-            return { ...prev, timeLeft: prev.timeLeft + 1 };
+            // Countup mode - increment elapsed time
+            const newElapsed = (prev.countupElapsed || 0) + 1;
+            
+            // Also handle background countdown if active
+            let updates: any = { countupElapsed: newElapsed };
+            
+            if (prev.backgroundCountdownRunning && prev.backgroundCountdownTime !== undefined) {
+              const newBgCountdown = prev.backgroundCountdownTime - 1;
+              
+              // Play sound at 3 seconds for background countdown
+              if (newBgCountdown === 3) {
+                TimerNotifications.playCountdownIfNeeded(newBgCountdown);
+              }
+              
+              if (newBgCountdown <= 0) {
+                // Background countdown finished
+                TimerNotifications.playTimerComplete();
+                updates.backgroundCountdownRunning = false;
+                updates.backgroundCountdownTime = 0;
+              } else {
+                updates.backgroundCountdownTime = newBgCountdown;
+              }
+            }
+            
+            return { ...prev, ...updates };
           } else {
-            // Countdown mode
-            const newTimeLeft = prev.timeLeft - 1;
+            // Countdown mode - decrement time left
+            const newTimeLeft = (prev.countdownTimeLeft || 0) - 1;
             
             // Play countdown sound when reaching 3 seconds
             if (newTimeLeft === 3) {
               TimerNotifications.playCountdownIfNeeded(newTimeLeft);
             }
             
-            // Also update the background countdown if it exists
-            if (prev.countdownRunning) {
+            if (newTimeLeft <= 0) {
+              // Countdown finished
+              TimerNotifications.playTimerComplete();
+              TimerLiveActivity.endTimer();
               return { 
                 ...prev, 
-                timeLeft: newTimeLeft,
-                countdownTime: newTimeLeft 
+                countdownTimeLeft: 0,
+                isRunning: false, 
+                completed: true 
               };
             }
             
-            return { ...prev, timeLeft: newTimeLeft };
+            return { ...prev, countdownTimeLeft: newTimeLeft };
           }
         });
       }, 1000);
-    }
-    
-    // Check for countdown completion
-    if (activeTimer?.timeLeft === 0 && !timerSettings.countUp && !activeTimer?.completed) {
-      // Timer finished - play notification and mark as completed (only for count-down mode)
-      TimerNotifications.playTimerComplete();
-      // End Live Activity when timer completes
-      TimerLiveActivity.endTimer();
-      setActiveTimer(prev => 
-        prev ? { ...prev, isRunning: false, completed: true, countdownRunning: false } : null
-      );
-    }
-    
-    // Continue countdown in background if switching to stopwatch
-    if (activeTimer?.countdownRunning && timerSettings.countUp && activeTimer.countdownTime && activeTimer.countdownTime > 0) {
-      const bgInterval = setInterval(() => {
-        setActiveTimer(prev => {
-          if (!prev || !prev.countdownRunning) {
-            clearInterval(bgInterval);
-            return prev;
-          }
-          
-          const newCountdownTime = (prev.countdownTime || 0) - 1;
-          
-          // Play countdown sound when reaching 3 seconds (background countdown)
-          if (newCountdownTime === 3) {
-            TimerNotifications.playCountdownIfNeeded(newCountdownTime);
-          }
-          
-          if (newCountdownTime <= 0) {
-            // Background countdown finished
-            TimerNotifications.playTimerComplete();
-            clearInterval(bgInterval);
-            return { ...prev, countdownTime: 0, countdownRunning: false };
-          }
-          
-          return { ...prev, countdownTime: newCountdownTime };
-        });
-      }, 1000);
-      
-      return () => {
-        clearInterval(interval);
-        clearInterval(bgInterval);
-      };
     }
     
     return () => clearInterval(interval);
-  }, [activeTimer?.isRunning, activeTimer?.countdownRunning, timerSettings.countUp]);
+  }, [activeTimer?.isRunning, activeTimer?.backgroundCountdownRunning, timerSettings.countUp]);
 
   // Initialize and animate toggle switch when countUp setting changes
   useEffect(() => {
@@ -1838,30 +1856,38 @@ export default function WorkoutLogScreen() {
     if (!wasCompleted && setIndex < dynamicExercises[exerciseIndex].sets - 1) {
       if (isLinkedToNext) {
         // First exercise in superset - 3 second transition timer
-        const initialTimeLeft = timerSettings.countUp ? 3600 : 3;
-        const originalDuration = timerSettings.countUp ? 0 : 3;
+        const transitionTime = 3;
         
         const newTimer = {
           exerciseIndex,
           setIndex: setIndex + 1, // Next set
-          timeLeft: initialTimeLeft,
-          originalDuration: originalDuration,
           isRunning: true,
           isQuickMode: false,
           completed: false,
           startTime: new Date(),
+          // Countdown mode fields
+          countdownTimeLeft: timerSettings.countUp ? undefined : transitionTime,
+          countdownDuration: timerSettings.countUp ? undefined : transitionTime,
+          // Countup mode fields
+          countupElapsed: timerSettings.countUp ? 0 : undefined,
+          // Background countdown when in countup mode
+          backgroundCountdownTime: timerSettings.countUp ? transitionTime : undefined,
+          backgroundCountdownRunning: timerSettings.countUp,
         };
         
         setActiveTimer(newTimer);
         
+        // Get display time for Live Activity
+        const displayTime = getDisplayTime(newTimer, timerSettings.countUp);
+        
         // Schedule background notification
-        TimerNotifications.scheduleTimerNotification(initialTimeLeft, timerSettings.countUp);
+        TimerNotifications.scheduleTimerNotification(displayTime, timerSettings.countUp);
         
         // Start Live Activity
         const timerExercise = dynamicExercises[exerciseIndex];
         TimerLiveActivity.startTimer({
           title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
-          timeLeft: initialTimeLeft,
+          timeLeft: displayTime,
           isRunning: true,
           exerciseName: timerExercise?.name || 'Exercise',
           setNumber: setIndex + 1,
@@ -1872,31 +1898,36 @@ export default function WorkoutLogScreen() {
         const optimalRest = exercise.rest || 120;
         const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
         
-        // For count-up mode (stopwatch), start with a large timeLeft value
-        const initialTimeLeft = timerSettings.countUp ? 3600 : optimalRest; // 1 hour max for stopwatch
-        const originalDuration = timerSettings.countUp ? 0 : optimalRest; // Stopwatch starts from 0
-        
         const newTimer = {
           exerciseIndex,
           setIndex: setIndex + 1, // Next set
-          timeLeft: initialTimeLeft,
-          originalDuration: originalDuration,
           isRunning: true,
           isQuickMode: false,
           completed: false,
           startTime: new Date(),
+          // Countdown mode fields
+          countdownTimeLeft: timerSettings.countUp ? undefined : optimalRest,
+          countdownDuration: timerSettings.countUp ? undefined : optimalRest,
+          // Countup mode fields
+          countupElapsed: timerSettings.countUp ? 0 : undefined,
+          // Background countdown when in countup mode
+          backgroundCountdownTime: timerSettings.countUp ? optimalRest : undefined,
+          backgroundCountdownRunning: timerSettings.countUp,
         };
         
         setActiveTimer(newTimer);
         
+        // Get display time for Live Activity
+        const displayTime = getDisplayTime(newTimer, timerSettings.countUp);
+        
         // Schedule background notification
-        TimerNotifications.scheduleTimerNotification(initialTimeLeft, timerSettings.countUp);
+        TimerNotifications.scheduleTimerNotification(displayTime, timerSettings.countUp);
         
         // Start Live Activity
         const timerExercise = dynamicExercises[exerciseIndex];
         TimerLiveActivity.startTimer({
           title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
-          timeLeft: initialTimeLeft,
+          timeLeft: displayTime,
           isRunning: true,
           exerciseName: timerExercise?.name || 'Exercise',
           setNumber: setIndex + 1,
@@ -1916,12 +1947,13 @@ export default function WorkoutLogScreen() {
       
       if (isStarting) {
         // Starting the timer - set start time and schedule notification
-        TimerNotifications.scheduleTimerNotification(prev.timeLeft, timerSettings.countUp);
+        const displayTime = getDisplayTime(prev, timerSettings.countUp);
+        TimerNotifications.scheduleTimerNotification(displayTime, timerSettings.countUp);
         
         // Start Live Activity
         TimerLiveActivity.startTimer({
           title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
-          timeLeft: prev.timeLeft,
+          timeLeft: displayTime,
           isRunning: true,
           exerciseName: currentExercise?.name || 'Exercise',
           setNumber: prev.setIndex,
@@ -1955,15 +1987,23 @@ export default function WorkoutLogScreen() {
     const optimalRest = exercise.rest || 120;
     const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
     
-    setActiveTimer(prev => 
-      prev ? {
+    setActiveTimer(prev => {
+      if (!prev) return null;
+      
+      const newIsQuickMode = !prev.isQuickMode;
+      const newRestTime = newIsQuickMode ? quickRest : optimalRest;
+      
+      return {
         ...prev,
-        isQuickMode: !prev.isQuickMode,
-        timeLeft: !prev.isQuickMode ? quickRest : optimalRest,
-        originalDuration: !prev.isQuickMode ? quickRest : optimalRest,
+        isQuickMode: newIsQuickMode,
         completed: false,
-      } : null
-    );
+        // Update countdown fields
+        countdownTimeLeft: newRestTime,
+        countdownDuration: newRestTime,
+        // Background countdown time also updates for countup mode
+        backgroundCountdownTime: timerSettings.countUp ? newRestTime : prev.backgroundCountdownTime,
+      };
+    });
   };
   
   const handleTimerStop = () => {
@@ -1993,19 +2033,6 @@ export default function WorkoutLogScreen() {
     }
   };
 
-  const getDisplayTime = (timer: typeof activeTimer) => {
-    if (!timer) return { minutes: 0, seconds: 0, isOvertime: false };
-    
-    const displayTime = timerSettings.countUp 
-      ? 3600 - timer.timeLeft  // For stopwatch: starts at 3600, counts down internally, display shows elapsed time
-      : timer.timeLeft;
-    
-    return {
-      minutes: Math.floor(Math.abs(displayTime) / 60),
-      seconds: Math.abs(displayTime) % 60,
-      isOvertime: false  // No overtime concept for stopwatch
-    };
-  };
 
   // Function to handle setting exercise preference
   const handleSetExercisePreference = (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => {
@@ -3189,6 +3216,7 @@ export default function WorkoutLogScreen() {
       </KeyboardAvoidingView>
       
       {/* BRAND NEW TIMER SYSTEM */}
+      <>
       {!activeTimer && (
         <View 
           style={{
@@ -3286,7 +3314,7 @@ export default function WorkoutLogScreen() {
               fontWeight: '600',
               color: themeColor
             }}>
-              {getDisplayTime(activeTimer).minutes}:{getDisplayTime(activeTimer).seconds.toString().padStart(2, '0')}
+              {formatDisplayTime(activeTimer).minutes}:{formatDisplayTime(activeTimer).seconds.toString().padStart(2, '0')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -3340,81 +3368,28 @@ export default function WorkoutLogScreen() {
             width: '90%',
             maxHeight: '80%', // Limit height to 80% of screen
           }]}>
-            {/* Header */}
-            <View style={styles.timerHeader}>
-              <Text style={styles.timerTitle}>Rest Timer</Text>
-              <View style={styles.timerHeaderButtons}>
-                <TouchableOpacity 
-                  onPress={handleTimerStop}
-                  style={styles.timerIconButton}
-                >
-                  <Ionicons name="remove" size={20} color="#71717a" />
-                </TouchableOpacity>
-              </View>
-            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity 
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: '#27272a',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+              }}
+              onPress={() => setTimerMinimized(true)}
+            >
+              <Ionicons name="close" size={18} color="#a1a1aa" />
+            </TouchableOpacity>
 
             {/* Timer Display */}
-            {activeTimer.completed ? (
-              <View style={styles.timerDisplay}>
-                {/* Timer Completed Screen */}
-                <Ionicons name="checkmark-circle" size={72} color={themeColor} />
-                <Text style={[styles.completedTitle, { color: themeColor }]}>Rest Complete!</Text>
-                <Text style={styles.completedSubtitle}>Ready for your next set</Text>
-                
-                {/* Completion Actions */}
-                <View style={styles.completionActions}>
-                  <TouchableOpacity 
-                    style={[styles.completionButton, { backgroundColor: themeColor }]}
-                    onPress={() => {
-                      // Reset and start a new timer
-                      const exercise = dynamicExercises[activeTimer.exerciseIndex];
-                      const optimalRest = exercise.rest || 120;
-                      const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
-                      const resetTime = activeTimer.isQuickMode ? quickRest : optimalRest;
-                      
-                      setActiveTimer(prev => {
-                        if (!prev) return null;
-                        
-                        const updatedTimer = {
-                          ...prev,
-                          timeLeft: resetTime,
-                          originalDuration: resetTime,
-                          isRunning: true,
-                          completed: false,
-                          startTime: new Date()
-                        };
-                        
-                        // Schedule background notification for rest again
-                        TimerNotifications.scheduleTimerNotification(resetTime, timerSettings.countUp);
-                        
-                        // Start Live Activity for rest again
-                        const restAgainExercise = dynamicExercises[prev.exerciseIndex];
-                        TimerLiveActivity.startTimer({
-                          title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
-                          timeLeft: resetTime,
-                          isRunning: true,
-                          exerciseName: restAgainExercise?.name || 'Exercise',
-                          setNumber: prev.setIndex,
-                        });
-                        
-                        return updatedTimer;
-                      });
-                    }}
-                  >
-                    <Ionicons name="refresh" size={16} color="#0a0a0b" />
-                    <Text style={styles.completionButtonText}>Rest Again</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.dismissButton}
-                    onPress={() => setTimerMinimized(true)}
-                  >
-                    <Text style={styles.dismissButtonText}>Dismiss</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.timerDisplay}>
+            <View style={styles.timerDisplay}>
                 {/* Timer Countdown - Main Focus */}
                 <View style={styles.timerMainDisplay}>
                   <View style={styles.timerRow}>
@@ -3422,12 +3397,22 @@ export default function WorkoutLogScreen() {
                       <TouchableOpacity 
                         style={styles.mainTimeAdjustButton}
                         onPress={() => {
-                          setActiveTimer(prev => prev ? {
-                            ...prev,
-                            timeLeft: timerSettings.countUp 
-                              ? Math.min(3600, prev.timeLeft + 15)  // In count-up mode, adding time means going forward
-                              : Math.max(0, prev.timeLeft - 15)     // In count-down mode, subtracting time
-                          } : null);
+                          setActiveTimer(prev => {
+                            if (!prev) return null;
+                            if (timerSettings.countUp) {
+                              // In countup mode, subtract 15 seconds from elapsed time (go backward)
+                              return {
+                                ...prev,
+                                countupElapsed: Math.max(0, (prev.countupElapsed || 0) - 15)
+                              };
+                            } else {
+                              // In countdown mode, subtract 15 seconds from remaining time
+                              return {
+                                ...prev,
+                                countdownTimeLeft: Math.max(0, (prev.countdownTimeLeft || 0) - 15)
+                              };
+                            }
+                          });
                         }}
                       >
                         <Text style={[styles.mainTimeAdjustText, { color: themeColor }]}>-15</Text>
@@ -3436,10 +3421,18 @@ export default function WorkoutLogScreen() {
                     
                     <View style={styles.timerCenterDisplay}>
                       <Text style={styles.timerCountdown}>
-                        {getDisplayTime(activeTimer).minutes}:{getDisplayTime(activeTimer).seconds.toString().padStart(2, '0')}
-                      </Text>
-                      <Text style={styles.timerMode}>
-                        {timerSettings.countUp ? 'Stopwatch' : `${activeTimer.isQuickMode ? 'Quick' : 'Optimal'} Rest`}
+                        {(() => {
+                          if (!activeTimer) return '0:00';
+                          try {
+                            const display = formatDisplayTime(activeTimer);
+                            const minutes = display?.minutes ?? 0;
+                            const seconds = display?.seconds ?? 0;
+                            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                          } catch (error) {
+                            console.error('Timer display error:', error);
+                            return '0:00';
+                          }
+                        })()}
                       </Text>
                     </View>
                     
@@ -3447,12 +3440,22 @@ export default function WorkoutLogScreen() {
                       <TouchableOpacity 
                         style={styles.mainTimeAdjustButton}
                         onPress={() => {
-                          setActiveTimer(prev => prev ? {
-                            ...prev,
-                            timeLeft: timerSettings.countUp 
-                              ? Math.max(0, prev.timeLeft - 15)     // In count-up mode, subtracting time means going backward
-                              : prev.timeLeft + 15                 // In count-down mode, adding time
-                          } : null);
+                          setActiveTimer(prev => {
+                            if (!prev) return null;
+                            if (timerSettings.countUp) {
+                              // In countup mode, add 15 seconds to elapsed time (go forward)
+                              return {
+                                ...prev,
+                                countupElapsed: Math.min(3600, (prev.countupElapsed || 0) + 15)
+                              };
+                            } else {
+                              // In countdown mode, add 15 seconds to remaining time
+                              return {
+                                ...prev,
+                                countdownTimeLeft: (prev.countdownTimeLeft || 0) + 15
+                              };
+                            }
+                          });
                         }}
                       >
                         <Text style={[styles.mainTimeAdjustText, { color: themeColor }]}>+15</Text>
@@ -3469,44 +3472,6 @@ export default function WorkoutLogScreen() {
                   <Ionicons name={activeTimer.isRunning ? "pause" : "play"} size={28} color="#0a0a0b" />
                 </TouchableOpacity>
 
-                {/* Secondary Controls Row */}
-                <View style={styles.secondaryControls}>
-                  <TouchableOpacity 
-                    style={styles.secondaryButton}
-                    onPress={() => {
-                      if (!activeTimer) return;
-                      
-                      if (timerSettings.countUp) {
-                        // Reset stopwatch to 0:00
-                        setActiveTimer(prev => prev ? {
-                          ...prev,
-                          timeLeft: 3600,  // Reset to max value for count-up display of 0:00
-                          isRunning: false,
-                          completed: false
-                        } : null);
-                      } else {
-                        // Reset countdown to original time
-                        const exercise = dynamicExercises[activeTimer.exerciseIndex];
-                        const optimalRest = exercise.rest || 120;
-                        const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
-                        const resetTime = activeTimer.isQuickMode ? quickRest : optimalRest;
-                        
-                        setActiveTimer(prev => prev ? {
-                          ...prev,
-                          timeLeft: resetTime,
-                          originalDuration: resetTime,
-                          isRunning: false,
-                          completed: false
-                        } : null);
-                      }
-                    }}
-                  >
-                    <Ionicons name="refresh" size={18} color="#71717a" />
-                    <Text style={styles.secondaryButtonText}>Reset</Text>
-                  </TouchableOpacity>
-
-
-                </View>
               </View>
             )}
 
@@ -3596,6 +3561,7 @@ export default function WorkoutLogScreen() {
           </View>
         </View>
       )}
+      </>
 
       {/* Start Workout Confirmation Modal */}
       <Modal
