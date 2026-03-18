@@ -27,8 +27,6 @@ import { TimerLiveActivity } from '../utils/liveActivity';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
-import { useSimpleTimer } from '../contexts/SimpleTimerContext';
-import { CleanTimerUI } from '../components/CleanTimerUI';
 import { AppState } from 'react-native';
 import { navigate } from '../utils/navigationRef';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -1001,7 +999,6 @@ export default function WorkoutLogScreen() {
   const route = useRoute<WorkoutLogScreenRouteProp>();
   const { themeColor } = useTheme();
   const { globalUnit, getExerciseUnit, setExerciseUnit, setGlobalUnit, formatWeight, convertWeight } = useWeightUnit();
-  const { startTimer } = useSimpleTimer();
   const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
   const { activeWorkout, setActiveWorkout } = useActiveWorkout();
   
@@ -1226,38 +1223,7 @@ export default function WorkoutLogScreen() {
     detectSupersets();
   }, [dynamicExercises]);
   
-  // Use global timer from context (replaces local globalTimer state)
-  
-  // Temporary placeholders for old timer references (preventing errors)
-  const globalTimer = null;
-  const toggleQuickMode = () => {};
-  const updateTimerState = () => {};
-  const setGlobalTimer = () => {};
-  const setTimerMinimized = () => {};
-  
-  // Helper function to get display time based on current mode
-  const getDisplayTime = (timer: any, isCountUp?: boolean): number => {
-    if (!timer) return 0;
-    const useCountUp = isCountUp !== undefined ? isCountUp : timerSettings.countUp;
-    if (useCountUp) {
-      return timer.countupElapsed || 0; // Show elapsed time in countup mode
-    } else {
-      return timer.countdownTimeLeft || 0; // Show remaining time in countdown mode
-    }
-  };
-
-  // Format display time for UI components  
-  const formatDisplayTime = (timer: any) => {
-    if (!timer) return { minutes: 0, seconds: 0, isOvertime: false };
-    
-    const displayTime = getDisplayTime(timer);
-    
-    return {
-      minutes: Math.floor(Math.abs(displayTime) / 60),
-      seconds: Math.abs(displayTime) % 60,
-      isOvertime: false
-    };
-  };
+  // TODO: Timer integration will be added here
   
   // Helper function to get timer duration for progress calculation
   const getTimerDuration = (timer: typeof globalTimer): number => {
@@ -1781,37 +1747,7 @@ export default function WorkoutLogScreen() {
       });
     }
     
-    // Start rest timer when completing a set (not when uncompleting)
-    const isLinkedToNext = supersetLinks.has(exerciseIndex);
-    const isLinkedToPrev = supersetLinks.has(exerciseIndex - 1);
-    
-    if (!wasCompleted && setIndex < dynamicExercises[exerciseIndex].sets - 1) {
-      if (isLinkedToNext) {
-        // First exercise in superset - 3 second transition timer
-        const transitionTime = 3;
-        
-        startTimer({
-          name: 'Superset Transition',
-          isCountUp: timerSettings.countUp,
-          startValue: timerSettings.countUp ? 0 : transitionTime,
-          isQuickMode: false // Transition timers are always quick
-        });
-      } else if (!isLinkedToNext || isLinkedToPrev) {
-        // Regular exercise or last exercise in superset - normal rest
-        const exercise = dynamicExercises[exerciseIndex];
-        const optimalRest = exercise.rest || 120;
-        const quickRest = Math.max(30, Math.floor(optimalRest * 0.5)); // Quick mode = 50% of optimal, minimum 30s
-        
-        startTimer({
-          name: 'Rest Timer',
-          isCountUp: timerSettings.countUp,
-          startValue: timerSettings.countUp ? 0 : optimalRest,
-          isQuickMode: false // Default to optimal mode
-        });
-      }
-      // Keep timer minimized by default
-      // setTimerMinimized(false); // Removed - keep it minimized
-    }
+    // TODO: Add timer integration here for rest periods between sets
   };
   
   const handleTimerToggle = async () => {
@@ -3944,9 +3880,6 @@ export default function WorkoutLogScreen() {
           </View>
         </Modal>
       )}
-
-      {/* NEW CLEAN TIMER SYSTEM */}
-      <CleanTimerUI />
 
     </SafeAreaView>
   );
