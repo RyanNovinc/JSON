@@ -27,7 +27,8 @@ import { TimerLiveActivity } from '../utils/liveActivity';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
-import { useWorkoutRoutines, GlobalTimer } from '../contexts/WorkoutRoutineContext';
+import { useSimpleTimer } from '../contexts/SimpleTimerContext';
+import { CleanTimerUI } from '../components/CleanTimerUI';
 import { AppState } from 'react-native';
 import { navigate } from '../utils/navigationRef';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -1000,7 +1001,7 @@ export default function WorkoutLogScreen() {
   const route = useRoute<WorkoutLogScreenRouteProp>();
   const { themeColor } = useTheme();
   const { globalUnit, getExerciseUnit, setExerciseUnit, setGlobalUnit, formatWeight, convertWeight } = useWeightUnit();
-  const { globalTimer, timerMinimized, setGlobalTimer, setTimerMinimized, updateTimerState } = useWorkoutRoutines();
+  const { startTimer } = useSimpleTimer();
   const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
   const { activeWorkout, setActiveWorkout } = useActiveWorkout();
   
@@ -1227,8 +1228,15 @@ export default function WorkoutLogScreen() {
   
   // Use global timer from context (replaces local globalTimer state)
   
+  // Temporary placeholders for old timer references (preventing errors)
+  const globalTimer = null;
+  const toggleQuickMode = () => {};
+  const updateTimerState = () => {};
+  const setGlobalTimer = () => {};
+  const setTimerMinimized = () => {};
+  
   // Helper function to get display time based on current mode
-  const getDisplayTime = (timer: GlobalTimer | null, isCountUp?: boolean): number => {
+  const getDisplayTime = (timer: any, isCountUp?: boolean): number => {
     if (!timer) return 0;
     const useCountUp = isCountUp !== undefined ? isCountUp : timerSettings.countUp;
     if (useCountUp) {
@@ -1238,8 +1246,8 @@ export default function WorkoutLogScreen() {
     }
   };
 
-  // Format display time for UI components
-  const formatDisplayTime = (timer: GlobalTimer | null) => {
+  // Format display time for UI components  
+  const formatDisplayTime = (timer: any) => {
     if (!timer) return { minutes: 0, seconds: 0, isOvertime: false };
     
     const displayTime = getDisplayTime(timer);
@@ -1430,7 +1438,7 @@ export default function WorkoutLogScreen() {
     
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [globalTimer?.isRunning, globalTimer?.startTime, timerSettings.countUp]);
+  }, [timerSettings.countUp]);
   
   // Timer is now managed by global context for background persistence
 
@@ -1782,79 +1790,23 @@ export default function WorkoutLogScreen() {
         // First exercise in superset - 3 second transition timer
         const transitionTime = 3;
         
-        const newTimer = {
-          exerciseIndex,
-          setIndex: setIndex + 1, // Next set
-          isRunning: true,
-          isQuickMode: false,
-          completed: false,
-          startTime: new Date(),
-          // Countdown mode fields
-          countdownTimeLeft: timerSettings.countUp ? undefined : transitionTime,
-          countdownDuration: timerSettings.countUp ? undefined : transitionTime,
-          // Countup mode fields
-          countupElapsed: timerSettings.countUp ? 0 : undefined,
-          // Background countdown when in countup mode
-          backgroundCountdownTime: timerSettings.countUp ? transitionTime : undefined,
-          backgroundCountdownRunning: timerSettings.countUp,
-        };
-        
-        setGlobalTimer(newTimer);
-        
-        // Get display time for Live Activity
-        const displayTime = getDisplayTime(newTimer, timerSettings.countUp);
-        
-        // Schedule background notification
-        TimerNotifications.scheduleTimerNotification(displayTime, timerSettings.countUp);
-        
-        // Start Live Activity
-        const timerExercise = dynamicExercises[exerciseIndex];
-        TimerLiveActivity.startTimer({
-          title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
-          timeLeft: displayTime,
-          isRunning: true,
-          exerciseName: timerExercise?.name || 'Exercise',
-          setNumber: setIndex + 1,
+        startTimer({
+          name: 'Superset Transition',
+          isCountUp: timerSettings.countUp,
+          startValue: timerSettings.countUp ? 0 : transitionTime,
+          isQuickMode: false // Transition timers are always quick
         });
       } else if (!isLinkedToNext || isLinkedToPrev) {
         // Regular exercise or last exercise in superset - normal rest
         const exercise = dynamicExercises[exerciseIndex];
         const optimalRest = exercise.rest || 120;
-        const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
+        const quickRest = Math.max(30, Math.floor(optimalRest * 0.5)); // Quick mode = 50% of optimal, minimum 30s
         
-        const newTimer = {
-          exerciseIndex,
-          setIndex: setIndex + 1, // Next set
-          isRunning: true,
-          isQuickMode: false,
-          completed: false,
-          startTime: new Date(),
-          // Countdown mode fields
-          countdownTimeLeft: timerSettings.countUp ? undefined : optimalRest,
-          countdownDuration: timerSettings.countUp ? undefined : optimalRest,
-          // Countup mode fields
-          countupElapsed: timerSettings.countUp ? 0 : undefined,
-          // Background countdown when in countup mode
-          backgroundCountdownTime: timerSettings.countUp ? optimalRest : undefined,
-          backgroundCountdownRunning: timerSettings.countUp,
-        };
-        
-        setGlobalTimer(newTimer);
-        
-        // Get display time for Live Activity
-        const displayTime = getDisplayTime(newTimer, timerSettings.countUp);
-        
-        // Schedule background notification
-        TimerNotifications.scheduleTimerNotification(displayTime, timerSettings.countUp);
-        
-        // Start Live Activity
-        const timerExercise = dynamicExercises[exerciseIndex];
-        TimerLiveActivity.startTimer({
-          title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
-          timeLeft: displayTime,
-          isRunning: true,
-          exerciseName: timerExercise?.name || 'Exercise',
-          setNumber: setIndex + 1,
+        startTimer({
+          name: 'Rest Timer',
+          isCountUp: timerSettings.countUp,
+          startValue: timerSettings.countUp ? 0 : optimalRest,
+          isQuickMode: false // Default to optimal mode
         });
       }
       // Keep timer minimized by default
@@ -3993,6 +3945,8 @@ export default function WorkoutLogScreen() {
         </Modal>
       )}
 
+      {/* NEW CLEAN TIMER SYSTEM */}
+      <CleanTimerUI />
 
     </SafeAreaView>
   );

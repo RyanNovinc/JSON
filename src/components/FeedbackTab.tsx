@@ -13,6 +13,7 @@ import {
   Linking,
   ScrollView,
   PanResponder,
+  Pressable,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -333,7 +334,7 @@ export function FeedbackTab() {
             <View style={styles.header}>
               <Text style={styles.title}>Feedback</Text>
               <View style={styles.headerActions}>
-                <TouchableOpacity 
+                <Pressable 
                   onPress={() => {
                     const newThemeState = !currentThemeState;
                     // Update local state immediately for visual feedback
@@ -341,9 +342,10 @@ export function FeedbackTab() {
                     // Update context state (will persist to storage)
                     setIsPinkTheme(newThemeState);
                   }} 
-                  style={[
+                  style={({ pressed }) => [
                     styles.colorToggle, 
-                    { backgroundColor: currentThemeColor }
+                    { backgroundColor: currentThemeColor },
+                    pressed && { opacity: 0.7 }
                   ]}
                 >
                   <Ionicons 
@@ -351,7 +353,7 @@ export function FeedbackTab() {
                     size={20} 
                     color="#0a0a0b" 
                   />
-                </TouchableOpacity>
+                </Pressable>
                 <TouchableOpacity onPress={closePanel} style={styles.closeButton}>
                   <Ionicons name="close" size={24} color="#71717a" />
                 </TouchableOpacity>

@@ -37,6 +37,7 @@ import { SimplifiedMealPlanningProvider } from '../contexts/SimplifiedMealPlanni
 import { WeightUnitProvider } from '../contexts/WeightUnitContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { WorkoutRoutineProvider } from '../contexts/WorkoutRoutineContext';
+import { SimpleTimerProvider } from '../contexts/SimpleTimerContext';
 import ShareIntentHandler from '../components/ShareIntentHandler';
 
 // Import nutrition screens
@@ -274,7 +275,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
         <AppModeProvider>
           <WeightUnitProvider>
             <WorkoutRoutineProvider>
-              <MealPlanningProvider>
+              <SimpleTimerProvider>
+                <MealPlanningProvider>
                 <SimplifiedMealPlanningProvider>
                 <NavigationContainer ref={navigationRef}>
                 <ShareIntentHandler />
@@ -666,7 +668,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
           <FeedbackTab />
                 </NavigationContainer>
                 </SimplifiedMealPlanningProvider>
-              </MealPlanningProvider>
+                </MealPlanningProvider>
+              </SimpleTimerProvider>
             </WorkoutRoutineProvider>
           </WeightUnitProvider>
         </AppModeProvider>
