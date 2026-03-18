@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,10 +21,12 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
 import AsyncStorageDebugger from '../utils/asyncStorageDebug';
 import RobustStorage from '../utils/robustStorage';
-import { TimerNotifications, SOUND_OPTIONS, TimerSettings } from '../utils/timerNotifications';
+import { TimerNotifications, TimerSettings } from '../utils/timerNotifications';
+import { TimerLiveActivity } from '../utils/liveActivity';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
+import { AppState } from 'react-native';
 import { navigate } from '../utils/navigationRef';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1044,9 +1046,10 @@ export default function WorkoutLogScreen() {
   const [exerciseHistory, setExerciseHistory] = useState<WorkoutHistory[]>([]);
   const [showNotes, setShowNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
   const [showDeloadInfo, setShowDeloadInfo] = useState(false);
-  const [showTimerSettings, setShowTimerSettings] = useState(false);
   const [timerSettings, setTimerSettings] = useState<TimerSettings>(TimerNotifications.defaultSettings);
   const [timerMinimized, setTimerMinimized] = useState(true); // Start minimized by default
+  const toggleAnimatedValue = useRef(new Animated.Value(0)).current; // 0 = countdown (default), 1 = countup
+  const quickModeAnimatedValue = useRef(new Animated.Value(0)).current; // 0 = optimal (default), 1 = quick
   
   // Exercise preference states
   const [showPreferenceDialog, setShowPreferenceDialog] = useState<{
@@ -1231,6 +1234,7 @@ export default function WorkoutLogScreen() {
     stopwatchTime?: number; // Separate stopwatch time
     countdownTime?: number; // Preserve countdown time when switching
     countdownRunning?: boolean; // Track if countdown was running
+    startTime?: Date; // Track when timer actually started for background support
   } | null>(null);
   
   useEffect(() => {
@@ -1369,6 +1373,41 @@ export default function WorkoutLogScreen() {
     };
   }, [workoutStartTime]);
   
+  // Handle app state changes for background timer support
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: any) => {
+      if (nextAppState === 'active' && activeTimer?.isRunning && activeTimer.startTime) {
+        // App came back to foreground, calculate elapsed time
+        const now = new Date();
+        const elapsedSeconds = Math.floor((now.getTime() - activeTimer.startTime.getTime()) / 1000);
+        
+        setActiveTimer(prev => {
+          if (!prev) return null;
+          
+          if (timerSettings.countUp) {
+            // Stopwatch mode - add elapsed time
+            const newTimeLeft = Math.max(0, 3600 - elapsedSeconds);
+            return { ...prev, timeLeft: newTimeLeft };
+          } else {
+            // Countdown mode - subtract elapsed time
+            const newTimeLeft = Math.max(0, prev.originalDuration - elapsedSeconds);
+            
+            // Check if timer should have completed while away
+            if (newTimeLeft === 0 && !prev.completed) {
+              TimerNotifications.playTimerComplete();
+              return { ...prev, timeLeft: 0, isRunning: false, completed: true };
+            }
+            
+            return { ...prev, timeLeft: newTimeLeft };
+          }
+        });
+      }
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [activeTimer?.isRunning, activeTimer?.startTime, timerSettings.countUp]);
+  
   // Timer countdown effect - handles both countdown and stopwatch
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -1380,11 +1419,16 @@ export default function WorkoutLogScreen() {
           
           // Update the appropriate timer based on current mode
           if (timerSettings.countUp) {
-            // Stopwatch mode - count up (decrease timeLeft from 3600)
-            return { ...prev, timeLeft: prev.timeLeft - 1 };
+            // Stopwatch mode - count up (increase timeLeft from 0)
+            return { ...prev, timeLeft: prev.timeLeft + 1 };
           } else {
             // Countdown mode
             const newTimeLeft = prev.timeLeft - 1;
+            
+            // Play countdown sound when reaching 3 seconds
+            if (newTimeLeft === 3) {
+              TimerNotifications.playCountdownIfNeeded(newTimeLeft);
+            }
             
             // Also update the background countdown if it exists
             if (prev.countdownRunning) {
@@ -1405,6 +1449,8 @@ export default function WorkoutLogScreen() {
     if (activeTimer?.timeLeft === 0 && !timerSettings.countUp && !activeTimer?.completed) {
       // Timer finished - play notification and mark as completed (only for count-down mode)
       TimerNotifications.playTimerComplete();
+      // End Live Activity when timer completes
+      TimerLiveActivity.endTimer();
       setActiveTimer(prev => 
         prev ? { ...prev, isRunning: false, completed: true, countdownRunning: false } : null
       );
@@ -1420,6 +1466,11 @@ export default function WorkoutLogScreen() {
           }
           
           const newCountdownTime = (prev.countdownTime || 0) - 1;
+          
+          // Play countdown sound when reaching 3 seconds (background countdown)
+          if (newCountdownTime === 3) {
+            TimerNotifications.playCountdownIfNeeded(newCountdownTime);
+          }
           
           if (newCountdownTime <= 0) {
             // Background countdown finished
@@ -1440,6 +1491,32 @@ export default function WorkoutLogScreen() {
     
     return () => clearInterval(interval);
   }, [activeTimer?.isRunning, activeTimer?.countdownRunning, timerSettings.countUp]);
+
+  // Initialize and animate toggle switch when countUp setting changes
+  useEffect(() => {
+    // Set initial value without animation on first load
+    toggleAnimatedValue.setValue(timerSettings.countUp ? 1 : 0);
+    
+    Animated.timing(toggleAnimatedValue, {
+      toValue: timerSettings.countUp ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false, // Can't use native driver for transform with interpolation
+    }).start();
+  }, [timerSettings.countUp, toggleAnimatedValue]);
+
+  // Initialize and animate quick mode toggle when isQuickMode changes
+  useEffect(() => {
+    if (activeTimer) {
+      // Set initial value without animation on first load
+      quickModeAnimatedValue.setValue(activeTimer.isQuickMode ? 1 : 0);
+      
+      Animated.timing(quickModeAnimatedValue, {
+        toValue: activeTimer.isQuickMode ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false, // Can't use native driver for transform with interpolation
+      }).start();
+    }
+  }, [activeTimer?.isQuickMode, quickModeAnimatedValue]);
   
   // Handle selected exercise from FavoriteExercisesScreen
   useFocusEffect(
@@ -1764,7 +1841,7 @@ export default function WorkoutLogScreen() {
         const initialTimeLeft = timerSettings.countUp ? 3600 : 3;
         const originalDuration = timerSettings.countUp ? 0 : 3;
         
-        setActiveTimer({
+        const newTimer = {
           exerciseIndex,
           setIndex: setIndex + 1, // Next set
           timeLeft: initialTimeLeft,
@@ -1772,6 +1849,22 @@ export default function WorkoutLogScreen() {
           isRunning: true,
           isQuickMode: false,
           completed: false,
+          startTime: new Date(),
+        };
+        
+        setActiveTimer(newTimer);
+        
+        // Schedule background notification
+        TimerNotifications.scheduleTimerNotification(initialTimeLeft, timerSettings.countUp);
+        
+        // Start Live Activity
+        const timerExercise = dynamicExercises[exerciseIndex];
+        TimerLiveActivity.startTimer({
+          title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
+          timeLeft: initialTimeLeft,
+          isRunning: true,
+          exerciseName: timerExercise?.name || 'Exercise',
+          setNumber: setIndex + 1,
         });
       } else if (!isLinkedToNext || isLinkedToPrev) {
         // Regular exercise or last exercise in superset - normal rest
@@ -1783,7 +1876,7 @@ export default function WorkoutLogScreen() {
         const initialTimeLeft = timerSettings.countUp ? 3600 : optimalRest; // 1 hour max for stopwatch
         const originalDuration = timerSettings.countUp ? 0 : optimalRest; // Stopwatch starts from 0
         
-        setActiveTimer({
+        const newTimer = {
           exerciseIndex,
           setIndex: setIndex + 1, // Next set
           timeLeft: initialTimeLeft,
@@ -1791,6 +1884,22 @@ export default function WorkoutLogScreen() {
           isRunning: true,
           isQuickMode: false,
           completed: false,
+          startTime: new Date(),
+        };
+        
+        setActiveTimer(newTimer);
+        
+        // Schedule background notification
+        TimerNotifications.scheduleTimerNotification(initialTimeLeft, timerSettings.countUp);
+        
+        // Start Live Activity
+        const timerExercise = dynamicExercises[exerciseIndex];
+        TimerLiveActivity.startTimer({
+          title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
+          timeLeft: initialTimeLeft,
+          isRunning: true,
+          exerciseName: timerExercise?.name || 'Exercise',
+          setNumber: setIndex + 1,
         });
       }
       // Keep timer minimized by default
@@ -1798,10 +1907,42 @@ export default function WorkoutLogScreen() {
     }
   };
   
-  const handleTimerToggle = () => {
-    setActiveTimer(prev => 
-      prev ? { ...prev, isRunning: !prev.isRunning } : null
-    );
+  const handleTimerToggle = async () => {
+    setActiveTimer(prev => {
+      if (!prev) return null;
+      
+      const isStarting = !prev.isRunning;
+      const currentExercise = dynamicExercises[prev.exerciseIndex];
+      
+      if (isStarting) {
+        // Starting the timer - set start time and schedule notification
+        TimerNotifications.scheduleTimerNotification(prev.timeLeft, timerSettings.countUp);
+        
+        // Start Live Activity
+        TimerLiveActivity.startTimer({
+          title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
+          timeLeft: prev.timeLeft,
+          isRunning: true,
+          exerciseName: currentExercise?.name || 'Exercise',
+          setNumber: prev.setIndex,
+        });
+        
+        return { 
+          ...prev, 
+          isRunning: true, 
+          startTime: new Date() 
+        };
+      } else {
+        // Pausing the timer - cancel notification and update Live Activity
+        TimerNotifications.cancelTimerNotifications();
+        TimerLiveActivity.updateTimer({ isRunning: false });
+        
+        return { 
+          ...prev, 
+          isRunning: false 
+        };
+      }
+    });
   };
   
   const handleTimerModeSwitch = () => {
@@ -1827,7 +1968,10 @@ export default function WorkoutLogScreen() {
   
   const handleTimerStop = () => {
     setTimerMinimized(true);
-    setShowTimerSettings(false);
+    // Cancel any background notifications when stopping timer
+    TimerNotifications.cancelTimerNotifications();
+    // End Live Activity
+    TimerLiveActivity.endTimer();
   };
   
   const handleDropSetComplete = async (exerciseIndex: number, setIndex: number, dropIndex: number) => {
@@ -2190,7 +2334,22 @@ export default function WorkoutLogScreen() {
       
       // Get existing completions using robust storage
       const completed = await RobustStorage.getItem(completedKey, true);
-      const completedSet = completed ? new Set(JSON.parse(completed)) : new Set();
+      let completedSet = new Set();
+      
+      if (completed) {
+        try {
+          const parsedCompleted = JSON.parse(completed);
+          // Ensure it's an array before creating Set
+          if (Array.isArray(parsedCompleted)) {
+            completedSet = new Set(parsedCompleted);
+          } else {
+            console.warn('🎯 [COMPLETION] ⚠️ Completed data is not an array, starting fresh:', parsedCompleted);
+          }
+        } catch (parseError) {
+          console.error('🎯 [COMPLETION] ❌ Error parsing completed data:', parseError);
+          // Start with empty set if parsing fails
+        }
+      }
       completedSet.add(workoutKey);
       
       const completedData = JSON.stringify(Array.from(completedSet));
@@ -3186,12 +3345,6 @@ export default function WorkoutLogScreen() {
               <Text style={styles.timerTitle}>Rest Timer</Text>
               <View style={styles.timerHeaderButtons}>
                 <TouchableOpacity 
-                  onPress={() => setShowTimerSettings(!showTimerSettings)}
-                  style={styles.timerIconButton}
-                >
-                  <Ionicons name="settings-outline" size={20} color="#71717a" />
-                </TouchableOpacity>
-                <TouchableOpacity 
                   onPress={handleTimerStop}
                   style={styles.timerIconButton}
                 >
@@ -3200,92 +3353,8 @@ export default function WorkoutLogScreen() {
               </View>
             </View>
 
-            {/* Timer Display or Settings */}
-            {showTimerSettings ? (
-              <ScrollView style={styles.settingsScroll} showsVerticalScrollIndicator={false}>
-                <View style={styles.settingsContainer}>
-                  <Text style={styles.settingsTitle}>Notifications</Text>
-                  
-                  {/* Sound Toggle */}
-                  <View style={styles.settingRow}>
-                    <Text style={styles.settingLabel}>Sound</Text>
-                    <TouchableOpacity
-                      style={[styles.toggle, timerSettings.soundEnabled && [styles.toggleOn, { backgroundColor: themeColor }]]}
-                      onPress={async () => {
-                        const newSettings = { ...timerSettings, soundEnabled: !timerSettings.soundEnabled };
-                        setTimerSettings(newSettings);
-                        await TimerNotifications.saveSettings(newSettings);
-                      }}
-                    >
-                      <View style={[styles.toggleKnob, timerSettings.soundEnabled && styles.toggleKnobOn]} />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Sound Options */}
-                  {timerSettings.soundEnabled && (
-                    <View style={styles.optionsGrid}>
-                      {SOUND_OPTIONS.map((option) => (
-                        <TouchableOpacity
-                          key={option.id}
-                          style={[styles.optionButton, timerSettings.selectedSound === option.id && [styles.optionSelected, { backgroundColor: themeColor + '20', borderColor: themeColor }]]}
-                          onPress={async () => {
-                            const newSettings = { ...timerSettings, selectedSound: option.id };
-                            setTimerSettings(newSettings);
-                            await TimerNotifications.saveSettings(newSettings);
-                          }}
-                          onLongPress={async () => {
-                            await TimerNotifications.playSound(option.id, timerSettings.volume);
-                          }}
-                        >
-                          <Text style={[styles.optionText, timerSettings.selectedSound === option.id && [styles.optionTextSelected, { color: themeColor }]]}>
-                            {option.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Haptic Toggle */}
-                  <View style={styles.settingRow}>
-                    <Text style={styles.settingLabel}>Haptic</Text>
-                    <TouchableOpacity
-                      style={[styles.toggle, timerSettings.hapticEnabled && [styles.toggleOn, { backgroundColor: themeColor }]]}
-                      onPress={async () => {
-                        const newSettings = { ...timerSettings, hapticEnabled: !timerSettings.hapticEnabled };
-                        setTimerSettings(newSettings);
-                        await TimerNotifications.saveSettings(newSettings);
-                      }}
-                    >
-                      <View style={[styles.toggleKnob, timerSettings.hapticEnabled && styles.toggleKnobOn]} />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Haptic Options */}
-                  {timerSettings.hapticEnabled && (
-                    <View style={styles.optionsGrid}>
-                      {['light', 'medium', 'heavy'].map((pattern) => (
-                        <TouchableOpacity
-                          key={pattern}
-                          style={[styles.optionButton, timerSettings.hapticPattern === pattern && [styles.optionSelected, { backgroundColor: themeColor + '20', borderColor: themeColor }]]}
-                          onPress={async () => {
-                            const newSettings = { ...timerSettings, hapticPattern: pattern as any };
-                            setTimerSettings(newSettings);
-                            await TimerNotifications.saveSettings(newSettings);
-                          }}
-                          onLongPress={async () => {
-                            await TimerNotifications.triggerHaptic(pattern as any);
-                          }}
-                        >
-                          <Text style={[styles.optionText, timerSettings.hapticPattern === pattern && [styles.optionTextSelected, { color: themeColor }]]}>
-                            {pattern.charAt(0).toUpperCase() + pattern.slice(1)}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              </ScrollView>
-            ) : activeTimer.completed ? (
+            {/* Timer Display */}
+            {activeTimer.completed ? (
               <View style={styles.timerDisplay}>
                 {/* Timer Completed Screen */}
                 <Ionicons name="checkmark-circle" size={72} color={themeColor} />
@@ -3303,13 +3372,33 @@ export default function WorkoutLogScreen() {
                       const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
                       const resetTime = activeTimer.isQuickMode ? quickRest : optimalRest;
                       
-                      setActiveTimer(prev => prev ? {
-                        ...prev,
-                        timeLeft: resetTime,
-                        originalDuration: resetTime,
-                        isRunning: true,
-                        completed: false
-                      } : null);
+                      setActiveTimer(prev => {
+                        if (!prev) return null;
+                        
+                        const updatedTimer = {
+                          ...prev,
+                          timeLeft: resetTime,
+                          originalDuration: resetTime,
+                          isRunning: true,
+                          completed: false,
+                          startTime: new Date()
+                        };
+                        
+                        // Schedule background notification for rest again
+                        TimerNotifications.scheduleTimerNotification(resetTime, timerSettings.countUp);
+                        
+                        // Start Live Activity for rest again
+                        const restAgainExercise = dynamicExercises[prev.exerciseIndex];
+                        TimerLiveActivity.startTimer({
+                          title: timerSettings.countUp ? 'Stopwatch Running' : 'Rest Timer',
+                          timeLeft: resetTime,
+                          isRunning: true,
+                          exerciseName: restAgainExercise?.name || 'Exercise',
+                          setNumber: prev.setIndex,
+                        });
+                        
+                        return updatedTimer;
+                      });
                     }}
                   >
                     <Ionicons name="refresh" size={16} color="#0a0a0b" />
@@ -3416,53 +3505,92 @@ export default function WorkoutLogScreen() {
                     <Text style={styles.secondaryButtonText}>Reset</Text>
                   </TouchableOpacity>
 
-                  {!timerSettings.countUp && (
-                    <TouchableOpacity 
-                      style={styles.secondaryButton}
-                      onPress={handleTimerModeSwitch}
-                    >
-                      <Ionicons name={activeTimer.isQuickMode ? "flash" : "fitness"} size={18} color="#71717a" />
-                      <Text style={styles.secondaryButtonText}>{activeTimer.isQuickMode ? 'Quick' : 'Optimal'}</Text>
-                    </TouchableOpacity>
-                  )}
 
-                  <TouchableOpacity 
-                    style={styles.secondaryButton}
-                    onPress={async () => {
-                      const newSettings = { ...timerSettings, countUp: !timerSettings.countUp };
-                      setTimerSettings(newSettings);
-                      await TimerNotifications.saveSettings(newSettings);
-                      
-                      // Preserve countdown state when switching modes
-                      if (activeTimer) {
-                        if (newSettings.countUp) {
-                          // Switching TO stopwatch - preserve countdown state
-                          setActiveTimer(prev => prev ? {
-                            ...prev,
-                            countdownTime: prev.timeLeft, // Save current countdown time
-                            countdownRunning: prev.isRunning, // Save if it was running
-                            timeLeft: prev.stopwatchTime || 3600, // Use saved stopwatch time or start fresh
-                            originalDuration: 0,
-                            isRunning: false, // Start stopwatch paused
-                            completed: false
-                          } : null);
-                        } else {
-                          // Switching TO countdown - restore countdown state
-                          setActiveTimer(prev => prev ? {
-                            ...prev,
-                            stopwatchTime: prev.timeLeft, // Save current stopwatch time
-                            timeLeft: prev.countdownTime || prev.originalDuration, // Restore countdown time
-                            isRunning: prev.countdownRunning || false, // Restore running state
-                            completed: false
-                          } : null);
-                        }
-                      }
-                    }}
-                  >
-                    <Ionicons name={timerSettings.countUp ? "arrow-up" : "arrow-down"} size={18} color="#71717a" />
-                    <Text style={styles.secondaryButtonText}>{timerSettings.countUp ? 'Count Up' : 'Count Down'}</Text>
-                  </TouchableOpacity>
                 </View>
+              </View>
+            )}
+
+            {/* Count Up/Down Toggle Switch - Bottom Left */}
+            <View style={styles.timerModeToggleContainer}>
+              <TouchableOpacity 
+                style={styles.timerModeToggle}
+                onPress={async () => {
+                  const newSettings = { ...timerSettings, countUp: !timerSettings.countUp };
+                  setTimerSettings(newSettings);
+                  await TimerNotifications.saveSettings(newSettings);
+                  
+                  // Smooth transition when switching modes
+                  if (activeTimer) {
+                    if (newSettings.countUp) {
+                      // Switching TO stopwatch - start from 0 instead of 3600 for smoother transition
+                      setActiveTimer(prev => prev ? {
+                        ...prev,
+                        countdownTime: prev.timeLeft, // Save current countdown time
+                        countdownRunning: prev.isRunning, // Save if it was running
+                        timeLeft: 0, // Start stopwatch at 0 for cleaner transition
+                        stopwatchTime: 0, // Reset stopwatch time
+                        originalDuration: 0,
+                        isRunning: false, // Pause for smooth transition
+                        completed: false
+                      } : null);
+                    } else {
+                      // Switching TO countdown - restore countdown state and pause for smooth transition
+                      setActiveTimer(prev => prev ? {
+                        ...prev,
+                        stopwatchTime: prev.timeLeft, // Save current stopwatch time
+                        timeLeft: prev.countdownTime || prev.originalDuration, // Restore countdown time
+                        isRunning: false, // Pause for smooth transition
+                        completed: false
+                      } : null);
+                    }
+                  }
+                }}
+              >
+                <View style={styles.timerToggleTrack}>
+                  <Animated.View style={[
+                    styles.timerToggleKnob, 
+                    { 
+                      backgroundColor: themeColor,
+                      transform: [{ 
+                        translateX: toggleAnimatedValue.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 18],
+                        })
+                      }] 
+                    }
+                  ]} />
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.timerModeLabel}>
+                {timerSettings.countUp ? 'Countup' : 'Countdown'}
+              </Text>
+            </View>
+
+            {/* Optimal/Quick Toggle Switch - Bottom Right */}
+            {!timerSettings.countUp && (
+              <View style={styles.timerQuickModeToggleContainer}>
+                <Text style={styles.timerModeLabel}>
+                  {activeTimer?.isQuickMode ? 'Quick' : 'Optimal'}
+                </Text>
+                <TouchableOpacity 
+                  style={styles.timerModeToggle}
+                  onPress={handleTimerModeSwitch}
+                >
+                  <View style={styles.timerToggleTrack}>
+                    <Animated.View style={[
+                      styles.timerToggleKnob, 
+                      { 
+                        backgroundColor: themeColor,
+                        transform: [{ 
+                          translateX: quickModeAnimatedValue.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, 18],
+                          })
+                        }] 
+                      }
+                    ]} />
+                  </View>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -4697,6 +4825,67 @@ const styles = StyleSheet.create({
   toggleKnobOn: {
     backgroundColor: '#ffffff',
     alignSelf: 'flex-end',
+  },
+  infoBox: {
+    backgroundColor: '#18181b',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#a1a1aa',
+    textAlign: 'center',
+  },
+  timerModeToggleContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timerModeLabel: {
+    fontSize: 12,
+    color: '#a1a1aa',
+    fontWeight: '500',
+  },
+  timerQuickModeToggleContainer: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timerModeToggle: {
+    padding: 2,
+  },
+  timerToggleTrack: {
+    width: 40,
+    height: 20,
+    backgroundColor: '#27272a',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  timerToggleOption: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  timerToggleKnob: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    left: 2,
+    zIndex: 2,
   },
   optionsGrid: {
     flexDirection: 'row',

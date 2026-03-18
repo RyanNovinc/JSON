@@ -53,6 +53,17 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
     ]).start();
   }, [appMode]);
 
+  // Fix initialization sync issue - ensure animated values match app mode on mount
+  useEffect(() => {
+    const correctTranslateValue = appMode === 'training' ? 0 : -SCREEN_WIDTH;
+    const correctProgressValue = appMode === 'training' ? 0 : 1;
+    
+    // Set values immediately without animation on mount to fix sync issues
+    translateX.setValue(correctTranslateValue);
+    transitionProgress.setValue(correctProgressValue);
+    gestureTranslateX.setValue(0);
+  }, []); // Run only on mount
+
   const onGestureEvent = (event: any) => {
     const { translationX } = event.nativeEvent;
     

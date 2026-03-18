@@ -2611,7 +2611,10 @@ This check exists because the JSON generator must reconstruct complete exercise 
                 opacity: modalOpacity,
                 borderColor: themeColor,
                 shadowColor: themeColor,
-                maxHeight: showAddMoreMode ? '75%' : '85%',
+                height: '60%',
+                alignSelf: 'center',
+                width: '90%',
+                justifyContent: 'flex-start',
               }
             ]}
           >

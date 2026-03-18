@@ -52,7 +52,6 @@ export default function ImportMealPlanScreen() {
   const [parsedMealPlan, setParsedMealPlan] = useState<SimplifiedMealPlan | null>(null);
   const [modalScale] = useState(new Animated.Value(0));
   const [modalOpacity] = useState(new Animated.Value(0));
-  const [outputPreference, setOutputPreference] = useState<'copy_paste' | 'save_import'>('copy_paste');
 
   const getCurrentDate = (): string => {
     const today = new Date();
@@ -72,35 +71,7 @@ export default function ImportMealPlanScreen() {
     return targetDate.toLocaleDateString('en-US', { weekday: 'long' });
   };
 
-  // Load output preference or default to copy_paste
-  useEffect(() => {
-    const loadOutputPreference = async () => {
-      try {
-        const savedData = await RobustStorage.getItem('outputPreference', true) || await AsyncStorage.getItem('outputPreference');
-        if (savedData) {
-          setOutputPreference(savedData as 'copy_paste' | 'save_import');
-        } else {
-          // Default to copy_paste for all platforms (works everywhere, especially good for mobile)
-          setOutputPreference('copy_paste');
-        }
-      } catch (error) {
-        console.error('Error loading output preference:', error);
-        // Default to copy_paste on error since it works on all platforms
-        setOutputPreference('copy_paste');
-      }
-    };
-    loadOutputPreference();
-  }, []);
 
-  // Save output preference
-  const saveOutputPreference = async (preference: 'copy_paste' | 'save_import') => {
-    try {
-      await RobustStorage.setItem('outputPreference', preference);
-      setOutputPreference(preference);
-    } catch (error) {
-      console.error('Error saving output preference:', error);
-    }
-  };
 
   const sampleMealPlan = {
     "id": "sample_3day_balanced",
@@ -641,6 +612,9 @@ export default function ImportMealPlanScreen() {
       console.log('📤 Importing meal plan to SimplifiedMealPlanningContext');
       await saveMealPlan(parsedMealPlan);
       
+      // Close the modal first
+      setShowConfirmation(false);
+      
       // Navigate to nutrition home
       navigation.navigate('NutritionHome', { 
         refresh: true
@@ -789,32 +763,12 @@ export default function ImportMealPlanScreen() {
                   Ask the AI to format it for the app
                 </Text>
                 
-                {/* Output preference toggle */}
-                <View style={styles.outputPreferenceContainer}>
-                  <TouchableOpacity
-                    style={[styles.preferenceOption, outputPreference === 'copy_paste' && { backgroundColor: themeColor + '20' }]}
-                    onPress={() => saveOutputPreference('copy_paste')}
-                  >
-                    <Text style={[styles.preferenceText, outputPreference === 'copy_paste' && { color: themeColor }]}>
-                      Copy & Paste
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.preferenceSeparator}>|</Text>
-                  <TouchableOpacity
-                    style={[styles.preferenceOption, outputPreference === 'save_import' && { backgroundColor: themeColor + '20' }]}
-                    onPress={() => saveOutputPreference('save_import')}
-                  >
-                    <Text style={[styles.preferenceText, outputPreference === 'save_import' && { color: themeColor }]}>
-                      Save & Import
-                    </Text>
-                  </TouchableOpacity>
-                </View>
                 
                 <TouchableOpacity 
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
-                      const prompt = generateJsonConversionPrompt(outputPreference);
+                      const prompt = generateJsonConversionPrompt('save_import');
                       await Clipboard.setStringAsync(prompt);
                       setAiPromptCopied(true);
                       setTimeout(() => {
@@ -1666,27 +1620,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#27272a',
-  },
-  outputPreferenceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    gap: 8,
-  },
-  preferenceOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  preferenceText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#71717a',
-  },
-  preferenceSeparator: {
-    fontSize: 13,
-    color: '#3f3f46',
-    marginHorizontal: 4,
   },
 });

@@ -314,7 +314,7 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   return specs;
 };
 
-export const getAIPrompt = (questionnaireData?: QuestionnaireData) => {
+export const getAIPrompt = (questionnaireData?: QuestionnaireData, outputPreference?: string) => {
   // Calculate equipment-specific transition tax
   const equipment = questionnaireData?.selectedEquipment ?? [];
   const transitionTax = equipment.includes('commercial_gym') 
@@ -322,6 +322,13 @@ export const getAIPrompt = (questionnaireData?: QuestionnaireData) => {
     : equipment.includes('home_gym') 
     ? 90 
     : 60;
+
+  // Determine output format based on user preference
+  const outputInstructions = outputPreference === 'copy_paste' 
+    ? `**Output each block as a \`\`\`json code block in chat. Do not create files.**`
+    : `**Write each block as a .json file. Do not output JSON to chat.**
+1. Create a file and write the complete JSON
+2. When finished, provide the download link`;
 
   return `# Generate Workout Program as JSON
 // PROMPT 3: JSON Generation Prompt - Converts verified workout plans to JSON format
@@ -340,13 +347,11 @@ Use these when calculating session durations and validating day structure.
 
 **JSON only** — do not reproduce the program in chat or create any text version. Only output JSON file(s).
 
-**Write JSON to a file** — do not output it to chat.
-1. Create a file and write the complete JSON
-2. When finished, provide the download link
+${outputInstructions}
 
 **Multi-block programs:**
 Generate one block at a time. After each block:
-1. Provide the download link for that block's JSON file
+1. ${outputPreference === 'copy_paste' ? 'Output the JSON in a code block' : 'Provide the download link for that block\'s JSON file'}
 2. Output a brief **volume summary** showing total primary-tagged sets per muscle group for that block (training weeks, not deload). This gives the reviewer something to check against.
 3. Say: "Block 1 complete. Say 'review' to validate this block before continuing, or 'next' to generate Block 2 directly."
 4. **STOP and wait for user input.** Do not proceed to the next block until the user responds.
@@ -354,7 +359,7 @@ Generate one block at a time. After each block:
 **When user says "next" for subsequent blocks:**
 1. Generate the next block directly as JSON format (do not create text version first)
 2. Apply the same JSON schema and structure established above
-3. Write the JSON to a file and provide download link
+3. ${outputPreference === 'copy_paste' ? 'Output the JSON in a code block' : 'Write the JSON to a file and provide download link'}
 4. Output volume summary for the new block
 5. Say: "Block [X] complete. Say 'review' to validate this block before continuing, or 'next' to generate Block [X+1] directly."
 6. **STOP and wait for user input.** Do not proceed to the next block until the user responds.
@@ -363,7 +368,7 @@ Generate one block at a time. After each block:
 1. Read the workout program document from earlier in the conversation
 2. Apply the embedded review checklist below to the specified block  
 3. Generate the corrected JSON version with all fixes applied
-4. Write corrected JSON to file and provide download link
+4. ${outputPreference === 'copy_paste' ? 'Output the corrected JSON in a code block' : 'Write corrected JSON to file and provide download link'}
 5. Say: "Block [X] reviewed and updated. Say 'next' to continue to Block [X+1]."
 
 ### Embedded Review Checklist
@@ -434,16 +439,11 @@ The plan is fully self-contained: it lists all exercise pools, block structures,
 For each exercise, design a weekly rep progression across the block. Since the app doesn't track weight, progressions are expressed entirely through rep targets — the user manages their own load increases.
 
 **Starting point rule:**
-- **Compounds:** Start at the TOP of the prescribed range in Week 1, reduce across the block. The rep ceiling is Week 1; the floor is the final training week before deload. This signals increasing load week over week.
-- **Isolations:** Start at the BOTTOM of the prescribed range in Week 1, climb toward the ceiling across the block. Never start at the ceiling — leave room to progress.
+Start at the TOP of the prescribed range in Week 1, reduce across the block. The rep ceiling is Week 1; the floor is the final training week before deload. This signals increasing load week over week.
 
-**Linear progression (default for compounds):**
+**Linear progression (default for all exercises):**
 Maintain rep targets in early weeks. Slight rep reduction in later weeks signals that the lifter should be using heavier loads.
 Example (5-week block, 4 sets): Week 1: "10, 10, 10, 8" → Week 2: "10, 10, 8, 8" → Week 3: "8, 8, 8, 8" → Week 4: "8, 8, 6, 6" → Week 5 (deload): "12, 12"
-
-**Ascending density (default for isolation):**
-Increase reps over the block, building volume tolerance at the same working difficulty.
-Example (5-week block, 3 sets): Week 1: "10, 10, 10" → Week 2: "11, 11, 10" → Week 3: "12, 12, 11" → Week 4: "12, 12, 12" → Week 5 (deload): "15, 15"
 
 **Deload week pattern:**
 Reduce sets by ~40-50% (via sets_weekly). Increase reps by 2-3 per set. Maintain movement patterns.
@@ -455,18 +455,14 @@ Example: If training weeks are 4 sets of "10, 10, 10, 8", deload is 2 sets of "1
 
 ### Rest Periods
 
-Use the rest periods specified in the plan if present. Otherwise use these defaults:
+Use the rest periods specified in the plan if present. Otherwise, apply evidence-based rest periods appropriate for the exercise type and training goal:
 
 **Heavy compounds** = squat variations, deadlift variations, barbell bench press, barbell overhead press.
 **Other compounds** = everything else with 2+ joints (rows, lunges, dumbbell presses, pull-ups, dips, leg press, etc.).
 
-| Exercise Type | rest (seconds) | restQuick (~65% of rest, rounded) |
-|---------------|---------------|-----------------------------------|
-| Heavy compounds | 150-180 | 100-115 |
-| Other compounds | 120-150 | 80-100 |
-| Isolation exercises | 60-90 | 40-60 |
+Use longer rest for heavy compounds that require more recovery, moderate rest for other compound movements, and shorter rest for isolation exercises. Consider the training goal (strength vs hypertrophy vs endurance) and adjust accordingly. Calculate restQuick as approximately 65% of the main rest period.
 
-**Superset rest encoding:** For superset pairs, the first exercise (SS[n]a) gets a short rest of 60-90s (transition to the second exercise). The second exercise (SS[n]b) gets the full rest appropriate to the exercise type (compound or isolation). This means you rest briefly between the two exercises, then take a full rest before starting the pair again.
+**Superset rest encoding:** For superset pairs, the first exercise (SS[n]a) gets a brief transition rest to move to the second exercise. The second exercise (SS[n]b) gets the full rest appropriate to the exercise type before repeating the pair. Use your judgment for transition timing based on the exercise pairing - some combinations need minimal rest, others may need more recovery between movements.
 
 If the plan notes shorter or minimal rest preferences, reduce accordingly (shorter: ~25% reduction; minimal: ~40% reduction).
 
@@ -484,29 +480,6 @@ Only include non-obvious technique tips or specific setup instructions. Do not a
 ### Supersets
 
 Place superset exercises adjacent in the exercises array. Include "Superset with [exact exercise name]" in both exercises' notes field. Add "superset_group": "ss1" (or "ss2", "ss3" etc.) to both exercises in the pair — use the same string value for both. The plan marks supersets with SS[n]a/SS[n]b notation — translate these to adjacent array entries with matching superset_group values.
-
-### Cardio Rotation
-
-If the plan prescribes a cardio day that rotates through different activities across weeks, encode it as a single cardio entry where progression_weekly describes each week's activity:
-
-\`\`\`json
-{
-  "type": "cardio",
-  "activity": "Cardio Rotation",
-  "duration_minutes": 30,
-  "target_intensity": "Moderate (RPE 5-7)",
-  "progression_weekly": {
-    "1": "Treadmill / Indoor Running — 30 min steady state, moderate pace",
-    "2": "Stationary Bike / Cycling — 30 min, mix of seated and standing intervals",
-    "3": "Swimming — 30 min continuous laps, mixed strokes",
-    "4": "Stair Climber / StepMill — 25 min steady climb + 5 min cooldown",
-    "5": "Treadmill / Indoor Running — 30 min with 5x1 min faster intervals"
-  },
-  "notes": "Rotate through preferred activities each week. Adjust duration and intensity as needed."
-}
-\`\`\`
-
-Use the activity names exactly as they appear in the plan's Secondary Goal Summary.
 
 ---
 
@@ -601,55 +574,6 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
 }
 \`\`\`
 
-### Cardio Exercise
-\`\`\`json
-{
-  "type": "cardio",
-  "activity": "string",
-  "duration_minutes": number,
-  "target_intensity": "string (optional)",
-  "cardio_mode": "string (optional)",
-  "progression_weekly": { "1": "string", "2": "string", ... },
-  "notes": "string (optional)"
-}
-\`\`\`
-
-### Stretch Exercise
-\`\`\`json
-{
-  "type": "stretch",
-  "exercise": "string",
-  "hold_seconds": number,
-  "sets": number,
-  "per_side": boolean,
-  "primaryMuscles": ["from taxonomy"],
-  "notes": "string (optional)"
-}
-\`\`\`
-
-### Circuit Exercise
-\`\`\`json
-{
-  "type": "circuit",
-  "circuit_name": "string",
-  "rounds": number,
-  "work_seconds": number,
-  "rest_seconds": number,
-  "exercises": [{ "exercise": "string", "notes": "string (optional)" }],
-  "notes": "string (optional)"
-}
-\`\`\`
-
-### Sport Exercise
-\`\`\`json
-{
-  "type": "sport",
-  "activity": "string",
-  "duration_minutes": number (optional),
-  "notes": "string (optional)"
-}
-\`\`\`
-
 ---
 
 ## Schema Rules
@@ -684,7 +608,7 @@ Before presenting each block's download link, silently verify:
 - [ ] Superset rest is correctly encoded (SS[n]a gets short rest, SS[n]b gets full rest)
 - [ ] Superset pairs both have a matching superset_group field with the same value (e.g. "ss1")
 - [ ] Rep progressions change meaningfully across weeks (not identical every week for all exercises)
-- [ ] Compounds trend flat-to-decreasing reps; isolations trend flat-to-increasing
+- [ ] All exercises trend flat-to-decreasing reps (signaling progressive overload)
 - [ ] Deload weeks show reduced sets_weekly (~40-50% fewer) and increased reps
 - [ ] Rest periods match exercise type (heavy compounds ≥150s, other compounds ≥120s, isolation ≤90s)
 - [ ] Muscle tags match the compound tagging guide

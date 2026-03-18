@@ -110,13 +110,13 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   const { appMode, setAppMode, isTrainingMode, isNutritionMode, isTransitioning, setIsTransitioning } = useAppMode();
   const hasNutritionAccess = useHasNutritionAccess();
 
-  // Load routines from storage on component mount
+  // Load additional data on mount (context handles main routines automatically)
   useEffect(() => {
     const initializeApp = async () => {
       // Clean up any corrupted completion data on app start
       await WorkoutStorage.cleanupCorruptedCompletionData();
       
-      // Load my routines (context handles main routines automatically)
+      // Load my routines (separate from main routines)
       loadMyRoutines();
     };
     
@@ -867,6 +867,16 @@ export default function HomeScreen({ route, transitionProgress }: any) {
 
 
   const renderContent = () => {
+    // Show loading if context is still loading (prevents flash of empty state)
+    if (isLoading) {
+      return (
+        <View style={[styles.emptyState, { backgroundColor: '#0a0a0b' }]}>
+          <Ionicons name="barbell-outline" size={64} color="#3f3f46" />
+          <Text style={styles.emptyTitle}>Loading Routines...</Text>
+        </View>
+      );
+    }
+
     if (routines.length === 0) {
       return (
         <View style={[styles.emptyState, { backgroundColor: '#0a0a0b' }]}>

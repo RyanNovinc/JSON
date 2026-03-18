@@ -58,34 +58,11 @@ For programs with 4+ training days, ensure adequate recovery between muscle grou
 }
 
 function getTimeFormula(data: QuestionnaireData): string {
-  const equipment = data.selectedEquipment ?? [];
-  
-  const transitionTax = equipment.includes('commercial_gym') 
-    ? 150  // seconds per exercise
-    : equipment.includes('home_gym') 
-    ? 90 
-    : 60;
-
-  return `**Session Duration Calculation Guidelines:**
-
-Use this formula to estimate and validate session duration:
-
-**Time Components:**
-- Straight sets: (sets × 45s execution) + (sets × rest_seconds)
-- Superset pairs: (pairs × 90s execution) + (pairs × rest_seconds) + (pairs × transition_time setup)
-- Equipment transitions: exercise_count × transition_time (use equipment-appropriate value from table below)
-- Warmup/cooldown: 300s fixed
-
-**Duration Management:**
-- Calculate total time for each session using the formula above
-- If session exceeds the user's stated time preference, reduce exercise count or use supersets
-- Prioritize compound movements — remove isolation exercises if time is tight
-- The formula is non-negotiable; adjust exercise selection to meet time constraints, not the other way around
-
-**Equipment-Specific Transition Times:**
-- Commercial gym: 150s
-- Home gym: 90s
-- Bodyweight/basic: 60s`;
+  return `**Session Duration:**
+- Estimate session length based on exercise count, sets, and rest periods
+- Account for warmup time
+- If session exceeds user's time preference, reduce exercise count or use supersets
+- Prioritize compound movements over isolation exercises when time is limited`;
 }
 
 function getMuscleAudit(data: QuestionnaireData): string {
@@ -159,7 +136,7 @@ function generateConstraintLayer(data: QuestionnaireData): string {
 
 export const INSTRUCTIONS_HEADER = `# Create a Complete Workout Program
 
-I'm using a fitness app called JSON.fit that supports multiple exercise types (strength, cardio, stretch, circuit, and sport). I need help creating a personalized workout program.
+I'm using a workout app called JSON.fit. I need help creating a personalized workout program.
 
 **USE WEB SEARCH** - If you have web search available, use it selectively to verify current research on volume recommendations, rest periods, exercise effectiveness, or training techniques that might improve this program. Current research can enhance programming decisions when it provides meaningful updates to established principles.
 
@@ -447,39 +424,29 @@ export const RULE_20 = `20. **Complete block coverage** — the plan must explic
 
 export const REST_SECTION_HEADER = `---
 
-## REST TIME DEFAULTS
+## REST TIME GUIDELINES
 
-Use these when the profile says "Let AI choose" or doesn't specify a preference. If the profile specifies a rest preference, adjust accordingly:`;
+Use evidence-based rest periods appropriate for the exercise type and training goal. When the profile specifies a rest preference, adjust accordingly:`;
 
 export const getRestSection = (restTrigger: string): string => {
   if (restTrigger === 'OPTIMAL') {
     return ''; // No adjustment text needed
   } else if (restTrigger === 'SHORTER') {
     return `
-- **Shorter Rest Times:** Reduce by ~25% (e.g., compounds 90-135s, isolation 45-70s).`;
+- **Shorter Rest:** Reduce rest periods while noting potential impact on performance`;
   } else if (restTrigger === 'MINIMAL') {
     return `
-- **Minimal Rest Times:** Reduce by ~40% (e.g., compounds 75-110s, isolation 35-55s). Note in trade-offs that this limits strength/hypertrophy outcomes.`;
+- **Minimal Rest:** Significantly reduce rest periods with clear trade-off warnings`;
   } else { // AI_CHOOSE
     return `
-- **Optimal Rest Times:** Use the defaults below as-is.
-- **Shorter Rest Times:** Reduce by ~25% (e.g., compounds 90-135s, isolation 45-70s).
-- **Minimal Rest Times:** Reduce by ~40% (e.g., compounds 75-110s, isolation 35-55s). Note in trade-offs that this limits strength/hypertrophy outcomes.`;
+- **Optimal Rest:** Use current research recommendations for optimal performance
+- **Shorter Rest:** Reduce rest periods while noting potential impact on performance
+- **Minimal Rest:** Significantly reduce rest periods with clear trade-off warnings`;
   }
 };
 
 export const STATIC_REST_TABLE = `
-**Heavy compounds** = squat variations, deadlift variations, barbell bench press, barbell overhead press.
-**Other compounds** = everything else with 2+ joints (rows, lunges, dumbbell presses, pull-ups, dips, leg press, etc.).
-
-| Exercise Type | Default Rest (seconds) |
-|---------------|----------------------|
-| Heavy compounds | 150-180 |
-| Other compounds | 120-150 |
-| Isolation exercises | 60-90 |
-| Superset exercises | SS[n]a: 60-90 (transition to second exercise); SS[n]b: full rest for its exercise type (compound or isolation) before repeating the pair |
-
-These defaults are also needed for session duration estimation.`;
+Consider exercise complexity, training goals, and user preferences when determining appropriate rest periods.`;
 
 // ================================
 // VOLUME RULES
@@ -632,7 +599,7 @@ Adapt the plan based on the user's Primary Goal from their profile.`;
 
 export const BUILD_MUSCLE_GUIDANCE = `
 ### Build Muscle / Body Recomposition
-Prioritize hypertrophy rep ranges (8-12 for compounds, 10-15 for isolation). Volume is the primary driver. Apply the full volume verification system above. For recomp, include cardio if the user selected it as a secondary goal.`;
+Prioritize hypertrophy rep ranges (8-12 for compounds, 10-15 for isolation). Volume is the primary driver. Apply the full volume verification system above.`;
 
 export const BURN_FAT_GUIDANCE = `
 ### Burn Fat
