@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutRoutine } from '../utils/storage';
 
@@ -6,16 +6,43 @@ import { WorkoutRoutine } from '../utils/storage';
 // WORKOUT ROUTINE CONTEXT - Based on SimplifiedMealPlanningContext Pattern
 // =============================================================================
 
+// Timer interface for background timer persistence
+export interface GlobalTimer {
+  exerciseIndex: number;
+  setIndex: number;
+  isRunning: boolean;
+  isQuickMode: boolean;
+  completed: boolean;
+  startTime: Date;
+  // Countdown mode fields
+  countdownTimeLeft?: number;
+  countdownDuration?: number;
+  // Countup mode fields  
+  countupElapsed?: number;
+  // Background countdown when in countup mode
+  backgroundCountdownTime?: number;
+  backgroundCountdownRunning?: boolean;
+}
+
 interface WorkoutRoutineContextType {
   // State
   routines: WorkoutRoutine[];
   isLoading: boolean;
+  
+  // Global timer state
+  globalTimer: GlobalTimer | null;
+  timerMinimized: boolean;
   
   // Core operations
   loadRoutines: () => Promise<void>;
   saveRoutine: (routine: WorkoutRoutine) => Promise<void>;
   deleteRoutine: (routineId: string) => Promise<void>;
   updateRoutine: (routine: WorkoutRoutine) => Promise<void>;
+  
+  // Timer operations
+  setGlobalTimer: (timer: GlobalTimer | null) => void;
+  setTimerMinimized: (minimized: boolean) => void;
+  updateTimerState: (updater: (timer: GlobalTimer | null) => GlobalTimer | null) => void;
 }
 
 const WorkoutRoutineContext = createContext<WorkoutRoutineContextType | undefined>(undefined);
@@ -23,7 +50,8 @@ const WorkoutRoutineContext = createContext<WorkoutRoutineContextType | undefine
 // Storage keys - using simple AsyncStorage like nutrition screen
 const STORAGE_KEYS = {
   ROUTINES: 'workout_routines_simple',
-  BACKUP: 'workout_routines_simple_backup'
+  BACKUP: 'workout_routines_simple_backup',
+  GLOBAL_TIMER: 'global_timer_state'
 };
 
 interface WorkoutRoutineProviderProps {
@@ -34,7 +62,12 @@ export const WorkoutRoutineProvider: React.FC<WorkoutRoutineProviderProps> = ({ 
   const [state, setState] = useState({
     routines: [] as WorkoutRoutine[],
     isLoading: true,
+    globalTimer: null as GlobalTimer | null,
+    timerMinimized: true,
   });
+  
+  // Background timer interval ref
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // =============================================================================
   // CORE DATA OPERATIONS - Simple and Reliable (copied from nutrition pattern)
@@ -71,9 +104,32 @@ export const WorkoutRoutineProvider: React.FC<WorkoutRoutineProviderProps> = ({ 
         }
       }
       
+      // Load timer state
+      const savedTimerState = await AsyncStorage.getItem(STORAGE_KEYS.GLOBAL_TIMER);
+      let globalTimer: GlobalTimer | null = null;
+      let timerMinimized = true;
+      
+      if (savedTimerState) {
+        try {
+          const parsed = JSON.parse(savedTimerState);
+          if (parsed.timer) {
+            globalTimer = {
+              ...parsed.timer,
+              startTime: new Date(parsed.timer.startTime)
+            };
+            timerMinimized = parsed.timerMinimized ?? true;
+            console.log('✅ WorkoutContext: Restored global timer state');
+          }
+        } catch (error) {
+          console.warn('⚠️ WorkoutContext: Failed to parse timer state:', error);
+        }
+      }
+      
       setState(prev => ({ 
         ...prev, 
         routines,
+        globalTimer,
+        timerMinimized,
         isLoading: false 
       }));
       
@@ -148,6 +204,121 @@ export const WorkoutRoutineProvider: React.FC<WorkoutRoutineProviderProps> = ({ 
     }
   };
 
+  // =============================================================================
+  // GLOBAL TIMER OPERATIONS
+  // =============================================================================
+
+  const saveTimerState = async (timer: GlobalTimer | null, minimized: boolean) => {
+    try {
+      const timerData = {
+        timer: timer ? {
+          ...timer,
+          startTime: timer.startTime.toISOString()
+        } : null,
+        timerMinimized: minimized
+      };
+      await AsyncStorage.setItem(STORAGE_KEYS.GLOBAL_TIMER, JSON.stringify(timerData));
+    } catch (error) {
+      console.error('❌ WorkoutContext: Failed to save timer state:', error);
+    }
+  };
+
+  const setGlobalTimer = (timer: GlobalTimer | null) => {
+    setState(prev => ({ ...prev, globalTimer: timer }));
+    saveTimerState(timer, state.timerMinimized);
+    
+    // Manage background timer interval
+    if (timer?.isRunning) {
+      startBackgroundTimer();
+    } else {
+      stopBackgroundTimer();
+    }
+  };
+
+  const setTimerMinimized = (minimized: boolean) => {
+    setState(prev => ({ ...prev, timerMinimized: minimized }));
+    saveTimerState(state.globalTimer, minimized);
+  };
+
+  const updateTimerState = (updater: (timer: GlobalTimer | null) => GlobalTimer | null) => {
+    setState(prev => {
+      const newTimer = updater(prev.globalTimer);
+      // Save immediately
+      saveTimerState(newTimer, prev.timerMinimized);
+      
+      // Manage background timer
+      if (newTimer?.isRunning) {
+        startBackgroundTimer();
+      } else {
+        stopBackgroundTimer();
+      }
+      
+      return { ...prev, globalTimer: newTimer };
+    });
+  };
+
+  const startBackgroundTimer = () => {
+    stopBackgroundTimer(); // Clear any existing timer
+    
+    timerIntervalRef.current = setInterval(() => {
+      setState(prev => {
+        if (!prev.globalTimer?.isRunning) return prev;
+        
+        const now = new Date();
+        const elapsedSeconds = Math.floor((now.getTime() - prev.globalTimer.startTime.getTime()) / 1000);
+        
+        let updatedTimer = { ...prev.globalTimer };
+        
+        // Update based on timer mode
+        if (updatedTimer.countdownTimeLeft !== undefined) {
+          // Countdown mode
+          const remaining = updatedTimer.countdownDuration! - elapsedSeconds;
+          updatedTimer.countdownTimeLeft = Math.max(0, remaining);
+          
+          if (remaining <= 0) {
+            updatedTimer.completed = true;
+            updatedTimer.isRunning = false;
+          }
+        }
+        
+        if (updatedTimer.countupElapsed !== undefined) {
+          // Count up mode
+          updatedTimer.countupElapsed = elapsedSeconds;
+        }
+        
+        // Background countdown in count up mode
+        if (updatedTimer.backgroundCountdownRunning && updatedTimer.backgroundCountdownTime !== undefined) {
+          const backgroundRemaining = updatedTimer.backgroundCountdownTime - elapsedSeconds;
+          if (backgroundRemaining <= 0) {
+            updatedTimer.backgroundCountdownRunning = false;
+          }
+        }
+        
+        // Save updated state
+        saveTimerState(updatedTimer, prev.timerMinimized);
+        
+        return { ...prev, globalTimer: updatedTimer };
+      });
+    }, 1000);
+  };
+
+  const stopBackgroundTimer = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+  };
+
+  // Start background timer if there's an active timer on mount
+  useEffect(() => {
+    if (state.globalTimer?.isRunning) {
+      startBackgroundTimer();
+    }
+    
+    // Cleanup on unmount
+    return () => stopBackgroundTimer();
+  }, [state.globalTimer?.isRunning]);
+
   // Load routines on mount
   useEffect(() => {
     loadRoutines();
@@ -156,10 +327,15 @@ export const WorkoutRoutineProvider: React.FC<WorkoutRoutineProviderProps> = ({ 
   const contextValue: WorkoutRoutineContextType = {
     routines: state.routines,
     isLoading: state.isLoading,
+    globalTimer: state.globalTimer,
+    timerMinimized: state.timerMinimized,
     loadRoutines,
     saveRoutine,
     deleteRoutine,
     updateRoutine,
+    setGlobalTimer,
+    setTimerMinimized,
+    updateTimerState,
   };
 
   return (

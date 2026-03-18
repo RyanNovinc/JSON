@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   Animated,
   Modal,
+  Pressable,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -26,6 +27,7 @@ import { TimerLiveActivity } from '../utils/liveActivity';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
+import { useWorkoutRoutines, GlobalTimer } from '../contexts/WorkoutRoutineContext';
 import { AppState } from 'react-native';
 import { navigate } from '../utils/navigationRef';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -998,6 +1000,7 @@ export default function WorkoutLogScreen() {
   const route = useRoute<WorkoutLogScreenRouteProp>();
   const { themeColor } = useTheme();
   const { globalUnit, getExerciseUnit, setExerciseUnit, setGlobalUnit, formatWeight, convertWeight } = useWeightUnit();
+  const { globalTimer, timerMinimized, setGlobalTimer, setTimerMinimized, updateTimerState } = useWorkoutRoutines();
   const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
   const { activeWorkout, setActiveWorkout } = useActiveWorkout();
   
@@ -1047,7 +1050,7 @@ export default function WorkoutLogScreen() {
   const [showNotes, setShowNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
   const [showDeloadInfo, setShowDeloadInfo] = useState(false);
   const [timerSettings, setTimerSettings] = useState<TimerSettings>(TimerNotifications.defaultSettings);
-  const [timerMinimized, setTimerMinimized] = useState(true); // Start minimized by default
+  // timerMinimized now comes from global context
   const toggleAnimatedValue = useRef(new Animated.Value(0)).current; // 0 = countdown (default), 1 = countup
   const quickModeAnimatedValue = useRef(new Animated.Value(0)).current; // 0 = optimal (default), 1 = quick
   
@@ -1222,26 +1225,10 @@ export default function WorkoutLogScreen() {
     detectSupersets();
   }, [dynamicExercises]);
   
-  // Rest timer state - completely rewritten for clean countdown/countup separation  
-  const [activeTimer, setActiveTimer] = useState<{
-    exerciseIndex: number;
-    setIndex: number;
-    isRunning: boolean;
-    isQuickMode: boolean;
-    completed: boolean;
-    startTime?: Date; // Track when timer actually started for background support
-    // Countdown mode fields
-    countdownTimeLeft?: number; // Time remaining in countdown
-    countdownDuration?: number; // Original countdown duration
-    // Countup mode fields  
-    countupElapsed?: number; // Elapsed time in countup (seconds from 0)
-    // Background countdown for countup mode
-    backgroundCountdownTime?: number;
-    backgroundCountdownRunning?: boolean;
-  } | null>(null);
+  // Use global timer from context (replaces local globalTimer state)
   
   // Helper function to get display time based on current mode
-  const getDisplayTime = (timer: typeof activeTimer, isCountUp?: boolean): number => {
+  const getDisplayTime = (timer: GlobalTimer | null, isCountUp?: boolean): number => {
     if (!timer) return 0;
     const useCountUp = isCountUp !== undefined ? isCountUp : timerSettings.countUp;
     if (useCountUp) {
@@ -1252,7 +1239,7 @@ export default function WorkoutLogScreen() {
   };
 
   // Format display time for UI components
-  const formatDisplayTime = (timer: typeof activeTimer) => {
+  const formatDisplayTime = (timer: GlobalTimer | null) => {
     if (!timer) return { minutes: 0, seconds: 0, isOvertime: false };
     
     const displayTime = getDisplayTime(timer);
@@ -1265,7 +1252,7 @@ export default function WorkoutLogScreen() {
   };
   
   // Helper function to get timer duration for progress calculation
-  const getTimerDuration = (timer: typeof activeTimer): number => {
+  const getTimerDuration = (timer: typeof globalTimer): number => {
     if (!timer) return 0;
     if (timerSettings.countUp) {
       return 3600; // Max display for countup (1 hour)
@@ -1413,12 +1400,12 @@ export default function WorkoutLogScreen() {
   // Handle app state changes for background timer support
   useEffect(() => {
     const handleAppStateChange = (nextAppState: any) => {
-      if (nextAppState === 'active' && activeTimer?.isRunning && activeTimer.startTime) {
+      if (nextAppState === 'active' && globalTimer?.isRunning && globalTimer.startTime) {
         // App came back to foreground, calculate elapsed time
         const now = new Date();
-        const elapsedSeconds = Math.floor((now.getTime() - activeTimer.startTime.getTime()) / 1000);
+        const elapsedSeconds = Math.floor((now.getTime() - globalTimer.startTime.getTime()) / 1000);
         
-        setActiveTimer(prev => {
+        updateTimerState(prev => {
           if (!prev) return null;
           
           if (timerSettings.countUp) {
@@ -1443,72 +1430,9 @@ export default function WorkoutLogScreen() {
     
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [activeTimer?.isRunning, activeTimer?.startTime, timerSettings.countUp]);
+  }, [globalTimer?.isRunning, globalTimer?.startTime, timerSettings.countUp]);
   
-  // Timer countdown effect - handles both countdown and countup modes separately
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (activeTimer?.isRunning) {
-      interval = setInterval(() => {
-        setActiveTimer(prev => {
-          if (!prev) return null;
-          
-          if (timerSettings.countUp) {
-            // Countup mode - increment elapsed time
-            const newElapsed = (prev.countupElapsed || 0) + 1;
-            
-            // Also handle background countdown if active
-            let updates: any = { countupElapsed: newElapsed };
-            
-            if (prev.backgroundCountdownRunning && prev.backgroundCountdownTime !== undefined) {
-              const newBgCountdown = prev.backgroundCountdownTime - 1;
-              
-              // Play sound at 3 seconds for background countdown
-              if (newBgCountdown === 3) {
-                TimerNotifications.playCountdownIfNeeded(newBgCountdown);
-              }
-              
-              if (newBgCountdown <= 0) {
-                // Background countdown finished
-                TimerNotifications.playTimerComplete();
-                updates.backgroundCountdownRunning = false;
-                updates.backgroundCountdownTime = 0;
-              } else {
-                updates.backgroundCountdownTime = newBgCountdown;
-              }
-            }
-            
-            return { ...prev, ...updates };
-          } else {
-            // Countdown mode - decrement time left
-            const newTimeLeft = (prev.countdownTimeLeft || 0) - 1;
-            
-            // Play countdown sound when reaching 3 seconds
-            if (newTimeLeft === 3) {
-              TimerNotifications.playCountdownIfNeeded(newTimeLeft);
-            }
-            
-            if (newTimeLeft <= 0) {
-              // Countdown finished
-              TimerNotifications.playTimerComplete();
-              TimerLiveActivity.endTimer();
-              return { 
-                ...prev, 
-                countdownTimeLeft: 0,
-                isRunning: false, 
-                completed: true 
-              };
-            }
-            
-            return { ...prev, countdownTimeLeft: newTimeLeft };
-          }
-        });
-      }, 1000);
-    }
-    
-    return () => clearInterval(interval);
-  }, [activeTimer?.isRunning, activeTimer?.backgroundCountdownRunning, timerSettings.countUp]);
+  // Timer is now managed by global context for background persistence
 
   // Initialize and animate toggle switch when countUp setting changes
   useEffect(() => {
@@ -1524,17 +1448,17 @@ export default function WorkoutLogScreen() {
 
   // Initialize and animate quick mode toggle when isQuickMode changes
   useEffect(() => {
-    if (activeTimer) {
+    if (globalTimer) {
       // Set initial value without animation on first load
-      quickModeAnimatedValue.setValue(activeTimer.isQuickMode ? 1 : 0);
+      quickModeAnimatedValue.setValue(globalTimer.isQuickMode ? 1 : 0);
       
       Animated.timing(quickModeAnimatedValue, {
-        toValue: activeTimer.isQuickMode ? 1 : 0,
+        toValue: globalTimer.isQuickMode ? 1 : 0,
         duration: 200,
         useNativeDriver: false, // Can't use native driver for transform with interpolation
       }).start();
     }
-  }, [activeTimer?.isQuickMode, quickModeAnimatedValue]);
+  }, [globalTimer?.isQuickMode, quickModeAnimatedValue]);
   
   // Handle selected exercise from FavoriteExercisesScreen
   useFocusEffect(
@@ -1875,7 +1799,7 @@ export default function WorkoutLogScreen() {
           backgroundCountdownRunning: timerSettings.countUp,
         };
         
-        setActiveTimer(newTimer);
+        setGlobalTimer(newTimer);
         
         // Get display time for Live Activity
         const displayTime = getDisplayTime(newTimer, timerSettings.countUp);
@@ -1915,7 +1839,7 @@ export default function WorkoutLogScreen() {
           backgroundCountdownRunning: timerSettings.countUp,
         };
         
-        setActiveTimer(newTimer);
+        setGlobalTimer(newTimer);
         
         // Get display time for Live Activity
         const displayTime = getDisplayTime(newTimer, timerSettings.countUp);
@@ -1939,7 +1863,7 @@ export default function WorkoutLogScreen() {
   };
   
   const handleTimerToggle = async () => {
-    setActiveTimer(prev => {
+    updateTimerState(prev => {
       if (!prev) return null;
       
       const isStarting = !prev.isRunning;
@@ -1978,16 +1902,16 @@ export default function WorkoutLogScreen() {
   };
   
   const handleTimerModeSwitch = () => {
-    if (!activeTimer) return;
+    if (!globalTimer) return;
     
     // Don't allow mode switching in count-up (stopwatch) mode
     if (timerSettings.countUp) return;
     
-    const exercise = dynamicExercises[activeTimer.exerciseIndex];
+    const exercise = dynamicExercises[globalTimer.exerciseIndex];
     const optimalRest = exercise.rest || 120;
     const quickRest = exercise.restQuick || Math.max(60, Math.floor(optimalRest * 0.6));
     
-    setActiveTimer(prev => {
+    updateTimerState(prev => {
       if (!prev) return null;
       
       const newIsQuickMode = !prev.isQuickMode;
@@ -2622,8 +2546,11 @@ export default function WorkoutLogScreen() {
           
           // Duration will be automatically calculated by the useEffect based on start time
           // Context will be updated by useEffect below
-        } else {
-          console.log('💾 DATA LOADING: No saved workout start time found');
+        }
+        
+        // Timer restoration is now handled by global context
+      } else {
+        console.log('💾 DATA LOADING: No saved workout start time found');
           
           // Check if there's an active workout context for this screen that has a timer
           if (activeWorkout) {
@@ -2643,27 +2570,6 @@ export default function WorkoutLogScreen() {
             }
           }
         }
-      } else {
-        console.log('💾 DATA LOADING: No matching saved workout found');
-        
-        // Even without saved data, check if there's an active workout context for this screen
-        if (activeWorkout) {
-          const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
-                                       activeWorkout.routeParams?.blockName === blockName;
-          const contextHasTimer = activeWorkout.duration > 0;
-          
-          console.log('💾 DATA LOADING: No saved data, checking active workout context');
-          console.log('💾 DATA LOADING: Current workout matches active workout?', currentWorkoutMatches);
-          console.log('💾 DATA LOADING: Context has timer (duration > 0)?', contextHasTimer);
-          
-          if (currentWorkoutMatches && contextHasTimer) {
-            // Calculate what the start time should be based on current duration
-            const estimatedStartTime = new Date(Date.now() - (activeWorkout.duration * 1000));
-            console.log('💾 DATA LOADING: Restoring timer from context (no saved data). Estimated start time:', estimatedStartTime.toISOString());
-            setWorkoutStartTime(estimatedStartTime);
-          }
-        }
-      }
       
       // Load timer settings
       console.log('💾 DATA LOADING: Loading timer settings...');
@@ -3217,63 +3123,9 @@ export default function WorkoutLogScreen() {
       
       {/* BRAND NEW TIMER SYSTEM */}
       <>
-      {!activeTimer && (
-        <View 
-          style={{
-            position: 'absolute',
-            bottom: 34,
-            left: 0,
-            right: 0,
-            alignItems: 'center',
-            zIndex: 99999,
-            pointerEvents: 'box-none'
-          }}
-        >
-          <TouchableOpacity 
-            style={{
-              backgroundColor: '#18181b',
-              borderRadius: 24,
-              borderWidth: 1,
-              borderColor: '#27272a',
-              paddingHorizontal: 20,
-              paddingVertical: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
-            }}
-            onPress={() => {
-              console.log('🚀 Start Timer pressed!');
-              const defaultRest = 120;
-              setActiveTimer({
-                exerciseIndex: 0,
-                setIndex: 0,
-                timeLeft: timerSettings.countUp ? 3600 : defaultRest,
-                originalDuration: timerSettings.countUp ? 0 : defaultRest,
-                isRunning: false,
-                isQuickMode: false,
-                completed: false,
-              });
-              setTimerMinimized(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="timer-outline" size={20} color={themeColor} />
-            <Text style={{
-              fontSize: 15,
-              fontWeight: '600',
-              color: themeColor
-            }}>Start Timer</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* SMALL COUNTDOWN TIMER */}
-      {activeTimer && timerMinimized && (
+      {globalTimer && timerMinimized && (
         <View 
           style={{
             position: 'absolute',
@@ -3314,63 +3166,106 @@ export default function WorkoutLogScreen() {
               fontWeight: '600',
               color: themeColor
             }}>
-              {formatDisplayTime(activeTimer).minutes}:{formatDisplayTime(activeTimer).seconds.toString().padStart(2, '0')}
+              {formatDisplayTime(globalTimer).minutes}:{formatDisplayTime(globalTimer).seconds.toString().padStart(2, '0')}
             </Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {(() => {
-        const shouldShow = activeTimer && !timerMinimized;
-        console.log('🔥 MODAL CHECK - activeTimer:', !!activeTimer, 'timerMinimized:', timerMinimized, 'shouldShow:', shouldShow);
-        if (shouldShow) {
-          console.log('🚀 MODAL IS RENDERING NOW!');
-        }
-        return shouldShow;
-      })() && (
-        <View
-          style={{ 
+      {/* Always-Visible Timer Display */}
+      {!globalTimer && (
+        <View 
+          style={{
             position: 'absolute',
-            top: 0,
-            bottom: 0,
+            bottom: 34,
             left: 0,
             right: 0,
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            justifyContent: 'center',
             alignItems: 'center',
             zIndex: 99999,
+            pointerEvents: 'box-none'
           }}
         >
           <TouchableOpacity 
             style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              right: 0,
+              backgroundColor: '#18181b',
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: '#27272a',
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
             }}
-            activeOpacity={1}
             onPress={() => {
-              console.log('Full timer modal tapped - minimizing');
-              setTimerMinimized(true);
+              console.log('🚀 Starting timer from 0:00 display');
+              // Start a generic rest timer (2 minutes) but paused at 0:00
+              const newTimer = {
+                exerciseIndex: 0,
+                setIndex: 0,
+                isRunning: false, // Start paused
+                isQuickMode: false,
+                completed: false,
+                startTime: new Date(),
+                countdownTimeLeft: timerSettings.countUp ? undefined : 120,
+                countdownDuration: timerSettings.countUp ? undefined : 120,
+                countupElapsed: timerSettings.countUp ? 0 : undefined,
+                backgroundCountdownTime: timerSettings.countUp ? 120 : undefined,
+                backgroundCountdownRunning: false,
+              };
+              
+              setGlobalTimer(newTimer);
+              setTimerMinimized(false); // Open the timer modal
             }}
-          />
-          
-          <View style={[styles.timerCard, {
-            backgroundColor: '#18181b',
-            borderRadius: 20,
-            padding: 20,
-            marginHorizontal: 20,
-            marginVertical: 40, // Add top/bottom margin to prevent cutoff
-            borderWidth: 1,
-            borderColor: '#27272a',
-            maxWidth: 350,
-            width: '90%',
-            maxHeight: '80%', // Limit height to 80% of screen
-          }]}>
+            activeOpacity={0.7}
+          >
+            <Ionicons name="timer-outline" size={18} color={themeColor} />
+            <Text style={{
+              fontSize: 15,
+              fontWeight: '600',
+              color: themeColor
+            }}>
+              0:00
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
+      {/* Clean Timer Modal */}
+      <Modal
+        visible={globalTimer !== null && !timerMinimized}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setTimerMinimized(true)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            backgroundColor: '#18181b',
+            borderRadius: 24,
+            padding: 24,
+            marginHorizontal: 20,
+            width: '90%',
+            maxWidth: 380,
+            borderWidth: 1,
+            borderColor: `${themeColor}25`,
+            shadowColor: themeColor,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 16,
+          }}>
+            
             {/* Close Button */}
-            <TouchableOpacity 
+            <Pressable 
               style={{
                 position: 'absolute',
                 top: 16,
@@ -3378,189 +3273,302 @@ export default function WorkoutLogScreen() {
                 width: 32,
                 height: 32,
                 borderRadius: 16,
-                backgroundColor: '#27272a',
+                backgroundColor: 'rgba(255,255,255,0.1)',
                 justifyContent: 'center',
                 alignItems: 'center',
                 zIndex: 1,
               }}
-              onPress={() => setTimerMinimized(true)}
+              onPress={() => {
+                console.log('Close button pressed!');
+                setTimerMinimized(true);
+              }}
             >
-              <Ionicons name="close" size={18} color="#a1a1aa" />
-            </TouchableOpacity>
+              <Ionicons name="close" size={18} color="#ffffff" />
+            </Pressable>
 
-            {/* Timer Display */}
-            <View style={styles.timerDisplay}>
-                {/* Timer Countdown - Main Focus */}
-                <View style={styles.timerMainDisplay}>
-                  <View style={styles.timerRow}>
-                    {!timerSettings.countUp && (
-                      <TouchableOpacity 
-                        style={styles.mainTimeAdjustButton}
-                        onPress={() => {
-                          setActiveTimer(prev => {
-                            if (!prev) return null;
-                            if (timerSettings.countUp) {
-                              // In countup mode, subtract 15 seconds from elapsed time (go backward)
-                              return {
-                                ...prev,
-                                countupElapsed: Math.max(0, (prev.countupElapsed || 0) - 15)
-                              };
-                            } else {
-                              // In countdown mode, subtract 15 seconds from remaining time
-                              return {
-                                ...prev,
-                                countdownTimeLeft: Math.max(0, (prev.countdownTimeLeft || 0) - 15)
-                              };
-                            }
-                          });
-                        }}
-                      >
-                        <Text style={[styles.mainTimeAdjustText, { color: themeColor }]}>-15</Text>
-                      </TouchableOpacity>
-                    )}
-                    
-                    <View style={styles.timerCenterDisplay}>
-                      <Text style={styles.timerCountdown}>
-                        {(() => {
-                          if (!activeTimer) return '0:00';
-                          try {
-                            const display = formatDisplayTime(activeTimer);
-                            const minutes = display?.minutes ?? 0;
-                            const seconds = display?.seconds ?? 0;
-                            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                          } catch (error) {
-                            console.error('Timer display error:', error);
-                            return '0:00';
-                          }
-                        })()}
-                      </Text>
-                    </View>
-                    
-                    {!timerSettings.countUp && (
-                      <TouchableOpacity 
-                        style={styles.mainTimeAdjustButton}
-                        onPress={() => {
-                          setActiveTimer(prev => {
-                            if (!prev) return null;
-                            if (timerSettings.countUp) {
-                              // In countup mode, add 15 seconds to elapsed time (go forward)
-                              return {
-                                ...prev,
-                                countupElapsed: Math.min(3600, (prev.countupElapsed || 0) + 15)
-                              };
-                            } else {
-                              // In countdown mode, add 15 seconds to remaining time
-                              return {
-                                ...prev,
-                                countdownTimeLeft: (prev.countdownTimeLeft || 0) + 15
-                              };
-                            }
-                          });
-                        }}
-                      >
-                        <Text style={[styles.mainTimeAdjustText, { color: themeColor }]}>+15</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-
-                {/* Primary Action - Play/Pause Button */}
-                <TouchableOpacity 
-                  style={[styles.primaryActionButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
-                  onPress={handleTimerToggle}
-                >
-                  <Ionicons name={activeTimer.isRunning ? "pause" : "play"} size={28} color="#0a0a0b" />
-                </TouchableOpacity>
-
-              </View>
-            )}
-
-            {/* Count Up/Down Toggle Switch - Bottom Left */}
-            <View style={styles.timerModeToggleContainer}>
-              <TouchableOpacity 
-                style={styles.timerModeToggle}
-                onPress={async () => {
-                  const newSettings = { ...timerSettings, countUp: !timerSettings.countUp };
-                  setTimerSettings(newSettings);
-                  await TimerNotifications.saveSettings(newSettings);
-                  
-                  // Smooth transition when switching modes
-                  if (activeTimer) {
-                    if (newSettings.countUp) {
-                      // Switching TO stopwatch - start from 0 instead of 3600 for smoother transition
-                      setActiveTimer(prev => prev ? {
-                        ...prev,
-                        countdownTime: prev.timeLeft, // Save current countdown time
-                        countdownRunning: prev.isRunning, // Save if it was running
-                        timeLeft: 0, // Start stopwatch at 0 for cleaner transition
-                        stopwatchTime: 0, // Reset stopwatch time
-                        originalDuration: 0,
-                        isRunning: false, // Pause for smooth transition
-                        completed: false
-                      } : null);
-                    } else {
-                      // Switching TO countdown - restore countdown state and pause for smooth transition
-                      setActiveTimer(prev => prev ? {
-                        ...prev,
-                        stopwatchTime: prev.timeLeft, // Save current stopwatch time
-                        timeLeft: prev.countdownTime || prev.originalDuration, // Restore countdown time
-                        isRunning: false, // Pause for smooth transition
-                        completed: false
-                      } : null);
-                    }
-                  }
-                }}
-              >
-                <View style={styles.timerToggleTrack}>
-                  <Animated.View style={[
-                    styles.timerToggleKnob, 
-                    { 
-                      backgroundColor: themeColor,
-                      transform: [{ 
-                        translateX: toggleAnimatedValue.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 18],
-                        })
-                      }] 
-                    }
-                  ]} />
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.timerModeLabel}>
-                {timerSettings.countUp ? 'Countup' : 'Countdown'}
+            {/* Timer Content */}
+            <View style={{
+              paddingTop: 50,
+              paddingBottom: 20,
+              alignItems: 'center',
+            }}>
+              
+              {/* Title */}
+              <Text style={{
+                fontSize: 18,
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: 24,
+              }}>
+                {!timerSettings.countUp ? 
+                  (globalTimer?.isQuickMode ? 'Quick Rest Timer' : 'Optimal Rest Timer') : 
+                  'Count Up Timer'
+                }
               </Text>
-            </View>
-
-            {/* Optimal/Quick Toggle Switch - Bottom Right */}
-            {!timerSettings.countUp && (
-              <View style={styles.timerQuickModeToggleContainer}>
-                <Text style={styles.timerModeLabel}>
-                  {activeTimer?.isQuickMode ? 'Quick' : 'Optimal'}
+              
+              {/* Timer Display */}
+              <View style={{
+                marginBottom: 24,
+                alignItems: 'center',
+              }}>
+                <Text style={{
+                  fontSize: 56,
+                  fontWeight: '300',
+                  color: '#ffffff',
+                  marginBottom: 6,
+                }}>
+                  {(() => {
+                    if (!globalTimer) return '0:00';
+                    try {
+                      const display = formatDisplayTime(globalTimer);
+                      const minutes = display?.minutes ?? 0;
+                      const seconds = display?.seconds ?? 0;
+                      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    } catch (error) {
+                      return '0:00';
+                    }
+                  })()}
                 </Text>
-                <TouchableOpacity 
-                  style={styles.timerModeToggle}
-                  onPress={handleTimerModeSwitch}
-                >
-                  <View style={styles.timerToggleTrack}>
-                    <Animated.View style={[
-                      styles.timerToggleKnob, 
-                      { 
-                        backgroundColor: themeColor,
-                        transform: [{ 
-                          translateX: quickModeAnimatedValue.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0, 18],
-                          })
-                        }] 
-                      }
-                    ]} />
-                  </View>
-                </TouchableOpacity>
+                <Text style={{
+                  fontSize: 12,
+                  color: '#888888',
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                }}>
+                  {timerSettings.countUp ? 'Elapsed Time' : 'Time Remaining'}
+                </Text>
               </View>
-            )}
+              
+              {/* Time Controls */}
+              {!timerSettings.countUp && (
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 12,
+                  marginBottom: 24,
+                }}>
+                  <TouchableOpacity 
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    }}
+                    onPress={() => {
+                      updateTimerState(prev => {
+                        if (!prev) return null;
+                        
+                        // Adjust startTime by moving it 15 seconds forward (making timer appear 15s less)
+                        const adjustedStartTime = new Date(prev.startTime.getTime() + 15000);
+                        
+                        if (timerSettings.countUp) {
+                          const newElapsed = Math.max(0, (prev.countupElapsed || 0) - 15);
+                          return {
+                            ...prev,
+                            startTime: adjustedStartTime,
+                            countupElapsed: newElapsed
+                          };
+                        } else {
+                          const newTimeLeft = Math.max(0, (prev.countdownTimeLeft || 0) - 15);
+                          return {
+                            ...prev,
+                            startTime: adjustedStartTime,
+                            countdownTimeLeft: newTimeLeft
+                          };
+                        }
+                      });
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>-15s</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    }}
+                    onPress={() => {
+                      updateTimerState(prev => {
+                        if (!prev) return null;
+                        
+                        // Adjust startTime by moving it 15 seconds backward (making timer appear 15s more)
+                        const adjustedStartTime = new Date(prev.startTime.getTime() - 15000);
+                        
+                        if (timerSettings.countUp) {
+                          const newElapsed = Math.min(3600, (prev.countupElapsed || 0) + 15);
+                          return {
+                            ...prev,
+                            startTime: adjustedStartTime,
+                            countupElapsed: newElapsed
+                          };
+                        } else {
+                          const newTimeLeft = (prev.countdownTimeLeft || 0) + 15;
+                          return {
+                            ...prev,
+                            startTime: adjustedStartTime,
+                            countdownTimeLeft: newTimeLeft
+                          };
+                        }
+                      });
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>+15s</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              {/* Play/Pause Button */}
+              <TouchableOpacity 
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: themeColor,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 24,
+                  shadowColor: themeColor,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                }}
+                onPress={handleTimerToggle}
+              >
+                <Ionicons 
+                  name={globalTimer?.isRunning ? "pause" : "play"} 
+                  size={28} 
+                  color="#000000"
+                  style={{
+                    marginLeft: globalTimer?.isRunning ? 0 : 3,
+                  }}
+                />
+              </TouchableOpacity>
+              
+              {/* Bottom Controls */}
+              <View style={{
+                width: '100%',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+              }}>
+                
+                {/* Mode Toggle */}
+                <View style={{
+                  flex: 1,
+                  marginRight: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 12,
+                    color: '#888888',
+                    marginBottom: 8,
+                    textAlign: 'center',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}>Mode</Text>
+                  <TouchableOpacity 
+                    style={{
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      borderRadius: 16,
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    }}
+                    onPress={async () => {
+                      const newSettings = { ...timerSettings, countUp: !timerSettings.countUp };
+                      setTimerSettings(newSettings);
+                      await TimerNotifications.saveSettings(newSettings);
+                      
+                      if (globalTimer) {
+                        if (newSettings.countUp) {
+                          updateTimerState(prev => prev ? {
+                            ...prev,
+                            countdownTime: prev.timeLeft,
+                            countdownRunning: prev.isRunning,
+                            timeLeft: 0,
+                            stopwatchTime: 0,
+                            originalDuration: 0,
+                            isRunning: false,
+                            completed: false
+                          } : null);
+                        } else {
+                          updateTimerState(prev => prev ? {
+                            ...prev,
+                            stopwatchTime: prev.timeLeft,
+                            timeLeft: prev.countdownTime || prev.originalDuration,
+                            isRunning: false,
+                            completed: false
+                          } : null);
+                        }
+                      }
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#ffffff',
+                      textAlign: 'center',
+                    }}>
+                      {timerSettings.countUp ? 'Count Up' : 'Countdown'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Timer Mode Toggle */}
+                {!timerSettings.countUp && (
+                  <View style={{
+                    flex: 1,
+                    marginLeft: 8,
+                  }}>
+                    <Text style={{
+                      fontSize: 12,
+                      color: '#888888',
+                      marginBottom: 8,
+                      textAlign: 'center',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}>Timer</Text>
+                    <TouchableOpacity 
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        borderRadius: 16,
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.2)',
+                      }}
+                      onPress={handleTimerModeSwitch}
+                    >
+                      <Text style={{
+                        fontSize: 14,
+                        fontWeight: '500',
+                        color: '#ffffff',
+                        textAlign: 'center',
+                      }}>
+                        {globalTimer?.isQuickMode ? 'Quick' : 'Optimal'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+              
+            </View>
           </View>
         </View>
-      )}
+      </Modal>
       </>
 
       {/* Start Workout Confirmation Modal */}

@@ -29,11 +29,24 @@ const DISTANCE_THRESHOLD = 50;
 type TabType = 'rating' | 'bug' | 'feature';
 
 export function FeedbackTab() {
-  const { themeColor, isPinkTheme, setIsPinkTheme } = useTheme();
+  const { themeColor, isPinkTheme, setIsPinkTheme, isThemeLoaded } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('rating');
   const [feedback, setFeedback] = useState('');
   const [rating, setRating] = useState(0);
+
+  // Initialize local state with current theme state immediately
+  const [localThemeState, setLocalThemeState] = useState(isPinkTheme);
+  
+  // Sync local state with theme context when context changes
+  React.useEffect(() => {
+    setLocalThemeState(isPinkTheme);
+  }, [isPinkTheme]);
+
+  // Use local state for immediate feedback
+  const currentThemeState = localThemeState;
+  const currentThemeColor = currentThemeState ? '#ec4899' : '#22d3ee';
+
 
   // Hide feedback tab on payment screen
   const navigationState = useNavigationState(state => state);
@@ -283,7 +296,7 @@ export function FeedbackTab() {
         {...panResponder.panHandlers}
       >
         <View style={styles.tabTouchArea}>
-          <View style={[styles.tabIndicator, { backgroundColor: themeColor }]} />
+          <View style={[styles.tabIndicator, { backgroundColor: currentThemeColor }]} />
         </View>
       </Animated.View>
 
@@ -321,11 +334,20 @@ export function FeedbackTab() {
               <Text style={styles.title}>Feedback</Text>
               <View style={styles.headerActions}>
                 <TouchableOpacity 
-                  onPress={() => setIsPinkTheme(!isPinkTheme)} 
-                  style={[styles.colorToggle, { backgroundColor: themeColor }]}
+                  onPress={() => {
+                    const newThemeState = !currentThemeState;
+                    // Update local state immediately for visual feedback
+                    setLocalThemeState(newThemeState);
+                    // Update context state (will persist to storage)
+                    setIsPinkTheme(newThemeState);
+                  }} 
+                  style={[
+                    styles.colorToggle, 
+                    { backgroundColor: currentThemeColor }
+                  ]}
                 >
                   <Ionicons 
-                    name={isPinkTheme ? "woman" : "man"} 
+                    name={currentThemeState ? "woman" : "man"} 
                     size={20} 
                     color="#0a0a0b" 
                   />
@@ -347,7 +369,7 @@ export function FeedbackTab() {
                   key={tab.key}
                   style={[
                     styles.tabButton,
-                    activeTab === tab.key && { ...styles.tabButtonActive, backgroundColor: themeColor }
+                    activeTab === tab.key && { ...styles.tabButtonActive, backgroundColor: currentThemeColor }
                   ]}
                   onPress={() => {
                     setActiveTab(tab.key as TabType);
@@ -386,7 +408,7 @@ export function FeedbackTab() {
                         <Ionicons
                           name={star <= rating ? 'star' : 'star-outline'}
                           size={32}
-                          color={star <= rating ? themeColor : '#3f3f46'}
+                          color={star <= rating ? currentThemeColor : '#3f3f46'}
                         />
                       </TouchableOpacity>
                     ))}
@@ -409,7 +431,7 @@ export function FeedbackTab() {
                   )}
 
                   {rating === 5 && (
-                    <Text style={[styles.appStoreText, { color: themeColor }]}>
+                    <Text style={[styles.appStoreText, { color: currentThemeColor }]}>
                       Glad you love it! Tap below to rate us on the App Store.
                     </Text>
                   )}
@@ -420,7 +442,7 @@ export function FeedbackTab() {
                       borderRadius: 12,
                       alignItems: 'center',
                       marginTop: 'auto',
-                      backgroundColor: rating === 0 ? '#18181b' : themeColor,
+                      backgroundColor: rating === 0 ? '#18181b' : currentThemeColor,
                       opacity: rating === 0 ? 0.3 : 1,
                     }}
                     onPress={handleRatingSubmit}
@@ -467,7 +489,7 @@ export function FeedbackTab() {
                       borderRadius: 12,
                       alignItems: 'center',
                       marginTop: 'auto',
-                      backgroundColor: !feedback.trim() ? '#18181b' : themeColor,
+                      backgroundColor: !feedback.trim() ? '#18181b' : currentThemeColor,
                       opacity: !feedback.trim() ? 0.3 : 1,
                     }}
                     onPress={handleFeedbackSubmit}
