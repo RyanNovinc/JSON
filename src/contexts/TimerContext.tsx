@@ -34,6 +34,7 @@ interface TimerContextType {
   // Timer controls
   startTimer: (targetSeconds?: number, exerciseIndex?: number, setIndex?: number) => void;
   pauseTimer: () => void;
+  resumeTimer: () => void;
   stopTimer: () => void;
   resetTimer: () => void;
   addTime: (seconds: number) => void;
@@ -253,14 +254,28 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const now = new Date();
         const elapsed = Math.floor((now.getTime() - prev.startTime.getTime()) / 1000);
         
-        // Check for countdown sound trigger (when 3 seconds remaining)
-        if (!prev.isCountUp && !prev.countdownSoundPlayed) {
+        // Check for countdown completion and sound trigger
+        if (!prev.isCountUp) {
           const remaining = prev.targetTime - elapsed;
           console.log(`Countdown check: remaining=${remaining}, elapsed=${elapsed}, targetTime=${prev.targetTime}`);
-          if (remaining <= 3 && remaining > 0) {
+          
+          // Play countdown sound when hitting 3 seconds
+          if (!prev.countdownSoundPlayed && remaining <= 3 && remaining > 0) {
             console.log('Triggering countdown sound!');
             playCountdownSound();
             return { ...prev, timeElapsed: elapsed, countdownSoundPlayed: true };
+          }
+          
+          // Stop timer when countdown reaches 0
+          if (remaining <= 0) {
+            console.log('Countdown finished! Stopping timer.');
+            return { 
+              ...prev, 
+              timeElapsed: 0, // Reset to 0
+              targetTime: 0,  // Reset to 0 so timer shows 0:00 cleanly
+              isRunning: false,
+              isPaused: false
+            };
           }
         }
         
@@ -302,6 +317,27 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } : null);
   };
 
+  const resumeTimer = () => {
+    setTimer(prev => {
+      if (!prev || !prev.isPaused || !prev.pausedAt || !prev.startTime) return prev;
+      
+      // Calculate how long we were paused
+      const now = new Date();
+      const pauseDuration = now.getTime() - prev.pausedAt.getTime();
+      
+      // Adjust the start time to account for the pause duration
+      const newStartTime = new Date(prev.startTime.getTime() + pauseDuration);
+      
+      return {
+        ...prev,
+        isRunning: true,
+        isPaused: false,
+        startTime: newStartTime,
+        pausedAt: null,
+      };
+    });
+  };
+
   const stopTimer = () => {
     setTimer(null);
     AsyncStorage.removeItem(STORAGE_KEY);
@@ -323,37 +359,92 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addTime = (seconds: number) => {
-    if (!timer) return;
+    console.log(`🔧 addTime called with ${seconds} seconds. Timer exists: ${!!timer}`);
+    
+    // If no timer exists, create one with the added time
+    if (!timer) {
+      console.log('⚡ No timer found, creating new one with added time');
+      setTimer({
+        isRunning: false,
+        isPaused: false,
+        timeElapsed: 0,
+        targetTime: timerSettings.countUp ? 0 : seconds,
+        startTime: null,
+        pausedAt: null,
+        isCountUp: timerSettings.countUp,
+        isQuickMode: timerSettings.quickMode,
+        countdownSoundPlayed: false,
+      });
+      return;
+    }
+    
+    console.log(`Timer mode: ${timerSettings.countUp ? 'Count Up' : 'Countdown'}, Target: ${timer.targetTime}`);
     
     if (timerSettings.countUp) {
-      // In count up mode, add to elapsed time
+      // In count up mode, adjust the start time to appear as if more time has elapsed
       setTimer(prev => prev ? {
         ...prev,
+        startTime: prev.startTime ? new Date(prev.startTime.getTime() - seconds * 1000) : prev.startTime,
         timeElapsed: Math.min(3600, prev.timeElapsed + seconds), // Max 1 hour
       } : null);
     } else {
-      // In countdown mode, add to target time
+      // In countdown mode, add to target time AND reset countdown sound flag
+      const newTargetTime = timer.targetTime + seconds;
+      
+      // If timer is stopped (not running, not paused), reset elapsed time so it starts fresh
+      const shouldResetElapsed = !timer.isRunning && !timer.isPaused;
+      
       setTimer(prev => prev ? {
         ...prev,
-        targetTime: prev.targetTime + seconds,
+        targetTime: newTargetTime,
+        timeElapsed: shouldResetElapsed ? 0 : prev.timeElapsed,
+        countdownSoundPlayed: false, // Reset so sound can play again if we go back under 3s
       } : null);
     }
   };
 
   const subtractTime = (seconds: number) => {
-    if (!timer) return;
+    // If no timer exists, create one with zero time (can't subtract from nothing)
+    if (!timer) {
+      console.log('⚡ No timer found for subtraction, creating new timer at 0:00');
+      setTimer({
+        isRunning: false,
+        isPaused: false,
+        timeElapsed: 0,
+        targetTime: 0,
+        startTime: null,
+        pausedAt: null,
+        isCountUp: timerSettings.countUp,
+        isQuickMode: timerSettings.quickMode,
+        countdownSoundPlayed: false,
+      });
+      return;
+    }
     
     if (timerSettings.countUp) {
-      // In count up mode, subtract from elapsed time
+      // In count up mode, adjust the start time to appear as if less time has elapsed
       setTimer(prev => prev ? {
         ...prev,
+        startTime: prev.startTime ? new Date(prev.startTime.getTime() + seconds * 1000) : prev.startTime,
         timeElapsed: Math.max(0, prev.timeElapsed - seconds),
       } : null);
     } else {
-      // In countdown mode, subtract from target time
+      // In countdown mode, check current remaining time first
+      const currentRemaining = timer.targetTime - timer.timeElapsed;
+      
+      // If already at or below 0, don't allow further reduction
+      if (currentRemaining <= 0) {
+        console.log('Timer already at 0:00, cannot subtract more time');
+        return;
+      }
+      
+      // Calculate new target time, but don't let it go below current elapsed time
+      const newTargetTime = Math.max(timer.timeElapsed, timer.targetTime - seconds);
+      
       setTimer(prev => prev ? {
         ...prev,
-        targetTime: Math.max(0, prev.targetTime - seconds),
+        targetTime: newTargetTime,
+        countdownSoundPlayed: false, // Reset so sound can play again
       } : null);
     }
   };
@@ -387,6 +478,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTimerSettings,
     startTimer,
     pauseTimer,
+    resumeTimer,
     stopTimer,
     resetTimer,
     addTime,
