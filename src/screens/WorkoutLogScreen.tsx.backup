@@ -737,7 +737,7 @@ function ExerciseCard({
                       onInteractionAttempt && onInteractionAttempt();
                     }
                   }}
-                  placeholder="0"
+                  placeholder={exercise.previous?.weight.toString() || '0'}
                   placeholderTextColor="#52525b"
                   keyboardType="decimal-pad"
                   editable={!setData.completed}
@@ -1002,34 +1002,9 @@ export default function WorkoutLogScreen() {
   const route = useRoute<WorkoutLogScreenRouteProp>();
   const { themeColor } = useTheme();
   const { globalUnit, getExerciseUnit, setExerciseUnit, setGlobalUnit, formatWeight, convertWeight } = useWeightUnit();
-  const { startAutoTimer, setExerciseContext } = useTimer();
+  const { startAutoTimer } = useTimer();
   const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
   const { activeWorkout, setActiveWorkout } = useActiveWorkout();
-
-  // Setup exercise context for Live Activities
-  useEffect(() => {
-    setExerciseContext((exerciseIndex?: number, setIndex?: number) => {
-      if (exerciseIndex === undefined || !dynamicExercises || !allSetsData) {
-        return {};
-      }
-
-      const currentExercise = dynamicExercises[exerciseIndex];
-      const nextExercise = dynamicExercises[exerciseIndex + 1];
-      const currentSetData = allSetsData[exerciseIndex]?.[setIndex || 0];
-      const totalSets = allSetsData[exerciseIndex]?.length || 0;
-
-      return {
-        currentExercise: currentExercise?.exercise || '',
-        nextExercise: nextExercise?.exercise || '',
-        currentSet: (setIndex || 0) + 1,
-        totalSets,
-        weight: currentSetData?.weight || '',
-        reps: currentSetData?.reps || '',
-      };
-    });
-
-    return () => setExerciseContext(null);
-  }, [setExerciseContext, dynamicExercises, allSetsData]);
   
   // Debug logging
   console.log('🏋️ WORKOUT SCREEN: === COMPONENT RENDER/MOUNT ===');
@@ -1709,7 +1684,7 @@ export default function WorkoutLogScreen() {
     if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
       const exercise = dynamicExercises[exerciseIndex];
       if (exercise?.rest && exercise?.restQuick) {
-        startAutoTimer(exercise.rest, exercise.restQuick, exerciseIndex, setIndex, themeColor);
+        startAutoTimer(exercise.rest, exercise.restQuick, exerciseIndex, setIndex);
       }
     }
   };
@@ -2898,6 +2873,874 @@ export default function WorkoutLogScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
       
+      {/* Timer section removed - using new TimerContext components */}
+        <View 
+          style={{
+            position: 'absolute',
+            bottom: 34,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            zIndex: 99999,
+            pointerEvents: 'box-none'
+          }}
+        >
+          <TouchableOpacity 
+            style={{
+              backgroundColor: '#18181b',
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: '#27272a',
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+            onPress={() => {
+              console.log('🎯 Timer countdown tapped - opening EXISTING modal!');
+              setTimerMinimized(false);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="timer-outline" size={18} color={themeColor} />
+            <Text style={{
+              fontSize: 15,
+              fontWeight: '600',
+              color: themeColor
+            }}>
+              {formatDisplayTime(globalTimer).minutes}:{formatDisplayTime(globalTimer).seconds.toString().padStart(2, '0')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Always-Visible Timer Display */}
+      {!globalTimer && (
+        <View 
+          style={{
+            position: 'absolute',
+            bottom: 34,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            zIndex: 99999,
+            pointerEvents: 'box-none'
+          }}
+        >
+          <TouchableOpacity 
+            style={{
+              backgroundColor: '#18181b',
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: '#27272a',
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+            onPress={() => {
+              console.log('🚀 Starting timer from 0:00 display');
+              // Start a generic rest timer (2 minutes) but paused at 0:00
+              const newTimer = {
+                exerciseIndex: 0,
+                setIndex: 0,
+                isRunning: false, // Start paused
+                isQuickMode: false,
+                completed: false,
+                startTime: new Date(),
+                countdownTimeLeft: timerSettings.countUp ? undefined : 120,
+                countdownDuration: timerSettings.countUp ? undefined : 120,
+                countupElapsed: timerSettings.countUp ? 0 : undefined,
+                backgroundCountdownTime: timerSettings.countUp ? 120 : undefined,
+                backgroundCountdownRunning: false,
+              };
+              
+              setGlobalTimer(newTimer);
+              setTimerMinimized(false); // Open the timer modal
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="timer-outline" size={18} color={themeColor} />
+            <Text style={{
+              fontSize: 15,
+              fontWeight: '600',
+              color: themeColor
+            }}>
+              0:00
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Clean Timer Modal */}
+      <Modal
+        visible={globalTimer !== null && !timerMinimized}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setTimerMinimized(true)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            backgroundColor: '#18181b',
+            borderRadius: 24,
+            padding: 24,
+            marginHorizontal: 20,
+            width: '90%',
+            maxWidth: 380,
+            borderWidth: 1,
+            borderColor: `${themeColor}25`,
+            shadowColor: themeColor,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 16,
+          }}>
+            
+            {/* Close Button */}
+            <Pressable 
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 1,
+              }}
+              onPress={() => {
+                console.log('Close button pressed!');
+                setTimerMinimized(true);
+              }}
+            >
+              <Ionicons name="close" size={18} color="#ffffff" />
+            </Pressable>
+
+            {/* Timer Content */}
+            <View style={{
+              paddingTop: 50,
+              paddingBottom: 20,
+              alignItems: 'center',
+            }}>
+              
+              {/* Title */}
+              <Text style={{
+                fontSize: 18,
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: 24,
+              }}>
+                {!timerSettings.countUp ? 
+                  (globalTimer?.isQuickMode ? 'Quick Rest Timer' : 'Optimal Rest Timer') : 
+                  'Count Up Timer'
+                }
+              </Text>
+              
+              {/* Timer Display */}
+              <View style={{
+                marginBottom: 24,
+                alignItems: 'center',
+              }}>
+                <Text style={{
+                  fontSize: 56,
+                  fontWeight: '300',
+                  color: '#ffffff',
+                  marginBottom: 6,
+                }}>
+                  {(() => {
+                    if (!globalTimer) return '0:00';
+                    try {
+                      const display = formatDisplayTime(globalTimer);
+                      const minutes = display?.minutes ?? 0;
+                      const seconds = display?.seconds ?? 0;
+                      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    } catch (error) {
+                      return '0:00';
+                    }
+                  })()}
+                </Text>
+                <Text style={{
+                  fontSize: 12,
+                  color: '#888888',
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                }}>
+                  {timerSettings.countUp ? 'Elapsed Time' : 'Time Remaining'}
+                </Text>
+              </View>
+              
+              {/* Time Controls */}
+              {!timerSettings.countUp && (
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 12,
+                  marginBottom: 24,
+                }}>
+                  <TouchableOpacity 
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    }}
+                    onPress={() => {
+                      updateTimerState(prev => {
+                        if (!prev) return null;
+                        
+                        // Adjust startTime by moving it 15 seconds forward (making timer appear 15s less)
+                        const adjustedStartTime = new Date(prev.startTime.getTime() + 15000);
+                        
+                        if (timerSettings.countUp) {
+                          const newElapsed = Math.max(0, (prev.countupElapsed || 0) - 15);
+                          return {
+                            ...prev,
+                            startTime: adjustedStartTime,
+                            countupElapsed: newElapsed
+                          };
+                        } else {
+                          const newTimeLeft = Math.max(0, (prev.countdownTimeLeft || 0) - 15);
+                          return {
+                            ...prev,
+                            startTime: adjustedStartTime,
+                            countdownTimeLeft: newTimeLeft
+                          };
+                        }
+                      });
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>-15s</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    }}
+                    onPress={() => {
+                      updateTimerState(prev => {
+                        if (!prev) return null;
+                        
+                        // Adjust startTime by moving it 15 seconds backward (making timer appear 15s more)
+                        const adjustedStartTime = new Date(prev.startTime.getTime() - 15000);
+                        
+                        if (timerSettings.countUp) {
+                          const newElapsed = Math.min(3600, (prev.countupElapsed || 0) + 15);
+                          return {
+                            ...prev,
+                            startTime: adjustedStartTime,
+                            countupElapsed: newElapsed
+                          };
+                        } else {
+                          const newTimeLeft = (prev.countdownTimeLeft || 0) + 15;
+                          return {
+                            ...prev,
+                            startTime: adjustedStartTime,
+                            countdownTimeLeft: newTimeLeft
+                          };
+                        }
+                      });
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 16,
+                      fontWeight: '600',
+                      color: '#ffffff',
+                    }}>+15s</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              {/* Play/Pause Button */}
+              <TouchableOpacity 
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: themeColor,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 24,
+                  shadowColor: themeColor,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                }}
+                onPress={handleTimerToggle}
+              >
+                <Ionicons 
+                  name={globalTimer?.isRunning ? "pause" : "play"} 
+                  size={28} 
+                  color="#000000"
+                  style={{
+                    marginLeft: globalTimer?.isRunning ? 0 : 3,
+                  }}
+                />
+              </TouchableOpacity>
+              
+              {/* Bottom Controls */}
+              <View style={{
+                width: '100%',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+              }}>
+                
+                {/* Mode Toggle */}
+                <View style={{
+                  flex: 1,
+                  marginRight: 8,
+                }}>
+                  <Text style={{
+                    fontSize: 12,
+                    color: '#888888',
+                    marginBottom: 8,
+                    textAlign: 'center',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}>Mode</Text>
+                  <TouchableOpacity 
+                    style={{
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      borderRadius: 16,
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.2)',
+                    }}
+                    onPress={async () => {
+                      const newSettings = { ...timerSettings, countUp: !timerSettings.countUp };
+                      setTimerSettings(newSettings);
+                      await TimerNotifications.saveSettings(newSettings);
+                      
+                      if (globalTimer) {
+                        if (newSettings.countUp) {
+                          updateTimerState(prev => prev ? {
+                            ...prev,
+                            countdownTime: prev.timeLeft,
+                            countdownRunning: prev.isRunning,
+                            timeLeft: 0,
+                            stopwatchTime: 0,
+                            originalDuration: 0,
+                            isRunning: false,
+                            completed: false
+                          } : null);
+                        } else {
+                          updateTimerState(prev => prev ? {
+                            ...prev,
+                            stopwatchTime: prev.timeLeft,
+                            timeLeft: prev.countdownTime || prev.originalDuration,
+                            isRunning: false,
+                            completed: false
+                          } : null);
+                        }
+                      }
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#ffffff',
+                      textAlign: 'center',
+                    }}>
+                      {timerSettings.countUp ? 'Count Up' : 'Countdown'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Timer Mode Toggle */}
+                {!timerSettings.countUp && (
+                  <View style={{
+                    flex: 1,
+                    marginLeft: 8,
+                  }}>
+                    <Text style={{
+                      fontSize: 12,
+                      color: '#888888',
+                      marginBottom: 8,
+                      textAlign: 'center',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}>Timer</Text>
+                    <TouchableOpacity 
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        borderRadius: 16,
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.2)',
+                      }}
+                      onPress={handleTimerModeSwitch}
+                    >
+                      <Text style={{
+                        fontSize: 14,
+                        fontWeight: '500',
+                        color: '#ffffff',
+                        textAlign: 'center',
+                      }}>
+                        {globalTimer?.isQuickMode ? 'Quick' : 'Optimal'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+              
+            </View>
+          </View>
+        </View>
+      </Modal>
+      </>
+
+      {/* Start Workout Confirmation Modal */}
+      <Modal
+        visible={showStartModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStartModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.newConfirmModalContainer}>
+            <View style={styles.newConfirmModalHeader}>
+              <View style={[styles.newConfirmModalIconContainer, { backgroundColor: `${themeColor}20` }]}>
+                <Ionicons name="play-circle" size={32} color={themeColor} />
+              </View>
+              <Text style={styles.newConfirmModalTitle}>Ready to Start?</Text>
+              <Text style={styles.newConfirmModalSubtitle}>
+                {day?.day_name || 'Workout'} • Week {currentWeek}
+              </Text>
+            </View>
+            
+            <View style={styles.newConfirmModalButtons}>
+              <TouchableOpacity
+                style={styles.newConfirmModalCancelButton}
+                onPress={() => setShowStartModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.newConfirmModalCancelText}>Not Yet</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.newConfirmModalStartButton, { backgroundColor: themeColor }]}
+                onPress={confirmStartWorkout}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="play" size={18} color="white" style={styles.newConfirmModalStartIcon} />
+                <Text style={styles.newConfirmModalStartText}>Start Workout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Active Workout Warning Modal */}
+      <Modal
+        visible={showActiveWorkoutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowActiveWorkoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.newConfirmModalContainer}>
+            <View style={styles.newConfirmModalHeader}>
+              <View style={[styles.newConfirmModalIconContainer, { backgroundColor: '#ef444415' }]}>
+                <Ionicons name="warning" size={32} color="#ef4444" />
+              </View>
+              <Text style={styles.newConfirmModalTitle}>Workout In Progress</Text>
+              <Text style={styles.newConfirmModalSubtitle}>
+                You have an active workout: {activeWorkout?.dayName}
+              </Text>
+            </View>
+            
+            <View style={styles.newConfirmModalButtons}>
+              <TouchableOpacity
+                style={styles.newConfirmModalCancelButton}
+                onPress={() => setShowActiveWorkoutModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.newConfirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.newConfirmModalStartButton, { backgroundColor: '#ef4444' }]}
+                onPress={() => {
+                  setShowActiveWorkoutModal(false);
+                  navigate('WorkoutLog', activeWorkout!.routeParams);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-forward" size={18} color="white" style={styles.newConfirmModalStartIcon} />
+                <Text style={styles.newConfirmModalStartText}>Go to Active</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Start Reminder Modal */}
+      <Modal
+        visible={showStartReminderModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStartReminderModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.reminderModalContainer}>
+            <Ionicons name="information-circle" size={48} color={themeColor} />
+            <Text style={styles.reminderModalTitle}>Start Your Workout</Text>
+            <Text style={styles.reminderModalMessage}>
+              You need to start your workout session first to begin logging exercises.
+            </Text>
+            
+            <TouchableOpacity
+              style={[styles.reminderModalPrimaryButton, { backgroundColor: themeColor }]}
+              onPress={() => {
+                setShowStartReminderModal(false);
+                confirmStartWorkout();
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.reminderModalPrimaryButtonText}>Start Workout</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.reminderModalSecondaryLink}
+              onPress={() => setShowStartReminderModal(false)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.reminderModalSecondaryLinkText}>Maybe Later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Workout Completion Summary Modal */}
+      <Modal
+        visible={showCompletionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCompletionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.completionModalContainer}>
+            <View style={[styles.completionIconContainer, { backgroundColor: themeColor + '1A' }]}>
+              <Ionicons name="fitness" size={32} color={themeColor} />
+            </View>
+            <Text style={styles.completionModalTitle}>Session Complete</Text>
+            <Text style={styles.completionModalSubtitle}>{day?.day_name || 'Workout'}</Text>
+            
+            {workoutStats && (
+              <View style={styles.summaryContainer}>
+                <View style={styles.durationContainer}>
+                  <Text style={styles.durationLabel}>Session Duration</Text>
+                  <Text style={styles.durationValue}>{workoutStats.duration}</Text>
+                </View>
+                
+                <View style={styles.volumeCard}>
+                  <Text style={styles.volumeLabel}>Total Volume</Text>
+                  <Text style={styles.volumeValue}>{workoutStats.totalVolume}</Text>
+                  <Text style={[styles.volumeUnit, { color: themeColor }]}>{globalUnit}</Text>
+                </View>
+              </View>
+            )}
+            
+            <View style={styles.completionModalButtons}>
+              <TouchableOpacity
+                style={[styles.completionModalButton, styles.completionModalContinueButton]}
+                onPress={() => setShowCompletionModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.completionModalContinueText}>Continue Session</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.completionModalButton, styles.completionModalFinishButton, { backgroundColor: themeColor }]}
+                onPress={() => {
+                  setShowCompletionModal(false);
+                  confirmFinishWorkout();
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.completionModalFinishText}>Save & Exit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Exercise Preference Dialog */}
+      <Modal
+        visible={!!showPreferenceDialog}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setShowPreferenceDialog(null)}
+      >
+        <Animated.View style={[styles.preferenceModalOverlay, { opacity: preferenceModalOpacity }]}>
+          <Animated.View style={[
+            styles.preferenceModalContainer, 
+            { 
+              shadowColor: themeColor,
+              transform: [{ scale: preferenceModalScale }]
+            }
+          ]}>
+            {/* Header */}
+            <View style={styles.preferenceModalHeader}>
+              <View style={[styles.preferenceModalIconContainer, { backgroundColor: themeColor + '15' }]}>
+                <Ionicons name="star" size={24} color={themeColor} />
+              </View>
+            </View>
+
+            {/* Content */}
+            <View style={styles.preferenceModalContent}>
+              <Text style={styles.preferenceModalTitle}>Set as Preferred</Text>
+              
+              <View style={styles.preferenceModalExerciseCard}>
+                <Text style={styles.preferenceModalExerciseName}>
+                  {showPreferenceDialog?.selectedAlternative}
+                </Text>
+                <View style={[styles.preferenceModalBadge, { backgroundColor: themeColor + '15' }]}>
+                  <Text style={[styles.preferenceModalBadgeText, { color: themeColor }]}>
+                    Block Default
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.preferenceModalDescription}>
+                This exercise will automatically be selected whenever 
+                <Text style={[styles.preferenceModalHighlight, { color: themeColor }]}>
+                  {' '}{showPreferenceDialog?.primaryExercise}{' '}
+                </Text>
+                appears in this block.
+              </Text>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.preferenceModalActions}>
+              <TouchableOpacity 
+                style={[styles.preferenceModalButton, styles.preferenceModalCancelButton]}
+                onPress={cancelExercisePreference}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.preferenceModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.preferenceModalButton, styles.preferenceModalConfirmButton, { backgroundColor: themeColor }]}
+                onPress={confirmExercisePreference}
+                activeOpacity={0.9}
+              >
+                <Ionicons name="star" size={16} color="#0a0a0b" style={{ marginRight: 6 }} />
+                <Text style={styles.preferenceModalConfirmText}>Set Preferred</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Deload Info Modal */}
+      <Modal
+        visible={showDeloadInfo}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeloadInfo(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View style={styles.deloadInfoModal}>
+            <View style={styles.deloadInfoHeader}>
+              <Text style={styles.deloadInfoTitle}>💡 Deload Week</Text>
+              <TouchableOpacity 
+                style={styles.deloadInfoClose}
+                onPress={() => setShowDeloadInfo(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={20} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+            
+            {(() => {
+              const deloadGuidance = block?.deload_guidance;
+              const previousWeek = currentWeek - 1;
+              
+              if (deloadGuidance) {
+                return (
+                  <>
+                    <Text style={styles.deloadInfoText}>
+                      Use {deloadGuidance.weight_percentage}% of your Week {previousWeek} weight.
+                    </Text>
+                    
+                    <Text style={styles.deloadInfoText}>
+                      Rep Range: {deloadGuidance.rep_range}
+                    </Text>
+                    
+                    <Text style={styles.deloadInfoExample}>
+                      {deloadGuidance.notes}
+                    </Text>
+                  </>
+                );
+              } else {
+                // Fallback to generic advice
+                return (
+                  <>
+                    <Text style={styles.deloadInfoText}>
+                      Use 40-60% of your Week {previousWeek} weight (50% is most common).
+                    </Text>
+                    
+                    <Text style={styles.deloadInfoExample}>
+                      Example: If you used 100kg for 6-8 reps in Week {previousWeek}, use 50kg for 12 reps this week.
+                    </Text>
+                  </>
+                );
+              }
+            })()}
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Add Exercise Modal */}
+      <Modal
+        visible={showAddExerciseModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAddExerciseModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.addExerciseModal}>
+            {/* Header */}
+            <View style={styles.addExerciseHeader}>
+              <Text style={styles.addExerciseTitle}>Add Exercise</Text>
+              <TouchableOpacity 
+                onPress={() => setShowAddExerciseModal(false)}
+                style={styles.addExerciseCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#71717a" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Options */}
+            <View style={styles.addExerciseOptions}>
+              <TouchableOpacity 
+                style={[styles.addExerciseCard, { backgroundColor: themeColor }]}
+                onPress={() => {
+                  setShowAddExerciseModal(false);
+                  navigation.navigate('FavoriteExercises' as never, { 
+                    ...route.params,
+                    selectionMode: true
+                  } as never);
+                }}
+              >
+                <Ionicons name="heart" size={24} color="#000000" />
+                <Text style={[styles.addExerciseCardText, { color: '#000000' }]}>Choose Favourite</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.addExerciseCard}
+                onPress={() => {
+                  setShowAddExerciseModal(false);
+                  navigation.navigate('ManualExerciseEntry' as never, route.params as never);
+                }}
+              >
+                <Ionicons name="add-circle-outline" size={24} color="#ffffff" />
+                <Text style={styles.addExerciseCardText}>Create New Exercise</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rep Scheme Editing Modal */}
+      {editingRepScheme && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setEditingRepScheme(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.repSchemeEditModal}>
+              <View style={styles.repSchemeEditHeader}>
+                <Text style={styles.repSchemeEditTitle}>
+                  Edit Week {editingRepScheme.week} Reps
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => setEditingRepScheme(null)}
+                  style={styles.repSchemeEditCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#71717a" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.repSchemeEditContent}>
+                <Text style={styles.repSchemeEditLabel}>Target Reps:</Text>
+                <TextInput
+                  style={styles.repSchemeEditInput}
+                  value={editingRepScheme.currentReps}
+                  onChangeText={(text) => 
+                    setEditingRepScheme(prev => prev ? {...prev, currentReps: text} : null)
+                  }
+                  placeholder="e.g. 8, 8, 8, 6"
+                  placeholderTextColor="#71717a"
+                  autoFocus={true}
+                />
+                <Text style={styles.repSchemeEditHint}>
+                  Enter reps separated by commas (e.g. "8, 8, 8, 6")
+                </Text>
+              </View>
+              
+              <View style={styles.repSchemeEditButtons}>
+                <TouchableOpacity 
+                  style={styles.repSchemeEditCancelButton}
+                  onPress={() => setEditingRepScheme(null)}
+                >
+                  <Text style={styles.repSchemeEditCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.repSchemeEditSaveButton, { backgroundColor: themeColor }]}
+                  onPress={() => {
+                    // Update the exercise's reps_weekly
+                    const updatedExercises = [...dynamicExercises];
+                    if (updatedExercises[editingRepScheme.exerciseIndex].reps_weekly) {
+                      updatedExercises[editingRepScheme.exerciseIndex].reps_weekly[editingRepScheme.week] = editingRepScheme.currentReps;
+                    }
+                    setDynamicExercises(updatedExercises);
+                    setEditingRepScheme(null);
+                  }}
+                >
+                  <Text style={styles.repSchemeEditSaveText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* Timer Components */}
       <TimerModal />
       <MinimizedTimer />

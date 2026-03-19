@@ -12,7 +12,7 @@ import { useTimer } from '../contexts/TimerContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 export const TimerModal: React.FC = () => {
-  const { timer, isMinimized, timerSettings, setTimerSettings, startTimer, pauseTimer, stopTimer, resetTimer, addTime, subtractTime, hideModal } = useTimer();
+  const { timer, isMinimized, timerSettings, setTimerSettings, startTimer, pauseTimer, resumeTimer, stopTimer, resetTimer, addTime, subtractTime, hideModal } = useTimer();
   const { themeColor } = useTheme();
 
   // Animation values
@@ -22,30 +22,32 @@ export const TimerModal: React.FC = () => {
   // Animate in/out when modal visibility changes
   useEffect(() => {
     if (!isMinimized) {
-      // Show modal
+      // Show modal with smooth, spring-like animation
       Animated.parallel([
         Animated.timing(overlayOpacity, {
           toValue: 1,
-          duration: 200,
+          duration: 400,
           useNativeDriver: true,
         }),
-        Animated.timing(slideAnim, {
+        Animated.spring(slideAnim, {
           toValue: 1,
-          duration: 300,
+          tension: 100,
+          friction: 8,
           useNativeDriver: true,
         }),
       ]).start();
     } else {
-      // Hide modal
+      // Hide modal with smooth spring animation
       Animated.parallel([
         Animated.timing(overlayOpacity, {
           toValue: 0,
-          duration: 150,
+          duration: 300,
           useNativeDriver: true,
         }),
-        Animated.timing(slideAnim, {
+        Animated.spring(slideAnim, {
           toValue: 0,
-          duration: 200,
+          tension: 120,
+          friction: 10,
           useNativeDriver: true,
         }),
       ]).start();
@@ -71,14 +73,15 @@ export const TimerModal: React.FC = () => {
   const handlePlayPause = () => {
     if (!timer) {
       // Start a new timer at 0:00
-      startTimer(0);
+      startTimer(0, undefined, undefined, themeColor);
     } else if (timer.isRunning && !timer.isPaused) {
       pauseTimer();
+    } else if (timer.isPaused) {
+      // Resume the paused timer
+      resumeTimer();
     } else {
-      // Resume timer by setting start time to account for elapsed time
-      const now = new Date();
-      const adjustedStartTime = new Date(now.getTime() - timer.timeElapsed * 1000);
-      startTimer(timer.targetTime, timer.exerciseIndex, timer.setIndex);
+      // Timer exists but is stopped - restart it with existing target time
+      startTimer(timer.targetTime, timer.exerciseIndex, timer.setIndex, themeColor);
     }
   };
 
@@ -108,12 +111,17 @@ export const TimerModal: React.FC = () => {
         <Animated.View 
           style={[
             styles.timerModal, 
-            { transform: [{ translateY: modalTranslateY }] }
+            { 
+              transform: [{ translateY: modalTranslateY }],
+              borderTopColor: `${themeColor}40`,
+              shadowColor: themeColor,
+              shadowOffset: { width: 0, height: -8 },
+              shadowOpacity: 0.3,
+              shadowRadius: 16,
+              elevation: 25,
+            }
           ]}
         >
-          {/* Header with drag indicator */}
-          <View style={styles.dragIndicator} />
-          
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.closeButton}
@@ -170,18 +178,6 @@ export const TimerModal: React.FC = () => {
           <View style={styles.controlSection}>
             <View style={styles.playbackControls}>
               <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={resetTimer}
-                disabled={!hasTimer}
-              >
-                <Ionicons 
-                  name="refresh-outline" 
-                  size={20} 
-                  color={hasTimer ? "#a1a1aa" : "#52525b"} 
-                />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
                 style={[styles.primaryButton, { backgroundColor: isTimerRunning ? '#ef4444' : themeColor }]}
                 onPress={handlePlayPause}
               >
@@ -192,71 +188,43 @@ export const TimerModal: React.FC = () => {
                   style={{ marginLeft: isTimerRunning ? 0 : 2 }}
                 />
               </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={stopTimer}
-                disabled={!hasTimer}
-              >
-                <Ionicons 
-                  name="stop-outline" 
-                  size={20} 
-                  color={hasTimer ? "#a1a1aa" : "#52525b"} 
-                />
-              </TouchableOpacity>
             </View>
           </View>
 
           {/* Settings */}
           <View style={styles.settingsSection}>
             {/* Mode Toggle */}
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>Timer Mode</Text>
-              <TouchableOpacity
-                style={[styles.modernToggle, timerSettings.countUp && styles.modernToggleActive]}
-                onPress={() => setTimerSettings({ ...timerSettings, countUp: !timerSettings.countUp })}
-              >
+            <TouchableOpacity 
+              style={styles.settingRow}
+              onPress={() => setTimerSettings({ ...timerSettings, countUp: !timerSettings.countUp })}
+            >
+              <Text style={styles.settingLabel}>
+                {timerSettings.countUp ? 'Count Up' : 'Countdown'}
+              </Text>
+              <View style={[styles.simpleToggle, timerSettings.countUp && { backgroundColor: themeColor }]}>
                 <View style={[
-                  styles.modernToggleThumb,
-                  { backgroundColor: timerSettings.countUp ? themeColor : '#52525b' },
-                  timerSettings.countUp && styles.modernToggleThumbActive
-                ]}>
-                  <Ionicons 
-                    name={timerSettings.countUp ? "trending-up" : "trending-down"} 
-                    size={12} 
-                    color="white" 
-                  />
-                </View>
-                <Text style={[styles.toggleText, timerSettings.countUp && { color: themeColor }]}>
-                  {timerSettings.countUp ? 'Count Up' : 'Countdown'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                  styles.toggleKnob,
+                  timerSettings.countUp && styles.toggleKnobActive
+                ]} />
+              </View>
+            </TouchableOpacity>
 
             {/* Rest Time Toggle (only for countdown) */}
             {!timerSettings.countUp && (
-              <View style={styles.settingRow}>
-                <Text style={styles.settingLabel}>Rest Duration</Text>
-                <TouchableOpacity
-                  style={[styles.modernToggle, timerSettings.quickMode && styles.modernToggleActive]}
-                  onPress={() => setTimerSettings({ ...timerSettings, quickMode: !timerSettings.quickMode })}
-                >
+              <TouchableOpacity 
+                style={styles.settingRow}
+                onPress={() => setTimerSettings({ ...timerSettings, quickMode: !timerSettings.quickMode })}
+              >
+                <Text style={styles.settingLabel}>
+                  {timerSettings.quickMode ? 'Quick Rest' : 'Optimal Rest'}
+                </Text>
+                <View style={[styles.simpleToggle, timerSettings.quickMode && { backgroundColor: themeColor }]}>
                   <View style={[
-                    styles.modernToggleThumb,
-                    { backgroundColor: timerSettings.quickMode ? themeColor : '#52525b' },
-                    timerSettings.quickMode && styles.modernToggleThumbActive
-                  ]}>
-                    <Ionicons 
-                      name={timerSettings.quickMode ? "flash" : "time"} 
-                      size={12} 
-                      color="white" 
-                    />
-                  </View>
-                  <Text style={[styles.toggleText, timerSettings.quickMode && { color: themeColor }]}>
-                    {timerSettings.quickMode ? 'Quick Rest' : 'Optimal Rest'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                    styles.toggleKnob,
+                    timerSettings.quickMode && styles.toggleKnobActive
+                  ]} />
+                </View>
+              </TouchableOpacity>
             )}
           </View>
         </Animated.View>
@@ -268,181 +236,145 @@ export const TimerModal: React.FC = () => {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'flex-end',
   },
   backdrop: {
     flex: 1,
   },
   timerModal: {
-    backgroundColor: '#18181b',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 34, // Account for home indicator
-    maxHeight: '75%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 24,
-    elevation: 20,
-  },
-  dragIndicator: {
-    width: 36,
-    height: 4,
-    backgroundColor: '#52525b',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 8,
+    backgroundColor: '#000000',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+    paddingTop: 24,
+    maxHeight: '70%',
+    borderTopWidth: 2,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginBottom: 8,
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#27272a',
+    position: 'absolute',
+    right: 24,
+    top: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   titleContainer: {
     alignItems: 'center',
-    flex: 1,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#ffffff',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#888',
+    fontWeight: '400',
   },
   timerSection: {
     alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
+    paddingVertical: 40,
+    paddingHorizontal: 24,
   },
   timeDisplay: {
-    fontSize: 64,
-    fontWeight: '300',
+    fontSize: 72,
+    fontWeight: '200',
     color: '#ffffff',
     fontVariant: ['tabular-nums'],
-    letterSpacing: -2,
-    marginBottom: 24,
+    letterSpacing: -3,
+    marginBottom: 32,
   },
   timeAdjustControls: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 20,
+    marginBottom: 8,
   },
   adjustButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
+    gap: 8,
+    minWidth: 80,
+    justifyContent: 'center',
   },
   minusButton: {
-    backgroundColor: '#ef444415',
+    backgroundColor: '#2a1a1a',
     borderWidth: 1,
-    borderColor: '#ef444430',
+    borderColor: '#333',
   },
   plusButton: {
-    backgroundColor: '#22c55e15',
+    backgroundColor: '#1a2a1a',
     borderWidth: 1,
-    borderColor: '#22c55e30',
+    borderColor: '#333',
   },
   adjustButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#a1a1aa',
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#ccc',
   },
   controlSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
   },
   playbackControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
-  primaryButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
-  secondaryButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#27272a',
+  primaryButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   settingsSection: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
-    gap: 20,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    borderTopWidth: 0.5,
+    borderTopColor: '#333',
+    gap: 24,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 4,
   },
   settingLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
     color: '#ffffff',
   },
-  modernToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#27272a',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    gap: 8,
-    minWidth: 140,
-  },
-  modernToggleActive: {
-    backgroundColor: '#ffffff10',
-  },
-  modernToggleThumb: {
-    width: 24,
+  simpleToggle: {
+    width: 44,
     height: 24,
+    backgroundColor: '#404040',
     borderRadius: 12,
-    alignItems: 'center',
+    padding: 2,
     justifyContent: 'center',
   },
-  modernToggleThumbActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    transform: [{ translateX: 0 }],
   },
-  toggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#a1a1aa',
-    flex: 1,
+  toggleKnobActive: {
+    transform: [{ translateX: 18 }],
   },
 });

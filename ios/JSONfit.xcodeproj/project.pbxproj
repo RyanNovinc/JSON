@@ -7,29 +7,117 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0FC02775F2534B8C849BD56D /* LiveActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DE1B9A4D2E4AD38E125E97 /* LiveActivityView.swift */; };
+		13983D6D2629FB779CAC93F9 /* libPods-JSONfit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3B0D4D18FFD79AAEECC6FD05 /* libPods-JSONfit.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		2D3B4873251840148FC31612 /* Color+hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E7BFE75725424EADBB7C97 /* Color+hex.swift */; };
+		311A822DFC35463798772C02 /* ViewHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD62467C70F340BF84530B38 /* ViewHelpers.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		B5C791753AF8E728B39D4EED /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B5A537FDE7D3B0FC606C2D18 /* PrivacyInfo.xcprivacy */; };
+		45F6537475824037917BCABB /* LiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0B873D59786146F88250F8BA /* LiveActivity.appex */; };
+		48F0224C74894DBAB4D24453 /* View+applyWidgetURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0284EB73E0B40D2B69A60D1 /* View+applyWidgetURL.swift */; };
+		5AC68AA94CC341B2A983DC73 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 129F0FA2AC8C4A58B458BB6A /* Assets.xcassets */; };
+		79E1713E34935BF91DF5C425 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E6E387B6946CE5BBFC33835 /* ExpoModulesProvider.swift */; };
+		8B36AC2F620A4999A0BE5883 /* LiveActivityWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C742B0627046BCBBDFBE50 /* LiveActivityWidgetBundle.swift */; };
+		A9D3E2EC06874723A4E93A00 /* View+applyIfPresent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66F5F62BEF6A475A92B0CB02 /* View+applyIfPresent.swift */; };
+		AD0FFE3131A6A805104C9771 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA25FA1FA413FD46A916EBF2 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		C7A1570C3A87DFAAE63AFC97 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29BFEA87A6A15A0A49092E3C /* ExpoModulesProvider.swift */; };
+		DD56F6B499CB49BEB918851B /* Image+dynamic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EEEA156957D4085AD0A7C7C /* Image+dynamic.swift */; };
+		E0599A9674014016979FDD13 /* LiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D371B98465644899F0B67A1 /* LiveActivityWidget.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F7AF868C51C6CD0F5EF4B664 /* libPods-JSONfit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D766B47C60FCC060F3A331FE /* libPods-JSONfit.a */; };
+		FF327DDBDD8144F2A0089518 /* Date+toTimerInterval.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B08EDDE2804BBC9D237572 /* Date+toTimerInterval.swift */; };
+		BA419B68405D42E2BC4CFB38 /* LiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AB3DA441F46E4BA3B29647E2 /* LiveActivity.appex */; };
+		206EF3F7813D4EB799AE4D1D /* LiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D29637BB1DD44B4A8E1EC7C1 /* LiveActivity.appex */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		DBAA8AFE5421471AAFC2F019 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F28B5CC6E4BC40888DC00FC2;
+			remoteInfo = LiveActivity;
+		};
+		EA885D05A35447ECA8CF35CD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F9F10EEC53334AAFB2ECB5D7;
+			remoteInfo = LiveActivity;
+		};
+		B41D92523CE6463BA65AF785 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8B5C6A0588DC4DE5ADFCEB6D;
+			remoteInfo = LiveActivity;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		9383F0C449FE4E69B5485D57 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				45F6537475824037917BCABB /* LiveActivity.appex in Embed Foundation Extensions */,
+				BA419B68405D42E2BC4CFB38 /* LiveActivity.appex in Embed Foundation Extensions */,
+				206EF3F7813D4EB799AE4D1D /* LiveActivity.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		228CDC09DCFC47A4B22D9AA4 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Embed Foundation Extensions";
+			dstPath = "";
+			dstSubfolderSpec = 13;
+		};
+		997A5BE429A94E9DB1724152 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Embed Foundation Extensions";
+			dstPath = "";
+			dstSubfolderSpec = 13;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		06C742B0627046BCBBDFBE50 /* LiveActivityWidgetBundle.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityWidgetBundle.swift; path = LiveActivityWidgetBundle.swift; sourceTree = "<group>"; };
+		0B873D59786146F88250F8BA /* LiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = LiveActivity.appex; path = LiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0D371B98465644899F0B67A1 /* LiveActivityWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityWidget.swift; path = LiveActivityWidget.swift; sourceTree = "<group>"; };
+		129F0FA2AC8C4A58B458BB6A /* Assets.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Assets.xcassets; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* JSONfit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JSONfit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = JSONfit/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = JSONfit/Info.plist; sourceTree = "<group>"; };
-		29BFEA87A6A15A0A49092E3C /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-JSONfit/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		A664390014BD373AC9717E46 /* Pods-JSONfit.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-JSONfit.release.xcconfig"; path = "Target Support Files/Pods-JSONfit/Pods-JSONfit.release.xcconfig"; sourceTree = "<group>"; };
+		17DE1B9A4D2E4AD38E125E97 /* LiveActivityView.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityView.swift; path = LiveActivityView.swift; sourceTree = "<group>"; };
+		269783752BF9C7DFB8785D8A /* Pods-JSONfit.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-JSONfit.debug.xcconfig"; path = "Target Support Files/Pods-JSONfit/Pods-JSONfit.debug.xcconfig"; sourceTree = "<group>"; };
+		2900ED02AB7F4FDEB54F228D /* LiveActivity.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = LiveActivity.entitlements; path = LiveActivity.entitlements; sourceTree = "<group>"; };
+		3B0D4D18FFD79AAEECC6FD05 /* libPods-JSONfit.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-JSONfit.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		66F5F62BEF6A475A92B0CB02 /* View+applyIfPresent.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "View+applyIfPresent.swift"; path = "View+applyIfPresent.swift"; sourceTree = "<group>"; };
+		7EEEA156957D4085AD0A7C7C /* Image+dynamic.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Image+dynamic.swift"; path = "Image+dynamic.swift"; sourceTree = "<group>"; };
+		89E7BFE75725424EADBB7C97 /* Color+hex.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Color+hex.swift"; path = "Color+hex.swift"; sourceTree = "<group>"; };
+		8E6E387B6946CE5BBFC33835 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-JSONfit/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		9DD676E34D0CAE811ADC3E1B /* Pods-JSONfit.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-JSONfit.release.xcconfig"; path = "Target Support Files/Pods-JSONfit/Pods-JSONfit.release.xcconfig"; sourceTree = "<group>"; };
+		9F48677EF06344849FCA2613 /* Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = Info.plist; path = Info.plist; sourceTree = "<group>"; };
+		AA25FA1FA413FD46A916EBF2 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = JSONfit/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = JSONfit/SplashScreen.storyboard; sourceTree = "<group>"; };
-		B5A537FDE7D3B0FC606C2D18 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = JSONfit/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B9B08EDDE2804BBC9D237572 /* Date+toTimerInterval.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Date+toTimerInterval.swift"; path = "Date+toTimerInterval.swift"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		CA81E42B0E78F1BAB16C15D9 /* Pods-JSONfit.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-JSONfit.debug.xcconfig"; path = "Target Support Files/Pods-JSONfit/Pods-JSONfit.debug.xcconfig"; sourceTree = "<group>"; };
-		D766B47C60FCC060F3A331FE /* libPods-JSONfit.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-JSONfit.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		BD62467C70F340BF84530B38 /* ViewHelpers.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = ViewHelpers.swift; path = ViewHelpers.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F0284EB73E0B40D2B69A60D1 /* View+applyWidgetURL.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "View+applyWidgetURL.swift"; path = "View+applyWidgetURL.swift"; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = JSONfit/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* JSONfit-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "JSONfit-Bridging-Header.h"; path = "JSONfit/JSONfit-Bridging-Header.h"; sourceTree = "<group>"; };
+		AB3DA441F46E4BA3B29647E2 /* LiveActivity.appex */ = {isa = PBXFileReference; name = "LiveActivity.appex"; path = "LiveActivity.appex"; sourceTree = BUILT_PRODUCTS_DIR; fileEncoding = undefined; lastKnownFileType = undefined; explicitFileType = wrapper.app-extension; includeInIndex = 0; };
+		D29637BB1DD44B4A8E1EC7C1 /* LiveActivity.appex */ = {isa = PBXFileReference; name = "LiveActivity.appex"; path = "LiveActivity.appex"; sourceTree = BUILT_PRODUCTS_DIR; fileEncoding = undefined; lastKnownFileType = undefined; explicitFileType = wrapper.app-extension; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,19 +125,52 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F7AF868C51C6CD0F5EF4B664 /* libPods-JSONfit.a in Frameworks */,
+				13983D6D2629FB779CAC93F9 /* libPods-JSONfit.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1FC7352608CA45FEBB94321B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		36E286BC6BE14E6B87DE9D94 /* Embed Foundation Extensions */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		12390DA58CCE4A3D994B6BE2 /* Embed Foundation Extensions */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		0981CBDAB75AFB342234591E /* ExpoModulesProviders */ = {
+		0C80D0C2974F48FCA5A6B571 /* LiveActivity */ = {
 			isa = PBXGroup;
 			children = (
-				38CE180A833933B37A456695 /* JSONfit */,
+				89E7BFE75725424EADBB7C97 /* Color+hex.swift */,
+				B9B08EDDE2804BBC9D237572 /* Date+toTimerInterval.swift */,
+				7EEEA156957D4085AD0A7C7C /* Image+dynamic.swift */,
+				17DE1B9A4D2E4AD38E125E97 /* LiveActivityView.swift */,
+				0D371B98465644899F0B67A1 /* LiveActivityWidget.swift */,
+				06C742B0627046BCBBDFBE50 /* LiveActivityWidgetBundle.swift */,
+				66F5F62BEF6A475A92B0CB02 /* View+applyIfPresent.swift */,
+				F0284EB73E0B40D2B69A60D1 /* View+applyWidgetURL.swift */,
+				BD62467C70F340BF84530B38 /* ViewHelpers.swift */,
+				9F48677EF06344849FCA2613 /* Info.plist */,
+				129F0FA2AC8C4A58B458BB6A /* Assets.xcassets */,
+				2900ED02AB7F4FDEB54F228D /* LiveActivity.entitlements */,
 			);
-			name = ExpoModulesProviders;
+			name = LiveActivity;
+			path = LiveActivity;
 			sourceTree = "<group>";
 		};
 		13B07FAE1A68108700A75B9A /* JSONfit */ = {
@@ -61,35 +182,36 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				B5A537FDE7D3B0FC606C2D18 /* PrivacyInfo.xcprivacy */,
+				AA25FA1FA413FD46A916EBF2 /* PrivacyInfo.xcprivacy */,
 			);
 			name = JSONfit;
+			sourceTree = "<group>";
+		};
+		26D98DDC913B22F69B09A1BF /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				269783752BF9C7DFB8785D8A /* Pods-JSONfit.debug.xcconfig */,
+				9DD676E34D0CAE811ADC3E1B /* Pods-JSONfit.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				D766B47C60FCC060F3A331FE /* libPods-JSONfit.a */,
+				3B0D4D18FFD79AAEECC6FD05 /* libPods-JSONfit.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		38CE180A833933B37A456695 /* JSONfit */ = {
+		6EB0646CE09C2D1809FE97F3 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				29BFEA87A6A15A0A49092E3C /* ExpoModulesProvider.swift */,
+				FB52D979289E5D5E33C9DEFF /* JSONfit */,
 			);
-			name = JSONfit;
-			sourceTree = "<group>";
-		};
-		7090F97D89EA2B7894840691 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				CA81E42B0E78F1BAB16C15D9 /* Pods-JSONfit.debug.xcconfig */,
-				A664390014BD373AC9717E46 /* Pods-JSONfit.release.xcconfig */,
-			);
-			path = Pods;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -106,8 +228,11 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				7090F97D89EA2B7894840691 /* Pods */,
-				0981CBDAB75AFB342234591E /* ExpoModulesProviders */,
+				0C80D0C2974F48FCA5A6B571 /* LiveActivity */,
+				26D98DDC913B22F69B09A1BF /* Pods */,
+				6EB0646CE09C2D1809FE97F3 /* ExpoModulesProviders */,
+				F320D892EB6A43CBBD7A85CC /* LiveActivity */,
+				3EAD0B10979F4C1CBA2B1B4C /* LiveActivity */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -118,6 +243,9 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* JSONfit.app */,
+				0B873D59786146F88250F8BA /* LiveActivity.appex */,
+				AB3DA441F46E4BA3B29647E2 /* LiveActivity.appex */,
+				D29637BB1DD44B4A8E1EC7C1 /* LiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -131,6 +259,54 @@
 			path = JSONfit/Supporting;
 			sourceTree = "<group>";
 		};
+		FB52D979289E5D5E33C9DEFF /* JSONfit */ = {
+			isa = PBXGroup;
+			children = (
+				8E6E387B6946CE5BBFC33835 /* ExpoModulesProvider.swift */,
+			);
+			name = JSONfit;
+			sourceTree = "<group>";
+		};
+		F320D892EB6A43CBBD7A85CC /* LiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				89E7BFE75725424EADBB7C97 /* Color+hex.swift */,
+				B9B08EDDE2804BBC9D237572 /* Date+toTimerInterval.swift */,
+				7EEEA156957D4085AD0A7C7C /* Image+dynamic.swift */,
+				17DE1B9A4D2E4AD38E125E97 /* LiveActivityView.swift */,
+				0D371B98465644899F0B67A1 /* LiveActivityWidget.swift */,
+				06C742B0627046BCBBDFBE50 /* LiveActivityWidgetBundle.swift */,
+				66F5F62BEF6A475A92B0CB02 /* View+applyIfPresent.swift */,
+				F0284EB73E0B40D2B69A60D1 /* View+applyWidgetURL.swift */,
+				BD62467C70F340BF84530B38 /* ViewHelpers.swift */,
+				9F48677EF06344849FCA2613 /* Info.plist */,
+				129F0FA2AC8C4A58B458BB6A /* Assets.xcassets */,
+				2900ED02AB7F4FDEB54F228D /* LiveActivity.entitlements */,
+			);
+			name = LiveActivity;
+			path = LiveActivity;
+			sourceTree = "<group>";
+		};
+		3EAD0B10979F4C1CBA2B1B4C /* LiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				89E7BFE75725424EADBB7C97 /* Color+hex.swift */,
+				B9B08EDDE2804BBC9D237572 /* Date+toTimerInterval.swift */,
+				7EEEA156957D4085AD0A7C7C /* Image+dynamic.swift */,
+				17DE1B9A4D2E4AD38E125E97 /* LiveActivityView.swift */,
+				0D371B98465644899F0B67A1 /* LiveActivityWidget.swift */,
+				06C742B0627046BCBBDFBE50 /* LiveActivityWidgetBundle.swift */,
+				66F5F62BEF6A475A92B0CB02 /* View+applyIfPresent.swift */,
+				F0284EB73E0B40D2B69A60D1 /* View+applyWidgetURL.swift */,
+				BD62467C70F340BF84530B38 /* ViewHelpers.swift */,
+				9F48677EF06344849FCA2613 /* Info.plist */,
+				129F0FA2AC8C4A58B458BB6A /* Assets.xcassets */,
+				2900ED02AB7F4FDEB54F228D /* LiveActivity.entitlements */,
+			);
+			name = LiveActivity;
+			path = LiveActivity;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -139,22 +315,79 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "JSONfit" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				C7818045161DB25AB087735B /* [Expo] Configure project */,
+				003ADF7FDA77DC52A1FC3E6F /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				CD5605853322905E87889620 /* [CP] Embed Pods Frameworks */,
+				9383F0C449FE4E69B5485D57 /* Embed Foundation Extensions */,
+				57167CA2C145A7D232624913 /* [CP] Embed Pods Frameworks */,
+				228CDC09DCFC47A4B22D9AA4 /* Embed Foundation Extensions */,
+				997A5BE429A94E9DB1724152 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				19A41C28BE2645788BB11306 /* PBXTargetDependency */,
+				EE95823E424B4972B4494D71 /* PBXTargetDependency */,
+				1FC256DEB93F4C088686869F /* PBXTargetDependency */,
 			);
 			name = JSONfit;
 			productName = JSONfit;
 			productReference = 13B07F961A680F5B00A75B9A /* JSONfit.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F28B5CC6E4BC40888DC00FC2 /* LiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3EABFCACBC9F411AACFC24F7 /* Build configuration list for PBXNativeTarget "LiveActivity" */;
+			buildPhases = (
+				65869865E6374B93BFBDC831 /* Sources */,
+				1FC7352608CA45FEBB94321B /* Frameworks */,
+				2B920C9331AC45479392DA37 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LiveActivity;
+			productName = LiveActivity;
+			productReference = 0B873D59786146F88250F8BA /* LiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		F9F10EEC53334AAFB2ECB5D7 /* LiveActivity */ = {
+			isa = PBXNativeTarget;
+			name = LiveActivity;
+			productName = LiveActivity;
+			productReference = AB3DA441F46E4BA3B29647E2;
+			productType = "com.apple.product-type.app-extension";
+			buildConfigurationList = 75BB65AD753345F59559A929;
+			buildPhases = (
+				383B6FBEDF364E7AB80FCCCB /* Embed Foundation Extensions */,
+				36E286BC6BE14E6B87DE9D94 /* Embed Foundation Extensions */,
+				2BD703CCA0D44F69B7899C2F /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+		};
+		8B5C6A0588DC4DE5ADFCEB6D /* LiveActivity */ = {
+			isa = PBXNativeTarget;
+			name = LiveActivity;
+			productName = LiveActivity;
+			productReference = D29637BB1DD44B4A8E1EC7C1;
+			productType = "com.apple.product-type.app-extension";
+			buildConfigurationList = D672AD6007084E68BF9DA109;
+			buildPhases = (
+				F2FDD964B40B450B80DE0940 /* Embed Foundation Extensions */,
+				12390DA58CCE4A3D994B6BE2 /* Embed Foundation Extensions */,
+				D79D66A1E7864232B4E0776A /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
 		};
 /* End PBXNativeTarget section */
 
@@ -165,6 +398,15 @@
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
+						LastSwiftMigration = 1250;
+					};
+					F28B5CC6E4BC40888DC00FC2 = {
+						LastSwiftMigration = 1250;
+					};
+					F9F10EEC53334AAFB2ECB5D7 = {
+						LastSwiftMigration = 1250;
+					};
+					8B5C6A0588DC4DE5ADFCEB6D = {
 						LastSwiftMigration = 1250;
 					};
 				};
@@ -183,6 +425,9 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* JSONfit */,
+				F28B5CC6E4BC40888DC00FC2 /* LiveActivity */,
+				F9F10EEC53334AAFB2ECB5D7 /* LiveActivity */,
+				8B5C6A0588DC4DE5ADFCEB6D /* LiveActivity */,
 			);
 		};
 /* End PBXProject section */
@@ -195,13 +440,61 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				B5C791753AF8E728B39D4EED /* PrivacyInfo.xcprivacy in Resources */,
+				AD0FFE3131A6A805104C9771 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2B920C9331AC45479392DA37 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5AC68AA94CC341B2A983DC73 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2BD703CCA0D44F69B7899C2F /* Embed Foundation Extensions */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5AC68AA94CC341B2A983DC73 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D79D66A1E7864232B4E0776A /* Embed Foundation Extensions */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5AC68AA94CC341B2A983DC73 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		003ADF7FDA77DC52A1FC3E6F /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/JSONfit/JSONfit.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-JSONfit/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-JSONfit/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-JSONfit/expo-configure-project.sh\"\n";
+		};
 		00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -239,6 +532,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		57167CA2C145A7D232624913 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-JSONfit/Pods-JSONfit-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-JSONfit/Pods-JSONfit-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
@@ -287,48 +598,6 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-JSONfit/Pods-JSONfit-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		C7818045161DB25AB087735B /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/JSONfit/JSONfit.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-JSONfit/expo-configure-project.sh",
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-JSONfit/ExpoModulesProvider.swift",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-JSONfit/expo-configure-project.sh\"\n";
-		};
-		CD5605853322905E87889620 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-JSONfit/Pods-JSONfit-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-JSONfit/Pods-JSONfit-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -337,22 +606,87 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				C7A1570C3A87DFAAE63AFC97 /* ExpoModulesProvider.swift in Sources */,
+				79E1713E34935BF91DF5C425 /* ExpoModulesProvider.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		65869865E6374B93BFBDC831 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2D3B4873251840148FC31612 /* Color+hex.swift in Sources */,
+				FF327DDBDD8144F2A0089518 /* Date+toTimerInterval.swift in Sources */,
+				DD56F6B499CB49BEB918851B /* Image+dynamic.swift in Sources */,
+				0FC02775F2534B8C849BD56D /* LiveActivityView.swift in Sources */,
+				E0599A9674014016979FDD13 /* LiveActivityWidget.swift in Sources */,
+				8B36AC2F620A4999A0BE5883 /* LiveActivityWidgetBundle.swift in Sources */,
+				A9D3E2EC06874723A4E93A00 /* View+applyIfPresent.swift in Sources */,
+				48F0224C74894DBAB4D24453 /* View+applyWidgetURL.swift in Sources */,
+				311A822DFC35463798772C02 /* ViewHelpers.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		383B6FBEDF364E7AB80FCCCB /* Embed Foundation Extensions */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2D3B4873251840148FC31612 /* "Color+hex.swift" in Sources */,
+				FF327DDBDD8144F2A0089518 /* "Date+toTimerInterval.swift" in Sources */,
+				DD56F6B499CB49BEB918851B /* "Image+dynamic.swift" in Sources */,
+				0FC02775F2534B8C849BD56D /* LiveActivityView.swift in Sources */,
+				E0599A9674014016979FDD13 /* LiveActivityWidget.swift in Sources */,
+				8B36AC2F620A4999A0BE5883 /* LiveActivityWidgetBundle.swift in Sources */,
+				A9D3E2EC06874723A4E93A00 /* "View+applyIfPresent.swift" in Sources */,
+				48F0224C74894DBAB4D24453 /* "View+applyWidgetURL.swift" in Sources */,
+				311A822DFC35463798772C02 /* ViewHelpers.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F2FDD964B40B450B80DE0940 /* Embed Foundation Extensions */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2D3B4873251840148FC31612 /* "Color+hex.swift" in Sources */,
+				FF327DDBDD8144F2A0089518 /* "Date+toTimerInterval.swift" in Sources */,
+				DD56F6B499CB49BEB918851B /* "Image+dynamic.swift" in Sources */,
+				0FC02775F2534B8C849BD56D /* LiveActivityView.swift in Sources */,
+				E0599A9674014016979FDD13 /* LiveActivityWidget.swift in Sources */,
+				8B36AC2F620A4999A0BE5883 /* LiveActivityWidgetBundle.swift in Sources */,
+				A9D3E2EC06874723A4E93A00 /* "View+applyIfPresent.swift" in Sources */,
+				48F0224C74894DBAB4D24453 /* "View+applyWidgetURL.swift" in Sources */,
+				311A822DFC35463798772C02 /* ViewHelpers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		19A41C28BE2645788BB11306 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F28B5CC6E4BC40888DC00FC2 /* LiveActivity */;
+			targetProxy = DBAA8AFE5421471AAFC2F019 /* PBXContainerItemProxy */;
+		};
+		EE95823E424B4972B4494D71 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F9F10EEC53334AAFB2ECB5D7 /* LiveActivity */;
+			targetProxy = EA885D05A35447ECA8CF35CD /* PBXContainerItemProxy */;
+		};
+		1FC256DEB93F4C088686869F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8B5C6A0588DC4DE5ADFCEB6D /* LiveActivity */;
+			targetProxy = B41D92523CE6463BA65AF785 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CA81E42B0E78F1BAB16C15D9 /* Pods-JSONfit.debug.xcconfig */;
+			baseConfigurationReference = 269783752BF9C7DFB8785D8A /* Pods-JSONfit.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = JSONfit/JSONfit.entitlements;
-				CURRENT_PROJECT_VERSION = 4;
-				DEVELOPMENT_TEAM = RJL5VQK2DK;
+				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -364,15 +698,15 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.7;
+				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSONfit;
-				PRODUCT_NAME = JSONfit;
+				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSON;
+				PRODUCT_NAME = "JSONfit";
 				SWIFT_OBJC_BRIDGING_HEADER = "JSONfit/JSONfit-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -383,28 +717,27 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A664390014BD373AC9717E46 /* Pods-JSONfit.release.xcconfig */;
+			baseConfigurationReference = 9DD676E34D0CAE811ADC3E1B /* Pods-JSONfit.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = JSONfit/JSONfit.entitlements;
-				CURRENT_PROJECT_VERSION = 4;
-				DEVELOPMENT_TEAM = RJL5VQK2DK;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = JSONfit/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.7;
+				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSONfit;
-				PRODUCT_NAME = JSONfit;
+				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSON;
+				PRODUCT_NAME = "JSONfit";
 				SWIFT_OBJC_BRIDGING_HEADER = "JSONfit/JSONfit-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -528,6 +861,128 @@
 			};
 			name = Release;
 		};
+		8BD4852391114DDFB0676DDD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
+				CURRENT_PROJECT_VERSION = 7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				MARKETING_VERSION = 1.0.7;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSON.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		EE02231F289B4065A7B541F6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
+				CURRENT_PROJECT_VERSION = 7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				MARKETING_VERSION = 1.0.7;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSON.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DE94D8B5D758410EB3321FEC /* Debug */ = {
+			name = Debug;
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				INFOPLIST_FILE = LiveActivity/Info.plist;
+				CURRENT_PROJECT_VERSION = "7";
+				IPHONEOS_DEPLOYMENT_TARGET = "16.2";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.RyanNovinc.JSON.LiveActivity";
+				GENERATE_INFOPLIST_FILE = "YES";
+				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MARKETING_VERSION = "1.0.7";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				CODE_SIGN_ENTITLEMENTS = "LiveActivity/LiveActivity.entitlements";
+				APPLICATION_EXTENSION_API_ONLY = "YES";
+			};
+		};
+		C0973F0F0BC8407E861493F3 /* Release */ = {
+			name = Release;
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				INFOPLIST_FILE = LiveActivity/Info.plist;
+				CURRENT_PROJECT_VERSION = "7";
+				IPHONEOS_DEPLOYMENT_TARGET = "16.2";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.RyanNovinc.JSON.LiveActivity";
+				GENERATE_INFOPLIST_FILE = "YES";
+				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MARKETING_VERSION = "1.0.7";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				CODE_SIGN_ENTITLEMENTS = "LiveActivity/LiveActivity.entitlements";
+				APPLICATION_EXTENSION_API_ONLY = "YES";
+			};
+		};
+		AD791DFD438741BEBFA0A5FB /* Debug */ = {
+			name = Debug;
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				INFOPLIST_FILE = LiveActivity/Info.plist;
+				CURRENT_PROJECT_VERSION = "7";
+				IPHONEOS_DEPLOYMENT_TARGET = "16.2";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.RyanNovinc.JSON.LiveActivity";
+				GENERATE_INFOPLIST_FILE = "YES";
+				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MARKETING_VERSION = "1.0.7";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				CODE_SIGN_ENTITLEMENTS = "LiveActivity/LiveActivity.entitlements";
+				APPLICATION_EXTENSION_API_ONLY = "YES";
+			};
+		};
+		55E216BB03E34D94857CE067 /* Release */ = {
+			name = Release;
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				INFOPLIST_FILE = LiveActivity/Info.plist;
+				CURRENT_PROJECT_VERSION = "7";
+				IPHONEOS_DEPLOYMENT_TARGET = "16.2";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.RyanNovinc.JSON.LiveActivity";
+				GENERATE_INFOPLIST_FILE = "YES";
+				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				MARKETING_VERSION = "1.0.7";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				CODE_SIGN_ENTITLEMENTS = "LiveActivity/LiveActivity.entitlements";
+				APPLICATION_EXTENSION_API_ONLY = "YES";
+			};
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -540,11 +995,38 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		3EABFCACBC9F411AACFC24F7 /* Build configuration list for PBXNativeTarget "LiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EE02231F289B4065A7B541F6 /* Debug */,
+				8BD4852391114DDFB0676DDD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "JSONfit" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		75BB65AD753345F59559A929 /* Build configuration list for PBXNativeTarget "LiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DE94D8B5D758410EB3321FEC /* Debug */,
+				C0973F0F0BC8407E861493F3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D672AD6007084E68BF9DA109 /* Build configuration list for PBXNativeTarget "LiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AD791DFD438741BEBFA0A5FB /* Debug */,
+				55E216BB03E34D94857CE067 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
