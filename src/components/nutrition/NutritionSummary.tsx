@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
-import Slider from 'react-native-slider';
+import Slider from '@react-native-community/slider';
 import { NutritionFormData, MacroResults } from '../../screens/NutritionQuestionnaireScreen';
 
 interface Props {
