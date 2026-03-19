@@ -54,6 +54,9 @@ For programs with 4+ training days, ensure adequate recovery between muscle grou
 3. If conflicts exist, either adjust the split structure or downgrade conflicting work to maintenance volume
 4. Secondary/assistance muscles can overlap if they're not the primary focus
 
+**Rest Day Integration:**
+- Include optimal rest days in weekly schedule for recovery and training stimulus
+
 **Validation Rule:** No muscle group should be primarily trained again before meeting its minimum recovery window. Plan your week accordingly before writing specific exercises.`;
 }
 

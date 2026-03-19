@@ -6,12 +6,12 @@ export const foundationBuilderProgram: WorkoutProgram = {
   "id": "17727999117880.yd7ak19i9k",
   "routine_name": "Foundation Builder",
   "description": "12-week full body general fitness program for beginners. Three days per week using antagonist supersets to maximise volume within 45-minute sessions. Block 1 builds movement quality and a base of fitness across 10–15 rep ranges.",
-  "days_per_week": 3,
+  "days_per_week": 7,
   "blocks": [
     {
       "block_name": "Block 1: Foundation (Part 1)",
       "weeks": "1-6",
-      "structure": "Full Body Full Body Full Body",
+      "structure": "Full Body Rest Full Body Rest Full Body Rest Rest",
       "days": [
         {
           "day_name": "Full Body A",
@@ -164,6 +164,11 @@ export const foundationBuilderProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Full Body B",
           "estimated_duration": 44,
           "exercises": [
@@ -314,6 +319,11 @@ export const foundationBuilderProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Full Body C",
           "estimated_duration": 44,
           "exercises": [
@@ -462,13 +472,23 @@ export const foundationBuilderProgram: WorkoutProgram = {
               ]
             }
           ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
         }
       ]
     },
     {
       "block_name": "Block 2: Development (Part 2)",
       "weeks": "7-12",
-      "structure": "Full Body Full Body Full Body",
+      "structure": "Full Body Rest Full Body Rest Full Body Rest Rest",
       "days": [
         {
           "day_name": "Full Body A",
@@ -621,6 +641,11 @@ export const foundationBuilderProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Full Body B",
           "estimated_duration": 44,
           "exercises": [
@@ -771,6 +796,11 @@ export const foundationBuilderProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Full Body C",
           "estimated_duration": 44,
           "exercises": [
@@ -919,6 +949,16 @@ export const foundationBuilderProgram: WorkoutProgram = {
               ]
             }
           ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
         }
       ]
     }

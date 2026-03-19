@@ -400,6 +400,8 @@ Apply these checks to the block before correcting the JSON:
 - [ ] Equipment requirements match available resources
 - [ ] Exercise transitions are logical and efficient
 - [ ] Workout flow supports adherence and motivation
+**Rest Day Structure:**
+- [ ] Rest days are properly formatted as REST DAY entries with empty exercises
 
 Each block should be a complete, standalone JSON file with routine_name, description, days_per_week, and a single block in the blocks array. Keep routine_name and description consistent across all files.
 
@@ -470,6 +472,7 @@ If the plan notes shorter or minimal rest preferences, reduce accordingly (short
 
 Each exercise must include 2 alternatives (or 1 alternative for bodyweight-only programs where the exercise pool is limited). Alternatives should:
 - Target the same primary muscles
+- Use different equipment types when possible (e.g., if main exercise uses cables, provide dumbbell/barbell/bodyweight/machine alternatives to ensure equipment availability)
 - Use a different movement variation or equipment
 - Include their own primaryMuscles and secondaryMuscles tags
 
@@ -529,18 +532,30 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
 {
   "routine_name": "string",
   "description": "string",
-  "days_per_week": number,
+  "days_per_week": 7, // Always 7 for programs with rest days
   "blocks": [
     {
       "block_name": "string",
       "weeks": "string (e.g. '1-6')",
       "structure": "string (e.g. 'Push Pull Legs Upper Lower')",
+      "weekly_schedule": [
+        {
+          "day_number": number,
+          "type": "training" | "rest",
+          "day_name": "string (e.g. 'Push', 'Pull', 'REST DAY')"
+        }
+      ],
       "deload_weeks": [number] (optional — include only if block has deloads),
       "days": [
         {
           "day_name": "string",
           "estimated_duration": number (minutes),
           "exercises": [Exercise]
+        },
+        {
+          "day_name": "REST DAY", 
+          "estimated_duration": 0,
+          "exercises": []
         }
       ]
     }
@@ -586,7 +601,12 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
 6. **Superset rest encoding** — for superset exercises, SS[n]a's \`rest\` field represents the inter-exercise transition rest (60-90s). SS[n]b's \`rest\` field represents the full rest before repeating the pair (compound or isolation default for that exercise type). \`restQuick\` is calculated from each exercise's own \`rest\` value.
 7. **sets vs sets_weekly** — \`sets\` is the default set count for training weeks (used for display). \`sets_weekly\` must be specified for every week in the block: training weeks should match \`sets\`, and deload weeks should show reduced values. Both fields are required for every strength exercise.
 8. **deload_weeks optionality** — omit \`deload_weeks\` entirely for blocks without deloads. Do not include an empty array.
-9. **Sample plan protection** — for sample plans only, include \`"_metadata": {"isSamplePlan": true}\` at the root level to prevent overwriting users' exercise preferences during import.
+9. **weekly_schedule** — create a 7-day schedule showing training and rest days. For each day 1-7, specify: day_number, type ("training" or "rest"), and day_name (e.g., "Push", "Pull", "REST DAY"). Training days must match the day_name values in the days array. Example for 5-day program: 
+   - Day 1: {"day_number": 1, "type": "training", "day_name": "Push"}
+   - Day 2: {"day_number": 2, "type": "training", "day_name": "Pull"}  
+   - Day 3: {"day_number": 3, "type": "rest", "day_name": "REST DAY"}
+   - Days 4,5: training, Day 6: rest, Day 7: training
+10. **Sample plan protection** — for sample plans only, include \`"_metadata": {"isSamplePlan": true}\` at the root level to prevent overwriting users' exercise preferences during import.
 
 ---
 

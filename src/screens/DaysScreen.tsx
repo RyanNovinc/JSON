@@ -278,6 +278,19 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
     );
   }
   
+  // Handle REST DAY - special card design
+  if (exerciseCount === 0 && day.day_name && day.day_name.toUpperCase().includes('REST')) {
+    return (
+      <View style={[styles.restDayCard, { borderLeftColor: '#6b7280' }]}>
+        <View style={styles.restDayContent}>
+          <Ionicons name="bed-outline" size={24} color="#6b7280" />
+          <Text style={styles.restDayTitle}>{day.day_name}</Text>
+          <Text style={styles.restDaySubtitle}>Recovery & Rest</Text>
+        </View>
+      </View>
+    );
+  }
+
   // Regular uncompleted card with full details
   return (
     <TouchableOpacity 
@@ -361,6 +374,7 @@ export default function DaysScreen() {
   const [selectedDay, setSelectedDay] = useState<Day | null>(null);
   const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
   const [editedDuration, setEditedDuration] = useState('');
+  const [showRestDays, setShowRestDays] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   
   // Calculate total weeks for this block
@@ -901,10 +915,27 @@ export default function DaysScreen() {
           <Text style={styles.blockLabel}>BLOCK {localBlock.block_name.split(' ')[1] || 'A'}</Text>
           <Text style={styles.blockPhase}>{localBlock.block_name.includes('Hypertrophy') ? 'Hypertrophy' : localBlock.block_name.includes('Strength') ? 'Strength' : 'Training'}</Text>
         </View>
+        
+        <TouchableOpacity 
+          style={styles.restToggle}
+          onPress={() => setShowRestDays(!showRestDays)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.restToggleTrack, { backgroundColor: showRestDays ? themeColor : '#3f3f46' }]}>
+            <View style={[styles.restToggleThumb, { 
+              transform: [{ translateX: showRestDays ? 14 : 0 }],
+              backgroundColor: '#ffffff'
+            }]} />
+          </View>
+          <Text style={styles.restToggleLabel}>Rest</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        data={localBlock.days}
+        data={localBlock.days.filter(day => {
+          const isRestDay = day.day_name && day.day_name.toUpperCase().includes('REST');
+          return showRestDays || !isRestDay;
+        })}
         keyExtractor={(item, index) => `${item.day_name}-${index}`}
         ListHeaderComponent={() => (
           <View style={styles.weekNavigationContainer}>
@@ -1183,7 +1214,6 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     alignItems: 'center',
-    paddingRight: 40, // Compensate for back button to center title
   },
   blockLabel: {
     fontSize: 14,
@@ -1932,5 +1962,62 @@ const styles = StyleSheet.create({
   },
   moveButtonDisabled: {
     backgroundColor: '#18181b',
+  },
+  restDayName: {
+    color: '#6b7280',
+  },
+  restDayCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderLeftWidth: 4,
+    padding: 20,
+    marginBottom: 20,
+  },
+  restDayContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  restDayTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#6b7280',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  restDaySubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#9ca3af',
+  },
+  restToggle: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  restToggleTrack: {
+    width: 32,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  restToggleThumb: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  restToggleLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#71717a',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

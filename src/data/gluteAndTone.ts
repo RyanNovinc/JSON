@@ -4,12 +4,12 @@ export const gluteAndToneProgram: WorkoutProgram = {
   "id": "17728448668640.uf0en2ohf08",
   "routine_name": "Glute & Tone",
   "description": "12-week hypertrophy program prioritising Glutes and Hamstrings. Full body 4x/week split alternating lower-biased and upper-biased sessions. Two blocks of 6 weeks (5 training + 1 deload each).",
-  "days_per_week": 4,
+  "days_per_week": 7,
   "blocks": [
     {
       "block_name": "Block 1: Foundation (Part 1)",
       "weeks": "1-6",
-      "structure": "Full Body — Day A: Lower + Vertical Pull | Day B: Push + Lower | Day C: Lower + Horizontal Pull | Day D: Hinge + Upper",
+      "structure": "Day A Rest Day B Day C Rest Day D Rest",
       "deload_weeks": [
         6
       ],
@@ -313,6 +313,11 @@ export const gluteAndToneProgram: WorkoutProgram = {
               ]
             }
           ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
         },
         {
           "day_name": "Day B: Push + Lower",
@@ -921,6 +926,11 @@ export const gluteAndToneProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day D: Hinge + Upper",
           "estimated_duration": 64,
           "exercises": [
@@ -1225,13 +1235,18 @@ export const gluteAndToneProgram: WorkoutProgram = {
               ]
             }
           ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
         }
       ]
     },
     {
       "block_name": "Block 2: Accumulation (Part 2)",
       "weeks": "7-12",
-      "structure": "Full Body — Day A: Lower + Vertical Pull | Day B: Push + Lower | Day C: Lower + Horizontal Pull | Day D: Hinge + Upper",
+      "structure": "Day A Rest Day B Day C Rest Day D Rest",
       "deload_weeks": [
         6
       ],
@@ -1538,6 +1553,11 @@ export const gluteAndToneProgram: WorkoutProgram = {
               ]
             }
           ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
         },
         {
           "day_name": "Day B: Push + Lower",
@@ -2146,6 +2166,11 @@ export const gluteAndToneProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day D: Hinge + Upper",
           "estimated_duration": 64,
           "exercises": [
@@ -2450,6 +2475,11 @@ export const gluteAndToneProgram: WorkoutProgram = {
               ]
             }
           ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
         }
       ]
     }

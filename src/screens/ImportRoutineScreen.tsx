@@ -687,7 +687,9 @@ export default function ImportRoutineScreen() {
             throw new Error(`"${day.day_name}" has invalid estimated_duration`);
           }
           
-          if (!Array.isArray(day.exercises) || day.exercises.length === 0) {
+          // Allow REST DAY entries to have no exercises
+          const isRestDay = day.day_name && day.day_name.toUpperCase().includes('REST');
+          if (!Array.isArray(day.exercises) || (day.exercises.length === 0 && !isRestDay)) {
             throw new Error(`"${day.day_name}" has no exercises`);
           }
           
@@ -2235,6 +2237,7 @@ These must pass after your fixes. If any of these still fail after revision, you
 - **User requirements priority** — ALL equipment, frequency, time, and experience constraints must be perfectly met (no exceptions).
 - **Volume minimums** — Major muscles need 12+ sets minimum, medium muscles need 8+ sets minimum based on current research.
 - **Recovery standards** — 48-72h minimum between same-muscle training sessions for optimal protein synthesis.
+- **Rest days are included and optimally placed for recovery**
 - **Practical feasibility** — Session durations must be realistic including warm-up, rest, and transitions.
 - **No draft content** — the output must contain zero working, iteration, or revision commentary.
 

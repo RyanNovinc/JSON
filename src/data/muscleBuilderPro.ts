@@ -4,12 +4,12 @@ export const muscleBuilderProProgram: WorkoutProgram = {
   "id": "sample_muscle_builder_pro_52w",
   "routine_name": "Muscle Builder Pro",
   "description": "Complete 48-week advanced 5-day Push/Pull/Legs/Upper/Lower hypertrophy program. 4 mesocycles of 2 blocks each, progressing through Hypertrophy Foundation (Meso 1, 8-12 reps), Strength-Hypertrophy (Meso 2, 6-10 reps), Metabolic Intensification (Meso 3, 10-15 reps), and Peak & Consolidation (Meso 4, 6-8 reps). Designed for advanced lifters training 5 days per week in a commercial gym.",
-  "days_per_week": 5,
+  "days_per_week": 7,
   "blocks": [
     {
       "block_name": "Block 1 — Hypertrophy Foundation",
       "weeks": "1-6",
-      "structure": "Push Pull Legs Upper Lower",
+      "structure": "Push Pull Rest Legs Upper Rest Lower",
       "deload_weeks": [
         6
       ],
@@ -816,6 +816,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 3 — Legs",
           "estimated_duration": 77,
           "exercises": [
@@ -1537,6 +1542,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 5 — Lower",
           "estimated_duration": 74,
           "exercises": [
@@ -1871,7 +1881,7 @@ export const muscleBuilderProProgram: WorkoutProgram = {
     {
       "block_name": "Block 2 — Hypertrophy Foundation",
       "weeks": "7-12",
-      "structure": "Push Pull Legs Upper Lower",
+      "structure": "Push Pull Rest Legs Upper Rest Lower",
       "deload_weeks": [
         6
       ],
@@ -2674,6 +2684,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 3 — Legs",
           "estimated_duration": 77,
           "exercises": [
@@ -3398,6 +3413,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 5 — Lower",
           "estimated_duration": 74,
           "exercises": [
@@ -3730,7 +3750,7 @@ export const muscleBuilderProProgram: WorkoutProgram = {
     {
       "block_name": "Block 3 — Strength-Hypertrophy",
       "weeks": "13-18",
-      "structure": "Push Pull Legs Upper Lower",
+      "structure": "Push Pull Rest Legs Upper Rest Lower",
       "deload_weeks": [
         6
       ],
@@ -4536,6 +4556,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 3 — Legs",
           "estimated_duration": 77,
           "exercises": [
@@ -5256,6 +5281,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 5 — Lower",
           "estimated_duration": 74,
           "exercises": [
@@ -5589,7 +5619,7 @@ export const muscleBuilderProProgram: WorkoutProgram = {
     {
       "block_name": "Block 4 — Strength-Hypertrophy",
       "weeks": "19-24",
-      "structure": "Push Pull Legs Upper Lower",
+      "structure": "Push Pull Rest Legs Upper Rest Lower",
       "deload_weeks": [
         6
       ],
@@ -6392,6 +6422,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 3 — Legs",
           "estimated_duration": 77,
           "exercises": [
@@ -7117,6 +7152,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 5 — Lower",
           "estimated_duration": 74,
           "exercises": [
@@ -7449,7 +7489,7 @@ export const muscleBuilderProProgram: WorkoutProgram = {
     {
       "block_name": "Block 5 — Metabolic Intensification",
       "weeks": "25-30",
-      "structure": "Push Pull Legs Upper Lower",
+      "structure": "Push Pull Rest Legs Upper Rest Lower",
       "deload_weeks": [
         6
       ],
@@ -8254,6 +8294,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 3 — Legs",
           "estimated_duration": 75,
           "exercises": [
@@ -8978,6 +9023,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 5 — Lower",
           "estimated_duration": 73,
           "exercises": [
@@ -9312,7 +9362,7 @@ export const muscleBuilderProProgram: WorkoutProgram = {
     {
       "block_name": "Block 6 — Metabolic Intensification",
       "weeks": "31-36",
-      "structure": "Push Pull Legs Upper Lower",
+      "structure": "Push Pull Rest Legs Upper Rest Lower",
       "deload_weeks": [
         6
       ],
@@ -10121,6 +10171,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 3 — Legs",
           "estimated_duration": 75,
           "exercises": [
@@ -10847,6 +10902,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 5 — Lower",
           "estimated_duration": 73,
           "exercises": [
@@ -11181,7 +11241,7 @@ export const muscleBuilderProProgram: WorkoutProgram = {
     {
       "block_name": "Block 7 — Peak & Consolidation",
       "weeks": "37-42",
-      "structure": "Push Pull Legs Upper Lower",
+      "structure": "Push Pull Rest Legs Upper Rest Lower",
       "deload_weeks": [
         6
       ],
@@ -11929,6 +11989,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 3 — Legs",
           "estimated_duration": 70,
           "exercises": [
@@ -12658,6 +12723,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 5 — Lower",
           "estimated_duration": 70,
           "exercises": [
@@ -12991,7 +13061,7 @@ export const muscleBuilderProProgram: WorkoutProgram = {
     {
       "block_name": "Block 8 — Peak & Consolidation",
       "weeks": "43-48",
-      "structure": "Push Pull Legs Upper Lower",
+      "structure": "Push Pull Rest Legs Upper Rest Lower",
       "deload_weeks": [
         6
       ],
@@ -13739,6 +13809,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Day 3 — Legs",
           "estimated_duration": 70,
           "exercises": [
@@ -14459,6 +14534,11 @@ export const muscleBuilderProProgram: WorkoutProgram = {
               ]
             }
           ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
         },
         {
           "day_name": "Day 5 — Lower",
