@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+import LiveActivity from 'expo-live-activity';
 
 export interface TimerState {
   isRunning: boolean;
@@ -15,11 +16,21 @@ export interface TimerState {
   exerciseIndex?: number;
   setIndex?: number;
   countdownSoundPlayed?: boolean; // Track if countdown sound has been played
+  liveActivityId?: string; // Track Live Activity ID
 }
 
 export interface TimerSettings {
   countUp: boolean;
   quickMode: boolean;
+}
+
+interface ExerciseContext {
+  currentExercise?: string;
+  nextExercise?: string;
+  currentSet?: number;
+  totalSets?: number;
+  weight?: string;
+  reps?: string;
 }
 
 interface TimerContextType {
@@ -32,7 +43,7 @@ interface TimerContextType {
   setTimerSettings: (settings: TimerSettings) => void;
   
   // Timer controls
-  startTimer: (targetSeconds?: number, exerciseIndex?: number, setIndex?: number) => void;
+  startTimer: (targetSeconds?: number, exerciseIndex?: number, setIndex?: number, themeColor?: string) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
   stopTimer: () => void;
@@ -46,7 +57,10 @@ interface TimerContextType {
   minimize: () => void;
   
   // Auto-timer for set completion
-  startAutoTimer: (restTime: number, quickRestTime: number, exerciseIndex: number, setIndex: number) => void;
+  startAutoTimer: (restTime: number, quickRestTime: number, exerciseIndex: number, setIndex: number, themeColor?: string) => void;
+  
+  // Exercise context for Live Activities
+  setExerciseContext: (getContext: ((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null) => void;
   
   // Test function for audio
   testAudio: () => void;
@@ -68,6 +82,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const appStateRef = useRef(AppState.currentState);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const getExerciseContextRef = useRef<((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null>(null);
 
   // Load persisted state on mount
   useEffect(() => {
@@ -269,12 +284,17 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Stop timer when countdown reaches 0
           if (remaining <= 0) {
             console.log('Countdown finished! Stopping timer.');
+            // Stop Live Activity when timer completes
+            if (prev.liveActivityId) {
+              stopLiveActivity(prev.liveActivityId);
+            }
             return { 
               ...prev, 
               timeElapsed: 0, // Reset to 0
               targetTime: 0,  // Reset to 0 so timer shows 0:00 cleanly
               isRunning: false,
-              isPaused: false
+              isPaused: false,
+              liveActivityId: undefined, // Clear Live Activity ID
             };
           }
         }
@@ -291,9 +311,9 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const startTimer = (targetSeconds = 0, exerciseIndex?: number, setIndex?: number) => {
+  const startTimer = async (targetSeconds = 0, exerciseIndex?: number, setIndex?: number, themeColor?: string) => {
     const now = new Date();
-    setTimer({
+    const newTimer = {
       isRunning: true,
       isPaused: false,
       timeElapsed: 0,
@@ -305,7 +325,25 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       exerciseIndex,
       setIndex,
       countdownSoundPlayed: false, // Reset countdown sound flag
-    });
+    };
+    
+    setTimer(newTimer);
+    
+    // Start Live Activity for countdown timers with exercise context
+    if (!timerSettings.countUp && targetSeconds > 0) {
+      // Try to get current exercise information if available
+      const exerciseContext = getExerciseContextRef.current?.(exerciseIndex, setIndex);
+      await startLiveActivity(
+        newTimer, 
+        exerciseContext?.currentExercise,
+        exerciseContext?.nextExercise,
+        exerciseContext?.currentSet,
+        exerciseContext?.totalSets,
+        exerciseContext?.weight,
+        exerciseContext?.reps,
+        themeColor
+      );
+    }
   };
 
   const pauseTimer = () => {
@@ -461,14 +499,87 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsMinimized(true);
   };
 
-  const startAutoTimer = (restTime: number, quickRestTime: number, exerciseIndex: number, setIndex: number) => {
+  const startAutoTimer = (restTime: number, quickRestTime: number, exerciseIndex: number, setIndex: number, themeColor?: string) => {
     const targetTime = timerSettings.quickMode ? quickRestTime : restTime;
-    startTimer(targetTime, exerciseIndex, setIndex);
+    startTimer(targetTime, exerciseIndex, setIndex, themeColor);
   };
 
   const testAudio = () => {
     console.log('🔊 Testing audio manually...');
     playCountdownSound();
+  };
+
+  const setExerciseContext = (getContext: ((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null) => {
+    getExerciseContextRef.current = getContext;
+  };
+
+  // Live Activity functions
+  const startLiveActivity = async (timer: TimerState, exerciseName?: string, nextExerciseName?: string, currentSet?: number, totalSets?: number, weight?: string, reps?: string, themeColor?: string) => {
+    try {
+      if (!timer.isCountUp && timer.targetTime > 0) {
+        const endTime = new Date(Date.now() + (timer.targetTime - timer.timeElapsed) * 1000);
+        
+        // Choose icon based on theme color
+        const isPinkTheme = themeColor?.toLowerCase().includes('pink') || themeColor === '#ec4899' || themeColor === '#f472b6';
+        const iconName = isPinkTheme ? 'icon_pink_transparent' : 'icon_transparent';
+        
+        const liveActivityState = {
+          title: timer.isQuickMode ? 'Quick Rest' : 'Optimal Rest',
+          subtitle: exerciseName ? `Next: ${nextExerciseName || 'Workout Complete'}` : 'Workout Timer',
+          progressBar: {
+            date: endTime.getTime(),
+          },
+          imageName: iconName,
+          dynamicIslandImageName: iconName,
+          // Additional workout context for lock screen
+          exerciseName: exerciseName || '',
+          nextExerciseName: nextExerciseName || '',
+          setInfo: currentSet && totalSets ? `Set ${currentSet} of ${totalSets}` : '',
+          weightReps: weight && reps ? `${weight} kgs x ${reps} reps` : '',
+        };
+
+        const activityId = await LiveActivity.startActivity(liveActivityState);
+        console.log('🎯 Live Activity started:', activityId);
+        
+        // Update timer with Live Activity ID
+        setTimer(prev => prev ? { ...prev, liveActivityId: activityId } : null);
+        return activityId;
+      }
+    } catch (error) {
+      console.error('❌ Failed to start Live Activity:', error);
+    }
+  };
+
+  const stopLiveActivity = async (activityId?: string) => {
+    try {
+      if (activityId) {
+        await LiveActivity.endActivity(activityId);
+        console.log('🛑 Live Activity stopped:', activityId);
+      }
+    } catch (error) {
+      console.error('❌ Failed to stop Live Activity:', error);
+    }
+  };
+
+  const updateLiveActivity = async (timer: TimerState) => {
+    try {
+      if (timer.liveActivityId && !timer.isCountUp && timer.targetTime > 0) {
+        const endTime = new Date(Date.now() + (timer.targetTime - timer.timeElapsed) * 1000);
+        
+        const liveActivityState = {
+          title: timer.isQuickMode ? 'Quick Rest Timer' : 'Optimal Rest Timer',
+          subtitle: timer.isRunning ? 'Running...' : 'Paused',
+          progressBar: {
+            date: endTime.getTime(),
+          },
+        };
+
+        await LiveActivity.updateActivity(timer.liveActivityId, liveActivityState);
+        console.log('🔄 Live Activity updated');
+      }
+    } catch (error) {
+      console.error('❌ Failed to update Live Activity:', error);
+    }
   };
 
   const contextValue: TimerContextType = {
@@ -487,6 +598,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     hideModal,
     minimize,
     startAutoTimer,
+    setExerciseContext,
     testAudio,
   };
 
