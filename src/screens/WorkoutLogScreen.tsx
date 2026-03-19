@@ -2125,6 +2125,10 @@ export default function WorkoutLogScreen() {
       await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
       console.log('Saved completion stats for key:', statsKey);
       
+      // Save the complete workout to history
+      console.log('🎯 [HISTORY] Saving workout to history...');
+      await saveWorkoutToHistory();
+      
       // Sets are now saved immediately when completed, so no need to save them again here
       await WorkoutStorage.clearCurrentWorkout(day?.day_name || '', blockName); // Clear any saved progress
       

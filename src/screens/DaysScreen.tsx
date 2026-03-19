@@ -536,6 +536,30 @@ export default function DaysScreen() {
     }
   }, [currentWeek, totalWeeks, maxVisibleWeeks]);
 
+  // Load rest day preference on component mount
+  useEffect(() => {
+    loadRestDayPreference();
+  }, []);
+
+  const loadRestDayPreference = async () => {
+    try {
+      const savedPreference = await AsyncStorage.getItem('showRestDays');
+      if (savedPreference !== null) {
+        setShowRestDays(JSON.parse(savedPreference));
+      }
+    } catch (error) {
+      console.log('Error loading rest day preference:', error);
+    }
+  };
+
+  const saveRestDayPreference = async (value: boolean) => {
+    try {
+      await AsyncStorage.setItem('showRestDays', JSON.stringify(value));
+    } catch (error) {
+      console.log('Error saving rest day preference:', error);
+    }
+  };
+
   const loadCurrentWeek = async () => {
     try {
       const savedWeek = await AsyncStorage.getItem(`currentWeek_${localBlock.block_name}`);
@@ -918,7 +942,11 @@ export default function DaysScreen() {
         
         <TouchableOpacity 
           style={styles.restToggle}
-          onPress={() => setShowRestDays(!showRestDays)}
+          onPress={() => {
+            const newValue = !showRestDays;
+            setShowRestDays(newValue);
+            saveRestDayPreference(newValue);
+          }}
           activeOpacity={0.7}
         >
           <View style={[styles.restToggleTrack, { backgroundColor: showRestDays ? themeColor : '#3f3f46' }]}>
