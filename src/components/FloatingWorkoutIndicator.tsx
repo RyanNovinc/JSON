@@ -30,8 +30,14 @@ export function FloatingWorkoutIndicator() {
   }, [activeWorkout?.duration]);
 
   // Don't show on the WorkoutLog screen if it's the SAME workout as the active one
+  // Also don't show on AddExercise screen
   const currentRoute = getCurrentRoute();
   if (!activeWorkout) return null;
+  
+  // Hide on AddExercise screen
+  if (currentRoute?.name === 'AddExercise') {
+    return null;
+  }
   
   // If we're on a WorkoutLog screen, check if it's the same workout as the active one
   if (currentRoute?.name === 'WorkoutLog' && currentRoute?.params) {

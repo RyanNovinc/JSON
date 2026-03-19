@@ -1,0 +1,86 @@
+{
+  "id": "test-foundation-builder",
+  "routine_name": "Foundation Builder with Rest Days",
+  "description": "12-week full body program with rest days",
+  "days_per_week": 7,
+  "blocks": [
+    {
+      "block_name": "Block 1: Foundation",
+      "weeks": "1-6", 
+      "structure": "Full Body Rest Full Body Rest Full Body Rest Rest",
+      "days": [
+        {
+          "day_name": "Full Body A",
+          "estimated_duration": 44,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Barbell Back Squat",
+              "sets": 3,
+              "reps": "10",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Quads", "Glutes"],
+              "secondaryMuscles": ["Core"],
+              "notes": "Basic squat exercise"
+            }
+          ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
+          "day_name": "Full Body B", 
+          "estimated_duration": 44,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Dumbbell Romanian Deadlift",
+              "sets": 3,
+              "reps": "10",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Hamstrings", "Glutes"],
+              "secondaryMuscles": ["Core"],
+              "notes": "Hip hinge movement"
+            }
+          ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
+          "day_name": "Full Body C",
+          "estimated_duration": 44, 
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Leg Press Machine",
+              "sets": 3,
+              "reps": "12",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Quads"],
+              "secondaryMuscles": ["Glutes"],
+              "notes": "Machine exercise"
+            }
+          ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        }
+      ]
+    }
+  ]
+}

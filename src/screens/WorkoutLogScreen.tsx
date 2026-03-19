@@ -1093,8 +1093,6 @@ export default function WorkoutLogScreen() {
   // Exercise settings state - track which exercise is in settings mode
   const [exerciseInSettings, setExerciseInSettings] = useState<number | null>(null);
   
-  // Add exercise modal
-  const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
   
   // Dynamic exercises state to handle runtime additions
   const [dynamicExercises, setDynamicExercises] = useState<Exercise[]>(day?.exercises || []);
@@ -1473,8 +1471,6 @@ export default function WorkoutLogScreen() {
     // Add the new sets data to allSetsData
     setAllSetsData(prev => [...prev, newSetsData]);
     
-    // Close the add exercise modal if it's open
-    setShowAddExerciseModal(false);
     
     console.log('Exercise added successfully:', newExercise.exercise);
   };
@@ -2887,7 +2883,14 @@ export default function WorkoutLogScreen() {
           {/* Add Exercise Button */}
           <TouchableOpacity 
             style={[styles.addExerciseButton, { borderColor: themeColor }]}
-            onPress={() => setShowAddExerciseModal(true)}
+            onPress={() => {
+              navigation.navigate('AddExercise' as any, {
+                programId: route.params.programId,
+                weekId: route.params.weekId,
+                dayId: route.params.dayId,
+                workoutStarted: !!workoutStartTime
+              });
+            }}
           >
             <Ionicons name="add-circle-outline" size={24} color={themeColor} />
             <Text style={[styles.addExerciseText, { color: themeColor }]}>Add Exercise</Text>
@@ -2901,6 +2904,145 @@ export default function WorkoutLogScreen() {
       {/* Timer Components */}
       <TimerModal />
       <MinimizedTimer />
+
+      {/* Start Workout Confirmation Modal */}
+      <Modal
+        visible={showStartModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStartModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.newConfirmModalContainer}>
+            <View style={styles.newConfirmModalHeader}>
+              <View style={[styles.newConfirmModalIconContainer, { backgroundColor: `${themeColor}20` }]}>
+                <Ionicons name="play-circle" size={32} color={themeColor} />
+              </View>
+              <Text style={styles.newConfirmModalTitle}>Ready to Start?</Text>
+              <Text style={styles.newConfirmModalSubtitle}>
+                {day?.day_name || 'Workout'} • Week {currentWeek}
+              </Text>
+            </View>
+            
+            <View style={styles.newConfirmModalButtons}>
+              <TouchableOpacity
+                style={styles.newConfirmModalCancelButton}
+                onPress={() => setShowStartModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.newConfirmModalCancelText}>Not Yet</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.newConfirmModalStartButton, { backgroundColor: themeColor }]}
+                onPress={confirmStartWorkout}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="play" size={18} color="white" style={styles.newConfirmModalStartIcon} />
+                <Text style={styles.newConfirmModalStartText}>Start Workout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Active Workout Warning Modal */}
+      <Modal
+        visible={showActiveWorkoutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowActiveWorkoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.newConfirmModalContainer}>
+            <View style={styles.newConfirmModalHeader}>
+              <View style={[styles.newConfirmModalIconContainer, { backgroundColor: '#ef444415' }]}>
+                <Ionicons name="warning" size={32} color="#ef4444" />
+              </View>
+              <Text style={styles.newConfirmModalTitle}>Workout In Progress</Text>
+              <Text style={styles.newConfirmModalSubtitle}>
+                You have an active workout: {activeWorkout?.dayName}
+              </Text>
+            </View>
+            
+            <View style={styles.newConfirmModalButtons}>
+              <TouchableOpacity
+                style={styles.newConfirmModalCancelButton}
+                onPress={() => setShowActiveWorkoutModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.newConfirmModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.newConfirmModalStartButton, { backgroundColor: '#ef4444' }]}
+                onPress={() => {
+                  setShowActiveWorkoutModal(false);
+                  navigate('WorkoutLog', activeWorkout!.routeParams);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-forward" size={18} color="white" style={styles.newConfirmModalStartIcon} />
+                <Text style={styles.newConfirmModalStartText}>Go to Active</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Workout Completion Summary Modal */}
+      <Modal
+        visible={showCompletionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCompletionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.completionModalContainer}>
+            <View style={[styles.completionIconContainer, { backgroundColor: themeColor + '1A' }]}>
+              <Ionicons name="fitness" size={32} color={themeColor} />
+            </View>
+            <Text style={styles.completionModalTitle}>Session Complete</Text>
+            <Text style={styles.completionModalSubtitle}>{day?.day_name || 'Workout'}</Text>
+            
+            {workoutStats && (
+              <View style={styles.summaryContainer}>
+                <View style={styles.durationContainer}>
+                  <Text style={styles.durationLabel}>Session Duration</Text>
+                  <Text style={styles.durationValue}>{workoutStats.duration}</Text>
+                </View>
+                
+                <View style={styles.volumeCard}>
+                  <Text style={styles.volumeLabel}>Total Volume</Text>
+                  <Text style={styles.volumeValue}>{workoutStats.totalVolume}</Text>
+                  <Text style={[styles.volumeUnit, { color: themeColor }]}>{globalUnit}</Text>
+                </View>
+              </View>
+            )}
+            
+            <View style={styles.completionModalButtons}>
+              <TouchableOpacity
+                style={[styles.completionModalButton, styles.completionModalContinueButton]}
+                onPress={() => setShowCompletionModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.completionModalContinueText}>Continue Session</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.completionModalButton, styles.completionModalFinishButton, { backgroundColor: themeColor }]}
+                onPress={() => {
+                  setShowCompletionModal(false);
+                  confirmFinishWorkout();
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.completionModalFinishText}>Save & Exit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
