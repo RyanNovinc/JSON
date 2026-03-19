@@ -2,7 +2,25 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
-import LiveActivity from 'expo-live-activity';
+// Conditionally import LiveActivity - works in dev builds/production, disabled in Expo Go
+let LiveActivity: any = null;
+try {
+  // Check if we're in a development build (not Expo Go)
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+    // Production build - import LiveActivity
+    LiveActivity = require('expo-live-activity');
+  } else {
+    // Check if expo-live-activity is available (custom dev build)
+    try {
+      LiveActivity = require('expo-live-activity');
+      console.log('📱 Live Activity available in development build');
+    } catch {
+      console.log('📱 Live Activity disabled in Expo Go simulator');
+    }
+  }
+} catch (error) {
+  console.log('📱 Live Activity not available in this environment');
+}
 
 export interface TimerState {
   isRunning: boolean;
@@ -538,6 +556,12 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           weightReps: weight && reps ? `${weight} kgs x ${reps} reps` : '',
         };
 
+        // Check if LiveActivity is available (only on physical iOS devices 16.1+)
+        if (!LiveActivity || typeof LiveActivity.startActivity !== 'function') {
+          console.log('📱 Live Activity not available (simulator or unsupported device)');
+          return undefined;
+        }
+        
         const activityId = await LiveActivity.startActivity(liveActivityState);
         console.log('🎯 Live Activity started:', activityId);
         
@@ -552,7 +576,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const stopLiveActivity = async (activityId?: string) => {
     try {
-      if (activityId) {
+      if (activityId && LiveActivity && typeof LiveActivity.endActivity === 'function') {
         await LiveActivity.endActivity(activityId);
         console.log('🛑 Live Activity stopped:', activityId);
       }
@@ -563,7 +587,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateLiveActivity = async (timer: TimerState) => {
     try {
-      if (timer.liveActivityId && !timer.isCountUp && timer.targetTime > 0) {
+      if (timer.liveActivityId && !timer.isCountUp && timer.targetTime > 0 && LiveActivity && typeof LiveActivity.updateActivity === 'function') {
         const endTime = new Date(Date.now() + (timer.targetTime - timer.timeElapsed) * 1000);
         
         const liveActivityState = {
