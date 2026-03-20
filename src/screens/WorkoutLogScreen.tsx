@@ -1002,7 +1002,7 @@ export default function WorkoutLogScreen() {
   const route = useRoute<WorkoutLogScreenRouteProp>();
   const { themeColor } = useTheme();
   const { globalUnit, getExerciseUnit, setExerciseUnit, setGlobalUnit, formatWeight, convertWeight } = useWeightUnit();
-  const { startAutoTimer, setExerciseContext } = useTimer();
+  const { startAutoTimer, setExerciseContext, stopTimer } = useTimer();
   const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
   const { activeWorkout, setActiveWorkout } = useActiveWorkout();
 
@@ -2034,6 +2034,9 @@ export default function WorkoutLogScreen() {
       
       // Clear workout timer by resetting start time
       setWorkoutStartTime(null);
+      
+      // Stop any active rest timer and clean up Live Activities
+      stopTimer();
       
       // Clear active workout from context
       setActiveWorkout(null);

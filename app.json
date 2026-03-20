@@ -44,8 +44,7 @@
     },
     "owner": "ryan_novinc",
     "plugins": [
-      "@react-native-community/datetimepicker",
-      "expo-live-activity"
+      "@react-native-community/datetimepicker"
     ]
   }
 }
