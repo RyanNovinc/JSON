@@ -228,7 +228,7 @@ function ExerciseCard({
         const existingData = await RobustStorage.getItem('favoriteExercises', true) || await AsyncStorage.getItem('favoriteExercises');
         const parsed = existingData ? JSON.parse(existingData) : [];
         const existingExercises = Array.isArray(parsed) ? parsed : [];
-        const isAlreadyFavorited = existingExercises.some(ex => ex.name.toLowerCase() === exercise.exercise.toLowerCase());
+        const isAlreadyFavorited = existingExercises.some(ex => ex.name?.toLowerCase() === exercise.exercise?.toLowerCase());
         setIsFavorited(isAlreadyFavorited);
       } catch (error) {
         console.error('Error checking favorite status:', error);

@@ -53,27 +53,24 @@ const COLORS = {
 const SLIDES: OnboardingSlide[] = [
   {
     icon: 'clipboard-outline',
-    title: 'Quick Setup',
-    description: 'Answer a few questions about your goals',
-    highlight: '',
+    title: 'Set Your Goals',
+    description:
+      'Answer the questionnaires in the bottom left for your workout goals and nutrition goals.',
+    highlight: 'Questionnaires help us build the perfect prompt for your needs',
   },
   {
-    icon: 'sparkles',
-    title: 'We Build Your Perfect Prompt',
-    description: 'Customized for your exact needs and preferences',
-    highlight: '',
+    icon: 'bulb-outline',
+    title: 'Generate Your Program',
+    description:
+      'Copy your personalised prompt into any AI — ChatGPT, Claude, Gemini, or whatever you prefer.',
+    highlight: 'No locked-in AI. Use whichever one you like best',
   },
   {
-    icon: 'send-outline',
-    title: 'Send It to Any AI',
-    description: 'ChatGPT, Claude, Gemini - whatever you like',
-    highlight: '',
-  },
-  {
-    icon: 'rocket-outline',
-    title: 'Import and Start Training',
-    description: 'Just paste or upload the result',
-    highlight: '',
+    icon: 'download-outline',
+    title: 'Import & Track',
+    description:
+      'Import the JSON file back into the app and follow your optimised workout and meal plans.',
+    highlight: '⚠️ All data is stored locally on your device. Deleting the app will permanently remove your workout logs, progress, and questionnaire data.',
   },
 ];
 
@@ -268,6 +265,16 @@ const OnboardingSlideshow: React.FC<OnboardingSlideshowProps> = ({
 
         {/* Bottom Section */}
         <View style={styles.bottomSection}>
+          {/* Warning for step 3 */}
+          {currentIndex === 2 && (
+            <Animated.View style={[styles.warningBox, { opacity: contentOpacity }]}>
+              <Ionicons name="warning" size={16} color="#f59e0b" />
+              <Text style={styles.warningText}>
+                All data is stored locally. Deleting the app will remove your workout logs and progress.
+              </Text>
+            </Animated.View>
+          )}
+
           {/* Progress Dots */}
           <View style={styles.dotsContainer}>
             {SLIDES.map((_, index) => {
@@ -433,6 +440,22 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     maxWidth: 300,
     alignSelf: 'center',
+  },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 20,
+    gap: 8,
+  },
+  warningText: {
+    color: '#f59e0b',
+    fontSize: 12,
+    lineHeight: 16,
+    flex: 1,
   },
   bottomSection: {
     paddingHorizontal: 20,

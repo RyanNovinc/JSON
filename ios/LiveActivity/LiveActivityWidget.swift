@@ -79,11 +79,15 @@ struct LiveActivityWidget: Widget {
           }
         }
       } compactLeading: {
-        if let dynamicIslandImageName = context.state.dynamicIslandImageName {
-          resizableImage(imageName: dynamicIslandImageName)
-            .frame(maxWidth: 23, maxHeight: 23)
-            .applyWidgetURL(from: context.attributes.deepLinkUrl)
-        }
+        // Use system icon with theme-based coloring
+        let progressTint = context.attributes.progressViewTint ?? "#007AFF"
+        let iconColor: Color = progressTint.contains("pink") || progressTint.contains("ec4899") || progressTint.contains("f472b6") ? .pink : .blue
+        
+        Image(systemName: "figure.strengthtraining.traditional")
+          .font(.system(size: 16, weight: .medium))
+          .foregroundColor(iconColor)
+          .frame(maxWidth: 23, maxHeight: 23)
+          .applyWidgetURL(from: context.attributes.deepLinkUrl)
       } compactTrailing: {
         if let date = context.state.timerEndDateInMilliseconds {
           compactTimer(
@@ -124,63 +128,35 @@ struct LiveActivityWidget: Widget {
   }
 
   private func dynamicIslandExpandedLeading(title: String, subtitle: String?) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text("REST")
-        .font(.caption)
-        .fontWeight(.semibold)
-        .foregroundStyle(.white.opacity(0.8))
+    VStack(alignment: .leading) {
+      Spacer()
       Text(title)
-        .font(.footnote)
-        .fontWeight(.medium)
+        .font(.title2)
         .foregroundStyle(.white)
-        .lineLimit(2)
+        .fontWeight(.semibold)
       if let subtitle {
         Text(subtitle)
-          .font(.caption2)
+          .font(.title3)
           .minimumScaleFactor(0.8)
           .foregroundStyle(.white.opacity(0.75))
       }
+      Spacer()
     }
-    .padding(.leading, 8)
   }
 
   private func dynamicIslandExpandedTrailing(imageName: String) -> some View {
     VStack {
       Spacer()
       resizableImage(imageName: imageName)
-        .frame(width: 24, height: 24)
       Spacer()
     }
-    .padding(.trailing, 8)
   }
 
   private func dynamicIslandExpandedBottom(endDate: Double, progressViewTint: String?) -> some View {
-    HStack {
-      Text(formatTime(endDate))
-        .font(.title2)
-        .fontWeight(.bold)
-        .foregroundStyle(Color(hex: progressViewTint ?? "#007AFF"))
-      Spacer()
-      Button("Skip Rest") {
-        // Skip rest action
-      }
-      .font(.caption)
+    ProgressView(timerInterval: Date.toTimerInterval(miliseconds: endDate))
       .foregroundStyle(.white)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 6)
-      .background(Color.white.opacity(0.2))
-      .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-    .padding(.horizontal, 12)
-    .padding(.bottom, 8)
-  }
-  
-  private func formatTime(_ date: Double) -> String {
-    let now = Date().timeIntervalSince1970 * 1000
-    let remaining = max(0, Int((date - now) / 1000))
-    let minutes = remaining / 60
-    let seconds = remaining % 60
-    return String(format: "%d:%02d", minutes, seconds)
+      .tint(progressViewTint.map { Color(hex: $0) })
+      .padding(.top, 5)
   }
 
   private func circularTimer(endDate: Double) -> some View {

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 
-import { NativeModules } from 'react-native';
+import { startActivity, updateActivity, stopActivity } from 'expo-live-activity';
 
 export interface TimerState {
   isRunning: boolean;
@@ -294,7 +294,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             
             // Stop Live Activity when timer completes
             if (prev.liveActivityId) {
-              stopLiveActivity(prev.liveActivityId);
+              stopTimerLiveActivity(prev.liveActivityId);
             }
             
             return { 
@@ -308,12 +308,14 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
         }
         
-        // Update Live Activity if active
-        if (prev.liveActivityId && !prev.isCountUp && prev.targetTime > 0) {
-          updateLiveActivity({ ...prev, timeElapsed: elapsed });
+        const updatedTimer = { ...prev, timeElapsed: elapsed };
+        
+        // Update Live Activity immediately with the same timer state
+        if (updatedTimer.liveActivityId && !updatedTimer.isCountUp && updatedTimer.targetTime > 0) {
+          updateTimerLiveActivity(updatedTimer);
         }
         
-        return { ...prev, timeElapsed: elapsed };
+        return updatedTimer;
       });
     }, 1000);
   };
@@ -326,6 +328,11 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const startTimer = async (targetSeconds = 0, exerciseIndex?: number, setIndex?: number, themeColor?: string) => {
+    // Stop any existing Live Activity first
+    if (timer?.liveActivityId) {
+      await stopTimerLiveActivity(timer.liveActivityId);
+    }
+    
     const now = new Date();
     const newTimer = {
       isRunning: true,
@@ -339,13 +346,14 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       exerciseIndex,
       setIndex,
       countdownSoundPlayed: false, // Reset countdown sound flag
+      liveActivityId: undefined, // Clear the old Live Activity ID
     };
     
     setTimer(newTimer);
     
     // Start Live Activity for countdown timers
     if (!timerSettings.countUp && targetSeconds > 0) {
-      startLiveActivity(newTimer, exerciseIndex, setIndex, themeColor).then(activityId => {
+      startTimerLiveActivity(newTimer, exerciseIndex, setIndex, themeColor).then(activityId => {
         if (activityId) {
           setTimer(prev => prev ? { ...prev, liveActivityId: activityId } : null);
         }
@@ -387,7 +395,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const stopTimer = () => {
     // Stop Live Activity if it exists
     if (timer?.liveActivityId) {
-      stopLiveActivity(timer.liveActivityId);
+      stopTimerLiveActivity(timer.liveActivityId);
     }
     
     setTimer(null);
@@ -527,91 +535,97 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Native SwiftUI Live Activity bridge
-  const { WorkoutLiveActivity } = NativeModules;
-
-  const startLiveActivity = async (timer: TimerState, exerciseIndex?: number, setIndex?: number, themeColor?: string): Promise<string | null> => {
+  const startTimerLiveActivity = async (timer: TimerState, exerciseIndex?: number, setIndex?: number, themeColor?: string): Promise<string | null> => {
     try {
-      if (!WorkoutLiveActivity) {
-        console.log('📱 Custom Live Activity not available');
-        return null;
-      }
-
       // Get exercise context if available
       const exerciseContext = getExerciseContextRef.current?.(exerciseIndex, setIndex);
       
-      const remainingSeconds = timer.targetTime - timer.timeElapsed;
-      const endTime = Date.now() + (remainingSeconds * 1000);
+      const remainingSeconds = Math.max(0, timer.targetTime - timer.timeElapsed);
+      // Ensure we have at least 1 second remaining to avoid immediate expiration
+      const safeRemainingSeconds = Math.max(1, remainingSeconds);
+      const endTime = Date.now() + (safeRemainingSeconds * 1000);
       
       // Choose icon based on theme
       const isPinkTheme = themeColor?.toLowerCase().includes('pink') || themeColor === '#ec4899' || themeColor === '#f472b6';
-      const iconName = isPinkTheme ? 'IconPink' : 'IconBlue';
+      const iconName = isPinkTheme ? 'icon_pink_transparent' : 'icon_transparent';
       
-      const activityData = {
-        endTime: endTime,
-        remainingSeconds: remainingSeconds,
-        exerciseName: exerciseContext?.currentExercise || '',
-        nextExercise: exerciseContext?.nextExercise || '',
-        setInfo: exerciseContext?.currentSet && exerciseContext?.totalSets 
-          ? `Set ${exerciseContext.currentSet} of ${exerciseContext.totalSets}` 
-          : '',
-        weightReps: exerciseContext?.weight && exerciseContext?.reps 
-          ? `${exerciseContext.weight} kg × ${exerciseContext.reps} reps` 
-          : '',
-        iconName: iconName,
-        themeColor: themeColor || '#007AFF'
+      // Live Activity state (data to display)
+      const state = {
+        title: 'REST',
+        subtitle: exerciseContext?.nextExercise ? `Next: ${exerciseContext.nextExercise}` : undefined,
+        timerEndDateInMilliseconds: endTime,
+        progressBar: { date: endTime },
+        imageName: iconName,
+        dynamicIslandImageName: iconName,
       };
       
-      console.log('🎯 Starting custom SwiftUI Live Activity:', activityData);
+      // Live Activity config (styling)
+      const config = {
+        backgroundColor: '#1a1a1a',
+        titleColor: '#ffffff',
+        subtitleColor: '#cccccc',
+        progressViewTint: themeColor || '#007AFF',
+        timerType: 'digital' as const,
+      };
       
-      const activityId = await WorkoutLiveActivity.startActivity(activityData);
-      console.log('✅ Custom Live Activity started:', activityId);
+      console.log('🎯 Starting JEFIT-style Live Activity:', { state, config });
+      
+      const activityId = await startActivity(state, config);
+      console.log('✅ Live Activity started:', activityId);
       return activityId;
       
     } catch (error) {
-      console.error('❌ Failed to start custom Live Activity:', error);
+      console.error('❌ Failed to start Live Activity:', error);
       return null;
     }
   };
 
-  const updateLiveActivity = async (timer: TimerState): Promise<void> => {
+  const updateTimerLiveActivity = async (timer: TimerState): Promise<void> => {
     try {
-      if (!timer.liveActivityId || !WorkoutLiveActivity) return;
+      if (!timer.liveActivityId) return;
       
-      const remainingSeconds = timer.targetTime - timer.timeElapsed;
-      const endTime = Date.now() + (remainingSeconds * 1000);
+      const remainingSeconds = Math.max(0, timer.targetTime - timer.timeElapsed);
+      // Ensure we have at least 1 second remaining to avoid immediate expiration
+      const safeRemainingSeconds = Math.max(1, remainingSeconds);
+      const endTime = Date.now() + (safeRemainingSeconds * 1000);
       
       // Get exercise context for updates
       const exerciseContext = getExerciseContextRef.current?.(timer.exerciseIndex, timer.setIndex);
       
-      const updateData = {
-        activityId: timer.liveActivityId,
-        endTime: endTime,
-        remainingSeconds: remainingSeconds,
-        nextExercise: exerciseContext?.nextExercise || '',
-        setInfo: exerciseContext?.currentSet && exerciseContext?.totalSets 
-          ? `Set ${exerciseContext.currentSet} of ${exerciseContext.totalSets}` 
-          : '',
-        weightReps: exerciseContext?.weight && exerciseContext?.reps 
-          ? `${exerciseContext.weight} kg × ${exerciseContext.reps} reps` 
-          : ''
+      // Use default icon (theme was set during start)
+      const iconName = 'icon_transparent';
+      
+      const state = {
+        title: 'REST',
+        subtitle: exerciseContext?.nextExercise ? `Next: ${exerciseContext.nextExercise}` : undefined,
+        timerEndDateInMilliseconds: endTime,
+        progressBar: { date: endTime },
+        imageName: iconName,
+        dynamicIslandImageName: iconName,
       };
       
-      await WorkoutLiveActivity.updateActivity(updateData);
+      await updateActivity(timer.liveActivityId, state);
       // Don't log updates every second
       
     } catch (error) {
-      console.error('❌ Failed to update custom Live Activity:', error);
+      // If Live Activity no longer exists, clear the ID to stop trying to update
+      if (error.message?.includes('ActivityNotFoundException') || error.message?.includes('not found')) {
+        console.log('🔄 Live Activity ended, clearing ID');
+        setTimer(prev => prev ? { ...prev, liveActivityId: undefined } : null);
+      } else {
+        console.error('❌ Failed to update Live Activity:', error);
+      }
     }
   };
 
-  const stopLiveActivity = async (activityId?: string): Promise<void> => {
+  const stopTimerLiveActivity = async (activityId?: string): Promise<void> => {
     try {
-      if (activityId && WorkoutLiveActivity) {
-        await WorkoutLiveActivity.stopActivity(activityId);
-        console.log('🛑 Custom Live Activity stopped:', activityId);
+      if (activityId) {
+        await stopActivity(activityId, { title: 'Timer Complete' });
+        console.log('🛑 Live Activity stopped:', activityId);
       }
     } catch (error) {
-      console.error('❌ Failed to stop custom Live Activity:', error);
+      console.error('❌ Failed to stop Live Activity:', error);
     }
   };
 
