@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 
 import { startActivity, updateActivity, stopActivity } from 'expo-live-activity';
+import { DebugLogger } from '../components/DebugOverlay';
 
 export interface TimerState {
   isRunning: boolean;
@@ -18,6 +19,8 @@ export interface TimerState {
   setIndex?: number;
   countdownSoundPlayed?: boolean; // Track if countdown sound has been played
   liveActivityId?: string; // Track native Live Activity ID
+  themeColor?: string; // Theme color for Live Activity
+  fixedEndTime?: number; // Fixed end timestamp to prevent Live Activity jumping
 }
 
 interface ExerciseContext {
@@ -152,6 +155,11 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (timer) {
       persistState();
     }
+  }, [timer]);
+
+  // Sync Live Activity with timer state changes
+  useEffect(() => {
+    syncLiveActivity();
   }, [timer]);
 
   // Cleanup sound on unmount
@@ -292,30 +300,19 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (remaining <= 0) {
             console.log('Countdown finished! Stopping timer.');
             
-            // Stop Live Activity when timer completes
-            if (prev.liveActivityId) {
-              stopTimerLiveActivity(prev.liveActivityId);
-            }
-            
+            // Keep Live Activity ID for proper cleanup by syncLiveActivity
             return { 
               ...prev, 
               timeElapsed: 0, // Reset to 0
               targetTime: 0,  // Reset to 0 so timer shows 0:00 cleanly
               isRunning: false,
               isPaused: false,
-              liveActivityId: undefined, // Clear Live Activity ID
+              // Don't clear liveActivityId here - let syncLiveActivity handle cleanup
             };
           }
         }
         
-        const updatedTimer = { ...prev, timeElapsed: elapsed };
-        
-        // Update Live Activity immediately with the same timer state
-        if (updatedTimer.liveActivityId && !updatedTimer.isCountUp && updatedTimer.targetTime > 0) {
-          updateTimerLiveActivity(updatedTimer);
-        }
-        
-        return updatedTimer;
+        return { ...prev, timeElapsed: elapsed };
       });
     }, 1000);
   };
@@ -328,12 +325,25 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const startTimer = async (targetSeconds = 0, exerciseIndex?: number, setIndex?: number, themeColor?: string) => {
-    // Stop any existing Live Activity first
+    // Debug logging for new timer start
+    DebugLogger.log(`🚀 startTimer called: targetSeconds=${targetSeconds}, exerciseIndex=${exerciseIndex}, setIndex=${setIndex}`, 'log');
+    
+    // Check if there's an existing Live Activity that needs to be stopped
     if (timer?.liveActivityId) {
-      await stopTimerLiveActivity(timer.liveActivityId);
+      DebugLogger.log(`⚠️ Found existing Live Activity ${timer.liveActivityId} - should be stopped before new timer`, 'warn');
+      // Explicitly stop the old Live Activity
+      try {
+        await stopActivity(timer.liveActivityId, { title: 'Timer Stopped' });
+        DebugLogger.log(`✅ Successfully stopped old Live Activity ${timer.liveActivityId}`, 'log');
+      } catch (error) {
+        DebugLogger.log(`❌ Failed to stop old Live Activity ${timer.liveActivityId}: ${error}`, 'error');
+      }
+    } else {
+      DebugLogger.log(`✅ No existing Live Activity to stop`, 'log');
     }
     
     const now = new Date();
+    const fixedEndTime = now.getTime() + (targetSeconds * 1000); // Calculate stable end time once
     const newTimer = {
       isRunning: true,
       isPaused: false,
@@ -345,20 +355,14 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isQuickMode: timerSettings.quickMode,
       exerciseIndex,
       setIndex,
-      countdownSoundPlayed: false, // Reset countdown sound flag
-      liveActivityId: undefined, // Clear the old Live Activity ID
+      countdownSoundPlayed: false,
+      liveActivityId: undefined, // Always start fresh - syncLiveActivity will create new one
+      themeColor, // Store theme color for Live Activity
+      fixedEndTime, // Store stable end time to prevent Live Activity jumping
     };
     
+    DebugLogger.log(`📊 New timer created: targetTime=${targetSeconds}s, countUp=${timerSettings.countUp}`, 'log');
     setTimer(newTimer);
-    
-    // Start Live Activity for countdown timers
-    if (!timerSettings.countUp && targetSeconds > 0) {
-      startTimerLiveActivity(newTimer, exerciseIndex, setIndex, themeColor).then(activityId => {
-        if (activityId) {
-          setTimer(prev => prev ? { ...prev, liveActivityId: activityId } : null);
-        }
-      });
-    }
     
   };
 
@@ -393,11 +397,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const stopTimer = () => {
-    // Stop Live Activity if it exists
-    if (timer?.liveActivityId) {
-      stopTimerLiveActivity(timer.liveActivityId);
-    }
-    
+    // Live Activity will be stopped by syncLiveActivity when timer becomes null
     setTimer(null);
     AsyncStorage.removeItem(STORAGE_KEY);
   };
@@ -534,98 +534,135 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     getExerciseContextRef.current = getContext;
   };
 
-  // Native SwiftUI Live Activity bridge
-  const startTimerLiveActivity = async (timer: TimerState, exerciseIndex?: number, setIndex?: number, themeColor?: string): Promise<string | null> => {
+  // Simple Live Activity - mirrors timer state
+  // Track last sync time to detect rapid consecutive calls that could cause jumping
+  const lastSyncTimeRef = useRef<number>(0);
+
+  const syncLiveActivity = async () => {
     try {
-      // Get exercise context if available
-      const exerciseContext = getExerciseContextRef.current?.(exerciseIndex, setIndex);
+      const syncStartTime = Date.now();
+      const timeSinceLastSync = syncStartTime - lastSyncTimeRef.current;
       
-      const remainingSeconds = Math.max(0, timer.targetTime - timer.timeElapsed);
-      // Ensure we have at least 1 second remaining to avoid immediate expiration
-      const safeRemainingSeconds = Math.max(1, remainingSeconds);
-      const endTime = Date.now() + (safeRemainingSeconds * 1000);
+      const debugInfo = {
+        hasTimer: !!timer,
+        isCountUp: timer?.isCountUp,
+        isRunning: timer?.isRunning,
+        isPaused: timer?.isPaused,
+        hasStartTime: !!timer?.startTime,
+        targetTime: timer?.targetTime,
+        liveActivityId: timer?.liveActivityId
+      };
       
-      // Choose icon based on theme
-      const isPinkTheme = themeColor?.toLowerCase().includes('pink') || themeColor === '#ec4899' || themeColor === '#f472b6';
-      const iconName = isPinkTheme ? 'icon_pink_transparent' : 'icon_transparent';
+      console.log('🔄 syncLiveActivity called', debugInfo);
+      DebugLogger.log(`syncLiveActivity called: ${JSON.stringify(debugInfo)}`);
       
-      // Live Activity state (data to display)
+      // Detect rapid consecutive syncs that could cause timer jumping
+      if (timeSinceLastSync < 100 && lastSyncTimeRef.current > 0) {
+        DebugLogger.log(`⚠️ RAPID SYNC: Only ${timeSinceLastSync}ms since last sync - potential race condition!`, 'warn');
+      }
+      lastSyncTimeRef.current = syncStartTime;
+
+      // Only sync Live Activity for running countdown timers
+      if (!timer || timer.isCountUp || !timer.isRunning || timer.isPaused || !timer.startTime || timer.targetTime <= 0) {
+        const reason = !timer ? 'no timer' : 
+                     timer.isCountUp ? 'count up mode' :
+                     !timer.isRunning ? 'timer not running' :
+                     timer.isPaused ? 'timer paused' :
+                     !timer.startTime ? 'no start time' :
+                     timer.targetTime <= 0 ? 'target time <= 0' : 'unknown';
+        
+        console.log('⚠️ Stopping Live Activity - conditions not met');
+        DebugLogger.log(`Stopping Live Activity - reason: ${reason}`);
+        
+        // No active countdown timer, stop any existing Live Activity
+        if (timer?.liveActivityId) {
+          DebugLogger.log(`Stopping existing Live Activity: ${timer.liveActivityId}`);
+          await stopActivity(timer.liveActivityId, { title: 'Timer Complete' });
+          setTimer(prev => prev ? { ...prev, liveActivityId: undefined } : null);
+          DebugLogger.log('Live Activity stopped successfully');
+        }
+        return;
+      }
+
+      const exerciseContext = getExerciseContextRef.current?.(timer.exerciseIndex, timer.setIndex);
+      // Use the stable fixedEndTime to prevent jumping, fallback to calculation if not available
+      const now = new Date().getTime();
+      const elapsed = Math.floor((now - timer.startTime.getTime()) / 1000);
+      const remaining = Math.max(0, timer.targetTime - elapsed);
+      const endTime = timer.fixedEndTime || (now + (remaining * 1000));
+      
+      // Debug log if we're using stable vs calculated endTime
+      if (!timer.fixedEndTime) {
+        DebugLogger.log(`⚠️ Using calculated endTime (timer missing fixedEndTime)`, 'warn');
+      }
+
+      const timingInfo = {
+        now: new Date(now).toISOString(),
+        startTime: timer.startTime.toISOString(),
+        elapsed,
+        targetTime: timer.targetTime,
+        remaining,
+        endTime: new Date(endTime).toISOString()
+      };
+
+      console.log('📊 Live Activity timing calculation', timingInfo);
+      DebugLogger.log(`Timing calculation: elapsed=${elapsed}s, remaining=${remaining}s, endTime=${new Date(endTime).toISOString()}`);
+      
+      // Check for timing inconsistencies that could cause jumping
+      const timeDiffFromNow = Math.abs((endTime - now) / 1000 - remaining);
+      if (timeDiffFromNow > 2) {
+        DebugLogger.log(`⚠️ TIMING INCONSISTENCY: endTime-now=${Math.round((endTime-now)/1000)}s but remaining=${remaining}s (diff=${Math.round(timeDiffFromNow)}s)`, 'warn');
+      }
+      
       const state = {
         title: 'REST',
         subtitle: exerciseContext?.nextExercise ? `Next: ${exerciseContext.nextExercise}` : undefined,
         timerEndDateInMilliseconds: endTime,
         progressBar: { date: endTime },
-        imageName: iconName,
-        dynamicIslandImageName: iconName,
+        imageName: 'icon_transparent',
+        dynamicIslandImageName: 'icon_transparent',
       };
-      
-      // Live Activity config (styling)
+
+      // Log the exact state being sent to Live Activity for lock screen debugging
+      DebugLogger.log(`📱 Live Activity State: title="${state.title}", endTime=${new Date(endTime).toISOString()}, timerEndMs=${endTime}`, 'log');
+
       const config = {
         backgroundColor: '#1a1a1a',
         titleColor: '#ffffff',
         subtitleColor: '#cccccc',
-        progressViewTint: themeColor || '#007AFF',
+        progressViewTint: timer.themeColor || '#007AFF',
         timerType: 'digital' as const,
       };
-      
-      console.log('🎯 Starting JEFIT-style Live Activity:', { state, config });
-      
-      const activityId = await startActivity(state, config);
-      console.log('✅ Live Activity started:', activityId);
-      return activityId;
-      
-    } catch (error) {
-      console.error('❌ Failed to start Live Activity:', error);
-      return null;
-    }
-  };
 
-  const updateTimerLiveActivity = async (timer: TimerState): Promise<void> => {
-    try {
-      if (!timer.liveActivityId) return;
-      
-      const remainingSeconds = Math.max(0, timer.targetTime - timer.timeElapsed);
-      // Ensure we have at least 1 second remaining to avoid immediate expiration
-      const safeRemainingSeconds = Math.max(1, remainingSeconds);
-      const endTime = Date.now() + (safeRemainingSeconds * 1000);
-      
-      // Get exercise context for updates
-      const exerciseContext = getExerciseContextRef.current?.(timer.exerciseIndex, timer.setIndex);
-      
-      // Use default icon (theme was set during start)
-      const iconName = 'icon_transparent';
-      
-      const state = {
-        title: 'REST',
-        subtitle: exerciseContext?.nextExercise ? `Next: ${exerciseContext.nextExercise}` : undefined,
-        timerEndDateInMilliseconds: endTime,
-        progressBar: { date: endTime },
-        imageName: iconName,
-        dynamicIslandImageName: iconName,
-      };
-      
-      await updateActivity(timer.liveActivityId, state);
-      // Don't log updates every second
-      
-    } catch (error) {
-      // If Live Activity no longer exists, clear the ID to stop trying to update
-      if (error.message?.includes('ActivityNotFoundException') || error.message?.includes('not found')) {
-        console.log('🔄 Live Activity ended, clearing ID');
-        setTimer(prev => prev ? { ...prev, liveActivityId: undefined } : null);
+      if (!timer.liveActivityId) {
+        // Start new Live Activity
+        console.log('🚀 Starting new Live Activity', { state, config });
+        DebugLogger.log(`🆕 Starting new Live Activity with endTime: ${new Date(endTime).toISOString()}`);
+        
+        const activityId = await startActivity(state, config);
+        console.log('✅ Live Activity started with ID:', activityId);
+        DebugLogger.log(`✅ Live Activity started successfully with ID: ${activityId}`);
+        
+        if (activityId) {
+          setTimer(prev => prev ? { ...prev, liveActivityId: activityId } : null);
+        }
       } else {
-        console.error('❌ Failed to update Live Activity:', error);
-      }
-    }
-  };
-
-  const stopTimerLiveActivity = async (activityId?: string): Promise<void> => {
-    try {
-      if (activityId) {
-        await stopActivity(activityId, { title: 'Timer Complete' });
-        console.log('🛑 Live Activity stopped:', activityId);
+        // Update existing Live Activity
+        console.log('🔄 Updating existing Live Activity', timer.liveActivityId, { state });
+        DebugLogger.log(`🔄 Updating existing Live Activity ${timer.liveActivityId} with endTime: ${new Date(endTime).toISOString()}`);
+        
+        await updateActivity(timer.liveActivityId, state);
+        console.log('✅ Live Activity updated');
+        DebugLogger.log('✅ Live Activity updated successfully');
       }
     } catch (error) {
-      console.error('❌ Failed to stop Live Activity:', error);
+      console.error('Live Activity sync error:', error);
+      DebugLogger.log(`ERROR: Live Activity sync failed: ${error.message}`, 'error');
+      
+      if (timer?.liveActivityId && error.message?.includes('not found')) {
+        DebugLogger.log(`Live Activity ${timer.liveActivityId} not found, clearing ID`);
+        setTimer(prev => prev ? { ...prev, liveActivityId: undefined } : null);
+      }
     }
   };
 

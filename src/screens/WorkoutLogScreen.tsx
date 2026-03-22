@@ -17,6 +17,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { DebugOverlay } from '../components/DebugOverlay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
@@ -3050,6 +3051,9 @@ export default function WorkoutLogScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Debug Overlay for Live Activity debugging */}
+      <DebugOverlay />
 
     </SafeAreaView>
   );
