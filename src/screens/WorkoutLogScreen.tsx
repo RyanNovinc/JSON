@@ -1690,6 +1690,7 @@ export default function WorkoutLogScreen() {
       reps: newData[exerciseIndex][setIndex].reps
     });
     
+    
     // Save to history immediately when set is completed
     if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
       console.log('Attempting to save set to history...');
@@ -1966,6 +1967,7 @@ export default function WorkoutLogScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+
   const calculateWorkoutStats = () => {
     let totalVolume = 0;
     let completedSets = 0;
@@ -1975,8 +1977,9 @@ export default function WorkoutLogScreen() {
     allSetsData.forEach((exerciseSets, exerciseIndex) => {
       let exerciseHasCompletedSets = false;
       
-      exerciseSets.forEach(setData => {
+      exerciseSets.forEach((setData, setIndex) => {
         totalSets++;
+        
         if (setData.completed && setData.weight && setData.reps) {
           completedSets++;
           exerciseHasCompletedSets = true;
@@ -1984,7 +1987,8 @@ export default function WorkoutLogScreen() {
           const weight = parseFloat(setData.weight) || 0;
           const weightInKg = convertWeight(weight, getExerciseUnit(exerciseIndex), 'kg');
           const reps = parseInt(setData.reps) || 0;
-          totalVolume += weightInKg * reps;
+          const setVolume = weightInKg * reps;
+          totalVolume += setVolume;
           
           // Add drop sets to volume calculation (only completed ones)
           if (setData.isDropSet && setData.drops) {
@@ -1993,7 +1997,8 @@ export default function WorkoutLogScreen() {
                 const dropWeight = parseFloat(drop.weight) || 0;
                 const dropWeightInKg = convertWeight(dropWeight, getExerciseUnit(exerciseIndex), 'kg');
                 const dropReps = parseInt(drop.reps) || 0;
-                totalVolume += dropWeightInKg * dropReps;
+                const dropVolume = dropWeightInKg * dropReps;
+                totalVolume += dropVolume;
               }
             });
           }
@@ -2006,6 +2011,7 @@ export default function WorkoutLogScreen() {
     });
     
     const duration = formatDuration(workoutDuration);
+    
     
     return {
       duration,
@@ -2121,6 +2127,7 @@ export default function WorkoutLogScreen() {
       const statsKey = `completionStats_${blockName}_week${weekString}`;
       const existingStats = await AsyncStorage.getItem(statsKey);
       const statsMap = existingStats ? new Map(JSON.parse(existingStats)) : new Map();
+      
       statsMap.set(workoutKey, {
         duration: Math.round(workoutDuration / 60), // Convert to minutes
         totalVolume: stats.totalVolume,
@@ -2129,9 +2136,9 @@ export default function WorkoutLogScreen() {
       await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
       console.log('Saved completion stats for key:', statsKey);
       
-      // Save the complete workout to history
-      console.log('🎯 [HISTORY] Saving workout to history...');
-      await saveWorkoutToHistory();
+      // Sets are already saved individually when completed via saveSetToHistory()
+      // No need to save them again here to prevent duplicates
+      console.log('🎯 [HISTORY] Sets already saved individually - skipping duplicate save');
       
       // Sets are now saved immediately when completed, so no need to save them again here
       await WorkoutStorage.clearCurrentWorkout(day?.day_name || '', blockName); // Clear any saved progress
@@ -2827,6 +2834,7 @@ export default function WorkoutLogScreen() {
             </TouchableOpacity>
           )}
           
+          
           <Animated.View style={{ transform: [{ translateX: shakeAnimation }] }}>
             <TouchableOpacity 
               style={styles.finishButton}
@@ -3051,6 +3059,7 @@ export default function WorkoutLogScreen() {
           </View>
         </View>
       </Modal>
+
 
       {/* Debug Overlay for Live Activity debugging */}
       <DebugOverlay />

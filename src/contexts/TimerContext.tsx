@@ -104,14 +104,14 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       console.log('Loading countdown sound...');
       
-      // Set audio mode first
+      // Set audio mode first - use media volume instead of ringer volume
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         staysActiveInBackground: false,
-        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        interruptionModeIOS: InterruptionModeIOS.DuckOthers,
         playsInSilentModeIOS: true,
         shouldDuckAndroid: true,
-        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+        interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
         playThroughEarpieceAndroid: false,
       });
 
