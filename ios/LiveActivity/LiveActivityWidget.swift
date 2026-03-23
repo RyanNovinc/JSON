@@ -7,6 +7,7 @@ struct LiveActivityAttributes: ActivityAttributes {
     var title: String
     var subtitle: String?
     var timerEndDateInMilliseconds: Double?
+    var remainingSeconds: Int? // Explicit remaining seconds to avoid calculation mismatches
     var progress: Double?
     var imageName: String?
     var dynamicIslandImageName: String?
@@ -63,11 +64,9 @@ struct LiveActivityWidget: Widget {
             .applyWidgetURL(from: context.attributes.deepLinkUrl)
         }
         DynamicIslandExpandedRegion(.trailing) {
-          if let imageName = context.state.imageName {
-            dynamicIslandExpandedTrailing(imageName: imageName)
-              .padding(.trailing, 5)
-              .applyWidgetURL(from: context.attributes.deepLinkUrl)
-          }
+          dynamicIslandExpandedTrailing(context: context)
+            .padding(.trailing, 5)
+            .applyWidgetURL(from: context.attributes.deepLinkUrl)
         }
         DynamicIslandExpandedRegion(.bottom) {
           if let date = context.state.timerEndDateInMilliseconds {
@@ -89,17 +88,17 @@ struct LiveActivityWidget: Widget {
           .frame(maxWidth: 23, maxHeight: 23)
           .applyWidgetURL(from: context.attributes.deepLinkUrl)
       } compactTrailing: {
-        if let date = context.state.timerEndDateInMilliseconds {
+        if context.state.timerEndDateInMilliseconds != nil || context.state.remainingSeconds != nil {
           compactTimer(
-            endDate: date,
+            context: context,
             timerType: context.attributes.timerType ?? .circular,
             progressViewTint: context.attributes.progressViewTint
           ).applyWidgetURL(from: context.attributes.deepLinkUrl)
         }
       } minimal: {
-        if let date = context.state.timerEndDateInMilliseconds {
+        if context.state.timerEndDateInMilliseconds != nil || context.state.remainingSeconds != nil {
           compactTimer(
-            endDate: date,
+            context: context,
             timerType: context.attributes.timerType ?? .circular,
             progressViewTint: context.attributes.progressViewTint
           ).applyWidgetURL(from: context.attributes.deepLinkUrl)
@@ -110,20 +109,25 @@ struct LiveActivityWidget: Widget {
 
   @ViewBuilder
   private func compactTimer(
-    endDate: Double,
+    context: ActivityViewContext<LiveActivityAttributes>,
     timerType: LiveActivityAttributes.DynamicIslandTimerType,
     progressViewTint: String?
   ) -> some View {
     if timerType == .digital {
-      Text(timerInterval: Date.toTimerInterval(miliseconds: endDate))
-        .font(.system(size: 15))
-        .minimumScaleFactor(0.8)
-        .fontWeight(.semibold)
-        .frame(maxWidth: 60)
-        .multilineTextAlignment(.trailing)
+      // Always use native iOS timer calculation for maximum accuracy
+      if let endDate = context.state.timerEndDateInMilliseconds {
+        Text(timerInterval: Date.toTimerInterval(miliseconds: endDate))
+          .font(.system(size: 15))
+          .minimumScaleFactor(0.8)
+          .fontWeight(.semibold)
+          .frame(maxWidth: 60)
+          .multilineTextAlignment(.trailing)
+      }
     } else {
-      circularTimer(endDate: endDate)
-        .tint(progressViewTint.map { Color(hex: $0) })
+      if let endDate = context.state.timerEndDateInMilliseconds {
+        circularTimer(endDate: endDate)
+          .tint(progressViewTint.map { Color(hex: $0) })
+      }
     }
   }
 
@@ -144,10 +148,21 @@ struct LiveActivityWidget: Widget {
     }
   }
 
-  private func dynamicIslandExpandedTrailing(imageName: String) -> some View {
+  private func dynamicIslandExpandedTrailing(context: ActivityViewContext<LiveActivityAttributes>) -> some View {
     VStack {
       Spacer()
-      resizableImage(imageName: imageName)
+      
+      // Use programmatic icon with theme-based coloring
+      let progressTint = context.attributes.progressViewTint ?? "#007AFF"
+      let iconColor: Color = progressTint.contains("pink") || progressTint.contains("ec4899") || progressTint.contains("f472b6") ? .pink : .blue
+      
+      Image(systemName: "figure.strengthtraining.traditional")
+        .font(.system(size: 28, weight: .medium))
+        .foregroundColor(iconColor)
+        .frame(width: 40, height: 40)
+        .background(Circle().fill(Color.black.opacity(0.3)))
+        .clipShape(Circle())
+      
       Spacer()
     }
   }

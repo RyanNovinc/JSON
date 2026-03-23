@@ -21,6 +21,7 @@ export interface TimerState {
   liveActivityId?: string; // Track native Live Activity ID
   themeColor?: string; // Theme color for Live Activity
   fixedEndTime?: number; // Fixed end timestamp to prevent Live Activity jumping
+  lastSentRemaining?: number; // Track last remaining seconds sent to Live Activity to avoid excessive updates
 }
 
 interface ExerciseContext {
@@ -51,8 +52,8 @@ interface TimerContextType {
   startTimer: (targetSeconds?: number, exerciseIndex?: number, setIndex?: number, themeColor?: string) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
-  stopTimer: () => void;
-  resetTimer: () => void;
+  stopTimer: () => Promise<void>;
+  resetTimer: () => Promise<void>;
   addTime: (seconds: number) => void;
   subtractTime: (seconds: number) => void;
   
@@ -88,6 +89,8 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const appStateRef = useRef(AppState.currentState);
   const soundRef = useRef<Audio.Sound | null>(null);
   const getExerciseContextRef = useRef<((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null>(null);
+  const backgroundLiveActivityId = useRef<string | null>(null); // Store Live Activity ID when going to background
+  const prevTimerRef = useRef<TimerState | null>(null); // Track previous timer state to avoid excessive Live Activity updates
 
   // Load persisted state on mount
   useEffect(() => {
@@ -157,9 +160,25 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [timer]);
 
-  // Sync Live Activity with timer state changes
+  // Sync Live Activity only for significant timer state changes (not every second)
   useEffect(() => {
-    syncLiveActivity();
+    // Only sync for significant changes, not every timeElapsed update
+    const shouldSync = !timer || // Timer cleared
+                      !prevTimerRef.current || // First timer
+                      timer.isRunning !== prevTimerRef.current.isRunning || // Start/stop
+                      timer.isPaused !== prevTimerRef.current.isPaused || // Pause/resume
+                      timer.targetTime !== prevTimerRef.current.targetTime || // Time adjusted
+                      !timer.liveActivityId; // No Live Activity exists
+                      
+    if (shouldSync) {
+      DebugLogger.log(`🔄 Syncing Live Activity for significant change: running=${timer?.isRunning}, paused=${timer?.isPaused}, hasId=${!!timer?.liveActivityId}`);
+      syncLiveActivity();
+    } else {
+      DebugLogger.log(`⏭️ Skipping Live Activity sync - only timeElapsed changed`);
+    }
+    
+    // Store previous timer state for comparison
+    prevTimerRef.current = timer;
   }, [timer]);
 
   // Cleanup sound on unmount
@@ -229,9 +248,15 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
       // App came to foreground, update timer if running
       if (timer?.isRunning && !timer.isPaused && timer.startTime) {
+        DebugLogger.log(`📱 App activated - refreshing Live Activity timer to sync accurate time`, 'log');
         const now = new Date();
         const elapsed = Math.floor((now.getTime() - timer.startTime.getTime()) / 1000);
-        setTimer(prev => prev ? { ...prev, timeElapsed: elapsed } : null);
+        setTimer(prev => prev ? { 
+          ...prev, 
+          timeElapsed: elapsed,
+          // Force Live Activity refresh by clearing lastSentRemaining
+          lastSentRemaining: undefined 
+        } : null);
       }
     }
     appStateRef.current = nextAppState;
@@ -396,14 +421,36 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  const stopTimer = () => {
-    // Live Activity will be stopped by syncLiveActivity when timer becomes null
+  const stopTimer = async () => {
+    // Explicitly stop Live Activity before clearing timer
+    if (timer?.liveActivityId) {
+      DebugLogger.log(`🛑 Explicitly stopping Live Activity in stopTimer: ${timer.liveActivityId}`, 'log');
+      try {
+        await stopActivity(timer.liveActivityId, { title: 'Timer Stopped' });
+        DebugLogger.log(`✅ Live Activity stopped successfully in stopTimer`, 'log');
+      } catch (error) {
+        DebugLogger.log(`❌ Failed to stop Live Activity in stopTimer: ${error}`, 'error');
+      }
+    }
+    
+    // Clear timer state and storage
     setTimer(null);
     AsyncStorage.removeItem(STORAGE_KEY);
   };
 
-  const resetTimer = () => {
+  const resetTimer = async () => {
     if (!timer) return;
+    
+    // Explicitly stop Live Activity before resetting
+    if (timer?.liveActivityId) {
+      DebugLogger.log(`🔄 Explicitly stopping Live Activity in resetTimer: ${timer.liveActivityId}`, 'log');
+      try {
+        await stopActivity(timer.liveActivityId, { title: 'Timer Reset' });
+        DebugLogger.log(`✅ Live Activity stopped successfully in resetTimer`, 'log');
+      } catch (error) {
+        DebugLogger.log(`❌ Failed to stop Live Activity in resetTimer: ${error}`, 'error');
+      }
+    }
     
     const now = new Date();
     setTimer(prev => prev ? {
@@ -414,6 +461,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isRunning: false,
       isPaused: false,
       countdownSoundPlayed: false, // Reset countdown sound flag
+      liveActivityId: undefined, // Clear Live Activity ID
     } : null);
   };
 
@@ -589,7 +637,13 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const now = new Date().getTime();
       const elapsed = Math.floor((now - timer.startTime.getTime()) / 1000);
       const remaining = Math.max(0, timer.targetTime - elapsed);
-      const endTime = timer.fixedEndTime || (now + (remaining * 1000));
+      
+      // CRITICAL: Always align endTime perfectly with remaining seconds to prevent lock screen jumping
+      // Don't use fixedEndTime if it would create inconsistency with remaining seconds
+      const calculatedEndTime = now + (remaining * 1000);
+      const endTime = timer.fixedEndTime && Math.abs((timer.fixedEndTime - calculatedEndTime) / 1000) < 2 
+        ? timer.fixedEndTime 
+        : calculatedEndTime;
       
       // Debug log if we're using stable vs calculated endTime
       if (!timer.fixedEndTime) {
@@ -610,21 +664,24 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       // Check for timing inconsistencies that could cause jumping
       const timeDiffFromNow = Math.abs((endTime - now) / 1000 - remaining);
-      if (timeDiffFromNow > 2) {
-        DebugLogger.log(`⚠️ TIMING INCONSISTENCY: endTime-now=${Math.round((endTime-now)/1000)}s but remaining=${remaining}s (diff=${Math.round(timeDiffFromNow)}s)`, 'warn');
+      if (timeDiffFromNow > 1) {
+        const usedFixed = timer.fixedEndTime && Math.abs((timer.fixedEndTime - calculatedEndTime) / 1000) < 2;
+        DebugLogger.log(`⚠️ TIMING INCONSISTENCY: endTime-now=${Math.round((endTime-now)/1000)}s but remaining=${remaining}s (diff=${Math.round(timeDiffFromNow)}s) usedFixed=${usedFixed}`, 'warn');
       }
       
       const state = {
         title: 'REST',
         subtitle: exerciseContext?.nextExercise ? `Next: ${exerciseContext.nextExercise}` : undefined,
         timerEndDateInMilliseconds: endTime,
+        // Remove remainingSeconds - let iOS calculate natively to prevent jumping
         progressBar: { date: endTime },
-        imageName: 'icon_transparent',
-        dynamicIslandImageName: 'icon_transparent',
+        // Remove custom icons - let iOS use default app icon
+        // imageName: 'icon_transparent',
+        // dynamicIslandImageName: 'icon_transparent',
       };
 
       // Log the exact state being sent to Live Activity for lock screen debugging
-      DebugLogger.log(`📱 Live Activity State: title="${state.title}", endTime=${new Date(endTime).toISOString()}, timerEndMs=${endTime}`, 'log');
+      DebugLogger.log(`📱 Live Activity State: title="${state.title}", endTime=${new Date(endTime).toISOString()}, timerEndMs=${endTime}, remainingSeconds=${remaining}`, 'log');
 
       const config = {
         backgroundColor: '#1a1a1a',
@@ -635,9 +692,9 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
 
       if (!timer.liveActivityId) {
-        // Start new Live Activity
+        // Start new Live Activity - set once and let iOS handle native countdown
         console.log('🚀 Starting new Live Activity', { state, config });
-        DebugLogger.log(`🆕 Starting new Live Activity with endTime: ${new Date(endTime).toISOString()}`);
+        DebugLogger.log(`🆕 Starting new Live Activity with endTime: ${new Date(endTime).toISOString()} - will use native iOS countdown`);
         
         const activityId = await startActivity(state, config);
         console.log('✅ Live Activity started with ID:', activityId);
@@ -647,13 +704,21 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setTimer(prev => prev ? { ...prev, liveActivityId: activityId } : null);
         }
       } else {
-        // Update existing Live Activity
-        console.log('🔄 Updating existing Live Activity', timer.liveActivityId, { state });
-        DebugLogger.log(`🔄 Updating existing Live Activity ${timer.liveActivityId} with endTime: ${new Date(endTime).toISOString()}`);
+        // Don't update every second - let iOS handle native countdown for accuracy
+        // Only update if there are significant state changes (pause/resume/time adjustments)
+        const hasSignificantChange = timer.isPaused !== (timer.isPaused || false) ||
+                                   Math.abs(remaining - (timer.lastSentRemaining || remaining)) > 5;
         
-        await updateActivity(timer.liveActivityId, state);
-        console.log('✅ Live Activity updated');
-        DebugLogger.log('✅ Live Activity updated successfully');
+        if (hasSignificantChange) {
+          console.log('🔄 Updating Live Activity for significant change', timer.liveActivityId, { state });
+          DebugLogger.log(`🔄 Updating Live Activity for significant change: remaining=${remaining}, lastSent=${timer.lastSentRemaining}`);
+          
+          await updateActivity(timer.liveActivityId, state);
+          setTimer(prev => prev ? { ...prev, lastSentRemaining: remaining } : null);
+          DebugLogger.log('✅ Live Activity updated successfully');
+        } else {
+          DebugLogger.log(`⏭️ Skipping Live Activity update - no significant change (remaining=${remaining})`);
+        }
       }
     } catch (error) {
       console.error('Live Activity sync error:', error);

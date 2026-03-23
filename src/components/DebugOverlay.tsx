@@ -71,6 +71,10 @@ export const DebugOverlay: React.FC = () => {
   useEffect(() => {
     const updateLogs = (newLogs: LogEntry[]) => setLogs(newLogs);
     DebugLogger.addListener(updateLogs);
+    
+    // Test if DebugLogger is working
+    DebugLogger.log('🔧 DebugOverlay mounted and DebugLogger is working!', 'log');
+    
     return () => DebugLogger.removeListener(updateLogs);
   }, []);
 
@@ -90,6 +94,18 @@ export const DebugOverlay: React.FC = () => {
   const clearLogs = () => {
     DebugLogger.clear();
   };
+
+  // Check if we're in development mode (should be true in simulator)
+  console.log('🔍 DebugOverlay: __DEV__ =', __DEV__, 'logs.length =', logs.length);
+  
+  // Only show debug UI in development mode, but keep logging system active
+  if (!__DEV__) {
+    return (
+      <View style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}>
+        {/* Hidden component to keep DebugLogger active in production */}
+      </View>
+    );
+  }
 
   return (
     <>

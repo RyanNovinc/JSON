@@ -7,44 +7,44 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		005111B700AF47AA9A3F8F4C /* View+applyIfPresent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 247885967C1548488516EE97 /* View+applyIfPresent.swift */; };
+		0D7C009BCB2949A882E763D0 /* View+applyWidgetURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8C03A96551B4C228C1E4DA1 /* View+applyWidgetURL.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		28C152AE10AB42CA8EECFB49 /* LiveActivityWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4195F929D21543028891A042 /* LiveActivityWidgetBundle.swift */; };
-		354EE1982C664CB9B41CE34E /* ViewHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4629DC7DFE6C4F93979841FE /* ViewHelpers.swift */; };
+		17706E20C3EE45009AC458D0 /* LiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3E9592CC2D2D408391AE296C /* LiveActivity.appex */; };
+		1CA82728E1D04165B94B4855 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9728EEE63FE12AC4EFA4A0EF /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		4DBF7425D7DF4992B15F3CBA /* Date+toTimerInterval.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203CEC8773064C079E3F4C1F /* Date+toTimerInterval.swift */; };
-		763CA837B367ED9C67F7F97C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F08BEFEB97811773D4EB4277 /* PrivacyInfo.xcprivacy */; };
-		79BF6971336D4302B2A7EED8 /* View+applyWidgetURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F516612F3B94313B6059956 /* View+applyWidgetURL.swift */; };
-		7EE728CC98114253B66047F3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EF021CC623434593B78259D9 /* Assets.xcassets */; };
-		9BC3AB1B02D29B82E9333D05 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 496ACD890643D694F318B77D /* ExpoModulesProvider.swift */; };
-		B76893E86AD05BE496B81744 /* libPods-JSONfit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DD126155188F52C06FED20D /* libPods-JSONfit.a */; };
-		B7D2B142985B4CB6BE67BBC8 /* LiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A820775BD92247C1A7303D8E /* LiveActivity.appex */; };
+		4B4998D622F5FA7E5688EB04 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650DE131BFAB135E99A64106 /* ExpoModulesProvider.swift */; };
+		4D86EE97FB004C659DB8D889 /* Color+hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38878E73AB6741FDAF28BB6A /* Color+hex.swift */; };
+		531988D7EA9F4D8698B6B7D7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BF3632F378FB4FECA857E013 /* Assets.xcassets */; };
+		6CE16F1495134226A35F1A49 /* LiveActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD2C5A72077415490EE0ABE /* LiveActivityView.swift */; };
+		77E7B64F79F7447A8EC1FEC2 /* LiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B92CAF37CBB48D0B6EF9433 /* LiveActivityWidget.swift */; };
+		885393DC05C9EE972D021254 /* libPods-JSONfit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 30BD82E54F0049B068296CFE /* libPods-JSONfit.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		E2A042396B9C4CBC9176DA45 /* Color+hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18DF0D1A81F84C32B58E48C3 /* Color+hex.swift */; };
-		E3A939AF5D9E47DDA1167EF0 /* LiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1635A8AF37BB454E9B6FC890 /* LiveActivityWidget.swift */; };
-		E57BB07C70B94A0F975D2228 /* Image+dynamic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700131BCDFBD4FE0AA3E4571 /* Image+dynamic.swift */; };
-		EB37D5E210B44E02A197A37E /* LiveActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9297D53A87C4AD8985C3365 /* LiveActivityView.swift */; };
+		CD40D35CFF9E4591893BB7D5 /* View+applyIfPresent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509CD64EF45D4DB096EC3AC1 /* View+applyIfPresent.swift */; };
+		D79EAD54736D4D4290EDCE82 /* ViewHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430666CF47D0452F861FCE7B /* ViewHelpers.swift */; };
+		E251942CDB83428EA2D12641 /* Image+dynamic.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D76E701F594304A85CB600 /* Image+dynamic.swift */; };
+		F02307B3F46C455AA32A80D0 /* LiveActivityWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 224985507F184C0C8EABDAE1 /* LiveActivityWidgetBundle.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		F6951D0156034E7798227DA4 /* Date+toTimerInterval.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CF1BE16FF1844C4BA2F3CC3 /* Date+toTimerInterval.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		25573DCF3AFB4165910ADB58 /* PBXContainerItemProxy */ = {
+		9BC73950C7F644379E7FA7A5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 6B2D4E531A604AC8849B67C5;
+			remoteGlobalIDString = 41A9B87F199144A1B161AACC;
 			remoteInfo = LiveActivity;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		18AFE728FC4D492DA071E3BF /* Embed Foundation Extensions */ = {
+		99C611CB4BC04C42B2BC02A4 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				B7D2B142985B4CB6BE67BBC8 /* LiveActivity.appex in Embed Foundation Extensions */,
+				17706E20C3EE45009AC458D0 /* LiveActivity.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -55,44 +55,44 @@
 		13B07F961A680F5B00A75B9A /* JSONfit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JSONfit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = JSONfit/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = JSONfit/Info.plist; sourceTree = "<group>"; };
-		1635A8AF37BB454E9B6FC890 /* LiveActivityWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityWidget.swift; path = LiveActivityWidget.swift; sourceTree = "<group>"; };
-		18DF0D1A81F84C32B58E48C3 /* Color+hex.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Color+hex.swift"; path = "Color+hex.swift"; sourceTree = "<group>"; };
-		203CEC8773064C079E3F4C1F /* Date+toTimerInterval.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Date+toTimerInterval.swift"; path = "Date+toTimerInterval.swift"; sourceTree = "<group>"; };
-		247885967C1548488516EE97 /* View+applyIfPresent.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "View+applyIfPresent.swift"; path = "View+applyIfPresent.swift"; sourceTree = "<group>"; };
-		2DD126155188F52C06FED20D /* libPods-JSONfit.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-JSONfit.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		4195F929D21543028891A042 /* LiveActivityWidgetBundle.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityWidgetBundle.swift; path = LiveActivityWidgetBundle.swift; sourceTree = "<group>"; };
-		4629DC7DFE6C4F93979841FE /* ViewHelpers.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = ViewHelpers.swift; path = ViewHelpers.swift; sourceTree = "<group>"; };
-		496ACD890643D694F318B77D /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-JSONfit/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		5D72F506E1084CAA81A9298F /* LiveActivity.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = LiveActivity.entitlements; path = LiveActivity.entitlements; sourceTree = "<group>"; };
-		5F516612F3B94313B6059956 /* View+applyWidgetURL.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "View+applyWidgetURL.swift"; path = "View+applyWidgetURL.swift"; sourceTree = "<group>"; };
-		6D1884C969D19EDCADA7827B /* Pods-JSONfit.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-JSONfit.debug.xcconfig"; path = "Target Support Files/Pods-JSONfit/Pods-JSONfit.debug.xcconfig"; sourceTree = "<group>"; };
-		700131BCDFBD4FE0AA3E4571 /* Image+dynamic.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Image+dynamic.swift"; path = "Image+dynamic.swift"; sourceTree = "<group>"; };
-		A6462CF8544F476D9AC92A0E /* Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = Info.plist; path = Info.plist; sourceTree = "<group>"; };
-		A820775BD92247C1A7303D8E /* LiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = LiveActivity.appex; path = LiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		224985507F184C0C8EABDAE1 /* LiveActivityWidgetBundle.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityWidgetBundle.swift; path = LiveActivityWidgetBundle.swift; sourceTree = "<group>"; };
+		30BD82E54F0049B068296CFE /* libPods-JSONfit.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-JSONfit.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		38878E73AB6741FDAF28BB6A /* Color+hex.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Color+hex.swift"; path = "Color+hex.swift"; sourceTree = "<group>"; };
+		3E9592CC2D2D408391AE296C /* LiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = LiveActivity.appex; path = LiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		430666CF47D0452F861FCE7B /* ViewHelpers.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = ViewHelpers.swift; path = ViewHelpers.swift; sourceTree = "<group>"; };
+		4B92CAF37CBB48D0B6EF9433 /* LiveActivityWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityWidget.swift; path = LiveActivityWidget.swift; sourceTree = "<group>"; };
+		509CD64EF45D4DB096EC3AC1 /* View+applyIfPresent.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "View+applyIfPresent.swift"; path = "View+applyIfPresent.swift"; sourceTree = "<group>"; };
+		650DE131BFAB135E99A64106 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-JSONfit/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		653AB6C7250CBDD8AA2805C0 /* Pods-JSONfit.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-JSONfit.debug.xcconfig"; path = "Target Support Files/Pods-JSONfit/Pods-JSONfit.debug.xcconfig"; sourceTree = "<group>"; };
+		79641A55A9954EC6AA269EBB /* LiveActivity.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = LiveActivity.entitlements; path = LiveActivity.entitlements; sourceTree = "<group>"; };
+		8C454988304AC183E47C0215 /* Pods-JSONfit.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-JSONfit.release.xcconfig"; path = "Target Support Files/Pods-JSONfit/Pods-JSONfit.release.xcconfig"; sourceTree = "<group>"; };
+		9728EEE63FE12AC4EFA4A0EF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = JSONfit/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9CF1BE16FF1844C4BA2F3CC3 /* Date+toTimerInterval.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Date+toTimerInterval.swift"; path = "Date+toTimerInterval.swift"; sourceTree = "<group>"; };
+		A8C03A96551B4C228C1E4DA1 /* View+applyWidgetURL.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "View+applyWidgetURL.swift"; path = "View+applyWidgetURL.swift"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = JSONfit/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		C9297D53A87C4AD8985C3365 /* LiveActivityView.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityView.swift; path = LiveActivityView.swift; sourceTree = "<group>"; };
-		D7A85F8E4C6D87D726FA4044 /* Pods-JSONfit.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-JSONfit.release.xcconfig"; path = "Target Support Files/Pods-JSONfit/Pods-JSONfit.release.xcconfig"; sourceTree = "<group>"; };
+		BF3632F378FB4FECA857E013 /* Assets.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Assets.xcassets; sourceTree = "<group>"; };
+		D3D76E701F594304A85CB600 /* Image+dynamic.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "Image+dynamic.swift"; path = "Image+dynamic.swift"; sourceTree = "<group>"; };
+		DAD2C5A72077415490EE0ABE /* LiveActivityView.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = LiveActivityView.swift; path = LiveActivityView.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		EF021CC623434593B78259D9 /* Assets.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Assets.xcassets; sourceTree = "<group>"; };
-		F08BEFEB97811773D4EB4277 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = JSONfit/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = JSONfit/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* JSONfit-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "JSONfit-Bridging-Header.h"; path = "JSONfit/JSONfit-Bridging-Header.h"; sourceTree = "<group>"; };
+		F78C3FB1A59F40828EC4C5BE /* Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = Info.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		0FC07C02F6104484BE8286F5 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		13B07F8C1A680F5B00A75B9A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B76893E86AD05BE496B81744 /* libPods-JSONfit.a in Frameworks */,
+				885393DC05C9EE972D021254 /* libPods-JSONfit.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A474B462B29F4EFEBEF31592 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -108,7 +108,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				F08BEFEB97811773D4EB4277 /* PrivacyInfo.xcprivacy */,
+				9728EEE63FE12AC4EFA4A0EF /* PrivacyInfo.xcprivacy */,
 			);
 			name = JSONfit;
 			sourceTree = "<group>";
@@ -117,27 +117,19 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				2DD126155188F52C06FED20D /* libPods-JSONfit.a */,
+				30BD82E54F0049B068296CFE /* libPods-JSONfit.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		4EBBD151B7EFEB3CC89994CB /* Pods */ = {
+		453BFBD7DCC64C32772C26CD /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				6D1884C969D19EDCADA7827B /* Pods-JSONfit.debug.xcconfig */,
-				D7A85F8E4C6D87D726FA4044 /* Pods-JSONfit.release.xcconfig */,
+				653AB6C7250CBDD8AA2805C0 /* Pods-JSONfit.debug.xcconfig */,
+				8C454988304AC183E47C0215 /* Pods-JSONfit.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
-			sourceTree = "<group>";
-		};
-		6A3526A1AED89C8B97F97B6D /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				B1ACE2810BB7460C1A19B3DF /* JSONfit */,
-			);
-			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -154,9 +146,9 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				BACA1FC40BA94D6F9BE54A79 /* LiveActivity */,
-				4EBBD151B7EFEB3CC89994CB /* Pods */,
-				6A3526A1AED89C8B97F97B6D /* ExpoModulesProviders */,
+				DCD75E997B4A416E833C95A9 /* LiveActivity */,
+				453BFBD7DCC64C32772C26CD /* Pods */,
+				8A260F6B769D9B856F9CC468 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -167,37 +159,25 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* JSONfit.app */,
-				A820775BD92247C1A7303D8E /* LiveActivity.appex */,
+				3E9592CC2D2D408391AE296C /* LiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B1ACE2810BB7460C1A19B3DF /* JSONfit */ = {
+		8A260F6B769D9B856F9CC468 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				496ACD890643D694F318B77D /* ExpoModulesProvider.swift */,
+				A14CCF37D6D68D3A953735DD /* JSONfit */,
 			);
-			name = JSONfit;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
-		BACA1FC40BA94D6F9BE54A79 /* LiveActivity */ = {
+		A14CCF37D6D68D3A953735DD /* JSONfit */ = {
 			isa = PBXGroup;
 			children = (
-				18DF0D1A81F84C32B58E48C3 /* Color+hex.swift */,
-				203CEC8773064C079E3F4C1F /* Date+toTimerInterval.swift */,
-				700131BCDFBD4FE0AA3E4571 /* Image+dynamic.swift */,
-				C9297D53A87C4AD8985C3365 /* LiveActivityView.swift */,
-				1635A8AF37BB454E9B6FC890 /* LiveActivityWidget.swift */,
-				4195F929D21543028891A042 /* LiveActivityWidgetBundle.swift */,
-				247885967C1548488516EE97 /* View+applyIfPresent.swift */,
-				5F516612F3B94313B6059956 /* View+applyWidgetURL.swift */,
-				4629DC7DFE6C4F93979841FE /* ViewHelpers.swift */,
-				A6462CF8544F476D9AC92A0E /* Info.plist */,
-				EF021CC623434593B78259D9 /* Assets.xcassets */,
-				5D72F506E1084CAA81A9298F /* LiveActivity.entitlements */,
+				650DE131BFAB135E99A64106 /* ExpoModulesProvider.swift */,
 			);
-			name = LiveActivity;
-			path = LiveActivity;
+			name = JSONfit;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -209,6 +189,26 @@
 			path = JSONfit/Supporting;
 			sourceTree = "<group>";
 		};
+		DCD75E997B4A416E833C95A9 /* LiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				38878E73AB6741FDAF28BB6A /* Color+hex.swift */,
+				9CF1BE16FF1844C4BA2F3CC3 /* Date+toTimerInterval.swift */,
+				D3D76E701F594304A85CB600 /* Image+dynamic.swift */,
+				DAD2C5A72077415490EE0ABE /* LiveActivityView.swift */,
+				4B92CAF37CBB48D0B6EF9433 /* LiveActivityWidget.swift */,
+				224985507F184C0C8EABDAE1 /* LiveActivityWidgetBundle.swift */,
+				509CD64EF45D4DB096EC3AC1 /* View+applyIfPresent.swift */,
+				A8C03A96551B4C228C1E4DA1 /* View+applyWidgetURL.swift */,
+				430666CF47D0452F861FCE7B /* ViewHelpers.swift */,
+				F78C3FB1A59F40828EC4C5BE /* Info.plist */,
+				BF3632F378FB4FECA857E013 /* Assets.xcassets */,
+				79641A55A9954EC6AA269EBB /* LiveActivity.entitlements */,
+			);
+			name = LiveActivity;
+			path = LiveActivity;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -217,32 +217,32 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "JSONfit" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				FD930EF474F826216844A360 /* [Expo] Configure project */,
+				A76AA4C9108CC3EF4C651A74 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				18AFE728FC4D492DA071E3BF /* Embed Foundation Extensions */,
-				795A958123A111968F5D662D /* [CP] Embed Pods Frameworks */,
+				99C611CB4BC04C42B2BC02A4 /* Embed Foundation Extensions */,
+				24716B5F708BD14BEE86DFD5 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				48B0A88A7BC34D7481441EF4 /* PBXTargetDependency */,
+				9DE53A87AD85495FB032FA14 /* PBXTargetDependency */,
 			);
 			name = JSONfit;
 			productName = JSONfit;
 			productReference = 13B07F961A680F5B00A75B9A /* JSONfit.app */;
 			productType = "com.apple.product-type.application";
 		};
-		6B2D4E531A604AC8849B67C5 /* LiveActivity */ = {
+		41A9B87F199144A1B161AACC /* LiveActivity */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3CD99137376C4E2782FEB05F /* Build configuration list for PBXNativeTarget "LiveActivity" */;
+			buildConfigurationList = 23A3CA0521B74FD2A76B6D29 /* Build configuration list for PBXNativeTarget "LiveActivity" */;
 			buildPhases = (
-				6B8C328E669D425C882D1F98 /* Sources */,
-				0FC07C02F6104484BE8286F5 /* Frameworks */,
-				8824FF8F1C7E4423805F7CCB /* Resources */,
+				322B869729AD4AE4A71C52DB /* Sources */,
+				A474B462B29F4EFEBEF31592 /* Frameworks */,
+				FAFA54F0D8D54BCAA381745B /* Resources */,
 			);
 			buildRules = (
 			);
@@ -250,7 +250,7 @@
 			);
 			name = LiveActivity;
 			productName = LiveActivity;
-			productReference = A820775BD92247C1A7303D8E /* LiveActivity.appex */;
+			productReference = 3E9592CC2D2D408391AE296C /* LiveActivity.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -264,7 +264,7 @@
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1250;
 					};
-					6B2D4E531A604AC8849B67C5 = {
+					41A9B87F199144A1B161AACC = {
 						LastSwiftMigration = 1250;
 					};
 				};
@@ -283,7 +283,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* JSONfit */,
-				6B2D4E531A604AC8849B67C5 /* LiveActivity */,
+				41A9B87F199144A1B161AACC /* LiveActivity */,
 			);
 		};
 /* End PBXProject section */
@@ -296,15 +296,15 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				763CA837B367ED9C67F7F97C /* PrivacyInfo.xcprivacy in Resources */,
+				1CA82728E1D04165B94B4855 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8824FF8F1C7E4423805F7CCB /* Resources */ = {
+		FAFA54F0D8D54BCAA381745B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7EE728CC98114253B66047F3 /* Assets.xcassets in Resources */,
+				531988D7EA9F4D8698B6B7D7 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -350,7 +350,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		795A958123A111968F5D662D /* [CP] Embed Pods Frameworks */ = {
+		24716B5F708BD14BEE86DFD5 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -418,7 +418,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-JSONfit/Pods-JSONfit-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		FD930EF474F826216844A360 /* [Expo] Configure project */ = {
+		A76AA4C9108CC3EF4C651A74 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -450,40 +450,40 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				9BC3AB1B02D29B82E9333D05 /* ExpoModulesProvider.swift in Sources */,
+				4B4998D622F5FA7E5688EB04 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		6B8C328E669D425C882D1F98 /* Sources */ = {
+		322B869729AD4AE4A71C52DB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E2A042396B9C4CBC9176DA45 /* Color+hex.swift in Sources */,
-				4DBF7425D7DF4992B15F3CBA /* Date+toTimerInterval.swift in Sources */,
-				E57BB07C70B94A0F975D2228 /* Image+dynamic.swift in Sources */,
-				EB37D5E210B44E02A197A37E /* LiveActivityView.swift in Sources */,
-				E3A939AF5D9E47DDA1167EF0 /* LiveActivityWidget.swift in Sources */,
-				28C152AE10AB42CA8EECFB49 /* LiveActivityWidgetBundle.swift in Sources */,
-				005111B700AF47AA9A3F8F4C /* View+applyIfPresent.swift in Sources */,
-				79BF6971336D4302B2A7EED8 /* View+applyWidgetURL.swift in Sources */,
-				354EE1982C664CB9B41CE34E /* ViewHelpers.swift in Sources */,
+				4D86EE97FB004C659DB8D889 /* Color+hex.swift in Sources */,
+				F6951D0156034E7798227DA4 /* Date+toTimerInterval.swift in Sources */,
+				E251942CDB83428EA2D12641 /* Image+dynamic.swift in Sources */,
+				6CE16F1495134226A35F1A49 /* LiveActivityView.swift in Sources */,
+				77E7B64F79F7447A8EC1FEC2 /* LiveActivityWidget.swift in Sources */,
+				F02307B3F46C455AA32A80D0 /* LiveActivityWidgetBundle.swift in Sources */,
+				CD40D35CFF9E4591893BB7D5 /* View+applyIfPresent.swift in Sources */,
+				0D7C009BCB2949A882E763D0 /* View+applyWidgetURL.swift in Sources */,
+				D79EAD54736D4D4290EDCE82 /* ViewHelpers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		48B0A88A7BC34D7481441EF4 /* PBXTargetDependency */ = {
+		9DE53A87AD85495FB032FA14 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 6B2D4E531A604AC8849B67C5 /* LiveActivity */;
-			targetProxy = 25573DCF3AFB4165910ADB58 /* PBXContainerItemProxy */;
+			target = 41A9B87F199144A1B161AACC /* LiveActivity */;
+			targetProxy = 9BC73950C7F644379E7FA7A5 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 6D1884C969D19EDCADA7827B /* Pods-JSONfit.debug.xcconfig */;
+			baseConfigurationReference = 653AB6C7250CBDD8AA2805C0 /* Pods-JSONfit.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -519,7 +519,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D7A85F8E4C6D87D726FA4044 /* Pods-JSONfit.release.xcconfig */;
+			baseConfigurationReference = 8C454988304AC183E47C0215 /* Pods-JSONfit.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -544,27 +544,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
-			};
-			name = Release;
-		};
-		65E3D1660B594CA2AA45F20F /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
-				CURRENT_PROJECT_VERSION = 9;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = LiveActivity/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
-				MARKETING_VERSION = 1.0.9;
-				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSON.LiveActivity;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -684,18 +663,39 @@
 			};
 			name = Release;
 		};
-		FAF19DF7B5CB4C3CBE4DB4B6 /* Debug */ = {
+		989B59B168834DB59AF5F65E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
-				MARKETING_VERSION = 1.0.9;
+				MARKETING_VERSION = 1.0.10;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSON.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		EDCF39900DA441859AF86EBC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
+				CURRENT_PROJECT_VERSION = 10;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = LiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				MARKETING_VERSION = 1.0.10;
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.RyanNovinc.JSON.LiveActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -717,11 +717,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3CD99137376C4E2782FEB05F /* Build configuration list for PBXNativeTarget "LiveActivity" */ = {
+		23A3CA0521B74FD2A76B6D29 /* Build configuration list for PBXNativeTarget "LiveActivity" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				FAF19DF7B5CB4C3CBE4DB4B6 /* Debug */,
-				65E3D1660B594CA2AA45F20F /* Release */,
+				EDCF39900DA441859AF86EBC /* Debug */,
+				989B59B168834DB59AF5F65E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

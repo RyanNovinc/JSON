@@ -43,94 +43,218 @@ import WidgetKit
       attributes.progressViewTint.map { Color(hex: $0) }
     }
 
-    var body: some View {
-      VStack(spacing: 0) {
-        // Main content with JEFIT-style gradient background
-        VStack(spacing: 12) {
-          // Header with app icon and info
-          HStack(alignment: .center, spacing: 12) {
-            // App icon
-            if let imageName = contentState.imageName {
-              Image.dynamic(assetNameOrPath: imageName)
-                .resizable()
-                .frame(width: 32, height: 32)
-            }
-            
-            VStack(alignment: .leading, spacing: 2) {
-              Text("JSON.fit")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(.white.opacity(0.8))
-              
-              Text(contentState.title)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundStyle(.white)
-            }
-            
-            Spacer()
-            
-            // Large JEFIT-style countdown timer
-            if let date = contentState.timerEndDateInMilliseconds {
-              Text(timerInterval: Date.toTimerInterval(miliseconds: date))
-                .font(.system(size: 32, weight: .bold, design: .rounded))
-                .foregroundStyle(progressViewTint ?? .blue)
-                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-            }
-          }
-          
-          // Exercise details
-          if let subtitle = contentState.subtitle {
-            VStack(alignment: .leading, spacing: 6) {
-              HStack {
-                Text(subtitle)
-                  .font(.footnote)
-                  .fontWeight(.medium)
-                  .foregroundStyle(.white.opacity(0.9))
-                Spacer()
-              }
-            }
-          }
-        }
-        .padding(16)
-        .background(
-          // JEFIT-style gradient
-          LinearGradient(
-            gradient: Gradient(stops: [
-              .init(color: Color.black.opacity(0.9), location: 0),
-              .init(color: Color.gray.opacity(0.8), location: 0.5), 
-              .init(color: Color.black.opacity(0.9), location: 1)
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          )
-        )
-        
-        // Bottom action bar
-        HStack {
-          Spacer()
-          Button(action: {}) {
-            HStack(spacing: 6) {
-              Image(systemName: "forward.fill")
-                .font(.caption)
-              Text("Skip Rest")
-                .font(.caption)
-                .fontWeight(.medium)
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background((progressViewTint ?? .blue).opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-          }
-          Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.black.opacity(0.7))
+    private var imageAlignment: Alignment {
+      switch attributes.imageAlign {
+      case "center":
+        return .center
+      case "bottom":
+        return .bottom
+      default:
+        return .top
       }
-      .clipShape(RoundedRectangle(cornerRadius: 20))
-      .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+    }
+    
+    private func programmaticIcon() -> some View {
+      let progressTint = attributes.progressViewTint ?? "#007AFF"
+      let iconColor: Color = progressTint.contains("pink") || progressTint.contains("ec4899") || progressTint.contains("f472b6") ? .pink : .blue
+      
+      return Image(systemName: "figure.strengthtraining.traditional")
+        .font(.system(size: 24, weight: .medium))
+        .foregroundColor(iconColor)
+        .frame(width: 32, height: 32)
+        .background(Circle().fill(Color.black.opacity(0.3)))
+        .clipShape(Circle())
+    }
+    
+    @ViewBuilder
+    private func timerDisplay() -> some View {
+      // Always use native iOS timer calculation for maximum accuracy
+      if let date = contentState.timerEndDateInMilliseconds {
+        Text(timerInterval: Date.toTimerInterval(miliseconds: date))
+      }
+    }
+    
+    @ViewBuilder
+    private func progressDisplay() -> some View {
+      // Always use native iOS timer calculation for maximum accuracy
+      if let date = contentState.timerEndDateInMilliseconds {
+        ProgressView(timerInterval: Date.toTimerInterval(miliseconds: date))
+          .tint(progressViewTint)
+          .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
+      } else if let progress = contentState.progress {
+        ProgressView(value: progress)
+          .tint(progressViewTint)
+          .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
+      }
+    }
+
+    private func alignedImage(imageName: String) -> some View {
+      let defaultHeight: CGFloat = 64
+      let defaultWidth: CGFloat = 64
+      let containerHeight = imageContainerSize?.height
+      let containerWidth = imageContainerSize?.width
+      let hasWidthConstraint = (attributes.imageWidthPercent != nil) || (attributes.imageWidth != nil)
+
+      let computedHeight: CGFloat? = {
+        if let percent = attributes.imageHeightPercent {
+          let clamped = min(max(percent, 0), 100) / 100.0
+          // Use the row height as a base. Fallback to default when row height is not measured yet.
+          let base = (containerHeight ?? defaultHeight)
+          return base * clamped
+        } else if let size = attributes.imageHeight {
+          return CGFloat(size)
+        } else if hasWidthConstraint {
+          // Mimic CSS: when only width is set, keep height automatic to preserve aspect ratio
+          return nil
+        } else {
+          // Mimic CSS: this works against CSS but provides a better default behavior.
+          // When no width/height is set, use a default size (64pt)
+          // Width will adjust automatically base on aspect ratio
+          return defaultHeight
+        }
+      }()
+
+      let computedWidth: CGFloat? = {
+        if let percent = attributes.imageWidthPercent {
+          let clamped = min(max(percent, 0), 100) / 100.0
+          let base = (containerWidth ?? defaultWidth)
+          return base * clamped
+        } else if let size = attributes.imageWidth {
+          return CGFloat(size)
+        } else {
+          return nil // Keep aspect fit based on height
+        }
+      }()
+
+      return ZStack(alignment: .center) {
+        Group {
+          let fit = attributes.contentFit ?? "cover"
+          switch fit {
+          case "contain":
+            Image.dynamic(assetNameOrPath: imageName).resizable().scaledToFit().frame(width: computedWidth, height: computedHeight)
+          case "fill":
+            Image.dynamic(assetNameOrPath: imageName).resizable().frame(
+              width: computedWidth,
+              height: computedHeight
+            )
+          case "none":
+            Image.dynamic(assetNameOrPath: imageName).renderingMode(.original).frame(width: computedWidth, height: computedHeight)
+          case "scale-down":
+            if let uiImage = UIImage.dynamic(assetNameOrPath: imageName) {
+              // Determine the target box. When width/height are nil, we use image's intrinsic dimension for comparison.
+              let targetHeight = computedHeight ?? uiImage.size.height
+              let targetWidth = computedWidth ?? uiImage.size.width
+              let shouldScaleDown = uiImage.size.height > targetHeight || uiImage.size.width > targetWidth
+
+              if shouldScaleDown {
+                Image(uiImage: uiImage)
+                  .resizable()
+                  .scaledToFit()
+                  .frame(width: computedWidth, height: computedHeight)
+              } else {
+                Image(uiImage: uiImage)
+                  .renderingMode(.original)
+                  .frame(width: min(uiImage.size.width, targetWidth), height: min(uiImage.size.height, targetHeight))
+              }
+            } else {
+              DebugLog("⚠️[ExpoLiveActivity] assetNameOrPath couldn't resolve to UIImage")
+            }
+          case "cover":
+            Image.dynamic(assetNameOrPath: imageName).resizable().scaledToFill().frame(
+              width: computedWidth,
+              height: computedHeight
+            ).clipped()
+          default:
+            DebugLog("⚠️[ExpoLiveActivity] Unknown contentFit '\(fit)'")
+          }
+        }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: imageAlignment)
+      .background(
+        GeometryReader { proxy in
+          Color.clear
+            .onAppear {
+              let s = proxy.size
+              if s.width > 0, s.height > 0 { imageContainerSize = s }
+            }
+            .onChange(of: proxy.size) { s in
+              if s.width > 0, s.height > 0 { imageContainerSize = s }
+            }
+        }
+      )
+    }
+
+    var body: some View {
+      let defaultPadding = 24
+
+      let top = CGFloat(
+        attributes.paddingDetails?.top
+          ?? attributes.paddingDetails?.vertical
+          ?? attributes.padding
+          ?? defaultPadding
+      )
+
+      let bottom = CGFloat(
+        attributes.paddingDetails?.bottom
+          ?? attributes.paddingDetails?.vertical
+          ?? attributes.padding
+          ?? defaultPadding
+      )
+
+      let leading = CGFloat(
+        attributes.paddingDetails?.left
+          ?? attributes.paddingDetails?.horizontal
+          ?? attributes.padding
+          ?? defaultPadding
+      )
+
+      let trailing = CGFloat(
+        attributes.paddingDetails?.right
+          ?? attributes.paddingDetails?.horizontal
+          ?? attributes.padding
+          ?? defaultPadding
+      )
+
+      VStack(alignment: .leading) {
+        let position = attributes.imagePosition ?? "right"
+        let isStretch = position.contains("Stretch")
+        let isLeftImage = position.hasPrefix("left")
+        let hasImage = true // Always show programmatic icon
+        let effectiveStretch = isStretch && hasImage
+
+        HStack(alignment: .center) {
+          if hasImage, isLeftImage {
+            programmaticIcon()
+          }
+
+          VStack(alignment: .leading, spacing: 2) {
+            Text(contentState.title)
+              .font(.title2)
+              .fontWeight(.semibold)
+              .modifier(ConditionalForegroundViewModifier(color: attributes.titleColor))
+
+            if let subtitle = contentState.subtitle {
+              Text(subtitle)
+                .font(.title3)
+                .modifier(ConditionalForegroundViewModifier(color: attributes.subtitleColor))
+            }
+
+            if effectiveStretch {
+              progressDisplay()
+            }
+          }.layoutPriority(1)
+
+          if hasImage, !isLeftImage { // right side (default)
+            Spacer()
+            programmaticIcon()
+          }
+        }
+
+        if !effectiveStretch {
+          progressDisplay()
+        }
+      }
+      .padding(EdgeInsets(top: top, leading: leading, bottom: bottom, trailing: trailing))
     }
   }
 

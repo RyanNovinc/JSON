@@ -2,7 +2,7 @@
   "expo": {
     "name": "JSON.fit",
     "slug": "json",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -14,7 +14,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "9",
+      "buildNumber": "10",
+      "entitlements": {
+        "aps-environment": "development",
+        "com.apple.developer.usernotifications.communication": true
+      },
       "infoPlist": {
         "CFBundleDisplayName": "JSON.fit",
         "CFBundleName": "JSON.fit",
@@ -28,7 +32,7 @@
         "backgroundColor": "#0f0f0f"
       },
       "package": "com.RyanNovinc.JSON",
-      "versionCode": 9,
+      "versionCode": 10,
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
