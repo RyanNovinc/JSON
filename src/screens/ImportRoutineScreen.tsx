@@ -29,6 +29,10 @@ import RobustStorage from '../utils/robustStorage';
 // import * as Crypto from 'expo-crypto';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutProgram, Exercise } from '../types/workout';
+import WorkoutGeneratorStep1 from '../components/WorkoutGeneratorStep1';
+import WorkoutGeneratorStep2 from '../components/WorkoutGeneratorStep2';
+import WorkoutGeneratorStep3 from '../components/WorkoutGeneratorStep3';
+import WorkoutGeneratorStep4 from '../components/WorkoutGeneratorStep4';
 
 type ImportScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ImportRoutine'>;
 
@@ -55,6 +59,8 @@ export default function ImportRoutineScreen() {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [outputPreference, setOutputPreference] = useState<'copy_paste' | 'save_import'>('copy_paste');
   const [uploadMode, setUploadMode] = useState(false);
+  const [showSlideMode, setShowSlideMode] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(1);
 
   // Mesocycle state
   const [currentProgram, setCurrentProgram] = useState<Program | null>(null);
@@ -1422,18 +1428,20 @@ export default function ImportRoutineScreen() {
           blocks: m.blocks
         }));
         
-        program = await ProgramStorage.createProgram({
+        program = {
+          id: Date.now().toString(),
           name: importedProgram.routine_name,
           totalMesocycles: programMesocycles.length,
           currentMesocycle: 1,
           mesocycleRoadmap: mesocycleRoadmap
-        });
+        };
         
+        await ProgramStorage.addProgram(program);
       }
       
       // Create the routine (always without mesocycleNumber for unified imports)
       const newRoutineId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-      const newRoutine: WorkoutRoutine = {
+      const newRoutine: WorkoutProgram = {
         id: newRoutineId,
         name: metadata.currentDisplayName || importedProgram.routine_name,
         days: metadata.originalDaysPerWeek || importedProgram.days_per_week || 5,
@@ -1646,8 +1654,8 @@ export default function ImportRoutineScreen() {
       ]);
 
       // Parse the JSON data with better error handling
-      let fitnessGoals = {};
-      let equipmentPrefs = {};
+      let fitnessGoals: any = {};
+      let equipmentPrefs: any = {};
       
       try {
         fitnessGoals = fitnessGoalsData ? JSON.parse(fitnessGoalsData) : {};
@@ -2461,6 +2469,53 @@ This check exists because the JSON generator must reconstruct complete exercise 
     );
   }
 
+  // Show slide mode if enabled
+  if (showSlideMode && currentSlide === 1) {
+    return (
+      <WorkoutGeneratorStep1
+        onNext={() => setCurrentSlide(2)}
+        onBack={() => setShowSlideMode(false)}
+      />
+    );
+  }
+
+  if (showSlideMode && currentSlide === 2) {
+    return (
+      <WorkoutGeneratorStep2
+        onNext={() => setCurrentSlide(3)}
+        onBack={() => setCurrentSlide(1)}
+      />
+    );
+  }
+
+  if (showSlideMode && currentSlide === 3) {
+    return (
+      <WorkoutGeneratorStep3
+        onNext={() => setCurrentSlide(4)}
+        onBack={() => setCurrentSlide(2)}
+      />
+    );
+  }
+
+  if (showSlideMode && currentSlide === 4) {
+    return (
+      <WorkoutGeneratorStep4
+        onBack={() => setCurrentSlide(3)}
+        onImportSuccess={(program) => {
+          // Handle successful import - use existing import logic
+          setParsedProgram(program);
+          setShowConfirmation(true);
+          setShowSlideMode(false);
+          setCurrentSlide(1);
+        }}
+        onExitSlideMode={() => {
+          setShowSlideMode(false);
+          setCurrentSlide(1);
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <View style={styles.container}>
@@ -2529,8 +2584,9 @@ This check exists because the JSON generator must reconstruct complete exercise 
         }}>
           <TouchableOpacity 
             onPress={() => {
-              console.log('Help link pressed');
-              setShowInstructions(true);
+              console.log('Opening workout generator slideshow');
+              setShowSlideMode(true);
+              setCurrentSlide(1);
             }}
             style={{
               backgroundColor: 'transparent',
