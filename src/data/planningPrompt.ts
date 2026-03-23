@@ -15,83 +15,29 @@ export interface ProgramContext {
 // ================================
 
 function getSplitArchitecture(data: QuestionnaireData): string {
-  return `**Split Selection Guidelines:**
-
-Choose the most appropriate training split based on the user's training frequency, primary goal, and experience level:
-
-**By Training Days:**
-- 2 days: Full Body A/B alternating
-- 3 days: Full Body A/B/C OR Push/Pull/Legs  
-- 4 days: Upper/Lower/Upper/Lower OR Push/Pull/Legs + Upper
-- 5 days: Push/Pull/Legs/Upper/Lower OR Upper/Lower/Push/Pull/Legs
-- 6+ days: Push/Pull/Legs repeated OR specialized splits
-
-**Goal Considerations:**
-- Strength training: Favor full body or upper/lower splits for higher frequency on main lifts
-- Hypertrophy: Push/Pull/Legs works well for moderate frequency with higher volume
-- Beginners: Full body splits allow skill practice and recovery
-
-**Experience Adjustments:**
-- Complete beginners: Favor full body splits regardless of days available
-- Advanced trainees: Can handle higher frequency and more complex splits
-
-Select the split that best matches the user's profile and explain your reasoning.`;
+  return '';
 }
 
 function getComplementarityRules(data: QuestionnaireData): string {
-  return `**Recovery and Session Planning Guidelines:**
-
-For programs with 4+ training days, ensure adequate recovery between muscle groups:
-
-**Recovery Requirements:**
-- Major compound muscles (Quads, Hamstrings, Glutes, Lats, Upper Back): 72hr minimum between primary training sessions
-- Smaller muscle groups (Biceps, Triceps, Calves, Delts): 48hr minimum between primary sessions
-- Maintenance work (light isolation, <50% of primary volume) can be done within recovery windows
-
-**Session Planning Process:**
-1. First assign primary muscle focus for each training day based on your chosen split
-2. Check for recovery conflicts between days
-3. If conflicts exist, either adjust the split structure or downgrade conflicting work to maintenance volume
-4. Secondary/assistance muscles can overlap if they're not the primary focus
-
-**Rest Day Integration:**
-- Include optimal rest days in weekly schedule for recovery and training stimulus
-
-**Validation Rule:** No muscle group should be primarily trained again before meeting its minimum recovery window. Plan your week accordingly before writing specific exercises.`;
+  return '';
 }
 
 function getTimeFormula(data: QuestionnaireData): string {
-  return `**Session Duration:**
-- Estimate session length based on exercise count, sets, and rest periods
-- Account for warmup time
-- If session exceeds user's time preference, reduce exercise count or use supersets
-- Prioritize compound movements over isolation exercises when time is limited`;
+  return `**Session Duration:** Duration is determined by your chosen rest style. Do not compress rest periods to hit a time target — the rest style setting takes priority. If the user chose Optimal Rest, sessions may run 75-90 minutes and that is acceptable.`;
 }
 
 function getMuscleAudit(data: QuestionnaireData): string {
   return `**Volume Verification Requirements:**
 
-After completing your program, create a Muscle Group Coverage Audit section that reviews weekly volume for each muscle group:
-
 **Status Indicators (use exactly these):**
 - ✅ = within target range for user's training approach
 - ⚠️ LOW = below experience-scaled minimum (must be fixed before presenting)
-- ⚠️ HIGH = above 20 sets/week (flag for review)
+- ⚠️ HIGH = above the target range ceiling for the user's approach (flag for review)
 - ℹ️ CONSTRAINED = below target but above minimum due to legitimate constraints
 
-**Audit Process:**
-1. Count total weekly sets where each muscle is tagged as PRIMARY
-2. Compare against volume targets from the user's training approach and experience level
-3. For any muscle with 0 direct sets: justify with specific indirect volume from compounds
-4. For CONSTRAINED status: explain the specific structural limitation (split, equipment, time)
-5. For LOW status: immediately revise the program to add volume before presenting
-6. When fixing a LOW muscle: add sets to the day where that muscle is already trained, or add a second training day for that muscle. Do not add leg exercises to upper body days or upper body exercises to leg days.
-7. If the profile says "Direct Core Work: No", do not add core exercises to any session. Core is exempt from volume requirements for this program. If the profile says "Direct Core Work: Yes" or is silent on this setting, include 2–3 sets of direct core work per week distributed across 1–2 sessions. Suitable exercises: Cable Crunch, Ab Wheel Rollout, Hanging Leg Raise, Plank variations. Core does not count toward any muscle group's volume target and will not trigger a LOW flag.
+For LOW status: immediately revise the program to add volume before presenting. When fixing a LOW muscle: add sets to the day where that muscle is already trained, or add a second training day for that muscle.
 
-**Goal-Specific Considerations:**
-- Strength programs: Focus audit on compound movement muscles; isolation volume can be lower
-- Fat loss programs: Slightly relaxed volume standards acceptable if adherence is prioritized  
-- Hypertrophy programs: Apply full volume standards strictly
+If the profile says "Direct Core Work: No", do not add core exercises to any session. Core is exempt from volume requirements. If the profile says "Direct Core Work: Yes" or is silent, include 2–3 sets of direct core work per week distributed across 1–2 sessions. Core does not count toward any muscle group's volume target.
 
 Include this audit as a section in your final program document.`;
 }
@@ -180,13 +126,11 @@ export const VERIFICATION_STEPS_4_5 = `4. **If any muscle group is below target*
 5. **Check distribution balance** — avoid some muscles maxed out while others sit at the floor of their target range.`;
 
 export const VERIFICATION_STEP_6_WITH_CARDIO = `6. **Estimate session duration** for each day:
-   - **Strength days:** Use the Session Duration Formula from the Program Architecture Constraints section above — do not recalculate independently.
-   - **Cardio days:** Use the prescribed activity duration + 5 min warmup + 5 min cooldown.
-   - If the profile specifies a session length, enforce it. If not, use 60-75 minutes as a default and flag any session that exceeds it.`;
+   - **Strength days:** Calculate based on exercise count, sets, and the user's chosen rest style — do not compress rest to hit an arbitrary time target.
+   - **Cardio days:** Use the prescribed activity duration + 5 min warmup + 5 min cooldown.`;
 
 export const VERIFICATION_STEP_6_NO_CARDIO = `6. **Estimate session duration** for each day:
-   - **Strength days:** Use the Session Duration Formula from the Program Architecture Constraints section above — do not recalculate independently.
-   - If the profile specifies a session length, enforce it. If not, use 60-75 minutes as a default and flag any session that exceeds it.`;
+   - **Strength days:** Calculate based on exercise count, sets, and the user's chosen rest style — do not compress rest to hit an arbitrary time target.`;
 
 export const PROGRAM_DOCUMENT_FORMAT = `---
 
@@ -219,11 +163,11 @@ export const TAGGING_HEADER = `### COMPOUND EXERCISE TAGGING GUIDE
 Primary = main driver through full ROM. Secondary = assists but not the main driver.`;
 
 export const TAGGING_GYM = `**Barbell / Dumbbell / Cable / Machine:**
-- Bench press variants: Primary Chest, Triceps
+- Bench press variants: Primary Chest | Secondary Triceps
 - Incline press variants: Primary Chest, Front Delts | Secondary Triceps
 - Row variants: Primary Upper Back, Lats | Secondary Biceps, Rear Delts
 - Pull-up / Pulldown: Primary Lats | Secondary Biceps, Upper Back
-- Overhead press: Primary Front Delts, Triceps | Secondary Side Delts
+- Overhead press: Primary Front Delts | Secondary Triceps, Side Delts
 - Squat variants: Primary Quads, Glutes
 - Leg press / Hack squat: Primary Quads | Secondary Glutes
 - Lunge / Split squat: Primary Quads, Glutes
@@ -233,9 +177,9 @@ export const TAGGING_GYM = `**Barbell / Dumbbell / Cable / Machine:**
 - Calf raise variants: Primary Calves`;
 
 export const TAGGING_BODYWEIGHT = `**Bodyweight:**
-- Push-ups (and variations): Primary Chest, Triceps | Secondary Front Delts
+- Push-ups (and variations): Primary Chest | Secondary Triceps, Front Delts
 - Diamond / Close-grip push-ups: Primary Triceps, Chest
-- Pike push-ups / Handstand push-ups: Primary Front Delts, Triceps | Secondary Side Delts
+- Pike push-ups / Handstand push-ups: Primary Front Delts | Secondary Triceps, Side Delts
 - Inverted rows: Primary Upper Back, Lats | Secondary Biceps, Rear Delts
 - Pull-ups / Chin-ups: Primary Lats | Secondary Biceps, Upper Back
 - Dips (parallel bars / bench): Primary Chest, Triceps
@@ -276,7 +220,7 @@ export const getRule1 = (equipment: string[]): string => {
   }
 };
 
-export const STATIC_RULE_2 = `2. **Stay within session duration** — use the Session Duration Formula from the Program Architecture Constraints section. If the profile specifies a session length, that is a hard constraint. If it says "Let AI suggest," use 60-75 minutes for hypertrophy/strength, 45-60 minutes for general fitness/fat loss, and note your recommendation.`;
+export const STATIC_RULE_2 = `2. **Stay within rest style parameters** — use the rest periods defined by the user's Rest Style selection. Do not compress rest periods to hit a session time target. The rest style setting takes priority over session duration.`;
 
 // Rule 3 variants by secondary goals
 export const getRule3 = (hasActivityGoals: boolean): string => {
@@ -291,32 +235,32 @@ export const STATIC_RULES_4_5_6_7 = `4. **Treat exercise names as identifiers** 
 5. **Make definitive choices** — explain reasoning and trade-offs, but commit to a plan. The user will tell you what to change.
 6. **Respect exercise preferences** — if the profile lists liked exercises, incorporate them where they fit the plan. If it lists disliked exercises, avoid them and use alternatives for that movement pattern.
 7. **Only program working sets** — do not include warm-up sets in the plan. The app tracks working sets only.
-8. **Exercise placement** — place exercises on days that match their movement pattern. Leg exercises (isolation or compound) belong on Legs or Lower days only. Do not place them on Upper or Push/Pull days to solve a volume shortfall.
-9. **Volume distribution** — when a muscle group is below target, distribute additional sets across multiple days to achieve at least 2x weekly frequency. Never stack all sets for a muscle onto a single day just to hit a weekly number.
-10. **Sets per exercise cap** — do not exceed 5 sets of any single isolation exercise in one session. If volume targets require more sets than this allows, distribute across a second exercise or a second training day rather than stacking onto one exercise.`;
+8. **Sets per exercise cap** — do not exceed 5 sets of any single isolation exercise in one session. If volume targets require more sets than this allows, distribute across a second exercise or a second training day rather than stacking onto one exercise.
+10. **Volume distribution across days** — if a muscle group is below its target range and only appears on 1-2 training days, add sets on a third day. Calves, biceps, and triceps can be placed on any training day regardless of the split's primary focus. Do not leave a muscle below target when adding 2-3 sets to an existing session would fix it.
+11. **Target range, not just minimums** — clearing the experience-scaled minimum floor is not sufficient. Every non-exempt muscle should land within its target range from the Volume Targets table. If a muscle is above its minimum but below its target, treat it as a problem to solve, not an acceptable result.`;
 
 // Rule 10 variants by goal
 export const getRule8 = (goal: string): string => {
   if (goal === 'build_muscle' || goal === 'body_recomposition' || goal === 'burn_fat') {
-    return `10. **Exercise count per session** — aim for 6-10 exercises per session. Supersets count as 2 exercises.`;
+    return `9. **Exercise count per session** — aim for 6-10 exercises per session. Supersets count as 2 exercises.`;
   } else if (goal === 'gain_strength' || goal === 'sport_specific') {
-    return `10. **Exercise count per session** — aim for 4-7 exercises per session. Fewer exercises with more sets on primary lifts. Supersets count as 2 exercises.`;
+    return `9. **Exercise count per session** — aim for 4-7 exercises per session. Fewer exercises with more sets on primary lifts. Supersets count as 2 exercises.`;
   } else if (goal === 'general_fitness') {
-    return `10. **Exercise count per session** — aim for 5-8 exercises per session. Supersets count as 2 exercises.`;
+    return `9. **Exercise count per session** — aim for 5-8 exercises per session. Supersets count as 2 exercises.`;
   } else {
     // custom_primary - show all ranges
-    return `10. **Exercise count per session** — aim for 6-10 exercises per session for hypertrophy programs, 4-7 for strength programs, and 5-8 for general fitness. These are guidelines, not hard limits — supersets count as 2 exercises.`;
+    return `9. **Exercise count per session** — aim for 6-10 exercises per session for hypertrophy programs, 4-7 for strength programs, and 5-8 for general fitness. These are guidelines, not hard limits — supersets count as 2 exercises.`;
   }
 };
 
 export const ROTATION_PERIODIZATION_HEADER = `
 ### Rotation and Periodization`;
 
-export const RULE_11 = `11. **Rotate secondary goal activities** — if the user has preferred activities (cardio types, sports, flexibility work, etc.), rotate through them across weeks. Every preferred activity should appear at least once per block.`;
+export const RULE_11 = `12. **Rotate secondary goal activities** — if the user has preferred activities (cardio types, sports, flexibility work, etc.), rotate through them across weeks. Every preferred activity should appear at least once per block.`;
 
-export const RULE_12 = `12. **Rotate exercises between blocks** — change exercise variations while keeping movement patterns. Longer programs need more distinct exercise pools to prevent staleness.`;
+export const RULE_12 = `13. **Rotate exercises between blocks** — change exercise variations while keeping movement patterns. Longer programs need more distinct exercise pools to prevent staleness.`;
 
-export const RULE_13 = `13. **Long-term periodization** — for programs longer than 16 weeks, describe how training evolves across repeated cycles. Don't just rotate exercises — show how rep ranges, volume, or intensity shift over the course of the program.`;
+export const RULE_13 = `14. **Long-term periodization** — for programs longer than 16 weeks, describe how training evolves across repeated cycles. Don't just rotate exercises — show how rep ranges, volume, or intensity shift over the course of the program.`;
 
 export const BLOCK_STRUCTURE_HEADER = `
 ### Block Structure`;
@@ -324,17 +268,17 @@ export const BLOCK_STRUCTURE_HEADER = `
 // Rule 14 variants by experience
 export const getRule12 = (expTier: string): string => {
   if (expTier === 'beginner') {
-    return `14. **Preferred block length by experience:**
+    return `15. **Preferred block length by experience:**
     - **Beginner:** 4-6 weeks per block (including deload if applicable).`;
   } else if (expTier === 'intermediate') {
-    return `14. **Preferred block length by experience:**
+    return `15. **Preferred block length by experience:**
     - **Intermediate:** 5-6 weeks per block (4-5 training weeks + 1 deload).`;
   } else if (expTier === 'advanced') {
-    return `14. **Preferred block length by experience:**
+    return `15. **Preferred block length by experience:**
     - **Advanced:** 5-6 weeks per block (4-5 training weeks + 1 deload).`;
   } else {
     // Fallback
-    return `14. **Preferred block length by experience:**
+    return `15. **Preferred block length by experience:**
     - **Beginner:** 4-6 weeks per block (including deload if applicable).
     - **Intermediate:** 5-6 weeks per block (4-5 training weeks + 1 deload).
     - **Advanced:** 5-6 weeks per block (4-5 training weeks + 1 deload).`;
@@ -343,7 +287,7 @@ export const getRule12 = (expTier: string): string => {
 
 // Rule 15 variants by duration
 export const getRule13 = (duration: string): string => {
-  const rule13Header = `15. **Program duration → block count:**`;
+  const rule13Header = `16. **Program duration → block count:**`;
   
   if (duration === '4_weeks') {
     return `${rule13Header}
@@ -371,7 +315,7 @@ export const getRule13 = (duration: string): string => {
   }
 };
 
-export const RULE_16 = `16. **Mesocycle structure for programs 13+ weeks:** Any program longer than 12 weeks must be organised into mesocycles. Each mesocycle is typically 12-13 weeks (2-3 blocks). Each mesocycle shifts training emphasis — e.g., Mesocycle 1: Hypertrophy (8-12 reps), Mesocycle 2: Strength-Hypertrophy (6-10 reps), Mesocycle 3: Metabolic/Intensity (10-15 reps + advanced techniques).
+export const RULE_16 = `17. **Mesocycle structure for programs 13+ weeks:** Any program longer than 12 weeks must be organised into mesocycles. Each mesocycle is typically 12-13 weeks (2-3 blocks). Each mesocycle shifts training emphasis — e.g., Mesocycle 1: Hypertrophy (8-12 reps), Mesocycle 2: Strength-Hypertrophy (6-10 reps), Mesocycle 3: Metabolic/Intensity (10-15 reps + advanced techniques).
 
 **Declare the full mesocycle structure upfront** before detailing any exercises — output a Mesocycle Roadmap table in this format:
 
@@ -389,67 +333,55 @@ export const RECOVERY_PROGRESSION_HEADER = `
 export const getRule15 = (expTier: string, duration: string): string => {
   if (expTier === 'beginner') {
     if (duration === '4_weeks' || duration === '8_weeks') {
-      return `15. **Deload frequency by experience:**
+      return `18. **Deload frequency by experience:**
     - **Beginner:** Deloads are not needed for this program length at your experience level.`;
     } else {
-      return `15. **Deload frequency by experience:**
+      return `18. **Deload frequency by experience:**
     - **Beginner:** Deloads generally not needed for programs under 12 weeks. For longer programs, deload every 6-8 weeks.`;
     }
   } else if (expTier === 'intermediate') {
-    return `15. **Deload frequency by experience:**
+    return `18. **Deload frequency by experience:**
     - **Intermediate:** Deload every 5-6 training weeks. Every block longer than 4 weeks must include a deload week.`;
   } else if (expTier === 'advanced') {
-    return `15. **Deload frequency by experience:**
+    return `18. **Deload frequency by experience:**
     - **Advanced:** Do not go more than 6 consecutive training weeks without a deload. Every block longer than 4 weeks must include a deload week.`;
   } else {
     // Fallback
-    return `15. **Deload frequency by experience:**
+    return `18. **Deload frequency by experience:**
     - **Beginner:** Deloads generally not needed for programs under 12 weeks. For longer programs, deload every 6-8 weeks.
     - **Intermediate:** Deload every 5-6 training weeks. Every block longer than 4 weeks must include a deload week.
     - **Advanced:** Do not go more than 6 consecutive training weeks without a deload. Every block longer than 4 weeks must include a deload week.`;
   }
 };
 
-export const RULE_17 = `17. **Deload structure** — deload weeks reduce total sets by ~40-50% while maintaining movement patterns. Rep ranges increase by 2-3 reps per set. The app does not track weight — do not reference load reductions.`;
+export const RULE_17 = `19. **Deload structure** — deload weeks reduce total sets by ~40-50% while maintaining movement patterns. Rep ranges increase by 2-3 reps per set. The app does not track weight — do not reference load reductions.`;
 
-export const RULE_18 = `18. **Plateau management** — for programs 8 weeks or longer, include guidance for when the lifter stalls on a prescribed progression. Frame in terms of rep targets, not weight.`;
+export const RULE_18 = `20. **Plateau management** — for programs 8 weeks or longer, include guidance for when the lifter stalls on a prescribed progression. Frame in terms of rep targets, not weight.`;
 
 export const BALANCE_HEADER = `
 ### Balance`;
 
-export const STATIC_RULE_19 = `19. **Pull movement balance** — vertical pulls (pulldowns, pull-ups) should make up at least one-third of total back volume.`;
+export const STATIC_RULE_19 = `21. **Pull movement balance** — vertical pulls (pulldowns, pull-ups) should make up at least one-third of total back volume.`;
 
-export const RULE_20 = `20. **Complete block coverage** — the plan must explicitly cover every block (with the diff-based exception for 5+ block programs as described in the output format).`;
+export const RULE_20 = `22. **Complete block coverage** — the plan must explicitly cover every block (with the diff-based exception for 5+ block programs as described in the output format).`;
 
 // ================================
 // REST TIME DEFAULTS
 // ================================
 
-export const REST_SECTION_HEADER = `---
-
-## REST TIME GUIDELINES
-
-Use evidence-based rest periods appropriate for the exercise type and training goal. When the profile specifies a rest preference, adjust accordingly:`;
+export const REST_SECTION_HEADER = `Use evidence-based rest periods appropriate for exercise type and training goal. Adjust based on user's rest preference if specified.`;
 
 export const getRestSection = (restTrigger: string): string => {
   if (restTrigger === 'OPTIMAL') {
-    return ''; // No adjustment text needed
-  } else if (restTrigger === 'SHORTER') {
-    return `
-- **Shorter Rest:** Reduce rest periods while noting potential impact on performance`;
+    return "\n- **Optimal Rest:** Use full rest periods (2-3 min compounds, 90-120s isolation). Do not compress rest to hit a session time target. Session duration is whatever the rest periods require.";
   } else if (restTrigger === 'MINIMAL') {
-    return `
-- **Minimal Rest:** Significantly reduce rest periods with clear trade-off warnings`;
-  } else { // AI_CHOOSE
-    return `
-- **Optimal Rest:** Use current research recommendations for optimal performance
-- **Shorter Rest:** Reduce rest periods while noting potential impact on performance
-- **Minimal Rest:** Significantly reduce rest periods with clear trade-off warnings`;
+    return "\n- **Minimal Rest:** Compounds 60-90s, isolation 45-60s. Prioritize time efficiency.";
+  } else { // MODERATE
+    return "\n- **Moderate Rest:** Compounds 90-120s, isolation 60-90s. Target 60-75 minute sessions.";
   }
 };
 
-export const STATIC_REST_TABLE = `
-Consider exercise complexity, training goals, and user preferences when determining appropriate rest periods.`;
+export const STATIC_REST_TABLE = ``;
 
 // ================================
 // VOLUME RULES
@@ -491,7 +423,7 @@ export const STATIC_VOLUME_DEFINITIONS = `
 **Major** = Chest, Lats, Upper Back, Quads, Hamstrings, Glutes
 **Medium** = Side Delts, Biceps, Triceps, Calves
 
-Going above 20 sets/week for any muscle group has diminishing returns for natural lifters.
+Going above the target range ceiling for any muscle group has diminishing returns for natural lifters.
 
 ### Experience-Scaled Minimums
 
@@ -556,24 +488,15 @@ export const STATIC_STATUS_INDICATORS = `
 
 - ✅ = within target range for the user's approach
 - ⚠️ LOW = below the experience-scaled minimum — **must fix before presenting**
-- ⚠️ HIGH = above 20 sets for non-priority muscles, or above 22 sets for priority muscles. Diminishing returns for natural lifters
+- ⚠️ HIGH = above the target range ceiling for the user's approach. For priority muscles, ceiling is 22 sets. Exceeding the ceiling has diminishing returns — reduce before presenting.
 - ℹ️ CONSTRAINED = above minimum but below target due to split/schedule/equipment. Must explain in Recommendations.
-
-### Quality Standards
-
-- If any non-exempt muscle is below minimum, **revise the plan before presenting**.
-- Soft justifications such as 'compound pulling provides sufficient stimulus', 'close enough to floor', or 'mechanical overlap covers the deficit' are not valid reasons to leave a LOW status unfixed. If a muscle is below its experience-scaled floor, add a set — do not rationalise the gap.
-- If the user's approach targets aren't met and a practical fix exists (add a superset, swap an exercise), **implement it** rather than flagging.
-- After verifying ranges, **check distribution balance** — avoid some muscles maxed out while others sit at the floor.
 
 ### HIGH Threshold Handling
 
 When HIGH occurs on a non-priority muscle:
 - Identify the lowest-priority isolation exercise contributing to the excess
 - Reduce it by 1-2 sets in the session table
-- If reduction would drop below target range, leave at target ceiling (16 sets) and note as acceptable overflow
-
-"Recoverable" is not a valid justification for leaving HIGH unfixed. The only valid exception is a priority muscle explicitly named in the user profile.`;
+- If reduction would drop below target range, leave at the ceiling for the user's approach and note as acceptable overflow`;
 
 // Quality standards with approach-specific additions
 export const getQualityStandards = (approach: string): string => {
@@ -602,27 +525,27 @@ Adapt the plan based on the user's Primary Goal from their profile.`;
 
 export const BUILD_MUSCLE_GUIDANCE = `
 ### Build Muscle / Body Recomposition
-Prioritize hypertrophy rep ranges (8-12 for compounds, 10-15 for isolation). Volume is the primary driver. Apply the full volume verification system above.`;
+Prioritize hypertrophy rep ranges (8-12 for compounds, 10-15 for isolation). Volume is the primary driver.`;
 
 export const BURN_FAT_GUIDANCE = `
 ### Burn Fat
-Include higher-rep metabolic work and prioritize compound movements for caloric expenditure. Lifting volume can sit at the lower end of the user's approach range — the minimum targets still apply, but pushing to the upper end is less important than for muscle building. Cardio days (if present) are important for the goal. Consider shorter rest periods if the user didn't specify a preference.`;
+Include higher-rep metabolic work and compound movements for caloric expenditure. Consider shorter rest periods.`;
 
 export const GAIN_STRENGTH_GUIDANCE = `
 ### Gain Strength
-Prioritize lower rep ranges (3-6 for main compounds, 6-10 for accessories). Longer rest periods (use heavy compound defaults for most exercises). Fewer exercises per session but more sets on primary lifts. Volume targets still apply but sets on main lifts count more heavily — 5 sets of squats at RPE 8-9 delivers more stimulus than the same volume split across 3 exercises. Periodize with progressively heavier blocks.`;
+Prioritize lower rep ranges (3-6 for main compounds, 6-10 for accessories). Longer rest periods and fewer exercises per session.`;
 
 export const SPORT_SPECIFIC_GUIDANCE = `
 ### Sport-Specific Training
-The profile should include sport details. Design training around the movement patterns and physical demands of that sport. Lifting supports the sport — not the other way around. Volume targets apply to lifting days only — sport practice days don't count toward muscle volume. If the user has few lifting days (2-3), volume minimums may be hard to hit; use ℹ️ CONSTRAINED and explain.`;
+Design training around the movement patterns of the sport. Lifting supports the sport, not the other way around.`;
 
 export const GENERAL_FITNESS_GUIDANCE = `
 ### General Fitness
-Balanced approach across strength, cardio, and mobility. Don't over-optimize for any single quality. Wider exercise variety is appropriate. Sessions can be shorter and more varied. Volume targets apply but use the lower end of the range — general fitness doesn't require hypertrophy-optimal volume. Circuit-type training counts toward muscle volume: each exercise in a circuit gets volume credit equal to the number of rounds (e.g., a 3-round circuit with 4 exercises = 3 sets per exercise for volume counting purposes). Prompt 3's volume verification should count circuit rounds as sets.`;
+Balanced approach across strength, cardio, and mobility. Use lower end of volume targets.`;
 
 export const CUSTOM_GOAL_GUIDANCE = `
 ### Custom Goal
-Read the user's custom description and design accordingly. If the custom goal maps closely to one of the above, use that framework. If it's genuinely unique, explain your interpretation and approach.`;
+Design according to the user's custom description. Use the most applicable framework from above.`;
 
 export const CUSTOM_GOAL_FRAMEWORK_SUMMARY = `
 
@@ -718,12 +641,11 @@ export function assemblePlanningPrompt(
   );
   const gymDays = data.gymTrainingDays || 0;
   
-  // Derive rest trigger
-  let restTrigger: 'OPTIMAL' | 'SHORTER' | 'MINIMAL' | 'AI_CHOOSE';
-  if (data.restTimePreference === 'optimal') restTrigger = 'OPTIMAL';
-  else if (data.restTimePreference === 'shorter') restTrigger = 'SHORTER';
-  else if (data.restTimePreference === 'minimal') restTrigger = 'MINIMAL';
-  else restTrigger = 'AI_CHOOSE';
+  // Derive rest trigger from sessionStyle
+  let restTrigger: 'OPTIMAL' | 'MODERATE' | 'MINIMAL';
+  if (data.sessionStyle === 'optimal') restTrigger = 'OPTIMAL';
+  else if (data.sessionStyle === 'minimal') restTrigger = 'MINIMAL';
+  else restTrigger = 'MODERATE'; // default or 'moderate'
   
   // Derive deload needed
   const beginnerShortProgram = expTier === 'beginner' && ['4_weeks', '8_weeks'].includes(duration);
@@ -788,7 +710,8 @@ ${generateProgramSpecs(data)}`;
   prompt += '\n' + STATIC_RULES_4_5_6_7;
   prompt += '\n' + getRule8(goal);
   
-  prompt += '\n' + ROTATION_PERIODIZATION_HEADER;
+  const hasRotationRules = hasActivityGoals || !isShortProgram || isLongProgram;
+  if (hasRotationRules) prompt += '\n' + ROTATION_PERIODIZATION_HEADER;
   if (hasActivityGoals) prompt += '\n' + RULE_11;
   if (!isShortProgram) prompt += '\n' + RULE_12;
   

@@ -47,10 +47,7 @@ export interface QuestionnaireData {
   selectedEquipment?: string[];
   specificEquipment?: string;
   unavailableEquipment?: string[];
-  workoutDuration?: number;
-  useAISuggestion?: boolean;
-  restTimePreference?: string;
-  useAIRestTime?: boolean;
+  sessionStyle?: 'optimal' | 'moderate' | 'minimal';
   
   // Exercise Preferences
   likedExercises?: string[];
@@ -269,24 +266,16 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   if (data.unavailableEquipment && Array.isArray(data.unavailableEquipment) && data.unavailableEquipment.length > 0) {
     specs += `**Equipment to Avoid:** ${data.unavailableEquipment.join(', ')}\n`;
   }
-  // Handle workout duration (including AI optimization case)
-  if (data.workoutDuration && data.workoutDuration > 0) {
-    specs += `**Preferred Session Length:** ${data.workoutDuration} minutes\n`;
-  } else if (data.useAISuggestion) {
-    specs += `**Session Length:** Not specified — design session length based on the user's goal, experience level, and number of exercises. For hypertrophy with an advanced lifter, 60-75 minutes is typical.\n`;
-  }
-  
-  
-  // Handle rest time preference (including AI optimization case)
-  if (data.restTimePreference) {
-    const restMap: { [key: string]: string } = {
-      'optimal': 'Optimal (longer rest for maximum performance)',
-      'shorter': 'Shorter (reduced rest for time efficiency)',
-      'minimal': 'Minimal (shorter rest for time efficiency)'
+  // Session Style (replaces separate duration and rest time preferences)
+  if (data.sessionStyle) {
+    const sessionMap: { [key: string]: string } = {
+      'optimal': 'Rest Style: Optimal — full recovery between sets. Compounds: 2-3 min, Isolation: 90-120s. Session duration is unconstrained — let it be whatever the rest periods require.',
+      'moderate': 'Rest Style: Moderate — compounds: 90-120s, isolation: 60-90s. Sessions typically 60-75 minutes.',
+      'minimal': 'Rest Style: Minimal — compounds: 60-90s, isolation: 45-60s. Prioritizes time efficiency over per-set performance.'
     };
-    specs += `**Rest Time Preference:** ${restMap[data.restTimePreference] || data.restTimePreference}\n`;
-  } else if (data.useAIRestTime) {
-    specs += `**Rest Time Preference:** Not specified — use evidence-based rest periods appropriate for the user's goal. For hypertrophy: 1-2 min for compounds, 60-90 sec for isolation. For strength: 2-3 min for main lifts.\n`;
+    specs += `**${sessionMap[data.sessionStyle]}\n`;
+  } else {
+    specs += `**Rest Style: Moderate — compounds: 90-120s, isolation: 60-90s. Sessions typically 60-75 minutes.\n`;
   }
 
   // Exercise Preferences
@@ -341,7 +330,7 @@ Before generating, note from the plan:
 - Recommended split and session focus per day
 - Any re-entry protocol requirements
 
-Use these when calculating session durations and validating day structure.
+Use these when applying rest style parameters and validating day structure.
 
 ## Output Instructions
 
@@ -372,36 +361,8 @@ Generate one block at a time. After each block:
 5. Say: "Block [X] reviewed and updated. Say 'next' to continue to Block [X+1]."
 
 ### Embedded Review Checklist
-// IMPORTANT: This checklist must stay synchronized with Step 2 review process in ImportRoutineScreen.tsx
-// If you update one checklist, update both to maintain consistency across the workflow
 
-Apply these checks to the block before correcting the JSON:
-
-**Architecture Validation:**
-- [ ] Split structure matches the plan's recommended architecture
-- [ ] Session coherence rules are followed (muscle recovery windows)
-- [ ] Sessions don't exceed calculated duration limits from formula
-
-**Volume Analysis:**
-- [ ] All muscle groups meet minimum weekly set thresholds (12+ major, 8+ medium muscles)
-- [ ] Volume distribution is balanced across training days
-- [ ] The program document includes a Muscle Group Coverage Audit section  
-- [ ] Every muscle group with 0 direct sets has an explicit indirect volume justification
-- [ ] **FAIL if** the audit section is missing entirely from the document
-
-**Programming Quality:**
-- [ ] Exercise selection matches stated goals and experience level
-- [ ] Rep ranges align with block focus (strength/hypertrophy/endurance)
-- [ ] Progression patterns are realistic and appropriate
-- [ ] Rest periods match exercise complexity and training demands
-
-**Implementation Practicality:**
-- [ ] Session complexity is manageable for target audience
-- [ ] Equipment requirements match available resources
-- [ ] Exercise transitions are logical and efficient
-- [ ] Workout flow supports adherence and motivation
-**Rest Day Structure:**
-- [ ] Rest days are properly formatted as REST DAY entries with empty exercises
+Re-read the workout plan document from earlier in the conversation. Compare your JSON output against the plan and fix any discrepancies in exercise names, set counts, muscle tags, superset pairings, or day structure.
 
 Each block should be a complete, standalone JSON file with routine_name, description, days_per_week, and a single block in the blocks array. Keep routine_name and description consistent across all files.
 
@@ -426,11 +387,10 @@ The plan is fully self-contained: it lists all exercise pools, block structures,
 
 ## Translation Principles
 
-1. **The plan is authoritative** — use the exercise names, sets, muscle tags, superset pairings, and day structure exactly as specified. Do not add, remove, or rename exercises. If the plan declares a mesocycle structure, append \`- Mesocycle X\` to the routine_name in every JSON file for that mesocycle (e.g., \`"Iron Year - Mesocycle 1"\`). This is required for the app to correctly associate imported blocks with the right mesocycle. The reviewed plan is authoritative on set counts and exercise selection — do not add, remove, or reduce sets on any exercise to fix volume calculations. If your volume recalculation produces a HIGH or LOW flag that differs from the reviewed plan's audit, note the discrepancy in your volume summary but proceed with the reviewed plan's set counts unchanged.
-2. **Treat exercise names as identifiers** — use the exact same string for the same exercise across all blocks, days, notes, and superset references. Never vary naming (e.g., always "Overhead Cable Extension", never "Cable Overhead Extension").
-3. **Design what the plan doesn't specify** — you are responsible for rest periods, alternative exercises, and technique notes. For rep progressions: if the plan states a progression scheme, follow it exactly. If the plan is silent on progressions, use the defaults below. The plan provides structure; you provide programming detail.
-4. **Only program working sets** — do not include warm-up sets. The app tracks working sets only.
-5. **The plan is self-contained** — it contains every exercise pool, block structure, and periodization detail needed to generate any block. Always reference the plan for exercise names and structure — never rely on memory of prior blocks in the conversation. If the plan uses a diff-based format for later blocks (referencing carryovers from earlier blocks), first reconstruct the complete exercise list by applying the stated changes to the referenced base block, then generate JSON from that complete list. Every block's JSON must contain all exercises for all days.
+1. **The plan is authoritative** — use the exercise names, sets, muscle tags, superset pairings, and day structure exactly as specified. Do not add, remove, or rename exercises. If the plan declares a mesocycle structure, append the mesocycle name to routine_name in every JSON file. The reviewed plan's set counts are final — do not adjust them based on your own volume recalculation.
+2. **Treat exercise names as identifiers** — use the exact same string for the same exercise across all blocks, days, notes, and superset references. Never vary naming.
+3. **Design what the plan doesn't specify** — you are responsible for rest periods, alternative exercises, and technique notes. For rep progressions: follow the plan's scheme if stated, otherwise use the defaults below.
+4. **Only program working sets** — do not include warm-up sets.
 
 ---
 
@@ -447,34 +407,19 @@ Start at the TOP of the prescribed range in Week 1, reduce across the block. The
 Maintain rep targets in early weeks. Slight rep reduction in later weeks signals that the lifter should be using heavier loads.
 Example (5-week block, 4 sets): Week 1: "10, 10, 10, 8" → Week 2: "10, 10, 8, 8" → Week 3: "8, 8, 8, 8" → Week 4: "8, 8, 6, 6" → Week 5 (deload): "12, 12"
 
-**Deload week pattern:**
-Reduce sets by ~40-50% (via sets_weekly). Increase reps by 2-3 per set. Maintain movement patterns.
-Example: If training weeks are 4 sets of "10, 10, 10, 8", deload is 2 sets of "12, 12".
-
 \`reps_weekly\` values must be comma-separated rep targets per set (e.g., "10, 10, 10, 8"), not shorthand like "4x10".
 
 **Match progressions to the plan's rep range focus.** If the plan says "Block B: Strength — 5-8 reps," your compound progressions should work within that range. Isolation exercises can run 2-4 reps higher than the block's stated range (e.g., 8-12 isolation reps in a "5-8" strength block is fine).
 
 ### Rest Periods
 
-Use the rest periods specified in the plan if present. Otherwise, apply evidence-based rest periods appropriate for the exercise type and training goal:
+Use rest periods from the plan if specified, otherwise apply evidence-based defaults appropriate for exercise type and training goal. Calculate restQuick as approximately 65% of the main rest period.
 
-**Heavy compounds** = squat variations, deadlift variations, barbell bench press, barbell overhead press.
-**Other compounds** = everything else with 2+ joints (rows, lunges, dumbbell presses, pull-ups, dips, leg press, etc.).
-
-Use longer rest for heavy compounds that require more recovery, moderate rest for other compound movements, and shorter rest for isolation exercises. Consider the training goal (strength vs hypertrophy vs endurance) and adjust accordingly. Calculate restQuick as approximately 65% of the main rest period.
-
-**Superset rest encoding:** For superset pairs, the first exercise (SS[n]a) gets a brief transition rest to move to the second exercise. The second exercise (SS[n]b) gets the full rest appropriate to the exercise type before repeating the pair. Use your judgment for transition timing based on the exercise pairing - some combinations need minimal rest, others may need more recovery between movements.
-
-If the plan notes shorter or minimal rest preferences, reduce accordingly (shorter: ~25% reduction; minimal: ~40% reduction).
+**Superset rest encoding:** For superset pairs, the first exercise (SS[n]a) gets a brief transition rest to move to the second exercise. The second exercise (SS[n]b) gets the full rest appropriate to the exercise type before repeating the pair.
 
 ### Alternative Exercises
 
-Each exercise must include 2 alternatives (or 1 alternative for bodyweight-only programs where the exercise pool is limited). Alternatives should:
-- Target the same primary muscles
-- Use different equipment types when possible (e.g., if main exercise uses cables, provide dumbbell/barbell/bodyweight/machine alternatives to ensure equipment availability)
-- Use a different movement variation or equipment
-- Include their own primaryMuscles and secondaryMuscles tags
+Each exercise must include 2 alternatives (1 for bodyweight-only programs). Alternatives should target the same primary muscles, use different equipment or movement variations, and include their own primaryMuscles and secondaryMuscles tags.
 
 ### Notes
 
@@ -488,41 +433,7 @@ Place superset exercises adjacent in the exercises array. Include "Superset with
 
 ## Muscle Taxonomy
 
-Use EXACTLY these names — no generic terms like "Shoulders", "Back", "Arms", or "Legs":
-
-Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
-
-### Compound Exercise Tagging Guide
-
-Primary = main driver through full ROM. Secondary = assists but not the main driver.
-
-**Barbell / Dumbbell / Cable / Machine:**
-- Bench press variants: Primary Chest, Triceps
-- Incline press variants: Primary Chest, Front Delts | Secondary Triceps
-- Row variants: Primary Upper Back, Lats | Secondary Biceps, Rear Delts
-- Pull-up / Pulldown: Primary Lats | Secondary Biceps, Upper Back
-- Overhead press: Primary Front Delts, Triceps | Secondary Side Delts
-- Squat variants: Primary Quads, Glutes
-- Leg press / Hack squat: Primary Quads | Secondary Glutes
-- Lunge / Split squat: Primary Quads, Glutes
-- Hip hinge (RDL, good morning): Primary Hamstrings, Glutes
-- Hip thrust: Primary Glutes | Secondary Hamstrings
-- Dips: Primary Chest, Triceps
-- Calf raise variants: Primary Calves
-
-**Bodyweight:**
-- Push-ups (and variations): Primary Chest, Triceps | Secondary Front Delts
-- Diamond / Close-grip push-ups: Primary Triceps, Chest
-- Pike push-ups / Handstand push-ups: Primary Front Delts, Triceps | Secondary Side Delts
-- Inverted rows: Primary Upper Back, Lats | Secondary Biceps, Rear Delts
-- Pull-ups / Chin-ups: Primary Lats | Secondary Biceps, Upper Back
-- Dips (parallel bars / bench): Primary Chest, Triceps
-- Bodyweight squats / Pistol squats: Primary Quads, Glutes
-- Lunges / Step-ups: Primary Quads, Glutes
-- Glute bridges / Single-leg glute bridge: Primary Glutes | Secondary Hamstrings
-- Nordic curls: Primary Hamstrings
-- Calf raises (bodyweight): Primary Calves
-- Planks / Dead bugs / Leg raises: Primary Core
+Use the exact muscle taxonomy and compound exercise tagging guide from the workout plan above. Do not use generic terms like "Shoulders", "Back", "Arms", or "Legs".
 
 ---
 
@@ -612,32 +523,17 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
 
 ## Pre-Delivery Self-Check
 
-Before presenting each block's download link, silently verify:
+Before presenting each block, silently verify:
 
-**Constraint Validation:**
-- [ ] Session durations match recalculated formula values (not plan estimates)
-- [ ] Split architecture follows plan's recommended structure
-- [ ] Session coherence rules are respected (muscle recovery windows)
-- [ ] Muscle coverage audit exists in source plan before proceeding
-- [ ] Deload patterns match re-entry protocol volume reduction targets
-
-**Schema Compliance:**
-- [ ] Every exercise from the plan appears in the JSON with correct set counts
-- [ ] Exercise names are identical everywhere they appear (across days, notes, superset references)
-- [ ] Superset exercises are adjacent in the array and cross-reference each other in notes
-- [ ] Superset rest is correctly encoded (SS[n]a gets short rest, SS[n]b gets full rest)
-- [ ] Superset pairs both have a matching superset_group field with the same value (e.g. "ss1")
-- [ ] Rep progressions change meaningfully across weeks (not identical every week for all exercises)
-- [ ] All exercises trend flat-to-decreasing reps (signaling progressive overload)
-- [ ] Deload weeks show reduced sets_weekly (~40-50% fewer) and increased reps
-- [ ] Rest periods match exercise type (heavy compounds ≥150s, other compounds ≥120s, isolation ≤90s)
-- [ ] Muscle tags match the compound tagging guide
-- [ ] primaryMuscles and secondaryMuscles use exact taxonomy names
-- [ ] No exercise has empty primaryMuscles
+- [ ] Every exercise from the plan appears in JSON with correct set counts
+- [ ] Exercise names are identical everywhere (across days, notes, superset references)
+- [ ] Superset exercises are adjacent with matching superset_group values and cross-referenced in notes
+- [ ] Rep progressions trend flat-to-decreasing across weeks (not identical every week)
+- [ ] Deload weeks show reduced sets_weekly (~40-50%) and increased reps
+- [ ] restQuick ≈ 65% of rest for every exercise
+- [ ] Muscle tags match the compound tagging guide from the plan
 - [ ] Block-relative week keys start from "1"
-- [ ] \`restQuick\` ≈ 65% of \`rest\` for every exercise
-- [ ] Rep ranges match the block's stated focus from the plan
-- [ ] No warm-up sets included — working sets only
+- [ ] Session durations are recalculated using the duration formula
 
-Fix any issues before presenting. After the download link and volume summary, briefly note what you verified (one line, not a full checklist).`;
+Fix any issues before presenting.`;
 };

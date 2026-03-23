@@ -1694,10 +1694,7 @@ export default function ImportRoutineScreen() {
         selectedEquipment: equipmentPrefs.selectedEquipment,
         specificEquipment: equipmentPrefs.specificEquipment,
         unavailableEquipment: equipmentPrefs.unavailableEquipment,
-        workoutDuration: equipmentPrefs.workoutDuration,
-        useAISuggestion: equipmentPrefs.useAISuggestion,
-        restTimePreference: equipmentPrefs.restTimePreference,
-        useAIRestTime: equipmentPrefs.useAIRestTime,
+        sessionStyle: equipmentPrefs.sessionStyle,
         likedExercises: equipmentPrefs.likedExercises,
         dislikedExercises: equipmentPrefs.dislikedExercises,
         exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
@@ -1725,6 +1722,9 @@ export default function ImportRoutineScreen() {
       if (!cleanedData.trainingExperience) {
         cleanedData.trainingExperience = 'intermediate';
       }
+      if (!cleanedData.sessionStyle) {
+        cleanedData.sessionStyle = 'moderate';
+      }
 
       return cleanedData;
     } catch (error) {
@@ -1735,7 +1735,8 @@ export default function ImportRoutineScreen() {
         selectedEquipment: ['commercial_gym'],
         trainingExperience: 'intermediate',
         trainingApproach: 'balanced',
-        programDuration: '12_weeks'
+        programDuration: '12_weeks',
+        sessionStyle: 'moderate'
       };
     }
   };
@@ -1803,22 +1804,6 @@ export default function ImportRoutineScreen() {
       'basic_equipment': 'Basic Equipment (dumbbells, resistance bands)'
     };
 
-    const sessionLengthMap: { [key: string]: string } = {
-      '30': '30 minutes',
-      '45': '45 minutes', 
-      '60': '60 minutes',
-      '75': '75 minutes',
-      '90': '90 minutes',
-      'custom': data.customDuration ? `${data.customDuration} minutes` : 'Custom duration',
-      'ai_suggest': 'Not specified — let AI suggest optimal duration based on goal and experience.'
-    };
-
-    const restTimeMap: { [key: string]: string } = {
-      'optimal': 'Optimal rest times — prioritize maximum results regardless of session length.',
-      'shorter': 'Shorter rest times — reduced rest (~25% less) for time efficiency.',
-      'minimal': 'Minimal rest times — time efficient, higher intensity.',
-      'ai_choose': 'Not specified — use evidence-based defaults.'
-    };
 
     const noteDetailMap: { [key: string]: string } = {
       'detailed': 'Detailed instructions for each exercise.',
@@ -1968,14 +1953,13 @@ export default function ImportRoutineScreen() {
       lines.push(`**Unavailable Equipment:** ${data.unavailableEquipment}`);
     }
 
-    // Session Length
-    const sessionKey = data.useAISuggestion ? 'ai_suggest' : 
-                       data.workoutDuration ? data.workoutDuration.toString() : 'custom';
-    lines.push(`**Session Length:** ${sessionLengthMap[sessionKey] || 'Not specified'}`);
-
-    // Rest Time Preference
-    const restKey = data.useAIRestTime ? 'ai_choose' : data.restTimePreference || 'ai_choose';
-    lines.push(`**Rest Time Preference:** ${restTimeMap[restKey] || 'Not specified — use evidence-based defaults.'}`);
+    // Rest Style
+    const restStyleMap: { [key: string]: string } = {
+      'optimal': 'Optimal — full recovery between sets. Compounds: 2-3 min, Isolation: 90-120s. Session duration is unconstrained.',
+      'moderate': 'Moderate — compounds: 90-120s, isolation: 60-90s. Sessions typically 60-75 minutes.',
+      'minimal': 'Minimal — compounds: 60-90s, isolation: 45-60s. Prioritizes time efficiency.'
+    };
+    lines.push(`**Rest Style:** ${restStyleMap[data.sessionStyle || 'moderate'] || restStyleMap['moderate']}`);
 
     // Exercise Note Detail
     lines.push(`**Exercise Note Detail:** ${noteDetailMap[data.exerciseNoteDetail || 'minimal'] || 'Only non-obvious technique tips or specific setup instructions.'}`);
@@ -2066,8 +2050,7 @@ export default function ImportRoutineScreen() {
                         (questionnaireData.selectedEquipment && !questionnaireData.selectedEquipment.includes('commercial_gym')) ||
                         (questionnaireData.trainingExperience && questionnaireData.trainingExperience !== 'intermediate') ||
                         questionnaireData.totalTrainingDays ||
-                        questionnaireData.workoutDuration ||
-                        questionnaireData.restTimePreference ||
+                        questionnaireData.sessionStyle && questionnaireData.sessionStyle !== 'moderate' ||
                         questionnaireData.programDuration && questionnaireData.programDuration !== '12_weeks'
                       );
                       
@@ -2228,39 +2211,19 @@ First, read the workout program you just created so you have the full content in
 4. **Present the CORRECTED plan** — output the complete, clean, final version of the workout program with all fixes applied. Do not show the review process, do not show before/after comparisons, do not show your working. Present ONLY the clean corrected plan.
 5. **At the end, provide a brief change log** — a short bullet list of what you changed and why (e.g., "Added 2 sets of lat pulldowns on Day 2 to bring lat volume from 10 to 12 sets weekly").
 6. **Remind the user about JSON conversion** — after presenting the corrected plan, tell the user: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
-7. **USE WEB SEARCH** - If you have web search available, use it during the review to verify current research on volume standards, training frequency, and session duration guidelines.
+7. **USE WEB SEARCH** - If you have web search available, use it during the review to verify current research on volume standards, training frequency, and rest style guidelines.
 
-## HARD CONSTRAINTS — ZERO TOLERANCE
+## Fix Priority
 
-These must pass after your fixes. If any of these still fail after revision, you have not finished — go back and fix again.
-
-- **User requirements priority** — ALL equipment, frequency, time, and experience constraints must be perfectly met (no exceptions).
-- **Volume minimums** — Major muscles need 12+ sets minimum, medium muscles need 8+ sets minimum based on current research.
-- **Recovery standards** — 48-72h minimum between same-muscle training sessions for optimal protein synthesis.
-- **Rest days are included and optimally placed for recovery**
-- **Practical feasibility** — Session durations must be realistic including warm-up, rest, and transitions.
-- **No draft content** — the output must contain zero working, iteration, or revision commentary.
-
-## What "Fix" Means for Each Type of Failure
-
-- **Volume shortfalls**: Attempt a fix first — add sets to an existing exercise, swap a lower-priority isolation, or add a superset. Only after a genuine attempt fails may you accept CONSTRAINED, and you must state the exact structural reason. Show what you tried and why it couldn't work. Recalculate and verify totals.
-- **Recovery violations**: Redistribute exercises across days or adjust training split to ensure adequate rest.
-- **Equipment violations**: Replace exercises requiring unavailable equipment with alternatives using only listed equipment.
-- **Time overruns**: Reduce volume, combine exercises, or streamline the program to fit session limits.
-- **Experience mismatches**: Simplify exercise selection or progression schemes to match user's training background.
-- **Draft/working shown**: Remove all iteration, working, and draft content. Present only the final clean version.
+When a check fails, fix it immediately — do not ask for permission. The one non-obvious rule: for volume shortfalls, attempt a concrete fix first (add sets, swap an isolation, add a superset) before accepting CONSTRAINED. Only accept CONSTRAINED if you can state the exact structural blocker. "Split doesn't allow it" is not acceptable.
 
 ## Review Checklist
 
 Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
 
 ### 1. User Requirements Verification
-- **Equipment constraints**: Does EVERY exercise require only available equipment?
-- **Training frequency**: Exact match to requested days per week?
-- **Time constraints**: Are session lengths within user's stated limits?
-- **Experience level**: Is complexity appropriate for user's training background?
-- **Goals**: Does the plan prioritize the stated primary goal throughout?
-- **FAIL if** ANY user requirement is not perfectly met (no exceptions)
+- Verify all equipment, frequency, time, experience, and goal constraints from the profile are met exactly.
+- **FAIL if** any user requirement is not perfectly met.
 
 ### 1b. Diff-Based Block Completeness
 For any block described as changes from a prior block (diff format) rather than a full session table:
@@ -2278,7 +2241,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
 - **Medium muscles** (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
 - **FAIL if** ANY muscle falls below research-backed minimums
 - **FAIL if** "structural constraints" are used to excuse inadequate volume
-- **Attempt-first rule**: Before accepting any shortfall as CONSTRAINED or exempt, you must attempt a concrete fix: add sets to an existing exercise, swap a lower-priority isolation for one covering the deficient muscle, or add a superset without materially extending session duration. Only accept CONSTRAINED if you can state the exact structural blocker (e.g., "Adding Hamstring sets to any day would exceed the 75-min cap"). A vague "split doesn't allow it" is not acceptable.
+- **Attempt-first rule**: Before accepting any shortfall as CONSTRAINED or exempt, you must attempt a concrete fix: add sets to an existing exercise, swap a lower-priority isolation for one covering the deficient muscle, or add a superset using rest periods appropriate for the user's chosen rest style. Only accept CONSTRAINED if you can state the exact structural blocker (e.g., "Adding Hamstring sets would violate the user's minimal rest style constraints"). A vague "split doesn't allow it" is not acceptable.
 
 **Additionally verify:**
 - The program document includes a Muscle Group Coverage Audit section
@@ -2295,12 +2258,9 @@ This check exists because the JSON generator must reconstruct complete exercise 
 - **FAIL if** recovery between same muscles is inadequate
 - **FAIL if** total weekly stress appears unsustainable
 
-### 4. Exercise Quality and Appropriateness
-- **Experience alignment**: Every exercise appropriate for stated training background
-- **Movement balance**: Check push/pull ratios and movement pattern distribution
-- **Practical complexity**: Exercise selection fits user's gym environment
-- **FAIL if** exercises are too advanced or require unavailable equipment
-- **FAIL if** movement patterns are imbalanced or neglect key functions
+### 4. Exercise Quality
+- Every exercise must be appropriate for the user's stated experience level and available equipment.
+- **FAIL if** exercises are too advanced or require unavailable equipment.
 
 ### 5. Progression and Periodization Logic
 - **Goal alignment**: Rep ranges align with stated goals and current research

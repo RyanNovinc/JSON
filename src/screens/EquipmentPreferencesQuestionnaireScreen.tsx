@@ -109,12 +109,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [specificEquipment, setSpecificEquipment] = useState<string>('');
   const [unavailableEquipment, setUnavailableEquipment] = useState<string>('');
-  const [workoutDuration, setWorkoutDuration] = useState<number>(0);
-  const [customDuration, setCustomDuration] = useState<string>('');
-  const [showCustomDuration, setShowCustomDuration] = useState<boolean>(false);
-  const [useAISuggestion, setUseAISuggestion] = useState<boolean>(false);
-  const [restTimePreference, setRestTimePreference] = useState<string>('');
-  const [useAIRestTime, setUseAIRestTime] = useState<boolean>(false);
+  const [sessionStyle, setSessionStyle] = useState<'optimal' | 'moderate' | 'minimal'>('moderate');
   const [likedExercises, setLikedExercises] = useState<string>('');
   const [dislikedExercises, setDislikedExercises] = useState<string>('');
   const [exerciseNoteDetail, setExerciseNoteDetail] = useState<'detailed' | 'brief' | 'minimal'>('brief');
@@ -123,10 +118,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const [showResults, setShowResults] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [showDurationOptions, setShowDurationOptions] = useState(true);
-  const [showRestTimeOptions, setShowRestTimeOptions] = useState(true);
-  const durationOptionsRef = React.useRef<any>(null);
-  const restTimeOptionsRef = React.useRef<any>(null);
   const equipmentScrollRef = React.useRef<ScrollView>(null);
   const timeScrollRef = React.useRef<ScrollView>(null);
   const exerciseScrollRef = React.useRef<ScrollView>(null);
@@ -147,14 +138,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         setSelectedEquipment(data.selectedEquipment || []);
         setSpecificEquipment(data.specificEquipment || '');
         setUnavailableEquipment(data.unavailableEquipment || '');
-        setWorkoutDuration(data.workoutDuration || 0);
-        setCustomDuration(data.customDuration || '');
-        setShowCustomDuration(data.customDuration !== '');
-        setUseAISuggestion(data.useAISuggestion || false);
-        setShowDurationOptions(!(data.useAISuggestion || false));
-        setRestTimePreference(data.restTimePreference || '');
-        setUseAIRestTime(data.useAIRestTime || false);
-        setShowRestTimeOptions(!(data.useAIRestTime || false));
+        setSessionStyle(data.sessionStyle || 'moderate');
         setLikedExercises(data.likedExercises || '');
         setDislikedExercises(data.dislikedExercises || '');
         setExerciseNoteDetail(data.exerciseNoteDetail || 'brief');
@@ -188,11 +172,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         selectedEquipment,
         specificEquipment,
         unavailableEquipment,
-        workoutDuration,
-        customDuration,
-        useAISuggestion,
-        restTimePreference,
-        useAIRestTime,
+        sessionStyle,
         likedExercises,
         dislikedExercises,
         exerciseNoteDetail,
@@ -213,8 +193,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
     if (!isLoading && !isCompleted) {
       saveProgress();
     }
-  }, [selectedEquipment, specificEquipment, unavailableEquipment, workoutDuration, customDuration, useAISuggestion,
-      restTimePreference, useAIRestTime, likedExercises, dislikedExercises, exerciseNoteDetail, includeDirectCore]);
+  }, [selectedEquipment, specificEquipment, unavailableEquipment, sessionStyle, likedExercises, dislikedExercises, exerciseNoteDetail, includeDirectCore]);
 
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
@@ -251,29 +230,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       return;
     }
 
-    // Validate workout duration and rest time on step 1
-    if (currentStep === 1) {
-      const hasDurationSelection = useAISuggestion || workoutDuration > 0 || customDuration.trim() !== '';
-      const hasRestTimeSelection = useAIRestTime || restTimePreference !== '';
-      
-      if (!hasDurationSelection) {
-        Alert.alert(
-          'Workout Duration Required',
-          'Please select a workout duration or choose AI optimization.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-      
-      if (!hasRestTimeSelection) {
-        Alert.alert(
-          'Rest Time Required',
-          'Please select a rest time preference or choose AI optimization.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-    }
+    // Step 1 validation - sessionStyle always has a valid value, so no validation needed
 
     if (currentStep < 2) {
       const newStep = currentStep + 1;
@@ -314,11 +271,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         selectedEquipment,
         specificEquipment,
         unavailableEquipment,
-        workoutDuration,
-        customDuration,
-        useAISuggestion,
-        restTimePreference,
-        useAIRestTime,
+        sessionStyle,
         likedExercises,
         dislikedExercises,
         exerciseNoteDetail,
@@ -475,6 +428,27 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
 
   // Time availability step
   const renderTimeStep = () => {
+    const sessionStyleOptions = [
+      {
+        id: 'optimal',
+        title: 'Optimal Rest',
+        subtitle: 'Full recovery between sets. Sessions may run 75-90 min.',
+        icon: 'timer-outline'
+      },
+      {
+        id: 'moderate',
+        title: 'Moderate Rest',
+        subtitle: 'Balanced rest and efficiency. Sessions around 60-75 min.',
+        icon: 'swap-horizontal-outline'
+      },
+      {
+        id: 'minimal',
+        title: 'Minimal Rest',
+        subtitle: 'Time efficient, shorter rest. Sessions around 45-60 min.',
+        icon: 'speedometer-outline'
+      }
+    ];
+
     return (
       <ScrollView 
         ref={timeScrollRef}
@@ -488,136 +462,52 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
           style={styles.sectionContainer}
         >
           <Text style={[styles.sectionTitle, { color: themeColor }]}>
-            Workout Duration
+            Rest Style
           </Text>
           <Text style={styles.sectionSubtitle}>
-            How long can you typically workout per session?
+            Choose your rest period approach. Rest periods determine session duration.
           </Text>
 
-          {/* AI Suggestion Option - Featured at the top */}
-          <Animatable.View
-            animation="fadeInUp"
-            delay={100}
-            style={styles.aiSuggestionContainer}
-          >
-            <TouchableOpacity
-              style={[
-                styles.aiSuggestionCard,
-                useAISuggestion && [styles.selectedAiCard, { 
-                  borderColor: themeColor, 
-                  backgroundColor: `${themeColor}10`,
-                  shadowColor: themeColor,
-                  shadowOpacity: 0.3,
-                }]
-              ]}
-              onPress={() => {
-                if (useAISuggestion) {
-                  // If already selected, unselect AI suggestion and show options
-                  setUseAISuggestion(false);
-                  setTimeout(() => setShowDurationOptions(true), 100);
-                } else {
-                  // Select AI suggestion, animate options out then hide
-                  if (durationOptionsRef.current) {
-                    durationOptionsRef.current.fadeOutUp(400).then(() => {
-                      setShowDurationOptions(false);
-                      setUseAISuggestion(true);
-                      setWorkoutDuration(0);
-                      setShowCustomDuration(false);
-                      setCustomDuration('');
-                    });
-                  }
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.aiSuggestionHeader}>
-                <View style={[styles.aiIconContainer, useAISuggestion && { backgroundColor: themeColor }]}>
-                  <Ionicons 
-                    name="sparkles" 
-                    size={24} 
-                    color={useAISuggestion ? '#000000' : themeColor} 
-                  />
-                </View>
-                <View style={styles.aiTextContainer}>
-                  <Text style={[styles.aiSuggestionTitle, useAISuggestion && { color: themeColor }]}>
-                    AI Optimized Duration
-                  </Text>
-                  <Text style={[styles.aiSuggestionSubtitle, useAISuggestion && { color: themeColor, opacity: 0.8 }]}>
-                    Let AI determine the optimal workout length for your goals
-                  </Text>
-                </View>
-                <View style={styles.aiSelectionIndicator}>
-                  {useAISuggestion ? (
-                    <Ionicons name="checkmark-circle" size={20} color={themeColor} />
-                  ) : (
-                    <View style={styles.unselectedCircle} />
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
-          </Animatable.View>
-
-          {/* Separator */}
-          <Animatable.View
-            animation="fadeInUp"
-            delay={200}
-            style={styles.separatorContainer}
-          >
-            <View style={styles.separatorLine} />
-            <Text style={styles.separatorText}>or choose a specific duration</Text>
-            <View style={styles.separatorLine} />
-          </Animatable.View>
-          
-          {/* Time Options - Clean List Style with Animation */}
-          {showDurationOptions && (
-            <Animatable.View
-              ref={durationOptionsRef}
-              animation="fadeInUp"
-              delay={300}
-              style={styles.timeOptionsContainer}
-            >
-              {/* Custom Duration Option - First */}
+          {sessionStyleOptions.map((option, index) => {
+            const isSelected = sessionStyle === option.id;
+            return (
               <Animatable.View
+                key={option.id}
                 animation="fadeInUp"
-                delay={350}
+                delay={100 + (index * 100)}
                 style={styles.durationOptionWrapper}
               >
                 <TouchableOpacity
                   style={[
                     styles.durationOption,
-                    showCustomDuration && [styles.selectedDurationOption, { 
+                    isSelected && [styles.selectedDurationOption, { 
                       borderColor: themeColor, 
                       backgroundColor: `${themeColor}10`,
                       shadowColor: themeColor,
                       shadowOpacity: 0.3,
                     }]
                   ]}
-                  onPress={() => {
-                    setShowCustomDuration(true);
-                    setWorkoutDuration(0);
-                    setUseAISuggestion(false);
-                    setShowDurationOptions(true);
-                  }}
+                  onPress={() => setSessionStyle(option.id as 'optimal' | 'moderate' | 'minimal')}
                   activeOpacity={0.8}
                 >
                   <View style={styles.durationOptionContent}>
-                    <View style={[styles.durationIconContainer, showCustomDuration && { backgroundColor: themeColor }]}>
+                    <View style={[styles.durationIconContainer, isSelected && { backgroundColor: themeColor }]}>
                       <Ionicons 
-                        name="create-outline" 
+                        name={option.icon as any}
                         size={20} 
-                        color={showCustomDuration ? '#000000' : themeColor} 
+                        color={isSelected ? '#000000' : themeColor} 
                       />
                     </View>
                     <View style={styles.durationTextContainer}>
-                      <Text style={[styles.durationTitle, showCustomDuration && { color: themeColor }]}>
-                        Custom Duration
+                      <Text style={[styles.durationTitle, isSelected && { color: themeColor }]}>
+                        {option.title}
                       </Text>
-                      <Text style={[styles.durationSubtitle, showCustomDuration && { color: themeColor, opacity: 0.8 }]}>
-                        Set your own workout length
+                      <Text style={[styles.durationSubtitle, isSelected && { color: themeColor, opacity: 0.8 }]}>
+                        {option.subtitle}
                       </Text>
                     </View>
                     <View style={styles.durationSelectionIndicator}>
-                      {showCustomDuration ? (
+                      {isSelected ? (
                         <Ionicons name="checkmark-circle" size={20} color={themeColor} />
                       ) : (
                         <View style={styles.unselectedCircle} />
@@ -625,248 +515,9 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
                     </View>
                   </View>
                 </TouchableOpacity>
-                
-                {/* Custom input field - Right below the card */}
-                {showCustomDuration && (
-                  <Animatable.View
-                    animation="fadeInUp"
-                    delay={200}
-                    style={styles.customTimeContainer}
-                  >
-                    <KeyboardAvoidingView 
-                      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-                    >
-                      <TextInput
-                        style={styles.customTimeInput}
-                        placeholder="Enter duration in minutes"
-                        placeholderTextColor="#71717a"
-                        value={customDuration}
-                        onChangeText={(text) => {
-                          // Only allow numbers
-                          const numericValue = text.replace(/[^0-9]/g, '');
-                          setCustomDuration(numericValue);
-                        }}
-                        keyboardType="numeric"
-                      />
-                    </KeyboardAvoidingView>
-                  </Animatable.View>
-                )}
               </Animatable.View>
-
-              {/* Preset Time Options */}
-              {timeOptions.map((time, index) => {
-                const isSelected = !showCustomDuration && !useAISuggestion && workoutDuration === time;
-                return (
-                  <Animatable.View
-                    key={time}
-                    animation="fadeInUp"
-                    delay={400 + (index * 50)}
-                    style={styles.durationOptionWrapper}
-                  >
-                    <TouchableOpacity
-                      style={[
-                        styles.durationOption,
-                        isSelected && [styles.selectedDurationOption, { 
-                          borderColor: themeColor, 
-                          backgroundColor: `${themeColor}10`,
-                          shadowColor: themeColor,
-                          shadowOpacity: 0.3,
-                        }]
-                      ]}
-                      onPress={() => {
-                        setWorkoutDuration(time);
-                        setShowCustomDuration(false);
-                        setCustomDuration('');
-                        setUseAISuggestion(false);
-                        setShowDurationOptions(true);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={styles.durationOptionContent}>
-                        <View style={[styles.durationIconContainer, isSelected && { backgroundColor: themeColor }]}>
-                          <Ionicons 
-                            name="time-outline" 
-                            size={20} 
-                            color={isSelected ? '#000000' : themeColor} 
-                          />
-                        </View>
-                        <View style={styles.durationTextContainer}>
-                          <Text style={[styles.durationTitle, isSelected && { color: themeColor }]}>
-                            {time} minutes
-                          </Text>
-                          <Text style={[styles.durationSubtitle, isSelected && { color: themeColor, opacity: 0.8 }]}>
-                            {time === 30 ? 'Quick session' :
-                             time === 45 ? 'Standard workout' :
-                             time === 60 ? 'Full session' :
-                             time === 75 ? 'Extended workout' :
-                             'Intensive session'}
-                          </Text>
-                        </View>
-                        <View style={styles.durationSelectionIndicator}>
-                          {isSelected ? (
-                            <Ionicons name="checkmark-circle" size={20} color={themeColor} />
-                          ) : (
-                            <View style={styles.unselectedCircle} />
-                          )}
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  </Animatable.View>
-                );
-              })}
-            </Animatable.View>
-          )}
-
-          {/* Rest Time Preferences Section */}
-          <Animatable.View
-            animation="fadeInUp"
-            delay={600}
-            style={styles.restTimeSection}
-          >
-            <Text style={[styles.sectionTitle, { color: themeColor }]}>
-              Rest Time Preferences
-            </Text>
-            <Text style={styles.sectionSubtitle}>
-              How long do you prefer to rest between sets?
-            </Text>
-
-            {/* AI Rest Time Suggestion Option - Featured at the top */}
-            <Animatable.View
-              animation="fadeInUp"
-              delay={650}
-              style={styles.aiSuggestionContainer}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.aiSuggestionCard,
-                  useAIRestTime && [styles.selectedAiCard, { 
-                    borderColor: themeColor, 
-                    backgroundColor: `${themeColor}10`,
-                    shadowColor: themeColor,
-                    shadowOpacity: 0.3,
-                  }]
-                ]}
-                onPress={() => {
-                  if (useAIRestTime) {
-                    // If already selected, unselect AI rest time and show options
-                    setUseAIRestTime(false);
-                    setTimeout(() => setShowRestTimeOptions(true), 100);
-                  } else {
-                    // Select AI rest time, animate options out then hide
-                    if (restTimeOptionsRef.current) {
-                      restTimeOptionsRef.current.fadeOutUp(400).then(() => {
-                        setShowRestTimeOptions(false);
-                        setUseAIRestTime(true);
-                        setRestTimePreference('');
-                      });
-                    }
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <View style={styles.aiSuggestionHeader}>
-                  <View style={[styles.aiIconContainer, useAIRestTime && { backgroundColor: themeColor }]}>
-                    <Ionicons 
-                      name="sparkles" 
-                      size={24} 
-                      color={useAIRestTime ? '#000000' : themeColor} 
-                    />
-                  </View>
-                  <View style={styles.aiTextContainer}>
-                    <Text style={[styles.aiSuggestionTitle, useAIRestTime && { color: themeColor }]}>
-                      AI Optimized Rest Time
-                    </Text>
-                    <Text style={[styles.aiSuggestionSubtitle, useAIRestTime && { color: themeColor, opacity: 0.8 }]}>
-                      Let AI determine optimal rest periods for your goals based on your workout length
-                    </Text>
-                  </View>
-                  <View style={styles.aiSelectionIndicator}>
-                    {useAIRestTime ? (
-                      <Ionicons name="checkmark-circle" size={20} color={themeColor} />
-                    ) : (
-                      <View style={styles.unselectedCircle} />
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </Animatable.View>
-
-            {/* Separator */}
-            <Animatable.View
-              animation="fadeInUp"
-              delay={700}
-              style={styles.separatorContainer}
-            >
-              <View style={styles.separatorLine} />
-              <Text style={styles.separatorText}>or choose a specific rest time</Text>
-              <View style={styles.separatorLine} />
-            </Animatable.View>
-
-            {showRestTimeOptions && (
-              <Animatable.View
-                ref={restTimeOptionsRef}
-                animation="fadeInUp"
-                delay={750}
-                style={styles.restTimeOptionsContainer}
-              >
-                {restTimeOptions.map((option, index) => {
-                const isSelected = restTimePreference === option.id && !useAIRestTime;
-                return (
-                  <Animatable.View
-                    key={option.id}
-                    animation="fadeInUp"
-                    delay={750 + (index * 50)}
-                    style={styles.restTimeOptionWrapper}
-                  >
-                    <TouchableOpacity
-                      style={[
-                        styles.restTimeOption,
-                        isSelected && [styles.selectedRestTimeOption, { 
-                          borderColor: themeColor, 
-                          backgroundColor: `${themeColor}10`,
-                          shadowColor: themeColor,
-                          shadowOpacity: 0.3,
-                        }]
-                      ]}
-                      onPress={() => {
-                        setRestTimePreference(option.id);
-                        setUseAIRestTime(false);
-                        setShowRestTimeOptions(true);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={styles.restTimeOptionContent}>
-                        <View style={[styles.restTimeIconContainer, isSelected && { backgroundColor: themeColor }]}>
-                          <Ionicons 
-                            name="timer-outline" 
-                            size={20} 
-                            color={isSelected ? '#000000' : themeColor} 
-                          />
-                        </View>
-                        <View style={styles.restTimeTextContainer}>
-                          <Text style={[styles.restTimeTitle, isSelected && { color: themeColor }]}>
-                            {option.title}
-                          </Text>
-                          <Text style={[styles.restTimeSubtitle, isSelected && { color: themeColor, opacity: 0.8 }]}>
-                            {option.subtitle} • {option.description}
-                          </Text>
-                        </View>
-                        <View style={styles.restTimeSelectionIndicator}>
-                          {isSelected ? (
-                            <Ionicons name="checkmark-circle" size={20} color={themeColor} />
-                          ) : (
-                            <View style={styles.unselectedCircle} />
-                          )}
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  </Animatable.View>
-                );
-                })}
-              </Animatable.View>
-            )}
-          </Animatable.View>
+            );
+          })}
         </Animatable.View>
       </ScrollView>
     );
@@ -1117,39 +768,21 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               </View>
             </View>
 
-            {/* Duration Row */}
+            {/* Rest Style Row */}
             <View style={[styles.tronDataRow, { borderBottomColor: `${themeColor}30` }]}>
               <View style={styles.tronLabelSection}>
                 <View style={[styles.tronLabelIndicator, { backgroundColor: themeColor, shadowColor: themeColor }]} />
-                <Text style={[styles.tronLabel, { color: themeColor }]}>DURATION</Text>
+                <Text style={[styles.tronLabel, { color: themeColor }]}>REST STYLE</Text>
               </View>
               <View style={styles.tronValueSection}>
                 <Text style={styles.tronValue}>
-                  {useAISuggestion ? 'AI will optimize based on your goals' :
-                   workoutDuration > 0 ? `${workoutDuration} minutes per session` : 
-                   customDuration ? `${customDuration} minutes per session` : 'NOT SPECIFIED'}
+                  {sessionStyle === 'optimal' ? 'Optimal Rest (full recovery, 75-90 min sessions)' :
+                   sessionStyle === 'moderate' ? 'Moderate Rest (balanced, 60-75 min sessions)' :
+                   sessionStyle === 'minimal' ? 'Minimal Rest (time efficient, 45-60 min sessions)' :
+                   'Moderate Rest (default)'}
                 </Text>
               </View>
             </View>
-
-            {/* Rest Times Row */}
-            {(restTimePreference || useAIRestTime) && (
-              <View style={[styles.tronDataRow, { borderBottomColor: `${themeColor}30` }]}>
-                <View style={styles.tronLabelSection}>
-                  <View style={[styles.tronLabelIndicator, { backgroundColor: themeColor, shadowColor: themeColor }]} />
-                  <Text style={[styles.tronLabel, { color: themeColor }]}>REST TIMES</Text>
-                </View>
-                <View style={styles.tronValueSection}>
-                  <Text style={styles.tronValue}>
-                    {useAIRestTime ? 'AI will optimize for your workout type' :
-                     restTimePreference === 'optimal' ? 'Optimal rest times for maximum results' :
-                     restTimePreference === 'shorter' ? 'Shorter rest times for quicker workouts' :
-                     restTimePreference === 'minimal' ? 'Minimal rest times for time efficiency' :
-                     'NOT SPECIFIED'}
-                  </Text>
-                </View>
-              </View>
-            )}
 
             
             <View style={[styles.tronDataRow, { borderBottomColor: `${themeColor}30` }]}>
@@ -1230,7 +863,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>
             {currentStep === 0 ? 'Equipment Access' : 
-             currentStep === 1 ? 'Workout Duration & Rest' : 
+             currentStep === 1 ? 'Rest Style' : 
              'Exercise Preferences'}
           </Text>
           <Text style={styles.headerSubtitle}>
@@ -1267,13 +900,10 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             if (ref && currentStep === 0 && selectedEquipment.length === 1) {
               setTimeout(() => ref.bounceIn(600), 100);
             }
-            // Trigger animation when button becomes enabled on duration step
+            // Trigger animation when button becomes enabled on session style step
             if (ref && currentStep === 1) {
-              const hasDurationSelection = useAISuggestion || workoutDuration > 0 || customDuration.trim() !== '';
-              const hasRestTimeSelection = useAIRestTime || restTimePreference !== '';
-              if (hasDurationSelection && hasRestTimeSelection) {
-                setTimeout(() => ref.bounceIn(600), 100);
-              }
+              // sessionStyle always has a default value, so always enable
+              setTimeout(() => ref.bounceIn(600), 100);
             }
           }}
         >
@@ -1283,11 +913,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               { 
                 backgroundColor: (() => {
                   if (currentStep === 0 && selectedEquipment.length === 0) return '#71717a';
-                  if (currentStep === 1) {
-                    const hasDurationSelection = useAISuggestion || workoutDuration > 0 || customDuration.trim() !== '';
-                    const hasRestTimeSelection = useAIRestTime || restTimePreference !== '';
-                    if (!hasDurationSelection || !hasRestTimeSelection) return '#71717a';
-                  }
+                  // sessionStyle always has a valid value, so step 1 is always enabled
                   return themeColor;
                 })()
               }
@@ -1299,11 +925,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               styles.nextButtonText,
               (() => {
                 if (currentStep === 0 && selectedEquipment.length === 0) return { color: '#a1a1aa' };
-                if (currentStep === 1) {
-                  const hasDurationSelection = useAISuggestion || workoutDuration > 0 || customDuration.trim() !== '';
-                  const hasRestTimeSelection = useAIRestTime || restTimePreference !== '';
-                  if (!hasDurationSelection || !hasRestTimeSelection) return { color: '#a1a1aa' };
-                }
+                // sessionStyle always has a valid value, so step 1 text is always enabled
                 return {};
               })()
             ]}>
@@ -1315,11 +937,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
                 size={20} 
                 color={(() => {
                   if (currentStep === 0 && selectedEquipment.length === 0) return '#a1a1aa';
-                  if (currentStep === 1) {
-                    const hasDurationSelection = useAISuggestion || workoutDuration > 0 || customDuration.trim() !== '';
-                    const hasRestTimeSelection = useAIRestTime || restTimePreference !== '';
-                    if (!hasDurationSelection || !hasRestTimeSelection) return '#a1a1aa';
-                  }
+                  // sessionStyle always has a valid value, so step 1 checkmark is always enabled
                   return '#000000';
                 })()} 
               />
@@ -1329,11 +947,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
                 size={20} 
                 color={(() => {
                   if (currentStep === 0 && selectedEquipment.length === 0) return '#a1a1aa';
-                  if (currentStep === 1) {
-                    const hasDurationSelection = useAISuggestion || workoutDuration > 0 || customDuration.trim() !== '';
-                    const hasRestTimeSelection = useAIRestTime || restTimePreference !== '';
-                    if (!hasDurationSelection || !hasRestTimeSelection) return '#a1a1aa';
-                  }
+                  // sessionStyle always has a valid value, so step 1 arrow is always enabled
                   return '#000000';
                 })()} 
               />
