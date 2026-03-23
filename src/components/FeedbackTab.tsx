@@ -78,6 +78,7 @@ export function FeedbackTab() {
 
   const closePanel = () => {
     Keyboard.dismiss();
+    setIsOpen(false); // Update state immediately, not in callback
     Animated.parallel([
       Animated.spring(translateX, {
         toValue: PANEL_WIDTH,
@@ -94,7 +95,7 @@ export function FeedbackTab() {
     ]).start(() => {
       // Force tab to final position to fix iOS production build bug
       tabTranslateX.setValue(0);
-      setIsOpen(false);
+      // Reset form state after animation completes
       setFeedback('');
       setRating(0);
       setActiveTab('rating');
