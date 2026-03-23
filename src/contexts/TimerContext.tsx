@@ -355,13 +355,18 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     // Check if there's an existing Live Activity that needs to be stopped
     if (timer?.liveActivityId) {
-      DebugLogger.log(`⚠️ Found existing Live Activity ${timer.liveActivityId} - should be stopped before new timer`, 'warn');
-      // Explicitly stop the old Live Activity
+      DebugLogger.log(`⚠️ Found existing Live Activity ${timer.liveActivityId} - attempting to stop before new timer`, 'warn');
+      // Explicitly stop the old Live Activity, but handle "not found" errors gracefully
       try {
         await stopActivity(timer.liveActivityId, { title: 'Timer Stopped' });
         DebugLogger.log(`✅ Successfully stopped old Live Activity ${timer.liveActivityId}`, 'log');
       } catch (error) {
-        DebugLogger.log(`❌ Failed to stop old Live Activity ${timer.liveActivityId}: ${error}`, 'error');
+        // If Activity not found, that's fine - just clear the stale ID
+        if (error.message?.includes('not found') || error.message?.includes('ActivityNotFoundException')) {
+          DebugLogger.log(`🧹 Old Live Activity ${timer.liveActivityId} not found (likely expired) - clearing stale ID`, 'warn');
+        } else {
+          DebugLogger.log(`❌ Failed to stop old Live Activity ${timer.liveActivityId}: ${error}`, 'error');
+        }
       }
     } else {
       DebugLogger.log(`✅ No existing Live Activity to stop`, 'log');
@@ -429,7 +434,12 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await stopActivity(timer.liveActivityId, { title: 'Timer Stopped' });
         DebugLogger.log(`✅ Live Activity stopped successfully in stopTimer`, 'log');
       } catch (error) {
-        DebugLogger.log(`❌ Failed to stop Live Activity in stopTimer: ${error}`, 'error');
+        // Handle "not found" errors gracefully - activity may have already expired
+        if (error.message?.includes('not found') || error.message?.includes('ActivityNotFoundException')) {
+          DebugLogger.log(`🧹 Live Activity ${timer.liveActivityId} not found (likely expired) in stopTimer`, 'warn');
+        } else {
+          DebugLogger.log(`❌ Failed to stop Live Activity in stopTimer: ${error}`, 'error');
+        }
       }
     }
     
@@ -448,7 +458,12 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await stopActivity(timer.liveActivityId, { title: 'Timer Reset' });
         DebugLogger.log(`✅ Live Activity stopped successfully in resetTimer`, 'log');
       } catch (error) {
-        DebugLogger.log(`❌ Failed to stop Live Activity in resetTimer: ${error}`, 'error');
+        // Handle "not found" errors gracefully - activity may have already expired
+        if (error.message?.includes('not found') || error.message?.includes('ActivityNotFoundException')) {
+          DebugLogger.log(`🧹 Live Activity ${timer.liveActivityId} not found (likely expired) in resetTimer`, 'warn');
+        } else {
+          DebugLogger.log(`❌ Failed to stop Live Activity in resetTimer: ${error}`, 'error');
+        }
       }
     }
     
@@ -625,9 +640,18 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // No active countdown timer, stop any existing Live Activity
         if (timer?.liveActivityId) {
           DebugLogger.log(`Stopping existing Live Activity: ${timer.liveActivityId}`);
-          await stopActivity(timer.liveActivityId, { title: 'Timer Complete' });
+          try {
+            await stopActivity(timer.liveActivityId, { title: 'Timer Complete' });
+            DebugLogger.log('Live Activity stopped successfully');
+          } catch (error) {
+            // Handle "not found" errors gracefully - activity may have already expired
+            if (error.message?.includes('not found') || error.message?.includes('ActivityNotFoundException')) {
+              DebugLogger.log(`🧹 Live Activity ${timer.liveActivityId} not found (likely expired) in syncLiveActivity`, 'warn');
+            } else {
+              DebugLogger.log(`❌ Failed to stop Live Activity in syncLiveActivity: ${error}`, 'error');
+            }
+          }
           setTimer(prev => prev ? { ...prev, liveActivityId: undefined } : null);
-          DebugLogger.log('Live Activity stopped successfully');
         }
         return;
       }
