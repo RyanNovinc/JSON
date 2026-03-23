@@ -149,8 +149,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
           setIsCompleted(true);
           setShowResults(true);
         } else {
-          // Restore current step for partial progress, but ensure it starts at 0 if incomplete
-          setCurrentStep(data.currentStep || 0);
+          // Always start from step 0 for incomplete questionnaires
+          setCurrentStep(0);
         }
       } else {
         // No saved data - start fresh at step 0
@@ -895,15 +895,15 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       {/* Footer Button */}
       <View style={styles.footer}>
         <Animatable.View
-          ref={(ref) => {
+          ref={(ref: any) => {
             // Trigger animation when button becomes enabled on equipment step
             if (ref && currentStep === 0 && selectedEquipment.length === 1) {
-              setTimeout(() => ref.bounceIn(600), 100);
+              setTimeout(() => ref.bounceIn && ref.bounceIn(600), 100);
             }
             // Trigger animation when button becomes enabled on session style step
             if (ref && currentStep === 1) {
               // sessionStyle always has a default value, so always enable
-              setTimeout(() => ref.bounceIn(600), 100);
+              setTimeout(() => ref.bounceIn && ref.bounceIn(600), 100);
             }
           }}
         >
@@ -935,11 +935,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               <Ionicons 
                 name="checkmark" 
                 size={20} 
-                color={(() => {
-                  if (currentStep === 0 && selectedEquipment.length === 0) return '#a1a1aa';
-                  // sessionStyle always has a valid value, so step 1 checkmark is always enabled
-                  return '#000000';
-                })()} 
+                color="#000000"
               />
             ) : (
               <Ionicons 
@@ -1487,7 +1483,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     letterSpacing: 0.5,
     textShadowOffset: { width: 0, height: 0 },
-    textShadowOpacity: 0.8,
+    shadowOpacity: 0.8,
     textShadowRadius: 8,
     textAlign: 'center',
   },

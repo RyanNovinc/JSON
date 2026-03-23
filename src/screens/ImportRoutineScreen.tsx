@@ -23,7 +23,7 @@ import { getAIPrompt, MUSCLE_GROUPS, QuestionnaireData, generateProgramSpecs } f
 import { assemblePlanningPrompt, ProgramContext } from '../data/planningPrompt';
 import { ProgramStorage, Program, MesocyclePhase } from '../data/programStorage';
 import { extractMesocycleSummary } from '../data/mesocycleExtractor';
-import { WorkoutStorage } from '../utils/storage';
+import { WorkoutStorage, WorkoutRoutine } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
 // import * as Crypto from 'expo-crypto';
@@ -1218,7 +1218,7 @@ export default function ImportRoutineScreen() {
       
       // Restore manual blocks
       if (metadata.manualBlocks && metadata.manualBlocks.length > 0) {
-        const manualBlocksByMesocycle = {};
+        const manualBlocksByMesocycle: Record<string, any[]> = {};
         
         for (const block of metadata.manualBlocks) {
           if (block.mesocycleNumber) {
@@ -1431,9 +1431,14 @@ export default function ImportRoutineScreen() {
         program = {
           id: Date.now().toString(),
           name: importedProgram.routine_name,
+          createdAt: new Date().toISOString(),
+          programDuration: 'custom',
           totalMesocycles: programMesocycles.length,
           currentMesocycle: 1,
-          mesocycleRoadmap: mesocycleRoadmap
+          mesocycleRoadmap: mesocycleRoadmap,
+          mesocycleRoadmapText: '',
+          completedMesocycles: [],
+          routineIds: []
         };
         
         await ProgramStorage.addProgram(program);
@@ -1441,7 +1446,7 @@ export default function ImportRoutineScreen() {
       
       // Create the routine (always without mesocycleNumber for unified imports)
       const newRoutineId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-      const newRoutine: WorkoutProgram = {
+      const newRoutine: WorkoutRoutine = {
         id: newRoutineId,
         name: metadata.currentDisplayName || importedProgram.routine_name,
         days: metadata.originalDaysPerWeek || importedProgram.days_per_week || 5,
@@ -2505,8 +2510,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
           // Handle successful import - use existing import logic
           setParsedProgram(program);
           setShowConfirmation(true);
-          setShowSlideMode(false);
-          setCurrentSlide(1);
+          // Don't immediately exit slide mode - let confirmation modal handle it
         }}
         onExitSlideMode={() => {
           setShowSlideMode(false);
@@ -2589,24 +2593,29 @@ This check exists because the JSON generator must reconstruct complete exercise 
               setCurrentSlide(1);
             }}
             style={{
-              backgroundColor: 'transparent',
-              paddingVertical: 16,
-              paddingHorizontal: 24,
-              minHeight: 48,
-              justifyContent: 'center',
+              flexDirection: 'row',
               alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 16,
+              paddingHorizontal: 20,
+              borderWidth: 1,
+              borderRadius: 12,
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              borderColor: themeColor,
+              gap: 8,
             }}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
+            <Ionicons name="bulb-outline" size={20} color={themeColor} />
             <Text style={{
-              fontSize: 16,
-              fontWeight: '500',
+              fontSize: 15,
+              fontWeight: '600',
               textAlign: 'center',
-              textDecorationLine: 'underline',
               color: themeColor,
             }}>
-              How to create custom programs with AI?
+              How to create custom workouts with AI?
             </Text>
+            <Ionicons name="chevron-forward" size={16} color={themeColor} />
           </TouchableOpacity>
         </View>
       </View>
@@ -2799,7 +2808,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
         visible={showErrorModal}
         onRequestClose={() => setShowErrorModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={styles.errorModalOverlay}>
           <View style={styles.errorModalContainer}>
             <View style={styles.errorModalHeader}>
               <Text style={styles.errorModalTitle}>Production Error Logs</Text>
@@ -3396,7 +3405,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#a1a1aa',
   },
-  modalOverlay: {
+  errorModalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
