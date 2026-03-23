@@ -1265,14 +1265,8 @@ export default function WorkoutLogScreen() {
           
           // Validate that saved data matches current exercise count
           if (savedSetsData.length === dynamicExercises.length) {
-            // Clear reps from saved data to show placeholders instead of pre-filled values
-            const migratedSetsData = savedSetsData.map(exerciseSets => 
-              exerciseSets.map(setData => ({
-                ...setData,
-                reps: '' // Clear reps to show placeholder text
-              }))
-            );
-            setAllSetsData(migratedSetsData);
+            // Restore saved sets data
+            setAllSetsData(savedSetsData);
             return;
           } else {
             console.log('Saved sets data length mismatch, reinitializing');
@@ -1879,7 +1873,7 @@ export default function WorkoutLogScreen() {
         // Restore previous data for this exercise if it exists
         if (setData.exerciseData[selectedExerciseIndex]) {
           setData.weight = setData.exerciseData[selectedExerciseIndex].weight;
-          setData.reps = ''; // Always use placeholder instead of saved reps
+          setData.reps = setData.exerciseData[selectedExerciseIndex].reps;
           setData.completed = setData.exerciseData[selectedExerciseIndex].completed;
           setData.isDropSet = setData.exerciseData[selectedExerciseIndex].isDropSet;
           setData.drops = setData.exerciseData[selectedExerciseIndex].drops ? [...setData.exerciseData[selectedExerciseIndex].drops] : undefined;
@@ -2313,14 +2307,8 @@ export default function WorkoutLogScreen() {
         console.log('💾 DATA LOADING: Found matching saved workout, restoring data...');
         console.log('💾 DATA LOADING: Saved workout start time:', savedWorkout.workoutStartTime);
         
-        // Clear reps from saved workout data to show placeholders
-        const migratedWorkoutSetsData = savedWorkout.allSetsData.map(exerciseSets => 
-          exerciseSets.map(setData => ({
-            ...setData,
-            reps: '' // Clear reps to show placeholder text
-          }))
-        );
-        setAllSetsData(migratedWorkoutSetsData);
+        // Restore saved workout data
+        setAllSetsData(savedWorkout.allSetsData);
         if (savedWorkout.exerciseNotes) {
           setExerciseNotes(savedWorkout.exerciseNotes);
         }

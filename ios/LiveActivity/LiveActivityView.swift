@@ -53,40 +53,6 @@ import WidgetKit
         return .top
       }
     }
-    
-    private func programmaticIcon() -> some View {
-      let progressTint = attributes.progressViewTint ?? "#007AFF"
-      let iconColor: Color = progressTint.contains("pink") || progressTint.contains("ec4899") || progressTint.contains("f472b6") ? .pink : .blue
-      
-      return Image(systemName: "figure.strengthtraining.traditional")
-        .font(.system(size: 24, weight: .medium))
-        .foregroundColor(iconColor)
-        .frame(width: 32, height: 32)
-        .background(Circle().fill(Color.black.opacity(0.3)))
-        .clipShape(Circle())
-    }
-    
-    @ViewBuilder
-    private func timerDisplay() -> some View {
-      // Always use native iOS timer calculation for maximum accuracy
-      if let date = contentState.timerEndDateInMilliseconds {
-        Text(timerInterval: Date.toTimerInterval(miliseconds: date))
-      }
-    }
-    
-    @ViewBuilder
-    private func progressDisplay() -> some View {
-      // Always use native iOS timer calculation for maximum accuracy
-      if let date = contentState.timerEndDateInMilliseconds {
-        ProgressView(timerInterval: Date.toTimerInterval(miliseconds: date))
-          .tint(progressViewTint)
-          .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
-      } else if let progress = contentState.progress {
-        ProgressView(value: progress)
-          .tint(progressViewTint)
-          .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
-      }
-    }
 
     private func alignedImage(imageName: String) -> some View {
       let defaultHeight: CGFloat = 64
@@ -219,12 +185,14 @@ import WidgetKit
         let position = attributes.imagePosition ?? "right"
         let isStretch = position.contains("Stretch")
         let isLeftImage = position.hasPrefix("left")
-        let hasImage = true // Always show programmatic icon
+        let hasImage = contentState.imageName != nil
         let effectiveStretch = isStretch && hasImage
 
         HStack(alignment: .center) {
           if hasImage, isLeftImage {
-            programmaticIcon()
+            if let imageName = contentState.imageName {
+              alignedImage(imageName: imageName)
+            }
           }
 
           VStack(alignment: .leading, spacing: 2) {
@@ -240,18 +208,36 @@ import WidgetKit
             }
 
             if effectiveStretch {
-              progressDisplay()
+              if let date = contentState.timerEndDateInMilliseconds {
+                ProgressView(timerInterval: Date.toTimerInterval(miliseconds: date))
+                  .tint(progressViewTint)
+                  .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
+              } else if let progress = contentState.progress {
+                ProgressView(value: progress)
+                  .tint(progressViewTint)
+                  .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
+              }
             }
           }.layoutPriority(1)
 
           if hasImage, !isLeftImage { // right side (default)
             Spacer()
-            programmaticIcon()
+            if let imageName = contentState.imageName {
+              alignedImage(imageName: imageName)
+            }
           }
         }
 
         if !effectiveStretch {
-          progressDisplay()
+          if let date = contentState.timerEndDateInMilliseconds {
+            ProgressView(timerInterval: Date.toTimerInterval(miliseconds: date))
+              .tint(progressViewTint)
+              .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
+          } else if let progress = contentState.progress {
+            ProgressView(value: progress)
+              .tint(progressViewTint)
+              .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
+          }
         }
       }
       .padding(EdgeInsets(top: top, leading: leading, bottom: bottom, trailing: trailing))

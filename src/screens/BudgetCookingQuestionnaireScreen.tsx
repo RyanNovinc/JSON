@@ -25,16 +25,20 @@ import { useTheme } from '../contexts/ThemeContext';
 interface BudgetCookingQuestionnaireProps {
   onComplete?: (data: any) => void;
   onBack?: () => void;
+  route?: any;
 }
 
 const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps> = ({
   onComplete,
-  onBack
+  onBack,
+  route
 }) => {
   const navigation = useNavigation();
   const { getFavoriteMeals } = useMealPlanning();
   const { themeColor, themeColorLight } = useTheme();
   const [currentStep, setCurrentStep] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   const handleComplete = async () => {
     try {
@@ -45,15 +49,32 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
       };
       await WorkoutStorage.saveBudgetCookingResults(results);
       
-      // Call onComplete if provided, otherwise navigate back to NutritionHome
+      // Mark as completed and show results
+      setIsCompleted(true);
+      setShowResults(true);
+      
+      // Call onComplete if provided
       if (onComplete) {
         onComplete(formData);
-      } else {
-        navigation.navigate('NutritionHome' as never);
       }
     } catch (error) {
       console.error('Failed to save budget cooking results:', error);
-      // Still navigate back even if save fails
+      // Still show results even if save fails
+      setIsCompleted(true);
+      setShowResults(true);
+    }
+  };
+
+  const handleRetakeQuestions = () => {
+    setCurrentStep(0);
+    setShowResults(false);
+    setIsCompleted(false);
+  };
+
+  const handleSaveAndContinue = () => {
+    if (onComplete) {
+      onComplete(formData);
+    } else {
       navigation.navigate('NutritionHome' as never);
     }
   };
@@ -99,6 +120,67 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   const [customAvoidFood, setCustomAvoidFood] = useState('');
   const [showResults, setShowResults] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Load saved data on component mount
+  useEffect(() => {
+    loadSavedData();
+  }, []);
+
+  // Handle showing results if user has already completed
+  useEffect(() => {
+    if (route?.params?.showResults) {
+      loadAndShowResults();
+    }
+  }, [route?.params?.showResults]);
+
+  const loadSavedData = async () => {
+    try {
+      const savedResults = await WorkoutStorage.loadBudgetCookingResults();
+      if (savedResults) {
+        // Restore form data, merging with defaults to ensure all fields exist
+        setFormData(prev => ({
+          ...prev,
+          ...savedResults.formData
+        }));
+        
+        // If questionnaire was completed, show results directly
+        if (savedResults.completedAt) {
+          setIsCompleted(true);
+          setShowResults(true);
+        } else {
+          // Always start from step 0 for incomplete questionnaires
+          setCurrentStep(0);
+        }
+      } else {
+        // No saved data - start fresh at step 0
+        setCurrentStep(0);
+        setIsCompleted(false);
+        setShowResults(false);
+      }
+    } catch (error) {
+      console.error('Failed to load saved budget cooking data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadAndShowResults = async () => {
+    try {
+      const savedResults = await WorkoutStorage.loadBudgetCookingResults();
+      if (savedResults && savedResults.completedAt) {
+        setFormData(prev => ({
+          ...prev,
+          ...savedResults.formData
+        }));
+        setIsCompleted(true);
+        setShowResults(true);
+      }
+    } catch (error) {
+      console.error('Failed to load budget cooking results:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Initialize custom date object if not set
   React.useEffect(() => {
@@ -2043,6 +2125,32 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                 </View>
               </TouchableOpacity>
             </Animatable.View>
+
+            {/* Action Buttons */}
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={600}
+              style={styles.actionButtonsContainer}
+            >
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: themeColor }]}
+                onPress={handleSaveAndContinue}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.saveButtonText}>Looks Good, Save It</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.retakeButton, { borderColor: themeColor }]}
+                onPress={handleRetakeQuestions}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.retakeButtonText, { color: themeColor }]}>
+                  Let Me Make Changes
+                </Text>
+              </TouchableOpacity>
+            </Animatable.View>
+
           </View>
         </ScrollView>
       </View>
@@ -2798,6 +2906,18 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     );
   };
 
+  // Show loading screen while data is loading
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
@@ -2813,6 +2933,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   header: {
     flexDirection: 'row',
@@ -3887,6 +4017,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   skipBudgetText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  actionButtonsContainer: {
+    paddingHorizontal: 32,
+    paddingTop: 40,
+    paddingBottom: 40,
+    gap: 16,
+  },
+  saveButton: {
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
+  retakeButton: {
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 2,
+    backgroundColor: '#1a1a1b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retakeButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },

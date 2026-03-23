@@ -28,6 +28,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
 import { Platform } from 'react-native';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
+import NutritionGeneratorStep1 from '../components/NutritionGeneratorStep1';
+import NutritionGeneratorStep2 from '../components/NutritionGeneratorStep2';
+import NutritionGeneratorStep3 from '../components/NutritionGeneratorStep3';
+import NutritionGeneratorStep4 from '../components/NutritionGeneratorStep4';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
 
@@ -48,6 +52,8 @@ export default function ImportMealPlanScreen() {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
   const [reviewPromptCopied, setReviewPromptCopied] = useState(false);
+  const [showSlideMode, setShowSlideMode] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(1);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [parsedMealPlan, setParsedMealPlan] = useState<SimplifiedMealPlan | null>(null);
   const [modalScale] = useState(new Animated.Value(0));
@@ -634,6 +640,66 @@ export default function ImportMealPlanScreen() {
     );
   }
 
+  if (showSlideMode) {
+    const handleSlideBack = () => {
+      if (currentSlide === 1) {
+        setShowSlideMode(false);
+      } else {
+        setCurrentSlide(currentSlide - 1);
+      }
+    };
+
+    const handleSlideNext = () => {
+      if (currentSlide < 4) {
+        setCurrentSlide(currentSlide + 1);
+      }
+    };
+
+    const handleExitSlideMode = () => {
+      setShowSlideMode(false);
+      setCurrentSlide(1);
+    };
+
+    const handleImportSuccess = async (mealPlan: SimplifiedMealPlan) => {
+      // Don't immediately exit slide mode - let confirmation modal handle it
+      await importMealPlanDirectly(mealPlan);
+    };
+
+    switch (currentSlide) {
+      case 1:
+        return (
+          <NutritionGeneratorStep1
+            onNext={handleSlideNext}
+            onBack={handleSlideBack}
+          />
+        );
+      case 2:
+        return (
+          <NutritionGeneratorStep2
+            onNext={handleSlideNext}
+            onBack={handleSlideBack}
+          />
+        );
+      case 3:
+        return (
+          <NutritionGeneratorStep3
+            onNext={handleSlideNext}
+            onBack={handleSlideBack}
+          />
+        );
+      case 4:
+        return (
+          <NutritionGeneratorStep4
+            onBack={handleSlideBack}
+            onImportSuccess={handleImportSuccess}
+            onExitSlideMode={handleExitSlideMode}
+          />
+        );
+      default:
+        return null;
+    }
+  }
+
   if (showInstructions) {
     return (
       <SafeAreaView style={styles.container}>
@@ -929,11 +995,13 @@ export default function ImportMealPlanScreen() {
         {/* Move help link to bottom of screen */}
         <View style={styles.helpLinkWrapper}>
           <TouchableOpacity 
-            style={styles.helpLink}
-            onPress={() => setShowInstructions(true)}
+            style={[styles.helpButton, { borderColor: themeColor }]}
+            onPress={() => setShowSlideMode(true)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.helpLinkText, { color: themeColor }]}>How to create a custom meal plan with AI?</Text>
+            <Ionicons name="bulb-outline" size={20} color={themeColor} />
+            <Text style={[styles.helpButtonText, { color: themeColor }]}>How to create custom meal plans with AI?</Text>
+            <Ionicons name="chevron-forward" size={16} color={themeColor} />
           </TouchableOpacity>
         </View>
       </View>
@@ -1229,19 +1297,24 @@ const styles = StyleSheet.create({
   helpLinkWrapper: {
     position: 'absolute',
     bottom: 40,
-    left: 0,
-    right: 0,
+    left: 20,
+    right: 20,
   },
-  helpLink: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  helpButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    gap: 8,
   },
-  helpLinkText: {
-    fontSize: 16,
-    fontWeight: '500',
+  helpButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
     textAlign: 'center',
-    textDecorationLine: 'underline',
   },
   loadingContainer: {
     flex: 1,

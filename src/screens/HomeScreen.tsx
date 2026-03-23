@@ -20,6 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RobustStorage from '../utils/robustStorage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
 import WorkoutCalendar from '../components/WorkoutCalendar';
@@ -742,9 +743,28 @@ export default function HomeScreen({ route, transitionProgress }: any) {
         if (bookmarkData?.isBookmarked) {
           currentWeek = bookmarkData.week;
         } else {
-          // Find first incomplete week
+          // Find first incomplete week using robust storage
           for (let week = 1; week <= totalWeeks; week++) {
-            const completedWorkouts = await WorkoutStorage.getCompletedWorkouts(activeBlock.block_name, week);
+            // Use the same robust storage logic as DaysScreen.tsx
+            const key = `completed_${activeBlock.block_name}_week${week}`;
+            
+            // Try robust storage first, with fallback to legacy storage
+            let completed = await RobustStorage.getItem(key, true);
+            if (!completed) {
+              // Fallback to legacy AsyncStorage
+              completed = await AsyncStorage.getItem(key);
+            }
+            
+            let completedWorkouts: string[] = [];
+            if (completed) {
+              try {
+                const parsedCompleted = JSON.parse(completed);
+                completedWorkouts = Array.isArray(parsedCompleted) ? parsedCompleted : [];
+              } catch (error) {
+                console.log(`Error parsing completed workouts for week ${week}:`, error);
+                completedWorkouts = [];
+              }
+            }
             
             if (!completedWorkouts || completedWorkouts.length === 0) {
               currentWeek = week;
