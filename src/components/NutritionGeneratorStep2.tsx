@@ -20,6 +20,7 @@ export default function NutritionGeneratorStep2({ onNext, onBack }: NutritionGen
   const { themeColor } = useTheme();
   const [reviewPromptCopied, setReviewPromptCopied] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [showInfo, setShowInfo] = useState(false);
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -66,7 +67,19 @@ export default function NutritionGeneratorStep2({ onNext, onBack }: NutritionGen
             <View style={styles.progressDot} />
             <View style={styles.progressDot} />
           </View>
+
+          <TouchableOpacity style={styles.infoButton} onPress={() => setShowInfo(!showInfo)}>
+            <Ionicons name="information-circle-outline" size={24} color="#71717a" />
+          </TouchableOpacity>
         </View>
+
+        {showInfo && (
+          <View style={styles.infoModal}>
+            <Text style={styles.infoMessage}>
+              Send one prompt at a time before continuing to the next step. Don't send them all in one message.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.content}>
           <View style={styles.centerContent}>
@@ -118,12 +131,16 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 30,
+    position: 'relative',
   },
   backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 60,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -208,5 +225,40 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 17,
     fontWeight: '600',
+  },
+  infoButton: {
+    position: 'absolute',
+    right: 20,
+    top: 60,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoModal: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 20,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#333336',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  infoMessage: {
+    fontSize: 15,
+    color: '#d1d5db',
+    lineHeight: 22,
+    textAlign: 'center',
   },
 });
