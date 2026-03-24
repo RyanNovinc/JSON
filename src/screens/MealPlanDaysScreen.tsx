@@ -234,7 +234,7 @@ export default function MealPlanDaysScreen() {
   const mealPlanning = useMealPlanning();
   const { currentPlan, deleteMealFromDate, saveMealPlan } = useSimplifiedMealPlanning();
 
-  const { week, mealPlanName, mealPrepSession, allMealPrepSessions, groceryList } = route.params;
+  const { week = { week_number: 1, days: [] }, mealPlanName, mealPrepSession, allMealPrepSessions, groceryList } = route.params;
   
   // Get current grocery list from context to reflect any updates (deletions, additions)
   // First check SimplifiedMealPlan (currentPlan), then legacy meal plan, then fallback
@@ -761,7 +761,7 @@ export default function MealPlanDaysScreen() {
 
     console.log('🔍 Grouping days by prep session');
     console.log('allMealPrepSessions:', allMealPrepSessions);
-    console.log('week.days:', week.days);
+    console.log('week.days:', week?.days);
 
     const groups = [];
     const usedDayIndices = new Set();
@@ -821,7 +821,7 @@ export default function MealPlanDaysScreen() {
   const createDaysFromCurrentPlan = () => {
     if (!currentPlan) {
       console.log('⚠️ No current plan available, falling back to legacy week.days');
-      return week.days || [];
+      return week?.days || [];
     }
 
     const availableDates = Object.keys(currentPlan.dailyMeals).sort();
@@ -920,13 +920,13 @@ export default function MealPlanDaysScreen() {
     today.setHours(0, 0, 0, 0);
     const dayDate = new Date(today);
     
-    if (week.week_number === 1) {
+    if ((week?.week_number || 1) === 1) {
       dayDate.setDate(today.getDate() + dayIndex);
     } else {
       const currentDayOfWeek = today.getDay();
       const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
       let weekStartOffset = week1Days;
-      for (let i = 2; i < week.week_number; i++) {
+      for (let i = 2; i < (week?.week_number || 1); i++) {
         weekStartOffset += 7;
       }
       dayDate.setDate(today.getDate() + weekStartOffset + dayIndex);
@@ -953,13 +953,13 @@ export default function MealPlanDaysScreen() {
     today.setHours(0, 0, 0, 0);
     const dayDate = new Date(today);
     
-    if (week.week_number === 1) {
+    if ((week?.week_number || 1) === 1) {
       dayDate.setDate(today.getDate() + dayIndex);
     } else {
       const currentDayOfWeek = today.getDay();
       const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
       let weekStartOffset = week1Days;
-      for (let i = 2; i < week.week_number; i++) {
+      for (let i = 2; i < (week?.week_number || 1); i++) {
         weekStartOffset += 7;
       }
       dayDate.setDate(today.getDate() + weekStartOffset + dayIndex);
@@ -986,13 +986,13 @@ export default function MealPlanDaysScreen() {
     // Fallback to legacy calculation
     const dayDate = new Date(today);
     
-    if (week.week_number === 1) {
+    if ((week?.week_number || 1) === 1) {
       dayDate.setDate(today.getDate() + dayIndex);
     } else {
       const currentDayOfWeek = today.getDay();
       const week1Days = currentDayOfWeek === 0 ? 1 : 8 - currentDayOfWeek;
       let weekStartOffset = week1Days;
-      for (let i = 2; i < week.week_number; i++) {
+      for (let i = 2; i < (week?.week_number || 1); i++) {
         weekStartOffset += 7;
       }
       dayDate.setDate(today.getDate() + weekStartOffset + dayIndex);
@@ -1044,7 +1044,7 @@ export default function MealPlanDaysScreen() {
     
     navigation.navigate('MealPlanDay', {
       day: enhancedDay,
-      weekNumber: week.week_number,
+      weekNumber: week?.week_number || 1,
       mealPlanName,
       dayIndex: index,
       calculatedDayName: getDayName(index),
@@ -1438,7 +1438,7 @@ export default function MealPlanDaysScreen() {
               
               {group.days.map(({ day, dayIndex }) => (
                 <DayCard
-                  key={`${week.week_number}-${dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day)}`}
+                  key={`${week?.week_number || 1}-${dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day)}`}
                   day={day}
                   onPress={() => handleDayPress(day, dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
                   onLongPress={() => handleDayLongPress(day, dayIndex !== undefined ? dayIndex : group.days.findIndex(d => d.day === day))}
