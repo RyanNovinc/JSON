@@ -137,6 +137,10 @@ const STORAGE_KEYS = {
   BUDGET_COOKING_QUESTIONNAIRE: 'budget_cooking_questionnaire_results',
   FRIDGE_PANTRY_QUESTIONNAIRE: 'fridge_pantry_questionnaire_results',
   SLEEP_OPTIMIZATION: 'sleep_optimization_results',
+  EQUIPMENT_PREFERENCES: 'equipment_preferences_questionnaire_results',
+  FITNESS_GOALS: 'fitness_goals_questionnaire_results',
+  FAVORITE_EXERCISES: 'favorite_exercises_results',
+  WEIGHT_HISTORY: 'weight_tracking_history',
 };
 
 export class WorkoutStorage {
@@ -182,11 +186,44 @@ export class WorkoutStorage {
       const data = robustData || fallbackData;
       console.log('🔄 [STORAGE] Final data to parse:', data ? 'Has data' : 'No data');
       
-      const result = data ? JSON.parse(data) : [];
-      console.log('🔄 [STORAGE] Parsed routines count:', result.length);
-      return result;
+      if (!data) {
+        console.log('🔄 [STORAGE] No routine data found, returning empty array');
+        return [];
+      }
+      
+      const result = JSON.parse(data);
+      
+      // Validate the parsed data structure
+      if (!Array.isArray(result)) {
+        console.warn('⚠️ [STORAGE] Routine data is not an array, resetting to empty');
+        await this.saveRoutines([]); // Reset corrupted data
+        return [];
+      }
+      
+      // Validate each routine has required fields
+      const validRoutines = result.filter(routine => {
+        if (!routine || typeof routine !== 'object') {
+          console.warn('⚠️ [STORAGE] Invalid routine found, skipping:', routine);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validRoutines.length !== result.length) {
+        console.warn(`⚠️ [STORAGE] Found ${result.length - validRoutines.length} corrupted routines, saving clean data`);
+        await this.saveRoutines(validRoutines);
+      }
+      
+      console.log('🔄 [STORAGE] Parsed routines count:', validRoutines.length);
+      return validRoutines;
     } catch (error) {
-      console.error('❌ [STORAGE] Failed to load routines:', error);
+      console.error('❌ [STORAGE] Failed to load routines, resetting data:', error);
+      // Reset corrupted data to prevent future crashes
+      try {
+        await this.saveRoutines([]);
+      } catch (resetError) {
+        console.error('❌ [STORAGE] Failed to reset corrupted routine data:', resetError);
+      }
       return [];
     }
   }
@@ -247,15 +284,44 @@ export class WorkoutStorage {
   static async loadMyRoutines(): Promise<WorkoutRoutine[]> {
     try {
       const data = await RobustStorage.getItem(STORAGE_KEYS.MY_ROUTINES, true) || await AsyncStorage.getItem(STORAGE_KEYS.MY_ROUTINES);
-      if (!data) return [];
-      const parsed = JSON.parse(data);
-      if (!Array.isArray(parsed)) {
-        console.warn('⚠️ My routines storage corrupted, returning empty array');
+      
+      if (!data) {
+        console.log('🔄 [STORAGE] No my routines data found, returning empty array');
         return [];
       }
-      return parsed;
+      
+      const parsed = JSON.parse(data);
+      
+      if (!Array.isArray(parsed)) {
+        console.warn('⚠️ [STORAGE] My routines data is not an array, resetting to empty');
+        await this.saveMyRoutines([]);
+        return [];
+      }
+      
+      // Validate each routine
+      const validRoutines = parsed.filter(routine => {
+        if (!routine || typeof routine !== 'object') {
+          console.warn('⚠️ [STORAGE] Invalid my routine found, skipping:', routine);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validRoutines.length !== parsed.length) {
+        console.warn(`⚠️ [STORAGE] Found ${parsed.length - validRoutines.length} corrupted my routines, saving clean data`);
+        await this.saveMyRoutines(validRoutines);
+      }
+      
+      console.log('🔄 [STORAGE] Loaded my routines count:', validRoutines.length);
+      return validRoutines;
     } catch (error) {
-      console.error('Failed to load my routines:', error);
+      console.error('❌ [STORAGE] Failed to load my routines, resetting data:', error);
+      // Reset corrupted data to prevent future crashes
+      try {
+        await this.saveMyRoutines([]);
+      } catch (resetError) {
+        console.error('❌ [STORAGE] Failed to reset corrupted my routines data:', resetError);
+      }
       return [];
     }
   }
@@ -295,9 +361,45 @@ export class WorkoutStorage {
   static async loadMealPlans(): Promise<MealPlan[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.MEAL_PLANS);
-      return data ? JSON.parse(data) : [];
+      
+      if (!data) {
+        console.log('🔄 [STORAGE] No meal plans data found, returning empty array');
+        return [];
+      }
+      
+      const result = JSON.parse(data);
+      
+      // Validate the parsed data structure
+      if (!Array.isArray(result)) {
+        console.warn('⚠️ [STORAGE] Meal plans data is not an array, resetting to empty');
+        await this.saveMealPlans([]);
+        return [];
+      }
+      
+      // Validate each meal plan has required fields
+      const validMealPlans = result.filter(plan => {
+        if (!plan || typeof plan !== 'object' || !plan.id || !plan.name) {
+          console.warn('⚠️ [STORAGE] Invalid meal plan found, skipping:', plan);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validMealPlans.length !== result.length) {
+        console.warn(`⚠️ [STORAGE] Found ${result.length - validMealPlans.length} corrupted meal plans, saving clean data`);
+        await this.saveMealPlans(validMealPlans);
+      }
+      
+      console.log('🔄 [STORAGE] Parsed meal plans count:', validMealPlans.length);
+      return validMealPlans;
     } catch (error) {
-      console.error('Failed to load meal plans:', error);
+      console.error('❌ [STORAGE] Failed to load meal plans, resetting data:', error);
+      // Reset corrupted data to prevent future crashes
+      try {
+        await this.saveMealPlans([]);
+      } catch (resetError) {
+        console.error('❌ [STORAGE] Failed to reset corrupted meal plans data:', resetError);
+      }
       return [];
     }
   }
@@ -326,9 +428,45 @@ export class WorkoutStorage {
   static async loadWorkoutHistory(): Promise<WorkoutHistory[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.HISTORY);
-      return data ? JSON.parse(data) : [];
+      
+      if (!data) {
+        console.log('🔄 [STORAGE] No workout history data found, returning empty array');
+        return [];
+      }
+      
+      const result = JSON.parse(data);
+      
+      // Validate the parsed data structure
+      if (!Array.isArray(result)) {
+        console.warn('⚠️ [STORAGE] Workout history data is not an array, resetting to empty');
+        await this.saveWorkoutHistory([]);
+        return [];
+      }
+      
+      // Validate each workout entry has required fields
+      const validEntries = result.filter(entry => {
+        if (!entry || typeof entry !== 'object' || !entry.exerciseName || !entry.date) {
+          console.warn('⚠️ [STORAGE] Invalid workout entry found, skipping:', entry);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validEntries.length !== result.length) {
+        console.warn(`⚠️ [STORAGE] Found ${result.length - validEntries.length} corrupted workout entries, saving clean data`);
+        await this.saveWorkoutHistory(validEntries);
+      }
+      
+      console.log('🔄 [STORAGE] Parsed workout history count:', validEntries.length, 'entries');
+      return validEntries;
     } catch (error) {
-      console.error('Failed to load workout history:', error);
+      console.error('❌ [STORAGE] Failed to load workout history, resetting data:', error);
+      // Reset corrupted data to prevent future crashes
+      try {
+        await this.saveWorkoutHistory([]);
+      } catch (resetError) {
+        console.error('❌ [STORAGE] Failed to reset corrupted workout history:', resetError);
+      }
       return [];
     }
   }
@@ -360,17 +498,47 @@ export class WorkoutStorage {
 
   static async loadCurrentWorkout(dayName?: string, blockName?: string): Promise<any> {
     try {
+      let data: string | null = null;
+      let workoutKey: string;
+      
       if (dayName && blockName) {
-        const workoutKey = `${STORAGE_KEYS.CURRENT_WORKOUT}_${dayName}_${blockName}`;
-        const data = await AsyncStorage.getItem(workoutKey);
-        return data ? JSON.parse(data) : null;
-      } else {
-        // Fallback to old key for backwards compatibility
-        const data = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_WORKOUT);
-        return data ? JSON.parse(data) : null;
+        workoutKey = `${STORAGE_KEYS.CURRENT_WORKOUT}_${dayName}_${blockName}`;
+        data = await AsyncStorage.getItem(workoutKey);
       }
+      
+      // Fallback to old key for backwards compatibility
+      if (!data) {
+        workoutKey = STORAGE_KEYS.CURRENT_WORKOUT;
+        data = await AsyncStorage.getItem(workoutKey);
+      }
+      
+      if (!data) {
+        console.log('🔄 [STORAGE] No current workout data found');
+        return null;
+      }
+      
+      const result = JSON.parse(data);
+      
+      // Validate the parsed data structure
+      if (!result || typeof result !== 'object') {
+        console.warn('⚠️ [STORAGE] Current workout data is invalid, removing');
+        await AsyncStorage.removeItem(workoutKey);
+        return null;
+      }
+      
+      console.log('🔄 [STORAGE] Current workout loaded successfully');
+      return result;
     } catch (error) {
-      console.error('Failed to load current workout:', error);
+      console.error('❌ [STORAGE] Failed to load current workout, removing corrupted data:', error);
+      // Clean up corrupted data
+      try {
+        if (dayName && blockName) {
+          await AsyncStorage.removeItem(`${STORAGE_KEYS.CURRENT_WORKOUT}_${dayName}_${blockName}`);
+        }
+        await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_WORKOUT);
+      } catch (cleanupError) {
+        console.error('❌ [STORAGE] Failed to cleanup corrupted workout data:', cleanupError);
+      }
       return null;
     }
   }
@@ -608,9 +776,31 @@ export class WorkoutStorage {
   static async loadNutritionResults(): Promise<NutritionQuestionnaireResults | null> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.NUTRITION_QUESTIONNAIRE);
-      return data ? JSON.parse(data) : null;
+      
+      if (!data) {
+        console.log('🔄 [STORAGE] No nutrition questionnaire data found');
+        return null;
+      }
+      
+      const result = JSON.parse(data);
+      
+      // Validate the parsed data structure
+      if (!result || typeof result !== 'object') {
+        console.warn('⚠️ [STORAGE] Nutrition results data is invalid, resetting');
+        await AsyncStorage.removeItem(STORAGE_KEYS.NUTRITION_QUESTIONNAIRE);
+        return null;
+      }
+      
+      console.log('🔄 [STORAGE] Nutrition results loaded successfully');
+      return result;
     } catch (error) {
-      console.error('Failed to load nutrition results:', error);
+      console.error('❌ [STORAGE] Failed to load nutrition results, resetting:', error);
+      // Reset corrupted data
+      try {
+        await AsyncStorage.removeItem(STORAGE_KEYS.NUTRITION_QUESTIONNAIRE);
+      } catch (resetError) {
+        console.error('❌ [STORAGE] Failed to reset corrupted nutrition data:', resetError);
+      }
       return null;
     }
   }
@@ -626,22 +816,58 @@ export class WorkoutStorage {
   static async loadNutritionCompletionStatus(): Promise<NutritionCompletionStatus> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.NUTRITION_COMPLETION_STATUS);
-      return data ? JSON.parse(data) : {
+      
+      const defaultStatus: NutritionCompletionStatus = {
         nutritionGoals: false,
         budgetCooking: false,
         sleepOptimization: false,
         fridgePantry: false,
         favoriteMeals: false,
       };
+      
+      if (!data) {
+        console.log('🔄 [STORAGE] No nutrition completion status found, using defaults');
+        return defaultStatus;
+      }
+      
+      const result = JSON.parse(data);
+      
+      // Validate the parsed data structure
+      if (!result || typeof result !== 'object') {
+        console.warn('⚠️ [STORAGE] Nutrition completion status is invalid, using defaults');
+        await this.saveNutritionCompletionStatus(defaultStatus);
+        return defaultStatus;
+      }
+      
+      // Ensure all required fields exist with proper boolean values
+      const validatedStatus: NutritionCompletionStatus = {
+        nutritionGoals: !!result.nutritionGoals,
+        budgetCooking: !!result.budgetCooking,
+        sleepOptimization: !!result.sleepOptimization,
+        fridgePantry: !!result.fridgePantry,
+        favoriteMeals: !!result.favoriteMeals,
+      };
+      
+      console.log('🔄 [STORAGE] Nutrition completion status loaded successfully');
+      return validatedStatus;
     } catch (error) {
-      console.error('Failed to load nutrition completion status:', error);
-      return {
+      console.error('❌ [STORAGE] Failed to load nutrition completion status, using defaults:', error);
+      const defaultStatus: NutritionCompletionStatus = {
         nutritionGoals: false,
         budgetCooking: false,
         sleepOptimization: false,
         fridgePantry: false,
         favoriteMeals: false,
       };
+      
+      // Reset corrupted data
+      try {
+        await this.saveNutritionCompletionStatus(defaultStatus);
+      } catch (resetError) {
+        console.error('❌ [STORAGE] Failed to reset corrupted nutrition completion status:', resetError);
+      }
+      
+      return defaultStatus;
     }
   }
 
@@ -769,6 +995,169 @@ export class WorkoutStorage {
       }
     } catch (error) {
       console.error('Failed to cleanup corrupted data:', error);
+    }
+  }
+
+  // Equipment & Preferences Questionnaire Storage
+  static async saveEquipmentPreferencesResults(results: any): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.EQUIPMENT_PREFERENCES, JSON.stringify(results));
+      console.log('Equipment preferences results saved successfully');
+    } catch (error) {
+      console.error('Failed to save equipment preferences results:', error);
+      throw error;
+    }
+  }
+
+  static async loadEquipmentPreferencesResults(): Promise<any | null> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.EQUIPMENT_PREFERENCES);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Failed to load equipment preferences results:', error);
+      return null;
+    }
+  }
+
+  // Data recovery and cleanup utilities
+  static async performDataRecovery(): Promise<void> {
+    console.log('🔧 [STORAGE] Performing data recovery and cleanup...');
+    
+    try {
+      // Test and fix routine data
+      const routines = await this.loadRoutines();
+      console.log('✅ [STORAGE] Routines data recovered:', routines.length, 'routines');
+      
+      // Test and fix my routines data
+      const myRoutines = await this.loadMyRoutines();
+      console.log('✅ [STORAGE] My routines data recovered:', myRoutines.length, 'routines');
+      
+      // Test and fix meal plans data
+      const mealPlans = await this.loadMealPlans();
+      console.log('✅ [STORAGE] Meal plans data recovered:', mealPlans.length, 'plans');
+      
+      // Test and fix nutrition completion status
+      const nutritionStatus = await this.loadNutritionCompletionStatus();
+      console.log('✅ [STORAGE] Nutrition completion status recovered');
+      
+      // Test and fix nutrition questionnaire results
+      const nutritionResults = await this.loadNutritionResults();
+      console.log('✅ [STORAGE] Nutrition results recovered:', nutritionResults ? 'has data' : 'no data');
+      
+      // Test and fix workout history (critical user progress data)
+      const workoutHistory = await this.loadWorkoutHistory();
+      console.log('✅ [STORAGE] Workout history recovered:', workoutHistory.length, 'entries');
+      
+      // Test and fix current workout progress
+      const currentWorkout = await this.loadCurrentWorkout();
+      console.log('✅ [STORAGE] Current workout recovered:', currentWorkout ? 'has active workout' : 'no active workout');
+      
+      // Test and fix weight history (critical user progress data)
+      const weightHistory = await this.loadWeightHistory();
+      console.log('✅ [STORAGE] Weight history recovered:', weightHistory ? weightHistory.length : 0, 'entries');
+      
+      console.log('🎉 [STORAGE] Data recovery completed successfully');
+    } catch (error) {
+      console.error('❌ [STORAGE] Data recovery failed:', error);
+    }
+  }
+
+  // Fitness Goals Questionnaire Storage
+  static async saveFitnessGoalsResults(results: any): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.FITNESS_GOALS, JSON.stringify(results));
+      console.log('Fitness goals results saved successfully');
+    } catch (error) {
+      console.error('Failed to save fitness goals results:', error);
+      throw error;
+    }
+  }
+
+  static async loadFitnessGoalsResults(): Promise<any | null> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.FITNESS_GOALS);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Failed to load fitness goals results:', error);
+      return null;
+    }
+  }
+
+  // Favorite Exercises Storage
+  static async saveFavoriteExercisesResults(results: any): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.FAVORITE_EXERCISES, JSON.stringify(results));
+      console.log('Favorite exercises results saved successfully');
+    } catch (error) {
+      console.error('Failed to save favorite exercises results:', error);
+      throw error;
+    }
+  }
+
+  static async loadFavoriteExercisesResults(): Promise<any | null> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITE_EXERCISES);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Failed to load favorite exercises results:', error);
+      return null;
+    }
+  }
+
+  // Weight History Storage - Critical user progress data
+  static async saveWeightHistory(history: any[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.WEIGHT_HISTORY, JSON.stringify(history));
+      console.log('Weight history saved successfully');
+    } catch (error) {
+      console.error('Failed to save weight history:', error);
+      throw error;
+    }
+  }
+
+  static async loadWeightHistory(): Promise<any[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.WEIGHT_HISTORY);
+      
+      if (!data) {
+        console.log('🔄 [STORAGE] No weight history data found, returning empty array');
+        return [];
+      }
+      
+      const result = JSON.parse(data);
+      
+      // Validate the parsed data structure
+      if (!Array.isArray(result)) {
+        console.warn('⚠️ [STORAGE] Weight history data is not an array, resetting to empty');
+        await this.saveWeightHistory([]);
+        return [];
+      }
+      
+      // Validate each weight entry has required fields
+      const validEntries = result.filter(entry => {
+        if (!entry || typeof entry !== 'object' || !entry.weight || !entry.date) {
+          console.warn('⚠️ [STORAGE] Invalid weight entry found, skipping:', entry);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validEntries.length !== result.length) {
+        console.warn(`⚠️ [STORAGE] Found ${result.length - validEntries.length} corrupted weight entries, saving clean data`);
+        await this.saveWeightHistory(validEntries);
+      }
+      
+      console.log('🔄 [STORAGE] Parsed weight history count:', validEntries.length, 'entries');
+      return validEntries;
+    } catch (error) {
+      console.error('❌ [STORAGE] Failed to load weight history, resetting data:', error);
+      // Reset corrupted data to prevent future crashes
+      try {
+        await this.saveWeightHistory([]);
+      } catch (resetError) {
+        console.error('❌ [STORAGE] Failed to reset corrupted weight history:', resetError);
+      }
+      return [];
     }
   }
 }

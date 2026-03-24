@@ -42,20 +42,48 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   
   const handleComplete = async () => {
     try {
-      // Save budget cooking results to storage
+      // Save comprehensive budget cooking results to storage
       const results = {
         formData,
         completedAt: new Date().toISOString(),
+        questionnaireCompleted: true,
+        preferences: {
+          budgetPriority: formData.weeklyBudget,
+          location: {
+            country: formData.country,
+            city: formData.city,
+            groceryStore: formData.groceryStore
+          },
+          cookingStyle: {
+            planningStyle: formData.planningStyle,
+            cookingEnjoyment: formData.cookingEnjoyment,
+            timeInvestment: formData.timeInvestment,
+            varietySeeking: formData.varietySeeking,
+            skillConfidence: formData.skillConfidence
+          },
+          planSettings: {
+            duration: formData.planDuration,
+            startDate: formData.startDate,
+            customStartDate: formData.customStartDate,
+            mealPreferences: formData.mealPreferences,
+            cookingEquipment: formData.cookingEquipment
+          }
+        }
       };
+      
+      // Save to storage
       await WorkoutStorage.saveBudgetCookingResults(results);
       
       // Mark as completed and show results
       setIsCompleted(true);
       setShowResults(true);
       
-      // Call onComplete if provided
+      // Call onComplete if provided with structured data
       if (onComplete) {
-        onComplete(formData);
+        onComplete(results);
+      } else {
+        // Navigate to nutrition dashboard if no callback
+        navigation.navigate('NutritionDashboard' as never);
       }
     } catch (error) {
       console.error('Failed to save budget cooking results:', error);
@@ -75,7 +103,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     if (onComplete) {
       onComplete(formData);
     } else {
-      navigation.navigate('NutritionHome' as never);
+      navigation.navigate('NutritionDashboard' as never);
     }
   };
 
@@ -2095,36 +2123,6 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               )}
             </Animatable.View>
 
-            {/* Tron-style Action Buttons */}
-            <Animatable.View 
-              animation="fadeInUp" 
-              delay={2250}
-              duration={300}
-              style={styles.tronButtonsContainer}
-            >
-              <TouchableOpacity
-                style={[styles.tronButton, styles.tronButtonSecondary, { borderColor: colors.primary }]}
-                onPress={() => {
-                  setShowResults(false);
-                  setCurrentStep(0);
-                }}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.tronButtonInner, { backgroundColor: 'rgba(0, 0, 0, 0.8)' }]}>
-                  <Text style={[styles.tronButtonText, { color: colors.primary }]}>← EDIT PROFILE</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.tronButton, styles.tronButtonPrimary, { borderColor: colors.primary, backgroundColor: colors.primary }]}
-                onPress={handleComplete}
-                activeOpacity={0.8}
-              >
-                <View style={styles.tronButtonInner}>
-                  <Text style={[styles.tronButtonText, { color: '#000000' }]}>SAVE & CONTINUE →</Text>
-                </View>
-              </TouchableOpacity>
-            </Animatable.View>
 
             {/* Action Buttons */}
             <Animatable.View 
@@ -2134,7 +2132,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
             >
               <TouchableOpacity
                 style={[styles.saveButton, { backgroundColor: themeColor }]}
-                onPress={handleSaveAndContinue}
+                onPress={handleComplete}
                 activeOpacity={0.8}
               >
                 <Text style={styles.saveButtonText}>Looks Good, Save It</Text>
@@ -2843,7 +2841,18 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
 
     const isStepValid = () => {
       switch (currentStep) {
-        case 0: return formData.country && formData.city;
+        case 0: 
+          const isValid = !!(formData.country?.trim() && formData.city?.trim() && formData.groceryStore?.trim());
+          console.log('🔍 Step 0 validation:', {
+            country: `"${formData.country}"`,
+            city: `"${formData.city}"`,
+            groceryStore: `"${formData.groceryStore}"`,
+            isValid,
+            countryLength: formData.country?.length,
+            cityLength: formData.city?.length,
+            groceryStoreLength: formData.groceryStore?.length
+          });
+          return isValid;
         case 1: return formData.weeklyBudget;
         case 2: return true; // Budget range is optional
         case 3: return formData.planningStyle > 0 && formData.cookingEnjoyment > 0 && 

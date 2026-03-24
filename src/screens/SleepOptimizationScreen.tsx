@@ -137,7 +137,7 @@ export default function SleepOptimizationScreen() {
     if (previousRoute?.name === 'WorkoutDashboard') {
       navigation.navigate('WorkoutDashboard' as any);
     } else {
-      navigation.navigate('NutritionHome' as any);
+      navigation.navigate('NutritionDashboard' as any);
     }
   };
 
@@ -631,14 +631,6 @@ export default function SleepOptimizationScreen() {
     >
       {/* Header */}
       <View style={styles.researchScreenHeader}>
-        <TouchableOpacity
-          style={styles.researchBackButton}
-          onPress={() => setShowResearch(false)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="chevron-back" size={24} color={themeColor} />
-        </TouchableOpacity>
-        
         <View style={styles.researchHeaderContent}>
           <View style={[styles.researchHeaderIcon, { backgroundColor: themeColor + '20' }]}>
             <Ionicons name="library" size={32} color={themeColor} />
@@ -1161,7 +1153,6 @@ const styles = StyleSheet.create({
   researchHeaderContent: {
     flex: 1,
     alignItems: 'center',
-    marginLeft: -40, // Offset back button to center content
   },
   researchHeaderIcon: {
     width: 48,

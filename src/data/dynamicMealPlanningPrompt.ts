@@ -932,16 +932,17 @@ Verify the grocery list is complete and correct:
 - **FAIL if** 3+ ingredients are missing from the grocery list or quantities are significantly wrong
 - **FIX**: Add missing items, correct quantities, remove phantom items, fix prices.
 
-### 11. Meal Prep Session Completeness
+### 11. Meal Prep Sessions Completeness
 Verify the meal prep guide is functional:
-- **All batch-cooked items** from the recipes are covered in the prep session
+- **Each prep session should be a separate object in the array** — A 7-day plan with a mid-week restock should have 2 session objects
+- **All batch-cooked items** from the recipes are covered in the prep sessions
 - **Step-by-step instructions** are clear and logically ordered
 - **Equipment list** matches what's actually needed for the prep
 - **Storage guidelines** are included with realistic fridge/freezer times
 - **Time estimates** are realistic (prep time + cook time = total time)
-- **Coverage statement** is concise (max 6 words): "21 meals across 7 days" format
+- **Coverage statement** is concise (max 6 words): "21 meals across 7 days" format. Never include verbose explanations
 - **Recommended date** is included in YYYY-MM-DD format for each prep session
-- **FAIL if** meal prep session is missing, incomplete, or doesn't match the actual recipes
+- **FAIL if** meal prep sessions are missing, incomplete, or don't match the actual recipes
 - **FIX**: Add missing prep steps, correct equipment list, add storage guidelines, fix time estimates.
 
 ### 12. Overall Coherence
@@ -1040,7 +1041,8 @@ This JSON format is designed to work directly with the app's simplified meal pla
     }
   },
   "grocery_list": {
-    "total_estimated_cost": number,
+    "total_estimated_cost_low": number,
+    "total_estimated_cost_high": number,
     "currency": "string",
     "categories": [
       {
@@ -1058,23 +1060,26 @@ This JSON format is designed to work directly with the app's simplified meal pla
       }
     ]
   },
-  "meal_prep_session": {
-    "session_name": "string",
-    "prep_time": number,
-    "cook_time": number,
-    "total_time": number,
-    "covers": "string",
-    "recommended_timing": "string",
-    "recommended_date": "YYYY-MM-DD",
-    "equipment_needed": ["string array"],
-    "instructions": ["string array"],
-    "storage_guidelines": {
-      "key": "string value"
+  "meal_prep_sessions": [
+    {
+      "session_name": "string",
+      "prep_time": number,
+      "cook_time": number,
+      "total_time": number,
+      "covers": "string",
+      "recommended_timing": "string",
+      "recommended_date": "YYYY-MM-DD",
+      "equipment_needed": ["string array"],
+      "instructions": ["string array"],
+      "storage_guidelines": {
+        "key": "string value"
+      }
     }
-  },
+  ],
   "metadata": {
     "generatedAt": "string (ISO date format)",
-    "totalCost": number,
+    "totalCost_low": number,
+    "totalCost_high": number,
     "duration": number
   }
 }
@@ -1132,7 +1137,8 @@ This JSON format is designed to work directly with the app's simplified meal pla
 
 | Field | Required | Format | Notes |
 |-------|----------|--------|-------|
-| **total_estimated_cost** | Yes | Number | Sum of all item prices |
+| **total_estimated_cost_low** | Yes | Number | Lower bound of estimated cost (sum of all item prices) |
+| **total_estimated_cost_high** | Yes | Number | Upper bound with 10% buffer (low × 1.10, rounded up) |
 | **currency** | Yes | String | Currency code (e.g., "AUD", "USD") |
 | **categories** | Yes | Array | Grouped grocery items |
 | **category_name** | Yes | String | Category like "Meat & Seafood" |
@@ -1144,7 +1150,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 | **notes** | No | String | Usage notes, storage tips |
 | **is_purchased** | Yes | Boolean | Always false (user will check off) |
 
-## Meal Prep Session Structure
+## Meal Prep Sessions Structure
 
 | Field | Required | Format | Notes |
 |-------|----------|--------|-------|
@@ -1158,6 +1164,15 @@ This JSON format is designed to work directly with the app's simplified meal pla
 | **equipment_needed** | Yes | Array | Required equipment |
 | **instructions** | Yes | Array | Step-by-step prep instructions |
 | **storage_guidelines** | Yes | Object | How long items last |
+
+## Metadata Structure
+
+| Field | Required | Format | Notes |
+|-------|----------|--------|-------|
+| **generatedAt** | Yes | String | ISO timestamp when plan was created |
+| **totalCost_low** | No | Number | Lower bound of estimated grocery cost |
+| **totalCost_high** | No | Number | Upper bound with 10% buffer |
+| **duration** | Yes | Number | Total days in the meal plan |
 
 # CRITICAL CONVERSION RULES
 
@@ -1180,6 +1195,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 - Group by logical shopping categories
 - Ensure estimated prices are realistic for the specified store/country
 - Remove duplicates and consolidate similar items
+- If the meal plan states the grocery total as a range, preserve both bounds: use the lower number for total_estimated_cost_low and the upper number for total_estimated_cost_high. If the plan only states a single number, set total_estimated_cost_low to that number and total_estimated_cost_high to that number * 1.10 rounded up.
 
 ## Time Formatting
 - Use 12-hour format with AM/PM (e.g., "7:45 AM")
@@ -1205,12 +1221,10 @@ If the meal plan says "Cook rice according to package instructions", convert thi
 ]
 \`\`\`
 
-# OUTPUT REQUIREMENTS
+# FINAL STEPS
 
-1. **Create the file first** - don't output to chat
-2. **Complete structure** - include all required fields
-3. **Validate structure** - ensure JSON is valid
-4. **Provide download link** when finished
-
-Start the conversion now and create the JSON file.`;
+Complete structure - include all required fields
+Validate JSON - ensure the output is valid, parseable JSON
+Cross-check totals - verify grocery list item prices sum to total_estimated_cost ranges, and metadata costs match the grocery list ranges
+Start the conversion now.`;
 };

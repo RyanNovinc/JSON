@@ -21,7 +21,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutStorage } from '../utils/storage';
-import RobustStorage from '../utils/robustStorage';
 import { sendTestimonial } from '../services/feedbackApi';
 
 interface ProgressPhoto {
@@ -73,6 +72,15 @@ const WeightTrackerScreen: React.FC = () => {
     checkReturnContext();
   }, []);
 
+  // Auto-populate before photos when selectedStartWeight changes
+  useEffect(() => {
+    if (selectedStartWeight && selectedStartWeight.photos && selectedStartWeight.photos.length > 0) {
+      setSelectedBeforePhotos(selectedStartWeight.photos);
+    } else {
+      setSelectedBeforePhotos([]);
+    }
+  }, [selectedStartWeight]);
+
   const checkReturnContext = async () => {
     try {
       const context = await AsyncStorage.getItem('@nutrition_return_context');
@@ -87,51 +95,20 @@ const WeightTrackerScreen: React.FC = () => {
 
   const loadWeightHistory = async () => {
     try {
-      console.log('⚖️ [WEIGHT] Loading weight history with ROBUST STORAGE...');
+      console.log('⚖️ [WEIGHT] Loading weight history with centralized storage...');
       
-      // Run health check first
-      const healthCheck = await RobustStorage.healthCheck();
-      console.log('⚖️ [WEIGHT] Storage health check:', healthCheck);
+      const history = await WorkoutStorage.loadWeightHistory();
       
-      // Try robust storage first
-      let stored = await RobustStorage.getItem('@weight_history', true);
-      let dataSource = 'robust';
-      
-      if (!stored) {
-        // Fallback to legacy storage for migration
-        console.log('⚖️ [WEIGHT] No data in robust storage, checking legacy storage...');
-        stored = await AsyncStorage.getItem('@weight_history');
-        dataSource = 'legacy';
-        
-        if (stored) {
-          // Migrate to robust storage
-          console.log('⚖️ [WEIGHT] 🔄 Migrating legacy weight data to robust storage...');
-          await RobustStorage.setItem('@weight_history', stored, true);
-          dataSource = 'migrated';
-        }
-      }
-      
-      if (stored) {
-        try {
-          const history: WeightEntry[] = JSON.parse(stored);
-          
-          // Ensure history is an array before calling sort
-          if (Array.isArray(history)) {
-            console.log(`⚖️ [WEIGHT] Loaded ${history.length} weight entries from ${dataSource} storage`);
-            setWeightHistory(history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-          } else {
-            console.log('⚖️ [WEIGHT] Invalid weight history format - resetting to empty array');
-            setWeightHistory([]);
-          }
-        } catch (parseError) {
-          console.log('⚖️ [WEIGHT] Failed to parse weight history - resetting to empty array');
-          setWeightHistory([]);
-        }
+      if (history && Array.isArray(history)) {
+        console.log(`⚖️ [WEIGHT] Loaded ${history.length} weight entries from centralized storage`);
+        setWeightHistory(history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       } else {
         console.log('⚖️ [WEIGHT] No weight history found');
+        setWeightHistory([]);
       }
     } catch (error) {
       console.error('Failed to load weight history:', error);
+      setWeightHistory([]);
     }
   };
 
@@ -170,17 +147,12 @@ const WeightTrackerScreen: React.FC = () => {
     try {
       const updatedHistory = [newEntry, ...weightHistory];
       
-      console.log('⚖️ [WEIGHT] 💾 Saving weight entry with robust storage...');
+      console.log('⚖️ [WEIGHT] 💾 Saving weight entry with centralized storage...');
       console.log('⚖️ [WEIGHT] New entry:', { weight: newEntry.weight, unit: newEntry.unit, date: newEntry.date });
       
-      // Save using robust storage with redundancy
-      const saveSuccess = await RobustStorage.setItem('@weight_history', JSON.stringify(updatedHistory), true);
-      console.log(`⚖️ [WEIGHT] Robust save result: ${saveSuccess ? '✅ SUCCESS' : '❌ FAILED'}`);
-      
-      if (!saveSuccess) {
-        console.error('⚖️ [WEIGHT] ❌ Robust save failed, trying emergency fallback...');
-        await AsyncStorage.setItem('@weight_history', JSON.stringify(updatedHistory));
-      }
+      // Save using centralized storage with robust error handling
+      await WorkoutStorage.saveWeightHistory(updatedHistory);
+      console.log('⚖️ [WEIGHT] ✅ Weight history saved successfully');
       
       setWeightHistory(updatedHistory);
       
@@ -230,14 +202,9 @@ const WeightTrackerScreen: React.FC = () => {
       
       console.log('⚖️ [WEIGHT] 🗑️ Deleting weight entry...');
       
-      // Save updated history with robust storage
-      const saveSuccess = await RobustStorage.setItem('@weight_history', JSON.stringify(updatedHistory), true);
-      console.log(`⚖️ [WEIGHT] Delete save result: ${saveSuccess ? '✅ SUCCESS' : '❌ FAILED'}`);
-      
-      if (!saveSuccess) {
-        console.error('⚖️ [WEIGHT] ❌ Robust save failed, trying emergency fallback...');
-        await AsyncStorage.setItem('@weight_history', JSON.stringify(updatedHistory));
-      }
+      // Save updated history with centralized storage
+      await WorkoutStorage.saveWeightHistory(updatedHistory);
+      console.log('⚖️ [WEIGHT] ✅ Weight entry deleted successfully');
       
       setWeightHistory(updatedHistory);
       
@@ -354,6 +321,31 @@ const WeightTrackerScreen: React.FC = () => {
       };
       
       setCurrentAfterPhotos(prev => {
+        const filtered = prev.filter(photo => photo.type !== photoType);
+        return [...filtered, newPhoto];
+      });
+    }
+  };
+
+  const selectBeforePhoto = async (photoType: ProgressPhoto['type']) => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+      base64: false,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const newPhoto: ProgressPhoto = {
+        uri: result.assets[0].uri,
+        type: photoType,
+        timestamp: selectedStartWeight?.date || new Date().toISOString(),
+      };
+      
+      setSelectedBeforePhotos(prev => {
         const filtered = prev.filter(photo => photo.type !== photoType);
         return [...filtered, newPhoto];
       });
@@ -1161,36 +1153,41 @@ const WeightTrackerScreen: React.FC = () => {
                     <View style={styles.testimonialPhotoSection}>
                       <Text style={styles.testimonialPhotoTitle}>Add Photos to Your Story</Text>
                       
-                      {/* Before Photos Selection */}
-                      {selectedStartWeight.photos && selectedStartWeight.photos.length > 0 && (
-                        <View style={styles.beforePhotosSection}>
-                          <Text style={styles.beforePhotosLabel}>
-                            Choose "Before" photos from {formatDate(selectedStartWeight.date)}:
-                          </Text>
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.beforePhotosScroll}>
-                            {selectedStartWeight.photos.map((photo, index) => (
+                      {/* Add Before Photos - Always show this section */}
+                      <View style={styles.beforePhotosSection}>
+                        <Text style={styles.beforePhotosLabel}>Add "Before" photos from your gallery:</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.beforePhotosScroll}>
+                          {(['front', 'side_left', 'back', 'side_right'] as const).map((photoType) => {
+                            const existingPhoto = selectedBeforePhotos.find(p => p.type === photoType);
+                            return (
                               <TouchableOpacity
-                                key={index}
-                                style={[
-                                  styles.selectablePhoto,
-                                  { borderColor: selectedBeforePhotos.some(p => p.uri === photo.uri) ? themeColor : 'rgba(255, 255, 255, 0.2)' }
-                                ]}
-                                onPress={() => toggleBeforePhotoSelection(photo)}
+                                key={photoType}
+                                style={styles.addPhotoSlot}
+                                onPress={() => selectBeforePhoto(photoType)}
                               >
-                                <Image source={{ uri: photo.uri }} style={styles.selectablePhotoImage} />
-                                {selectedBeforePhotos.some(p => p.uri === photo.uri) && (
-                                  <View style={styles.photoSelectionOverlay}>
-                                    <Ionicons name="checkmark-circle" size={24} color={themeColor} />
+                                {existingPhoto ? (
+                                  <View style={styles.addedPhotoContainer}>
+                                    <Image source={{ uri: existingPhoto.uri }} style={styles.addedPhotoImage} />
+                                    <TouchableOpacity 
+                                      style={styles.removeAddedPhoto}
+                                      onPress={() => setSelectedBeforePhotos(prev => prev.filter(p => p.type !== photoType))}
+                                    >
+                                      <Ionicons name="close-circle" size={20} color="#ef4444" />
+                                    </TouchableOpacity>
+                                  </View>
+                                ) : (
+                                  <View style={styles.emptyAddPhotoSlot}>
+                                    <Ionicons name="camera-outline" size={24} color="#71717a" />
                                   </View>
                                 )}
-                                <Text style={styles.selectablePhotoLabel}>
-                                  {photo.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                <Text style={styles.addPhotoLabel}>
+                                  {photoType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                 </Text>
                               </TouchableOpacity>
-                            ))}
-                          </ScrollView>
-                        </View>
-                      )}
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
 
                       {/* Current After Photos */}
                       <View style={styles.afterPhotosSection}>

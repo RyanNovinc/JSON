@@ -18,7 +18,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
-import { getMealPlanPrompt } from '../data/mealPlanPrompt';
 import { assembleMealPlanningPrompt, getMealPlanReviewPrompt } from '../data/mealPlanningPrompt';
 import { generateJsonConversionPrompt } from '../data/generateJsonConversionPrompt';
 import { useTheme } from '../contexts/ThemeContext';

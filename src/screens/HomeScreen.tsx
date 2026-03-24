@@ -747,6 +747,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
           for (let week = 1; week <= totalWeeks; week++) {
             // Use the same robust storage logic as DaysScreen.tsx
             const key = `completed_${activeBlock.block_name}_week${week}`;
+            console.log(`🎯 [TODAY-BUTTON] Checking week ${week} with key: ${key}`);
             
             // Try robust storage first, with fallback to legacy storage
             let completed = await RobustStorage.getItem(key, true);
@@ -760,29 +761,46 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               try {
                 const parsedCompleted = JSON.parse(completed);
                 completedWorkouts = Array.isArray(parsedCompleted) ? parsedCompleted : [];
+                console.log(`🎯 [TODAY-BUTTON] Week ${week} completed workouts:`, completedWorkouts);
               } catch (error) {
                 console.log(`Error parsing completed workouts for week ${week}:`, error);
                 completedWorkouts = [];
               }
+            } else {
+              console.log(`🎯 [TODAY-BUTTON] No completion data found for week ${week}`);
             }
             
             if (!completedWorkouts || completedWorkouts.length === 0) {
+              console.log(`🎯 [TODAY-BUTTON] Week ${week} has no completed workouts - selecting this week`);
               currentWeek = week;
               break;
             }
             
-            // Check if all days in this week are completed
-            const allDaysCompleted = activeBlock.days.every(day => 
-              completedWorkouts.includes(`${day.day_name}_week${week}`)
+            // Check if all workout days in this week are completed (exclude REST days)
+            console.log(`🎯 [TODAY-BUTTON] Checking days for week ${week}:`, activeBlock.days.map(d => d.day_name));
+            const workoutDays = activeBlock.days.filter(day => 
+              day.day_name && !day.day_name.toLowerCase().includes('rest')
             );
+            console.log(`🎯 [TODAY-BUTTON] Workout days (excluding rest):`, workoutDays.map(d => d.day_name));
+            
+            const allDaysCompleted = workoutDays.every(day => {
+              const expectedKey = `${day.day_name}_week${week}`;
+              const isCompleted = completedWorkouts.includes(expectedKey);
+              console.log(`🎯 [TODAY-BUTTON] Day ${day.day_name} - expected key: ${expectedKey}, completed: ${isCompleted}`);
+              return isCompleted;
+            });
+            
+            console.log(`🎯 [TODAY-BUTTON] Week ${week} all days completed: ${allDaysCompleted}`);
             
             if (!allDaysCompleted) {
+              console.log(`🎯 [TODAY-BUTTON] Week ${week} has incomplete days - selecting this week`);
               currentWeek = week;
               break;
             }
             
             // If we're on the last week and it's complete, stay on last week
             if (week === totalWeeks) {
+              console.log(`🎯 [TODAY-BUTTON] Reached last week ${week} - staying here`);
               currentWeek = totalWeeks;
             }
           }

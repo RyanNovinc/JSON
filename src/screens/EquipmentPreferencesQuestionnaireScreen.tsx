@@ -11,8 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import RobustStorage from '../utils/robustStorage';
+import { WorkoutStorage } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -130,9 +129,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
 
   const loadSavedData = async () => {
     try {
-      const savedData = await RobustStorage.getItem('equipmentPreferencesData', true) || await AsyncStorage.getItem('equipmentPreferencesData');
-      if (savedData) {
-        const data = JSON.parse(savedData);
+      const data = await WorkoutStorage.loadEquipmentPreferencesResults();
+      if (data) {
         
         // Restore all form data
         setSelectedEquipment(data.selectedEquipment || []);
@@ -181,8 +179,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         // Note: no completedAt field - this indicates it's in progress
       };
 
-      const saveSuccess = await RobustStorage.setItem('equipmentPreferencesData', JSON.stringify(progressData), true);
-      if (!saveSuccess) await AsyncStorage.setItem('equipmentPreferencesData', JSON.stringify(progressData));
+      await WorkoutStorage.saveEquipmentPreferencesResults(progressData);
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
@@ -279,9 +276,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         completedAt: new Date().toISOString(),
       };
 
-      // Save to AsyncStorage
-      const saveSuccess = await RobustStorage.setItem('equipmentPreferencesData', JSON.stringify(equipmentPreferencesData), true);
-      if (!saveSuccess) await AsyncStorage.setItem('equipmentPreferencesData', JSON.stringify(equipmentPreferencesData));
+      // Save to storage
+      await WorkoutStorage.saveEquipmentPreferencesResults(equipmentPreferencesData);
       console.log('Equipment Preferences Data saved:', equipmentPreferencesData);
       
       // Mark as completed

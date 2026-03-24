@@ -11,6 +11,7 @@ import { ThemeProvider } from './src/contexts/ThemeContext';
 import { WeightUnitProvider } from './src/contexts/WeightUnitContext';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import SplashScreen from './src/components/SplashScreen';
+import { WorkoutStorage } from './src/utils/storage';
 
 // Keep the native splash screen visible while loading
 ExpoSplashScreen.preventAutoHideAsync();
@@ -30,6 +31,11 @@ function AppContent() {
   useEffect(() => {
     // Hide native splash screen immediately to show our custom one
     ExpoSplashScreen.hideAsync();
+    
+    // Perform data recovery on app startup to fix any corrupted data
+    WorkoutStorage.performDataRecovery().catch(error => {
+      console.error('❌ [APP] Data recovery failed:', error);
+    });
   }, []);
 
   const handleSplashFinish = () => {

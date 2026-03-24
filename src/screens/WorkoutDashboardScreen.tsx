@@ -85,20 +85,18 @@ export default function WorkoutDashboardScreen() {
   const loadCompletionStatus = async () => {
     try {
       // Check if fitness goals questionnaire is completed
-      const fitnessGoalsDataString = await RobustStorage.getItem('fitnessGoalsData', true) || await AsyncStorage.getItem('fitnessGoalsData');
+      const fitnessGoalsData = await WorkoutStorage.loadFitnessGoalsResults();
       let fitnessGoalsCompleted = false;
       
-      if (fitnessGoalsDataString) {
-        const fitnessGoalsData = JSON.parse(fitnessGoalsDataString);
+      if (fitnessGoalsData) {
         fitnessGoalsCompleted = !!(fitnessGoalsData && fitnessGoalsData.completedAt);
       }
 
       // Check if equipment preferences questionnaire is completed
-      const equipmentPreferencesDataString = await RobustStorage.getItem('equipmentPreferencesData', true) || await AsyncStorage.getItem('equipmentPreferencesData');
+      const equipmentPreferencesData = await WorkoutStorage.loadEquipmentPreferencesResults();
       let equipmentPreferencesCompleted = false;
       
-      if (equipmentPreferencesDataString) {
-        const equipmentPreferencesData = JSON.parse(equipmentPreferencesDataString);
+      if (equipmentPreferencesData) {
         equipmentPreferencesCompleted = !!(equipmentPreferencesData && equipmentPreferencesData.completedAt);
       }
 

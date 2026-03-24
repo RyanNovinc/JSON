@@ -11,8 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import RobustStorage from '../utils/robustStorage';
+import { WorkoutStorage } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -152,9 +151,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
 
   const loadSavedData = async () => {
     try {
-      const savedData = await RobustStorage.getItem('fitnessGoalsData', true) || await AsyncStorage.getItem('fitnessGoalsData');
-      if (savedData) {
-        const data = JSON.parse(savedData);
+      const data = await WorkoutStorage.loadFitnessGoalsResults();
+      if (data) {
         
         // Restore all form data
         setSelectedPrimaryGoal(data.primaryGoal || '');
@@ -240,8 +238,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
         // Note: no completedAt field - this indicates it's in progress
       };
 
-      const saveSuccess = await RobustStorage.setItem('fitnessGoalsData', JSON.stringify(progressData), true);
-      if (!saveSuccess) await AsyncStorage.setItem('fitnessGoalsData', JSON.stringify(progressData));
+      await WorkoutStorage.saveFitnessGoalsResults(progressData);
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
@@ -427,9 +424,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
         completedAt: new Date().toISOString(),
       };
 
-      // Save to AsyncStorage
-      const saveSuccess = await RobustStorage.setItem('fitnessGoalsData', JSON.stringify(fitnessGoalsData), true);
-      if (!saveSuccess) await AsyncStorage.setItem('fitnessGoalsData', JSON.stringify(fitnessGoalsData));
+      // Save to storage
+      await WorkoutStorage.saveFitnessGoalsResults(fitnessGoalsData);
       console.log('Fitness Goals Data saved:', fitnessGoalsData);
       
       // Mark as completed

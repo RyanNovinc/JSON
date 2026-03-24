@@ -26,7 +26,6 @@ import { MigrationHelper } from '../utils/migrationHelper';
 import { WorkoutStorage, NutritionCompletionStatus, MealPlan } from '../utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMealPlan } from '../types/nutrition';
-import { generateUserMealPlanPrompt } from '../data/generateUserMealPrompt';
 import { NutritionFeatureGate, IfNutritionPro, IfNutritionFree } from '../components/NutritionFeatureGate';
 import { PremiumFeature } from '../utils/premiumFeatures';
 

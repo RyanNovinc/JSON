@@ -294,6 +294,19 @@ export default function GroceryListScreen() {
   console.log('💰 Total calculated cost:', totalCost, 'from', totalItems, 'items');
   console.log('🔍 Using items as source of truth for pricing');
 
+  // Get the AI's estimated cost range from the grocery list metadata
+  const groceryListData = passedGroceryList || currentMealPlan?.data?.grocery_list;
+  const estimatedLow = groceryListData?.total_estimated_cost_low;
+  const estimatedHigh = groceryListData?.total_estimated_cost_high;
+  const legacyEstimate = groceryListData?.total_estimated_cost;
+
+  const hasRange = estimatedLow != null && estimatedHigh != null;
+  const estimateDisplay = hasRange 
+    ? `$${Math.round(estimatedLow)}–$${Math.round(estimatedHigh)}`
+    : legacyEstimate != null 
+      ? `$${legacyEstimate.toFixed(2)}`
+      : null;
+
   // Generate a unique key for this grocery list (use simpler key)
   const groceryListKey = passedGroceryList ? 
     `grocery_purchases_${passedGroceryList.total_estimated_cost}_${passedGroceryList.categories?.length || 0}` : 
@@ -887,9 +900,9 @@ export default function GroceryListScreen() {
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryValue, { color: themeColor }]}>
-                ${totalCost.toFixed(2)}
+                {estimateDisplay || `$${totalCost.toFixed(2)}`}
               </Text>
-              <Text style={styles.summaryLabel}>Total Cost</Text>
+              <Text style={styles.summaryLabel}>Est. Cost</Text>
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryValue, { color: '#22c55e' }]}>

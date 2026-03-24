@@ -126,12 +126,16 @@ export interface SimplifiedMealPlan {
   dailyMeals: Record<string, SimplifiedMealPlanDay>; // key: "2024-02-20"
   metadata: {
     generatedAt: string;
-    totalCost: number;
+    totalCost?: number;       // Legacy
+    totalCost_low?: number;   // New
+    totalCost_high?: number;  // New
     duration: number;
   };
   // Optional legacy fields for grocery lists and meal prep
   grocery_list?: {
-    total_estimated_cost: number;
+    total_estimated_cost?: number;        // Legacy single value
+    total_estimated_cost_low?: number;    // New: lower bound
+    total_estimated_cost_high?: number;   // New: upper bound with 10% buffer
     currency: string;
     categories: Array<{
       category_name: string;

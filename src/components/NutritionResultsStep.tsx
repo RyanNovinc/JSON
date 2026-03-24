@@ -400,7 +400,8 @@ const styles = StyleSheet.create({
   },
   sliderLabels: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    position: 'relative',
   },
   sliderLabelText: {
     fontSize: 14,
