@@ -15,6 +15,8 @@ import ModeTransitionContainer from '../components/ModeTransitionContainer';
 import CreateCountdownScreen from '../screens/CreateCountdownScreen';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
+import MyWorkoutsScreen from '../screens/MyWorkoutsScreen';
+import MyMealPlansScreen from '../screens/MyMealPlansScreen';
 import SampleMealPlansScreen from '../screens/SampleMealPlansScreen';
 import BlocksScreen from '../screens/BlocksScreen';
 import MesocycleBlocksScreen from '../screens/MesocycleBlocksScreen';
@@ -80,6 +82,8 @@ export type RootStackParamList = {
   CreateCountdown: undefined;
   ImportRoutine: undefined;
   ImportMealPlan: undefined;
+  MyWorkouts: undefined;
+  MyMealPlans: undefined;
   SampleMealPlans: undefined;
   AppIcon: undefined;
   Payment: undefined;
@@ -335,6 +339,22 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                       },
                     };
                   },
+                }}
+              />
+              <RootStack.Screen 
+                name="MyWorkouts" 
+                component={MyWorkoutsScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal'
+                }}
+              />
+              <RootStack.Screen 
+                name="MyMealPlans" 
+                component={MyMealPlansScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal'
                 }}
               />
               <RootStack.Screen 

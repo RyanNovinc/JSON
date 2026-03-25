@@ -1698,7 +1698,9 @@ export default function ImportRoutineScreen() {
         trainingStylePreference: fitnessGoals.trainingStylePreference,
         customTrainingStyle: fitnessGoals.customTrainingStyle,
         trainingExperience: fitnessGoals.trainingExperience,
-        trainingApproach: fitnessGoals.trainingApproach,
+        volumePreference: fitnessGoals.volumePreference,
+        customVolume: fitnessGoals.customVolume,
+        gender: fitnessGoals.gender,
         programDuration: fitnessGoals.programDuration,
         customDuration: fitnessGoals.customDuration,
         cardioPreferences: fitnessGoals.cardioPreferences,
@@ -1747,7 +1749,8 @@ export default function ImportRoutineScreen() {
         primaryGoal: 'build_muscle',
         selectedEquipment: ['commercial_gym'],
         trainingExperience: 'intermediate',
-        trainingApproach: 'balanced',
+        volumePreference: '12-16',
+        gender: '',
         programDuration: '12_weeks',
         sessionStyle: 'moderate'
       };
@@ -1794,11 +1797,6 @@ export default function ImportRoutineScreen() {
       'advanced': 'Advanced (2+ years, excellent technique, slow progression)'
     };
 
-    const approachMap: { [key: string]: string } = {
-      'push_hard': 'Push Hard — target upper end of optimal volume ranges.',
-      'balanced': 'Balanced — moderate volume, sustainable long-term.',
-      'conservative': 'Conservative — lower volume, focus on recovery and consistency.'
-    };
 
     const durationMap: { [key: string]: string } = {
       '4_weeks': '4 weeks (short training block)',
@@ -1903,7 +1901,17 @@ export default function ImportRoutineScreen() {
 
     // Experience & Approach  
     lines.push(`**Training Experience:** ${experienceMap[data.trainingExperience || ''] || 'Not specified'}`);
-    lines.push(`**Training Approach:** ${approachMap[data.trainingApproach || ''] || 'Not specified'}`);
+    
+    // Volume preference
+    const volumeText = data.volumePreference === 'custom' && data.customVolume ? 
+      `${data.customVolume} sets/week` : 
+      data.volumePreference ? `${data.volumePreference} sets/week` : 'Not specified';
+    lines.push(`**Weekly Volume Target:** ${volumeText} per muscle group`);
+    
+    // Gender
+    const genderText = data.gender === 'prefer_not_to_say' ? 'Prefer not to say' : 
+                      data.gender || 'Not specified';
+    lines.push(`**Gender:** ${genderText} (for volume context)`);
 
     lines.push(''); // blank line
 
@@ -2158,7 +2166,8 @@ Create a workout program based on the following information:
 - Goal: ${questionnaireData.primaryGoal || 'muscle building'}
 - Experience: ${questionnaireData.trainingExperience || 'intermediate'}
 - Equipment: ${(questionnaireData.selectedEquipment || ['commercial_gym']).join(', ')}
-- Training Approach: ${questionnaireData.trainingApproach || 'balanced'}
+- Volume Target: ${questionnaireData.volumePreference || '12-16'} sets/week per muscle group
+- Gender: ${questionnaireData.gender || 'not specified'} (for volume context)
 
 Please design a complete workout program with exercises, sets, reps, and rest periods.`;
                       }
@@ -2561,6 +2570,17 @@ This check exists because the JSON generator must reconstruct complete exercise 
             </Text>
           </TouchableOpacity>
 
+          <View style={styles.orSection}>
+            <View style={styles.orLine} />
+          </View>
+
+          <TouchableOpacity 
+            style={styles.secondaryButton}
+            onPress={() => navigation.navigate('MyWorkouts')}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.secondaryButtonText}>My Workouts</Text>
+          </TouchableOpacity>
 
         </View>
 
@@ -2600,7 +2620,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
               textAlign: 'center',
               color: themeColor,
             }}>
-              How to create custom workouts with AI?
+              Create your tailored workout routine
             </Text>
             <Ionicons name="chevron-forward" size={16} color={themeColor} />
           </TouchableOpacity>

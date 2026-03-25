@@ -34,7 +34,11 @@ export interface QuestionnaireData {
   
   // Training Experience
   trainingExperience?: string;
-  trainingApproach?: 'push_hard' | 'balanced' | 'conservative';
+  
+  // Volume Preference
+  volumePreference?: '8-12' | '12-16' | '16-20' | 'custom' | 'not_sure';
+  customVolume?: string;
+  gender?: 'male' | 'female' | 'prefer_not_to_say';
   
   // Program Preferences
   programDuration?: string;
@@ -186,17 +190,35 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
       'intermediate': 'Intermediate (1+ years training, good form, steady progress)',
       'advanced': 'Advanced (2+ years, excellent technique, slow progression)',
     };
+    
+    const exerciseGuidance: { [key: string]: string } = {
+      'complete_beginner': 'Focus on basic compound movements only (squat, deadlift, bench press, rows). Avoid complex exercises like Bulgarian split squats, deficit deadlifts, or advanced variations. Use machine alternatives when form is still developing.',
+      'beginner': 'Primarily compound movements with some basic isolation work. Stick to standard exercise variations. Avoid unilateral exercises, complex supersets, or advanced techniques.',
+      'intermediate': 'Mix of compound and isolation exercises. Can handle standard exercise variations and some unilateral work. Introduce basic supersets and intensity techniques sparingly.',
+      'advanced': 'Full range of exercises including advanced variations, unilateral movements, and complex techniques. Can handle deficit movements, pause reps, drop sets, and challenging exercise combinations.'
+    };
+    
     specs += `\n**Training Experience:** ${expMap[data.trainingExperience] || data.trainingExperience}\n`;
+    specs += `**Exercise Selection Guidance:** ${exerciseGuidance[data.trainingExperience] || 'Use appropriate exercise complexity for experience level'}\n`;
   }
 
-  // Training Approach
-  if (data.trainingApproach) {
-    const approachMap: { [key: string]: string } = {
-      'push_hard': 'Push Hard — program toward upper end of optimal volume ranges. User understands this requires good sleep, nutrition, and recovery.',
-      'balanced': 'Balanced — program in the middle of optimal volume ranges. Sustainable for most people with moderate recovery.',
-      'conservative': 'Conservative — program toward lower end of volume ranges. Prioritize efficiency and easy recovery.'
-    };
-    specs += `**Training Approach:** ${approachMap[data.trainingApproach] || data.trainingApproach}\n`;
+  // Volume Preference
+  if (data.volumePreference) {
+    let volumeText = '';
+    if (data.volumePreference === 'custom' && data.customVolume) {
+      volumeText = `${data.customVolume} sets per week per muscle group`;
+    } else if (data.volumePreference === 'not_sure') {
+      volumeText = 'User needs volume assessment - use moderate volume (12-16 sets/week) as default';
+    } else {
+      volumeText = `${data.volumePreference} sets per week per muscle group`;
+    }
+    specs += `**Weekly Volume Target:** ${volumeText}\n`;
+  }
+
+  // Gender (for volume context)
+  if (data.gender) {
+    const genderText = data.gender === 'prefer_not_to_say' ? 'Prefer not to say' : data.gender;
+    specs += `**Gender:** ${genderText} (affects volume tolerance)\n`;
   }
 
   // Program Duration

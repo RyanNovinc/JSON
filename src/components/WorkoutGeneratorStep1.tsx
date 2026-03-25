@@ -84,7 +84,9 @@ export default function WorkoutGeneratorStep1({ onNext, onBack }: WorkoutGenerat
         trainingStylePreference: fitnessGoals.trainingStylePreference,
         customTrainingStyle: fitnessGoals.customTrainingStyle,
         trainingExperience: fitnessGoals.trainingExperience,
-        trainingApproach: fitnessGoals.trainingApproach,
+        volumePreference: fitnessGoals.volumePreference,
+        customVolume: fitnessGoals.customVolume,
+        gender: fitnessGoals.gender,
         programDuration: fitnessGoals.programDuration,
         sessionStyle: fitnessGoals.sessionStyle,
         exerciseNoteDetail: fitnessGoals.exerciseNoteDetail,
@@ -192,7 +194,8 @@ Create a workout program based on the following information:
 - Goal: ${questionnaireData.primaryGoal || 'muscle building'}
 - Experience: ${questionnaireData.trainingExperience || 'intermediate'}
 - Equipment: ${(questionnaireData.selectedEquipment || ['commercial_gym']).join(', ')}
-- Training Approach: ${questionnaireData.trainingApproach || 'balanced'}
+- Volume Target: ${questionnaireData.volumePreference || '12-16'} sets/week per muscle group
+- Gender: ${questionnaireData.gender || 'not specified'} (for volume context)
 Please design a complete workout program with exercises, sets, reps, and rest periods.`;
       }
       

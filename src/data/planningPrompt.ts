@@ -393,29 +393,33 @@ export const VOLUME_RULES_HEADER = `---
 
 ### Volume Targets by Training Approach (Natural Lifters)
 
-Look up the user's Training Approach from their profile:`;
+Use the user's specified Volume Preference from their profile:`;
 
-// Volume targets by approach
-export const getVolumeTargets = (approach: string): string => {
-  if (approach === 'push_hard') {
-    return `| Approach | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|----------|--------------------------|---------------------------|
-| Push Hard | 16-20 | 12-16 |`;
-  } else if (approach === 'balanced') {
-    return `| Approach | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|----------|--------------------------|---------------------------|
-| Balanced | 12-16 | 10-14 |`;
-  } else if (approach === 'conservative') {
-    return `| Approach | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|----------|--------------------------|---------------------------|
-| Conservative | 10-12 | 8-10 |`;
+// Volume targets by user preference
+export const getVolumeTargets = (volumePreference: string, customVolume?: string): string => {
+  if (volumePreference === 'custom' && customVolume) {
+    const customSets = parseInt(customVolume);
+    const mediumSets = Math.max(6, Math.round(customSets * 0.75)); // Medium muscles get ~75% of major muscle volume
+    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
+|---------------|--------------------------|---------------------------|
+| Custom | ${customSets} | ${mediumSets} |`;
+  } else if (volumePreference === '16-20') {
+    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
+|---------------|--------------------------|---------------------------|
+| High Volume | 16-20 | 12-16 |`;
+  } else if (volumePreference === '12-16') {
+    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
+|---------------|--------------------------|---------------------------|
+| Moderate | 12-16 | 10-14 |`;
+  } else if (volumePreference === '8-12') {
+    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
+|---------------|--------------------------|---------------------------|
+| Conservative | 8-12 | 8-10 |`;
   } else {
-    // Fallback
-    return `| Approach | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|----------|--------------------------|---------------------------|
-| Push Hard | 16-20 | 12-16 |
-| Balanced | 12-16 | 10-14 |
-| Conservative | 10-12 | 8-10 |`;
+    // Fallback for 'not_sure' or undefined
+    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
+|---------------|--------------------------|---------------------------|
+| Moderate (Default) | 12-16 | 10-14 |`;
   }
 };
 
@@ -463,13 +467,13 @@ If the profile specifies priority muscles, increase those toward 16-22 sets/week
 Front Delts, Traps, Rear Delts, Forearms — these get sufficient indirect work from compounds. Core inclusion is controlled by the Direct Core Work setting in the user's profile — see point 7 in the Volume Verification Requirements above. Do not apply length-based core exemption rules. **Note:** Core being exempt from volume targets means it does not trigger a LOW flag and does not count toward any muscle group's set tally — it does not mean skip core entirely. Whether to include core exercises is determined solely by the Direct Core Work setting.`;
 
 // Exempt muscles with conditional rear delt recommendation
-export const getExemptMuscles = (approach: string, gymDays: number): string => {
+export const getExemptMuscles = (volumePreference: string, gymDays: number): string => {
   const baseText = STATIC_PRIORITY_MUSCLES;
   
-  if (approach === 'push_hard' && gymDays >= 5) {
+  if (volumePreference === '16-20' && gymDays >= 5) {
     return baseText + `
 
-**Recommendation for Push Hard programs with 5+ training days:** Add 3-6 sets of direct rear delt work (face pulls, reverse flyes) for balanced shoulder development — not required, but recommended when programming space allows.`;
+**Recommendation for High Volume programs with 5+ training days:** Add 3-6 sets of direct rear delt work (face pulls, reverse flyes) for balanced shoulder development — not required, but recommended when programming space allows.`;
   }
   
   return baseText;
@@ -499,15 +503,15 @@ When HIGH occurs on a non-priority muscle:
 - If reduction would drop below target range, leave at the ceiling for the user's approach and note as acceptable overflow`;
 
 // Quality standards with approach-specific additions
-export const getQualityStandards = (approach: string): string => {
+export const getQualityStandards = (volumePreference: string): string => {
   let standards = STATIC_STATUS_INDICATORS;
   
-  if (approach === 'push_hard') {
+  if (volumePreference === '16-20' || (volumePreference === 'custom' && parseInt(volumePreference) >= 16)) {
     standards += `
-- A Push Hard program where most muscles sit at the floor of their target range is underdelivering — **aim for the upper half**.`;
-  } else if (approach === 'conservative') {
+- A High Volume program where most muscles sit at the floor of their target range is underdelivering — **aim for the upper half**.`;
+  } else if (volumePreference === '8-12') {
     standards += `
-- A Conservative program doesn't need to push every muscle to maximum — staying within range is sufficient.`;
+- A Conservative volume program doesn't need to push every muscle to maximum — staying within range is sufficient.`;
   }
   
   return standards;
@@ -625,7 +629,8 @@ export function assemblePlanningPrompt(
   const goal = data.primaryGoal || 'build_muscle';
   const exp = data.trainingExperience || 'intermediate';
   const expTier = ['complete_beginner', 'beginner'].includes(exp) ? 'beginner' : exp;
-  const approach = data.trainingApproach || 'balanced';
+  const volumePreference = data.volumePreference || '12-16';
+  const customVolume = data.customVolume;
   const equipment = data.selectedEquipment || [];
   const hasGymEquipment = equipment.some(e => ['commercial_gym', 'home_gym'].includes(e));
   const isBodyweightOnly = equipment.length === 1 && equipment[0] === 'bodyweight';
@@ -739,12 +744,12 @@ ${generateProgramSpecs(data)}`;
   
   // === SECTION 7: Volume Rules ===
   prompt += '\n\n' + VOLUME_RULES_HEADER;
-  prompt += '\n' + getVolumeTargets(approach);
+  prompt += '\n' + getVolumeTargets(volumePreference, customVolume);
   prompt += '\n' + STATIC_VOLUME_DEFINITIONS;
   prompt += '\n' + getExperienceMinimums(expTier);
-  prompt += '\n' + getExemptMuscles(approach, gymDays);
+  prompt += '\n' + getExemptMuscles(volumePreference, gymDays);
   if (isBodyweightOnly) prompt += '\n' + BODYWEIGHT_VOLUME_ADJUSTMENTS;
-  prompt += '\n' + getQualityStandards(approach);
+  prompt += '\n' + getQualityStandards(volumePreference);
   
   // === SECTION 8: Goal-Specific Guidance ===
   prompt += '\n\n' + getGoalGuidance(goal);

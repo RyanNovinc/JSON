@@ -992,10 +992,10 @@ export default function ImportMealPlanScreen() {
 
           <TouchableOpacity 
             style={styles.secondaryButton}
-            onPress={() => navigation.navigate('SampleMealPlans' as any)}
+            onPress={() => navigation.navigate('MyMealPlans' as any)}
             activeOpacity={0.9}
           >
-            <Text style={styles.secondaryButtonText}>Try Sample Meal Plans</Text>
+            <Text style={styles.secondaryButtonText}>My Meal Plans</Text>
           </TouchableOpacity>
 
         </View>
@@ -1008,7 +1008,7 @@ export default function ImportMealPlanScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="bulb-outline" size={20} color={themeColor} />
-            <Text style={[styles.helpButtonText, { color: themeColor }]}>How to create custom meal plans with AI?</Text>
+            <Text style={[styles.helpButtonText, { color: themeColor }]}>Create your personalized nutrition plan</Text>
             <Ionicons name="chevron-forward" size={16} color={themeColor} />
           </TouchableOpacity>
         </View>

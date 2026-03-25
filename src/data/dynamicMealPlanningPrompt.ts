@@ -105,7 +105,7 @@ export const buildNutritionTargetsSection = (data: MealPlanPromptData): string =
 
 export const buildPersonalInfoSection = (data: MealPlanPromptData): string => {
   return `PERSONAL INFO:
-- Gender: ${data.personalInfo.gender}
+- Gender: ${data.personalInfo.gender === 'prefer_not_to_say' ? 'Prefer not to say' : data.personalInfo.gender}
 - Age: ${data.personalInfo.age}
 - Activity level: ${data.personalInfo.activityLevel}
 - Job type: ${data.personalInfo.jobType}`;

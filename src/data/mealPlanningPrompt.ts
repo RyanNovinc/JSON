@@ -132,7 +132,7 @@ ${getMealStructure(budgetData.mealsPerDay || 3, macroResults.protein || 150)}
 **KEY RULE FOR JSON OUTPUT:** Use ONLY these meal types: breakfast, lunch, dinner, snack. If you have multiple snacks, they all use type "snack" — differentiate them by name (e.g., "Morning Protein Snack", "Afternoon Energy Snack").
 
 PERSONAL INFO:
-- Gender: ${nutritionData.gender || 'Not specified'}
+- Gender: ${nutritionData.gender === 'prefer_not_to_say' ? 'Prefer not to say' : nutritionData.gender || 'Not specified'}
 - Age: ${nutritionData.age || 'Not specified'}
 - Activity level: ${nutritionData.activityLevel || 'moderate'}
 - Job type: ${nutritionData.jobType || 'desk_job'}

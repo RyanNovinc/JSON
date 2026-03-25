@@ -115,7 +115,13 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [showCustomFrequency, setShowCustomFrequency] = useState<boolean>(false);
   const [customGoals, setCustomGoals] = useState<string>('');
   const [trainingExperience, setTrainingExperience] = useState<string>('');
-  const [trainingApproach, setTrainingApproach] = useState<'push_hard' | 'balanced' | 'conservative'>('balanced');
+  const [volumePreference, setVolumePreference] = useState<'8-12' | '12-16' | '16-20' | 'custom' | 'not_sure'>('12-16');
+  const [customVolume, setCustomVolume] = useState<string>('');
+  const [showMiniQuestionnaire, setShowMiniQuestionnaire] = useState<boolean>(false);
+  const [recoveryAnswer, setRecoveryAnswer] = useState<string>('');
+  const [frequencyAnswer, setFrequencyAnswer] = useState<string>('');
+  const [stressAnswer, setStressAnswer] = useState<string>('');
+  const [gender, setGender] = useState<'male' | 'female' | 'prefer_not_to_say' | ''>('');
   const [programDuration, setProgramDuration] = useState<string>('');
   const [customDuration, setCustomDuration] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
@@ -176,7 +182,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
         setShowCustomFrequency(data.customFrequency !== '');
         setCustomGoals(data.customGoals || '');
         setTrainingExperience(data.trainingExperience || '');
-        setTrainingApproach(data.trainingApproach || 'balanced');
+        setVolumePreference(data.volumePreference || '12-16');
+        setCustomVolume(data.customVolume || '');
+        setGender(data.gender || '');
         setProgramDuration(data.programDuration || '');
         setCustomDuration(data.customDuration || '');
         
@@ -231,7 +239,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
         otherTrainingDays: otherTrainingDays,
         customGoals: customGoals,
         trainingExperience: trainingExperience,
-        trainingApproach: trainingApproach,
+        volumePreference: volumePreference,
+        customVolume: customVolume,
+        gender: gender,
         programDuration: programDuration,
         customDuration: customDuration,
         currentStep: currentStep,
@@ -253,7 +263,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       funSocialDetails, injuryPreventionDetails, flexibilityDetails, priorityMuscleGroups, 
       customMuscleGroup, movementLimitations, customLimitation, trainingStylePreference, 
       customTrainingStyle, totalTrainingDays, customFrequency, gymTrainingDays, 
-      otherTrainingDays, customGoals, trainingExperience, trainingApproach, programDuration, customDuration]);
+      otherTrainingDays, customGoals, trainingExperience, volumePreference, customVolume, gender, programDuration, customDuration]);
 
   // Calculate otherTrainingDays based on secondary goals with 'dedicated' integration method
   useEffect(() => {
@@ -344,7 +354,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
     }
     if (currentStep === 2) {
       // Step 3: Require both program duration and training approach
-      return programDuration !== '' && trainingApproach !== '';
+      const hasVolume = volumePreference !== '' && (volumePreference !== 'custom' || customVolume !== '');
+      return programDuration !== '' && hasVolume;
     }
     if (currentStep === 3) {
       return programDuration !== '';
@@ -369,7 +380,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       } else if (currentStep === 2) {
         if (programDuration === '') {
           Alert.alert('Required Selection', 'Please select a program duration.');
-        } else if (trainingApproach === '') {
+        } else if (volumePreference === '' || (volumePreference === 'custom' && customVolume === '')) {
           Alert.alert('Required Selection', 'Please select how hard you want to train.');
         }
       } else if (currentStep === 3) {
@@ -418,7 +429,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
         otherTrainingDays: otherTrainingDays,
         customGoals: customGoals,
         trainingExperience: trainingExperience,
-        trainingApproach: trainingApproach,
+        volumePreference: volumePreference,
+        customVolume: customVolume,
+        gender: gender,
         programDuration: programDuration,
         customDuration: customDuration,
         completedAt: new Date().toISOString(),
@@ -1094,6 +1107,82 @@ export default function FitnessGoalsQuestionnaireScreen() {
         </View>
       </Animatable.View>
 
+      {/* Gender Section */}
+      <Animatable.View
+        animation="fadeInUp"
+        delay={150}
+        style={styles.sectionContainer}
+      >
+        <Text style={[styles.sectionTitle, { color: themeColor }]}>
+          Gender
+        </Text>
+        <Text style={styles.sectionSubtitle}>
+          This helps us provide more accurate volume recommendations
+        </Text>
+        
+        <View style={styles.genderContainer}>
+          <TouchableOpacity
+            style={[
+              styles.genderButton,
+              gender === 'male' && [styles.genderButtonActive, { borderColor: themeColor }],
+            ]}
+            onPress={() => setGender('male')}
+          >
+            <Ionicons 
+              name="male" 
+              size={24} 
+              color={gender === 'male' ? themeColor : '#666'} 
+            />
+            <Text style={[
+              styles.genderText,
+              gender === 'male' && { color: themeColor }
+            ]}>
+              Male
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.genderButton,
+              gender === 'female' && [styles.genderButtonActive, { borderColor: '#FF69B4' }],
+            ]}
+            onPress={() => setGender('female')}
+          >
+            <Ionicons 
+              name="female" 
+              size={24} 
+              color={gender === 'female' ? '#FF69B4' : '#666'} 
+            />
+            <Text style={[
+              styles.genderText,
+              gender === 'female' && { color: '#FF69B4' }
+            ]}>
+              Female
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.genderButton,
+              gender === 'prefer_not_to_say' && [styles.genderButtonActive, { borderColor: '#9CA3AF' }],
+            ]}
+            onPress={() => setGender('prefer_not_to_say')}
+          >
+            <Ionicons 
+              name="help-circle-outline" 
+              size={24} 
+              color={gender === 'prefer_not_to_say' ? '#9CA3AF' : '#666'} 
+            />
+            <Text style={[
+              styles.genderText,
+              gender === 'prefer_not_to_say' && { color: '#9CA3AF' }
+            ]}>
+              Prefer not to say
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Animatable.View>
+
       {/* Training Experience Section */}
       <Animatable.View
         animation="fadeInUp"
@@ -1191,77 +1280,54 @@ export default function FitnessGoalsQuestionnaireScreen() {
         style={styles.sectionContainer}
       >
         <Text style={[styles.sectionTitle, { color: themeColor }]}>
-          How hard do you want to train?
+          Weekly Training Volume
         </Text>
         <Text style={styles.sectionSubtitle}>
-          Choose your preferred training intensity and volume level
+          How many sets per muscle group per week do you want to target?
         </Text>
         
         <View style={styles.experienceContainer}>
           {[
             {
-              id: 'push_hard',
-              title: 'Push Hard',
-              icon: 'flame-outline',
-              getSubtitle: () => {
-                switch (trainingExperience) {
-                  case 'complete_beginner':
-                    return '~8-10 sets/week per major muscle · Longer sessions · Prioritize sleep and nutrition';
-                  case 'beginner':
-                    return '~8-10 sets/week per major muscle · Longer sessions · Prioritize sleep and nutrition';
-                  case 'intermediate':
-                    return '~12-16 sets/week per major muscle · Longer sessions · Good recovery habits needed';
-                  case 'advanced':
-                    return '~16-20 sets/week per major muscle · Longer sessions · Excellent recovery essential';
-                  default:
-                    return '~12-16 sets/week per major muscle · Longer sessions · Good recovery habits needed';
-                }
-              }
-            },
-            {
-              id: 'balanced',
-              title: 'Balanced',
-              subtitle: '(Recommended)',
-              icon: 'speedometer-outline',
-              getSubtitle: () => {
-                switch (trainingExperience) {
-                  case 'complete_beginner':
-                    return '~6-8 sets/week per major muscle · Moderate sessions · Sustainable for most people';
-                  case 'beginner':
-                    return '~6-8 sets/week per major muscle · Moderate sessions · Sustainable for most people';
-                  case 'intermediate':
-                    return '~10-14 sets/week per major muscle · Moderate sessions · Best effort-to-results ratio';
-                  case 'advanced':
-                    return '~12-16 sets/week per major muscle · Moderate sessions · Solid gains without burnout';
-                  default:
-                    return '~10-14 sets/week per major muscle · Moderate sessions · Best effort-to-results ratio';
-                }
-              }
-            },
-            {
-              id: 'conservative',
-              title: 'Conservative',
+              id: '8-12',
+              title: '8-12 sets/week',
+              subtitle: 'Conservative',
               icon: 'leaf-outline',
-              getSubtitle: () => {
-                switch (trainingExperience) {
-                  case 'complete_beginner':
-                    return '~6 sets/week per major muscle · Shorter sessions · Great for busy schedules';
-                  case 'beginner':
-                    return '~6 sets/week per major muscle · Shorter sessions · Great for busy schedules';
-                  case 'intermediate':
-                    return '~8-10 sets/week per major muscle · Shorter sessions · Easy recovery';
-                  case 'advanced':
-                    return '~10-12 sets/week per major muscle · Shorter sessions · Sustainable long-term';
-                  default:
-                    return '~8-10 sets/week per major muscle · Shorter sessions · Easy recovery';
-                }
-              }
+              description: 'Focus on strength and technique · Shorter sessions · Easy recovery'
+            },
+            {
+              id: '12-16',
+              title: '12-16 sets/week', 
+              subtitle: 'Moderate (Recommended)',
+              icon: 'speedometer-outline',
+              description: 'Balanced muscle growth · Moderate sessions · Best effort-to-results ratio'
+            },
+            {
+              id: '16-20',
+              title: '16-20 sets/week',
+              subtitle: 'High Volume',
+              icon: 'flame-outline',
+              description: 'Maximum muscle growth · Longer sessions · Good recovery habits needed'
+            },
+            {
+              id: 'custom',
+              title: 'Custom Volume',
+              subtitle: 'Specify exact sets',
+              icon: 'create-outline',
+              description: 'Enter your preferred sets per week'
+            },
+            {
+              id: 'not_sure',
+              title: "I'm not sure",
+              subtitle: 'Get guidance',
+              icon: 'help-circle-outline',
+              description: 'Answer a few questions to find your ideal volume'
             }
-          ].map((approach, index) => {
-            const isSelected = trainingApproach === approach.id;
+          ].map((option, index) => {
+            const isSelected = volumePreference === option.id;
             return (
               <Animatable.View
-                key={approach.id}
+                key={option.id}
                 animation="fadeInUp"
                 delay={350 + (index * 50)}
                 style={styles.experienceOptionWrapper}
@@ -1274,23 +1340,33 @@ export default function FitnessGoalsQuestionnaireScreen() {
                       { borderColor: themeColor, backgroundColor: `${themeColor}10` }
                     ]
                   ]}
-                  onPress={() => setTrainingApproach(approach.id as 'push_hard' | 'balanced' | 'conservative')}
+                  onPress={() => {
+                    setVolumePreference(option.id as any);
+                    if (option.id === 'not_sure') {
+                      setShowMiniQuestionnaire(true);
+                    } else {
+                      setShowMiniQuestionnaire(false);
+                    }
+                  }}
                   activeOpacity={0.8}
                 >
                   <View style={styles.experienceOptionContent}>
                     <View style={[styles.experienceIconContainer, isSelected && { backgroundColor: themeColor }]}>
                       <Ionicons
-                        name={approach.icon as any}
+                        name={option.icon as any}
                         size={20}
                         color={isSelected ? '#000000' : themeColor}
                       />
                     </View>
                     <View style={styles.experienceTextContainer}>
                       <Text style={[styles.experienceTitle, isSelected && { color: themeColor }]}>
-                        {approach.title}{approach.subtitle ? ` ${approach.subtitle}` : ''}
+                        {option.title}
+                      </Text>
+                      <Text style={[styles.experienceSubtitle, isSelected && { color: themeColor, opacity: 0.9 }]}>
+                        {option.subtitle}
                       </Text>
                       <Text style={[styles.experienceDescription, isSelected && { color: themeColor, opacity: 0.8 }]}>
-                        {approach.getSubtitle()}
+                        {option.description}
                       </Text>
                     </View>
                     <View style={styles.experienceSelectionIndicator}>
@@ -1306,6 +1382,196 @@ export default function FitnessGoalsQuestionnaireScreen() {
             );
           })}
         </View>
+
+        {/* Custom Volume Input */}
+        {volumePreference === 'custom' && (
+          <Animatable.View
+            animation="fadeInUp"
+            delay={400}
+            style={styles.customInputContainer}
+          >
+            <Text style={styles.customInputLabel}>Enter your preferred sets per week per muscle group:</Text>
+            <TextInput
+              style={[styles.customInput, { borderColor: themeColor }]}
+              value={customVolume}
+              onChangeText={setCustomVolume}
+              placeholder="e.g., 14"
+              placeholderTextColor="#666"
+              keyboardType="numeric"
+              maxLength={2}
+            />
+          </Animatable.View>
+        )}
+
+        {/* Mini Questionnaire for "Not Sure" */}
+        {showMiniQuestionnaire && (
+          <Animatable.View
+            animation="fadeInUp"
+            delay={400}
+            style={styles.miniQuestionnaireContainer}
+          >
+            <View style={styles.miniQuestionnaireHeader}>
+              <Text style={styles.miniQuestionnaireTitle}>Let's find your ideal volume</Text>
+            </View>
+            
+            {/* Question 1: Recovery */}
+            <View style={styles.miniQuestionContainer}>
+              <View style={styles.questionHeader}>
+                <Text style={styles.questionNumber}>1 of 3</Text>
+                <Text style={styles.miniQuestionText}>How do you typically feel 48 hours after your hardest workouts?</Text>
+              </View>
+              <View style={styles.miniAnswerContainer}>
+                {[
+                  { id: 'tired', text: 'Still sore and tired, need extra rest', level: 'low' },
+                  { id: 'ready', text: 'Slightly tired but ready for next workout', level: 'medium' },
+                  { id: 'recovered', text: 'Fully recovered and energized', level: 'high' }
+                ].map((answer, index) => (
+                  <Animatable.View 
+                    key={answer.id}
+                    animation="fadeInUp"
+                    delay={100 + (index * 50)}
+                  >
+                    <TouchableOpacity 
+                      style={[
+                        styles.miniAnswer,
+                        styles[`miniAnswer${answer.level.charAt(0).toUpperCase() + answer.level.slice(1)}`],
+                        recoveryAnswer === answer.id && [styles.miniAnswerSelected, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
+                      ]}
+                      onPress={() => setRecoveryAnswer(answer.id)}
+                    >
+                      <Text style={[
+                        styles.miniAnswerText,
+                        recoveryAnswer === answer.id && { color: themeColor, fontWeight: '600' }
+                      ]}>
+                        {answer.text}
+                      </Text>
+                      {recoveryAnswer === answer.id && (
+                        <View style={[styles.selectionIndicator, { backgroundColor: themeColor }]} />
+                      )}
+                    </TouchableOpacity>
+                  </Animatable.View>
+                ))}
+              </View>
+            </View>
+
+            {/* Question 2: Training Frequency */}
+            <View style={styles.miniQuestionContainer}>
+              <View style={styles.questionHeader}>
+                <Text style={styles.questionNumber}>2 of 3</Text>
+                <Text style={styles.miniQuestionText}>When you've tried higher frequency training, what usually happens?</Text>
+              </View>
+              <View style={styles.miniAnswerContainer}>
+                {[
+                  { id: 'burnout', text: 'I get burnt out or overtrained within a few weeks', level: 'low' },
+                  { id: 'maintain', text: 'I can maintain it for a while but eventually need a break', level: 'medium' },
+                  { id: 'thrive', text: 'I thrive on higher frequency and feel better with more activity', level: 'high' }
+                ].map((answer, index) => (
+                  <Animatable.View 
+                    key={answer.id}
+                    animation="fadeInUp"
+                    delay={100 + (index * 50)}
+                  >
+                    <TouchableOpacity 
+                      style={[
+                        styles.miniAnswer,
+                        styles[`miniAnswer${answer.level.charAt(0).toUpperCase() + answer.level.slice(1)}`],
+                        frequencyAnswer === answer.id && [styles.miniAnswerSelected, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
+                      ]}
+                      onPress={() => setFrequencyAnswer(answer.id)}
+                    >
+                      <Text style={[
+                        styles.miniAnswerText,
+                        frequencyAnswer === answer.id && { color: themeColor, fontWeight: '600' }
+                      ]}>
+                        {answer.text}
+                      </Text>
+                      {frequencyAnswer === answer.id && (
+                        <View style={[styles.selectionIndicator, { backgroundColor: themeColor }]} />
+                      )}
+                    </TouchableOpacity>
+                  </Animatable.View>
+                ))}
+              </View>
+            </View>
+
+            {/* Question 3: Life Stress */}
+            <View style={styles.miniQuestionContainer}>
+              <View style={styles.questionHeader}>
+                <Text style={styles.questionNumber}>3 of 3</Text>
+                <Text style={styles.miniQuestionText}>How well do you handle training when life is stressful?</Text>
+              </View>
+              <View style={styles.miniAnswerContainer}>
+                {[
+                  { id: 'struggle', text: 'Training suffers - I need to reduce intensity', level: 'low' },
+                  { id: 'maintain', text: 'I can maintain normal training through moderate stress', level: 'medium' },
+                  { id: 'helps', text: 'Exercise actually helps me handle stress better', level: 'high' }
+                ].map((answer, index) => (
+                  <Animatable.View 
+                    key={answer.id}
+                    animation="fadeInUp"
+                    delay={100 + (index * 50)}
+                  >
+                    <TouchableOpacity 
+                      style={[
+                        styles.miniAnswer,
+                        styles[`miniAnswer${answer.level.charAt(0).toUpperCase() + answer.level.slice(1)}`],
+                        stressAnswer === answer.id && [styles.miniAnswerSelected, { borderColor: themeColor, backgroundColor: `${themeColor}15` }]
+                      ]}
+                      onPress={() => setStressAnswer(answer.id)}
+                    >
+                      <Text style={[
+                        styles.miniAnswerText,
+                        stressAnswer === answer.id && { color: themeColor, fontWeight: '600' }
+                      ]}>
+                        {answer.text}
+                      </Text>
+                      {stressAnswer === answer.id && (
+                        <View style={[styles.selectionIndicator, { backgroundColor: themeColor }]} />
+                      )}
+                    </TouchableOpacity>
+                  </Animatable.View>
+                ))}
+              </View>
+            </View>
+
+            {/* Get Recommendation Button */}
+            {recoveryAnswer && frequencyAnswer && stressAnswer && (
+              <Animatable.View animation="fadeInUp" delay={200}>
+                <TouchableOpacity 
+                  style={[styles.getRecommendationButton, { backgroundColor: themeColor }]}
+                  onPress={() => {
+                  // Calculate recommendation based on answers
+                  let score = 0;
+                  if (recoveryAnswer === 'recovered') score += 2;
+                  else if (recoveryAnswer === 'ready') score += 1;
+                  
+                  if (frequencyAnswer === 'thrive') score += 2;
+                  else if (frequencyAnswer === 'maintain') score += 1;
+                  
+                  if (stressAnswer === 'helps') score += 2;
+                  else if (stressAnswer === 'maintain') score += 1;
+                  
+                  // Gender bonus: Women can typically handle ~15% more volume
+                  if (gender === 'female') score += 1;
+                  
+                  // Set volume based on score (adjusted thresholds for gender)
+                  if (score >= 6) {
+                    setVolumePreference('16-20');
+                  } else if (score >= 3) {
+                    setVolumePreference('12-16');
+                  } else {
+                    setVolumePreference('8-12');
+                  }
+                  
+                  setShowMiniQuestionnaire(false);
+                }}
+              >
+                <Text style={styles.getRecommendationButtonText}>Get My Recommendation</Text>
+                </TouchableOpacity>
+              </Animatable.View>
+            )}
+          </Animatable.View>
+        )}
       </Animatable.View>
 
     </ScrollView>
@@ -1467,6 +1733,38 @@ export default function FitnessGoalsQuestionnaireScreen() {
             </Animatable.View>
           )}
 
+          {/* Gender */}
+          {gender && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={1450}
+              duration={500}
+              style={styles.summaryCard}
+            >
+              <Text style={styles.summaryCardTitle}>Gender</Text>
+              
+              <View style={styles.summaryItem}>
+                <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
+                  <Ionicons 
+                    name={
+                      gender === 'male' ? 'male' :
+                      gender === 'female' ? 'female' : 'help-circle'
+                    } 
+                    size={18} 
+                    color={themeColor} 
+                  />
+                </View>
+                <View style={styles.summaryItemContent}>
+                  <Text style={styles.summaryItemLabel}>For volume recommendations</Text>
+                  <Text style={styles.summaryItemValue}>
+                    {gender === 'male' ? 'Male' :
+                     gender === 'female' ? 'Female' : 'Prefer not to say'}
+                  </Text>
+                </View>
+              </View>
+            </Animatable.View>
+          )}
+
           {/* Training Experience */}
           {trainingExperience && (
             <Animatable.View 
@@ -1501,32 +1799,35 @@ export default function FitnessGoalsQuestionnaireScreen() {
             </Animatable.View>
           )}
 
-          {/* Training Approach */}
-          {trainingApproach && (
+          {/* Volume Preference */}
+          {volumePreference && (
             <Animatable.View 
               animation="fadeInUp" 
               delay={1550}
               duration={500}
               style={styles.summaryCard}
             >
-              <Text style={styles.summaryCardTitle}>Training Approach</Text>
+              <Text style={styles.summaryCardTitle}>Weekly Volume Target</Text>
               
               <View style={styles.summaryItem}>
                 <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
                   <Ionicons 
                     name={
-                      trainingApproach === 'push_hard' ? 'flame' :
-                      trainingApproach === 'balanced' ? 'speedometer' : 'leaf'
+                      volumePreference === '16-20' ? 'flame' :
+                      volumePreference === '12-16' ? 'speedometer' :
+                      volumePreference === '8-12' ? 'leaf' :
+                      volumePreference === 'custom' ? 'create' : 'help-circle'
                     } 
                     size={18} 
                     color={themeColor} 
                   />
                 </View>
                 <View style={styles.summaryItemContent}>
-                  <Text style={styles.summaryItemLabel}>Training Intensity</Text>
+                  <Text style={styles.summaryItemLabel}>Sets per muscle group</Text>
                   <Text style={styles.summaryItemValue}>
-                    {trainingApproach === 'push_hard' ? 'Push Hard' :
-                     trainingApproach === 'balanced' ? 'Balanced (Recommended)' : 'Conservative'}
+                    {volumePreference === 'custom' ? `${customVolume} sets/week` :
+                     volumePreference === 'not_sure' ? 'Assessment needed' :
+                     `${volumePreference} sets/week`}
                   </Text>
                 </View>
               </View>
@@ -3080,6 +3381,149 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#71717a',
     backgroundColor: 'transparent',
+  },
+  experienceSubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#71717a',
+    marginBottom: 4,
+  },
+  customInputContainer: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  customInputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 12,
+  },
+  customInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#ffffff',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  miniQuestionnaireContainer: {
+    marginTop: 24,
+    padding: 20,
+    backgroundColor: '#000000',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  miniQuestionnaireHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  miniQuestionnaireTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  miniQuestionnaireSubtitle: {
+    fontSize: 14,
+    color: '#71717a',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  miniQuestionContainer: {
+    marginBottom: 16,
+  },
+  questionHeader: {
+    marginBottom: 12,
+  },
+  questionNumber: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  miniQuestionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 12,
+  },
+  miniAnswerContainer: {
+    gap: 8,
+  },
+  miniAnswer: {
+    padding: 12,
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  miniAnswerLow: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
+  },
+  miniAnswerMedium: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#3b82f6',
+  },
+  miniAnswerHigh: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#10b981',
+  },
+  miniAnswerText: {
+    fontSize: 14,
+    color: '#ffffff',
+    flex: 1,
+  },
+  miniAnswerSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 2,
+  },
+  selectionIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  getRecommendationButton: {
+    marginTop: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  getRecommendationButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  genderContainer: {
+    gap: 12,
+  },
+  genderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    gap: 8,
+  },
+  genderButtonActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  genderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
   },
 
 });

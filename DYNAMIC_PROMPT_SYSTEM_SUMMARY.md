@@ -17,7 +17,7 @@ Successfully mapped all questionnaire fields to dynamic template variables:
 
 #### From Nutrition Questionnaire:
 - Daily calories, protein, carbs, fat (from calculated macros)
-- Personal info (gender, age, activity level, job type)
+- Personal info (gender [male/female/prefer not to say], age, activity level, job type)
 - Goal and rate (weight loss/gain targets)
 - Fiber target (calculated from calories using evidence-based formula)
 
@@ -103,7 +103,7 @@ Shop at: ${budgetData.groceryStore}
 | Category | Fields Mapped | Status |
 |----------|---------------|---------|
 | **Nutrition Targets** | calories, protein, carbs, fat, fiber, meals/day, duration, snacking, goal | ✅ Complete |
-| **Personal Info** | gender, age, activity level, job type | ✅ Complete |
+| **Personal Info** | gender (male/female/prefer not to say), age, activity level, job type | ✅ Complete |
 | **Dietary Requirements** | allergies, avoid foods, eating challenges | ✅ Complete |
 | **Cooking Preferences** | planning style, time investment, variety seeking, skill confidence, enjoyment | ✅ Complete |
 | **Equipment** | Available cooking equipment list | ✅ Complete |

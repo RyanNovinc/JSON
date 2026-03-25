@@ -546,6 +546,9 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
       const isCurrentlySaved = savedMealPlans.has(planId);
       
       console.log('💾 Save meal plan button pressed:', originalPlan.name, 'Currently saved:', isCurrentlySaved);
+      console.log('🔍 Debug - Modal plan ID:', deleteModal.plan?.id, 'Modal plan fingerprint:', deleteModal.plan?.fingerprint);
+      console.log('🔍 Debug - Original plan ID:', originalPlan.id, 'Original plan fingerprint:', originalPlan.fingerprint);
+      console.log('🔍 Debug - Using planId:', planId, 'Saved plans:', Array.from(savedMealPlans));
       
       if (isCurrentlySaved) {
         // Unsave the meal plan
@@ -1115,16 +1118,17 @@ ${JSON.stringify(debugData, null, 2)}
         </Pressable>
       </View>
 
-      {/* Gender Theme Toggle - Top Right */}
+      {/* Theme Toggle - Top Right */}
       <TouchableOpacity
-        style={styles.genderToggle}
+        style={styles.themeToggle}
         onPress={() => setIsPinkTheme(!isPinkTheme)}
         activeOpacity={0.8}
       >
-        <Ionicons 
-          name={isPinkTheme ? "woman" : "man"} 
-          size={24} 
-          color={themeColor} 
+        <View 
+          style={[
+            styles.colorSquare,
+            { backgroundColor: themeColor }
+          ]} 
         />
       </TouchableOpacity>
 
@@ -1205,8 +1209,13 @@ ${JSON.stringify(debugData, null, 2)}
               <TouchableOpacity
                 style={[
                   styles.saveActionButton,
-                  deleteModal.plan && savedMealPlans.has(deleteModal.plan.fingerprint || deleteModal.plan.id) && styles.removeActionButton
-                ]}
+                  (() => {
+                    if (!deleteModal.plan) return false;
+                    const originalPlan = mealPlans.find(p => p.name === deleteModal.plan?.name);
+                    const planId = originalPlan?.fingerprint || originalPlan?.id;
+                    return planId && savedMealPlans.has(planId) ? styles.removeActionButton : false;
+                  })()
+                ].filter(Boolean)}
                 onPress={() => {
                   console.log('🔥 Save button pressed, modal plan:', deleteModal.plan?.name);
                   if (deleteModal.plan) {
@@ -1218,12 +1227,22 @@ ${JSON.stringify(debugData, null, 2)}
                 activeOpacity={0.7}
               >
                 <Ionicons 
-                  name={deleteModal.plan && savedMealPlans.has(deleteModal.plan.fingerprint || deleteModal.plan.id) ? "heart-dislike" : "heart"} 
+                  name={(() => {
+                    if (!deleteModal.plan) return "heart";
+                    const originalPlan = mealPlans.find(p => p.name === deleteModal.plan?.name);
+                    const planId = originalPlan?.fingerprint || originalPlan?.id;
+                    return planId && savedMealPlans.has(planId) ? "heart-dislike" : "heart";
+                  })()} 
                   size={18} 
                   color="#ffffff" 
                 />
                 <Text style={styles.saveActionText}>
-                  {deleteModal.plan && savedMealPlans.has(deleteModal.plan.fingerprint || deleteModal.plan.id) ? 'Remove from My Meals' : 'Save to My Meals'}
+                  {(() => {
+                    if (!deleteModal.plan) return 'Save to My Meals';
+                    const originalPlan = mealPlans.find(p => p.name === deleteModal.plan?.name);
+                    const planId = originalPlan?.fingerprint || originalPlan?.id;
+                    return planId && savedMealPlans.has(planId) ? 'Remove from My Meals' : 'Save to My Meals';
+                  })()}
                 </Text>
               </TouchableOpacity>
               
@@ -2216,7 +2235,7 @@ const styles = StyleSheet.create({
     color: '#a1a1aa',
     marginTop: 2,
   },
-  genderToggle: {
+  themeToggle: {
     position: 'absolute',
     top: 60,
     right: 16,
@@ -2233,6 +2252,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  colorSquare: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
   },
   // Central mode toggle styles
   centralToggleContainer: {

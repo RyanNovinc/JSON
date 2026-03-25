@@ -184,6 +184,26 @@ export const NutritionStep3: React.FC<Props> = ({
                   Female
                 </Text>
               </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.genderButton,
+                  formData.gender === 'prefer_not_to_say' && [styles.genderButtonActive, { borderColor: '#9CA3AF' }],
+                ]}
+                onPress={() => updateFormData({ gender: 'prefer_not_to_say' })}
+              >
+                <Ionicons 
+                  name="help-circle-outline" 
+                  size={24} 
+                  color={formData.gender === 'prefer_not_to_say' ? '#9CA3AF' : '#666'} 
+                />
+                <Text style={[
+                  styles.genderText,
+                  formData.gender === 'prefer_not_to_say' && { color: '#9CA3AF' }
+                ]}>
+                  Prefer not to say
+                </Text>
+              </TouchableOpacity>
             </View>
           </Animatable.View>
 
@@ -348,16 +368,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   genderContainer: {
-    flexDirection: 'row',
     gap: 12,
   },
   genderButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 2,

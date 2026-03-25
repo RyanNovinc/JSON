@@ -24,7 +24,7 @@ export interface NutritionFormData {
   
   // Step 3: Personal Details
   age: number | null;
-  gender: 'male' | 'female' | null;
+  gender: 'male' | 'female' | 'prefer_not_to_say' | null;
   height: number | null; // cm
   weight: number | null; // kg
   
@@ -142,8 +142,13 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
       let bmr: number;
       if (savedData.gender === 'male') {
         bmr = (10 * savedData.weight) + (6.25 * savedData.height) - (5 * savedData.age) + 5;
-      } else {
+      } else if (savedData.gender === 'female') {
         bmr = (10 * savedData.weight) + (6.25 * savedData.height) - (5 * savedData.age) - 161;
+      } else {
+        // For 'prefer_not_to_say', use the average of male and female formulas
+        const maleBmr = (10 * savedData.weight) + (6.25 * savedData.height) - (5 * savedData.age) + 5;
+        const femaleBmr = (10 * savedData.weight) + (6.25 * savedData.height) - (5 * savedData.age) - 161;
+        bmr = (maleBmr + femaleBmr) / 2;
       }
 
       const activityMultipliers = {
@@ -209,8 +214,13 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
         let bmr: number;
         if (formData.gender === 'male') {
           bmr = (10 * formData.weight) + (6.25 * formData.height) - (5 * formData.age) + 5;
-        } else {
+        } else if (formData.gender === 'female') {
           bmr = (10 * formData.weight) + (6.25 * formData.height) - (5 * formData.age) - 161;
+        } else {
+          // For 'prefer_not_to_say', use the average of male and female formulas
+          const maleBmr = (10 * formData.weight) + (6.25 * formData.height) - (5 * formData.age) + 5;
+          const femaleBmr = (10 * formData.weight) + (6.25 * formData.height) - (5 * formData.age) - 161;
+          bmr = (maleBmr + femaleBmr) / 2;
         }
 
         // Activity multipliers
@@ -332,8 +342,13 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
     let bmr: number;
     if (formData.gender === 'male') {
       bmr = (10 * formData.weight) + (6.25 * formData.height) - (5 * formData.age) + 5;
-    } else {
+    } else if (formData.gender === 'female') {
       bmr = (10 * formData.weight) + (6.25 * formData.height) - (5 * formData.age) - 161;
+    } else {
+      // For 'prefer_not_to_say', use the average of male and female formulas
+      const maleBmr = (10 * formData.weight) + (6.25 * formData.height) - (5 * formData.age) + 5;
+      const femaleBmr = (10 * formData.weight) + (6.25 * formData.height) - (5 * formData.age) - 161;
+      bmr = (maleBmr + femaleBmr) / 2;
     }
 
     // Activity multipliers

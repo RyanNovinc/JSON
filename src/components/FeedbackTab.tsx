@@ -349,10 +349,11 @@ export function FeedbackTab() {
                     pressed && { opacity: 0.7 }
                   ]}
                 >
-                  <Ionicons 
-                    name={currentThemeState ? "woman" : "man"} 
-                    size={20} 
-                    color="#0a0a0b" 
+                  <View 
+                    style={[
+                      styles.colorIndicator,
+                      { backgroundColor: '#0a0a0b' }
+                    ]} 
                   />
                 </Pressable>
                 <TouchableOpacity onPress={closePanel} style={styles.closeButton}>
@@ -702,5 +703,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'transparent',
     zIndex: 2000,
+  },
+  colorIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
   },
 });
