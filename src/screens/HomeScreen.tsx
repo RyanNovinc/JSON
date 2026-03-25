@@ -168,7 +168,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
         if (program.id && sampleWorkoutIds.includes(program.id)) {
           Alert.alert(
             'Already Available',
-            'This workout is already available in Sample Plans. You can access it anytime from the Workout Plans screen.',
+            'This workout has been imported previously. You can access it anytime from your saved workouts.',
             [{ text: 'OK' }]
           );
           

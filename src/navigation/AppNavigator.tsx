@@ -15,7 +15,6 @@ import ModeTransitionContainer from '../components/ModeTransitionContainer';
 import CreateCountdownScreen from '../screens/CreateCountdownScreen';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
-import SampleWorkoutsScreen from '../screens/SampleWorkoutsScreen';
 import SampleMealPlansScreen from '../screens/SampleMealPlansScreen';
 import BlocksScreen from '../screens/BlocksScreen';
 import MesocycleBlocksScreen from '../screens/MesocycleBlocksScreen';
@@ -81,7 +80,6 @@ export type RootStackParamList = {
   CreateCountdown: undefined;
   ImportRoutine: undefined;
   ImportMealPlan: undefined;
-  SampleWorkouts: undefined;
   SampleMealPlans: undefined;
   AppIcon: undefined;
   Payment: undefined;
@@ -337,14 +335,6 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                       },
                     };
                   },
-                }}
-              />
-              <RootStack.Screen 
-                name="SampleWorkouts" 
-                component={SampleWorkoutsScreen}
-                options={{
-                  headerShown: false,
-                  presentation: 'modal'
                 }}
               />
               <RootStack.Screen 

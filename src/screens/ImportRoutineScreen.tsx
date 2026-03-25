@@ -2561,19 +2561,6 @@ This check exists because the JSON generator must reconstruct complete exercise 
             </Text>
           </TouchableOpacity>
 
-          <View style={styles.orSection}>
-            <View style={styles.orLine} />
-            <Text style={styles.orText}>OR</Text>
-            <View style={styles.orLine} />
-          </View>
-
-          <TouchableOpacity 
-            style={styles.secondaryButton}
-            onPress={() => navigation.navigate('SampleWorkouts')}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.secondaryButtonText}>Try Sample Programs</Text>
-          </TouchableOpacity>
 
         </View>
 

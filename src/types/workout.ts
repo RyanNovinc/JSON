@@ -93,20 +93,3 @@ export interface WorkoutProgram {
   }>;
 }
 
-export interface SampleWorkout {
-  id: string;
-  title: string;
-  description: string;
-  duration: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced' | 'Custom';
-  focus: string;
-  program: WorkoutProgram;
-  detailInfo: {
-    overview: string;
-    highlights: string[];
-    targetMuscles: string;
-    restPeriods: string;
-    progression: string;
-    equipment: string;
-  };
-}
