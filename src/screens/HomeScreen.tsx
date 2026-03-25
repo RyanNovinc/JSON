@@ -13,6 +13,7 @@ import {
   Dimensions,
   TextInput,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
@@ -673,7 +674,13 @@ export default function HomeScreen({ route, transitionProgress }: any) {
   const handleNutritionTransition = () => {
     if (isTransitioning) return;
     
-    // Just switch the app mode, the container will handle the animation
+    // Check if we're already in nutrition mode - no need to transition
+    if (appMode === 'nutrition') return;
+    
+    // Set transitioning state to prevent multiple clicks
+    setIsTransitioning(true);
+    
+    // Switch the app mode, the container will handle the animation
     setAppMode('nutrition');
   };
 
@@ -1210,10 +1217,9 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               }
             ]}
           >
-            <TouchableOpacity
+            <Pressable
               style={styles.centralModeToggleInner}
               onPress={() => setAppMode('training')}
-              activeOpacity={0.8}
             >
               <Ionicons 
                 name="barbell" 
@@ -1226,7 +1232,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               ]}>
                 Workouts
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </Animated.View>
           
           <Animated.View
@@ -1244,10 +1250,9 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               }
             ]}
           >
-            <TouchableOpacity
+            <Pressable
               style={styles.centralModeToggleInner}
               onPress={handleNutritionTransition}
-              activeOpacity={0.8}
             >
               <Ionicons 
                 name="restaurant" 
@@ -1260,7 +1265,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               ]}>
                 Nutrition
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </Animated.View>
         </View>
       </View>

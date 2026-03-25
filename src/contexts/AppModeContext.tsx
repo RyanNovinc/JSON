@@ -24,6 +24,7 @@ export const AppModeProvider: React.FC<AppModeProviderProps> = ({ children }) =>
   const isTrainingMode = appMode === 'training';
   const isNutritionMode = appMode === 'nutrition';
 
+
   return (
     <AppModeContext.Provider 
       value={{ 

@@ -12,6 +12,8 @@ import {
   Animated,
   Dimensions,
   TextInput,
+  ScrollView,
+  Pressable,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
@@ -286,6 +288,7 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
   const [savedMealPlans, setSavedMealPlans] = useState<Set<string>>(new Set());
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  
 
   // Completion status loaded from storage
   const [completionStatus, setCompletionStatus] = useState<NutritionCompletionStatus>({
@@ -513,7 +516,13 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
   const handleTrainingTransition = () => {
     if (isTransitioning) return;
     
-    // Just switch the app mode, the container will handle the animation
+    // Check if we're already in training mode - no need to transition
+    if (appMode === 'training') return;
+    
+    // Set transitioning state to prevent multiple clicks
+    setIsTransitioning(true);
+    
+    // Switch the app mode, the container will handle the animation
     setAppMode('training');
   };
 
@@ -575,6 +584,167 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
 
   const handleExport = (plan: MealPlan) => {
     setShareModal({ visible: true, plan });
+  };
+
+  // Debug function to capture all relevant state
+  const generateDebugInfo = async () => {
+    const timestamp = new Date().toISOString();
+    
+    try {
+      // Collect animated values (approximate current values)
+      let fadeAnimValue = 'unknown';
+      let scaleAnimValue = 'unknown';
+      let appModeContextDebug = {};
+      
+      try {
+        // Note: Animated values don't have direct access to current value in production
+        fadeAnimValue = 'accessible via debug only';
+        scaleAnimValue = 'accessible via debug only';
+        
+        // Get additional context from AppModeContext
+        appModeContextDebug = {
+          setAppMode_available: typeof setAppMode === 'function',
+          setIsTransitioning_available: typeof setIsTransitioning === 'function',
+          transition_history: 'not_tracked_yet'
+        };
+      } catch (e) {
+        fadeAnimValue = 'error accessing';
+        scaleAnimValue = 'error accessing';
+      }
+      
+      // Get storage state
+      let asyncStorageKeys = [];
+      let mealPlanStorageData = 'none';
+      try {
+        const keys = await AsyncStorage.getAllKeys();
+        asyncStorageKeys = keys.filter(key => 
+          key.includes('meal') || 
+          key.includes('nutrition') || 
+          key.includes('current') ||
+          key.includes('MEAL') ||
+          key.includes('NUTRITION')
+        );
+        
+        const currentPlanData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
+        mealPlanStorageData = currentPlanData ? 'exists' : 'null';
+      } catch (e) {
+        asyncStorageKeys = ['error accessing storage'];
+      }
+      
+      const debugData = {
+        timestamp,
+        bug_context: "Tab switching stuck after meal plan import",
+        app_mode_context: {
+          appMode,
+          isTrainingMode,
+          isNutritionMode,
+          isTransitioning
+        },
+        meal_plan_context: {
+          mealPlans_count: mealPlans?.length || 0,
+          currentPlan_exists: !!currentPlan,
+          currentPlan_id: currentPlan?.id || 'none',
+          currentPlan_name: currentPlan?.name || 'none',
+          converted_plans_count: convertedMealPlans?.length || 0,
+          mealPlanStorageData
+        },
+        modal_states: {
+          shareModal_visible: shareModal.visible,
+          successModal,
+          deleteModal_visible: deleteModal.visible,
+          renameModal_visible: renameModal.visible,
+          preferencesModal,
+          showMigration,
+          showDebugModal
+        },
+        animation_states: {
+          fadeAnim_value: fadeAnimValue,
+          scaleAnim_value: scaleAnimValue,
+        },
+        app_mode_debug: appModeContextDebug,
+        navigation_context: {
+          route_params: route?.params || {},
+          navigation_state: 'available'
+        },
+        storage_keys: asyncStorageKeys,
+        theme_context: {
+          isPinkTheme,
+          themeColor,
+          themeColorLight
+        },
+        component_state: {
+          completionStatus,
+          savedMealPlans_size: savedMealPlans?.size || 0,
+          errorMessage: 'none_currently'
+        },
+        device_info: {
+          platform: Platform.OS,
+          is_dev: __DEV__
+        }
+      };
+      
+      const formattedDebugInfo = `=== NUTRITION TAB SWITCHING DEBUG INFO ===
+Timestamp: ${timestamp}
+Issue: ${debugData.bug_context}
+
+APP MODE STATE:
+- appMode: ${debugData.app_mode_context.appMode}
+- isTrainingMode: ${debugData.app_mode_context.isTrainingMode}  
+- isNutritionMode: ${debugData.app_mode_context.isNutritionMode}
+- isTransitioning: ${debugData.app_mode_context.isTransitioning}
+
+MEAL PLAN STATE:
+- mealPlans count: ${debugData.meal_plan_context.mealPlans_count}
+- currentPlan exists: ${debugData.meal_plan_context.currentPlan_exists}
+- currentPlan ID: ${debugData.meal_plan_context.currentPlan_id}
+- currentPlan name: ${debugData.meal_plan_context.currentPlan_name}
+- converted plans count: ${debugData.meal_plan_context.converted_plans_count}
+- storage data: ${debugData.meal_plan_context.mealPlanStorageData}
+
+MODAL STATES:
+- shareModal: ${debugData.modal_states.shareModal_visible}
+- successModal: ${debugData.modal_states.successModal}
+- deleteModal: ${debugData.modal_states.deleteModal_visible}
+- renameModal: ${debugData.modal_states.renameModal_visible}
+- preferencesModal: ${debugData.modal_states.preferencesModal}
+- debugModal: ${debugData.modal_states.showDebugModal}
+
+ANIMATION STATES:
+- fadeAnim: ${debugData.animation_states.fadeAnim_value}
+- scaleAnim: ${debugData.animation_states.scaleAnim_value}
+
+APP MODE DEBUG:
+- setAppMode available: ${debugData.app_mode_debug.setAppMode_available}
+- setIsTransitioning available: ${debugData.app_mode_debug.setIsTransitioning_available}
+
+STORAGE KEYS:
+${debugData.storage_keys.map(key => `- ${key}`).join('\n')}
+
+NAVIGATION:
+- route params: ${JSON.stringify(debugData.navigation_context.route_params)}
+
+THEME:
+- isPinkTheme: ${debugData.theme_context.isPinkTheme}
+- themeColor: ${debugData.theme_context.themeColor}
+
+COMPLETION STATUS:
+${Object.entries(debugData.component_state.completionStatus).map(([key, value]) => `- ${key}: ${value}`).join('\n')}
+
+DEVICE:
+- Platform: ${debugData.device_info.platform}
+- Dev mode: ${debugData.device_info.is_dev}
+
+RAW JSON (for detailed analysis):
+${JSON.stringify(debugData, null, 2)}
+===============================================`;
+
+      setDebugInfo(formattedDebugInfo);
+      setShowDebugModal(true);
+      
+    } catch (error) {
+      setDebugInfo(`Error generating debug info: ${error}`);
+      setShowDebugModal(true);
+    }
   };
 
   const handleShare = async (action: 'copy' | 'share') => {
@@ -759,10 +929,10 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
                 <View style={styles.tripleActions}>
                   <TouchableOpacity
                     style={styles.tripleActionButton}
-                    onPress={() => handleJumpToToday(plan)}
+                    onPress={() => handleExport(plan)}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="today-outline" size={20} color={themeColor} />
+                    <Ionicons name="share-outline" size={20} color={themeColor} />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -804,13 +974,6 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
                     activeOpacity={0.7}
                   >
                     <Ionicons name="share-outline" size={18} color={themeColor} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.quadShareButton}
-                    onPress={() => handleJumpToToday(plan)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="today-outline" size={18} color={themeColor} />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -908,15 +1071,15 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
         </TouchableOpacity>
       </View>
 
+
       {/* App Mode Toggle - Centered at Top */}
       <View style={styles.centralToggleContainer}>
-        <TouchableOpacity
+        <Pressable
           style={[
             styles.centralModeToggle, 
             isTrainingMode && { backgroundColor: themeColor, borderColor: themeColor }
           ]}
           onPress={handleTrainingTransition}
-          activeOpacity={0.8}
         >
           <Ionicons 
             name="barbell" 
@@ -929,15 +1092,14 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
           ]}>
             Workouts
           </Text>
-        </TouchableOpacity>
+        </Pressable>
         
-        <TouchableOpacity
+        <Pressable
           style={[
             styles.centralModeToggle, 
             isNutritionMode && { backgroundColor: themeColor, borderColor: themeColor }
           ]}
           onPress={() => {}} // Already in nutrition mode
-          activeOpacity={0.8}
         >
           <Ionicons 
             name="restaurant" 
@@ -950,7 +1112,7 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
           ]}>
             Nutrition
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {/* Gender Theme Toggle - Top Right */}
@@ -965,6 +1127,7 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
           color={themeColor} 
         />
       </TouchableOpacity>
+
 
 
       {/* Add Meal Plan FAB - Bottom Right */}
@@ -1243,6 +1406,7 @@ export default function NutritionHomeScreen({ route, transitionProgress }: any) 
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }

@@ -620,10 +620,19 @@ export default function ImportMealPlanScreen() {
       // Close the modal first
       setShowConfirmation(false);
       
-      // Navigate to nutrition home
-      navigation.navigate('NutritionHome', { 
-        refresh: true
-      } as any);
+      // Check if we're already on nutrition home to avoid navigation conflicts
+      const currentRoute = navigation.getState().routes[navigation.getState().index];
+      if (currentRoute?.name === 'NutritionHome') {
+        // Already on nutrition home, just go back without navigation conflict
+        console.log('🏠 Already on NutritionHome, going back without refresh navigation');
+        navigation.goBack();
+      } else {
+        // Navigate to Home screen (ModeTransitionContainer) and set nutrition mode
+        console.log('🏠 Navigating to Home screen in nutrition mode');
+        navigation.navigate('Home', { 
+          refresh: true
+        } as any);
+      }
     } catch (error) {
       console.error('Failed to save meal plan:', error);
       Alert.alert('Error', 'Failed to save meal plan. Please try again.');

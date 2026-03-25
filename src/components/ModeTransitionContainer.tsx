@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { useAppMode } from '../contexts/AppModeContext';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import HomeScreen from '../screens/HomeScreen';
 import NutritionHomeScreen from '../screens/NutritionHomeScreen';
 
@@ -18,6 +18,8 @@ const SWIPE_VELOCITY_THRESHOLD = 800; // Velocity threshold for quick swipes
 export default function ModeTransitionContainer({ route, navigation }: any) {
   const { appMode, setAppMode, isTransitioning, setIsTransitioning } = useAppMode();
   const nav = useNavigation();
+  
+  
   
   // Animated value for the container position
   // 0 = workout screen visible, -SCREEN_WIDTH = nutrition screen visible
@@ -37,20 +39,38 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
     const toValue = appMode === 'training' ? 0 : -SCREEN_WIDTH;
     const progressValue = appMode === 'training' ? 0 : 1;
     
+    
+    
+    // Reset gesture offset to prevent state confusion
+    gestureTranslateX.setValue(0);
+    
+    // Force immediate state update for instant visual feedback
+    translateX.setValue(toValue);
+    transitionProgress.setValue(progressValue);
+    
+    // Then animate smoothly
     Animated.parallel([
       Animated.spring(translateX, {
         toValue,
         useNativeDriver: true,
-        tension: 100,
-        friction: 30,
+        tension: 120,
+        friction: 25,
       }),
       Animated.spring(transitionProgress, {
         toValue: progressValue,
         useNativeDriver: true,
-        tension: 100,
-        friction: 30,
+        tension: 120,
+        friction: 25,
       }),
-    ]).start();
+    ]).start((finished) => {
+      // Only clear transition state if animation actually completed successfully
+      if (finished) {
+        setIsTransitioning(false);
+      } else {
+        // Force clear anyway after a short delay to prevent getting stuck
+        setTimeout(() => setIsTransitioning(false), 100);
+      }
+    });
   }, [appMode]);
 
   // Fix initialization sync issue - ensure animated values match app mode on mount
@@ -58,11 +78,13 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
     const correctTranslateValue = appMode === 'training' ? 0 : -SCREEN_WIDTH;
     const correctProgressValue = appMode === 'training' ? 0 : 1;
     
+    
     // Set values immediately without animation on mount to fix sync issues
     translateX.setValue(correctTranslateValue);
     transitionProgress.setValue(correctProgressValue);
     gestureTranslateX.setValue(0);
-  }, []); // Run only on mount
+    setIsTransitioning(false);
+  }, [appMode]); // Run whenever appMode changes!
 
   const onGestureEvent = (event: any) => {
     const { translationX } = event.nativeEvent;
@@ -120,6 +142,12 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
         setAppMode(newMode);
         
         // Animate the gesture offset to complete the transition
+        const gestureTimestamp = new Date().toISOString();
+        console.log(`👆 [${gestureTimestamp}] Gesture transition animation starting...`);
+        console.log(`   - newMode: ${newMode}`);
+        console.log(`   - targetValue: ${targetValue}`);
+        console.log(`   - targetProgress: ${targetProgress}`);
+        
         Animated.parallel([
           Animated.spring(gestureTranslateX, {
             toValue: 0,
@@ -139,13 +167,24 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
             tension: 100,
             friction: 30,
           }),
-        ]).start(() => {
-          setIsTransitioning(false);
+        ]).start((finished) => {
+          const gestureCompletionTimestamp = new Date().toISOString();
+          console.log(`👆✅ [${gestureCompletionTimestamp}] Gesture animation callback fired!`);
+          console.log(`   - finished: ${finished}`);
+          
+          if (finished) {
+            console.log(`   - Gesture animation completed successfully`);
+            setIsTransitioning(false);
+          } else {
+            console.warn(`⚠️ Gesture animation interrupted! Force clearing...`);
+            setTimeout(() => setIsTransitioning(false), 100);
+          }
         });
       } else {
         // Snap back to current mode
         const currentProgress = appMode === 'training' ? 0 : 1;
         
+        console.log(`🔙 Snap back animation starting...`);
         Animated.parallel([
           Animated.spring(gestureTranslateX, {
             toValue: 0,
@@ -159,8 +198,16 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
             tension: 100,
             friction: 30,
           }),
-        ]).start(() => {
-          setIsTransitioning(false);
+        ]).start((finished) => {
+          console.log(`🔙✅ Snap back animation callback fired! finished: ${finished}`);
+          
+          if (finished) {
+            console.log(`   - Snap back completed successfully`);
+            setIsTransitioning(false);
+          } else {
+            console.warn(`⚠️ Snap back animation interrupted! Force clearing...`);
+            setTimeout(() => setIsTransitioning(false), 100);
+          }
         });
       }
     }
@@ -173,7 +220,7 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
         onHandlerStateChange={onHandlerStateChange}
         activeOffsetX={[-10, 10]}
         failOffsetY={[-30, 30]}
-        enabled={false}
+        enabled={!isTransitioning}
       >
         <Animated.View
           style={[

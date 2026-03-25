@@ -45,7 +45,6 @@ import { NutritionQuestionnaireScreen } from '../screens/NutritionQuestionnaireS
 import BudgetCookingQuestionnaireScreen from '../screens/BudgetCookingQuestionnaireScreen';
 import FridgePantryQuestionnaireScreen from '../screens/FridgePantryQuestionnaireScreen';
 import SleepOptimizationScreen from '../screens/SleepOptimizationScreen';
-import NutritionHomeScreen from '../screens/NutritionHomeScreen';
 import NutritionDashboardScreen from '../screens/NutritionDashboardScreen';
 import WorkoutDashboardScreen from '../screens/WorkoutDashboardScreen';
 import FitnessGoalsQuestionnaireScreen from '../screens/FitnessGoalsQuestionnaireScreen';
@@ -173,7 +172,6 @@ export type RootStackParamList = {
   BudgetCookingQuestionnaire: undefined;
   FridgePantryQuestionnaire: undefined;
   SleepOptimizationScreen: undefined;
-  NutritionHome: undefined;
   NutritionDashboard: undefined;
   WorkoutDashboard: undefined;
   FitnessGoalsQuestionnaire: undefined;
@@ -472,13 +470,6 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 options={{
                   headerShown: false,
                   presentation: 'modal'
-                }}
-              />
-              <RootStack.Screen 
-                name="NutritionHome" 
-                component={NutritionHomeScreen}
-                options={{
-                  headerShown: false,
                 }}
               />
               <RootStack.Screen 
