@@ -59,8 +59,8 @@ const features = [
   },
   {
     icon: '💰',
-    title: 'Skip the Dietitian',
-    desc: 'Skip costly dietitian visits — get unlimited personalized meal plans that adjust as you progress',
+    title: 'Nutrition For Everyone',
+    desc: 'Get dietitian-level personalisation — unlimited meal plans that adjust as your goals evolve. No appointments needed.',
   },
 ];
 
@@ -286,7 +286,7 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
                 { feature: 'Meal prep guidance included', us: true, them: false },
                 { feature: 'Grocery lists with pricing', us: true, them: false },
                 { feature: 'No ongoing fees', us: true, them: false },
-                { feature: 'Typical cost', us: '$9.99 once', them: '$150–300/session' },
+                { feature: 'Typical cost', us: '$9.99\nonce', them: '$150–300/session' },
               ].map((row, index) => (
                 <View key={index} style={styles.comparisonRow}>
                   <Text style={styles.comparisonFeature}>{row.feature}</Text>

@@ -2888,6 +2888,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
             (buttonEnabled || currentStep > 0) && styles.expandedContainer
           ]}>
             <TouchableOpacity
+              key={`continue-button-${buttonEnabled}`}
               style={[
                 styles.continueButton,
                 { 
