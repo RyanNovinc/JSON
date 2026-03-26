@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { assemblePlanningPrompt } from '../data/planningPrompt';
 import { QuestionnaireData } from '../data/workoutPrompt';
 import { useTheme } from '../contexts/ThemeContext';
+import { WorkoutStorage } from '../utils/storage';
 
 interface WorkoutGeneratorStep1Props {
   onNext: () => void;
@@ -107,19 +108,16 @@ export default function WorkoutGeneratorStep1({ onNext, onBack }: WorkoutGenerat
 
   const checkQuestionnairesCompleted = async () => {
     try {
-      const questionnaireData = await loadQuestionnaireData();
+      // Use the exact same logic as WorkoutDashboardScreen
+      const [fitnessGoalsData, equipmentPreferencesData] = await Promise.all([
+        WorkoutStorage.loadFitnessGoalsResults(),
+        WorkoutStorage.loadEquipmentPreferencesResults()
+      ]);
+
+      const fitnessGoalsCompleted = !!(fitnessGoalsData && fitnessGoalsData.completedAt);
+      const equipmentPreferencesCompleted = !!(equipmentPreferencesData && equipmentPreferencesData.completedAt);
       
-      // Check if user has actually completed questionnaires (not just defaults)
-      const hasRealData = questionnaireData && (
-        (questionnaireData.primaryGoal && questionnaireData.primaryGoal !== 'build_muscle') ||
-        (questionnaireData.selectedEquipment && !questionnaireData.selectedEquipment.includes('commercial_gym')) ||
-        (questionnaireData.trainingExperience && questionnaireData.trainingExperience !== 'intermediate') ||
-        questionnaireData.totalTrainingDays ||
-        questionnaireData.sessionStyle && questionnaireData.sessionStyle !== 'moderate' ||
-        questionnaireData.programDuration && questionnaireData.programDuration !== '12_weeks'
-      );
-      
-      return hasRealData;
+      return fitnessGoalsCompleted && equipmentPreferencesCompleted;
     } catch (error) {
       return false;
     }
@@ -279,7 +277,13 @@ Please design a complete workout program with exercises, sets, reps, and rest pe
                 opacity: questionnairesCompleted ? 1 : 0.6
               }
             ]}
-            onPress={handleCopyPrompt}
+            onPress={questionnairesCompleted ? handleCopyPrompt : () => {
+              Alert.alert(
+                'Complete Questionnaires First',
+                'Please finish the Fitness Goals and Equipment & Preferences questionnaires to generate your personalized workout prompt.',
+                [{ text: 'OK' }]
+              );
+            }}
             activeOpacity={0.8}
           >
             <Ionicons 
@@ -298,7 +302,7 @@ Please design a complete workout program with exercises, sets, reps, and rest pe
           <Text style={styles.hintText}>
             {questionnairesCompleted 
               ? 'Then paste and send to any AI' 
-              : 'Complete both questionnaires above'
+              : 'Complete workout questionnaires'
             }
           </Text>
         </View>
@@ -306,12 +310,34 @@ Please design a complete workout program with exercises, sets, reps, and rest pe
 
       <View style={styles.bottomContainer}>
         <TouchableOpacity 
-          style={[styles.nextButton, { borderColor: themeColor }]}
-          onPress={onNext}
+          style={[
+            styles.nextButton, 
+            { 
+              borderColor: questionnairesCompleted ? themeColor : '#27272a',
+              opacity: questionnairesCompleted ? 1 : 0.6
+            }
+          ]}
+          onPress={questionnairesCompleted ? onNext : () => {
+            Alert.alert(
+              'Complete Questionnaires First',
+              'Please finish the Fitness Goals and Equipment & Preferences questionnaires before proceeding.',
+              [{ text: 'OK' }]
+            );
+          }}
           activeOpacity={0.8}
+          disabled={!questionnairesCompleted}
         >
-          <Text style={[styles.nextButtonText, { color: themeColor }]}>Next Step</Text>
-          <Ionicons name="chevron-forward" size={20} color={themeColor} />
+          <Text style={[
+            styles.nextButtonText, 
+            { color: questionnairesCompleted ? themeColor : '#71717a' }
+          ]}>
+            {questionnairesCompleted ? 'Next Step' : 'Complete Setup First'}
+          </Text>
+          <Ionicons 
+            name={questionnairesCompleted ? "chevron-forward" : "lock-closed"} 
+            size={20} 
+            color={questionnairesCompleted ? themeColor : '#71717a'} 
+          />
         </TouchableOpacity>
       </View>
       </Animated.View>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -111,7 +111,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     if (onBack) {
       onBack();
     } else {
-      navigation.navigate('NutritionHome' as never);
+      navigation.navigate('NutritionDashboard' as never);
     }
   };
   const [formData, setFormData] = useState({
@@ -297,6 +297,33 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   };
 
   const totalSteps = 9;
+
+  // Simple state for button validation
+  const [buttonEnabled, setButtonEnabled] = useState(false);
+
+  // Check if current step is valid - simple function
+  const checkStepValid = () => {
+    switch (currentStep) {
+      case 0: 
+        return !!(formData.country?.trim() && formData.city?.trim() && formData.groceryStore?.trim());
+      case 1: return !!formData.weeklyBudget;
+      case 2: return true; // Budget range is optional
+      case 3: return formData.planningStyle > 0 && formData.cookingEnjoyment > 0 && 
+                     formData.timeInvestment > 0 && formData.varietySeeking > 0 && 
+                     formData.skillConfidence > 0;
+      case 4: return true; // Eating patterns are optional
+      case 5: return formData.planDuration > 0; // Duration must be selected
+      case 6: return formData.startDate !== ''; // Start date must be selected
+      case 7: return formData.mealPreferences !== ''; // Meal preferences must be selected
+      case 8: return formData.cookingEquipment.length > 0; // At least one piece of equipment selected
+      default: return false;
+    }
+  };
+
+  // Update button state whenever form data or step changes
+  useEffect(() => {
+    setButtonEnabled(checkStepValid());
+  }, [currentStep, formData.country, formData.city, formData.groceryStore, formData.weeklyBudget, formData.planningStyle, formData.cookingEnjoyment, formData.timeInvestment, formData.varietySeeking, formData.skillConfidence, formData.planDuration, formData.startDate, formData.mealPreferences, formData.cookingEquipment]);
 
   const getStoreRecommendation = () => {
     const budget = formData.weeklyBudget;
@@ -2839,33 +2866,6 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
       return null;
     }
 
-    const isStepValid = () => {
-      switch (currentStep) {
-        case 0: 
-          const isValid = !!(formData.country?.trim() && formData.city?.trim() && formData.groceryStore?.trim());
-          console.log('🔍 Step 0 validation:', {
-            country: `"${formData.country}"`,
-            city: `"${formData.city}"`,
-            groceryStore: `"${formData.groceryStore}"`,
-            isValid,
-            countryLength: formData.country?.length,
-            cityLength: formData.city?.length,
-            groceryStoreLength: formData.groceryStore?.length
-          });
-          return isValid;
-        case 1: return formData.weeklyBudget;
-        case 2: return true; // Budget range is optional
-        case 3: return formData.planningStyle > 0 && formData.cookingEnjoyment > 0 && 
-                       formData.timeInvestment > 0 && formData.varietySeeking > 0 && 
-                       formData.skillConfidence > 0;
-        case 4: return true; // Eating patterns are optional
-        case 5: return formData.planDuration > 0; // Duration must be selected
-        case 6: return formData.startDate !== ''; // Start date must be selected
-        case 7: return formData.mealPreferences !== ''; // Meal preferences must be selected
-        case 8: return formData.cookingEquipment.length > 0; // At least one piece of equipment selected
-        default: return false;
-      }
-    };
 
     return (
       <View style={styles.footer}>
@@ -2885,28 +2885,29 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
           
           <View style={[
             styles.continueButtonContainer,
-            (isStepValid() || currentStep > 0) && styles.expandedContainer
+            (buttonEnabled || currentStep > 0) && styles.expandedContainer
           ]}>
             <TouchableOpacity
               style={[
                 styles.continueButton,
-                { backgroundColor: isStepValid() ? colors.primary : '#333333' },
-                !isStepValid() && styles.disabledButton
+                { 
+                  backgroundColor: buttonEnabled ? colors.primary : '#333333',
+                  opacity: buttonEnabled ? 1 : 0.6
+                }
               ]}
-              onPress={nextStep}
-              disabled={!isStepValid()}
+              onPress={buttonEnabled ? nextStep : () => {}}
               activeOpacity={0.8}
             >
               <Text style={[
                 styles.continueText,
-                { color: isStepValid() ? '#000000' : '#666666' }
+                { color: buttonEnabled ? '#000000' : '#666666' }
               ]}>
                 {currentStep === totalSteps - 1 ? 'View Results' : 'Continue'}
               </Text>
               <Ionicons 
                 name={currentStep === totalSteps - 1 ? "eye" : "arrow-forward"} 
                 size={20} 
-                color={isStepValid() ? '#000000' : '#666666'}
+                color={buttonEnabled ? '#000000' : '#666666'}
               />
             </TouchableOpacity>
           </View>

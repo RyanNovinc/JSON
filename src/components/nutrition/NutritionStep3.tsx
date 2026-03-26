@@ -17,6 +17,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NutritionFormData } from '../../screens/NutritionQuestionnaireScreen';
 import RobustStorage from '../../utils/robustStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WorkoutStorage } from '../../utils/storage';
 
 interface WeightEntry {
   id: string;
@@ -63,7 +64,23 @@ export const NutritionStep3: React.FC<Props> = ({
     try {
       console.log('🏃‍♂️ [NUTRITION STEP3] Loading current weight from tracker...');
       
-      // Try robust storage first
+      // Try to load from WorkoutStorage first (centralized storage)
+      const weightHistory = await WorkoutStorage.loadWeightHistory();
+      
+      if (weightHistory && weightHistory.length > 0) {
+        const sortedHistory = weightHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const latestEntry = sortedHistory[0];
+        console.log('🏃‍♂️ [NUTRITION STEP3] Found latest weight from WorkoutStorage:', latestEntry.weight, latestEntry.unit);
+        
+        setCurrentWeight(latestEntry.weight);
+        setWeightUnit(latestEntry.unit);
+        
+        // Always sync the latest weight from tracker to form data
+        updateFormData({ weight: latestEntry.weight });
+        return;
+      }
+      
+      // Fallback: Try robust storage
       let stored = await RobustStorage.getItem('@weight_history', true);
       
       if (!stored) {
@@ -77,15 +94,13 @@ export const NutritionStep3: React.FC<Props> = ({
         
         if (sortedHistory.length > 0) {
           const latestEntry = sortedHistory[0];
-          console.log('🏃‍♂️ [NUTRITION STEP3] Found latest weight:', latestEntry.weight, latestEntry.unit);
+          console.log('🏃‍♂️ [NUTRITION STEP3] Found latest weight from legacy storage:', latestEntry.weight, latestEntry.unit);
           
           setCurrentWeight(latestEntry.weight);
           setWeightUnit(latestEntry.unit);
           
-          // Auto-populate form data if not already set
-          if (!formData.weight) {
-            updateFormData({ weight: latestEntry.weight });
-          }
+          // Always sync the latest weight from tracker to form data
+          updateFormData({ weight: latestEntry.weight });
         }
       } else {
         console.log('🏃‍♂️ [NUTRITION STEP3] No weight history found');

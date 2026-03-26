@@ -49,11 +49,18 @@ export default function NutritionGeneratorStep1({ onNext, onBack }: NutritionGen
 
   const checkNutritionCompleted = async () => {
     try {
-      const completionStatus = await WorkoutStorage.loadNutritionCompletionStatus();
-      // Check that the core questionnaires are completed (same as dashboard screen)
-      return completionStatus.nutritionGoals && 
-             completionStatus.budgetCooking && 
-             completionStatus.sleepOptimization;
+      // Use the same logic as workout side - check for completedAt timestamps
+      const [nutritionGoalsData, budgetCookingData, sleepOptimizationData] = await Promise.all([
+        WorkoutStorage.loadNutritionResults(),
+        WorkoutStorage.loadBudgetCookingResults(), 
+        WorkoutStorage.loadSleepOptimizationResults()
+      ]);
+
+      const nutritionGoalsCompleted = !!(nutritionGoalsData && nutritionGoalsData.completedAt);
+      const budgetCookingCompleted = !!(budgetCookingData && budgetCookingData.completedAt);
+      const sleepOptimizationCompleted = !!(sleepOptimizationData && sleepOptimizationData.completedAt);
+      
+      return nutritionGoalsCompleted && budgetCookingCompleted && sleepOptimizationCompleted;
     } catch (error) {
       return false;
     }
@@ -76,7 +83,7 @@ export default function NutritionGeneratorStep1({ onNext, onBack }: NutritionGen
       if (!completed) {
         Alert.alert(
           'Complete Nutrition Setup First',
-          'Please complete the nutrition questionnaire to generate your personalized meal plan prompt.',
+          'Please complete the nutrition questionnaires to generate your personalized meal plan prompt.',
           [{ text: 'OK' }]
         );
         return;
@@ -192,7 +199,7 @@ Create a personalized meal plan based on the nutrition data provided. Include br
             <Text style={styles.hintText}>
               {nutritionCompleted 
                 ? 'Then paste and send to any AI' 
-                : 'Complete nutrition questionnaire above'
+                : 'Complete nutrition questionnaires'
               }
             </Text>
           </View>
@@ -200,12 +207,34 @@ Create a personalized meal plan based on the nutrition data provided. Include br
 
         <View style={styles.bottomContainer}>
           <TouchableOpacity 
-            style={[styles.nextButton, { borderColor: themeColor }]}
-            onPress={onNext}
+            style={[
+              styles.nextButton, 
+              { 
+                borderColor: nutritionCompleted ? themeColor : '#27272a',
+                opacity: nutritionCompleted ? 1 : 0.6
+              }
+            ]}
+            onPress={nutritionCompleted ? onNext : () => {
+              Alert.alert(
+                'Complete Nutrition Setup First',
+                'Please complete the nutrition questionnaires before proceeding.',
+                [{ text: 'OK' }]
+              );
+            }}
             activeOpacity={0.8}
+            disabled={!nutritionCompleted}
           >
-            <Text style={[styles.nextButtonText, { color: themeColor }]}>Next Step</Text>
-            <Ionicons name="chevron-forward" size={20} color={themeColor} />
+            <Text style={[
+              styles.nextButtonText, 
+              { color: nutritionCompleted ? themeColor : '#71717a' }
+            ]}>
+              {nutritionCompleted ? 'Next Step' : 'Complete Setup First'}
+            </Text>
+            <Ionicons 
+              name={nutritionCompleted ? "chevron-forward" : "lock-closed"} 
+              size={20} 
+              color={nutritionCompleted ? themeColor : '#71717a'} 
+            />
           </TouchableOpacity>
         </View>
       </Animated.View>
