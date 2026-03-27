@@ -69,7 +69,7 @@ function RoutineCard({ routine, onExport, onPress, onLongPress, isPinkTheme, the
   );
 }
 
-export default function HomeScreen({ route, transitionProgress }: any) {
+export default function HomeScreen({ route, transitionProgress, panGestureRef }: any) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   
   // NEW: Use WorkoutRoutineContext instead of local state
@@ -1217,9 +1217,10 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               }
             ]}
           >
-            <Pressable
+            <TouchableOpacity
               style={styles.centralModeToggleInner}
               onPress={() => setAppMode('training')}
+              simultaneousHandlers={panGestureRef}
             >
               <Ionicons 
                 name="barbell" 
@@ -1232,7 +1233,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               ]}>
                 Workouts
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           </Animated.View>
           
           <Animated.View
@@ -1250,9 +1251,10 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               }
             ]}
           >
-            <Pressable
+            <TouchableOpacity
               style={styles.centralModeToggleInner}
               onPress={handleNutritionTransition}
+              simultaneousHandlers={panGestureRef}
             >
               <Ionicons 
                 name="restaurant" 
@@ -1265,7 +1267,7 @@ export default function HomeScreen({ route, transitionProgress }: any) {
               ]}>
                 Nutrition
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           </Animated.View>
         </View>
       </View>

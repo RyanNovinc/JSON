@@ -5,7 +5,7 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, TouchableOpacity } from 'react-native-gesture-handler';
 import { useAppMode } from '../contexts/AppModeContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import HomeScreen from '../screens/HomeScreen';
@@ -18,6 +18,9 @@ const SWIPE_VELOCITY_THRESHOLD = 600; // Lower velocity threshold for quicker re
 export default function ModeTransitionContainer({ route, navigation }: any) {
   const { appMode, setAppMode, isTransitioning, setIsTransitioning } = useAppMode();
   const nav = useNavigation();
+  
+  // Create a ref for the pan gesture handler to allow simultaneous handlers
+  const panGestureRef = useRef(null);
   
   
   
@@ -216,11 +219,13 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       <PanGestureHandler
+        ref={panGestureRef}
         onGestureEvent={onGestureEvent}
         onHandlerStateChange={onHandlerStateChange}
         activeOffsetX={[-8, 8]}
         failOffsetY={[-25, 25]}
         enabled={!isTransitioning}
+        shouldCancelWhenOutside={false}
       >
         <Animated.View
           style={[
@@ -236,6 +241,7 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
               navigation={navigation || nav} 
               route={route} 
               transitionProgress={transitionProgress}
+              panGestureRef={panGestureRef}
             />
           </View>
           
@@ -245,6 +251,7 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
               navigation={navigation || nav} 
               route={route}
               transitionProgress={transitionProgress}
+              panGestureRef={panGestureRef}
             />
           </View>
         </Animated.View>

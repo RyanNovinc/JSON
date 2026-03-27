@@ -251,7 +251,7 @@ function MealPlanCard({ plan, onExport, onPress, onLongPress }: {
 
 // No scaling - meal plans are used exactly as designed
 
-export default function NutritionHomeScreen({ route, transitionProgress }: any) {
+export default function NutritionHomeScreen({ route, transitionProgress, panGestureRef }: any) {
   const navigation = useNavigation<NutritionNavigationProp>();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode, isTransitioning, setIsTransitioning } = useAppMode();
@@ -1077,12 +1077,13 @@ ${JSON.stringify(debugData, null, 2)}
 
       {/* App Mode Toggle - Centered at Top */}
       <View style={styles.centralToggleContainer}>
-        <Pressable
+        <TouchableOpacity
           style={[
             styles.centralModeToggle, 
             isTrainingMode && { backgroundColor: themeColor, borderColor: themeColor }
           ]}
           onPress={handleTrainingTransition}
+          simultaneousHandlers={panGestureRef}
         >
           <Ionicons 
             name="barbell" 
@@ -1095,14 +1096,15 @@ ${JSON.stringify(debugData, null, 2)}
           ]}>
             Workouts
           </Text>
-        </Pressable>
+        </TouchableOpacity>
         
-        <Pressable
+        <TouchableOpacity
           style={[
             styles.centralModeToggle, 
             isNutritionMode && { backgroundColor: themeColor, borderColor: themeColor }
           ]}
           onPress={() => {}} // Already in nutrition mode
+          simultaneousHandlers={panGestureRef}
         >
           <Ionicons 
             name="restaurant" 
@@ -1115,7 +1117,7 @@ ${JSON.stringify(debugData, null, 2)}
           ]}>
             Nutrition
           </Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
 
       {/* Theme Toggle - Top Right */}
