@@ -95,7 +95,7 @@ Review my profile and create a complete, structured workout program document usi
 
 The user will request changes if they disagree with your choices.
 
-If this conversation contains a completed mesocycle summary and roadmap from a previous phase, use them as context: follow the roadmap's prescribed progression, rotate exercises from the previous phase, and build on the established volume baseline.
+Do not search conversation history or reference previous chats. This prompt is self-contained — all context needed is provided below. If this is a continuation of a multi-mesocycle program, the previous mesocycle summary and roadmap will be included in this prompt explicitly.
 
 Before presenting the program, complete these verification steps:
 

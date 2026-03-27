@@ -23,7 +23,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 interface FavoriteExercise {
   id: string;
   name: string;
-  category: 'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom' | null;
+  category: 'gym' | 'bodyweight' | null;
   customCategory?: string;
   muscleGroups: string[]; // Legacy field for backward compatibility
   primaryMuscles?: string[]; // New field for primary target muscles
@@ -41,9 +41,6 @@ interface FavoriteExercise {
 const categoryOptions = [
   { id: 'gym', name: 'Gym', icon: 'barbell' },
   { id: 'bodyweight', name: 'Bodyweight', icon: 'body' },
-  { id: 'flexibility', name: 'Flexibility', icon: 'leaf' },
-  { id: 'cardio', name: 'Cardio', icon: 'heart' },
-  { id: 'custom', name: 'Custom', icon: 'add-circle' },
 ];
 
 const getMuscleGroupOptions = (category: string | null) => {
@@ -51,12 +48,6 @@ const getMuscleGroupOptions = (category: string | null) => {
     case 'gym':
     case 'bodyweight':
       return ['Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 'Traps', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Custom'];
-    case 'cardio':
-      return ['Lower Body', 'Upper Body', 'Full Body', 'Core', 'Custom'];
-    case 'flexibility':
-      return ['Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 'Traps', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Custom'];
-    case 'custom':
-      return ['Custom'];
     default:
       return ['Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 'Traps', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Custom'];
   }
@@ -72,7 +63,7 @@ export default function ManualExerciseEntryScreen() {
   const isEditing = route.params?.isEditing as boolean | undefined;
   
   const [exerciseName, setExerciseName] = useState(editExercise?.name || '');
-  const [selectedCategory, setSelectedCategory] = useState<'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom' | null>(editExercise?.category || null);
+  const [selectedCategory, setSelectedCategory] = useState<'gym' | 'bodyweight' | null>(editExercise?.category || null);
   
   // Category-specific muscle selections - preserve selections when switching categories
   const [categoryMuscleData, setCategoryMuscleData] = useState<{
@@ -101,14 +92,13 @@ export default function ManualExerciseEntryScreen() {
   const selectedSecondaryMuscles = selectedCategory ? (categoryMuscleData[selectedCategory]?.secondaryMuscles || []) : [];
   
   const [muscleSelectionMode, setMuscleSelectionMode] = useState<'primary' | 'secondary'>('primary');
-  const [customCategory, setCustomCategory] = useState(editExercise?.customCategory || '');
   const [instructionSteps, setInstructionSteps] = useState<string[]>(editExercise?.instructions ? editExercise.instructions.split('\n').filter(step => step.trim()) : ['']);
   const [notes, setNotes] = useState(editExercise?.notes || '');
   const [alternativeExercises, setAlternativeExercises] = useState<string[]>(editExercise?.alternatives || []);
   const [isLoading, setIsLoading] = useState(false);
   const [muscleGroupAnimation] = useState(new Animated.Value(0));
   const [showMuscleGroups, setShowMuscleGroups] = useState(false);
-  const [animatingCategory, setAnimatingCategory] = useState<'gym' | 'bodyweight' | 'flexibility' | 'cardio' | 'custom' | null>(null);
+  const [animatingCategory, setAnimatingCategory] = useState<'gym' | 'bodyweight' | null>(null);
   const [customMuscleGroups, setCustomMuscleGroups] = useState<string[]>([]);
   const [showCustomMuscleInput, setShowCustomMuscleInput] = useState(false);
   const [customMuscleInput, setCustomMuscleInput] = useState('');
@@ -176,15 +166,6 @@ export default function ManualExerciseEntryScreen() {
           }
         });
       }
-    } else {
-      // For other categories, use legacy muscle groups
-      updateCategoryMuscleData(selectedCategory, 'muscleGroups', prev => {
-        if (prev.includes(muscleGroup)) {
-          return prev.filter(group => group !== muscleGroup);
-        } else {
-          return [...prev, muscleGroup];
-        }
-      });
     }
   };
 
@@ -198,8 +179,6 @@ export default function ManualExerciseEntryScreen() {
       // Add to appropriate muscle group based on category
       if (selectedCategory === 'gym' || selectedCategory === 'bodyweight') {
         updateCategoryMuscleData(selectedCategory, muscleSelectionMode === 'primary' ? 'primaryMuscles' : 'secondaryMuscles', prev => [...prev, customGroup]);
-      } else {
-        updateCategoryMuscleData(selectedCategory, 'muscleGroups', prev => [...prev, customGroup]);
       }
       
       setCustomMuscleInput('');
@@ -244,17 +223,11 @@ export default function ManualExerciseEntryScreen() {
     let baseCalories = 200;
     
     switch (category) {
-      case 'cardio':
-        baseCalories = 350; // High intensity cardio burns a lot
-        break;
       case 'gym':
         baseCalories = 250; // Weight training
         break;
       case 'bodyweight':
         baseCalories = 200; // Moderate intensity
-        break;
-      case 'flexibility':
-        baseCalories = 120; // Lower intensity but still burns calories
         break;
       default:
         baseCalories = 200;
@@ -277,10 +250,6 @@ export default function ManualExerciseEntryScreen() {
       return;
     }
 
-    if (selectedCategory === 'custom' && !customCategory.trim()) {
-      Alert.alert('Error', 'Please enter a custom category name');
-      return;
-    }
 
     // Check muscle group selection based on category
     if (selectedCategory === 'gym' || selectedCategory === 'bodyweight') {
@@ -323,7 +292,6 @@ export default function ManualExerciseEntryScreen() {
         id: isEditing ? editExercise!.id : Date.now().toString(),
         name: exerciseName.trim(),
         category: selectedCategory,
-        customCategory: selectedCategory === 'custom' ? customCategory.trim() : undefined,
         muscleGroups: allMuscleGroups, // Legacy field - combined for backward compatibility
         primaryMuscles: (selectedCategory === 'gym' || selectedCategory === 'bodyweight') ? selectedPrimaryMuscles : undefined,
         secondaryMuscles: (selectedCategory === 'gym' || selectedCategory === 'bodyweight') ? selectedSecondaryMuscles : undefined,
@@ -333,7 +301,7 @@ export default function ManualExerciseEntryScreen() {
         addedAt: isEditing ? editExercise!.addedAt : new Date().toISOString(),
         estimatedCalories: estimateCalories(selectedCategory, allMuscleGroups),
         duration: isEditing ? editExercise!.duration : 30, // Preserve or default 30 minutes
-        intensity: isEditing ? editExercise!.intensity : (selectedCategory === 'cardio' ? 'high' : selectedCategory === 'flexibility' ? 'low' : 'moderate'),
+        intensity: isEditing ? editExercise!.intensity : 'moderate',
       };
 
       let updatedExercises;
@@ -505,56 +473,7 @@ export default function ManualExerciseEntryScreen() {
               );
             })}
           </View>
-          
-          {/* Custom Category Button - New Design */}
-          <TouchableOpacity
-            style={[
-              styles.customCategoryButton,
-              selectedCategory === 'custom' && { 
-                borderColor: themeColor, 
-                backgroundColor: `${themeColor}15` 
-              }
-            ]}
-            onPress={() => {
-              const newCategory = selectedCategory === 'custom' ? null : 'custom';
-              setSelectedCategory(newCategory);
-              // Reset to primary selection mode when switching categories
-              setMuscleSelectionMode('primary');
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.customIconCircle, selectedCategory === 'custom' && { backgroundColor: themeColor }]}>
-              <Ionicons 
-                name="add" 
-                size={20} 
-                color={selectedCategory === 'custom' ? '#000000' : themeColor} 
-              />
-            </View>
-            <Text style={[styles.customButtonText, selectedCategory === 'custom' && { color: themeColor }]}>
-              Add Custom Category
-            </Text>
-            <Ionicons 
-              name="chevron-forward" 
-              size={20} 
-              color={selectedCategory === 'custom' ? themeColor : '#71717a'} 
-            />
-          </TouchableOpacity>
         </View>
-
-        {/* Custom Category Input */}
-        {selectedCategory === 'custom' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Custom Category</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g., Yoga, Pilates, Swimming..."
-              placeholderTextColor="#71717a"
-              value={customCategory}
-              onChangeText={setCustomCategory}
-              maxLength={30}
-            />
-          </View>
-        )}
 
         {/* Muscle Groups - Only show if category is selected with animation */}
         {showMuscleGroups && (
@@ -638,9 +557,6 @@ export default function ManualExerciseEntryScreen() {
             <Text style={styles.sectionTitle}>
               {(animatingCategory === 'gym' || animatingCategory === 'bodyweight') ? 
                 (muscleSelectionMode === 'primary' ? 'Primary Target Muscles' : 'Secondary Involvement') :
-               animatingCategory === 'cardio' ? 'Primary Focus' : 
-               animatingCategory === 'flexibility' ? 'Stretch Areas' : 
-               animatingCategory === 'custom' ? 'Target Areas' :
                'Muscle Groups'}
             </Text>
             <Text style={styles.sectionSubtitle}>
@@ -778,11 +694,7 @@ export default function ManualExerciseEntryScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.customMuscleModalContainer}>
-            <Text style={styles.customMuscleModalTitle}>Add Custom {
-              animatingCategory === 'cardio' ? 'Focus Area' : 
-              animatingCategory === 'flexibility' ? 'Stretch Area' : 
-              'Muscle Group'
-            }</Text>
+            <Text style={styles.customMuscleModalTitle}>Add Custom Muscle Group</Text>
             
             <TextInput
               style={[styles.customMuscleInput, { borderColor: themeColor }]}

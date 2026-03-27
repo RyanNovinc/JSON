@@ -6,13 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Animated, StyleSheet } from 'react-native';
 import { navigationRef } from '../utils/navigationRef';
 
-// Import screens (we'll create these next)
-import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
+// Import screens
 import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ModeTransitionContainer from '../components/ModeTransitionContainer';
-import CreateCountdownScreen from '../screens/CreateCountdownScreen';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
 import MyWorkoutsScreen from '../screens/MyWorkoutsScreen';
@@ -77,9 +74,7 @@ interface CleanMealPlanNavigationParams {
 }
 
 export type RootStackParamList = {
-  Auth: undefined;
   Main: undefined;
-  CreateCountdown: undefined;
   ImportRoutine: undefined;
   ImportMealPlan: undefined;
   MyWorkouts: undefined;
@@ -198,10 +193,6 @@ export type RootStackParamList = {
   WeightTracker: undefined;
 };
 
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-};
 
 export type MainTabParamList = {
   Home: undefined;
@@ -209,17 +200,8 @@ export type MainTabParamList = {
 };
 
 const RootStack = createStackNavigator<RootStackParamList>();
-const AuthStack = createStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function AuthNavigator() {
-  return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStack.Screen name="Login" component={LoginScreen} />
-      <AuthStack.Screen name="Register" component={RegisterScreen} />
-    </AuthStack.Navigator>
-  );
-}
 
 function MainNavigator() {
   return (
@@ -281,20 +263,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 <NavigationContainer ref={navigationRef}>
                 <ShareIntentHandler />
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
-          {!isAuthenticated ? (
-            <RootStack.Screen name="Auth" component={AuthNavigator} />
-          ) : (
             <>
               <RootStack.Screen name="Main" component={MainNavigator} />
-              <RootStack.Screen 
-                name="CreateCountdown" 
-                component={CreateCountdownScreen}
-                options={{
-                  headerShown: true,
-                  headerTitle: 'Create Countdown',
-                  presentation: 'modal'
-                }}
-              />
               <RootStack.Screen 
                 name="ImportRoutine" 
                 component={ImportRoutineScreen}
@@ -663,7 +633,6 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 }}
               />
             </>
-          )}
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />
           <FeedbackTab />

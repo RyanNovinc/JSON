@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './src/hooks/useAuth';
 import AppNavigator from './src/navigation/AppNavigator';
 import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -12,6 +11,7 @@ import { WeightUnitProvider } from './src/contexts/WeightUnitContext';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import SplashScreen from './src/components/SplashScreen';
 import { WorkoutStorage } from './src/utils/storage';
+import { validateProductionEnvironment } from './src/utils/environmentValidator';
 
 // Keep the native splash screen visible while loading
 ExpoSplashScreen.preventAutoHideAsync();
@@ -29,6 +29,9 @@ function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
+    // Validate production environment configuration
+    validateProductionEnvironment();
+    
     // Hide native splash screen immediately to show our custom one
     ExpoSplashScreen.hideAsync();
     

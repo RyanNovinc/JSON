@@ -99,6 +99,8 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
 2. **ESTIMATED PRICING** - Use typical pricing patterns for ${store} in ${country}
 3. **USE WEB SEARCH** - If you have web search available, use it to improve the plan — verifying prices, checking product availability, confirming nutritional info, etc. Current, real-world data produces a better plan than estimates from training data.
 
+Do not search conversation history or reference previous chats. This prompt is self-contained — all context needed is provided below.
+
 **CONSTRAINT CONFLICT HANDLING:**
 
 Sometimes the user's preferences will conflict — for example, a very low budget combined with beginner skill level and high calorie targets, or maximum variety with dedicated meal prep. When constraints cannot all be satisfied simultaneously:
@@ -377,6 +379,8 @@ FAIL if last meal timing violates the buffer. FIX by moving dinner earlier and a
 '### 7. Sleep Optimization Compliance\nN/A — sleep optimization not enabled. Check meals are spaced 3-5 hours apart.';
     
     return `# Review and Fix Meal Plan
+
+Do not search conversation history or reference previous chats. This prompt is self-contained — all context needed is provided below.
 
 First, read the meal plan you just created so you have the full content in context. Then review it as an experienced nutritionist and meal planning expert auditing a plan for a client. This is an independent quality gate — do not assume your self-check caught everything.
 

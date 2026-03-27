@@ -1750,7 +1750,7 @@ export default function ImportRoutineScreen() {
         selectedEquipment: ['commercial_gym'],
         trainingExperience: 'intermediate',
         volumePreference: '12-16',
-        gender: '',
+        gender: 'male',
         programDuration: '12_weeks',
         sessionStyle: 'moderate'
       };

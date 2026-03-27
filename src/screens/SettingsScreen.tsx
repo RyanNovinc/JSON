@@ -9,9 +9,6 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../hooks/useAuth';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { settingsService } from '../services/api';
 import { useJSONPro } from '../hooks/useJSONPro';
 import { CustomerCenter } from '../components/CustomerCenter';
 import { useNavigation } from '@react-navigation/native';
@@ -19,38 +16,9 @@ import { useTheme } from '../contexts/ThemeContext';
 
 export default function SettingsScreen() {
   const { themeColor } = useTheme();
-  const { user, logout } = useAuth();
   const { hasAccess } = useJSONPro();
   const navigation = useNavigation();
-  const queryClient = useQueryClient();
   const [showCustomerCenter, setShowCustomerCenter] = useState(false);
-
-  const { data: settings } = useQuery({
-    queryKey: ['userSettings'],
-    queryFn: settingsService.getUserSettings,
-  });
-
-  const togglePremiumMutation = useMutation({
-    mutationFn: settingsService.togglePremium,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userSettings'] });
-    },
-  });
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive',
-          onPress: logout
-        },
-      ]
-    );
-  };
 
   return (
     <ScrollView style={styles.container}>
@@ -58,23 +26,6 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Settings</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        
-        <View style={styles.row}>
-          <View style={styles.rowLeft}>
-            <Ionicons name="person-outline" size={24} color="#007AFF" />
-            <Text style={styles.rowText}>{user?.name || 'User'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.row}>
-          <View style={styles.rowLeft}>
-            <Ionicons name="mail-outline" size={24} color="#007AFF" />
-            <Text style={styles.rowText}>{user?.email}</Text>
-          </View>
-        </View>
-      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Subscription</Text>
@@ -133,9 +84,6 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </TouchableOpacity>
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>Made with ❤️ using React Native</Text>

@@ -181,15 +181,104 @@ const WeightTrackerScreen: React.FC = () => {
   const updateNutritionWeight = async (newWeight: number) => {
     try {
       const nutritionResults = await WorkoutStorage.loadNutritionResults();
-      if (nutritionResults) {
+      if (nutritionResults?.formData) {
+        const formData = nutritionResults.formData;
+        
+        // Update weight in form data
+        const updatedFormData = {
+          ...formData,
+          weight: newWeight,
+        };
+
+        // Recalculate macros with new weight if we have all required data
+        let updatedMacroResults = nutritionResults.macroResults;
+        
+        if (formData.age && formData.gender && formData.height && formData.activityLevel) {
+          console.log('⚖️ [WEIGHT] 🔄 Recalculating macros with new weight:', newWeight, 'kg');
+          
+          // BMR calculation (Mifflin-St Jeor) - using newWeight
+          let bmr: number;
+          if (formData.gender === 'male') {
+            bmr = (10 * newWeight) + (6.25 * formData.height) - (5 * formData.age) + 5;
+          } else if (formData.gender === 'female') {
+            bmr = (10 * newWeight) + (6.25 * formData.height) - (5 * formData.age) - 161;
+          } else {
+            // For 'prefer_not_to_say', use the average of male and female formulas
+            const maleBmr = (10 * newWeight) + (6.25 * formData.height) - (5 * formData.age) + 5;
+            const femaleBmr = (10 * newWeight) + (6.25 * formData.height) - (5 * formData.age) - 161;
+            bmr = (maleBmr + femaleBmr) / 2;
+          }
+
+          // Activity multipliers
+          const activityMultipliers = {
+            sedentary: 1.2,
+            light: 1.375,
+            moderate: 1.55,
+            heavy: 1.725,
+            extreme: 1.9,
+          };
+
+          const tdee = Math.round(bmr * activityMultipliers[formData.activityLevel]);
+
+          // Calculate target calories based on goal
+          let targetCalories = tdee;
+          let weeklyWeightChange = 0;
+
+          if (formData.goal === 'lose_weight' && formData.targetRate) {
+            weeklyWeightChange = -formData.targetRate;
+            const dailyDeficit = (formData.targetRate * 7700) / 7; 
+            targetCalories = Math.round(tdee - dailyDeficit);
+          } else if (formData.goal === 'gain_weight' && formData.targetRate) {
+            weeklyWeightChange = formData.targetRate;
+            const dailySurplus = (formData.targetRate * 7700) / 7;
+            targetCalories = Math.round(tdee + dailySurplus);
+          }
+
+          // Calculate macros based on diet type
+          const dietMacros = {
+            balanced: { protein: 20, carbs: 50, fat: 30 },
+            high_protein: { protein: 30, carbs: 40, fat: 30 },
+            low_carb: { protein: 25, carbs: 25, fat: 50 },
+            keto: { protein: 20, carbs: 5, fat: 75 },
+            custom: formData.customMacros || { protein: 25, carbs: 45, fat: 30 },
+          };
+
+          const macroRatios = dietMacros[formData.dietType || 'balanced'];
+          
+          const proteinGrams = Math.round((targetCalories * macroRatios.protein / 100) / 4);
+          const carbsGrams = Math.round((targetCalories * macroRatios.carbs / 100) / 4);
+          const remainingCalories = targetCalories - (proteinGrams * 4) - (carbsGrams * 4);
+          const fatGrams = Math.round(remainingCalories / 9);
+
+          updatedMacroResults = {
+            bmr: Math.round(bmr),
+            tdee,
+            targetCalories,
+            weeklyWeightChange,
+            macros: {
+              protein: proteinGrams,
+              carbs: carbsGrams,
+              fat: fatGrams,
+            },
+            goal: formData.goal || 'maintain',
+          };
+
+          console.log('⚖️ [WEIGHT] ✅ New macros calculated:', {
+            calories: targetCalories,
+            protein: proteinGrams,
+            carbs: carbsGrams,
+            fat: fatGrams
+          });
+        }
+
         const updatedResults = {
           ...nutritionResults,
-          formData: {
-            ...nutritionResults.formData,
-            weight: newWeight.toString(),
-          },
+          formData: updatedFormData,
+          macroResults: updatedMacroResults,
         };
+
         await WorkoutStorage.saveNutritionResults(updatedResults);
+        console.log('⚖️ [WEIGHT] ✅ Nutrition data updated with new weight and recalculated macros');
       }
     } catch (error) {
       console.error('Failed to update nutrition weight:', error);

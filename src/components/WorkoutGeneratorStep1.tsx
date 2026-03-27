@@ -43,26 +43,12 @@ export default function WorkoutGeneratorStep1({ onNext, onBack }: WorkoutGenerat
         fitnessGoalsData,
         equipmentPreferencesData,
       ] = await Promise.all([
-        AsyncStorage.getItem('fitnessGoalsData'),
-        AsyncStorage.getItem('equipmentPreferencesData'),
+        WorkoutStorage.loadFitnessGoalsResults(),
+        WorkoutStorage.loadEquipmentPreferencesResults(),
       ]);
 
-      let fitnessGoals: any = {};
-      let equipmentPrefs: any = {};
-      
-      try {
-        fitnessGoals = fitnessGoalsData ? JSON.parse(fitnessGoalsData) : {};
-      } catch (parseError) {
-        console.error('Error parsing fitnessGoalsData:', parseError);
-        fitnessGoals = {};
-      }
-      
-      try {
-        equipmentPrefs = equipmentPreferencesData ? JSON.parse(equipmentPreferencesData) : {};
-      } catch (parseError) {
-        console.error('Error parsing equipmentPreferencesData:', parseError);
-        equipmentPrefs = {};
-      }
+      const fitnessGoals: any = fitnessGoalsData || {};
+      const equipmentPrefs: any = equipmentPreferencesData || {};
 
       const consolidatedData: QuestionnaireData = {
         // From fitnessGoalsData
@@ -89,14 +75,20 @@ export default function WorkoutGeneratorStep1({ onNext, onBack }: WorkoutGenerat
         customVolume: fitnessGoals.customVolume,
         gender: fitnessGoals.gender,
         programDuration: fitnessGoals.programDuration,
-        sessionStyle: fitnessGoals.sessionStyle,
-        exerciseNoteDetail: fitnessGoals.exerciseNoteDetail,
 
         // From equipmentPreferencesData
         selectedEquipment: equipmentPrefs.selectedEquipment,
         specificEquipment: equipmentPrefs.specificEquipment,
         unavailableEquipment: equipmentPrefs.unavailableEquipment,
         sessionStyle: equipmentPrefs.sessionStyle,
+        likedExercises: equipmentPrefs.likedExercises ? 
+          equipmentPrefs.likedExercises.split(',').map((ex: string) => ex.trim()).filter((ex: string) => ex.length > 0) 
+          : undefined,
+        dislikedExercises: equipmentPrefs.dislikedExercises ? 
+          equipmentPrefs.dislikedExercises.split(',').map((ex: string) => ex.trim()).filter((ex: string) => ex.length > 0) 
+          : undefined,
+        includeDirectCore: equipmentPrefs.includeDirectCore,
+        exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
       };
 
       return consolidatedData;
@@ -158,18 +150,18 @@ export default function WorkoutGeneratorStep1({ onNext, onBack }: WorkoutGenerat
         
         const createErrorDetails = async () => {
           try {
-            const rawFitnessData = await AsyncStorage.getItem('fitnessGoalsData');
-            const rawEquipmentData = await AsyncStorage.getItem('equipmentPreferencesData');
+            const rawFitnessData = await WorkoutStorage.loadFitnessGoalsResults();
+            const rawEquipmentData = await WorkoutStorage.loadEquipmentPreferencesResults();
             
             return `PRODUCTION PROMPT GENERATION ERROR:
 ERROR: ${promptError?.message || 'Unknown error'}
 ERROR TYPE: ${promptError?.name || 'Unknown'}
 
 RAW FITNESS DATA:
-${rawFitnessData || 'null'}
+${JSON.stringify(rawFitnessData, null, 2) || 'null'}
 
 RAW EQUIPMENT DATA:
-${rawEquipmentData || 'null'}
+${JSON.stringify(rawEquipmentData, null, 2) || 'null'}
 
 CONSOLIDATED DATA:
 ${JSON.stringify(questionnaireData, null, 2)}
