@@ -12,8 +12,8 @@ import HomeScreen from '../screens/HomeScreen';
 import NutritionHomeScreen from '../screens/NutritionHomeScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3; // 30% of screen width to trigger transition
-const SWIPE_VELOCITY_THRESHOLD = 800; // Velocity threshold for quick swipes
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25; // 25% of screen width to trigger transition (more responsive)
+const SWIPE_VELOCITY_THRESHOLD = 600; // Lower velocity threshold for quicker response
 
 export default function ModeTransitionContainer({ route, navigation }: any) {
   const { appMode, setAppMode, isTransitioning, setIsTransitioning } = useAppMode();
@@ -48,19 +48,19 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
     translateX.setValue(toValue);
     transitionProgress.setValue(progressValue);
     
-    // Then animate smoothly
+    // Then animate smoothly with improved spring settings
     Animated.parallel([
       Animated.spring(translateX, {
         toValue,
         useNativeDriver: true,
-        tension: 120,
-        friction: 25,
+        tension: 180,
+        friction: 20,
       }),
       Animated.spring(transitionProgress, {
         toValue: progressValue,
         useNativeDriver: true,
-        tension: 120,
-        friction: 25,
+        tension: 180,
+        friction: 20,
       }),
     ]).start((finished) => {
       // Only clear transition state if animation actually completed successfully
@@ -152,20 +152,20 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
           Animated.spring(gestureTranslateX, {
             toValue: 0,
             useNativeDriver: true,
-            tension: 100,
-            friction: 30,
+            tension: 200,
+            friction: 18,
           }),
           Animated.spring(translateX, {
             toValue: targetValue,
             useNativeDriver: true,
-            tension: 100,
-            friction: 30,
+            tension: 200,
+            friction: 18,
           }),
           Animated.spring(transitionProgress, {
             toValue: targetProgress,
             useNativeDriver: true,
-            tension: 100,
-            friction: 30,
+            tension: 200,
+            friction: 18,
           }),
         ]).start((finished) => {
           const gestureCompletionTimestamp = new Date().toISOString();
@@ -189,14 +189,14 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
           Animated.spring(gestureTranslateX, {
             toValue: 0,
             useNativeDriver: true,
-            tension: 100,
-            friction: 30,
+            tension: 220,
+            friction: 16,
           }),
           Animated.spring(transitionProgress, {
             toValue: currentProgress,
             useNativeDriver: true,
-            tension: 100,
-            friction: 30,
+            tension: 220,
+            friction: 16,
           }),
         ]).start((finished) => {
           console.log(`🔙✅ Snap back animation callback fired! finished: ${finished}`);
@@ -218,8 +218,8 @@ export default function ModeTransitionContainer({ route, navigation }: any) {
       <PanGestureHandler
         onGestureEvent={onGestureEvent}
         onHandlerStateChange={onHandlerStateChange}
-        activeOffsetX={[-10, 10]}
-        failOffsetY={[-30, 30]}
+        activeOffsetX={[-8, 8]}
+        failOffsetY={[-25, 25]}
         enabled={!isTransitioning}
       >
         <Animated.View
