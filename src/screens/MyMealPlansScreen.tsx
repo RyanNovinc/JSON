@@ -83,11 +83,11 @@ export default function MyMealPlansScreen() {
 
         {/* User Meal Plans */}
         {userMealPlans.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="restaurant-outline" size={64} color="rgba(255,255,255,0.3)" />
-            <Text style={styles.emptyTitle}>No Custom Meal Plans</Text>
+          <View style={styles.emptyStateCenter}>
+            <Ionicons name="heart-outline" size={64} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.emptyTitle}>No Favourites Yet</Text>
             <Text style={styles.emptyDescription}>
-              Import or create a custom meal plan to see it here
+              Long press a meal plan and add it to favourites to see it here
             </Text>
           </View>
         ) : (
@@ -131,11 +131,6 @@ export default function MyMealPlansScreen() {
           ))
         )}
 
-        <View style={styles.bottomSection}>
-          <Text style={styles.bottomText}>
-            Import meal plans to build your collection
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -242,6 +237,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 80,
     paddingHorizontal: 40,
+  },
+  emptyStateCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    minHeight: 400,
   },
   emptyTitle: {
     fontSize: 22,

@@ -129,6 +129,7 @@ const styles = StyleSheet.create({
   textContainer: {
     marginTop: 30,
     alignItems: 'center',
+    height: 30,
   },
   appName: {
     fontSize: 20,

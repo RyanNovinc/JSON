@@ -300,11 +300,12 @@ export default function GroceryListScreen() {
   const estimatedHigh = groceryListData?.total_estimated_cost_high;
   const legacyEstimate = groceryListData?.total_estimated_cost;
 
+  const currencySymbol = groceryListData?.currency || '$';
   const hasRange = estimatedLow != null && estimatedHigh != null;
   const estimateDisplay = hasRange 
-    ? `$${Math.round(estimatedLow)}–$${Math.round(estimatedHigh)}`
+    ? `${currencySymbol}${Math.round(estimatedLow)}–${currencySymbol}${Math.round(estimatedHigh)}`
     : legacyEstimate != null 
-      ? `$${legacyEstimate.toFixed(2)}`
+      ? `${currencySymbol}${legacyEstimate.toFixed(2)}`
       : null;
 
   // Generate a unique key for this grocery list (use simpler key)
@@ -425,12 +426,12 @@ export default function GroceryListScreen() {
       const listText = filteredCategories.map(category => {
         const items = groupedItems[category];
         const categoryText = `${CATEGORY_NAMES[category]}:\n${items.map(item => 
-          `${item.isPurchased ? '✓' : '•'} ${item.amount} ${item.unit} ${item.name} ($${item.estimatedCost.toFixed(2)})`
+          `${item.isPurchased ? '✓' : '•'} ${item.amount} ${item.unit} ${item.name} (${currencySymbol}${item.estimatedCost.toFixed(2)})`
         ).join('\n')}`;
         return categoryText;
       }).join('\n\n');
 
-      const shareContent = `Grocery List\n\nTotal: $${totalCost.toFixed(2)} | Remaining: $${remainingCost.toFixed(2)}\nItems: ${purchasedItems}/${totalItems} purchased\n\n${listText}`;
+      const shareContent = `Grocery List\n\nTotal: ${currencySymbol}${totalCost.toFixed(2)} | Remaining: ${currencySymbol}${remainingCost.toFixed(2)}\nItems: ${purchasedItems}/${totalItems} purchased\n\n${listText}`;
 
       await Share.share({
         message: shareContent,
@@ -829,7 +830,7 @@ export default function GroceryListScreen() {
           item.isPurchased && styles.purchasedPriceText,
           item.isFromInventory && styles.inventoryPriceText,
         ]}>
-          {item.isFromInventory ? 'Free' : `$${item.estimatedCost.toFixed(2)}`}
+          {item.isFromInventory ? 'Free' : `${currencySymbol}${item.estimatedCost.toFixed(2)}`}
         </Text>
       </View>
     </TouchableOpacity>
@@ -857,7 +858,7 @@ export default function GroceryListScreen() {
             </View>
           </View>
           <Text style={styles.categoryTotal}>
-            ${categoryTotal.toFixed(2)}
+            {currencySymbol}{categoryTotal.toFixed(2)}
           </Text>
         </View>
         <View style={styles.categoryItems}>
@@ -900,7 +901,7 @@ export default function GroceryListScreen() {
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryValue, { color: themeColor }]}>
-                {estimateDisplay || `$${totalCost.toFixed(2)}`}
+                {estimateDisplay || `${currencySymbol}${totalCost.toFixed(2)}`}
               </Text>
               <Text style={styles.summaryLabel}>Est. Cost</Text>
             </View>
@@ -912,7 +913,7 @@ export default function GroceryListScreen() {
             </View>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryValue, { color: '#f59e0b' }]}>
-                ${remainingCost.toFixed(2)}
+                {currencySymbol}{remainingCost.toFixed(2)}
               </Text>
               <Text style={styles.summaryLabel}>Remaining</Text>
             </View>

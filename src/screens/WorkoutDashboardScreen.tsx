@@ -205,6 +205,7 @@ export default function WorkoutDashboardScreen() {
               </Text>
             )}
           </View>
+          <View style={styles.placeholder} />
         </View>
 
         {/* Progress Bar */}
@@ -243,6 +244,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingTop: 10,
     paddingHorizontal: 16,
     paddingBottom: 20,
@@ -254,10 +256,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1b',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
   headerContent: {
     flex: 1,
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 28,
@@ -343,5 +345,9 @@ const styles = StyleSheet.create({
   },
   arrowContainer: {
     marginLeft: 'auto',
+  },
+  placeholder: {
+    width: 44,
+    height: 44,
   },
 });

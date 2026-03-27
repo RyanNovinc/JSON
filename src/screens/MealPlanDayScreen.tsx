@@ -164,7 +164,6 @@ export default function MealPlanDayScreen() {
       return {
         dayName: dayName || date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
         displayDate: displayDate || date.toLocaleDateString('en-US', { 
-          weekday: 'long', 
           month: 'short', 
           day: 'numeric',
           timeZone: 'UTC' 

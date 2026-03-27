@@ -412,7 +412,35 @@ export default function ImportMealPlanScreen() {
       
     } catch (jsonError) {
       const error = jsonError as Error;
-      setErrorMessage(`❌ JSON Parse Error: ${error.message}`);
+      let detailedError = '❌ JSON Parse Error:\n\n';
+      
+      // Show first 100 characters of what was actually pasted
+      detailedError += '🔍 What you pasted (first 100 characters):\n';
+      detailedError += `"${input.substring(0, 100).replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}"\n\n`;
+      
+      // Detect specific common issues
+      if (input.includes('I got this error') || input.includes('JSON Parse Error')) {
+        detailedError += '🔍 Issue: You copied an error message instead of JSON\n';
+        detailedError += '💡 Solution: Copy the actual JSON from the AI, not error text\n\n';
+      } else if (input.trim().startsWith('```')) {
+        detailedError += '🔍 Issue: Code block markers found\n';
+        detailedError += '💡 Solution: Copy only the JSON content, not the ```json markers\n\n';
+      } else if (!input.trim().startsWith('{')) {
+        detailedError += '🔍 Issue: Text found before JSON\n';
+        detailedError += '💡 Solution: Copy starting from the opening { bracket\n\n';
+      } else if (input.includes('\u201c') || input.includes('\u201d') || input.includes('\u2018') || input.includes('\u2019')) {
+        detailedError += '🔍 Issue: Smart/curly quotes detected\n';
+        detailedError += '💡 Solution: Use straight quotes only\n\n';
+      } else {
+        detailedError += '🔍 Issue: Invalid JSON format\n';
+        detailedError += '💡 Solution: Check for syntax errors\n\n';
+      }
+      
+      detailedError += '📋 Technical error: ' + error.message;
+      
+      console.log('JSON Parse Error:', error.message);
+      console.log('First 100 chars:', input.substring(0, 100));
+      setErrorMessage(detailedError);
       return null;
     }
   };
@@ -469,6 +497,9 @@ export default function ImportMealPlanScreen() {
         
         // Import the meal plan directly without confirmation modal
         await importMealPlanDirectly(mealPlan);
+      } else {
+        // Error case - loading state already turned off above, error message already set in validateAndParseJSON
+        console.log('Validation failed, staying on import screen');
       }
     }, 800);
   };

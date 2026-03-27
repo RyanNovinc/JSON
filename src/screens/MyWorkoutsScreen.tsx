@@ -129,11 +129,11 @@ export default function MyWorkoutsScreen() {
 
         {/* User Workouts */}
         {userWorkouts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="fitness-outline" size={64} color="rgba(255,255,255,0.3)" />
-            <Text style={styles.emptyTitle}>No Custom Workouts</Text>
+          <View style={styles.emptyStateCenter}>
+            <Ionicons name="heart-outline" size={64} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.emptyTitle}>No Favourites Yet</Text>
             <Text style={styles.emptyDescription}>
-              Import or create a custom workout to see it here
+              Long press a workout and add it to favourites to see it here
             </Text>
           </View>
         ) : (
@@ -181,11 +181,6 @@ export default function MyWorkoutsScreen() {
           })
         )}
 
-        <View style={styles.bottomSection}>
-          <Text style={styles.bottomText}>
-            Import workouts to build your collection
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -288,10 +283,18 @@ const styles = StyleSheet.create({
   },
   // Empty state styles
   emptyState: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
     paddingHorizontal: 40,
+    minHeight: 400,
+  },
+  emptyStateCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    minHeight: 400,
   },
   emptyTitle: {
     fontSize: 22,

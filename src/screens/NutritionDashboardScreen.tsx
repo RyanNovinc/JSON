@@ -309,6 +309,8 @@ export default function NutritionDashboardScreen() {
               </Text>
             )}
           </View>
+          
+          <View style={styles.placeholder} />
         </View>
 
         {/* Progress Bar */}
@@ -347,6 +349,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 24,
@@ -360,10 +363,10 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
   headerContent: {
     flex: 1,
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 28,
@@ -499,5 +502,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#a1a1aa',
     flex: 1,
+  },
+  placeholder: {
+    width: 44,
+    height: 44,
   },
 });

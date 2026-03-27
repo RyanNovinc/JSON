@@ -800,7 +800,7 @@ ${JSON.stringify(debugData, null, 2)}
     if (convertedMealPlans.length === 0) {
       return (
         <View style={styles.emptyState}>
-          <Ionicons name="restaurant-outline" size={80} color="#3f3f46" />
+          <Ionicons name="restaurant-outline" size={64} color="#3f3f46" />
           <Text style={styles.emptyTitle}>No Meal Plans Yet</Text>
           <Text style={styles.emptyDescription}>
             Import a custom JSON meal plan or choose one of the sample plans.

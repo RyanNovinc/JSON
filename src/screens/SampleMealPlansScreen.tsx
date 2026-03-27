@@ -337,11 +337,13 @@ export default function SampleMealPlansScreen() {
           )
         )}
         
-        <View style={styles.bottomSection}>
-          <Text style={styles.bottomText}>
-            {activeTab === 'sample' ? 'More meal plans coming soon' : 'Import meal plans to build your collection'}
-          </Text>
-        </View>
+        {activeTab === 'sample' && (
+          <View style={styles.bottomSection}>
+            <Text style={styles.bottomText}>
+              More meal plans coming soon
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       {/* Info Modal */}

@@ -31,7 +31,10 @@ export default function WorkoutGeneratorStep2({ onNext, onBack }: WorkoutGenerat
 
   const handleCopyReviewPrompt = async () => {
     const reviewPrompt = `# Critical Training Plan Review
-First, read the workout program you just created so you have the full content in context. Then review it as a skeptical strength coach conducting an independent audit of this training plan.
+
+Do not search conversation history or reference previous chats. This prompt is self-contained — all context needed is provided below.
+
+First, read the workout program you just created so you have the full content in context. Then review it as an experienced workout planning expert conducting an independent audit of this training plan for a client. This is an independent quality gate — do not assume your self-check caught everything.
 
 ## CRITICAL INSTRUCTIONS
 1. **Review the plan** using the checklist below, noting PASS or FAIL for each check.
@@ -39,6 +42,12 @@ First, read the workout program you just created so you have the full content in
 3. **After fixing, re-verify** — run the checklist again on the corrected plan to confirm all checks now pass.
 4. **Present the CORRECTED plan** — output the complete, clean, final version of the workout program with all fixes applied.
 5. **At the end, provide a brief change log** — a short bullet list of what you changed and why.
+6. **Duration Reality Check** — Calculate the total session duration for each training day using the rest periods in the plan. If any session exceeds reasonable limits, flag it to the user:
+   - **Optimal sessions >90 minutes**: "⚠️ This program creates [X] minute sessions with optimal rest periods. Continue with these longer sessions, or would you prefer shorter sessions with reduced rest periods?"
+   - **Moderate sessions >75 minutes**: "⚠️ This program exceeds your 75-minute target, reaching [X] minutes. Continue as-is, or shall I adjust for shorter sessions?"
+   - **Minimal sessions >60 minutes**: "⚠️ This program exceeds your 60-minute target, reaching [X] minutes. Shall I reduce volume or exercises to fit your time constraints?"
+   
+   **Wait for user confirmation before proceeding to JSON generation.**
 
 ## QUALITY CHECKLIST
 
@@ -59,10 +68,11 @@ First, read the workout program you just created so you have the full content in
 
 ### Practical Implementation Check
 - **Equipment consistency**: All exercises use equipment stated as available
-- **Time realistic**: Sessions fit within stated time constraints
+- **Time realistic**: Sessions fit within stated time constraints (optimal ≤90min, moderate ≤75min, minimal ≤60min)
 - **Skill appropriate**: Exercise complexity matches stated experience level
+- **Duration calculation**: Calculate total workout time including rest periods and flag if excessive
 
-When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit.`;
+End with: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."`;
     
     try {
       await Clipboard.setStringAsync(reviewPrompt);
@@ -92,11 +102,14 @@ When you're happy with this plan, send me the JSON generation prompt and I'll co
           <Ionicons name="chevron-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         
-        <View style={styles.progressContainer}>
-          <View style={styles.progressDot} />
-          <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
-          <View style={styles.progressDot} />
-          <View style={styles.progressDot} />
+        <View style={styles.headerCenter}>
+          <Ionicons name="barbell" size={24} color={themeColor} style={styles.headerIcon} />
+          <View style={styles.progressContainer}>
+            <View style={styles.progressDot} />
+            <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
+            <View style={styles.progressDot} />
+            <View style={styles.progressDot} />
+          </View>
         </View>
 
         <TouchableOpacity style={styles.infoButton} onPress={() => setShowInfo(!showInfo)}>
@@ -178,6 +191,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181b',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIcon: {
+    marginBottom: 4,
   },
   progressContainer: {
     flexDirection: 'row',

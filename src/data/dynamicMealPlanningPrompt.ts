@@ -328,7 +328,7 @@ Organize items into logical shopping categories:
 - Condiments & Supplements
 - (Add other categories as needed)
 
-Include a **total estimated cost** and **currency** for the full grocery list.`;
+Include a **total estimated cost** and **currency symbol** (not currency code) for the full grocery list.`;
 };
 
 export const MEAL_PREP_SESSION_REQUIREMENTS = `
@@ -1139,7 +1139,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 |-------|----------|--------|-------|
 | **total_estimated_cost_low** | Yes | Number | Lower bound of estimated cost (sum of all item prices) |
 | **total_estimated_cost_high** | Yes | Number | Upper bound with 10% buffer (low × 1.10, rounded up) |
-| **currency** | Yes | String | Currency code (e.g., "AUD", "USD") |
+| **currency** | Yes | String | Currency symbol (e.g., "AU$", "$", "£", "€", "L") |
 | **categories** | Yes | Array | Grouped grocery items |
 | **category_name** | Yes | String | Category like "Meat & Seafood" |
 | **items** | Yes | Array | Items in this category |

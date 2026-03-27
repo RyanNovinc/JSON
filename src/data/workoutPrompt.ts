@@ -337,9 +337,14 @@ export const getAIPrompt = (questionnaireData?: QuestionnaireData, outputPrefere
   // Determine output format based on user preference
   const outputInstructions = outputPreference === 'copy_paste' 
     ? `**Output each block as a \`\`\`json code block in chat. Do not create files.**`
-    : `**Write each block as a .json file. Do not output JSON to chat.**
-1. Create a file and write the complete JSON
-2. When finished, provide the download link`;
+    : `**DO NOT output JSON to chat** — it will hit token limits for large programs.
+
+**You MUST:**
+1. Create a file (use Code Interpreter on ChatGPT, or computer tool on Claude)
+2. Write the complete JSON structure to the file
+3. If you reach output limits, STOP at the end of a complete block, then continue appending to the same file
+4. Never stop mid-block or mid-day
+5. When finished, provide the download link`;
 
   return `# Generate Workout Program as JSON
 // PROMPT 3: JSON Generation Prompt - Converts verified workout plans to JSON format
@@ -356,7 +361,7 @@ Use these when applying rest style parameters and validating day structure.
 
 ## Output Instructions
 
-**JSON only** — do not reproduce the program in chat or create any text version. Only output JSON file(s).
+**Generate complete JSON files following the output instructions below.**
 
 ${outputInstructions}
 
@@ -530,7 +535,7 @@ Use the exact muscle taxonomy and compound exercise tagging guide from the worko
 2. **Deload tagging** — if a block has deload weeks, include a \`deload_weeks\` array with the block-relative week numbers (e.g., [5] for a 5-week block with deload on week 5).
 3. **Empty arrays** — if an exercise has no secondary muscles, use \`[]\`. Do not omit the field.
 4. **restQuick** — calculate as ~65% of the \`rest\` value, rounded to a clean number.
-5. **Estimated duration** — ALWAYS recalculate using this duration formula instead of trusting plan estimates: \`Straight sets: (sets × 45s) + (sets × rest_seconds) | Superset pairs: (pairs × 90s) + (pairs × rest_seconds) + (pairs × ${transitionTax}s) | Total: exercise_count × ${transitionTax}s + 300s warmup\`. If calculated duration exceeds session target, note the discrepancy but proceed with calculated value.
+5. **Estimated duration** — ALWAYS recalculate using this duration formula instead of trusting plan estimates: \`Straight sets: (sets × 45s) + (sets × rest_seconds) | Superset pairs: (pairs × 90s) + (pairs × rest_seconds) + (pairs × ${transitionTax}s) | Total: exercise_count × ${transitionTax}s + 300s warmup\`. Duration has been pre-approved in the review stage.
 6. **Superset rest encoding** — for superset exercises, SS[n]a's \`rest\` field represents the inter-exercise transition rest (60-90s). SS[n]b's \`rest\` field represents the full rest before repeating the pair (compound or isolation default for that exercise type). \`restQuick\` is calculated from each exercise's own \`rest\` value.
 7. **sets vs sets_weekly** — \`sets\` is the default set count for training weeks (used for display). \`sets_weekly\` must be specified for every week in the block: training weeks should match \`sets\`, and deload weeks should show reduced values. Both fields are required for every strength exercise.
 8. **deload_weeks optionality** — omit \`deload_weeks\` entirely for blocks without deloads. Do not include an empty array.

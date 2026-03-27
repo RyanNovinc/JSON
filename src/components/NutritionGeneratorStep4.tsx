@@ -49,11 +49,14 @@ export default function NutritionGeneratorStep4({ onBack, onImportSuccess, onExi
             <Ionicons name="chevron-back" size={24} color="#ffffff" />
           </TouchableOpacity>
           
-          <View style={styles.progressContainer}>
-            <View style={styles.progressDot} />
-            <View style={styles.progressDot} />
-            <View style={styles.progressDot} />
-            <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
+          <View style={styles.headerCenter}>
+            <Ionicons name="restaurant" size={24} color={themeColor} style={styles.headerIcon} />
+            <View style={styles.progressContainer}>
+              <View style={styles.progressDot} />
+              <View style={styles.progressDot} />
+              <View style={styles.progressDot} />
+              <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
+            </View>
           </View>
 
           <TouchableOpacity style={styles.headerInfoButton} onPress={() => setShowInfo(!showInfo)}>
@@ -161,6 +164,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181b',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIcon: {
+    marginBottom: 4,
   },
   progressContainer: {
     flexDirection: 'row',

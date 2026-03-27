@@ -632,6 +632,10 @@ export default function ImportRoutineScreen() {
       
       detailedError += '\n📋 Raw error: ' + error.message;
       
+      // Show first 100 characters of input for debugging
+      detailedError += '\n\n🔍 First 100 characters of input:\n';
+      detailedError += `"${text.substring(0, 100).replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}"`;
+      
       setErrorMessage(detailedError);
       return null;
     }
@@ -2558,7 +2562,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
             activeOpacity={0.9}
           >
             <Ionicons 
-              name={uploadMode ? "cloud-upload" : "clipboard"} 
+              name={uploadMode ? "cloud-upload" : "barbell"} 
               size={40} 
               color="#0a0a0b" 
             />
