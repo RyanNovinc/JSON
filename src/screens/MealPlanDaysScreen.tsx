@@ -1286,10 +1286,8 @@ export default function MealPlanDaysScreen() {
                   </LinearGradient>
                 </View>
                 <View style={styles.groceryContentImproved}>
-                  <View style={styles.groceryAmountRow}>
-                    <Text style={styles.groceryAmount}>{effectiveGroceryList?.currency || '$'}{actualGroceryTotal.toFixed(2)}</Text>
-                    <Text style={styles.groceryLabel}>grocery trip</Text>
-                  </View>
+                  <Text style={styles.groceryAmount}>{effectiveGroceryList?.currency || '$'}{actualGroceryTotal.toFixed(2)}</Text>
+                  <Text style={styles.groceryLabel}>grocery trip</Text>
                   <Text style={styles.grocerySubtext}>
                     Tap to see your shopping list
                   </Text>

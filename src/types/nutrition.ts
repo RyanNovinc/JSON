@@ -303,7 +303,7 @@ export interface Meal {
   isFavorite: boolean;
 }
 
-export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'morning_snack' | 'afternoon_snack' | 'evening_snack' | 'pre_workout' | 'post_workout' | 'second_lunch' | 'early_dinner' | 'brunch';
 
 export interface Ingredient {
   id: string;

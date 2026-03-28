@@ -214,7 +214,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         if (program.id) {
           setTimeout(() => {
             triggerFeedbackModal(program.id);
-          }, 1000); // Give time for the program to be added to the list
+          }, 100); // Quick delay to ensure UI update, then show feedback modal
         }
         
         // Clear the params to prevent re-adding
@@ -629,16 +629,33 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     }
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = () => {
     const routine = deleteModal.routine;
     if (!routine) return;
-
-    try {
-      await deleteRoutineFromContext(routine.id);
-      setDeleteModal({ visible: false, routine: null });
-    } catch (error) {
-      console.error('Failed to delete routine:', error);
-    }
+    
+    Alert.alert(
+      'Remove Workout Plan',
+      'Are you sure? This will delete all progress you have made in this plan and cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRoutineFromContext(routine.id);
+              setDeleteModal({ visible: false, routine: null });
+            } catch (error) {
+              console.error('Failed to delete routine:', error);
+              Alert.alert('Error', 'Failed to remove workout plan. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleRenameRequest = (routine: WorkoutRoutine) => {
@@ -653,7 +670,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     try {
       const updatedRoutine = { ...routine, name: newName.trim() };
       await WorkoutStorage.updateRoutine(updatedRoutine);
-      setRoutines(prev => prev.map(r => r.id === routine.id ? updatedRoutine : r));
+      // Update handled by WorkoutRoutineContext
       setRenameModal({ visible: false, routine: null, newName: '' });
     } catch (error) {
       console.error('Failed to rename routine:', error);
@@ -1220,7 +1237,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             <TouchableOpacity
               style={styles.centralModeToggleInner}
               onPress={() => setAppMode('training')}
-              simultaneousHandlers={panGestureRef}
             >
               <Ionicons 
                 name="barbell" 
@@ -1254,7 +1270,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             <TouchableOpacity
               style={styles.centralModeToggleInner}
               onPress={handleNutritionTransition}
-              simultaneousHandlers={panGestureRef}
             >
               <Ionicons 
                 name="restaurant" 
@@ -2720,6 +2735,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderRightWidth: 2,
     borderColor: '#22d3ee', // Default color, overridden by inline style
+    marginHorizontal: 4, // Add small margin to prevent border cutoff
   },
   handleBar: {
     width: 40,

@@ -33,6 +33,20 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
       ? Math.min(45, Math.max(25, Math.round((macroResults.calories / 1000) * 14)))
       : 30;
     
+    // Helper function for snack allocation guidance
+    const getSnackAllocationGuidance = (budgetData: any): string => {
+      const mealsPerDay = budgetData.mealsPerDay || 3;
+      
+      // Evidence-based snack percentage allocation
+      if (mealsPerDay >= 4) {
+        return "10-15% of daily calories per snack (smaller snacks since main meals are already substantial)";
+      } else if (mealsPerDay === 3) {
+        return "15-20% of daily calories per snack (moderate snacks to bridge longer gaps between meals)";
+      } else {
+        return "20-25% of daily calories per snack (larger snacks needed with fewer main meals)";
+      }
+    };
+
     // Helper function to format favorite meals details
     const formatSelectedFavoriteMeals = (selectedFavoriteIds: string[], allFavoriteMeals: any[]) => {
       if (!selectedFavoriteIds?.length || !allFavoriteMeals?.length) {
@@ -106,6 +120,7 @@ Do not search conversation history or reference previous chats. This prompt is s
 Sometimes the user's preferences will conflict — for example, a very low budget combined with beginner skill level and high calorie targets, or maximum variety with dedicated meal prep. When constraints cannot all be satisfied simultaneously:
 
 1. **PRIORITISE** in this order: food safety > calorie/macro targets > budget > dietary restrictions > skill/time level > variety > micronutrient diversity
+   **CALORIE TARGETS ARE NON-NEGOTIABLE** - Adjust portion sizes to hit calorie targets regardless of meal structure. Never accept calorie overages as "inherent" to any meal pattern.
 2. **ACKNOWLEDGE** the trade-off in the plan notes — tell the user which constraint you relaxed and why. For example: "Your moderate budget target is difficult to hit at 3000 kcal/day with convenience products. This plan uses some from-scratch cooking (rice cooker instead of microwave pouches) to bring costs closer to your budget. If you prefer fully no-cook meals, expect the weekly cost to be higher."
 3. **NEVER** silently ignore a constraint. If you can't meet it, say so.
 
@@ -113,7 +128,9 @@ Sometimes the user's preferences will conflict — for example, a very low budge
 - Daily calories: ${macroResults.calories || 2000}
 - Protein: ${macroResults.protein || 150}g | Carbs: ${macroResults.carbs || 200}g | Fat: ${macroResults.fat || 67}g
 - Daily fiber target: ${fiberTarget}g (aim for ${fiberTarget - 5}–${fiberTarget + 5}g range)
-- ${budgetData.mealsPerDay || 3} eating occasions per day (includes both main meals and snacks)
+- **MEAL STRUCTURE**: ${budgetData.mealsPerDay || 3} substantial main meals per day + snacks as completely separate items
+- **SNACK ALLOCATION**: ${getSnackAllocationGuidance(budgetData)} (snacks are NEVER counted as main meals)
+- **CRITICAL**: If user requests 4 meals + snacks, provide exactly 4 substantial main meals (each 700-900+ kcal) PLUS the requested number of snacks (each 10-15% of daily calories). Do not make snacks "optional" - include exactly what was requested.
 - Plan duration: ${budgetData.planDuration || 7} days
 - Snacking style: ${budgetData.snackingStyle || 'Occasional snacker'}
 - Goal: ${nutritionData.goal || 'maintain'} at ${displayRate} rate
@@ -129,9 +146,9 @@ ${getVarietyRequirements(budgetData, budgetData.skillConfidence, budgetData.time
 
 ${getMealStructure(budgetData.mealsPerDay || 3, macroResults.protein || 150)}
 
-**Snacking style:** ${getSnackingGuidance(budgetData.snackingStyle)}
+**Snacking requirements:** ${getSnackingGuidance(budgetData.snackingStyle, budgetData.snackFrequency)}
 
-**KEY RULE FOR JSON OUTPUT:** Use ONLY these meal types: breakfast, lunch, dinner, snack. If you have multiple snacks, they all use type "snack" — differentiate them by name (e.g., "Morning Protein Snack", "Afternoon Energy Snack").
+**KEY RULE FOR JSON OUTPUT:** Use these meal types: breakfast, brunch, lunch, second_lunch, early_dinner, dinner, snack, morning_snack, afternoon_snack, evening_snack, pre_workout, post_workout. Use specific snack types for different snacks rather than generic "snack".
 
 PERSONAL INFO:
 - Gender: ${nutritionData.gender === 'prefer_not_to_say' ? 'Prefer not to say' : nutritionData.gender || 'Not specified'}
@@ -407,7 +424,9 @@ ${hardConstraintsSection}
 Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
 
 ### 1. Nutrition Target Verification
-Verify the plan meets the hard constraint thresholds listed above. Check protein daily consistency, calorie/carb/fat weekly averages, and daily fiber adequacy. Adjust portion sizes if any threshold is missed.
+Verify the plan meets the hard constraint thresholds listed above. Check protein daily consistency, calorie/carb/fat weekly averages, and daily fiber adequacy. 
+
+**CALORIE COMPLIANCE IS MANDATORY** - If calories exceed 5% of target, you MUST reduce portion sizes across meals/snacks to meet the target. There is NO excuse for exceeding calorie targets regardless of meal structure. 4-meal + snack plans should hit calorie targets just as precisely as 3-meal plans by adjusting portion sizes.
 
 ### 2. Budget Compliance
 ${budgetData?.budgetMax ? 
@@ -433,24 +452,32 @@ ${sleepComplianceSection}
 ### 8. Practical Implementation
 Assess overall plan practicality.
 
-### 9. Nutritional Quality & Balance
+### 9. Snack Count & Structure Verification
+Verify snack requirements are met exactly as requested:
+- **If user specified exact snack count** (1, 2, or 3): Plan must include exactly that many snacks. FAIL if snacks are missing, labeled as "optional", or if snack count doesn't match.
+- **If user selected "No Snacks"**: Plan must include zero snacks. FAIL if any snacks are present.
+- **If user selected "Let AI Decide"**: Plan should include 1-3 snacks as appropriate for meal timing. PASS as long as snacks are reasonable for gaps.
+- **Snack sizing**: Each snack should be 10-15% of daily calories (300-500 kcal range). FAIL if snacks are meal-sized (>600 kcal) or too small (<200 kcal).
+- **Snack vs meal distinction**: Verify snacks use specific snack types (morning_snack, afternoon_snack, etc.) not generic "snack" or main meal types.
+
+### 10. Nutritional Quality & Balance
 Evaluate nutritional completeness.
 
-### 10. Grocery List Completeness & Accuracy
+### 11. Grocery List Completeness & Accuracy
 Verify the grocery list is complete and correct.
 
-### 11. Meal Prep Session Completeness & Skill Alignment
+### 12. Meal Prep Session Completeness & Skill Alignment
 
 - **Structure & Steps**: Verify prep session matches skill tier, includes all meal plan items, follows prep style (grab-and-go vs moderate), and includes mid-week restock if needed for perishables.
 - **Storage & Safety**: Check all storage durations meet food safety guidelines.${planDuration > 7 ? `
 - **Multi-week plans**: Verify each prep session covers its days and shopping aligns with prep timing.` : ''}
 
-### 12. Overall Coherence
+### 13. Overall Coherence
 Final assessment of plan quality.
 
 ## Output Format
 
-**If all 12 checks PASS on first review:**
+**If all 13 checks PASS on first review:**
 - State "All checks passed — plan is ready."
 - Present the plan as-is (clean, no changes needed).
 - End with: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."
@@ -508,12 +535,24 @@ const getMealStructure = (mealsPerDay: number, proteinTarget: number): string =>
 - Distribute ${proteinTarget}g protein appropriately across all meals`;
     
     case 4:
-      return `MEAL STRUCTURE (4 eating occasions):
+      return `MEAL STRUCTURE (4 main meals + snacks):
 
-Meal 1: breakfast | Meal 2: lunch | Meal 3: dinner
-Meal 4: If user doesn't snack, make it a substantial 4th meal (type "dinner" or "lunch"). If user snacks, make it a lighter snack (type "snack").
-Distribute ${proteinTarget}g protein across all meals, main meals carrying most
-Distribute calories appropriately (flexibility is fine)`;
+**EXACTLY 4 SUBSTANTIAL MAIN MEALS (NEVER MAKE THESE OPTIONAL):**
+- Meal 1: breakfast (700-900+ kcal, substantial meal)
+- Meal 2: brunch or second_lunch (700-900+ kcal, substantial meal) 
+- Meal 3: lunch (700-900+ kcal, substantial meal)
+- Meal 4: dinner (700-900+ kcal, substantial meal)
+
+**SNACKS (completely separate from the 4 main meals above):**
+- Include the exact number of snacks the user requested (check their snacking preferences)
+- Each snack should be 10-15% of daily calories (300-500 kcal range)
+- NEVER label snacks as "optional" - if user chose snacks, include them definitively
+- Place snacks between main meals to optimize timing
+
+**CRITICAL RULE**: Do not substitute a snack for one of the 4 main meals. User wants 4 large meals PLUS snacks.
+
+Distribute ${proteinTarget}g protein primarily across the 4 main meals
+Distribute calories across all 4 meals (aim for roughly equal portions)`;
     
     case 5:
       return `MEAL STRUCTURE (5 eating occasions):
@@ -541,11 +580,30 @@ Distribute calories appropriately (flexibility is fine)`;
   }
 };
 
-const getSnackingGuidance = (snackingStyle: string): string => {
+const getSnackingGuidance = (snackingStyle: string, snackFrequency?: string): string => {
   const style = snackingStyle?.toLowerCase() || 'occasional snacker';
   
   if (style.includes("don't snack") || style.includes("i don't snack")) {
     return `MINIMAL SNACKING: User prefers not to snack. For 4+ eating occasions, treat extra slots as substantial meals. Only add light snacks if gaps exceed 5-6 hours.`;
+  }
+  
+  // If user specified exact number of snacks, use that
+  if (snackFrequency && snackFrequency !== '0') {
+    const numSnacks = parseInt(snackFrequency);
+    const snackTypeGuidance = style.includes('sweet tooth') ? 'healthier sweet options' :
+                            style.includes('savory') ? 'savory options' :
+                            style.includes('need healthy snacks') ? 'whole food options' :
+                            'balanced protein + carb/fat combinations';
+    
+    return `SPECIFIC SNACK COUNT: User wants exactly ${numSnacks} snack${numSnacks > 1 ? 's' : ''} per day. Include exactly ${numSnacks} snack${numSnacks > 1 ? 's' : ''} - never make them optional. Focus on ${snackTypeGuidance}. Each snack should be 10-15% of daily calories (300-500 kcal range). AI should determine optimal timing between main meals.`;
+  }
+  
+  if (snackFrequency === '0') {
+    return `NO SNACKS: User wants no snacks between meals. Do not include any snacks. Focus all calories on the main meals.`;
+  }
+  
+  if (snackFrequency === 'ai_decide') {
+    return `AI DECIDES SNACKS: User wants AI to determine optimal snack count and timing. Include 1-3 snacks as needed based on meal gaps and sleep optimization. Each snack should be 10-15% of daily calories (300-500 kcal range).`;
   }
   
   if (style.includes('love snacking') || style.includes('frequent')) {

@@ -67,17 +67,18 @@ export default function ImportFeedbackModal({
       visible={visible}
       transparent
       animationType="fade"
+      onRequestClose={handleModalClose}
     >
       <KeyboardAvoidingView 
         style={styles.modalOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={[styles.modalContent, selectedFeedback && styles.modalContentExpanded]}>
+          <ScrollView 
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={[styles.modalContent, selectedFeedback && styles.modalContentExpanded]}>
             {/* Close button container - positioned relative to modal content */}
             <View style={styles.closeButtonContainer}>
               <TouchableOpacity 
@@ -187,8 +188,8 @@ export default function ImportFeedbackModal({
                 </View>
               </View>
             )}
-          </View>
-        </ScrollView>
+            </View>
+          </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   );

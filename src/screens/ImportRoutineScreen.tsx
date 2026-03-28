@@ -2650,7 +2650,7 @@ This check exists because the JSON generator must reconstruct complete exercise 
                 opacity: modalOpacity,
                 borderColor: themeColor,
                 shadowColor: themeColor,
-                height: '60%',
+                height: '65%',
                 alignSelf: 'center',
                 width: '90%',
                 justifyContent: 'flex-start',

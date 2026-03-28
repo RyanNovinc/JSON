@@ -795,7 +795,7 @@ export default function GroceryListScreen() {
       </TouchableOpacity>
 
       <View style={styles.itemInfo}>
-        <View style={styles.itemHeader}>
+        <View style={styles.itemHeaderStacked}>
           <Text style={[
             styles.itemName,
             item.isPurchased && styles.purchasedItemName
@@ -809,9 +809,18 @@ export default function GroceryListScreen() {
           )}
         </View>
         
-        <Text style={styles.itemAmount}>
-          {item.amount} {item.unit}
-        </Text>
+        <View style={styles.itemDetailsRow}>
+          <Text style={styles.itemAmount}>
+            {item.amount} {item.unit}
+          </Text>
+          <Text style={[
+            styles.priceText,
+            item.isPurchased && styles.purchasedPriceText,
+            item.isFromInventory && styles.inventoryPriceText,
+          ]}>
+            {item.isFromInventory ? 'Free' : `${currencySymbol}${item.estimatedCost.toFixed(2)}`}
+          </Text>
+        </View>
         
         {item.expirationDate && (
           <Text style={styles.expirationDate}>
@@ -822,16 +831,6 @@ export default function GroceryListScreen() {
         {item.notes && (
           <Text style={styles.itemNotes}>{item.notes}</Text>
         )}
-      </View>
-
-      <View style={styles.itemPrice}>
-        <Text style={[
-          styles.priceText,
-          item.isPurchased && styles.purchasedPriceText,
-          item.isFromInventory && styles.inventoryPriceText,
-        ]}>
-          {item.isFromInventory ? 'Free' : `${currencySymbol}${item.estimatedCost.toFixed(2)}`}
-        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -1298,6 +1297,19 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 4,
     flex: 1,
+  },
+  itemHeaderStacked: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 6,
+    flex: 1,
+  },
+  itemDetailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   itemName: {
     fontSize: 16,

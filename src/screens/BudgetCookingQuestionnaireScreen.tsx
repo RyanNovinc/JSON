@@ -131,6 +131,9 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
     skillConfidence: 0, // 1=afraid to try new, 5=love experimenting
     mealsPerDay: 0,
     snackingStyle: '',
+    snackFrequency: '', // How many snacks per day
+    customizeSnacks: false,
+    favoriteSnacks: '',
     eatingChallenges: [] as string[],
     allergies: [] as string[],
     avoidFoods: [] as string[],
@@ -1483,6 +1486,52 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               </View>
             </Animatable.View>
 
+            {/* Snack Frequency - Only show if user doesn't avoid snacking */}
+            {formData.snackingStyle && formData.snackingStyle !== "I don't snack" && (
+              <Animatable.View
+                animation="fadeInUp"
+                delay={450}
+                style={styles.preferenceSection}
+              >
+                <Text style={[styles.sectionTitle, { color: colors.primary }]}>
+                  How Many Snacks Per Day?
+                </Text>
+                <Text style={styles.sectionSubtitle}>
+                  This helps us plan the right number and size of snacks
+                </Text>
+                
+                <View style={styles.optionsGrid}>
+                  {[
+                    { value: '0', label: 'No Snacks' },
+                    { value: '1', label: '1 Snack' },
+                    { value: '2', label: '2 Snacks' },
+                    { value: '3', label: '3 Snacks' },
+                    { value: 'ai_decide', label: 'Let AI Decide' },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.optionButton,
+                        formData.snackFrequency === option.value && [
+                          styles.selectedOption,
+                          { backgroundColor: colors.primary }
+                        ]
+                      ]}
+                      onPress={() => setFormData({ ...formData, snackFrequency: option.value })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        styles.optionText,
+                        { color: formData.snackFrequency === option.value ? '#000000' : '#ffffff' }
+                      ]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Animatable.View>
+            )}
+
             {/* Eating Challenges */}
             <Animatable.View
               animation="fadeInUp"
@@ -2010,6 +2059,20 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   {formData.snackingStyle}
                 </Text>
               </Animatable.View>
+              {formData.snackFrequency && formData.snackingStyle !== "I don't snack" && (
+                <Animatable.View 
+                  style={styles.tronDataRow}
+                  animation="fadeInLeft"
+                  delay={1660}
+                >
+                  <Text style={styles.tronDataLabel}>Snacks Per Day</Text>
+                  <Text style={[styles.tronDataValue, { color: colors.primary }]}>
+                    {formData.snackFrequency === '0' ? 'None' : 
+                     formData.snackFrequency === 'ai_decide' ? 'AI Decides' : 
+                     formData.snackFrequency}
+                  </Text>
+                </Animatable.View>
+              )}
               {formData.eatingChallenges && formData.eatingChallenges.length > 0 && (
                 <Animatable.View 
                   style={styles.tronDataRow}

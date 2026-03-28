@@ -984,6 +984,8 @@ Final assessment of plan quality:
 export const getJsonConversionPrompt = (): string => {
   return `Please convert the meal plan you just created into a specific JSON format that can be imported into my nutrition app called JSON.fit.
 
+**CRITICAL: This is a DATA TRANSFER operation only. NEVER recalculate nutrition values - this causes calorie inflation bugs. Copy the EXACT calories, macros, and ingredient amounts from your reviewed meal plan.**
+
 # MEAL PLANNING STRUCTURE
 
 This JSON format is designed to work directly with the app's simplified meal planning system. The structure uses dates as keys for easy lookup and management.
@@ -1015,7 +1017,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
         {
           "id": "string",
           "name": "string",
-          "type": "breakfast" | "lunch" | "dinner" | "snack",
+          "type": "breakfast" | "brunch" | "lunch" | "second_lunch" | "early_dinner" | "dinner" | "snack" | "morning_snack" | "afternoon_snack" | "evening_snack" | "pre_workout" | "post_workout",
           "time": "string (HH:MM AM/PM format)",
           "calories": number,
           "macros": {
@@ -1111,7 +1113,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 |-------|----------|--------|-------|
 | **id** | Yes | String | Unique meal identifier |
 | **name** | Yes | String | Meal name |
-| **type** | Yes | Enum | "breakfast", "lunch", "dinner", "snack" |
+| **type** | Yes | Enum | "breakfast", "brunch", "lunch", "second_lunch", "early_dinner", "dinner", "snack", "morning_snack", "afternoon_snack", "evening_snack", "pre_workout", "post_workout" |
 | **time** | Yes | String | "7:45 AM", "12:30 PM" format |
 | **calories** | Yes | Number | Total calories for this meal |
 | **macros.protein** | Yes | Number | Protein in grams |
@@ -1176,6 +1178,16 @@ This JSON format is designed to work directly with the app's simplified meal pla
 
 # CRITICAL CONVERSION RULES
 
+## Nutrition Value Preservation (MOST IMPORTANT)
+- **DO NOT RECALCULATE MACROS** - Copy exact values from the reviewed meal plan
+- **DO NOT ADJUST PORTIONS** - Use exact ingredient amounts from the reviewed plan
+- **DO NOT SECOND-GUESS CALORIES** - The review process already verified these are correct
+- If you see 840 calories in the meal plan, the JSON must show exactly 840 calories
+- Any discrepancy between ingredients and stated macros means the STATED MACROS are correct (not the ingredients)
+- If ingredients seem inconsistent with macros, DO NOT "fix" them - use the reviewed macro values
+- If portion sizes seem "wrong", DO NOT adjust them - use the reviewed portions  
+- When in doubt, preserve the reviewed plan data exactly as written
+
 ## Date Handling
 - Use YYYY-MM-DD format consistently
 - Ensure dailyMeals keys match the date field within each day
@@ -1185,13 +1197,8 @@ This JSON format is designed to work directly with the app's simplified meal pla
 - meal plan id: use timestamp-based unique ID
 - meal ids: use format "meal_YYYYMMDD_breakfast" etc.
 
-## Nutrition Accuracy
-- Each meal's macros must match the recipe calculations
-- Double-check that ingredient amounts support the stated macros
-- Fiber should be calculated and included for every meal
-
 ## Grocery List Totaling
-- Sum ingredient quantities across all meals for the week
+- Transfer ingredient quantities from each meal exactly as listed, then sum identical items for grocery totals
 - Group by logical shopping categories
 - Ensure estimated prices are realistic for the specified store/country
 - Remove duplicates and consolidate similar items
@@ -1225,6 +1232,6 @@ If the meal plan says "Cook rice according to package instructions", convert thi
 
 Complete structure - include all required fields
 Validate JSON - ensure the output is valid, parseable JSON
-Cross-check totals - verify grocery list item prices sum to total_estimated_cost ranges, and metadata costs match the grocery list ranges
+Cross-check structure - verify all required fields are present and JSON is valid, preserve all nutrition values exactly as provided
 Start the conversion now.`;
 };

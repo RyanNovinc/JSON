@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "89",
+      "buildNumber": "90",
       "entitlements": {
         "aps-environment": "development",
         "com.apple.developer.usernotifications.communication": true
@@ -32,7 +32,7 @@
         "backgroundColor": "#0f0f0f"
       },
       "package": "com.RyanNovinc.JSON",
-      "versionCode": 20,
+      "versionCode": 90,
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,

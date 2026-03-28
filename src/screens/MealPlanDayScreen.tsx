@@ -172,13 +172,18 @@ export default function MealPlanDayScreen() {
       };
     } else {
       // Legacy fallback
+      const legacyDate = legacyCalculatedDateString ? new Date(legacyCalculatedDateString + 'T00:00:00.000Z') : null;
       return {
         dayName: legacyCalculatedDayName || 'Day',
-        displayDate: legacyCalculatedDayName || 'Unknown Date',
+        displayDate: legacyDate ? legacyDate.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          timeZone: 'UTC' 
+        }) : 'Unknown Date',
         planName: legacyMealPlanName || 'Meal Plan'
       };
     }
-  }, [targetDate, dayName, displayDate, planName, legacyCalculatedDayName, legacyMealPlanName]);
+  }, [targetDate, dayName, displayDate, planName, legacyCalculatedDayName, legacyCalculatedDateString, legacyMealPlanName]);
 
   // Auto-migrate legacy data on component mount
   useEffect(() => {
@@ -835,20 +840,42 @@ export default function MealPlanDayScreen() {
   const getMealIcon = (mealType: string) => {
     switch (mealType) {
       case 'breakfast': return 'sunny';
-      case 'lunch': return 'partly-sunny';
+      case 'brunch': return 'partly-sunny';
+      case 'lunch': return 'restaurant';
+      case 'second_lunch': return 'fast-food';
+      case 'early_dinner': return 'wine';
       case 'dinner': return 'moon';
       case 'snack': return 'nutrition';
+      case 'morning_snack': return 'cafe';
+      case 'afternoon_snack': return 'ice-cream';
+      case 'evening_snack': return 'pizza';
+      case 'pre_workout': return 'fitness';
+      case 'post_workout': return 'barbell';
       default: return 'restaurant';
     }
   };
 
   const getMealColor = (mealType: string) => {
     switch (mealType) {
-      case 'breakfast': return '#f59e0b';
-      case 'lunch': return '#06b6d4';
-      case 'dinner': return '#8b5cf6';
-      case 'snack': return '#10b981';
-      default: return '#ff6b6b'; // Bright red/coral for custom meal types
+      // Main meals - warm to cool progression through the day
+      case 'breakfast': return '#f97316'; // Warm orange (morning energy)
+      case 'brunch': return '#eab308'; // Golden yellow (late morning)
+      case 'lunch': return '#3b82f6'; // Blue (midday focus)
+      case 'second_lunch': return '#2563eb'; // Darker blue
+      case 'early_dinner': return '#7c3aed'; // Purple (early evening)
+      case 'dinner': return '#8b5cf6'; // Lighter purple (evening)
+      
+      // Snacks - complementary colors between main meals
+      case 'snack': return '#10b981'; // Green (general snack)
+      case 'morning_snack': return '#f59e0b'; // Amber (between breakfast and lunch)
+      case 'afternoon_snack': return '#06b6d4'; // Cyan (between lunch and dinner)
+      case 'evening_snack': return '#ec4899'; // Pink (after dinner)
+      
+      // Special/workout meals
+      case 'pre_workout': return '#dc2626'; // Red (energy/intensity)
+      case 'post_workout': return '#16a34a'; // Green (recovery)
+      
+      default: return '#6b7280'; // Gray for unknown types
     }
   };
 
