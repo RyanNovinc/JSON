@@ -316,7 +316,7 @@ For each grocery item include:
 - **Quantity** - Exact amount needed for the full week
 - **Unit** - Standard unit (kg, g, L, ml, cans, bags, etc.)
 - **Estimated price** - Realistic price for the specified store and location
-- **Notes** - How the item is used in the plan, storage tips, or substitution notes
+- **Notes** - ONLY include notes for items that must be bought outside the main grocery store (e.g., "Available at Chemist Warehouse" for supplements, "Health food store" for specialty items). Do NOT include usage notes, storage tips, or cooking instructions for regular grocery items.
 - **Purchased status** - Always set to not purchased (the user will check these off in the app)
 
 Organize items into logical shopping categories:
@@ -408,7 +408,7 @@ export const FORMAT_REQUIREMENTS = `
 - Make it fast to generate and easy to copy/edit
 - Include a "Weekly Meal Prep" summary section showing total prep time and number of unique recipes
 - Structure each meal as a complete recipe with ingredients and instructions
-- **INCLUDE THE GROCERY LIST** in the document — organized by category with quantities, prices, and notes
+- **INCLUDE THE GROCERY LIST** in the document — organized by category with quantities, prices, and notes (only for items bought outside the main grocery store)
 - **INCLUDE THE MEAL PREP SESSION** in the document — with step-by-step instructions, equipment, and storage guidelines
 - Present ONLY the final plan — do not show working, drafts, or iteration. If you need to adjust during creation, do so silently and present only the clean final version.
 
@@ -927,7 +927,7 @@ Verify the grocery list is complete and correct:
 - **Prices are realistic** for the specified store and location
 - **Categories are logical** — items are in the right shopping section
 - **No phantom items** — nothing in the grocery list that isn't used in any recipe
-- **Notes are helpful** — storage tips, usage notes, substitution suggestions
+- **Notes for external stores only** — include notes ONLY for items that must be bought outside the main grocery store (supplements, specialty items)
 - Cross-check: Pick 3 random ingredients from recipes and verify they appear in the grocery list with correct quantities
 - **FAIL if** 3+ ingredients are missing from the grocery list or quantities are significantly wrong
 - **FIX**: Add missing items, correct quantities, remove phantom items, fix prices.
@@ -1158,7 +1158,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 | **quantity** | Yes | String | Total amount needed |
 | **unit** | Yes | String | Unit of measurement |
 | **estimated_price** | Yes | Number | Price in local currency |
-| **notes** | No | String | Usage notes, storage tips |
+| **notes** | No | String | Store location notes for items bought outside main grocery store |
 | **is_purchased** | Yes | Boolean | Always false (user will check off) |
 | **alternatives** | No | Array | 1-2 substitute options for hard-to-find items |
 
@@ -1170,7 +1170,7 @@ This JSON format is designed to work directly with the app's simplified meal pla
 | **quantity** | Yes | String | Equivalent amount needed |
 | **unit** | Yes | String | Unit of measurement |
 | **estimated_price** | Yes | Number | Price in local currency |
-| **notes** | No | String | Conversion tips, cooking adjustments |
+| **notes** | No | String | Conversion tips, cooking adjustments for alternatives |
 
 ## Meal Prep Sessions Structure
 

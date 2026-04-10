@@ -809,7 +809,7 @@ For each grocery item include:
 - **Quantity** - Exact amount needed for ${durationText}
 - **Unit** - Standard unit (kg, g, L, ml, cans, bags, etc.)
 - **Estimated price** - Realistic price for the specified store and location
-- **Notes** - How the item is used in the plan, storage tips, or substitution notes
+- **Notes** - ONLY include notes for items that must be bought outside the main grocery store (e.g., "Available at Chemist Warehouse" for supplements, "Health food store" for specialty items). Do NOT include usage notes, storage tips, or cooking instructions for regular grocery items - these clutter the shopping experience.
 - **Purchased status** - Always set to not purchased (the user will check these off in the app)
 
 Organize items into logical shopping categories:
@@ -836,7 +836,14 @@ Focus on alternatives for:
 - Seasonal produce (if no asparagus → green beans, broccoli)
 - Items that may be hard to locate in some stores
 
-**SUPPLEMENT EXCEPTION:** Protein powder and other supplements are not expected to be available at the user's nominated grocery store. List them in a separate 'Supplements' category with a realistic price from a common supplement retailer (e.g., Chemist Warehouse, Bulk Nutrients). Do not treat external sourcing as a problem — most people buy supplements separately from their grocery shop.${additionalGuidance ? '\n\n' + additionalGuidance : ''}`;
+**ITEMS BOUGHT ELSEWHERE:** Some items may not be available at the user's main grocery store:
+
+- **Supplements** (protein powder, psyllium husk, etc.) → List in 'Supplements' category with note "Available at Chemist Warehouse" or "Available at Bulk Nutrients"
+- **Specialty health foods** (nutritional yeast, specialty flours) → Note "Available at health food store" 
+- **Ethnic ingredients** (miso paste, specialty spices) → Note "Available at Asian grocery store" or specific store if known
+- **Fresh specialty items** (specific cheese types, artisan breads) → Note "Available at deli/bakery"
+
+**CRITICAL:** Include specific store location notes ONLY for items that cannot be found at ${store}. For regular grocery items (chicken, vegetables, rice, etc.), do NOT include any notes as they clutter the shopping experience.${additionalGuidance ? '\n\n' + additionalGuidance : ''}`;
 };
 
 const getMealPrepSessionRequirements = (planDuration: number = 7, skillConfidence?: number, timeInvestment?: number, planningStyle?: number): string => {

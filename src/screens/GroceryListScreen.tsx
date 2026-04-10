@@ -809,22 +809,28 @@ export default function GroceryListScreen() {
         onPress={() => toggleItemPurchased(item)}
         activeOpacity={0.8}
       >
-        <View style={styles.purchaseInfoRow}>
-          <Text style={styles.itemAmount}>
-            {item.amount} {item.unit}
-          </Text>
-          <Text style={[
-            styles.priceText,
-            item.isPurchased && styles.purchasedPriceText,
-            item.isFromInventory && styles.inventoryPriceText,
-          ]}>
-            {item.isFromInventory ? 'Free' : `${currencySymbol}${item.estimatedCost.toFixed(2)}`}
-          </Text>
-          <Ionicons
-            name={item.isPurchased ? 'checkmark-circle' : 'ellipse-outline'}
-            size={20}
-            color={item.isPurchased ? '#22c55e' : '#71717a'}
-          />
+        <View style={styles.purchaseInfoContainer}>
+          <View style={styles.purchaseInfoRow}>
+            <Text style={styles.itemAmount}>
+              {item.amount} {item.unit}
+            </Text>
+            <Text style={[
+              styles.priceText,
+              item.isPurchased && styles.purchasedPriceText,
+              item.isFromInventory && styles.inventoryPriceText,
+            ]}>
+              {item.isFromInventory ? 'Free' : `${currencySymbol}${item.estimatedCost.toFixed(2)}`}
+            </Text>
+            <Ionicons
+              name={item.isPurchased ? 'checkmark-circle' : 'ellipse-outline'}
+              size={20}
+              color={item.isPurchased ? '#22c55e' : '#71717a'}
+            />
+          </View>
+          {/* Show notes only when they exist (for items bought elsewhere) */}
+          {item.notes && item.notes.trim() && (
+            <Text style={styles.itemStoreNote}>{item.notes}</Text>
+          )}
         </View>
       </TouchableOpacity>
     </View>
@@ -1242,10 +1248,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     flex: 1,
   },
+  purchaseInfoContainer: {
+    gap: 6,
+  },
   purchaseInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  itemStoreNote: {
+    fontSize: 12,
+    color: '#71717a',
+    fontStyle: 'italic',
+    marginTop: 4,
+    lineHeight: 16,
   },
   summaryValue: {
     fontSize: 20,
