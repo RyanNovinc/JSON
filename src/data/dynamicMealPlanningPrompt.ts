@@ -1056,7 +1056,16 @@ This JSON format is designed to work directly with the app's simplified meal pla
             "unit": "string",
             "estimated_price": number,
             "notes": "string",
-            "is_purchased": false
+            "is_purchased": false,
+            "alternatives": [
+              {
+                "item_name": "string",
+                "quantity": "string",
+                "unit": "string", 
+                "estimated_price": number,
+                "notes": "string"
+              }
+            ]
           }
         ]
       }
@@ -1151,6 +1160,17 @@ This JSON format is designed to work directly with the app's simplified meal pla
 | **estimated_price** | Yes | Number | Price in local currency |
 | **notes** | No | String | Usage notes, storage tips |
 | **is_purchased** | Yes | Boolean | Always false (user will check off) |
+| **alternatives** | No | Array | 1-2 substitute options for hard-to-find items |
+
+## Alternative Items Structure (within grocery list items)
+
+| Field | Required | Format | Notes |
+|-------|----------|--------|-------|
+| **item_name** | Yes | String | Alternative product name |
+| **quantity** | Yes | String | Equivalent amount needed |
+| **unit** | Yes | String | Unit of measurement |
+| **estimated_price** | Yes | Number | Price in local currency |
+| **notes** | No | String | Conversion tips, cooking adjustments |
 
 ## Meal Prep Sessions Structure
 

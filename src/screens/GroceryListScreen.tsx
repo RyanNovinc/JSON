@@ -181,6 +181,7 @@ export default function GroceryListScreen() {
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<FoodCategory[]>(CATEGORY_ORDER);
   const [sortBy, setSortBy] = useState<'category' | 'price'>('category');
+  const [filterMode, setFilterMode] = useState<'all' | 'remaining' | 'completed'>('all');
 
   // Use passed grocery list data or fall back to context
   const passedGroceryList = route.params?.groceryList;
@@ -772,32 +773,24 @@ export default function GroceryListScreen() {
   };
 
   const GroceryItemRow = ({ item }: { item: GroceryItem }) => (
-    <TouchableOpacity
+    <View
       style={[
         styles.itemRow,
         item.isPurchased && styles.purchasedItemRow,
         item.isFromInventory && styles.inventoryItemRow,
       ]}
-      onPress={() => toggleItemPurchased(item)}
-      onLongPress={() => handleLongPressItem(item)}
-      delayLongPress={800}
-      activeOpacity={0.7}
     >
+      {/* TOP HALF: Item name tap zone for alternatives */}
       <TouchableOpacity
-        style={styles.checkboxContainer}
-        onPress={() => toggleItemPurchased(item)}
+        style={styles.topTapZone}
+        onPress={() => {/* TODO: Show alternatives modal */}}
+        onLongPress={() => handleLongPressItem(item)}
+        delayLongPress={800}
+        activeOpacity={0.8}
       >
-        <Ionicons
-          name={item.isPurchased ? 'checkmark-circle' : 'ellipse-outline'}
-          size={24}
-          color={item.isPurchased ? '#22c55e' : '#71717a'}
-        />
-      </TouchableOpacity>
-
-      <View style={styles.itemInfo}>
-        <View style={styles.itemHeaderStacked}>
+        <View style={styles.itemNameContainer}>
           <Text style={[
-            styles.itemName,
+            styles.itemNameTitle,
             item.isPurchased && styles.purchasedItemName
           ]}>
             {item.name}
@@ -808,8 +801,15 @@ export default function GroceryListScreen() {
             </View>
           )}
         </View>
-        
-        <View style={styles.itemDetailsRow}>
+      </TouchableOpacity>
+
+      {/* BOTTOM HALF: Purchase info and completion tap zone */}
+      <TouchableOpacity
+        style={styles.bottomTapZone}
+        onPress={() => toggleItemPurchased(item)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.purchaseInfoRow}>
           <Text style={styles.itemAmount}>
             {item.amount} {item.unit}
           </Text>
@@ -820,25 +820,31 @@ export default function GroceryListScreen() {
           ]}>
             {item.isFromInventory ? 'Free' : `${currencySymbol}${item.estimatedCost.toFixed(2)}`}
           </Text>
+          <Ionicons
+            name={item.isPurchased ? 'checkmark-circle' : 'ellipse-outline'}
+            size={20}
+            color={item.isPurchased ? '#22c55e' : '#71717a'}
+          />
         </View>
-        
-        {item.expirationDate && (
-          <Text style={styles.expirationDate}>
-            Expires: {new Date(item.expirationDate).toLocaleDateString()}
-          </Text>
-        )}
-        
-        {item.notes && (
-          <Text style={styles.itemNotes}>{item.notes}</Text>
-        )}
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 
   const CategorySection = ({ category }: { category: FoodCategory }) => {
     const items = groupedItems[category];
-    const categoryTotal = items.reduce((sum, item) => sum + (item.estimatedCost || item.estimated_price || 0), 0);
-    const purchasedInCategory = items.filter(item => item.isPurchased).length;
+    
+    // Filter items based on current filter mode
+    const filteredItems = items.filter(item => {
+      if (filterMode === 'remaining') return !item.isPurchased;
+      if (filterMode === 'completed') return item.isPurchased;
+      return true; // 'all' shows everything
+    });
+    
+    // Don't render category if no items match the filter
+    if (filteredItems.length === 0) return null;
+    
+    const categoryTotal = filteredItems.reduce((sum, item) => sum + (item.estimatedCost || item.estimated_price || 0), 0);
+    const purchasedInCategory = filteredItems.filter(item => item.isPurchased).length;
 
     return (
       <View style={styles.categorySection}>
@@ -852,7 +858,7 @@ export default function GroceryListScreen() {
             <Text style={styles.categoryTitle}>{CATEGORY_NAMES[category]}</Text>
             <View style={styles.categoryStats}>
               <Text style={styles.categoryStatsText}>
-                {purchasedInCategory}/{items.length}
+                {purchasedInCategory}/{filteredItems.length}
               </Text>
             </View>
           </View>
@@ -861,7 +867,7 @@ export default function GroceryListScreen() {
           </Text>
         </View>
         <View style={styles.categoryItems}>
-          {items.map((item, index) => (
+          {filteredItems.map((item, index) => (
             <GroceryItemRow key={`${item.id || 'no_id'}_${index}_${Date.now()}`} item={item} />
           ))}
         </View>
@@ -878,14 +884,9 @@ export default function GroceryListScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Grocery List</Text>
         
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={shareGroceryList} style={styles.headerButton}>
-            <Ionicons name="share-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.headerButton}>
-            <Ionicons name="add" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.headerButton}>
+          <Ionicons name="add" size={24} color="#ffffff" />
+        </TouchableOpacity>
       </View>
 
       {showLoadingState ? (
@@ -897,24 +898,24 @@ export default function GroceryListScreen() {
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Summary Card */}
         <View style={styles.summaryCard}>
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryItem}>
+          <View style={styles.summaryColumn}>
+            <View style={styles.summaryItemHorizontal}>
+              <Text style={styles.summaryLabel}>Est. Cost</Text>
               <Text style={[styles.summaryValue, { color: themeColor }]}>
                 {estimateDisplay || `${currencySymbol}${totalCost.toFixed(2)}`}
               </Text>
-              <Text style={styles.summaryLabel}>Est. Cost</Text>
             </View>
-            <View style={styles.summaryItem}>
+            <View style={styles.summaryItemHorizontal}>
+              <Text style={styles.summaryLabel}>Purchased</Text>
               <Text style={[styles.summaryValue, { color: '#22c55e' }]}>
                 {purchasedItems}/{totalItems}
               </Text>
-              <Text style={styles.summaryLabel}>Purchased</Text>
             </View>
-            <View style={styles.summaryItem}>
+            <View style={styles.summaryItemHorizontal}>
+              <Text style={styles.summaryLabel}>Remaining</Text>
               <Text style={[styles.summaryValue, { color: '#f59e0b' }]}>
                 {currencySymbol}{remainingCost.toFixed(2)}
               </Text>
-              <Text style={styles.summaryLabel}>Remaining</Text>
             </View>
           </View>
           
@@ -936,6 +937,40 @@ export default function GroceryListScreen() {
           </View>
         </View>
 
+        {/* Filter Toggle */}
+        <View style={styles.filterContainer}>
+          <TouchableOpacity
+            style={[styles.filterToggle, { borderColor: themeColor }]}
+            onPress={() => {
+              setFilterMode(prev => {
+                if (prev === 'all') return 'remaining';
+                if (prev === 'remaining') return 'completed';
+                return 'all';
+              });
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={
+                filterMode === 'all' ? 'list' :
+                filterMode === 'remaining' ? 'ellipse-outline' :
+                'checkmark-circle'
+              }
+              size={18}
+              color={themeColor}
+            />
+            <Text style={[styles.filterText, { color: themeColor }]}>
+              {filterMode === 'all' ? 'All' :
+               filterMode === 'remaining' ? 'Remaining' :
+               'Completed'}
+            </Text>
+            <Text style={styles.filterCount}>
+              {filterMode === 'all' ? totalItems :
+               filterMode === 'remaining' ? totalItems - purchasedItems :
+               purchasedItems}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {filteredCategories.map((category) => (
           <CategorySection key={category} category={category} />
@@ -1171,8 +1206,46 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginBottom: 16,
   },
+  summaryColumn: {
+    gap: 12,
+    marginBottom: 16,
+  },
   summaryItem: {
     alignItems: 'center',
+  },
+  summaryItemHorizontal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  // Vertical split-card layout styles
+  topTapZone: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  bottomTapZone: {
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    backgroundColor: '#27272a',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  itemNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itemNameTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    lineHeight: 20,
+    flex: 1,
+  },
+  purchaseInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   summaryValue: {
     fontSize: 20,
@@ -1269,13 +1342,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
     backgroundColor: '#18181b',
     borderRadius: 12,
-    padding: 16,
     borderWidth: 1,
     borderColor: '#27272a',
+    overflow: 'hidden',
   },
   purchasedItemRow: {
     opacity: 0.6,
@@ -1601,5 +1673,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
+  },
+
+  // Filter Toggle Styles
+  filterContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  filterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  filterText: {
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  filterCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#71717a',
+    backgroundColor: '#27272a',
+    borderRadius: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
   },
 });

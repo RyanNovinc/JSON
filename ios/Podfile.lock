@@ -2067,7 +2067,7 @@ PODS:
     - SocketRocket
   - react-native-safe-area-context (5.6.2):
     - React-Core
-  - react-native-slider (4.5.4):
+  - react-native-slider (4.5.3):
     - boost
     - DoubleConversion
     - fast_float
@@ -3122,7 +3122,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: 94f4264de2cb156960cd82b338a403f4653f2fd9
   React-microtasksnativemodule: 6c4ee39a36958c39c97b074d28f360246a335e84
   react-native-safe-area-context: 6c8805194166a9d6b3e53ba69ca76756c9bfb052
-  react-native-slider: 94f88e48775845cc54cbacceaac4f98a3d7b5b44
+  react-native-slider: b4d7b09549c5a7ebbfbd7f5e9482062d697bea07
   React-NativeModulesApple: ebf2ce72b35870036900d6498b33724386540a71
   React-oscompat: eb0626e8ba1a2c61673c991bf9dc21834898475d
   React-perflogger: 509e1f9a3ee28df71b0a66de806ac515ce951246

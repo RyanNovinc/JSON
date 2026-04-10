@@ -823,6 +823,19 @@ Organize items into logical shopping categories:
 
 Include a **total estimated cost** and **currency** for the full grocery list.
 
+**INGREDIENT ALTERNATIVES:**
+For each grocery item that could be commonly unavailable or difficult to find, include 1-2 alternatives:
+- **Primary item**: [main ingredient with price]
+- **Alternative 1**: [substitute with price and conversion ratio]
+- **Alternative 2**: [backup option with price and conversion ratio]
+
+Focus on alternatives for:
+- Specialty proteins (if store doesn't have chicken thighs → chicken breast, turkey thighs)
+- Less common vegetables (if no zucchini → yellow squash, cucumber for raw dishes)
+- Specific brands/products (if no Greek yogurt brand X → brand Y, or plain yogurt)
+- Seasonal produce (if no asparagus → green beans, broccoli)
+- Items that may be hard to locate in some stores
+
 **SUPPLEMENT EXCEPTION:** Protein powder and other supplements are not expected to be available at the user's nominated grocery store. List them in a separate 'Supplements' category with a realistic price from a common supplement retailer (e.g., Chemist Warehouse, Bulk Nutrients). Do not treat external sourcing as a problem — most people buy supplements separately from their grocery shop.${additionalGuidance ? '\n\n' + additionalGuidance : ''}`;
 };
 
