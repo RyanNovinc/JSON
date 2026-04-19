@@ -236,6 +236,7 @@ export const STATIC_RULES_4_5_6_7 = `4. **Treat exercise names as identifiers** 
 6. **Respect exercise preferences** — if the profile lists liked exercises, incorporate them where they fit the plan. If it lists disliked exercises, avoid them and use alternatives for that movement pattern.
 7. **Only program working sets** — do not include warm-up sets in the plan. The app tracks working sets only.
 8. **Sets per exercise cap** — do not exceed 5 sets of any single isolation exercise in one session. If volume targets require more sets than this allows, distribute across a second exercise or a second training day rather than stacking onto one exercise.
+9. **RIR (Reps in Reserve) considerations** — consider appropriate intensity levels that optimize stimulus-to-fatigue ratio based on exercise type and user experience level.
 10. **Volume distribution across days** — if a muscle group is below its target range and only appears on 1-2 training days, add sets on a third day. Calves, biceps, and triceps can be placed on any training day regardless of the split's primary focus. Do not leave a muscle below target when adding 2-3 sets to an existing session would fix it.
 11. **Target range, not just minimums** — clearing the experience-scaled minimum floor is not sufficient. Every non-exempt muscle should land within its target range from the Volume Targets table. If a muscle is above its minimum but below its target, treat it as a problem to solve, not an acceptable result.`;
 

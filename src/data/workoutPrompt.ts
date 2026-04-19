@@ -520,7 +520,7 @@ Use the exact muscle taxonomy and compound exercise tagging guide from the worko
   "superset_group": "string (optional — e.g. 'ss1'; same value on two exercises links them as a superset)",
   "reps_weekly": { "1": "string", "2": "string", ... },
   "sets_weekly": { "1": number, "2": number, ... },
-  "notes": "string (optional — omit if not needed)",
+  "notes": "string (optional — include RIR guidance when beneficial, omit if not needed)",
   "alternatives": [
     { "exercise": "string", "primaryMuscles": [...], "secondaryMuscles": [...] }
   ]
@@ -545,6 +545,7 @@ Use the exact muscle taxonomy and compound exercise tagging guide from the worko
    - Day 3: {"day_number": 3, "type": "rest", "day_name": "REST DAY"}
    - Days 4,5: training, Day 6: rest, Day 7: training
 10. **Sample plan protection** — for sample plans only, include \`"_metadata": {"isSamplePlan": true}\` at the root level to prevent overwriting users' exercise preferences during import.
+11. **RIR (Reps in Reserve) guidance** — include appropriate RIR guidance in the notes field when beneficial for user progression and training quality.
 
 ---
 

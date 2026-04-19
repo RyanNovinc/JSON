@@ -104,7 +104,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       console.log('Loading countdown sound...');
       
-      // Set audio mode first - use media volume instead of ringer volume
+      // Set audio mode to duck background music for better timer alerts
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         staysActiveInBackground: false,
@@ -274,6 +274,24 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Stop and reset position first
           await soundRef.current.stopAsync();
           await soundRef.current.setPositionAsync(0);
+          
+          // Set up cleanup handler for when sound finishes
+          soundRef.current.setOnPlaybackStatusUpdate((playbackStatus) => {
+            if (playbackStatus.isLoaded && !playbackStatus.isPlaying && playbackStatus.didJustFinish) {
+              // Clear the status update handler to prevent repeated calls
+              soundRef.current?.setOnPlaybackStatusUpdate(null);
+              
+              // Properly deactivate and reactivate audio session to restore background music
+              Audio.setIsEnabledAsync(false)
+                .then(() => Audio.setIsEnabledAsync(true))
+                .then(() => {
+                  console.log('Audio session cycled to restore background music');
+                })
+                .catch((error) => {
+                  console.error('Failed to cycle audio session:', error);
+                });
+            }
+          });
           
           // Play the sound
           await soundRef.current.playAsync();

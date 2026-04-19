@@ -1960,6 +1960,12 @@ export default function WorkoutLogScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Calculate estimated 1RM using Epley formula
+  const calculate1RM = (weight: number, reps: number): number => {
+    if (reps <= 0 || weight <= 0) return 0;
+    if (reps === 1) return weight;
+    return Math.round(weight * (1 + reps / 30));
+  };
 
   const calculateWorkoutStats = () => {
     let totalVolume = 0;
@@ -2485,6 +2491,9 @@ export default function WorkoutLogScreen() {
                         </Text>
                         <Text style={styles.historySetData}>
                           {set.weight}{set.unit || globalUnit} × {set.reps}
+                          {set.reps > 1 && (
+                            <Text style={styles.oneRMText}> (~{calculate1RM(parseFloat(set.weight) || 0, parseInt(set.reps) || 0)}{set.unit || globalUnit} 1RM)</Text>
+                          )}
                           {set.drops && set.drops.length > 0 && (
                             <Text style={[styles.dropIndicator, { color: themeColor }]}> + {set.drops.length} drops</Text>
                           )}
@@ -2499,6 +2508,9 @@ export default function WorkoutLogScreen() {
                               </Text>
                               <Text style={styles.historyDropData}>
                                 {drop.weight}{drop.unit || globalUnit} × {drop.reps}
+                                {drop.reps > 1 && (
+                                  <Text style={styles.oneRMText}> (~{calculate1RM(parseFloat(drop.weight) || 0, parseInt(drop.reps) || 0)}{drop.unit || globalUnit} 1RM)</Text>
+                                )}
                               </Text>
                             </View>
                           ))}
@@ -2899,6 +2911,19 @@ export default function WorkoutLogScreen() {
             <Text style={[styles.addExerciseText, { color: themeColor }]}>Add Exercise</Text>
           </TouchableOpacity>
           
+          {/* Bottom Finish Workout Button */}
+          {workoutStartTime && dynamicExercises.length > 0 && (
+            <TouchableOpacity
+              style={[styles.bottomFinishButton, { borderColor: themeColor }]}
+              onPress={handleFinishWorkout}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="checkmark-circle-outline" size={24} color={themeColor} />
+              <Text style={[styles.bottomFinishButtonText, { color: themeColor }]}>
+                Finish Workout
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.bottomSpacer} />
         </ScrollView>
@@ -3607,6 +3632,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  bottomFinishButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    gap: 8,
+  },
+  bottomFinishButtonText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
   bottomSpacer: {
     height: 180,
   },
@@ -3647,6 +3689,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ffffff',
     marginLeft: 8,
+  },
+  oneRMText: {
+    fontSize: 12,
+    color: '#71717a',
+    fontStyle: 'italic',
   },
   dropIndicator: {
     fontSize: 12,

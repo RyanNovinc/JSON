@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Alert,
   Animated,
   TouchableOpacity,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -14,6 +15,7 @@ import { assembleMealPlanningPrompt } from '../data/mealPlanningPrompt';
 import { useTheme } from '../contexts/ThemeContext';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 import { WorkoutStorage } from '../utils/storage';
+import { useNavigation } from '@react-navigation/native';
 
 interface NutritionGeneratorStep1Props {
   onNext: () => void;
@@ -22,9 +24,11 @@ interface NutritionGeneratorStep1Props {
 
 export default function NutritionGeneratorStep1({ onNext, onBack }: NutritionGeneratorStep1Props) {
   const { themeColor } = useTheme();
+  const navigation = useNavigation<any>();
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [showInfo, setShowInfo] = useState(false);
+  const [showCustomAlert, setShowCustomAlert] = useState(false);
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -81,11 +85,7 @@ export default function NutritionGeneratorStep1({ onNext, onBack }: NutritionGen
       const completed = await checkNutritionCompleted();
       
       if (!completed) {
-        Alert.alert(
-          'Complete Nutrition Setup First',
-          'Please complete the nutrition questionnaires to generate your personalized meal plan prompt.',
-          [{ text: 'OK' }]
-        );
+        setShowCustomAlert(true);
         return;
       }
 
@@ -218,14 +218,9 @@ Create a personalized meal plan based on the nutrition data provided. Include br
               }
             ]}
             onPress={nutritionCompleted ? onNext : () => {
-              Alert.alert(
-                'Complete Nutrition Setup First',
-                'Please complete the nutrition questionnaires before proceeding.',
-                [{ text: 'OK' }]
-              );
+              setShowCustomAlert(true);
             }}
             activeOpacity={0.8}
-            disabled={!nutritionCompleted}
           >
             <Text style={[
               styles.nextButtonText, 
@@ -241,6 +236,45 @@ Create a personalized meal plan based on the nutrition data provided. Include br
           </TouchableOpacity>
         </View>
       </Animated.View>
+
+      {/* Custom Alert Modal */}
+      <Modal
+        visible={showCustomAlert}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCustomAlert(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>            
+            <View style={styles.modalBody}>
+              <Text style={styles.modalMessage}>
+                Complete your nutrition profile to continue
+              </Text>
+            </View>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalActionButton, { backgroundColor: themeColor }]}
+                onPress={() => {
+                  setShowCustomAlert(false);
+                  navigation.navigate('NutritionDashboard');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalActionText}>Go to Questionnaires</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowCustomAlert(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -400,5 +434,63 @@ const styles = StyleSheet.create({
     color: '#d1d5db',
     lineHeight: 22,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  modalContainer: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 0,
+    width: '100%',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  modalBody: {
+    paddingTop: 28,
+    paddingHorizontal: 28,
+    paddingBottom: 28,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#ffffff',
+    lineHeight: 24,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  modalButtons: {
+    flexDirection: 'column',
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+  },
+  modalCancelButton: {
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#71717a',
+  },
+  modalActionButton: {
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
   },
 });
