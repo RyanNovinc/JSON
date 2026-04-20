@@ -80,7 +80,7 @@ app.put('/api/feedback/:tableName/:id/status', async (req, res) => {
         const region = 'ap-southeast-2';
         
         // Valid statuses
-        const validStatuses = ['new', 'in_progress', 'under_review', 'resolved', 'implemented', 'archived'];
+        const validStatuses = ['new', 'in_progress', 'resolved'];
         const validPriorities = ['low', 'medium', 'high', 'critical'];
         
         if (status && !validStatuses.includes(status)) {
@@ -117,11 +117,6 @@ app.put('/api/feedback/:tableName/:id/status', async (req, res) => {
             expressionAttributeValues[':notes'] = { S: notes };
         }
         
-        // Archive flag
-        if (status === 'archived') {
-            updateExpression += ', isArchived = :archived';
-            expressionAttributeValues[':archived'] = { BOOL: true };
-        }
         
         const command = `aws dynamodb update-item --table-name ${tableName} --region ${region} --key '{"id":{"S":"${id}"}}' --update-expression "${updateExpression}" --expression-attribute-values '${JSON.stringify(expressionAttributeValues)}'`;
         
@@ -161,35 +156,31 @@ app.put('/api/feedback/:tableName/:id/status', async (req, res) => {
     }
 });
 
-// API endpoint to archive feedback (soft delete)
-app.put('/api/feedback/:tableName/:id/archive', async (req, res) => {
+// API endpoint to delete feedback (hard delete)
+app.delete('/api/feedback/:tableName/:id', async (req, res) => {
     try {
         const { tableName, id } = req.params;
-        const { reason } = req.body;
         const region = 'ap-southeast-2';
         
-        const updateExpression = 'SET isArchived = :archived, managementStatus = :status, lastUpdated = :timestamp, archiveReason = :reason';
-        const expressionAttributeValues = {
-            ':archived': { BOOL: true },
-            ':status': { S: 'archived' },
-            ':timestamp': { S: new Date().toISOString() },
-            ':reason': { S: reason || 'Archived by administrator' }
-        };
+        const command = `aws dynamodb delete-item --table-name ${tableName} --region ${region} --key '{"id":{"S":"${id}"}}' --return-values ALL_OLD`;
         
-        const command = `aws dynamodb update-item --table-name ${tableName} --region ${region} --key '{"id":{"S":"${id}"}}' --update-expression "${updateExpression}" --expression-attribute-values '${JSON.stringify(expressionAttributeValues)}'`;
-        
-        const { stderr } = await execPromise(command);
+        const { stdout, stderr } = await execPromise(command);
         
         if (stderr) {
             console.error('AWS CLI error:', stderr);
-            return res.status(500).json({ error: 'Failed to archive item', details: stderr });
+            return res.status(500).json({ error: 'Failed to delete item', details: stderr });
         }
         
-        console.log(`Archived feedback ${id} in ${tableName}`);
-        res.json({ success: true, message: 'Feedback archived successfully' });
+        const result = JSON.parse(stdout);
+        if (!result.Attributes) {
+            return res.status(404).json({ error: 'Item not found' });
+        }
+        
+        console.log(`Deleted feedback ${id} from ${tableName}`);
+        res.json({ success: true, message: 'Feedback deleted successfully' });
         
     } catch (error) {
-        console.error('Error archiving feedback:', error);
+        console.error('Error deleting feedback:', error);
         res.status(500).json({ error: 'Internal server error', details: error.message });
     }
 });
@@ -206,11 +197,11 @@ app.post('/api/feedback/bulk-update', async (req, res) => {
             try {
                 const { tableName, id } = item;
                 
-                if (action === 'archive') {
-                    // Archive multiple items
-                    const result = await archiveFeedbackItem(tableName, id, data.reason);
+                if (action === 'delete') {
+                    // Delete multiple items
+                    const result = await deleteFeedbackItem(tableName, id);
                     results.push({ id, status: 'success', ...result });
-                    console.log(`✅ Archived ${id}`);
+                    console.log(`✅ Deleted ${id}`);
                 } else if (action === 'update_status') {
                     // Update status for multiple items
                     const result = await updateFeedbackStatus(tableName, id, data);
@@ -269,10 +260,7 @@ app.get('/api/stats/feedback', async (req, res) => {
             byStatus: {
                 new: allFeedback.filter(f => (f.managementStatus || 'new') === 'new').length,
                 in_progress: allFeedback.filter(f => (f.managementStatus || 'new') === 'in_progress').length,
-                under_review: allFeedback.filter(f => (f.managementStatus || 'new') === 'under_review').length,
-                resolved: allFeedback.filter(f => (f.managementStatus || 'new') === 'resolved').length,
-                implemented: allFeedback.filter(f => (f.managementStatus || 'new') === 'implemented').length,
-                archived: allFeedback.filter(f => f.isArchived === true).length
+                resolved: allFeedback.filter(f => (f.managementStatus || 'new') === 'resolved').length
             },
             byPriority: {
                 low: allFeedback.filter(f => (f.priority || 'medium') === 'low').length,
@@ -339,21 +327,23 @@ async function updateFeedbackStatus(tableName, id, data) {
     return { message: 'Status updated successfully' };
 }
 
-async function archiveFeedbackItem(tableName, id, reason) {
+async function deleteFeedbackItem(tableName, id) {
     const region = 'ap-southeast-2';
     
-    const updateExpression = 'SET isArchived = :archived, managementStatus = :status, lastUpdated = :timestamp, archiveReason = :reason';
-    const expressionAttributeValues = {
-        ':archived': { BOOL: true },
-        ':status': { S: 'archived' },
-        ':timestamp': { S: new Date().toISOString() },
-        ':reason': { S: reason || 'Archived by administrator' }
-    };
+    const command = `aws dynamodb delete-item --table-name ${tableName} --region ${region} --key '{"id":{"S":"${id}"}}' --return-values ALL_OLD`;
     
-    const command = `aws dynamodb update-item --table-name ${tableName} --region ${region} --key '{"id":{"S":"${id}"}}' --update-expression "${updateExpression}" --expression-attribute-values '${JSON.stringify(expressionAttributeValues)}'`;
+    const { stdout, stderr } = await execPromise(command);
     
-    await execPromise(command);
-    return { message: 'Item archived successfully' };
+    if (stderr) {
+        throw new Error(`AWS CLI error: ${stderr}`);
+    }
+    
+    const result = JSON.parse(stdout);
+    if (!result.Attributes) {
+        throw new Error('Item not found');
+    }
+    
+    return { message: 'Item deleted successfully' };
 }
 
 // Helper function to convert DynamoDB item format to regular JSON
@@ -532,7 +522,7 @@ app.listen(PORT, () => {
     console.log(`🔧 Management features enabled:`);
     console.log(`   • Status tracking (New → In Progress → Resolved)`);
     console.log(`   • Priority management (Low/Medium/High/Critical)`);
-    console.log(`   • Archive functionality (instead of delete)`);
+    console.log(`   • Delete functionality`);
     console.log(`   • Bulk operations support`);
     console.log(`   • Assignment tracking`);
     

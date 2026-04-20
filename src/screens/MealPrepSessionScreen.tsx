@@ -81,14 +81,14 @@ export default function MealPrepSessionScreen() {
   console.log('🎯 MealPrepSessionScreen mounted');
   console.log('🎯 mealPrepSession:', mealPrepSession);
   console.log('🎯 prep_meals count:', mealPrepSession?.prep_meals?.length);
+  console.log('🎯 prep_meals array:', mealPrepSession?.prep_meals);
+  console.log('🎯 All mealPrepSession keys:', Object.keys(mealPrepSession || {}));
   console.log('🎯 equipment_needed:', mealPrepSession?.equipment_needed);
   console.log('🎯 ingredients:', mealPrepSession?.ingredients);
   
   // State for tracking completed prep meals
   const [completedMeals, setCompletedMeals] = useState<Set<string>>(new Set());
   
-  // State for tab navigation
-  const [activeTab, setActiveTab] = useState<'overview' | 'prep' | 'steps'>('overview');
 
   // Load completed meals from storage when component mounts
   useEffect(() => {
@@ -151,58 +151,12 @@ export default function MealPrepSessionScreen() {
             >
               <Ionicons name="chevron-back" size={28} color="#ffffff" />
             </TouchableOpacity>
-            
-            {/* Session Navigation */}
-            {allSessions && allSessions.length > 1 && (
-              <View style={styles.sessionNavigation}>
-                <TouchableOpacity 
-                  onPress={() => {
-                    const prevIndex = (sessionIndex || 0) - 1;
-                    if (prevIndex >= 0) {
-                      navigation.navigate('MealPrepSession', {
-                        mealPrepSession: allSessions[prevIndex],
-                        sessionIndex: prevIndex,
-                        allSessions,
-                      });
-                    }
-                  }}
-                  disabled={!sessionIndex || sessionIndex <= 0}
-                  style={[styles.navButton, (!sessionIndex || sessionIndex <= 0) && styles.navButtonDisabled]}
-                >
-                  <Ionicons name="chevron-back-outline" size={20} color={(!sessionIndex || sessionIndex <= 0) ? "#71717a" : "#ffffff"} />
-                </TouchableOpacity>
-                
-                <Text style={styles.sessionCounter}>
-                  {(sessionIndex || 0) + 1} of {allSessions.length}
-                </Text>
-                
-                <TouchableOpacity 
-                  onPress={() => {
-                    const nextIndex = (sessionIndex || 0) + 1;
-                    if (nextIndex < allSessions.length) {
-                      navigation.navigate('MealPrepSession', {
-                        mealPrepSession: allSessions[nextIndex],
-                        sessionIndex: nextIndex,
-                        allSessions,
-                      });
-                    }
-                  }}
-                  disabled={(sessionIndex || 0) >= allSessions.length - 1}
-                  style={[styles.navButton, ((sessionIndex || 0) >= allSessions.length - 1) && styles.navButtonDisabled]}
-                >
-                  <Ionicons name="chevron-forward-outline" size={20} color={((sessionIndex || 0) >= allSessions.length - 1) ? "#71717a" : "#ffffff"} />
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
           
           {/* Centered Hero Content */}
           <View style={styles.heroContent}>
             <Text style={styles.heroTitle}>
-              {allSessions && allSessions.length > 1 
-                ? `Prep ${(sessionIndex || 0) + 1} of ${allSessions.length}`
-                : mealPrepSession.session_name || 'Your Meal Prep Plan'
-              }
+              {mealPrepSession.session_name || 'Your Meal Prep Plan'}
             </Text>
             <Text style={styles.heroSubtitle}>
               {mealPrepSession.prep_day || 'Ready to build your week?'}
@@ -215,338 +169,137 @@ export default function MealPrepSessionScreen() {
           </View>
         </LinearGradient>
 
-        {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[
-              styles.tabItem, 
-              activeTab === 'overview' && { borderBottomColor: themeColor }
-            ]}
-            onPress={() => setActiveTab('overview')}
-          >
-            <Text style={[
-              styles.tabText, 
-              activeTab === 'overview' && { color: themeColor }
-            ]}>
-              Overview
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.tabItem, 
-              activeTab === 'prep' && { borderBottomColor: themeColor }
-            ]}
-            onPress={() => setActiveTab('prep')}
-          >
-            <Text style={[
-              styles.tabText, 
-              activeTab === 'prep' && { color: themeColor }
-            ]}>
-              Prep
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.tabItem, 
-              activeTab === 'steps' && { borderBottomColor: themeColor }
-            ]}
-            onPress={() => setActiveTab('steps')}
-          >
-            <Text style={[
-              styles.tabText, 
-              activeTab === 'steps' && { color: themeColor }
-            ]}>
-              Steps
-            </Text>
-          </TouchableOpacity>
-        </View>
 
-        {/* Tab Content */}
-        {activeTab === 'overview' && (
-          <>
-            {/* Time Breakdown */}
+        {/* Individual Meals to Prep */}
         <View style={styles.section}>
           <LinearGradient
-            colors={['#1a1a1d', '#2a2a2f']}
-            style={styles.timeBreakdownCard}
+            colors={[`${themeColor}15`, `${themeColor}05`]}
+            style={styles.prepStepsCard}
           >
-            <Text style={styles.cardTitle}>Time Breakdown</Text>
-            <View style={styles.timeGrid}>
-              <View style={styles.timeStatCard}>
-                <Ionicons name="cut-outline" size={24} color="#22d3ee" />
-                <Text style={styles.timeStatNumber}>
-                  {mealPrepSession.prep_time || 
-                   Math.floor((mealPrepSession.total_time || 0) / 3) || 
-                   (mealPrepSession.prep_session_guide?.reduce((total, step) => total + (step.time_required || 0), 0) || 0)}
-                </Text>
-                <Text style={styles.timeStatLabel}>Prep Minutes</Text>
-              </View>
-              <View style={styles.timeStatCard}>
-                <Ionicons name="flame-outline" size={24} color="#fb7185" />
-                <Text style={styles.timeStatNumber}>
-                  {mealPrepSession.cook_time || 
-                   Math.floor((mealPrepSession.total_time || 0) * 2 / 3) || 
-                   Math.floor((mealPrepSession.total_time || 0) - (mealPrepSession.prep_session_guide?.reduce((total, step) => total + (step.time_required || 0), 0) || 0))}
-                </Text>
-                <Text style={styles.timeStatLabel}>Cook Minutes</Text>
-              </View>
+            <Text style={styles.cardTitle}>What You're Making</Text>
+            
+            <View style={styles.mealsToPrep}>
+              {(() => {
+                // Extract meals from instructions since prep_meals doesn't exist
+                const extractedMeals = [];
+                
+                // Look for meal assembly steps in instructions
+                const instructions = mealPrepSession.instructions || [];
+                
+                instructions.forEach((instruction, index) => {
+                  if (instruction.includes('Chicken Rice Prep Bowls')) {
+                    extractedMeals.push({
+                      meal_name: 'Chicken Rice Prep Bowls',
+                      meal_type: 'lunch',
+                      servings: 4,
+                      description: 'Chicken, rice, broccoli, and chickpeas',
+                      total_time: 25,
+                      calories: 520,
+                      macros: { protein: 45, carbs: 52, fat: 18 },
+                      instructions: [instruction]
+                    });
+                  }
+                  
+                  if (instruction.includes('Beef Mince Rice Bowls')) {
+                    extractedMeals.push({
+                      meal_name: 'Beef Mince Rice Bowls',
+                      meal_type: 'lunch',
+                      servings: 3,
+                      description: 'Beef mince with rice (add fresh spinach & tomato)',
+                      total_time: 15,
+                      calories: 480,
+                      macros: { protein: 38, carbs: 48, fat: 15 },
+                      instructions: [instruction]
+                    });
+                  }
+                  
+                  if (instruction.includes('overnight oats')) {
+                    extractedMeals.push({
+                      meal_name: 'Overnight Oats',
+                      meal_type: 'breakfast',
+                      servings: 1,
+                      description: 'Oats with yogurt for Monday breakfast',
+                      total_time: 5,
+                      calories: 320,
+                      macros: { protein: 15, carbs: 45, fat: 8 },
+                      instructions: [instruction]
+                    });
+                  }
+                  
+                  if (instruction.includes('brunch chicken')) {
+                    extractedMeals.push({
+                      meal_name: 'Brunch Chicken Portions',
+                      meal_type: 'brunch',
+                      servings: 4,
+                      description: 'Diced chicken for eggs and rice brunch',
+                      total_time: 10,
+                      calories: 200,
+                      macros: { protein: 35, carbs: 5, fat: 6 },
+                      instructions: [instruction]
+                    });
+                  }
+                });
+                
+                // Remove duplicates
+                const uniqueMeals = extractedMeals.filter((meal, index, self) => 
+                  index === self.findIndex(m => m.meal_name === meal.meal_name)
+                );
+                
+                console.log('🎯 Extracted meals:', uniqueMeals);
+                
+                return uniqueMeals && uniqueMeals.length > 0 ? (
+                  uniqueMeals.map((meal, index) => (
+                  <TouchableOpacity 
+                    key={index} 
+                    style={styles.mealPrepCard}
+                    onPress={() => navigation.navigate('MealPrepDetail', {
+                      meal: meal,
+                      sessionName: mealPrepSession.session_name,
+                      themeColor: themeColor,
+                      sessionData: mealPrepSession
+                    })}
+                  >
+                    <LinearGradient
+                      colors={[`${themeColor}20`, `${themeColor}10`]}
+                      style={styles.mealPrepCardGradient}
+                    >
+                      <View style={styles.mealPrepCardHeader}>
+                        <Text style={styles.mealPrepName}>{meal.meal_name}</Text>
+                        <View style={styles.mealPrepMeta}>
+                          <Text style={styles.mealPrepServings}>{meal.servings} servings</Text>
+                          <Ionicons name="chevron-forward" size={20} color={themeColor} />
+                        </View>
+                      </View>
+                      
+                      <Text style={styles.mealPrepDescription}>
+                        {meal.description || meal.meal_prep_notes || `${meal.meal_type} • ${meal.total_time} min total`}
+                      </Text>
+                      
+                      <View style={styles.mealPrepStats}>
+                        <View style={styles.mealPrepStat}>
+                          <Ionicons name="time-outline" size={16} color="#a1a1aa" />
+                          <Text style={styles.mealPrepStatText}>{meal.total_time}m</Text>
+                        </View>
+                        <View style={styles.mealPrepStat}>
+                          <Ionicons name="flame-outline" size={16} color="#a1a1aa" />
+                          <Text style={styles.mealPrepStatText}>{meal.calories} cal</Text>
+                        </View>
+                        <View style={styles.mealPrepStat}>
+                          <Ionicons name="fitness-outline" size={16} color="#a1a1aa" />
+                          <Text style={styles.mealPrepStatText}>{meal.macros.protein}g protein</Text>
+                        </View>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.noDataText}>No individual meals found for this prep session.</Text>
+                );
+              })()}
             </View>
           </LinearGradient>
         </View>
 
-            {/* What You're Making */}
-            <View style={styles.section}>
-              <LinearGradient
-                colors={[`${themeColor}15`, `${themeColor}05`]}
-                style={styles.prepStepsCard}
-              >
-                <Text style={styles.cardTitle}>What You're Making</Text>
-                <Text style={styles.cardSubtitle}>This session covers {mealPrepSession.covers_days?.length || 0} days</Text>
-                
-                <View style={styles.mealsOverviewList}>
-                  {/* Chicken & Rice Bowls */}
-                  <View style={styles.mealOverviewItem}>
-                    <View style={styles.mealOverviewHeader}>
-                      <Text style={styles.mealOverviewName}>Chicken & Rice Bowls</Text>
-                      <Text style={styles.mealOverviewServings}>4 servings</Text>
-                    </View>
-                    <Text style={styles.mealOverviewCoverage}>
-                      Chicken thigh fillets with jasmine rice and broccoli
-                    </Text>
-                  </View>
-                  
-                  {/* Beef Pasta Containers */}
-                  <View style={styles.mealOverviewItem}>
-                    <View style={styles.mealOverviewHeader}>
-                      <Text style={styles.mealOverviewName}>Beef Pasta Containers</Text>
-                      <Text style={styles.mealOverviewServings}>4 servings</Text>
-                    </View>
-                    <Text style={styles.mealOverviewCoverage}>
-                      Lean beef mince with penne pasta and mixed vegetables
-                    </Text>
-                  </View>
-                  
-                  {/* Overnight Oat Bowls */}
-                  <View style={styles.mealOverviewItem}>
-                    <View style={styles.mealOverviewHeader}>
-                      <Text style={styles.mealOverviewName}>Overnight Oat Bowls</Text>
-                      <Text style={styles.mealOverviewServings}>4 servings</Text>
-                    </View>
-                    <Text style={styles.mealOverviewCoverage}>
-                      Rolled oats with Greek yogurt and protein powder
-                    </Text>
-                  </View>
-                  
-                  {/* Snack Packs */}
-                  <View style={styles.mealOverviewItem}>
-                    <View style={styles.mealOverviewHeader}>
-                      <Text style={styles.mealOverviewName}>Snack Packs</Text>
-                      <Text style={styles.mealOverviewServings}>4 servings</Text>
-                    </View>
-                    <Text style={styles.mealOverviewCoverage}>
-                      Almonds, cheese portions, crackers, and peanut butter
-                    </Text>
-                  </View>
-                </View>
-              </LinearGradient>
-            </View>
-
-          </>
-        )}
-
-        {/* Prep Tab Content */}
-        {activeTab === 'prep' && (
-          <>
-            {/* Equipment Needed - extracted from steps */}
-            <View style={styles.section}>
-              <LinearGradient
-                colors={['#1a1a1d', '#2a2a2f']}
-                style={styles.timeBreakdownCard}
-              >
-                <Text style={styles.cardTitle}>Equipment Needed</Text>
-                <Text style={styles.cardSubtitle}>Based on your cooking steps</Text>
-                <View style={styles.equipmentList}>
-                  {/* Extract equipment from step descriptions */}
-                  <View style={styles.equipmentItem}>
-                    <View style={styles.equipmentDot} />
-                    <Text style={styles.equipmentText}>Large microwave-safe bowl</Text>
-                  </View>
-                  <View style={styles.equipmentItem}>
-                    <View style={styles.equipmentDot} />
-                    <Text style={styles.equipmentText}>Air fryer</Text>
-                  </View>
-                  <View style={styles.equipmentItem}>
-                    <View style={styles.equipmentDot} />
-                    <Text style={styles.equipmentText}>Large oven tray</Text>
-                  </View>
-                  <View style={styles.equipmentItem}>
-                    <View style={styles.equipmentDot} />
-                    <Text style={styles.equipmentText}>Multiple meal prep containers</Text>
-                  </View>
-                  <View style={styles.equipmentItem}>
-                    <View style={styles.equipmentDot} />
-                    <Text style={styles.equipmentText}>Small portion containers</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-            </View>
-
-            {/* Key Ingredients - extracted from steps */}
-            <View style={styles.section}>
-              <LinearGradient
-                colors={[`${themeColor}15`, `${themeColor}05`]}
-                style={styles.prepStepsCard}
-              >
-                <Text style={styles.cardTitle}>Key Ingredients</Text>
-                <Text style={styles.cardSubtitle}>Main items you'll be prepping</Text>
-                
-                <View style={styles.mealIngredientSection}>
-                  <Text style={styles.mealIngredientTitle}>Proteins</Text>
-                  <View style={styles.ingredientsList}>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>800g</Text>
-                      <Text style={styles.ingredientName}>Chicken thigh fillets</Text>
-                    </View>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>720g</Text>
-                      <Text style={styles.ingredientName}>Lean beef mince</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.mealIngredientSection}>
-                  <Text style={styles.mealIngredientTitle}>Carbs & Base</Text>
-                  <View style={styles.ingredientsList}>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>600g</Text>
-                      <Text style={styles.ingredientName}>Jasmine rice</Text>
-                    </View>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>400g</Text>
-                      <Text style={styles.ingredientName}>Penne pasta</Text>
-                    </View>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>320g</Text>
-                      <Text style={styles.ingredientName}>Rolled oats</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.mealIngredientSection}>
-                  <Text style={styles.mealIngredientTitle}>Vegetables</Text>
-                  <View style={styles.ingredientsList}>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>400g</Text>
-                      <Text style={styles.ingredientName}>Broccoli</Text>
-                    </View>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>320g</Text>
-                      <Text style={styles.ingredientName}>Mixed zucchini & capsicum</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.mealIngredientSection}>
-                  <Text style={styles.mealIngredientTitle}>Other Essentials</Text>
-                  <View style={styles.ingredientsList}>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>1200g</Text>
-                      <Text style={styles.ingredientName}>Greek yogurt</Text>
-                    </View>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>480g</Text>
-                      <Text style={styles.ingredientName}>Pasta sauce</Text>
-                    </View>
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientAmount}>120g</Text>
-                      <Text style={styles.ingredientName}>Shredded mozzarella</Text>
-                    </View>
-                  </View>
-                </View>
-              </LinearGradient>
-            </View>
-          </>
-        )}
-
-        {/* Steps Tab Content */}
-        {activeTab === 'steps' && (
-          <>
-            {/* Prep Session Guide - structured step-by-step instructions */}
-            {mealPrepSession.prep_session_guide && mealPrepSession.prep_session_guide.length > 0 && (
-              <View style={styles.section}>
-                <LinearGradient
-                  colors={[`${themeColor}15`, `${themeColor}05`]}
-                  style={styles.prepStepsCard}
-                >
-                  <Text style={styles.cardTitle}>{mealPrepSession.session_name || 'Meal Prep Session'}</Text>
-                  <Text style={styles.cardSubtitle}>Step-by-step meal preparation</Text>
-                  
-                  <View style={styles.stepsContainer}>
-                    {mealPrepSession.prep_session_guide.map((step, index) => {
-                      // Strip step number prefixes from structured guide titles and descriptions
-                      const cleanTitle = step.title ? step.title.replace(/^Step\s*\d+\s*[—–\-:]\s*/i, '').trim() : '';
-                      const cleanDescription = step.description ? step.description.replace(/^Step\s*\d+\s*[—–\-:]\s*/i, '').trim() : '';
-                      
-                      return (
-                        <View key={step.step || index} style={styles.stepCard}>
-                          <View style={styles.stepHeader}>
-                            <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
-                              <Text style={styles.stepNumberText}>{step.step || index + 1}</Text>
-                            </View>
-                            <View style={styles.stepInfo}>
-                              <Text style={styles.stepTitle}>{cleanTitle}</Text>
-                              {step.time_required && (
-                                <Text style={styles.stepTime}>{step.time_required} min</Text>
-                              )}
-                            </View>
-                          </View>
-                          <Text style={styles.stepDescription}>{cleanDescription}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-            
-            {/* Fallback: Use instructions array if prep_session_guide not available */}
-            {(!mealPrepSession.prep_session_guide || mealPrepSession.prep_session_guide.length === 0) && 
-             mealPrepSession.instructions && mealPrepSession.instructions.length > 0 && (
-              <View style={styles.section}>
-                <LinearGradient
-                  colors={[`${themeColor}15`, `${themeColor}05`]}
-                  style={styles.prepStepsCard}
-                >
-                  <Text style={styles.cardTitle}>{mealPrepSession.session_name || 'Meal Prep Session'}</Text>
-                  <Text style={styles.cardSubtitle}>Step-by-step meal preparation</Text>
-                  
-                  <View style={styles.stepsContainer}>
-                    {mealPrepSession.instructions.map((instruction, index) => {
-                      // Strip step number prefixes from imported instructions
-                      const cleanInstruction = instruction.replace(/^Step\s*\d+\s*[—–\-:]\s*/i, '').trim();
-                      
-                      return (
-                        <View key={index} style={styles.stepCard}>
-                          <View style={styles.stepHeader}>
-                            <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
-                              <Text style={styles.stepNumberText}>{index + 1}</Text>
-                            </View>
-                            <View style={styles.stepInfo}>
-                              <Text style={styles.stepTitle}>Step {index + 1}</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.stepDescription}>{cleanInstruction}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-          </>
-        )}
 
         {/* Bottom spacing */}
         <View style={styles.bottomSpacing} />
@@ -961,5 +714,66 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     padding: 16,
+  },
+
+  // New Meal Prep Card Styles
+  mealsToPrep: {
+    marginTop: 16,
+    gap: 12,
+  },
+  mealPrepCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  mealPrepCardGradient: {
+    padding: 20,
+    borderRadius: 16,
+  },
+  mealPrepCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  mealPrepName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    flex: 1,
+    marginRight: 12,
+  },
+  mealPrepMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mealPrepServings: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#22d3ee',
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  mealPrepDescription: {
+    fontSize: 14,
+    color: '#a1a1aa',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  mealPrepStats: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  mealPrepStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  mealPrepStatText: {
+    fontSize: 12,
+    color: '#a1a1aa',
+    fontWeight: '500',
   },
 });

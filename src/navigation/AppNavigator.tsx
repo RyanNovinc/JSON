@@ -22,6 +22,7 @@ import MealPlanDaysScreen from '../screens/MealPlanDaysScreen';
 import MealPlanDayScreen from '../screens/MealPlanDayScreen';
 import MealPlanMealDetailScreen from '../screens/MealPlanMealDetailScreen';
 import MealPrepSessionScreen from '../screens/MealPrepSessionScreen';
+import MealPrepDetailScreen from '../screens/MealPrepDetailScreen';
 import DaysScreen from '../screens/DaysScreen';
 import WorkoutLogScreen from '../screens/WorkoutLogScreen';
 import WorkoutReviewScreen from '../screens/WorkoutReviewScreen';
@@ -144,6 +145,12 @@ export type RootStackParamList = {
     mealPrepSession: any;
     sessionIndex?: number; // Which session to display (0, 1, 2...)
     allSessions?: any[]; // All meal prep sessions for navigation
+  };
+  MealPrepDetail: {
+    meal: any;
+    sessionName: string;
+    themeColor: string;
+    sessionData: any;
   };
   Days: {
     block: any;
@@ -394,6 +401,13 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen 
                 name="MealPrepSession" 
                 component={MealPrepSessionScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen 
+                name="MealPrepDetail" 
+                component={MealPrepDetailScreen}
                 options={{
                   headerShown: false,
                 }}

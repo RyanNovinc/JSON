@@ -2135,6 +2135,51 @@ export default function WorkoutLogScreen() {
       await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
       console.log('Saved completion stats for key:', statsKey);
       
+      // PRODUCTION SAFEGUARD: Save completion data in multiple redundant formats
+      console.log('🔐 [PRODUCTION-SAFEGUARD] Saving completion data in redundant formats...');
+      try {
+        // Format 1: Individual workout completion marker
+        const individualKey = `workout_done_${blockName}_${day?.day_name || 'unknown'}_week${weekString}`;
+        await AsyncStorage.setItem(individualKey, JSON.stringify({
+          completed: true,
+          completedAt: new Date().toISOString(),
+          blockName,
+          dayName: day?.day_name,
+          week: currentWeek,
+          duration: Math.round(workoutDuration / 60),
+          totalVolume: stats.totalVolume
+        }));
+        console.log('🔐 [PRODUCTION-SAFEGUARD] Saved individual marker:', individualKey);
+        
+        // Format 2: Simple completion list
+        const simpleKey = `simple_completed_${blockName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const existingSimple = await AsyncStorage.getItem(simpleKey);
+        const simpleList = existingSimple ? JSON.parse(existingSimple) : [];
+        const simpleEntry = `${day?.day_name || 'unknown'}_week${weekString}`;
+        if (!simpleList.includes(simpleEntry)) {
+          simpleList.push(simpleEntry);
+          await AsyncStorage.setItem(simpleKey, JSON.stringify(simpleList));
+          console.log('🔐 [PRODUCTION-SAFEGUARD] Saved simple list:', simpleKey, simpleEntry);
+        }
+        
+        // Format 3: Date-based completion log
+        const dateKey = `completion_log_${new Date().toISOString().split('T')[0]}`; // YYYY-MM-DD
+        const existingLog = await AsyncStorage.getItem(dateKey);
+        const dailyLog = existingLog ? JSON.parse(existingLog) : [];
+        dailyLog.push({
+          blockName,
+          dayName: day?.day_name,
+          week: currentWeek,
+          completedAt: new Date().toISOString(),
+          workoutKey: `${day?.day_name || 'unknown'}_week${weekString}`
+        });
+        await AsyncStorage.setItem(dateKey, JSON.stringify(dailyLog));
+        console.log('🔐 [PRODUCTION-SAFEGUARD] Saved daily log:', dateKey);
+        
+      } catch (safeguardError) {
+        console.error('🔐 [PRODUCTION-SAFEGUARD] Error saving redundant data:', safeguardError);
+      }
+      
       // Sets are already saved individually when completed via saveSetToHistory()
       // No need to save them again here to prevent duplicates
       console.log('🎯 [HISTORY] Sets already saved individually - skipping duplicate save');

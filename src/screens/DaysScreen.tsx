@@ -19,6 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BodyHighlighter from 'react-native-body-highlighter';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import AsyncStorageDebugger from '../utils/asyncStorageDebug';
 import RobustStorage from '../utils/robustStorage';
@@ -375,8 +376,118 @@ export default function DaysScreen() {
   const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
   const [editedDuration, setEditedDuration] = useState('');
   const [showRestDays, setShowRestDays] = useState(true);
+  const [showVolumeOverview, setShowVolumeOverview] = useState(false);
+  const [bodyViewSide, setBodyViewSide] = useState<'front' | 'back'>('front');
   const scrollViewRef = useRef<ScrollView>(null);
-  
+
+  // Muscle group mapping using actual AI data
+  const getMuscleGroupsFromExercise = (exercise: any): string[] => {
+    // Use the primaryMuscles from the AI-generated data
+    const primaryMuscles = exercise.primaryMuscles || [];
+    
+    // Map AI muscle names to display names (keep all muscle groups separate for granular tracking)
+    const muscleMapping: { [key: string]: string } = {
+      'Chest': 'chest',
+      'Upper Back': 'upper back',
+      'Lats': 'lats', 
+      'Front Delts': 'front delts',
+      'Side Delts': 'side delts', 
+      'Rear Delts': 'rear delts',
+      'Biceps': 'biceps',
+      'Triceps': 'triceps',
+      'Quads': 'quads',
+      'Hamstrings': 'hamstrings',
+      'Glutes': 'glutes',
+      'Calves': 'calves',
+      'Core': 'core',
+      'Forearms': 'forearms'
+    };
+
+    const mappedMuscles: string[] = [];
+    primaryMuscles.forEach((muscle: string) => {
+      const mapped = muscleMapping[muscle];
+      if (mapped && !mappedMuscles.includes(mapped)) {
+        mappedMuscles.push(mapped);
+      }
+    });
+    
+    return mappedMuscles;
+  };
+
+  // Map our muscle groups to body highlighter muscle IDs
+  const getMuscleHighlighterData = (weeklyVolume: { [key: string]: number }) => {
+    // Try more variations based on common muscle naming conventions
+    const muscleToBodyParts: { [key: string]: string[] } = {
+      'chest': ['chest'], // ✅ Works
+      'upper back': ['trapezius', 'upper-back'], // ✅ Works
+      'lats': ['upper-back'], // ✅ Works
+      'front delts': ['shoulders', 'shoulder'], // Try shoulder instead of deltoids
+      'side delts': ['shoulders', 'shoulder'], 
+      'rear delts': ['shoulders', 'shoulder'], 
+      'biceps': ['biceps'], // ✅ Works
+      'triceps': ['triceps-brachii', 'arms'], // Try full name or general arms
+      'quads': ['quadriceps', 'quads'], // ✅ Works
+      'hamstrings': ['hamstring', 'hamstrings'], // ✅ Works
+      'glutes': ['gluteal', 'glutes'], // ✅ Works
+      'calves': ['calves', 'calf'], // ✅ Works
+      'core': ['abs'], // ✅ Works
+      'forearms': ['forearm', 'forearms']
+    };
+
+    const bodyData: Array<{slug: string, intensity: number}> = [];
+    const maxVolume = Math.max(...Object.values(weeklyVolume));
+
+    Object.entries(weeklyVolume).forEach(([muscle, volume]) => {
+      if (volume > 0) {
+        const bodyParts = muscleToBodyParts[muscle] || [];
+        // Use integer intensity values (1 or 2) as the library might expect integers
+        const intensity = maxVolume > 0 ? (volume >= maxVolume * 0.7 ? 2 : 1) : 1;
+        
+        bodyParts.forEach(part => {
+          console.log(`🎯 Adding slug: "${part}" for muscle: ${muscle}`);
+          // Check if this part is already added and combine intensity
+          const existing = bodyData.find(item => item.slug === part);
+          if (existing) {
+            existing.intensity = Math.min(2, existing.intensity + intensity);
+          } else {
+            bodyData.push({ slug: part, intensity });
+          }
+        });
+      }
+    });
+
+    return bodyData;
+  };
+
+  // Calculate weekly volume per muscle group using current week's sets
+  const calculateWeeklyVolume = () => {
+    const volumeMap: { [key: string]: number } = {};
+    
+    localBlock.days.forEach(day => {
+      if (!day.exercises || day.exercises.length === 0) return;
+      
+      day.exercises.forEach(exercise => {
+        // Use the sets_weekly data for the current week if available
+        const weeklySetData = exercise.sets_weekly;
+        let setsForThisWeek = exercise.sets || 0;
+        
+        if (weeklySetData && weeklySetData[currentWeek.toString()]) {
+          setsForThisWeek = weeklySetData[currentWeek.toString()];
+        }
+        
+        const muscleGroups = getMuscleGroupsFromExercise(exercise);
+        muscleGroups.forEach(muscle => {
+          if (!volumeMap[muscle]) {
+            volumeMap[muscle] = 0;
+          }
+          volumeMap[muscle] += setsForThisWeek;
+        });
+      });
+    });
+    
+    return volumeMap;
+  };
+
   // Calculate total weeks for this block
   const totalWeeks = localBlock.weeks.includes('-') 
     ? parseInt(localBlock.weeks.split('-')[1]) - parseInt(localBlock.weeks.split('-')[0]) + 1 
@@ -391,7 +502,7 @@ export default function DaysScreen() {
   // Find first incomplete week
   const findFirstIncompleteWeek = async () => {
     for (let week = 1; week <= totalWeeks; week++) {
-      const weekKey = `completed_${localBlock.block_name}_week${week}`;
+      const weekKey = `completed_${localBlock.block_name}_week${week.toString()}`;
       const weekCompleted = await AsyncStorage.getItem(weekKey);
       
       if (!weekCompleted) {
@@ -607,7 +718,7 @@ export default function DaysScreen() {
 
   const loadCompletedWorkouts = async () => {
     try {
-      const key = `completed_${localBlock.block_name}_week${currentWeek}`;
+      const key = `completed_${localBlock.block_name}_week${currentWeek.toString()}`;
       console.log('🔍 [LOAD-COMPLETION] Loading completed workouts with ROBUST STORAGE...');
       console.log('🔍 [LOAD-COMPLETION] Key:', key);
       console.log('🔍 [LOAD-COMPLETION] Block name:', localBlock.block_name);
@@ -636,11 +747,12 @@ export default function DaysScreen() {
         dataSource = 'legacy';
         
         if (!completed) {
-          // Emergency fallback: check for emergency backup keys
+          // Emergency fallback: check for emergency backup keys (same as WorkoutLogScreen)
           console.log('🔍 [LOAD-COMPLETION] Checking emergency backup keys...');
           const emergencyKeys = [
             `${key}_emergency`,
-            `workout_completion_${localBlock.block_name.replace(/[^a-zA-Z0-9]/g, '_')}_week${currentWeek}`
+            `workout_completion_${localBlock.block_name.replace(/[^a-zA-Z0-9]/g, '_')}_week${currentWeek.toString()}`,
+            // Also check for timestamped backups by scanning for any completion_backup keys
           ];
           
           for (const emergencyKey of emergencyKeys) {
@@ -654,6 +766,113 @@ export default function DaysScreen() {
               await RobustStorage.setItem(key, emergencyData, true);
               console.log('🔍 [LOAD-COMPLETION] 🔄 Migrated emergency data to robust storage');
               break;
+            }
+          }
+          
+          // Last resort: scan for any completion_backup_* keys with timestamps
+          if (!completed) {
+            console.log('🔍 [LOAD-COMPLETION] Scanning for timestamped backup keys...');
+            try {
+              const allKeys = await AsyncStorage.getAllKeys();
+              const backupKeys = allKeys.filter(k => k.startsWith('completion_backup_'));
+              
+              if (backupKeys.length > 0) {
+                // Sort by timestamp (newest first)
+                backupKeys.sort((a, b) => {
+                  const timestampA = parseInt(a.split('completion_backup_')[1]) || 0;
+                  const timestampB = parseInt(b.split('completion_backup_')[1]) || 0;
+                  return timestampB - timestampA;
+                });
+                
+                for (const backupKey of backupKeys) {
+                  const backupData = await AsyncStorage.getItem(backupKey);
+                  if (backupData) {
+                    try {
+                      const parsed = JSON.parse(backupData);
+                      // Check if this backup contains our workout
+                      const workoutKey = getWorkoutKey(localBlock.block_name, currentWeek);
+                      if (Array.isArray(parsed) && parsed.some(item => item.includes(workoutKey.split('_week')[0]))) {
+                        completed = backupData;
+                        dataSource = `timestamped-backup:${backupKey}`;
+                        console.log(`🔍 [LOAD-COMPLETION] Found relevant data in backup: ${backupKey}`);
+                        
+                        // Migrate backup data back to robust storage
+                        await RobustStorage.setItem(key, backupData, true);
+                        console.log('🔍 [LOAD-COMPLETION] 🔄 Migrated backup data to robust storage');
+                        break;
+                      }
+                    } catch (parseError) {
+                      console.log(`🔍 [LOAD-COMPLETION] Could not parse backup ${backupKey}:`, parseError);
+                    }
+                  }
+                }
+              }
+            } catch (scanError) {
+              console.log('🔍 [LOAD-COMPLETION] Error scanning backup keys:', scanError);
+            }
+          }
+          
+          // PRODUCTION RECOVERY: Check redundant storage formats
+          if (!completed) {
+            console.log('🔐 [PRODUCTION-RECOVERY] Checking redundant storage formats...');
+            try {
+              // Format 1: Check individual workout markers
+              const individualKey = `workout_done_${localBlock.block_name}_${localBlock.days.find(d => d.day_name)?.day_name || 'unknown'}_week${currentWeek.toString()}`;
+              const individualData = await AsyncStorage.getItem(individualKey);
+              if (individualData) {
+                const parsed = JSON.parse(individualData);
+                if (parsed.completed) {
+                  // Reconstruct the completed array from individual markers
+                  const reconstructedArray = [`${parsed.dayName}_week${parsed.week}`];
+                  completed = JSON.stringify(reconstructedArray);
+                  dataSource = 'individual-marker';
+                  console.log('🔐 [PRODUCTION-RECOVERY] Recovered from individual marker:', individualKey);
+                }
+              }
+              
+              // Format 2: Check simple completion lists
+              if (!completed) {
+                const simpleKey = `simple_completed_${localBlock.block_name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                const simpleData = await AsyncStorage.getItem(simpleKey);
+                if (simpleData) {
+                  completed = simpleData;
+                  dataSource = 'simple-list';
+                  console.log('🔐 [PRODUCTION-RECOVERY] Recovered from simple list:', simpleKey);
+                }
+              }
+              
+              // Format 3: Check recent daily logs
+              if (!completed) {
+                const today = new Date();
+                for (let daysBack = 0; daysBack < 7; daysBack++) {
+                  const checkDate = new Date(today.getTime() - (daysBack * 24 * 60 * 60 * 1000));
+                  const dateKey = `completion_log_${checkDate.toISOString().split('T')[0]}`;
+                  const logData = await AsyncStorage.getItem(dateKey);
+                  if (logData) {
+                    const logs = JSON.parse(logData);
+                    const relevantLogs = logs.filter((log: any) => 
+                      log.blockName === localBlock.block_name && 
+                      log.week === currentWeek
+                    );
+                    if (relevantLogs.length > 0) {
+                      const completedWorkouts = relevantLogs.map((log: any) => log.workoutKey);
+                      completed = JSON.stringify(completedWorkouts);
+                      dataSource = `daily-log:${dateKey}`;
+                      console.log('🔐 [PRODUCTION-RECOVERY] Recovered from daily log:', dateKey);
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // If we recovered data, migrate it back to the main storage
+              if (completed) {
+                await RobustStorage.setItem(key, completed, true);
+                console.log('🔐 [PRODUCTION-RECOVERY] 🔄 Migrated recovered data to main storage');
+              }
+              
+            } catch (recoveryError) {
+              console.log('🔐 [PRODUCTION-RECOVERY] Error during recovery:', recoveryError);
             }
           }
         } else if (completed) {
@@ -694,11 +913,11 @@ export default function DaysScreen() {
     }
   };
 
-  const getWorkoutKey = (dayName: string, week: number) => `${dayName}_week${week}`;
+  const getWorkoutKey = (dayName: string, week: number) => `${dayName}_week${week.toString()}`;
 
   const loadCompletionStats = async () => {
     try {
-      const stats = await AsyncStorage.getItem(`completionStats_${localBlock.block_name}_week${currentWeek}`);
+      const stats = await AsyncStorage.getItem(`completionStats_${localBlock.block_name}_week${currentWeek.toString()}`);
       if (stats) {
         setCompletionStats(new Map(JSON.parse(stats)));
       }
@@ -1028,6 +1247,126 @@ export default function DaysScreen() {
               <View style={styles.bookmarkIndicator}>
                 <Ionicons name="bookmark" size={10} color="#f59e0b" />
                 <Text style={styles.bookmarkText}>Bookmarked - Always opens to Week {bookmarkedWeek}</Text>
+              </View>
+            )}
+            
+            {/* Volume Overview Section */}
+            <TouchableOpacity 
+              style={styles.volumeToggle}
+              onPress={() => setShowVolumeOverview(!showVolumeOverview)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.volumeToggleContent}>
+                <Ionicons name="barbell-outline" size={16} color={themeColor} />
+                <Text style={[styles.volumeToggleText, { color: themeColor }]}>
+                  Week Volume
+                </Text>
+                <Ionicons 
+                  name={showVolumeOverview ? "chevron-up" : "chevron-down"} 
+                  size={16} 
+                  color={themeColor} 
+                />
+              </View>
+            </TouchableOpacity>
+            
+            {showVolumeOverview && (
+              <View style={styles.volumeOverview}>
+                {(() => {
+                  const weeklyVolume = calculateWeeklyVolume();
+                  console.log('🏋️ Weekly Volume Calculation:', weeklyVolume);
+                  const sortedMuscles = Object.entries(weeklyVolume)
+                    .sort(([,a], [,b]) => b - a) // Sort by volume descending
+                    .filter(([,sets]) => sets > 0); // Show all muscle groups with volume
+                  
+                  if (sortedMuscles.length === 0) {
+                    return (
+                      <Text style={styles.volumeEmptyText}>
+                        No exercises found for volume calculation
+                      </Text>
+                    );
+                  }
+                  
+                  const maxVolume = Math.max(...sortedMuscles.map(([,sets]) => sets));
+                  const muscleHighlighterData = getMuscleHighlighterData(weeklyVolume);
+                  
+                  return (
+                    <View style={styles.volumeContent}>
+                      {/* Body Diagram */}
+                      <View style={styles.bodyDiagramContainer}>
+                        <View style={styles.bodyDiagramHeader}>
+                          <Text style={styles.bodyDiagramTitle}>Training Heatmap</Text>
+                          
+                          {/* Front/Back Toggle */}
+                          <View style={styles.bodyToggleContainer}>
+                            <TouchableOpacity 
+                              style={[
+                                styles.bodyToggleButton,
+                                bodyViewSide === 'front' && { backgroundColor: themeColor }
+                              ]}
+                              onPress={() => setBodyViewSide('front')}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[
+                                styles.bodyToggleText,
+                                { color: bodyViewSide === 'front' ? '#000' : '#71717a' }
+                              ]}>
+                                Front
+                              </Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity 
+                              style={[
+                                styles.bodyToggleButton,
+                                bodyViewSide === 'back' && { backgroundColor: themeColor }
+                              ]}
+                              onPress={() => setBodyViewSide('back')}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[
+                                styles.bodyToggleText,
+                                { color: bodyViewSide === 'back' ? '#000' : '#71717a' }
+                              ]}>
+                                Back
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        
+                        <BodyHighlighter
+                          data={muscleHighlighterData}
+                          colors={[themeColor, '#ff6b9d']}
+                          side={bodyViewSide}
+                          scale={0.9}
+                          border="#27272a"
+                        />
+                      </View>
+                      
+                      {/* Detailed Breakdown */}
+                      <View style={styles.volumeGrid}>
+                      {sortedMuscles.map(([muscle, sets]) => {
+                        const intensity = Math.max(0.2, sets / maxVolume); // Min 20% opacity
+                        return (
+                          <View key={muscle} style={styles.volumeItem}>
+                            <View 
+                              style={[
+                                styles.volumeBar, 
+                                { 
+                                  backgroundColor: `${themeColor}${Math.round(intensity * 255).toString(16).padStart(2, '0')}`,
+                                  borderColor: themeColor,
+                                }
+                              ]} 
+                            />
+                            <Text style={styles.volumeNumber}>{sets}</Text>
+                            <Text style={styles.volumeMuscle} numberOfLines={1}>
+                              {muscle.charAt(0).toUpperCase() + muscle.slice(1)}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                    </View>
+                  );
+                })()}
               </View>
             )}
           </View>
@@ -2047,5 +2386,115 @@ const styles = StyleSheet.create({
     color: '#71717a',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  
+  // Volume Overview Styles
+  volumeToggle: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#18181b',
+  },
+  volumeToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  volumeToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  volumeOverview: {
+    marginTop: 12,
+    padding: 16,
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  volumeContent: {
+    gap: 24,
+  },
+  bodyDiagramContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#0f0f10',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  bodyDiagramHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  bodyDiagramTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  bodyToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#18181b',
+    borderRadius: 8,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  bodyToggleButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  bodyToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  volumeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  volumeItem: {
+    alignItems: 'center',
+    minWidth: 60,
+    maxWidth: 80,
+    gap: 4,
+    flex: 1,
+    flexBasis: '22%', // Fit 4 per row with some spacing
+  },
+  volumeBar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  volumeNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginTop: 2,
+  },
+  volumeMuscle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#a1a1aa',
+    textAlign: 'center',
+  },
+  volumeEmptyText: {
+    fontSize: 14,
+    color: '#71717a',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

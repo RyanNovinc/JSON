@@ -88,20 +88,20 @@ export default function WorkoutReviewScreen() {
   
   const handleConfirmRedo = async () => {
     // Clear the completion data
-    const completedKey = `completed_${blockName}_week${currentWeek}`;
+    const completedKey = `completed_${blockName}_week${currentWeek.toString()}`;
     const completed = await AsyncStorage.getItem(completedKey);
     if (completed) {
       const completedSet = new Set(JSON.parse(completed));
-      completedSet.delete(`${day.day_name}_week${currentWeek}`);
+      completedSet.delete(`${day.day_name}_week${currentWeek.toString()}`);
       await AsyncStorage.setItem(completedKey, JSON.stringify(Array.from(completedSet)));
     }
     
     // Clear the stats
-    const statsKey = `completionStats_${blockName}_week${currentWeek}`;
+    const statsKey = `completionStats_${blockName}_week${currentWeek.toString()}`;
     const existingStats = await AsyncStorage.getItem(statsKey);
     if (existingStats) {
       const statsMap = new Map(JSON.parse(existingStats));
-      statsMap.delete(`${day.day_name}_week${currentWeek}`);
+      statsMap.delete(`${day.day_name}_week${currentWeek.toString()}`);
       await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
     }
     
