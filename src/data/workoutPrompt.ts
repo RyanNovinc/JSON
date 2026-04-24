@@ -2,14 +2,14 @@
 export const MUSCLE_GROUPS = [
   'Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 
   'Traps', 'Biceps', 'Triceps', 'Forearms', 'Quads', 'Hamstrings', 'Glutes', 
-  'Calves', 'Core'
+  'Calves', 'Core', 'Neck', 'Lower Back', 'Obliques', 'Serratus Anterior',
+  'Hip Abductors', 'Hip Adductors', 'Shins'
 ];
 
 export interface QuestionnaireData {
   // Primary Goals
   primaryGoal?: string;
   customPrimaryGoal?: string;
-  customSecondaryGoal?: string;
   integrationMethods?: { [goalId: string]: 'integrated' | 'dedicated' };
   specificSport?: string;
   athleticPerformanceDetails?: string;
@@ -43,9 +43,6 @@ export interface QuestionnaireData {
   // Program Preferences
   programDuration?: string;
   customDuration?: string;
-  
-  // Cardio Preferences (conditional - only when include_cardio secondary goal selected)
-  cardioPreferences?: string[];
 
   // Equipment & Session Preferences
   selectedEquipment?: string[];
@@ -58,6 +55,9 @@ export interface QuestionnaireData {
   dislikedExercises?: string[];
   exerciseNoteDetail?: 'detailed' | 'brief' | 'minimal';
   includeDirectCore?: boolean;
+  
+  // Auxiliary Muscle Work
+  auxiliaryMuscles?: string[]; // Selections from: 'neck', 'forearms', 'obliques', 'serratus', 'lower_back', 'hip_abductors', 'hip_adductors', 'shins'
 }
 
 export const generateProgramSpecs = (data?: QuestionnaireData): string => {
@@ -126,18 +126,16 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
     
     if (data.gymTrainingDays) {
       // Get the primary goal title for gym days
-      const primaryGoalTitle = data.customPrimaryGoal || (() => {
-        const goalMap: { [key: string]: string } = {
-          'burn_fat': 'Fat Loss',
-          'build_muscle': 'Muscle Building',
-          'gain_strength': 'Strength Training',
-          'body_recomposition': 'Body Recomposition',
-          'sport_specific': 'Sport-Specific Training',
-          'general_fitness': 'General Fitness',
-          'custom_primary': 'Custom Goal'
-        };
-        return goalMap[data.primaryGoal] || 'Gym Training';
-      })();
+      const goalMap: { [key: string]: string } = {
+        'burn_fat': 'Fat Loss',
+        'build_muscle': 'Muscle Building',
+        'gain_strength': 'Strength Training',
+        'body_recomposition': 'Body Recomposition',
+        'sport_specific': 'Sport-Specific Training',
+        'general_fitness': 'General Fitness',
+        'custom_primary': 'Custom Goal'
+      };
+      const primaryGoalTitle = data.customPrimaryGoal || goalMap[data.primaryGoal] || 'Gym Training';
       specs += `- ${primaryGoalTitle} days: ${data.gymTrainingDays}\n`;
     }
     
@@ -159,7 +157,7 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
           'fun_social': data.funSocialDetails && typeof data.funSocialDetails === 'string'
             ? `recreational activities (${data.funSocialDetails})`
             : 'fun & social activities',
-          'custom_secondary': data.customSecondaryGoal?.toLowerCase() || 'custom focus'
+          'custom_secondary': 'custom focus'
         };
         
         const activity = activityMap[goal] || goal;
@@ -213,6 +211,7 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
       volumeText = `${data.volumePreference} sets per week per muscle group`;
     }
     specs += `**Weekly Volume Target:** ${volumeText}\n`;
+    specs += `(All volume targets are in EFFECTIVE terms — calculate volume per muscle as Primary × 1.0 + Secondary × 0.5. When verifying the plan meets targets, sum effective volume across all training days.)\n`;
   }
 
   // Gender (for volume context)
@@ -234,22 +233,6 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
     specs += `\n**Program Duration:** ${durationMap[data.programDuration] || data.programDuration}\n`;
   }
 
-  // Cardio Preferences (only when include_cardio is selected)
-  if (data.integrationMethods?.['include_cardio'] && data.cardioPreferences && Array.isArray(data.cardioPreferences) && data.cardioPreferences.length > 0) {
-    const cardioMap: { [key: string]: string } = {
-      'treadmill': 'Treadmill / Indoor Running',
-      'stationary_bike': 'Stationary Bike / Cycling',
-      'rowing_machine': 'Rowing Machine',
-      'swimming': 'Swimming',
-      'stair_climber': 'Stair Climber / StepMill',
-      'elliptical': 'Elliptical',
-      'jump_rope': 'Jump Rope',
-      'outdoor_running': 'Outdoor Running / Walking',
-      'no_preference': 'No Preference (AI chooses)',
-    };
-    const preferredActivities = data.cardioPreferences.map(activity => cardioMap[activity] || activity).join(', ');
-    specs += `**Preferred Cardio Activities:** ${preferredActivities}\n`;
-  }
 
   // Priority Muscle Groups
   if (data.priorityMuscleGroups && Array.isArray(data.priorityMuscleGroups) && data.priorityMuscleGroups.length > 0) {
@@ -291,13 +274,13 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   // Session Style (replaces separate duration and rest time preferences)
   if (data.sessionStyle) {
     const sessionMap: { [key: string]: string } = {
-      'optimal': 'Rest Style: Optimal — full recovery between sets. Compounds: 2-3 min, Isolation: 90-120s. Session duration is unconstrained — let it be whatever the rest periods require.',
-      'moderate': 'Rest Style: Moderate — compounds: 90-120s, isolation: 60-90s. Sessions typically 60-75 minutes.',
-      'minimal': 'Rest Style: Minimal — compounds: 60-90s, isolation: 45-60s. Prioritizes time efficiency over per-set performance.'
+      'optimal': 'Optimal — full recovery between sets. Compounds: 2-3 min, Isolation: 90-120s. Session duration is unconstrained — let it be whatever the rest periods require.',
+      'moderate': 'Moderate — compounds: 90-120s, isolation: 60-90s. Sessions typically 60-75 minutes.',
+      'minimal': 'Minimal — compounds: 60-90s, isolation: 45-60s. Prioritizes time efficiency over per-set performance.'
     };
-    specs += `**${sessionMap[data.sessionStyle]}\n`;
+    specs += `**Rest Style:** ${sessionMap[data.sessionStyle]}\n`;
   } else {
-    specs += `**Rest Style: Moderate — compounds: 90-120s, isolation: 60-90s. Sessions typically 60-75 minutes.\n`;
+    specs += `**Rest Style:** Moderate — compounds: 90-120s, isolation: 60-90s. Sessions typically 60-75 minutes.\n`;
   }
 
   // Exercise Preferences
@@ -320,6 +303,29 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
 
   if (data.includeDirectCore !== undefined) {
     specs += `**Direct Core Work:** ${data.includeDirectCore ? 'Yes — include dedicated core exercises' : 'No — omit direct core work'}\n`;
+  }
+
+  // Auxiliary Muscle Work
+  if (data.auxiliaryMuscles && Array.isArray(data.auxiliaryMuscles) && data.auxiliaryMuscles.length > 0) {
+    const auxiliaryMap: { [key: string]: string } = {
+      'neck': 'Neck: 4-6 sets/week (neck flexion, extension, and lateral flexion with plate or harness)',
+      'forearms': 'Forearms: 4-6 sets/week (wrist curls and reverse wrist curls)',
+      'obliques': 'Obliques: 4-6 sets/week (anti-rotation work like Pallof press, or direct work like weighted side plank or cable woodchop)',
+      'serratus': 'Serratus Anterior: 3-4 sets/week (push-up plus, dumbbell pullover, or landmine press)',
+      'lower_back': 'Lower Back: 4-6 sets/week (back extension, reverse hyperextension, or good morning)',
+      'hip_abductors': 'Hip Abductors: 4-6 sets/week (cable hip abduction or hip abduction machine)',
+      'hip_adductors': 'Hip Adductors: 4-6 sets/week (Copenhagen plank or hip adduction machine)',
+      'shins': 'Shins (Tibialis Anterior): 3-4 sets/week (tibialis raise or reverse calf raise)'
+    };
+    
+    specs += `\n**Auxiliary Muscle Work:**\n`;
+    specs += `MANDATORY: The user has explicitly requested direct work for these muscles. This overrides any default rules elsewhere in the prompt that would mark these muscles as exempt or covered by compounds. Include the specified sets. These muscles must appear in the weekly volume summary.\n\nThe user has specifically requested direct training for the following muscles that are typically not included in standard hypertrophy programs. Include the specified weekly volume, distributed across training days as session length allows. Prioritize placing these at the end of existing sessions as finishers rather than adding dedicated sessions.\n\n`;
+    
+    data.auxiliaryMuscles.forEach(muscle => {
+      if (auxiliaryMap[muscle]) {
+        specs += `- ${auxiliaryMap[muscle]}\n`;
+      }
+    });
   }
 
   return specs;

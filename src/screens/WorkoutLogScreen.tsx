@@ -18,6 +18,7 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BodyHighlighter from 'react-native-body-highlighter';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
 import AsyncStorageDebugger from '../utils/asyncStorageDebug';
@@ -34,6 +35,51 @@ import { useTimer } from '../contexts/TimerContext';
 import { navigate } from '../utils/navigationRef';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
+
+const SECONDARY_MUSCLE_WEIGHT = 0.5;
+
+const getMuscleContributions = (exercise: any): Array<{muscle: string, weight: number}> => {
+  const muscleMapping: { [key: string]: string } = {
+    'Chest': 'chest',
+    'Upper Back': 'upper back',
+    'Lats': 'lats',
+    'Traps': 'traps',
+    'Front Delts': 'front delts',
+    'Side Delts': 'side delts',
+    'Rear Delts': 'rear delts',
+    'Biceps': 'biceps',
+    'Triceps': 'triceps',
+    'Forearms': 'forearms',
+    'Quads': 'quads',
+    'Hamstrings': 'hamstrings',
+    'Glutes': 'glutes',
+    'Calves': 'calves',
+    'Core': 'core',
+    'Neck': 'neck',
+    'Lower Back': 'lower back',
+    'Obliques': 'obliques',
+    'Serratus Anterior': 'serratus',
+    'Hip Abductors': 'hip abductors',
+    'Hip Adductors': 'hip adductors',
+    'Shins': 'shins',
+    'Tibialis': 'shins',
+    'Tibialis Anterior': 'shins',
+  };
+
+  const contributions: Array<{muscle: string, weight: number}> = [];
+
+  (exercise.primaryMuscles || []).forEach((muscle: string) => {
+    const mapped = muscleMapping[muscle];
+    if (mapped) contributions.push({ muscle: mapped, weight: 1.0 });
+  });
+
+  (exercise.secondaryMuscles || []).forEach((muscle: string) => {
+    const mapped = muscleMapping[muscle];
+    if (mapped) contributions.push({ muscle: mapped, weight: SECONDARY_MUSCLE_WEIGHT });
+  });
+
+  return contributions;
+};
 
 // Parse rep scheme into structured format
 function parseRepScheme(reps: string): { type: 'weekly' | 'pyramid' | 'straight', values: string[] } {
@@ -997,6 +1043,93 @@ function SupersetLabel({ isActive, themeColor }: SupersetLabelProps) {
   );
 }
 
+// Muscle group calculation functions for daily volume tracking
+
+
+const getMuscleGroupsFromExercise = (exercise: any): string[] => {
+  // Use the primaryMuscles from the AI-generated data
+  const primaryMuscles = exercise.primaryMuscles || [];
+  
+  // Map AI muscle names to display names (same mapping as DaysScreen)
+  const muscleMapping: { [key: string]: string } = {
+    'Chest': 'chest',
+    'Upper Back': 'upper back',
+    'Lats': 'lats', 
+    'Front Delts': 'front delts',
+    'Side Delts': 'side delts', 
+    'Rear Delts': 'rear delts',
+    'Biceps': 'biceps',
+    'Triceps': 'triceps',
+    'Quads': 'quads',
+    'Hamstrings': 'hamstrings',
+    'Glutes': 'glutes',
+    'Calves': 'calves',
+    'Core': 'core',
+    'Forearms': 'forearms'
+  };
+
+  const mappedMuscles: string[] = [];
+  primaryMuscles.forEach((muscle: string) => {
+    const mapped = muscleMapping[muscle];
+    if (mapped && !mappedMuscles.includes(mapped)) {
+      mappedMuscles.push(mapped);
+    }
+  });
+  
+  return mappedMuscles;
+};
+
+// Map muscle groups to body highlighter muscle IDs (same mapping as DaysScreen)
+const getMuscleHighlighterData = (dailyVolume: { [key: string]: number }) => {
+  const muscleToBodyParts: { [key: string]: string | null } = {
+    'chest': 'chest',
+    'upper back': 'upper-back',      // CHANGED from 'trapezius' — this was a pre-existing bug
+    'lats': 'upper-back',            // Lats display on upper-back region (no dedicated lats slug)
+    'traps': 'trapezius',            // NEW
+    'front delts': 'deltoids',
+    'side delts': 'deltoids', 
+    'rear delts': 'deltoids',
+    'biceps': 'biceps',
+    'triceps': 'triceps',
+    'forearms': 'forearms',
+    'quads': 'quadriceps',
+    'hamstrings': 'hamstring',
+    'glutes': 'gluteal',
+    'calves': 'calves',
+    'core': 'abs',
+    'neck': 'neck',                  // NEW
+    'lower back': 'lower-back',      // NEW
+    'obliques': 'obliques',          // NEW
+    'hip adductors': 'adductors',    // NEW
+    'shins': 'tibialis',             // NEW
+    'serratus': null,                // Library doesn't support — will be skipped on diagram
+    'hip abductors': null            // Library doesn't support — will be skipped on diagram
+  };
+
+  const bodyData: Array<{slug: string, intensity: number}> = [];
+  const maxVolume = Math.max(...Object.values(dailyVolume));
+
+  // Combine volumes for muscles that map to the same body part
+  const bodyPartVolumes: { [key: string]: number } = {};
+  
+  Object.entries(dailyVolume).forEach(([muscle, volume]) => {
+    if (volume > 0) {
+      const bodyPart = muscleToBodyParts[muscle];
+      if (bodyPart) {
+        bodyPartVolumes[bodyPart] = (bodyPartVolumes[bodyPart] || 0) + volume;
+      }
+    }
+  });
+
+  // Convert to final data format with proper intensity scaling
+  Object.entries(bodyPartVolumes).forEach(([bodyPart, totalVolume]) => {
+    const intensity = maxVolume > 0 ? (totalVolume >= maxVolume * 0.7 ? 2 : 1) : 1;
+    bodyData.push({ slug: bodyPart, intensity });
+  });
+
+  return bodyData;
+};
+
 export default function WorkoutLogScreen() {
   const navigation = useNavigation<WorkoutLogScreenNavigationProp>();
   const route = useRoute<WorkoutLogScreenRouteProp>();
@@ -1102,12 +1235,37 @@ export default function WorkoutLogScreen() {
   const [currentNote, setCurrentNote] = useState('');
   const [personalNotes, setPersonalNotes] = useState<string[]>([]);
   
+  // Daily volume tracking state
+  const [showDailyVolume, setShowDailyVolume] = useState(false);
+  const [bodyViewSide, setBodyViewSide] = useState<'front' | 'back'>('front');
+  
   // Rep scheme editing state
   const [editingRepScheme, setEditingRepScheme] = useState<{
     exerciseIndex: number;
     week: string;
     currentReps: string;
   } | null>(null);
+
+  const calculateDailyVolume = (day: any): { [muscle: string]: number } => {
+    const volumeMap: { [muscle: string]: number } = {};
+    
+    if (day.exercises) {
+      day.exercises.forEach((exercise: any) => {
+        const setsForWeek1 = exercise.sets_weekly?.['1'] ?? exercise.sets ?? 0;
+        const contributions = getMuscleContributions(exercise);
+        contributions.forEach(({ muscle, weight }) => {
+          if (!volumeMap[muscle]) volumeMap[muscle] = 0;
+          volumeMap[muscle] += setsForWeek1 * weight;
+        });
+      });
+    }
+    
+    Object.keys(volumeMap).forEach(k => {
+      volumeMap[k] = Math.round(volumeMap[k] * 10) / 10;
+    });
+    
+    return volumeMap;
+  };
 
   // Initialize personal notes from existing notes when showNotes changes
   useEffect(() => {
@@ -2892,6 +3050,104 @@ export default function WorkoutLogScreen() {
           </Animated.View>
         </View>
       </View>
+
+          {/* Daily Volume Overview */}
+          <TouchableOpacity 
+            style={styles.volumeToggle}
+            onPress={() => setShowDailyVolume(!showDailyVolume)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.volumeToggleContent}>
+              <Ionicons name="barbell-outline" size={16} color={themeColor} />
+              <Text style={[styles.volumeToggleText, { color: themeColor }]}>
+                Today's Volume
+              </Text>
+              <Ionicons 
+                name={showDailyVolume ? "chevron-up" : "chevron-down"} 
+                size={16} 
+                color={themeColor} 
+              />
+            </View>
+          </TouchableOpacity>
+          
+          {showDailyVolume && (
+            <View style={styles.volumeOverview}>
+              {(() => {
+                const dailyVolume = calculateDailyVolume(day);
+                console.log('🏋️ Daily Volume Calculation:', dailyVolume);
+                const sortedMuscles = Object.entries(dailyVolume)
+                  .sort(([,a], [,b]) => b - a) // Sort by volume descending
+                  .filter(([,sets]) => sets > 0); // Show all muscle groups with volume
+                
+                if (sortedMuscles.length === 0) {
+                  return (
+                    <Text style={styles.volumeEmptyText}>
+                      No exercises found for volume calculation
+                    </Text>
+                  );
+                }
+                
+                const maxVolume = Math.max(...sortedMuscles.map(([,sets]) => sets));
+                const muscleHighlighterData = getMuscleHighlighterData(dailyVolume);
+                
+                return (
+                  <View style={styles.volumeContent}>
+                    {/* Body Diagram */}
+                    <View style={styles.bodyDiagramContainer}>
+                      <View style={styles.bodyDiagramHeader}>
+                        <Text style={styles.bodyDiagramTitle}>Today's Training Heatmap</Text>
+                        
+                        {/* Small Flip Icon */}
+                        <TouchableOpacity 
+                          style={styles.bodyFlipIcon}
+                          onPress={() => setBodyViewSide(bodyViewSide === 'front' ? 'back' : 'front')}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons 
+                            name="sync-outline" 
+                            size={20} 
+                            color={themeColor} 
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      
+                      <BodyHighlighter
+                        data={muscleHighlighterData}
+                        colors={[themeColor, '#ff6b9d']}
+                        side={bodyViewSide}
+                        scale={0.9}
+                        border="#27272a"
+                      />
+                    </View>
+                    
+                    {/* Detailed Breakdown */}
+                    <View style={styles.volumeGrid}>
+                    {sortedMuscles.map(([muscle, sets]) => {
+                      const intensity = Math.max(0.2, sets / maxVolume); // Min 20% opacity
+                      return (
+                        <View key={muscle} style={styles.volumeItem}>
+                          <View 
+                            style={[
+                              styles.volumeBar, 
+                              { 
+                                backgroundColor: `${themeColor}${Math.round(intensity * 255).toString(16).padStart(2, '0')}`,
+                                borderColor: themeColor,
+                              }
+                            ]} 
+                          />
+                          <Text style={styles.volumeNumber}>{sets}</Text>
+                          <Text style={styles.volumeMuscle} numberOfLines={1}>
+                            {muscle.charAt(0).toUpperCase() + muscle.slice(1)}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                  </View>
+                );
+              })()}
+            </View>
+          )}
           
           {/* Exercise content */}
           {dynamicExercises.map((exercise: Exercise, index: number) => (
@@ -4913,5 +5169,112 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#000000',
+  },
+
+  // Daily Volume Overview Styles (copied from DaysScreen.tsx)
+  volumeToggle: {
+    marginTop: 16,
+    marginHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#18181b',
+  },
+  volumeToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  volumeToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  volumeOverview: {
+    marginTop: 12,
+    marginHorizontal: 16,
+    padding: 16,
+    backgroundColor: '#18181b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  volumeContent: {
+    gap: 24,
+  },
+  bodyDiagramContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#0f0f10',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  bodyDiagramHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  bodyDiagramTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  bodyFlipIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  volumeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  volumeItem: {
+    alignItems: 'center',
+    minWidth: 60,
+    maxWidth: 80,
+    gap: 4,
+    flex: 1,
+    flexBasis: '22%', // Fit 4 per row with some spacing
+  },
+  volumeBar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  volumeNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginTop: 2,
+  },
+  volumeMuscle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#a1a1aa',
+    textAlign: 'center',
+  },
+  volumeEmptyText: {
+    fontSize: 14,
+    color: '#71717a',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

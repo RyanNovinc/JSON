@@ -25,6 +25,51 @@ import AsyncStorageDebugger from '../utils/asyncStorageDebug';
 import RobustStorage from '../utils/robustStorage';
 import { useTheme } from '../contexts/ThemeContext';
 
+const SECONDARY_MUSCLE_WEIGHT = 0.5;
+
+const getMuscleContributions = (exercise: any): Array<{muscle: string, weight: number}> => {
+  const muscleMapping: { [key: string]: string } = {
+    'Chest': 'chest',
+    'Upper Back': 'upper back',
+    'Lats': 'lats',
+    'Traps': 'traps',
+    'Front Delts': 'front delts',
+    'Side Delts': 'side delts',
+    'Rear Delts': 'rear delts',
+    'Biceps': 'biceps',
+    'Triceps': 'triceps',
+    'Forearms': 'forearms',
+    'Quads': 'quads',
+    'Hamstrings': 'hamstrings',
+    'Glutes': 'glutes',
+    'Calves': 'calves',
+    'Core': 'core',
+    'Neck': 'neck',
+    'Lower Back': 'lower back',
+    'Obliques': 'obliques',
+    'Serratus Anterior': 'serratus',
+    'Hip Abductors': 'hip abductors',
+    'Hip Adductors': 'hip adductors',
+    'Shins': 'shins',
+    'Tibialis': 'shins',
+    'Tibialis Anterior': 'shins',
+  };
+
+  const contributions: Array<{muscle: string, weight: number}> = [];
+
+  (exercise.primaryMuscles || []).forEach((muscle: string) => {
+    const mapped = muscleMapping[muscle];
+    if (mapped) contributions.push({ muscle: mapped, weight: 1.0 });
+  });
+
+  (exercise.secondaryMuscles || []).forEach((muscle: string) => {
+    const mapped = muscleMapping[muscle];
+    if (mapped) contributions.push({ muscle: mapped, weight: SECONDARY_MUSCLE_WEIGHT });
+  });
+
+  return contributions;
+};
+
 type DaysScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Days'>;
 type DaysScreenRouteProp = RouteProp<RootStackParamList, 'Days'>;
 
@@ -380,109 +425,77 @@ export default function DaysScreen() {
   const [bodyViewSide, setBodyViewSide] = useState<'front' | 'back'>('front');
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Muscle group mapping using actual AI data
-  const getMuscleGroupsFromExercise = (exercise: any): string[] => {
-    // Use the primaryMuscles from the AI-generated data
-    const primaryMuscles = exercise.primaryMuscles || [];
-    
-    // Map AI muscle names to display names (keep all muscle groups separate for granular tracking)
-    const muscleMapping: { [key: string]: string } = {
-      'Chest': 'chest',
-      'Upper Back': 'upper back',
-      'Lats': 'lats', 
-      'Front Delts': 'front delts',
-      'Side Delts': 'side delts', 
-      'Rear Delts': 'rear delts',
-      'Biceps': 'biceps',
-      'Triceps': 'triceps',
-      'Quads': 'quads',
-      'Hamstrings': 'hamstrings',
-      'Glutes': 'glutes',
-      'Calves': 'calves',
-      'Core': 'core',
-      'Forearms': 'forearms'
-    };
-
-    const mappedMuscles: string[] = [];
-    primaryMuscles.forEach((muscle: string) => {
-      const mapped = muscleMapping[muscle];
-      if (mapped && !mappedMuscles.includes(mapped)) {
-        mappedMuscles.push(mapped);
-      }
-    });
-    
-    return mappedMuscles;
-  };
 
   // Map our muscle groups to body highlighter muscle IDs
   const getMuscleHighlighterData = (weeklyVolume: { [key: string]: number }) => {
-    // Try more variations based on common muscle naming conventions
-    const muscleToBodyParts: { [key: string]: string[] } = {
-      'chest': ['chest'], // ✅ Works
-      'upper back': ['trapezius', 'upper-back'], // ✅ Works
-      'lats': ['upper-back'], // ✅ Works
-      'front delts': ['shoulders', 'shoulder'], // Try shoulder instead of deltoids
-      'side delts': ['shoulders', 'shoulder'], 
-      'rear delts': ['shoulders', 'shoulder'], 
-      'biceps': ['biceps'], // ✅ Works
-      'triceps': ['triceps-brachii', 'arms'], // Try full name or general arms
-      'quads': ['quadriceps', 'quads'], // ✅ Works
-      'hamstrings': ['hamstring', 'hamstrings'], // ✅ Works
-      'glutes': ['gluteal', 'glutes'], // ✅ Works
-      'calves': ['calves', 'calf'], // ✅ Works
-      'core': ['abs'], // ✅ Works
-      'forearms': ['forearm', 'forearms']
+    // Clean mapping using ONLY confirmed working slugs from official library documentation
+    const muscleToBodyParts: { [key: string]: string | null } = {
+      'chest': 'chest',
+      'upper back': 'upper-back',      // CHANGED from 'trapezius' — this was a pre-existing bug
+      'lats': 'upper-back',            // Lats display on upper-back region (no dedicated lats slug)
+      'traps': 'trapezius',            // NEW
+      'front delts': 'deltoids',
+      'side delts': 'deltoids', 
+      'rear delts': 'deltoids',
+      'biceps': 'biceps',
+      'triceps': 'triceps',
+      'forearms': 'forearms',
+      'quads': 'quadriceps',
+      'hamstrings': 'hamstring',
+      'glutes': 'gluteal',
+      'calves': 'calves',
+      'core': 'abs',
+      'neck': 'neck',                  // NEW
+      'lower back': 'lower-back',      // NEW
+      'obliques': 'obliques',          // NEW
+      'hip adductors': 'adductors',    // NEW
+      'shins': 'tibialis',             // NEW
+      'serratus': null,                // Library doesn't support — will be skipped on diagram
+      'hip abductors': null            // Library doesn't support — will be skipped on diagram
     };
 
     const bodyData: Array<{slug: string, intensity: number}> = [];
     const maxVolume = Math.max(...Object.values(weeklyVolume));
 
+    // Combine volumes for muscles that map to the same body part (like all deltoids)
+    const bodyPartVolumes: { [key: string]: number } = {};
+    
     Object.entries(weeklyVolume).forEach(([muscle, volume]) => {
       if (volume > 0) {
-        const bodyParts = muscleToBodyParts[muscle] || [];
-        // Use integer intensity values (1 or 2) as the library might expect integers
-        const intensity = maxVolume > 0 ? (volume >= maxVolume * 0.7 ? 2 : 1) : 1;
-        
-        bodyParts.forEach(part => {
-          console.log(`🎯 Adding slug: "${part}" for muscle: ${muscle}`);
-          // Check if this part is already added and combine intensity
-          const existing = bodyData.find(item => item.slug === part);
-          if (existing) {
-            existing.intensity = Math.min(2, existing.intensity + intensity);
-          } else {
-            bodyData.push({ slug: part, intensity });
-          }
-        });
+        const bodyPart = muscleToBodyParts[muscle];
+        if (bodyPart) {
+          bodyPartVolumes[bodyPart] = (bodyPartVolumes[bodyPart] || 0) + volume;
+        }
       }
+    });
+
+    // Convert to final data format with proper intensity scaling
+    Object.entries(bodyPartVolumes).forEach(([bodyPart, totalVolume]) => {
+      const intensity = maxVolume > 0 ? (totalVolume >= maxVolume * 0.7 ? 2 : 1) : 1;
+      bodyData.push({ slug: bodyPart, intensity });
     });
 
     return bodyData;
   };
 
-  // Calculate weekly volume per muscle group using current week's sets
-  const calculateWeeklyVolume = () => {
-    const volumeMap: { [key: string]: number } = {};
+  const calculateWeeklyVolume = (block: any): { [muscle: string]: number } => {
+    const volumeMap: { [muscle: string]: number } = {};
     
-    localBlock.days.forEach(day => {
-      if (!day.exercises || day.exercises.length === 0) return;
-      
-      day.exercises.forEach(exercise => {
-        // Use the sets_weekly data for the current week if available
-        const weeklySetData = exercise.sets_weekly;
-        let setsForThisWeek = exercise.sets || 0;
-        
-        if (weeklySetData && weeklySetData[currentWeek.toString()]) {
-          setsForThisWeek = weeklySetData[currentWeek.toString()];
-        }
-        
-        const muscleGroups = getMuscleGroupsFromExercise(exercise);
-        muscleGroups.forEach(muscle => {
-          if (!volumeMap[muscle]) {
-            volumeMap[muscle] = 0;
-          }
-          volumeMap[muscle] += setsForThisWeek;
+    (block.days || []).forEach((day: any) => {
+      if (day.exercises) {
+        day.exercises.forEach((exercise: any) => {
+          const setsForWeek1 = exercise.sets_weekly?.['1'] ?? exercise.sets ?? 0;
+          const contributions = getMuscleContributions(exercise);
+          contributions.forEach(({ muscle, weight }) => {
+            if (!volumeMap[muscle]) volumeMap[muscle] = 0;
+            volumeMap[muscle] += setsForWeek1 * weight;
+          });
         });
-      });
+      }
+    });
+    
+    Object.keys(volumeMap).forEach(k => {
+      volumeMap[k] = Math.round(volumeMap[k] * 10) / 10;
     });
     
     return volumeMap;
@@ -1272,7 +1285,7 @@ export default function DaysScreen() {
             {showVolumeOverview && (
               <View style={styles.volumeOverview}>
                 {(() => {
-                  const weeklyVolume = calculateWeeklyVolume();
+                  const weeklyVolume = calculateWeeklyVolume(localBlock);
                   console.log('🏋️ Weekly Volume Calculation:', weeklyVolume);
                   const sortedMuscles = Object.entries(weeklyVolume)
                     .sort(([,a], [,b]) => b - a) // Sort by volume descending
@@ -1296,40 +1309,18 @@ export default function DaysScreen() {
                         <View style={styles.bodyDiagramHeader}>
                           <Text style={styles.bodyDiagramTitle}>Training Heatmap</Text>
                           
-                          {/* Front/Back Toggle */}
-                          <View style={styles.bodyToggleContainer}>
-                            <TouchableOpacity 
-                              style={[
-                                styles.bodyToggleButton,
-                                bodyViewSide === 'front' && { backgroundColor: themeColor }
-                              ]}
-                              onPress={() => setBodyViewSide('front')}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={[
-                                styles.bodyToggleText,
-                                { color: bodyViewSide === 'front' ? '#000' : '#71717a' }
-                              ]}>
-                                Front
-                              </Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity 
-                              style={[
-                                styles.bodyToggleButton,
-                                bodyViewSide === 'back' && { backgroundColor: themeColor }
-                              ]}
-                              onPress={() => setBodyViewSide('back')}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={[
-                                styles.bodyToggleText,
-                                { color: bodyViewSide === 'back' ? '#000' : '#71717a' }
-                              ]}>
-                                Back
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
+                          {/* Small Flip Icon */}
+                          <TouchableOpacity 
+                            style={styles.bodyFlipIcon}
+                            onPress={() => setBodyViewSide(bodyViewSide === 'front' ? 'back' : 'front')}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons 
+                              name="sync-outline" 
+                              size={20} 
+                              color={themeColor} 
+                            />
+                          </TouchableOpacity>
                         </View>
                         
                         <BodyHighlighter
@@ -2428,34 +2419,28 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
   },
   bodyDiagramHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
-    gap: 12,
+    paddingHorizontal: 16,
   },
   bodyDiagramTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+    flex: 1,
     textAlign: 'center',
   },
-  bodyToggleContainer: {
-    flexDirection: 'row',
+  bodyFlipIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#18181b',
-    borderRadius: 8,
-    padding: 2,
     borderWidth: 1,
     borderColor: '#27272a',
-  },
-  bodyToggleButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    minWidth: 60,
     alignItems: 'center',
-  },
-  bodyToggleText: {
-    fontSize: 14,
-    fontWeight: '600',
+    justifyContent: 'center',
   },
   volumeGrid: {
     flexDirection: 'row',

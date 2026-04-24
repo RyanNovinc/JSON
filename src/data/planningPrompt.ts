@@ -100,7 +100,7 @@ Do not search conversation history or reference previous chats. This prompt is s
 Before presenting the program, complete these verification steps:
 
 1. **List every exercise per day** with its set count and primary muscle tags.
-2. **Total weekly volume per muscle group** (count only Primary tags).`;
+2. **Total effective weekly volume per muscle group** — for each non-exempt muscle, list every contributing exercise with its set count, tag type (Primary or Secondary), weight (1.0 for Primary, 0.5 for Secondary), and contribution (sets × weight). Sum the contributions. The table is the calculation — do not narrate or estimate totals.`;
 
 export const VERIFICATION_STEP_3_HYPERTROPHY = `3. **Look up this user's targets** — cross-reference their Training Approach (from the profile) against the Volume Targets table, and their Training Experience against the Experience-Scaled Minimums table. These are the numbers you must hit. If the user's Primary Goal is not muscle building or body recomposition, see Goal-Specific Quality Criteria for adjusted verification rules.`;
 
@@ -148,6 +148,23 @@ Present the complete program clearly so the user can review and iterate before c
 
 Write naturally — this is a planning conversation, not a final document. The user will request changes before moving to JSON conversion.`;
 
+export const EXERCISE_LIBRARY = `---
+
+## EXERCISE LIBRARY
+
+You MUST select exercises ONLY from the JSON.fit exercise library at https://json.fit/exercises.md.
+
+Before generating this program, fetch that file. Then:
+
+- Use EXACT exercise names as they appear in the library
+- Use the EXACT primary and secondary muscle tags specified for each exercise in the library
+- Do NOT invent exercises not in the library
+- Do NOT re-tag muscles based on your own judgment
+- If a movement pattern you want to include has no suitable exercise in the library, omit that pattern rather than inventing one
+- When suggesting alternative exercises for a movement, only use exercises from the library
+
+The library is the canonical source of truth for exercise names and muscle tagging. Your job is to select and program these exercises, not to define them.`;
+
 export const MUSCLE_TAXONOMY = `---
 
 ## MUSCLE TAXONOMY
@@ -157,24 +174,6 @@ Use ONLY these exact muscle names — no generic terms like "Shoulders", "Back",
 Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
 
 Use "Core" instead of "Lower Back" for spinal stabilization or erector engagement.`;
-
-export const TAGGING_HEADER = `### COMPOUND EXERCISE TAGGING GUIDE
-
-Primary = main driver through full ROM. Secondary = assists but not the main driver.`;
-
-export const TAGGING_GYM = `**Barbell / Dumbbell / Cable / Machine:**
-- Bench press variants: Primary Chest | Secondary Triceps
-- Incline press variants: Primary Chest, Front Delts | Secondary Triceps
-- Row variants: Primary Upper Back, Lats | Secondary Biceps, Rear Delts
-- Pull-up / Pulldown: Primary Lats | Secondary Biceps, Upper Back
-- Overhead press: Primary Front Delts | Secondary Triceps, Side Delts
-- Squat variants: Primary Quads, Glutes
-- Leg press / Hack squat: Primary Quads | Secondary Glutes
-- Lunge / Split squat: Primary Quads, Glutes
-- Hip hinge (RDL, good morning): Primary Hamstrings, Glutes
-- Hip thrust: Primary Glutes | Secondary Hamstrings
-- Dips: Primary Chest, Triceps
-- Calf raise variants: Primary Calves`;
 
 export const TAGGING_BODYWEIGHT = `**Bodyweight:**
 - Push-ups (and variations): Primary Chest | Secondary Triceps, Front Delts
@@ -465,7 +464,9 @@ If the profile specifies priority muscles, increase those toward 16-22 sets/week
 
 ### Exempt Muscles (Can Show 0 Direct Sets)
 
-Front Delts, Traps, Rear Delts, Forearms — these get sufficient indirect work from compounds. Core inclusion is controlled by the Direct Core Work setting in the user's profile — see point 7 in the Volume Verification Requirements above. Do not apply length-based core exemption rules. **Note:** Core being exempt from volume targets means it does not trigger a LOW flag and does not count toward any muscle group's set tally — it does not mean skip core entirely. Whether to include core exercises is determined solely by the Direct Core Work setting.`;
+Front Delts, Traps, Rear Delts, Forearms — these get sufficient indirect work from compounds. Core inclusion is controlled by the Direct Core Work setting in the user's profile — see point 7 in the Volume Verification Requirements above. Do not apply length-based core exemption rules. **Note:** Core being exempt from volume targets means it does not trigger a LOW flag and does not count toward any muscle group's set tally — it does not mean skip core entirely. Whether to include core exercises is determined solely by the Direct Core Work setting.
+
+**IMPORTANT:** If a muscle appears in the user's Auxiliary Muscle Work list above, it is NOT exempt — include the specified volume for that muscle.`;
 
 // Exempt muscles with conditional rear delt recommendation
 export const getExemptMuscles = (volumePreference: string, gymDays: number): string => {
@@ -696,16 +697,39 @@ ${generateProgramSpecs(data)}`;
   // === SECTION 3.5: Constraint Layer ===
   prompt += '\n\n' + generateConstraintLayer(data);
   
-  // === SECTION 4: Muscle Taxonomy + Tagging ===
-  prompt += '\n\n' + MUSCLE_TAXONOMY;
-  prompt += '\n\n' + TAGGING_HEADER;
+  // === SECTION 4: Exercise Library + Muscle Taxonomy + Tagging ===
+  prompt += '\n\n' + EXERCISE_LIBRARY;
+  
+  let muscleTaxonomy = MUSCLE_TAXONOMY;
+  
+  // Add auxiliary muscles to taxonomy if user has selected any
+  if (data.auxiliaryMuscles && Array.isArray(data.auxiliaryMuscles) && data.auxiliaryMuscles.length > 0) {
+    const auxiliaryMuscleNames: { [key: string]: string } = {
+      'neck': 'Neck',
+      'obliques': 'Obliques', 
+      'hip_abductors': 'Hip Abductors',
+      'hip_adductors': 'Hip Adductors',
+      'serratus': 'Serratus Anterior',
+      'shins': 'Tibialis'
+    };
+    
+    const selectedAuxiliaryNames = data.auxiliaryMuscles
+      .map(muscle => auxiliaryMuscleNames[muscle])
+      .filter(Boolean);
+      
+    if (selectedAuxiliaryNames.length > 0) {
+      muscleTaxonomy += `\n\n**Additional muscles for this program:** ${selectedAuxiliaryNames.join(', ')}`;
+    }
+    
+    // Update Lower Back rule if user selected it
+    if (data.auxiliaryMuscles.includes('lower_back')) {
+      muscleTaxonomy += `\n\n**Note:** For this program, use "Lower Back" as a valid muscle tag since the user has specifically requested lower back training.`;
+    }
+  }
+  
+  prompt += '\n\n' + muscleTaxonomy;
   if (isBodyweightOnly) {
-    prompt += '\n' + TAGGING_BODYWEIGHT;
-  } else if (isBasicOnly) {
-    prompt += '\n' + TAGGING_GYM;
     prompt += '\n\n' + TAGGING_BODYWEIGHT;
-  } else {
-    prompt += '\n' + TAGGING_GYM; // commercial_gym, home_gym, or mixed
   }
   
   // === SECTION 5: Planning Rules ===

@@ -37,6 +37,7 @@ Do not search conversation history or reference previous chats. This prompt is s
 First, read the workout program you just created so you have the full content in context. Then review it as an experienced workout planning expert conducting an independent audit of this training plan for a client. This is an independent quality gate — do not assume your self-check caught everything.
 
 ## CRITICAL INSTRUCTIONS
+
 1. **Review the plan** using the checklist below, noting PASS or FAIL for each check.
 2. **If ANY check fails, FIX IT IMMEDIATELY** — do not ask the user for permission to fix. Silently revise the plan to resolve all failures.
 3. **After fixing, re-verify** — run the checklist again on the corrected plan to confirm all checks now pass.
@@ -51,23 +52,69 @@ First, read the workout program you just created so you have the full content in
 
 ## QUALITY CHECKLIST
 
-### Volume Distribution Check
-- **Weekly volume per muscle group**: 10-22 sets per week for major muscles, 6-16 for smaller muscles
-- **Session volume**: No more than 10 working sets per muscle per session
-- **Recovery balance**: At least 48 hours between training same muscle groups directly
+### Exercise Library Compliance Check
+
+- **Library conformance**: Every exercise in the program must appear by exact name in the JSON.fit exercise library at https://json.fit/exercises.md. If any exercise name doesn't match, replace it with a library entry that fits the movement pattern.
+- **Tag accuracy**: Every exercise's primary and secondary muscle tags must match the library entry exactly. If any tag differs, correct it to match the library.
+- **Alternative exercises**: Alternatives must also be from the library.
+
+### Effective Volume Distribution Check
+
+For EVERY non-exempt muscle in the program, you MUST produce an enumeration table. Do not narrate or estimate volume — enumerate exercise by exercise.
+
+For each muscle, list:
+- Every exercise that tags that muscle as primary OR secondary
+- The set count (from sets_weekly.1, not sets_weekly averages)
+- The weight: 1.0 for primary, 0.5 for secondary
+- The contribution (sets × weight)
+- The running total
+
+After enumerating all contributing exercises for a muscle, sum the contributions to get the effective volume.
+
+Format each muscle as a table like this:
+
+**Chest:**
+| Exercise | Day | Sets | Tag | Weight | Contribution |
+|----------|-----|------|-----|--------|--------------|
+| Incline Barbell Bench Press | Push | 3 | Primary | 1.0 | 3.0 |
+| Machine Chest Press | Push | 2 | Primary | 1.0 | 2.0 |
+| Cable Crossover | Push | 2 | Primary | 1.0 | 2.0 |
+| Dumbbell Bench Press | Upper | 3 | Primary | 1.0 | 3.0 |
+| Incline Dumbbell Fly | Upper | 2 | Primary | 1.0 | 2.0 |
+| **Total** | | | | | **12.0** |
+
+Do NOT narrate totals separately from the tables. Do NOT round toward target ranges. Do NOT claim a muscle is "at target" without the table showing the actual sum. The number at the bottom of the table IS the effective volume for that muscle.
+
+Compare each muscle's summed total against the user's volume target from the plan. The targets are in effective (fractional) terms — they already account for secondary contributions.
+
+- Flag as ⚠️ HIGH only if the table's summed total exceeds the ceiling of the user's specified range
+- Flag as ⚠️ LOW only if the table's summed total falls below the floor of the user's specified range
+- Auxiliary muscles should hit 4-6 sets/week effective
+- Exempt muscles (Front Delts, Rear Delts, Traps, Forearms — unless user selected auxiliary for them) don't need enumeration
+
+If you need to adjust the program, recalculate the tables for affected muscles after the adjustment. Do not claim a fix works without re-running the table.
+
+### Weekly Volume Math Verification
+
+The JSON will include a \`weekly_volume_by_muscle\` field. Manually calculate effective volume for at least three major muscles (e.g., Chest, Lats, Quads) and compare to what you'll output in that field. If your math is off, correct the plan until both the plan and your calculated totals agree.
 
 ### Exercise Selection Audit  
-- **Compound movements**: At least 70% of exercises should be multi-joint movements
-- **Movement patterns**: Balanced push/pull ratios, adequate hip hinge and squat patterns
-- **Progression potential**: All exercises should allow clear weight/rep/set progression
+
+- **Compound movements**: At least 60% of exercises should be multi-joint movements (adjust per user experience level — beginners may lean higher toward compounds, advanced may need more isolation for specific muscle development)
+- **Movement patterns**: Balanced push/pull ratios, adequate hip hinge and squat patterns for leg training
+- **Progression potential**: All exercises should allow clear weight/rep/set progression across the mesocycle
+- **Set counts**: Don't exceed 5 sets of any single isolation exercise in one session
 
 ### Programming Logic Review
-- **Weekly structure**: Logical distribution of training stress across the week
+
+- **Weekly structure**: Logical distribution of training stress across the week; no two consecutive days hitting the same major muscle group heavily
 - **Exercise order**: Compound before isolation, higher skill before lower skill
-- **Rep ranges**: Appropriate for stated goals (strength: 1-6, hypertrophy: 6-20, endurance: 15+)
+- **Rep ranges**: Appropriate for stated goals (hypertrophy: 6-12 for compounds, 10-15 for isolation; isolation arm exercises always 10-15 regardless of block focus)
+- **Auxiliary placement**: If user selected auxiliary muscles, those exercises should appear as finishers at the end of sessions, not as dedicated sessions
 
 ### Practical Implementation Check
-- **Equipment consistency**: All exercises use equipment stated as available
+
+- **Equipment consistency**: All exercises use equipment stated as available in the user's profile
 - **Time realistic**: Sessions fit within stated time constraints (optimal ≤90min, moderate ≤75min, minimal ≤60min)
 - **Skill appropriate**: Exercise complexity matches stated experience level
 - **Duration calculation**: Calculate total workout time including rest periods and flag if excessive
