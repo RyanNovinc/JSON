@@ -166,6 +166,30 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
       "weeks": "string (e.g. '1-6')",
       "structure": "string (e.g. 'Push Pull Legs Upper Lower')",
       "deload_weeks": [number] (optional — include only if block has deloads),
+      "weekly_volume_by_muscle": {
+        "Chest": number,
+        "Front Delts": number,
+        "Side Delts": number,
+        "Rear Delts": number,
+        "Lats": number,
+        "Upper Back": number,
+        "Traps": number,
+        "Biceps": number,
+        "Triceps": number,
+        "Forearms": number,
+        "Quads": number,
+        "Hamstrings": number,
+        "Glutes": number,
+        "Calves": number,
+        "Core": number,
+        "Lower Back": number,
+        "Neck": number,
+        "Obliques": number,
+        "Serratus Anterior": number,
+        "Hip Abductors": number,
+        "Hip Adductors": number,
+        "Shins": number
+      },
       "days": [
         {
           "day_name": "string",
@@ -251,14 +275,21 @@ Primary = main driver through full ROM. Secondary = assists but not the main dri
 
 ## Schema Rules
 
-1. **Block-relative keys** — weekly progression keys always start from "1" within each block. Block B (weeks 7-12) uses "1", "2", "3"... not "7", "8", "9".
-2. **Deload tagging** — if a block has deload weeks, include a `deload_weeks` array with the block-relative week numbers (e.g., [5] for a 5-week block with deload on week 5).
-3. **Empty arrays** — if an exercise has no secondary muscles, use `[]`. Do not omit the field.
-4. **restQuick** — calculate as ~65% of the `rest` value, rounded to a clean number.
-5. **Estimated duration** — use the plan's session estimates. If not provided, calculate using the superset-adjusted formula: `(straight sets × avg rest) + (straight sets × 45s) + (superset pairs × pair rest × sets per pair) + (superset pairs × 45s × 2 × sets per pair) + 5 min warmup`.
-6. **Superset rest encoding** — for superset exercises, SS[n]a's `rest` field represents the inter-exercise transition rest (60-90s). SS[n]b's `rest` field represents the full rest before repeating the pair (compound or isolation default for that exercise type). `restQuick` is calculated from each exercise's own `rest` value.
-7. **sets vs sets_weekly** — `sets` is the default set count for training weeks (used for display). `sets_weekly` must be specified for every week in the block: training weeks should match `sets`, and deload weeks should show reduced values. Both fields are required for every strength exercise.
-8. **deload_weeks optionality** — omit `deload_weeks` entirely for blocks without deloads. Do not include an empty array.
+1. **weekly_volume_by_muscle** — Calculate for each block. For each muscle in the taxonomy:
+   - Sum sets from exercises where that muscle is listed as primary, at 1.0× weight
+   - Sum sets from exercises where that muscle is listed as secondary, at 0.5× weight
+   - Round to 1 decimal place
+   - Include all 22 muscles; use 0 for muscles with no work this week
+   - Use week 1 set counts (from sets_weekly.1) for this calculation
+   - This field is required for every block
+2. **Block-relative keys** — weekly progression keys always start from "1" within each block. Block B (weeks 7-12) uses "1", "2", "3"... not "7", "8", "9".
+3. **Deload tagging** — if a block has deload weeks, include a `deload_weeks` array with the block-relative week numbers (e.g., [5] for a 5-week block with deload on week 5).
+4. **Empty arrays** — if an exercise has no secondary muscles, use `[]`. Do not omit the field.
+5. **restQuick** — calculate as ~65% of the `rest` value, rounded to a clean number.
+6. **Estimated duration** — use the plan's session estimates. If not provided, calculate using the superset-adjusted formula: `(straight sets × avg rest) + (straight sets × 45s) + (superset pairs × pair rest × sets per pair) + (superset pairs × 45s × 2 × sets per pair) + 5 min warmup`.
+7. **Superset rest encoding** — for superset exercises, SS[n]a's `rest` field represents the inter-exercise transition rest (60-90s). SS[n]b's `rest` field represents the full rest before repeating the pair (compound or isolation default for that exercise type). `restQuick` is calculated from each exercise's own `rest` value.
+8. **sets vs sets_weekly** — `sets` is the default set count for training weeks (used for display). `sets_weekly` must be specified for every week in the block: training weeks should match `sets`, and deload weeks should show reduced values. Both fields are required for every strength exercise.
+9. **deload_weeks optionality** — omit `deload_weeks` entirely for blocks without deloads. Do not include an empty array.
 
 ---
 

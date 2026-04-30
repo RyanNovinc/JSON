@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BodyHighlighter from 'react-native-body-highlighter';
+import BodyHighlighter, { ExtendedBodyPart, Slug } from 'react-native-body-highlighter';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import AsyncStorageDebugger from '../utils/asyncStorageDebug';
 import RobustStorage from '../utils/robustStorage';
@@ -44,6 +44,10 @@ const getMuscleContributions = (exercise: any): Array<{muscle: string, weight: n
     'Glutes': 'glutes',
     'Calves': 'calves',
     'Core': 'core',
+    'Abs': 'core',
+    'Abdominals': 'core',
+    'Abs (Upper)': 'core',
+    'Abs (Lower)': 'core',
     'Neck': 'neck',
     'Lower Back': 'lower back',
     'Obliques': 'obliques',
@@ -70,6 +74,141 @@ const getMuscleContributions = (exercise: any): Array<{muscle: string, weight: n
   return contributions;
 };
 
+// Deterministic render order for body highlighter slugs.
+// Larger regions render FIRST so smaller specific regions paint on top of them.
+// Critical: 'upper-back' must come before 'trapezius' so traps don't get obscured.
+const SLUG_RENDER_ORDER: Slug[] = [
+  'upper-back',  // large back region - render first
+  'lower-back',  // large back region
+  'trapezius',   // sits on top of upper-back area - render after
+  'chest',
+  'abs',
+  'obliques',
+  'deltoids',
+  'biceps',
+  'triceps',
+  'forearm',
+  'quadriceps',
+  'hamstring',
+  'gluteal',
+  'adductors',
+  'calves',
+  'tibialis',
+  'neck',
+];
+
+// Map our muscle groups to body highlighter muscle slugs.
+// Hoisted out of component since it's a pure constant.
+const MUSCLE_TO_SLUG: { [key: string]: Slug | null } = {
+  // Core torso
+  'chest': 'chest',
+  'core': 'abs',
+
+  // Back regions
+  'upper back': 'trapezius',
+  'lats': 'upper-back',
+  'traps': 'trapezius',
+  'lower back': 'lower-back',
+
+  // Shoulders (library only has 'deltoids' - no front/back variants)
+  'front delts': 'deltoids',
+  'side delts': 'deltoids',
+  'rear delts': 'deltoids',
+
+  // Arms
+  'biceps': 'biceps',
+  'triceps': 'triceps',
+  'forearms': 'forearm',
+
+  // Legs
+  'quads': 'quadriceps',
+  'hamstrings': 'hamstring',
+  'glutes': 'gluteal',
+  'calves': 'calves',
+
+  // Other
+  'neck': 'neck',
+  'obliques': 'obliques',
+
+  // Unsupported by library
+  'hip adductors': 'adductors',
+  'hip abductors': null,
+  'shins': null,
+  'serratus': null,
+};
+
+const setsToIntensity = (sets: number): number => {
+  if (sets >= 10) return 2;
+  if (sets >= 1) return 1;
+  return 0;
+};
+
+// Pure function: convert weekly volume map to body highlighter data array.
+// 1. Aggregates volume by slug (so 'upper back' + 'lats' both feed 'upper-back')
+// 2. Sorts in deterministic render order to prevent overlap-painting bugs
+const buildHighlighterData = (weeklyVolume: { [key: string]: number }): ExtendedBodyPart[] => {
+  // Aggregate volume by slug
+  const slugVolume: Partial<Record<Slug, number>> = {};
+
+  Object.entries(weeklyVolume).forEach(([muscle, volume]) => {
+    if (volume > 0) {
+      const slug = MUSCLE_TO_SLUG[muscle];
+      if (slug) {
+        slugVolume[slug] = (slugVolume[slug] || 0) + volume;
+      }
+    }
+  });
+
+  console.log('🔧 AGGREGATED SLUG VOLUMES:', slugVolume);
+  console.log('🔧 Verification - upper-back total:', slugVolume['upper-back'], '(expected: upper back + lats)');
+
+  // Build array, then sort by deterministic render order
+  return Object.entries(slugVolume)
+    .map(([slug, totalSets]) => ({
+      slug: slug as Slug,
+      intensity: setsToIntensity(totalSets!),
+    }))
+    .sort((a, b) => {
+      const aIdx = SLUG_RENDER_ORDER.indexOf(a.slug);
+      const bIdx = SLUG_RENDER_ORDER.indexOf(b.slug);
+      // Unknown slugs go to the end
+      const aRank = aIdx === -1 ? 999 : aIdx;
+      const bRank = bIdx === -1 ? 999 : bIdx;
+      return aRank - bRank;
+    });
+};
+
+const calculateWeeklyVolume = (block: any): { [muscle: string]: number } => {
+  const volumeMap: { [muscle: string]: number } = {};
+  const allPrimaryMuscles = new Set<string>();
+  const allSecondaryMuscles = new Set<string>();
+
+  (block.days || []).forEach((day: any) => {
+    if (day.exercises) {
+      day.exercises.forEach((exercise: any) => {
+        (exercise.primaryMuscles || []).forEach((muscle: string) => allPrimaryMuscles.add(muscle));
+        (exercise.secondaryMuscles || []).forEach((muscle: string) => allSecondaryMuscles.add(muscle));
+
+        const setsForWeek1 = exercise.sets_weekly?.['1'] ?? exercise.sets ?? 0;
+        const contributions = getMuscleContributions(exercise);
+        contributions.forEach(({ muscle, weight }) => {
+          if (!volumeMap[muscle]) volumeMap[muscle] = 0;
+          volumeMap[muscle] += setsForWeek1 * weight;
+        });
+      });
+    }
+  });
+
+  console.log('🔍 DISCOVERED PRIMARY MUSCLES:', Array.from(allPrimaryMuscles).sort());
+  console.log('🔍 DISCOVERED SECONDARY MUSCLES:', Array.from(allSecondaryMuscles).sort());
+
+  Object.keys(volumeMap).forEach(k => {
+    volumeMap[k] = Math.round(volumeMap[k] * 10) / 10;
+  });
+
+  return volumeMap;
+};
+
 type DaysScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Days'>;
 type DaysScreenRouteProp = RouteProp<RootStackParamList, 'Days'>;
 
@@ -85,7 +224,7 @@ interface Exercise {
 
 interface Day {
   day_name: string;
-  estimated_duration?: number; // minutes
+  estimated_duration?: number;
   exercises: Exercise[];
 }
 
@@ -99,8 +238,8 @@ interface DayCardProps {
   blockName: string;
   refreshTrigger?: number;
   completionStats?: {
-    duration: number; // minutes
-    totalVolume: number; // kg
+    duration: number;
+    totalVolume: number;
     date: string;
   };
 }
@@ -109,36 +248,29 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
   const [modifiedExercises, setModifiedExercises] = useState<Exercise[]>(day.exercises || []);
   const [dynamicExercises, setDynamicExercises] = useState<Exercise[]>([]);
   const [customizedDuration, setCustomizedDuration] = useState<number | undefined>(day.estimated_duration);
-  
-  // Total exercise count including dynamic exercises
+
   const exerciseCount = (modifiedExercises?.length || 0) + (dynamicExercises?.length || 0);
 
-  // Load week-specific customizations (exercise order and duration)
   const loadWeekCustomizations = async () => {
     try {
       const customizationKey = `day_customization_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}`;
       const savedCustomization = await AsyncStorage.getItem(customizationKey);
       if (savedCustomization) {
         const customizationData = JSON.parse(savedCustomization);
-        
-        // PRIORITY: Use customized exercises, ignore any dynamic exercises when customization exists
+
         if (customizationData.exercises) {
           setModifiedExercises(customizationData.exercises);
         }
-        
-        // Update duration with customized value
+
         if (customizationData.estimated_duration !== undefined) {
           setCustomizedDuration(customizationData.estimated_duration);
         }
-        
-        // Don't load dynamic exercises when customization exists
+
         setDynamicExercises([]);
-        return; // Early return to skip dynamic loading
+        return;
       } else {
-        // No customization, use original data and load dynamic exercises
         setModifiedExercises(day.exercises || []);
         setCustomizedDuration(day.estimated_duration);
-        // Dynamic exercises will be loaded separately
       }
     } catch (error) {
       setModifiedExercises(day.exercises || []);
@@ -146,9 +278,7 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
     }
   };
 
-  // Load dynamic exercises that were added during workout (only if no customization)
   const loadDynamicExercises = async () => {
-    // Check if customization exists first
     const customizationKey = `day_customization_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}`;
     try {
       const savedCustomization = await AsyncStorage.getItem(customizationKey);
@@ -159,8 +289,7 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
     } catch (error) {
       // Continue to load dynamic exercises if customization check fails
     }
-    
-    // Only load dynamic exercises if no customization exists
+
     try {
       const dynamicKey = `workout_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}_exercises`;
       const savedDynamic = await AsyncStorage.getItem(dynamicKey);
@@ -175,19 +304,17 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
     }
   };
 
-  // Load saved sets data to get actual number of sets
   const loadSetsData = async () => {
     try {
       const savedKey = `workout_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}_sets`;
       const savedData = await AsyncStorage.getItem(savedKey);
       if (savedData) {
         const savedSetsData = JSON.parse(savedData);
-        // Update exercises with actual number of sets
         const updatedExercises = (day.exercises || []).map((exercise, index) => {
           if (savedSetsData[index] && savedSetsData[index].length > 0) {
             return {
               ...exercise,
-              sets: savedSetsData[index].length // Use actual number of sets
+              sets: savedSetsData[index].length
             };
           }
           return exercise;
@@ -204,74 +331,64 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
     loadSetsData();
     loadDynamicExercises();
   }, [blockName, day.day_name, currentWeek, refreshTrigger]);
-  
-  // Include both original day exercises and dynamic exercises
+
   const allExercises = [...(modifiedExercises || []), ...(dynamicExercises || [])];
-  
-  // Calculate duration based on actual exercises (ignore stored duration for dynamic calculation)
+
   const estimatedDuration = (() => {
-    // If no exercises, return 0
     if (exerciseCount === 0) {
       return 0;
     }
 
-    // Use customized duration if available, otherwise use original day duration
     if (customizedDuration !== undefined) {
       return customizedDuration;
     }
-    
-    // Use stored duration if available and day has original exercises
+
     if (day.estimated_duration && (day.exercises?.length || 0) > 0) {
       return day.estimated_duration;
     }
-    
-    // Calculate based on actual rest times and exercise complexity for all exercises
+
     const totalRestTime = allExercises.reduce((total, ex) => {
       const sets = ex.sets;
-      const restPerSet = (ex.rest || 120) / 60; // convert to minutes
+      const restPerSet = (ex.rest || 120) / 60;
       return total + (sets * restPerSet);
     }, 0);
-    
-    // Estimate exercise execution time (compound vs isolation)
+
     const executionTime = allExercises.reduce((total, ex) => {
       const name = (ex.exercise || '').toLowerCase();
-      const isCompound = name.includes('squat') || name.includes('deadlift') || 
-                        name.includes('press') || name.includes('row') || 
+      const isCompound = name.includes('squat') || name.includes('deadlift') ||
+                        name.includes('press') || name.includes('row') ||
                         name.includes('pull up') || name.includes('chin up');
-      const timePerSet = isCompound ? 1.5 : 1; // minutes per set
+      const timePerSet = isCompound ? 1.5 : 1;
       return total + (ex.sets * timePerSet);
     }, 0);
-    
-    // Add warmup and setup time
+
     const warmupTime = 5;
-    const setupTime = exerciseCount * 0.5; // 30 seconds setup per exercise
-    
+    const setupTime = exerciseCount * 0.5;
+
     return Math.round(totalRestTime + executionTime + warmupTime + setupTime);
   })();
-  
-  // Categorize exercises by type for better preview
+
   const exercisesByType = {
     compound: [] as string[],
     isolation: [] as string[],
     cardio: [] as string[]
   };
-  
+
   allExercises.forEach(ex => {
     const name = (ex.exercise || '').toLowerCase();
-    if (name.includes('squat') || name.includes('deadlift') || name.includes('press') || 
+    if (name.includes('squat') || name.includes('deadlift') || name.includes('press') ||
         name.includes('row') || name.includes('pull up') || name.includes('chin up')) {
       exercisesByType.compound.push(ex.exercise || 'Unknown Exercise');
-    } else if (name.includes('curl') || name.includes('extension') || name.includes('fly') || 
+    } else if (name.includes('curl') || name.includes('extension') || name.includes('fly') ||
               name.includes('raise') || name.includes('isolation')) {
       exercisesByType.isolation.push(ex.exercise || 'Unknown Exercise');
     } else if (name.includes('cardio') || name.includes('run') || name.includes('bike')) {
-      exercisesByType.cardio.push(ex.exercise || ex.activity || 'Unknown Cardio');
+      exercisesByType.cardio.push(ex.exercise || (ex as any).activity || 'Unknown Cardio');
     } else {
-      exercisesByType.compound.push(ex.exercise || 'Unknown Exercise'); // default to compound
+      exercisesByType.compound.push(ex.exercise || 'Unknown Exercise');
     }
   });
-  
-  // Get day type color
+
   const getDayTypeColor = (dayName: string) => {
     const name = (dayName || '').toLowerCase();
     if (name.includes('push') || name.includes('chest') || name.includes('shoulder')) return '#f59e0b';
@@ -279,20 +396,19 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
     if (name.includes('legs') || name.includes('lower') || name.includes('glute')) return '#a855f7';
     if (name.includes('upper')) return themeColor;
     if (name.includes('full') || name.includes('total')) return '#ef4444';
-    return themeColor; // default to theme color instead of gray
+    return themeColor;
   };
-  
+
   const dayColor = getDayTypeColor(day.day_name || '');
-  
+
   if (isCompleted && completionStats) {
-    // Minimal completed card
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
-          styles.card, 
+          styles.card,
           styles.cardCompleted,
           { borderLeftColor: '#10b981' }
-        ]} 
+        ]}
         activeOpacity={0.8}
         onPress={onPress}
       >
@@ -323,8 +439,7 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
       </TouchableOpacity>
     );
   }
-  
-  // Handle REST DAY - special card design
+
   if (exerciseCount === 0 && day.day_name && day.day_name.toUpperCase().includes('REST')) {
     return (
       <View style={[styles.restDayCard, { borderLeftColor: '#6b7280' }]}>
@@ -337,13 +452,12 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
     );
   }
 
-  // Regular uncompleted card with full details
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.card, 
+        styles.card,
         { borderLeftColor: dayColor }
-      ]} 
+      ]}
       activeOpacity={0.8}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -365,7 +479,7 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
           <Text style={[styles.startButtonText, { color: themeColor }]}>START</Text>
         </View>
       </View>
-      
+
       <View style={styles.cardBody}>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -377,7 +491,7 @@ function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completi
             <Text style={styles.statText}>{exercisesByType.compound.length} compound</Text>
           </View>
         </View>
-        
+
         <View style={styles.exerciseGrid}>
           {allExercises.slice(0, 6).map((exercise, index) => (
             <View key={index} style={styles.exerciseChip}>
@@ -403,11 +517,9 @@ export default function DaysScreen() {
   const route = useRoute<DaysScreenRouteProp>();
   const { themeColor } = useTheme();
   const { block, routineName, initialWeek } = route.params;
-  
-  
-  // Use local state for the block to enable immediate updates
+
   const [localBlock, setLocalBlock] = useState(block);
-  
+
   const [currentWeek, setCurrentWeek] = useState(1);
   const [completedWorkouts, setCompletedWorkouts] = useState<Set<string>>(new Set());
   const [completionStats, setCompletionStats] = useState<Map<string, any>>(new Map());
@@ -425,124 +537,67 @@ export default function DaysScreen() {
   const [bodyViewSide, setBodyViewSide] = useState<'front' | 'back'>('front');
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Memoized volume calculation - only recomputes when localBlock actually changes.
+  // This prevents the body highlighter data from being rebuilt on every render,
+  // which was causing inconsistent rendering due to non-deterministic timing.
+  const weeklyVolume = useMemo(
+    () => calculateWeeklyVolume(localBlock),
+    [localBlock]
+  );
 
-  // Map our muscle groups to body highlighter muscle IDs
-  const getMuscleHighlighterData = (weeklyVolume: { [key: string]: number }) => {
-    // Clean mapping using ONLY confirmed working slugs from official library documentation
-    const muscleToBodyParts: { [key: string]: string | null } = {
-      'chest': 'chest',
-      'upper back': 'upper-back',      // CHANGED from 'trapezius' — this was a pre-existing bug
-      'lats': 'upper-back',            // Lats display on upper-back region (no dedicated lats slug)
-      'traps': 'trapezius',            // NEW
-      'front delts': 'deltoids',
-      'side delts': 'deltoids', 
-      'rear delts': 'deltoids',
-      'biceps': 'biceps',
-      'triceps': 'triceps',
-      'forearms': 'forearms',
-      'quads': 'quadriceps',
-      'hamstrings': 'hamstring',
-      'glutes': 'gluteal',
-      'calves': 'calves',
-      'core': 'abs',
-      'neck': 'neck',                  // NEW
-      'lower back': 'lower-back',      // NEW
-      'obliques': 'obliques',          // NEW
-      'hip adductors': 'adductors',    // NEW
-      'shins': 'tibialis',             // NEW
-      'serratus': null,                // Library doesn't support — will be skipped on diagram
-      'hip abductors': null            // Library doesn't support — will be skipped on diagram
-    };
+  const muscleHighlighterData = useMemo(
+    () => buildHighlighterData(weeklyVolume),
+    [weeklyVolume]
+  );
 
-    const bodyData: Array<{slug: string, intensity: number}> = [];
-    const maxVolume = Math.max(...Object.values(weeklyVolume));
+  // Sorted muscle list for the volume grid (separate from highlighter sort).
+  const sortedMuscles = useMemo(
+    () => Object.entries(weeklyVolume)
+      .sort(([, a], [, b]) => b - a)
+      .filter(([, sets]) => sets > 0),
+    [weeklyVolume]
+  );
 
-    // Combine volumes for muscles that map to the same body part (like all deltoids)
-    const bodyPartVolumes: { [key: string]: number } = {};
-    
-    Object.entries(weeklyVolume).forEach(([muscle, volume]) => {
-      if (volume > 0) {
-        const bodyPart = muscleToBodyParts[muscle];
-        if (bodyPart) {
-          bodyPartVolumes[bodyPart] = (bodyPartVolumes[bodyPart] || 0) + volume;
-        }
-      }
-    });
+  const maxVolume = useMemo(
+    () => sortedMuscles.length > 0 ? Math.max(...sortedMuscles.map(([, sets]) => sets)) : 0,
+    [sortedMuscles]
+  );
 
-    // Convert to final data format with proper intensity scaling
-    Object.entries(bodyPartVolumes).forEach(([bodyPart, totalVolume]) => {
-      const intensity = maxVolume > 0 ? (totalVolume >= maxVolume * 0.7 ? 2 : 1) : 1;
-      bodyData.push({ slug: bodyPart, intensity });
-    });
-
-    return bodyData;
-  };
-
-  const calculateWeeklyVolume = (block: any): { [muscle: string]: number } => {
-    const volumeMap: { [muscle: string]: number } = {};
-    
-    (block.days || []).forEach((day: any) => {
-      if (day.exercises) {
-        day.exercises.forEach((exercise: any) => {
-          const setsForWeek1 = exercise.sets_weekly?.['1'] ?? exercise.sets ?? 0;
-          const contributions = getMuscleContributions(exercise);
-          contributions.forEach(({ muscle, weight }) => {
-            if (!volumeMap[muscle]) volumeMap[muscle] = 0;
-            volumeMap[muscle] += setsForWeek1 * weight;
-          });
-        });
-      }
-    });
-    
-    Object.keys(volumeMap).forEach(k => {
-      volumeMap[k] = Math.round(volumeMap[k] * 10) / 10;
-    });
-    
-    return volumeMap;
-  };
-
-  // Calculate total weeks for this block
-  const totalWeeks = localBlock.weeks.includes('-') 
-    ? parseInt(localBlock.weeks.split('-')[1]) - parseInt(localBlock.weeks.split('-')[0]) + 1 
+  const totalWeeks = localBlock.weeks.includes('-')
+    ? parseInt(localBlock.weeks.split('-')[1]) - parseInt(localBlock.weeks.split('-')[0]) + 1
     : 1;
-  
-  // Calculate visible weeks based on screen width
+
   const screenWidth = Dimensions.get('window').width;
   const weekTabWidth = 36;
   const weekTabGap = 8;
-  const maxVisibleWeeks = Math.floor((screenWidth - 120) / (weekTabWidth + weekTabGap)); // 120px for nav buttons and padding
+  const maxVisibleWeeks = Math.floor((screenWidth - 120) / (weekTabWidth + weekTabGap));
 
-  // Find first incomplete week
   const findFirstIncompleteWeek = async () => {
     for (let week = 1; week <= totalWeeks; week++) {
       const weekKey = `completed_${localBlock.block_name}_week${week.toString()}`;
       const weekCompleted = await AsyncStorage.getItem(weekKey);
-      
+
       if (!weekCompleted) {
         return week;
       }
-      
+
       const parsed = JSON.parse(weekCompleted);
       const completedSet = new Set(Array.isArray(parsed) ? parsed : []);
-      // Check if all days in this week are completed
-      const allDaysCompleted = localBlock.days.every(day => 
+      const allDaysCompleted = localBlock.days.every(day =>
         completedSet.has(`${day.day_name || 'unknown'}_week${week}`)
       );
-      
+
       if (!allDaysCompleted) {
         return week;
       }
     }
-    return totalWeeks; // If all weeks are complete, return the last week
+    return totalWeeks;
   };
-  
-  // Initial load - determine which week to show
+
   const initializeWeek = async () => {
-    // If initialWeek is passed from "Today" button, use that and skip other logic
     if (initialWeek) {
       setCurrentWeek(initialWeek);
-      
-      // Check if there's a bookmark for this block
+
       const bookmarkKey = `bookmark_${localBlock.block_name}`;
       const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
       if (savedBookmark) {
@@ -555,72 +610,62 @@ export default function DaysScreen() {
 
     const bookmarkKey = `bookmark_${localBlock.block_name}`;
     const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
-    
+
     if (savedBookmark) {
       const { week, isBookmarked: bookmarked } = JSON.parse(savedBookmark);
       setIsBookmarked(bookmarked);
-      
+
       if (bookmarked) {
-        // If bookmarked, save the bookmarked week and go to it
         setBookmarkedWeek(week);
         setCurrentWeek(week);
       } else {
-        // If not bookmarked, find first incomplete week
         setBookmarkedWeek(null);
         const incompleteWeek = await findFirstIncompleteWeek();
         setCurrentWeek(incompleteWeek);
       }
     } else {
-      // No bookmark saved, find first incomplete week
       setBookmarkedWeek(null);
       const incompleteWeek = await findFirstIncompleteWeek();
       setCurrentWeek(incompleteWeek);
     }
   };
-  
-  // Initial load
+
   useEffect(() => {
     initializeWeek();
-    reloadBlockData(); // Load manual days on initial load
+    reloadBlockData();
   }, []);
-  
-  // Function to reload block data from storage
+
   const reloadBlockData = async () => {
     try {
-      // Load manual days and merge with original block structure
       const manualDaysKey = `manual_days_${localBlock.block_name}`;
       const manualDaysData = await AsyncStorage.getItem(manualDaysKey);
-      
+
       if (manualDaysData) {
         const manualDays = JSON.parse(manualDaysData);
-        // Merge original days with manual days
         const mergedDays = [...block.days, ...manualDays];
         const updatedBlock = {
           ...localBlock,
           days: mergedDays
         };
-        
+
         setLocalBlock(updatedBlock);
       }
       return;
-      
+
       const routineData = await AsyncStorage.getItem('routine_1772009535369');
       if (routineData) {
         const routine = JSON.parse(routineData);
-        
+
         if (routine.data && typeof routine.data === 'object') {
-          // Convert routine.data object properties to days array
-          // Filter out non-day properties (like id, routine_name, etc.)
           const dayObjects = Object.entries(routine.data)
-            .filter(([key, value]) => 
-              // Only include properties that look like workout days
-              value && 
-              typeof value === 'object' && 
-              value.day_name && 
+            .filter(([key, value]) =>
+              value &&
+              typeof value === 'object' &&
+              (value as any).day_name &&
               !['id', 'routine_name', 'description', 'days_per_week', 'blocks', 'programId'].includes(key)
             )
             .map(([key, value]) => value);
-          
+
           if (dayObjects.length > 0) {
             const updatedBlock = {
               ...localBlock,
@@ -636,13 +681,11 @@ export default function DaysScreen() {
     }
   };
 
-  // Reload data when screen comes into focus (after workout completion)
   useFocusEffect(
     useCallback(() => {
-      reloadBlockData(); // Reload block data to get any new days
+      reloadBlockData();
       loadCompletedWorkouts();
       loadCompletionStats();
-      // Trigger refresh for DayCards to reload modified exercises
       setRefreshTrigger(prev => prev + 1);
     }, [currentWeek])
   );
@@ -651,16 +694,14 @@ export default function DaysScreen() {
     loadCompletedWorkouts();
     loadCompletionStats();
   }, [currentWeek]);
-  
+
   useEffect(() => {
-    // Auto-scroll to current week when it changes
     if (scrollViewRef.current && totalWeeks > maxVisibleWeeks) {
       const scrollToX = Math.max(0, (currentWeek - Math.floor(maxVisibleWeeks / 2) - 1) * (weekTabWidth + weekTabGap));
       scrollViewRef.current.scrollTo({ x: scrollToX, animated: true });
     }
   }, [currentWeek, totalWeeks, maxVisibleWeeks]);
 
-  // Load rest day preference on component mount
   useEffect(() => {
     loadRestDayPreference();
   }, []);
@@ -699,28 +740,23 @@ export default function DaysScreen() {
     try {
       await AsyncStorage.setItem(`currentWeek_${localBlock.block_name}`, week.toString());
       setCurrentWeek(week);
-      
-      // Don't update the bookmark week when navigating
-      // The bookmark should stay on its original week
     } catch (error) {
       console.error('Failed to save current week:', error);
     }
   };
-  
+
   const toggleBookmark = async () => {
     const newBookmarkState = !isBookmarked;
     setIsBookmarked(newBookmarkState);
-    
+
     const bookmarkKey = `bookmark_${localBlock.block_name}`;
     if (newBookmarkState) {
-      // Save bookmark with current week
       setBookmarkedWeek(currentWeek);
       await AsyncStorage.setItem(bookmarkKey, JSON.stringify({
         week: currentWeek,
         isBookmarked: true
       }));
     } else {
-      // Clear bookmark
       setBookmarkedWeek(null);
       await AsyncStorage.setItem(bookmarkKey, JSON.stringify({
         week: currentWeek,
@@ -736,80 +772,69 @@ export default function DaysScreen() {
       console.log('🔍 [LOAD-COMPLETION] Key:', key);
       console.log('🔍 [LOAD-COMPLETION] Block name:', localBlock.block_name);
       console.log('🔍 [LOAD-COMPLETION] Current week:', currentWeek);
-      
-      // Run health check and auto-repair if needed
+
       const healthCheck = await RobustStorage.healthCheck();
       console.log('🔍 [LOAD-COMPLETION] Storage health check:', healthCheck);
-      
+
       if (healthCheck.repaired > 0) {
         console.log(`🔍 [LOAD-COMPLETION] 🔧 Auto-repaired ${healthCheck.repaired} corrupted entries`);
       }
-      
-      // Get storage stats for debugging
+
       const stats = await RobustStorage.getStats();
       console.log('🔍 [LOAD-COMPLETION] Storage stats:', stats);
-      
-      // Try robust storage first
+
       let completed = await RobustStorage.getItem(key, true);
       let dataSource = 'robust';
-      
+
       if (!completed) {
-        // Fallback: try legacy storage methods
         console.log('🔍 [LOAD-COMPLETION] No data in robust storage, checking legacy storage...');
         completed = await AsyncStorageDebugger.getItem(key);
         dataSource = 'legacy';
-        
+
         if (!completed) {
-          // Emergency fallback: check for emergency backup keys (same as WorkoutLogScreen)
           console.log('🔍 [LOAD-COMPLETION] Checking emergency backup keys...');
           const emergencyKeys = [
             `${key}_emergency`,
             `workout_completion_${localBlock.block_name.replace(/[^a-zA-Z0-9]/g, '_')}_week${currentWeek.toString()}`,
-            // Also check for timestamped backups by scanning for any completion_backup keys
           ];
-          
+
           for (const emergencyKey of emergencyKeys) {
             const emergencyData = await AsyncStorage.getItem(emergencyKey);
             if (emergencyData) {
               completed = emergencyData;
               dataSource = `emergency:${emergencyKey}`;
               console.log(`🔍 [LOAD-COMPLETION] Found data in emergency key: ${emergencyKey}`);
-              
-              // Migrate emergency data back to robust storage
+
               await RobustStorage.setItem(key, emergencyData, true);
               console.log('🔍 [LOAD-COMPLETION] 🔄 Migrated emergency data to robust storage');
               break;
             }
           }
-          
-          // Last resort: scan for any completion_backup_* keys with timestamps
+
           if (!completed) {
             console.log('🔍 [LOAD-COMPLETION] Scanning for timestamped backup keys...');
             try {
               const allKeys = await AsyncStorage.getAllKeys();
               const backupKeys = allKeys.filter(k => k.startsWith('completion_backup_'));
-              
+
               if (backupKeys.length > 0) {
-                // Sort by timestamp (newest first)
                 backupKeys.sort((a, b) => {
                   const timestampA = parseInt(a.split('completion_backup_')[1]) || 0;
                   const timestampB = parseInt(b.split('completion_backup_')[1]) || 0;
                   return timestampB - timestampA;
                 });
-                
+
                 for (const backupKey of backupKeys) {
                   const backupData = await AsyncStorage.getItem(backupKey);
                   if (backupData) {
                     try {
                       const parsed = JSON.parse(backupData);
-                      // Check if this backup contains our workout
                       const workoutKey = getWorkoutKey(localBlock.block_name, currentWeek);
                       if (Array.isArray(parsed) && parsed.some(item => item.includes(workoutKey.split('_week')[0]))) {
                         completed = backupData;
                         dataSource = `timestamped-backup:${backupKey}`;
                         console.log(`🔍 [LOAD-COMPLETION] Found relevant data in backup: ${backupKey}`);
-                        
-                        // Migrate backup data back to robust storage
+
                         await RobustStorage.setItem(key, backupData, true);
                         console.log('🔍 [LOAD-COMPLETION] 🔄 Migrated backup data to robust storage');
                         break;
@@ -824,26 +849,22 @@ export default function DaysScreen() {
               console.log('🔍 [LOAD-COMPLETION] Error scanning backup keys:', scanError);
             }
           }
-          
-          // PRODUCTION RECOVERY: Check redundant storage formats
+
           if (!completed) {
             console.log('🔐 [PRODUCTION-RECOVERY] Checking redundant storage formats...');
             try {
-              // Format 1: Check individual workout markers
               const individualKey = `workout_done_${localBlock.block_name}_${localBlock.days.find(d => d.day_name)?.day_name || 'unknown'}_week${currentWeek.toString()}`;
               const individualData = await AsyncStorage.getItem(individualKey);
               if (individualData) {
                 const parsed = JSON.parse(individualData);
                 if (parsed.completed) {
-                  // Reconstruct the completed array from individual markers
                   const reconstructedArray = [`${parsed.dayName}_week${parsed.week}`];
                   completed = JSON.stringify(reconstructedArray);
                   dataSource = 'individual-marker';
                   console.log('🔐 [PRODUCTION-RECOVERY] Recovered from individual marker:', individualKey);
                 }
               }
-              
-              // Format 2: Check simple completion lists
+
               if (!completed) {
                 const simpleKey = `simple_completed_${localBlock.block_name.replace(/[^a-zA-Z0-9]/g, '_')}`;
                 const simpleData = await AsyncStorage.getItem(simpleKey);
@@ -853,8 +874,7 @@ export default function DaysScreen() {
                   console.log('🔐 [PRODUCTION-RECOVERY] Recovered from simple list:', simpleKey);
                 }
               }
-              
-              // Format 3: Check recent daily logs
+
               if (!completed) {
                 const today = new Date();
                 for (let daysBack = 0; daysBack < 7; daysBack++) {
@@ -863,8 +883,8 @@ export default function DaysScreen() {
                   const logData = await AsyncStorage.getItem(dateKey);
                   if (logData) {
                     const logs = JSON.parse(logData);
-                    const relevantLogs = logs.filter((log: any) => 
-                      log.blockName === localBlock.block_name && 
+                    const relevantLogs = logs.filter((log: any) =>
+                      log.blockName === localBlock.block_name &&
                       log.week === currentWeek
                     );
                     if (relevantLogs.length > 0) {
@@ -877,31 +897,28 @@ export default function DaysScreen() {
                   }
                 }
               }
-              
-              // If we recovered data, migrate it back to the main storage
+
               if (completed) {
                 await RobustStorage.setItem(key, completed, true);
                 console.log('🔐 [PRODUCTION-RECOVERY] 🔄 Migrated recovered data to main storage');
               }
-              
+
             } catch (recoveryError) {
               console.log('🔐 [PRODUCTION-RECOVERY] Error during recovery:', recoveryError);
             }
           }
         } else if (completed) {
-          // Migrate legacy data to robust storage
           console.log('🔍 [LOAD-COMPLETION] 🔄 Migrating legacy data to robust storage...');
           await RobustStorage.setItem(key, completed, true);
         }
       }
-      
+
       if (completed) {
         const parsedCompleted = JSON.parse(completed);
         console.log(`🔍 [LOAD-COMPLETION] Found completed workouts (${dataSource}):`, parsedCompleted);
         const validArray = Array.isArray(parsedCompleted) ? parsedCompleted : [];
         setCompletedWorkouts(new Set(validArray));
-        
-        // If we found data, verify it's properly stored in robust storage
+
         if (dataSource !== 'robust') {
           setTimeout(async () => {
             const verification = await RobustStorage.getItem(key, true);
@@ -916,10 +933,9 @@ export default function DaysScreen() {
         console.log('🔍 [LOAD-COMPLETION] No completed workouts found for this week (checked all sources)');
         setCompletedWorkouts(new Set());
       }
-      
-      // Print debug summary after loading
+
       AsyncStorageDebugger.printSummary();
-      
+
     } catch (error) {
       console.error('🔍 [LOAD-COMPLETION] Failed to load completed workouts:', error);
       setCompletedWorkouts(new Set());
@@ -950,9 +966,8 @@ export default function DaysScreen() {
   const handleDayPress = (day: Day) => {
     const isCompleted = isWorkoutCompleted(day.day_name || 'unknown');
     const stats = getCompletionStats(day.day_name || 'unknown');
-    
+
     if (isCompleted && stats) {
-      // Navigate to review screen for completed workouts
       navigation.navigate('WorkoutReview' as any, {
         day,
         blockName: localBlock.block_name,
@@ -960,8 +975,6 @@ export default function DaysScreen() {
         currentWeek
       });
     } else {
-      // Navigate to workout log for new workouts
-      // Add mock previous data for demonstration
       const dayWithPrevious = {
         ...day,
         exercises: day.exercises.map((ex, index) => ({
@@ -969,13 +982,13 @@ export default function DaysScreen() {
           previous: index % 2 === 0 ? { weight: 50 + index * 5, reps: 10 } : null
         }))
       };
-      
-      navigation.navigate('WorkoutLog' as any, { 
-        day: dayWithPrevious, 
+
+      navigation.navigate('WorkoutLog' as any, {
+        day: dayWithPrevious,
         blockName: localBlock.block_name,
-        currentWeek: currentWeek,  // Pass the current week
-        block: block,  // Pass the full block data for completion detection
-        routineName: routineName  // Pass routine name for exercise preferences
+        currentWeek: currentWeek,
+        block: block,
+        routineName: routineName
       });
     }
   };
@@ -984,7 +997,6 @@ export default function DaysScreen() {
     navigation.goBack();
   };
 
-
   const handleAddDay = () => {
     if (Platform.OS === 'ios') {
       Alert.prompt(
@@ -992,8 +1004,8 @@ export default function DaysScreen() {
         'Enter a name for this workout day:',
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Create', 
+          {
+            text: 'Create',
             onPress: (text) => {
               if (text && text.trim()) {
                 createNewDay(text.trim());
@@ -1004,7 +1016,6 @@ export default function DaysScreen() {
         'plain-text'
       );
     } else {
-      // Use custom modal for Android
       setNewDayName('');
       setShowAddDayModal(true);
     }
@@ -1020,20 +1031,17 @@ export default function DaysScreen() {
 
   const handleDayLongPress = async (day: Day) => {
     setSelectedDay(day);
-    
-    // Load current customizations for this specific week
+
     try {
       const customizationKey = `day_customization_${localBlock.block_name}_${day.day_name}_week${currentWeek}`;
       const savedCustomization = await AsyncStorage.getItem(customizationKey);
-      
+
       if (savedCustomization) {
         const customizationData = JSON.parse(savedCustomization);
-        
-        // Use customized exercises and duration
+
         setExerciseList([...(customizationData.exercises || day.exercises)]);
         setEditedDuration(customizationData.estimated_duration?.toString() || day.estimated_duration?.toString() || '');
       } else {
-        // No customization, use original data
         setExerciseList([...day.exercises]);
         setEditedDuration(day.estimated_duration?.toString() || '');
       }
@@ -1042,7 +1050,7 @@ export default function DaysScreen() {
       setExerciseList([...day.exercises]);
       setEditedDuration(day.estimated_duration?.toString() || '');
     }
-    
+
     setShowExerciseModal(true);
   };
 
@@ -1050,24 +1058,21 @@ export default function DaysScreen() {
     if (!selectedDay) return;
 
     try {
-      // Update the day with new exercise order and duration
       const updatedDay = {
         ...selectedDay,
         exercises: exerciseList,
         estimated_duration: editedDuration ? parseInt(editedDuration) : undefined
       };
 
-      // Update the local block immediately for UI
       const updatedBlock = {
         ...localBlock,
-        days: localBlock.days.map(d => 
+        days: localBlock.days.map(d =>
           d.day_name === selectedDay.day_name ? updatedDay : d
         )
       };
 
       setLocalBlock(updatedBlock);
 
-      // Save week-specific exercise customizations
       const customizationKey = `day_customization_${localBlock.block_name}_${selectedDay.day_name}_week${currentWeek}`;
       const customizationData = {
         exercises: exerciseList,
@@ -1075,27 +1080,23 @@ export default function DaysScreen() {
         customizedAt: new Date().toISOString(),
         week: currentWeek
       };
-      
+
       await AsyncStorage.setItem(customizationKey, JSON.stringify(customizationData));
 
-      // Check if this is a manual day (not in original block)
       const isManualDay = !block.days.some(originalDay => originalDay.day_name === selectedDay.day_name);
-      
+
       if (isManualDay) {
-        // Also save to manual days storage for manual days
         const manualDaysKey = `manual_days_${localBlock.block_name}`;
         const existingManualDays = await AsyncStorage.getItem(manualDaysKey);
         const manualDaysArray = existingManualDays ? JSON.parse(existingManualDays) : [];
-        
-        // Update the specific manual day
-        const updatedManualDays = manualDaysArray.map((day: Day) => 
+
+        const updatedManualDays = manualDaysArray.map((day: Day) =>
           day.day_name === selectedDay.day_name ? updatedDay : day
         );
-        
+
         await AsyncStorage.setItem(manualDaysKey, JSON.stringify(updatedManualDays));
       }
 
-      // Trigger a refresh of the day cards to show updated data
       setRefreshTrigger(prev => prev + 1);
 
       setShowExerciseModal(false);
@@ -1113,45 +1114,39 @@ export default function DaysScreen() {
     setExerciseList(newList);
   };
 
-  // Create a more vibrant version of theme color for buttons
-  const vibrantThemeColor = themeColor === '#10b981' ? '#059669' : 
-                           themeColor === '#3b82f6' ? '#2563eb' : 
-                           themeColor === '#8b5cf6' ? '#7c3aed' : 
-                           themeColor === '#f59e0b' ? '#d97706' : 
-                           themeColor === '#ef4444' ? '#dc2626' : 
+  const vibrantThemeColor = themeColor === '#10b981' ? '#059669' :
+                           themeColor === '#3b82f6' ? '#2563eb' :
+                           themeColor === '#8b5cf6' ? '#7c3aed' :
+                           themeColor === '#f59e0b' ? '#d97706' :
+                           themeColor === '#ef4444' ? '#dc2626' :
                            themeColor;
 
   const createNewDay = async (dayName: string) => {
     try {
-      // Create new day object
       const newDay: Day = {
         day_name: dayName,
-        exercises: [] // Start with empty exercises array
+        exercises: []
       };
 
-      // Add the new day to the block
       const updatedBlock = {
         ...localBlock,
         days: [...localBlock.days, newDay]
       };
 
-      // Update local state immediately for instant UI update
       setLocalBlock(updatedBlock);
-      
-      // Save manual days to a separate storage key to avoid corruption
+
       const manualDaysKey = `manual_days_${localBlock.block_name}`;
       try {
         const existingManualDays = await AsyncStorage.getItem(manualDaysKey);
         const manualDaysArray = existingManualDays ? JSON.parse(existingManualDays) : [];
-        
-        // Add the new day to manual days
+
         const updatedManualDays = [...manualDaysArray, newDay];
         await AsyncStorage.setItem(manualDaysKey, JSON.stringify(updatedManualDays));
-        
+
       } catch (error) {
         console.error('Failed to save manual day:', error);
       }
-      
+
     } catch (error) {
       console.error('Error creating new day:', error);
     }
@@ -1160,8 +1155,8 @@ export default function DaysScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={handleBack}
           activeOpacity={0.7}
         >
@@ -1171,8 +1166,8 @@ export default function DaysScreen() {
           <Text style={styles.blockLabel}>BLOCK {localBlock.block_name.split(' ')[1] || 'A'}</Text>
           <Text style={styles.blockPhase}>{localBlock.block_name.includes('Hypertrophy') ? 'Hypertrophy' : localBlock.block_name.includes('Strength') ? 'Strength' : 'Training'}</Text>
         </View>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.restToggle}
           onPress={() => {
             const newValue = !showRestDays;
@@ -1182,7 +1177,7 @@ export default function DaysScreen() {
           activeOpacity={0.7}
         >
           <View style={[styles.restToggleTrack, { backgroundColor: showRestDays ? themeColor : '#3f3f46' }]}>
-            <View style={[styles.restToggleThumb, { 
+            <View style={[styles.restToggleThumb, {
               transform: [{ translateX: showRestDays ? 14 : 0 }],
               backgroundColor: '#ffffff'
             }]} />
@@ -1200,18 +1195,18 @@ export default function DaysScreen() {
         ListHeaderComponent={() => (
           <View style={styles.weekNavigationContainer}>
             <View style={styles.weekNavigation}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.weekNavButton, currentWeek === 1 && styles.weekNavButtonDisabled]}
                 onPress={() => currentWeek > 1 && saveCurrentWeek(currentWeek - 1)}
                 disabled={currentWeek === 1}
               >
-                <Ionicons 
-                  name="chevron-back" 
-                  size={20} 
-                  color={currentWeek === 1 ? "#3f3f46" : "#71717a"} 
+                <Ionicons
+                  name="chevron-back"
+                  size={20}
+                  color={currentWeek === 1 ? "#3f3f46" : "#71717a"}
                 />
               </TouchableOpacity>
-              
+
               <View style={styles.weekDisplay}>
                 <View style={styles.weekHeader}>
                   <Text style={styles.weekLabel}>Week</Text>
@@ -1232,27 +1227,27 @@ export default function DaysScreen() {
                   <Text style={[styles.weekTotal, { color: themeColor }]}>/ {totalWeeks}</Text>
                 </View>
                 <View style={styles.weekProgress}>
-                  <View 
+                  <View
                     style={[
-                      styles.weekProgressFill, 
-                      { 
+                      styles.weekProgressFill,
+                      {
                         width: `${(currentWeek / totalWeeks) * 100}%`,
-                        backgroundColor: themeColor 
+                        backgroundColor: themeColor
                       }
-                    ]} 
+                    ]}
                   />
                 </View>
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.weekNavButton, currentWeek === totalWeeks && styles.weekNavButtonDisabled]}
                 onPress={() => currentWeek < totalWeeks && saveCurrentWeek(currentWeek + 1)}
                 disabled={currentWeek === totalWeeks}
               >
-                <Ionicons 
-                  name="chevron-forward" 
-                  size={20} 
-                  color={currentWeek === totalWeeks ? "#3f3f46" : "#71717a"} 
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={currentWeek === totalWeeks ? "#3f3f46" : "#71717a"}
                 />
               </TouchableOpacity>
             </View>
@@ -1262,9 +1257,9 @@ export default function DaysScreen() {
                 <Text style={styles.bookmarkText}>Bookmarked - Always opens to Week {bookmarkedWeek}</Text>
               </View>
             )}
-            
+
             {/* Volume Overview Section */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.volumeToggle}
               onPress={() => setShowVolumeOverview(!showVolumeOverview)}
               activeOpacity={0.7}
@@ -1274,78 +1269,63 @@ export default function DaysScreen() {
                 <Text style={[styles.volumeToggleText, { color: themeColor }]}>
                   Week Volume
                 </Text>
-                <Ionicons 
-                  name={showVolumeOverview ? "chevron-up" : "chevron-down"} 
-                  size={16} 
-                  color={themeColor} 
+                <Ionicons
+                  name={showVolumeOverview ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color={themeColor}
                 />
               </View>
             </TouchableOpacity>
-            
+
             {showVolumeOverview && (
               <View style={styles.volumeOverview}>
-                {(() => {
-                  const weeklyVolume = calculateWeeklyVolume(localBlock);
-                  console.log('🏋️ Weekly Volume Calculation:', weeklyVolume);
-                  const sortedMuscles = Object.entries(weeklyVolume)
-                    .sort(([,a], [,b]) => b - a) // Sort by volume descending
-                    .filter(([,sets]) => sets > 0); // Show all muscle groups with volume
-                  
-                  if (sortedMuscles.length === 0) {
-                    return (
-                      <Text style={styles.volumeEmptyText}>
-                        No exercises found for volume calculation
-                      </Text>
-                    );
-                  }
-                  
-                  const maxVolume = Math.max(...sortedMuscles.map(([,sets]) => sets));
-                  const muscleHighlighterData = getMuscleHighlighterData(weeklyVolume);
-                  
-                  return (
-                    <View style={styles.volumeContent}>
-                      {/* Body Diagram */}
-                      <View style={styles.bodyDiagramContainer}>
-                        <View style={styles.bodyDiagramHeader}>
-                          <Text style={styles.bodyDiagramTitle}>Training Heatmap</Text>
-                          
-                          {/* Small Flip Icon */}
-                          <TouchableOpacity 
-                            style={styles.bodyFlipIcon}
-                            onPress={() => setBodyViewSide(bodyViewSide === 'front' ? 'back' : 'front')}
-                            activeOpacity={0.7}
-                          >
-                            <Ionicons 
-                              name="sync-outline" 
-                              size={20} 
-                              color={themeColor} 
-                            />
-                          </TouchableOpacity>
-                        </View>
-                        
-                        <BodyHighlighter
-                          data={muscleHighlighterData}
-                          colors={[themeColor, '#ff6b9d']}
-                          side={bodyViewSide}
-                          scale={0.9}
-                          border="#27272a"
-                        />
+                {sortedMuscles.length === 0 ? (
+                  <Text style={styles.volumeEmptyText}>
+                    No exercises found for volume calculation
+                  </Text>
+                ) : (
+                  <View style={styles.volumeContent}>
+                    {/* Body Diagram */}
+                    <View style={styles.bodyDiagramContainer}>
+                      <View style={styles.bodyDiagramHeader}>
+                        <Text style={styles.bodyDiagramTitle}>Training Heatmap</Text>
+
+                        <TouchableOpacity
+                          style={styles.bodyFlipIcon}
+                          onPress={() => setBodyViewSide(bodyViewSide === 'front' ? 'back' : 'front')}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name="sync-outline"
+                            size={20}
+                            color={themeColor}
+                          />
+                        </TouchableOpacity>
                       </View>
-                      
-                      {/* Detailed Breakdown */}
-                      <View style={styles.volumeGrid}>
+
+                      <BodyHighlighter
+                        data={muscleHighlighterData}
+                        colors={[themeColor, themeColor + '80']}
+                        side={bodyViewSide}
+                        scale={0.9}
+                        border="#27272a"
+                      />
+                    </View>
+
+                    {/* Detailed Breakdown */}
+                    <View style={styles.volumeGrid}>
                       {sortedMuscles.map(([muscle, sets]) => {
-                        const intensity = Math.max(0.2, sets / maxVolume); // Min 20% opacity
+                        const intensity = Math.max(0.2, sets / maxVolume);
                         return (
                           <View key={muscle} style={styles.volumeItem}>
-                            <View 
+                            <View
                               style={[
-                                styles.volumeBar, 
-                                { 
+                                styles.volumeBar,
+                                {
                                   backgroundColor: `${themeColor}${Math.round(intensity * 255).toString(16).padStart(2, '0')}`,
                                   borderColor: themeColor,
                                 }
-                              ]} 
+                              ]}
                             />
                             <Text style={styles.volumeNumber}>{sets}</Text>
                             <Text style={styles.volumeMuscle} numberOfLines={1}>
@@ -1355,9 +1335,8 @@ export default function DaysScreen() {
                         );
                       })}
                     </View>
-                    </View>
-                  );
-                })()}
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1376,7 +1355,7 @@ export default function DaysScreen() {
           />
         )}
         ListFooterComponent={() => (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.addDayButton, { borderColor: themeColor }]}
             onPress={() => handleAddDay()}
           >
@@ -1399,7 +1378,7 @@ export default function DaysScreen() {
           <View style={styles.overlay}>
             <View style={styles.modal}>
               <Text style={styles.title}>Add New Day</Text>
-              
+
               <TextInput
                 style={styles.input}
                 value={newDayName}
@@ -1409,7 +1388,7 @@ export default function DaysScreen() {
                 autoFocus={true}
                 maxLength={30}
               />
-              
+
               <View style={styles.buttonContainer}>
                 <View style={styles.buttonWrapper}>
                   <Button
@@ -1440,16 +1419,16 @@ export default function DaysScreen() {
         onRequestClose={() => setShowExerciseModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalBackdrop}
             onPress={() => setShowExerciseModal(false)}
           />
           <View style={styles.modalContainer}>
             <View style={styles.modalHandle} />
-            
+
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Manage Day</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalCloseButton}
                 onPress={() => setShowExerciseModal(false)}
               >
@@ -1463,7 +1442,7 @@ export default function DaysScreen() {
                   <Text style={styles.modalSubtitle}>
                     Customize the exercise order and estimated duration for {selectedDay.day_name}
                   </Text>
-                  
+
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>Duration (minutes)</Text>
                     <TextInput
@@ -1491,21 +1470,21 @@ export default function DaysScreen() {
                         >
                           <Ionicons name="reorder-two" size={20} color="#71717a" />
                         </TouchableOpacity>
-                        
+
                         <View style={styles.exerciseContent}>
                           <Text style={styles.exerciseName}>{exercise.exercise}</Text>
                         </View>
-                        
+
                         <View style={styles.moveButtons}>
                           <TouchableOpacity
                             style={[styles.moveButton, index === 0 && styles.moveButtonDisabled]}
                             onPress={() => index > 0 && moveExercise(index, index - 1)}
                             disabled={index === 0}
                           >
-                            <Ionicons 
-                              name="chevron-up" 
-                              size={16} 
-                              color={index === 0 ? "#3f3f46" : themeColor} 
+                            <Ionicons
+                              name="chevron-up"
+                              size={16}
+                              color={index === 0 ? "#3f3f46" : themeColor}
                             />
                           </TouchableOpacity>
                           <TouchableOpacity
@@ -1513,10 +1492,10 @@ export default function DaysScreen() {
                             onPress={() => index < exerciseList.length - 1 && moveExercise(index, index + 1)}
                             disabled={index === exerciseList.length - 1}
                           >
-                            <Ionicons 
-                              name="chevron-down" 
-                              size={16} 
-                              color={index === exerciseList.length - 1 ? "#3f3f46" : themeColor} 
+                            <Ionicons
+                              name="chevron-down"
+                              size={16}
+                              color={index === exerciseList.length - 1 ? "#3f3f46" : themeColor}
                             />
                           </TouchableOpacity>
                         </View>
@@ -1528,13 +1507,13 @@ export default function DaysScreen() {
             </ScrollView>
 
             <View style={styles.modalFooter}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => setShowExerciseModal(false)}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalCreateButton, { backgroundColor: themeColor }]}
                 onPress={handleSaveExerciseChanges}
               >
@@ -1943,7 +1922,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  
+
   // Dark Modal Styles
   overlay: {
     flex: 1,
@@ -1984,7 +1963,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
-  
+
   // New Modal Styles
   newModalOverlay: {
     flex: 1,
@@ -1998,7 +1977,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0b',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingBottom: 34, // Safe area
+    paddingBottom: 34,
     maxHeight: '85%',
   },
   newModalHandle: {
@@ -2378,7 +2357,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  
+
   // Volume Overview Styles
   volumeToggle: {
     marginTop: 12,
@@ -2454,7 +2433,7 @@ const styles = StyleSheet.create({
     maxWidth: 80,
     gap: 4,
     flex: 1,
-    flexBasis: '22%', // Fit 4 per row with some spacing
+    flexBasis: '22%',
   },
   volumeBar: {
     width: 32,

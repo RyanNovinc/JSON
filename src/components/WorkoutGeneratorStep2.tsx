@@ -43,24 +43,82 @@ First, read the workout program you just created so you have the full content in
 3. **After fixing, re-verify** — run the checklist again on the corrected plan to confirm all checks now pass.
 4. **Present the CORRECTED plan** — output the complete, clean, final version of the workout program with all fixes applied.
 5. **At the end, provide a brief change log** — a short bullet list of what you changed and why.
-6. **Duration Reality Check** — Calculate the total session duration for each training day using the rest periods in the plan. If any session exceeds reasonable limits, flag it to the user:
-   - **Optimal sessions >90 minutes**: "⚠️ This program creates [X] minute sessions with optimal rest periods. Continue with these longer sessions, or would you prefer shorter sessions with reduced rest periods?"
-   - **Moderate sessions >75 minutes**: "⚠️ This program exceeds your 75-minute target, reaching [X] minutes. Continue as-is, or shall I adjust for shorter sessions?"
-   - **Minimal sessions >60 minutes**: "⚠️ This program exceeds your 60-minute target, reaching [X] minutes. Shall I reduce volume or exercises to fit your time constraints?"
-   
-   **Wait for user confirmation before proceeding to JSON generation.**
+6. **Session Duration Reporting** — Calculate and report the duration of each training day based on exercise count, sets, and rest periods. Include duration in the program output so the user knows what to expect. Do NOT treat duration as a constraint to fix — the user's volume and rest preferences drive session length, and that is intentional.
+
+   **Soft warning only:** If any single session exceeds 2 hours (120 minutes), add a brief note to the user along the lines of: "⚠️ Day X is estimated at [duration] minutes — this is on the long end and may be hard to sustain productively. This is a result of your high volume and rest period choices. If that's intentional, no changes needed. If you'd like shorter sessions, consider [Conservative volume / Minimal rest / more training days]."
+
+   Do NOT pause for user confirmation. Do NOT compress rest periods or reduce volume to fit a time target. Continue with the program as designed unless the user explicitly asks for changes.
 
 ## QUALITY CHECKLIST
 
-### Exercise Library Compliance Check
+### Exercise Library & Tag Audit (DO THIS FIRST)
 
-- **Library conformance**: Every exercise in the program must appear by exact name in the JSON.fit exercise library at https://json.fit/exercises.md. If any exercise name doesn't match, replace it with a library entry that fits the movement pattern.
-- **Tag accuracy**: Every exercise's primary and secondary muscle tags must match the library entry exactly. If any tag differs, correct it to match the library.
-- **Alternative exercises**: Alternatives must also be from the library.
+This audit is the most important check in this review. Volume calculations downstream are meaningless if tags are wrong, so verify tags BEFORE running volume enumeration.
+
+**Step 1: Fetch the library.** Read https://json.fit/exercises.md so you have the canonical tags in context.
+
+**Step 2: Build a tag audit table.** For EVERY exercise in the program, produce a row in this table:
+
+| Exercise | Plan Primary Tags | Library Primary Tags | Plan Secondary Tags | Library Secondary Tags | Match? |
+|----------|-------------------|----------------------|---------------------|------------------------|--------|
+| Barbell Row | Upper Back, Lats | Upper Back | Biceps, Rear Delts | Lats, Biceps, Rear Delts | ❌ MISMATCH |
+
+The "Match?" column says ✅ MATCH or ❌ MISMATCH. Every column entry must be the EXACT muscle list — do not paraphrase or abbreviate.
+
+**Step 3: Fix every mismatch.** For each ❌ MISMATCH row, correct the program so its tags exactly match the library's tags. The library is authoritative — your biomechanical knowledge is not. If the library says Primary = Upper Back only, the program must say Primary = Upper Back only, even if you believe Lats are also primary movers.
+
+**Common mistake patterns to specifically check for:**
+- Rows (Barbell Row, T-Bar Row, Chest-Supported T-Bar Row, Seated Cable Row, Pendlay Row, Seal Row): Library Primary = Upper Back ONLY. Lats is Secondary. Do NOT add Lats to Primary.
+- Squats and Lunges (Barbell Back Squat, Front Squat, Hack Squat, Leg Press, Bulgarian Split Squat, Walking Lunge, Reverse Lunge): Library Primary = Quads ONLY. Glutes is Secondary. Do NOT add Glutes to Primary.
+- RDL variants (Romanian Deadlift, Stiff-Leg Deadlift): Library Primary = Hamstrings ONLY. Glutes and Lower Back are Secondary.
+- Hip Thrust / Glute Bridge: Library Primary = Glutes ONLY. Hamstrings is Secondary.
+
+**Step 4: Re-verify.** After fixing tags, run the audit table again and confirm every row shows ✅ MATCH before moving to volume enumeration.
+
+**Step 5: Other library checks.**
+- Every exercise name must appear EXACTLY in the library (no variants, no abbreviations)
+- Alternative exercises must also be from the library
+- If any exercise is not in the library, replace it with a library entry that fits the movement pattern
+
+**Do not proceed to volume enumeration until the tag audit table shows every row as ✅ MATCH.** Wrong tags will produce wrong volume numbers, and the user will see different numbers in the app than what you tell them here.
+
+### Per-Muscle Volume Targets (DO THIS BEFORE VOLUME ENUMERATION)
+
+The volume enumeration tables in the next section need correct per-muscle target ranges to verify against. The original plan should already include a per-muscle target table — but rebuild it here from the canonical source to verify it's correct.
+
+**Step 1: Fetch the landmarks file.** Read https://json.fit/volume-landmarks.md so you have the canonical per-muscle MEV/MAV/MRV ranges in context.
+
+**Step 2: Identify the user's tier and experience.** From the original plan or user profile:
+- Volume Tier (Conservative / Moderate / High Volume)
+- Training Experience (Complete Beginner / Beginner / Intermediate / Advanced)
+
+**Step 3: Look up the tier × experience mapping.** In the landmarks file, find the matching cell in the tier mapping table to determine the position within MAV (e.g., "MAV-low", "MAV-mid", "MAV-high to MRV").
+
+**Step 4: Build the per-muscle target table.** For every muscle in the program (including any auxiliary muscles the user has selected), apply the position from Step 3 to that muscle's MAV range from the landmarks file:
+
+| Muscle | Target Range (effective sets/week) |
+|--------|------------------------------------|
+| Chest | [low]–[high] |
+| Lats | [low]–[high] |
+| Upper Back | [low]–[high] |
+| Front Delts | [low]–[high] |
+| Side Delts | [low]–[high] |
+| Rear Delts | [low]–[high] |
+| Biceps | [low]–[high] |
+| Triceps | [low]–[high] |
+| Quads | [low]–[high] |
+| Hamstrings | [low]–[high] |
+| Glutes | [low]–[high] |
+| Calves | [low]–[high] |
+| (continue for any auxiliary muscles user has selected, using their MAV-low range as floor) |
+
+**Step 5: Compare to the plan's target table.** If the original plan's table differs from what you computed from the landmarks file, USE YOUR COMPUTED VALUES, not the plan's values. The landmarks file is the canonical source. Note any discrepancies in the audit output.
+
+Use this per-muscle target table when running volume enumeration in the next section. Each muscle has its own range — do NOT apply a single major/medium range to all muscles.
 
 ### Effective Volume Distribution Check
 
-For EVERY non-exempt muscle in the program, you MUST produce an enumeration table. Do not narrate or estimate volume — enumerate exercise by exercise.
+For EVERY non-exempt muscle in the program, you MUST produce an enumeration table. Do not narrate or estimate volume — enumerate exercise by exercise. **Use the tag values from the tag audit above (which match the library), not whatever was in the original plan.**
 
 For each muscle, list:
 - Every exercise that tags that muscle as primary OR secondary
@@ -85,18 +143,18 @@ Format each muscle as a table like this:
 
 Do NOT narrate totals separately from the tables. Do NOT round toward target ranges. Do NOT claim a muscle is "at target" without the table showing the actual sum. The number at the bottom of the table IS the effective volume for that muscle.
 
-Compare each muscle's summed total against the user's volume target from the plan. The targets are in effective (fractional) terms — they already account for secondary contributions.
+Compare each muscle's summed total against THAT MUSCLE'S target range from the Per-Muscle Volume Targets table above. Each muscle has its own range — do NOT use a single range for all muscles. The targets are in effective (fractional) terms — they already account for secondary contributions.
 
-- Flag as ⚠️ HIGH only if the table's summed total exceeds the ceiling of the user's specified range
-- Flag as ⚠️ LOW only if the table's summed total falls below the floor of the user's specified range
-- Auxiliary muscles should hit 4-6 sets/week effective
-- Exempt muscles (Front Delts, Rear Delts, Traps, Forearms — unless user selected auxiliary for them) don't need enumeration
+- Flag as ⚠️ HIGH only if the table's summed total exceeds the ceiling of THAT muscle's target range
+- Flag as ⚠️ LOW only if the table's summed total falls below the floor of THAT muscle's target range
+- Auxiliary muscles use the MAV-low range from the landmarks file as their floor (typically 4-6 effective sets) — these MUST appear in the enumeration if the user selected them
+- Exempt muscles (Front Delts, Rear Delts, Traps, Forearms, Lower Back, Glutes — UNLESS the user selected them as auxiliary) don't need enumeration if compound contributions cover MEV. They are NOT exempt from MRV — going over the ceiling still causes problems.
 
 If you need to adjust the program, recalculate the tables for affected muscles after the adjustment. Do not claim a fix works without re-running the table.
 
 ### Weekly Volume Math Verification
 
-The JSON will include a \`weekly_volume_by_muscle\` field. Manually calculate effective volume for at least three major muscles (e.g., Chest, Lats, Quads) and compare to what you'll output in that field. If your math is off, correct the plan until both the plan and your calculated totals agree.
+The JSON will include a \`weekly_volume_by_muscle\` field. Manually calculate effective volume for at least three muscles with high training volume (e.g., Chest, Lats, Quads) and compare to what you'll output in that field. If your math is off, correct the plan until both the plan and your calculated totals agree.
 
 ### Exercise Selection Audit  
 
@@ -107,7 +165,7 @@ The JSON will include a \`weekly_volume_by_muscle\` field. Manually calculate ef
 
 ### Programming Logic Review
 
-- **Weekly structure**: Logical distribution of training stress across the week; no two consecutive days hitting the same major muscle group heavily
+- **Weekly structure**: Logical distribution of training stress across the week; no two consecutive days hitting the same muscle group heavily
 - **Exercise order**: Compound before isolation, higher skill before lower skill
 - **Rep ranges**: Appropriate for stated goals (hypertrophy: 6-12 for compounds, 10-15 for isolation; isolation arm exercises always 10-15 regardless of block focus)
 - **Auxiliary placement**: If user selected auxiliary muscles, those exercises should appear as finishers at the end of sessions, not as dedicated sessions
@@ -115,9 +173,8 @@ The JSON will include a \`weekly_volume_by_muscle\` field. Manually calculate ef
 ### Practical Implementation Check
 
 - **Equipment consistency**: All exercises use equipment stated as available in the user's profile
-- **Time realistic**: Sessions fit within stated time constraints (optimal ≤90min, moderate ≤75min, minimal ≤60min)
 - **Skill appropriate**: Exercise complexity matches stated experience level
-- **Duration calculation**: Calculate total workout time including rest periods and flag if excessive
+- **Duration honest**: Calculate total workout time including rest periods and report it transparently. Only flag if sessions exceed 2 hours — otherwise duration is whatever the user's volume and rest preferences produce.
 
 End with: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."`;
     

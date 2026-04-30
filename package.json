@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "eas-build-pre-install": "npm install --legacy-peer-deps && echo 'Dependencies installed via pre-install script'",
-    "eas-build-post-install": "find . -name '._*' -delete && echo 'Cleaned up ._ files'"
+    "eas-build-post-install": "find . -name '._*' -delete && echo 'Cleaned up ._ files'",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -52,6 +53,7 @@
     "react-native-country-picker-modal": "^2.0.0",
     "react-native-dropdown-picker": "^5.4.6",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-markdown-display": "^7.0.2",
     "react-native-purchases": "^9.7.2",
     "react-native-purchases-ui": "^9.7.2",
     "react-native-safe-area-context": "~5.6.0",
@@ -63,6 +65,8 @@
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@types/react": "~19.1.10",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
     "typescript": "~5.9.2"
   },
   "private": true,

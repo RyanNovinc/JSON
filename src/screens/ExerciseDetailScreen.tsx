@@ -131,7 +131,7 @@ export default function ExerciseDetailScreen() {
     if (exercise.category === 'custom' && exercise.customCategory) {
       return exercise.customCategory;
     }
-    return exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1);
+    return exercise.category ? exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1) : 'Unknown';
   };
 
   const getInstructionSteps = () => {

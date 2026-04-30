@@ -38,7 +38,7 @@ type ImportScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Impor
 
 // Interface moved to types/workout.ts - importing from there
 
-export default function ImportRoutineScreen() {
+export default function ImportRoutineScreen({ route }: any) {
   const navigation = useNavigation<ImportScreenNavigationProp>();
   const { themeColor } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +59,7 @@ export default function ImportRoutineScreen() {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [outputPreference, setOutputPreference] = useState<'copy_paste' | 'save_import'>('copy_paste');
   const [uploadMode, setUploadMode] = useState(false);
-  const [showSlideMode, setShowSlideMode] = useState(false);
+  const [showSlideMode, setShowSlideMode] = useState(route?.params?.showSlideMode || false);
   const [currentSlide, setCurrentSlide] = useState(1);
 
   // Mesocycle state
@@ -1684,6 +1684,7 @@ export default function ImportRoutineScreen() {
       const consolidatedData: QuestionnaireData = {
         // From fitnessGoalsData
         primaryGoal: fitnessGoals.primaryGoal,
+        customPrimaryGoal: fitnessGoals.customPrimaryGoal,
         integrationMethods: fitnessGoals.integrationMethods,
         specificSport: fitnessGoals.specificSport,
         athleticPerformanceDetails: fitnessGoals.athleticPerformanceDetails,
@@ -1703,11 +1704,9 @@ export default function ImportRoutineScreen() {
         customTrainingStyle: fitnessGoals.customTrainingStyle,
         trainingExperience: fitnessGoals.trainingExperience,
         volumePreference: fitnessGoals.volumePreference,
-        customVolume: fitnessGoals.customVolume,
         gender: fitnessGoals.gender,
         programDuration: fitnessGoals.programDuration,
         customDuration: fitnessGoals.customDuration,
-        cardioPreferences: fitnessGoals.cardioPreferences,
 
         // From equipmentPreferencesData
         selectedEquipment: equipmentPrefs.selectedEquipment,
@@ -1809,7 +1808,7 @@ export default function ImportRoutineScreen() {
       '16_weeks': '16 weeks (extended training cycle)',
       '6_months': '6 months (medium-term development plan)',
       '1_year': '1 year (long-term development plan)',
-      'custom': data.customDuration ? `${data.customDuration} weeks` : 'Custom duration'
+      'custom': 'Custom duration'
     };
 
     const equipmentMap: { [key: string]: string } = {
@@ -1907,9 +1906,7 @@ export default function ImportRoutineScreen() {
     lines.push(`**Training Experience:** ${experienceMap[data.trainingExperience || ''] || 'Not specified'}`);
     
     // Volume preference
-    const volumeText = data.volumePreference === 'custom' && data.customVolume ? 
-      `${data.customVolume} sets/week` : 
-      data.volumePreference ? `${data.volumePreference} sets/week` : 'Not specified';
+    const volumeText = data.volumePreference ? `${data.volumePreference} sets/week` : 'Not specified';
     lines.push(`**Weekly Volume Target:** ${volumeText} per muscle group`);
     
     // Gender

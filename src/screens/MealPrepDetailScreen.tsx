@@ -47,6 +47,23 @@ export default function MealPrepDetailScreen() {
   
   const { meal, sessionName, themeColor, sessionData } = route.params;
   const [activeTab, setActiveTab] = useState<'ingredients' | 'instructions'>('ingredients');
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+
+  const toggleStepCompletion = (stepIndex: number) => {
+    setCompletedSteps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(stepIndex)) {
+        newSet.delete(stepIndex);
+      } else {
+        newSet.add(stepIndex);
+      }
+      return newSet;
+    });
+  };
+
+  const resetProgress = () => {
+    setCompletedSteps(new Set());
+  };
 
   const getMealTypeIcon = (mealType: string) => {
     switch (mealType.toLowerCase()) {
@@ -94,12 +111,6 @@ export default function MealPrepDetailScreen() {
             >
               <Ionicons name="chevron-back" size={28} color="#ffffff" />
             </TouchableOpacity>
-            
-            <View style={styles.mealTypeIndicator}>
-              <View style={[styles.mealTypeIcon, { backgroundColor: getMealTypeColor(meal.meal_type) }]}>
-                <Ionicons name={getMealTypeIcon(meal.meal_type)} size={20} color="#ffffff" />
-              </View>
-            </View>
           </View>
           
           {/* Meal Title */}
@@ -282,8 +293,86 @@ export default function MealPrepDetailScreen() {
             colors={[`${themeColor}15`, `${themeColor}05`]}
             style={styles.instructionsCard}
           >
-            <Text style={styles.cardTitle}>Instructions</Text>
-            <Text style={styles.cardSubtitle}>Step-by-step cooking guide</Text>
+            <View style={styles.instructionsHeader}>
+              <View>
+                <Text style={styles.cardTitle}>Instructions</Text>
+                <Text style={styles.cardSubtitle}>Step-by-step cooking guide</Text>
+              </View>
+              <TouchableOpacity onPress={resetProgress} style={styles.resetButton}>
+                <Ionicons name="refresh-outline" size={20} color={themeColor} />
+                <Text style={[styles.resetButtonText, { color: themeColor }]}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {(() => {
+              const instructions = meal.instructions || [];
+              const allSteps = [];
+              
+              instructions.forEach((instruction) => {
+                const cleanInstruction = instruction.replace(/^Step\s*\d+\s*[—–\-:]\s*/i, '').trim();
+                
+                let steps = [];
+                
+                const sentences = cleanInstruction.split(/\.\s+/);
+                
+                sentences.forEach(sentence => {
+                  if (!sentence.trim()) return;
+                  
+                  if (sentence.includes(' then ')) {
+                    const thenParts = sentence.split(/,?\s+then\s+/);
+                    thenParts.forEach(part => {
+                      if (part.trim()) {
+                        steps.push(part.trim() + (part.endsWith('.') ? '' : '.'));
+                      }
+                    });
+                  }
+                  else if (sentence.includes('layer') || sentence.includes('add') || sentence.includes('container')) {
+                    const commaParts = sentence.split(/,\s+/);
+                    if (commaParts.length > 2) {
+                      commaParts.forEach(part => {
+                        if (part.trim() && part.length > 5) {
+                          steps.push(part.trim() + (part.endsWith('.') ? '' : '.'));
+                        }
+                      });
+                    } else {
+                      steps.push(sentence.trim() + (sentence.endsWith('.') ? '' : '.'));
+                    }
+                  }
+                  else {
+                    steps.push(sentence.trim() + (sentence.endsWith('.') ? '' : '.'));
+                  }
+                });
+                
+                if (steps.length === 0) {
+                  steps.push(cleanInstruction);
+                }
+                
+                allSteps.push(...steps);
+              });
+              
+              return (
+                <>
+                  {allSteps.length > 0 && (
+                    <View style={styles.progressContainer}>
+                      <Text style={styles.progressText}>
+                        Progress: {completedSteps.size} of {allSteps.length} steps completed
+                      </Text>
+                      <View style={styles.progressBar}>
+                        <View 
+                          style={[
+                            styles.progressFill, 
+                            { 
+                              width: `${(completedSteps.size / allSteps.length) * 100}%`,
+                              backgroundColor: themeColor 
+                            }
+                          ]} 
+                        />
+                      </View>
+                    </View>
+                  )}
+                </>
+              );
+            })()}
             
             <View style={styles.stepsContainer}>
               {(() => {
@@ -293,16 +382,13 @@ export default function MealPrepDetailScreen() {
                 instructions.forEach((instruction) => {
                   const cleanInstruction = instruction.replace(/^Step\s*\d+\s*[—–\-:]\s*/i, '').trim();
                   
-                  // Split long instructions into steps by logical breaks
                   let steps = [];
                   
-                  // First, split by sentences
                   const sentences = cleanInstruction.split(/\.\s+/);
                   
                   sentences.forEach(sentence => {
                     if (!sentence.trim()) return;
                     
-                    // Check if sentence has "then" connectors for sequential actions
                     if (sentence.includes(' then ')) {
                       const thenParts = sentence.split(/,?\s+then\s+/);
                       thenParts.forEach(part => {
@@ -311,9 +397,7 @@ export default function MealPrepDetailScreen() {
                         }
                       });
                     }
-                    // Check for comma-separated actions in assembly instructions
                     else if (sentence.includes('layer') || sentence.includes('add') || sentence.includes('container')) {
-                      // Split on commas but be smart about it
                       const commaParts = sentence.split(/,\s+/);
                       if (commaParts.length > 2) {
                         commaParts.forEach(part => {
@@ -325,13 +409,11 @@ export default function MealPrepDetailScreen() {
                         steps.push(sentence.trim() + (sentence.endsWith('.') ? '' : '.'));
                       }
                     }
-                    // Regular sentence
                     else {
                       steps.push(sentence.trim() + (sentence.endsWith('.') ? '' : '.'));
                     }
                   });
                   
-                  // If no steps were created, use the original instruction
                   if (steps.length === 0) {
                     steps.push(cleanInstruction);
                   }
@@ -339,16 +421,44 @@ export default function MealPrepDetailScreen() {
                   allSteps.push(...steps);
                 });
                 
-                return allSteps.map((step, index) => (
-                  <View key={index} style={styles.stepCard}>
-                    <View style={styles.stepHeader}>
-                      <View style={[styles.stepNumber, { backgroundColor: themeColor }]}>
-                        <Text style={styles.stepNumberText}>{index + 1}</Text>
+                return allSteps.map((step, index) => {
+                  const isCompleted = completedSteps.has(index);
+                  
+                  return (
+                    <TouchableOpacity 
+                      key={index} 
+                      style={[
+                        styles.stepCard,
+                        isCompleted && styles.stepCardCompleted
+                      ]}
+                      onPress={() => toggleStepCompletion(index)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.stepHeader}>
+                        <View style={[
+                          styles.stepNumber, 
+                          { 
+                            backgroundColor: isCompleted ? '#6b7280' : themeColor,
+                            opacity: isCompleted ? 0.6 : 1
+                          }
+                        ]}>
+                          <Text style={styles.stepNumberText}>{index + 1}</Text>
+                          {isCompleted && (
+                            <View style={styles.completedIndicator}>
+                              <Ionicons name="checkmark" size={14} color="#ffffff" />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[
+                          styles.stepDescription,
+                          isCompleted && styles.stepDescriptionCompleted
+                        ]}>
+                          {step}
+                        </Text>
                       </View>
-                      <Text style={styles.stepDescription}>{step}</Text>
-                    </View>
-                  </View>
-                ));
+                    </TouchableOpacity>
+                  );
+                });
               })()}
             </View>
           </LinearGradient>
@@ -661,6 +771,67 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
     fontWeight: '500',
+  },
+
+  // Instructions Header and Progress
+  instructionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  resetButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressContainer: {
+    marginBottom: 20,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#a1a1aa',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+
+  // Step Completion Styles
+  stepCardCompleted: {
+    opacity: 0.7,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  completedIndicator: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDescriptionCompleted: {
+    opacity: 0.6,
+    textDecorationLine: 'line-through',
   },
 
   // Utilities

@@ -184,6 +184,13 @@ export default function WorkoutDashboardScreen() {
   // Count completed questionnaires (exclude management screens)
   const completedCount = Object.values(completionStatus).filter(Boolean).length;
   const totalQuestionnaires = questionnaires.filter(q => q.completionKey).length;
+  
+  // Check if all questionnaires are completed
+  const allQuestionnairesCompleted = completedCount === totalQuestionnaires;
+  
+  const handleGeneratePrompt = () => {
+    navigation.navigate('ImportRoutine', { showSlideMode: true });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -231,6 +238,21 @@ export default function WorkoutDashboardScreen() {
             renderQuestionnaireCard(questionnaire, index)
           )}
         </View>
+
+        {/* Generate Prompt Button - shown when all questionnaires are completed */}
+        {allQuestionnairesCompleted && (
+          <View style={styles.generatePromptContainer}>
+            <TouchableOpacity 
+              style={[styles.generatePromptButton, { backgroundColor: themeColor }]}
+              onPress={handleGeneratePrompt}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="rocket-outline" size={24} color="#ffffff" />
+              <Text style={styles.generatePromptText}>Generate Workout Prompt</Text>
+              <Ionicons name="chevron-forward" size={20} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -349,5 +371,30 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 44,
     height: 44,
+  },
+  generatePromptContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 16,
+  },
+  generatePromptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    gap: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  generatePromptText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
   },
 });

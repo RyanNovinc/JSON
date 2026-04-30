@@ -292,7 +292,7 @@ export default function FavoriteExercisesScreen() {
           <Text style={[styles.categoryText, { color: themeColor }]}>
             {exercise.category === 'custom' && exercise.customCategory 
               ? exercise.customCategory 
-              : exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1)}
+              : exercise.category ? exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1) : 'Unknown'}
           </Text>
           
           <Text style={styles.muscleGroupsText}>

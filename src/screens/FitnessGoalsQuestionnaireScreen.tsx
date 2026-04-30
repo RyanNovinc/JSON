@@ -18,6 +18,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import * as Animatable from 'react-native-animatable';
+import { getVolumeRangeDisplay, ExperienceTier, VolumeTier } from '../data/volumeRanges';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -104,6 +105,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [flexibilityDetails, setFlexibilityDetails] = useState<string>('');
   const [priorityMuscleGroups, setPriorityMuscleGroups] = useState<string[]>([]);
   const [customMuscleGroup, setCustomMuscleGroup] = useState<string>('');
+  const [auxiliaryMuscles, setAuxiliaryMuscles] = useState<string[]>([]);
   const [movementLimitations, setMovementLimitations] = useState<string[]>([]);
   const [customLimitation, setCustomLimitation] = useState<string>('');
   const [trainingStylePreference, setTrainingStylePreference] = useState<string>('');
@@ -115,8 +117,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [showCustomFrequency, setShowCustomFrequency] = useState<boolean>(false);
   const [customGoals, setCustomGoals] = useState<string>('');
   const [trainingExperience, setTrainingExperience] = useState<string>('');
-  const [volumePreference, setVolumePreference] = useState<'8-12' | '12-16' | '16-20' | 'custom' | 'not_sure'>('12-16');
-  const [customVolume, setCustomVolume] = useState<string>('');
+  const [volumePreference, setVolumePreference] = useState<'8-12' | '12-16' | '16-20' | 'not_sure'>('12-16');
   const [showMiniQuestionnaire, setShowMiniQuestionnaire] = useState<boolean>(false);
   const [recoveryAnswer, setRecoveryAnswer] = useState<string>('');
   const [frequencyAnswer, setFrequencyAnswer] = useState<string>('');
@@ -171,6 +172,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
         setFlexibilityDetails(data.flexibilityDetails || '');
         setPriorityMuscleGroups(data.priorityMuscleGroups || []);
         setCustomMuscleGroup(data.customMuscleGroup || '');
+        setAuxiliaryMuscles(data.auxiliaryMuscles || []);
         setMovementLimitations(data.movementLimitations || []);
         setCustomLimitation(data.customLimitation || '');
         setTrainingStylePreference(data.trainingStylePreference || '');
@@ -183,7 +185,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
         setCustomGoals(data.customGoals || '');
         setTrainingExperience(data.trainingExperience || '');
         setVolumePreference(data.volumePreference || '12-16');
-        setCustomVolume(data.customVolume || '');
         setGender(data.gender || '');
         setProgramDuration(data.programDuration || '');
         setCustomDuration(data.customDuration || '');
@@ -229,6 +230,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
         flexibilityDetails: flexibilityDetails,
         priorityMuscleGroups: priorityMuscleGroups,
         customMuscleGroup: customMuscleGroup,
+        auxiliaryMuscles: auxiliaryMuscles,
         movementLimitations: movementLimitations,
         customLimitation: customLimitation,
         trainingStylePreference: trainingStylePreference,
@@ -240,7 +242,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
         customGoals: customGoals,
         trainingExperience: trainingExperience,
         volumePreference: volumePreference,
-        customVolume: customVolume,
         gender: gender,
         programDuration: programDuration,
         customDuration: customDuration,
@@ -261,9 +262,9 @@ export default function FitnessGoalsQuestionnaireScreen() {
     }
   }, [selectedPrimaryGoal, specificSport, athleticPerformanceDetails, 
       funSocialDetails, injuryPreventionDetails, flexibilityDetails, priorityMuscleGroups, 
-      customMuscleGroup, movementLimitations, customLimitation, trainingStylePreference, 
+      customMuscleGroup, auxiliaryMuscles, movementLimitations, customLimitation, trainingStylePreference, 
       customTrainingStyle, totalTrainingDays, customFrequency, gymTrainingDays, 
-      otherTrainingDays, customGoals, trainingExperience, volumePreference, customVolume, gender, programDuration, customDuration]);
+      otherTrainingDays, customGoals, trainingExperience, volumePreference, gender, programDuration, customDuration]);
 
   // Calculate otherTrainingDays based on secondary goals with 'dedicated' integration method
   useEffect(() => {
@@ -305,6 +306,16 @@ export default function FitnessGoalsQuestionnaireScreen() {
         return prev.filter(group => group !== muscleGroup);
       } else {
         return [...prev, muscleGroup];
+      }
+    });
+  };
+
+  const handleAuxiliaryMuscleToggle = (muscle: string) => {
+    setAuxiliaryMuscles(prev => {
+      if (prev.includes(muscle)) {
+        return prev.filter(m => m !== muscle);
+      } else {
+        return [...prev, muscle];
       }
     });
   };
@@ -354,7 +365,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
     }
     if (currentStep === 2) {
       // Step 3: Require both program duration and training approach
-      const hasVolume = volumePreference !== '' && (volumePreference !== 'custom' || customVolume !== '');
+      const hasVolume = volumePreference !== '';
       return programDuration !== '' && hasVolume;
     }
     if (currentStep === 3) {
@@ -380,7 +391,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       } else if (currentStep === 2) {
         if (programDuration === '') {
           Alert.alert('Required Selection', 'Please select a program duration.');
-        } else if (volumePreference === '' || (volumePreference === 'custom' && customVolume === '')) {
+        } else if (volumePreference === '') {
           Alert.alert('Required Selection', 'Please select how hard you want to train.');
         }
       } else if (currentStep === 3) {
@@ -419,6 +430,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
         flexibilityDetails: flexibilityDetails,
         priorityMuscleGroups: priorityMuscleGroups,
         customMuscleGroup: customMuscleGroup,
+        auxiliaryMuscles: auxiliaryMuscles,
         movementLimitations: movementLimitations,
         customLimitation: customLimitation,
         trainingStylePreference: trainingStylePreference,
@@ -430,7 +442,6 @@ export default function FitnessGoalsQuestionnaireScreen() {
         customGoals: customGoals,
         trainingExperience: trainingExperience,
         volumePreference: volumePreference,
-        customVolume: customVolume,
         gender: gender,
         programDuration: programDuration,
         customDuration: customDuration,
@@ -779,6 +790,100 @@ export default function FitnessGoalsQuestionnaireScreen() {
       contentContainerStyle={{ paddingBottom: 400 }}
       keyboardShouldPersistTaps="handled"    >
 
+      {/* Auxiliary Muscle Work */}
+      <Animatable.View
+        animation="fadeInUp"
+        delay={50}
+        style={styles.sectionContainer}
+      >
+        <Text style={[styles.sectionTitle, { color: themeColor }]}>
+          Auxiliary Muscle Work
+        </Text>
+        <Text style={styles.sectionSubtitle}>
+          Select any muscles you'd like trained directly. These are typically not covered in standard hypertrophy programs.
+        </Text>
+        
+        {/* Group 1: Aesthetics-focused */}
+        <Text style={styles.muscleGroupHeading}>AESTHETICS-FOCUSED</Text>
+        <View style={styles.auxiliaryMuscleList}>
+          {[
+            { id: 'neck', label: 'Neck', description: 'Thicker, more masculine neckline' },
+            { id: 'forearms', label: 'Forearms', description: 'More developed, visible arms' },
+            { id: 'obliques', label: 'Obliques', description: 'V-taper definition' },
+            { id: 'serratus', label: 'Serratus anterior', description: 'Visible ridges when lean, shoulder health' },
+          ].map((muscle) => {
+            const isSelected = auxiliaryMuscles.includes(muscle.id);
+            return (
+              <TouchableOpacity
+                key={muscle.id}
+                style={[
+                  styles.auxiliaryMuscleRow,
+                  isSelected && [styles.auxiliaryMuscleRowSelected, { borderColor: themeColor, backgroundColor: `${themeColor}08` }]
+                ]}
+                onPress={() => handleAuxiliaryMuscleToggle(muscle.id)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.auxiliaryMuscleCheckbox}>
+                  {isSelected ? (
+                    <Ionicons name="checkmark-circle" size={20} color={themeColor} />
+                  ) : (
+                    <View style={styles.unselectedCircle} />
+                  )}
+                </View>
+                <View style={styles.auxiliaryMuscleContent}>
+                  <Text style={[styles.auxiliaryMuscleLabel, isSelected && { color: themeColor }]}>
+                    {muscle.label}
+                  </Text>
+                  <Text style={styles.auxiliaryMuscleDescription}>
+                    {muscle.description}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        
+        {/* Group 2: Strength & injury prevention */}
+        <Text style={styles.muscleGroupHeading}>STRENGTH & INJURY PREVENTION</Text>
+        <View style={styles.auxiliaryMuscleList}>
+          {[
+            { id: 'lower_back', label: 'Lower back', description: 'Hinge strength, posture support' },
+            { id: 'hip_abductors', label: 'Hip abductors', description: 'Glute shape, knee tracking' },
+            { id: 'hip_adductors', label: 'Hip adductors', description: 'Inner thigh, groin resilience' },
+            { id: 'shins', label: 'Shins (tibialis)', description: 'Ankle stability, shin splint prevention' },
+          ].map((muscle) => {
+            const isSelected = auxiliaryMuscles.includes(muscle.id);
+            return (
+              <TouchableOpacity
+                key={muscle.id}
+                style={[
+                  styles.auxiliaryMuscleRow,
+                  isSelected && [styles.auxiliaryMuscleRowSelected, { borderColor: themeColor, backgroundColor: `${themeColor}08` }]
+                ]}
+                onPress={() => handleAuxiliaryMuscleToggle(muscle.id)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.auxiliaryMuscleCheckbox}>
+                  {isSelected ? (
+                    <Ionicons name="checkmark-circle" size={20} color={themeColor} />
+                  ) : (
+                    <View style={styles.unselectedCircle} />
+                  )}
+                </View>
+                <View style={styles.auxiliaryMuscleContent}>
+                  <Text style={[styles.auxiliaryMuscleLabel, isSelected && { color: themeColor }]}>
+                    {muscle.label}
+                  </Text>
+                  <Text style={styles.auxiliaryMuscleDescription}>
+                    {muscle.description}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Animatable.View>
+
         {/* Priority Muscle Groups */}
         <Animatable.View
           animation="fadeInUp"
@@ -1117,7 +1222,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
           Gender
         </Text>
         <Text style={styles.sectionSubtitle}>
-          This helps us provide more accurate volume recommendations
+          Helps tailor exercise selection and program recommendations
         </Text>
         
         <View style={styles.genderContainer}>
@@ -1283,47 +1388,43 @@ export default function FitnessGoalsQuestionnaireScreen() {
           Weekly Training Volume
         </Text>
         <Text style={styles.sectionSubtitle}>
-          How many sets per muscle group per week do you want to target?
+          How quickly do you want to see results?
         </Text>
         
         <View style={styles.experienceContainer}>
-          {[
-            {
-              id: '8-12',
-              title: '8-12 sets/week',
-              subtitle: 'Conservative',
-              icon: 'leaf-outline',
-              description: 'Focus on strength and technique · Shorter sessions · Easy recovery'
-            },
-            {
-              id: '12-16',
-              title: '12-16 sets/week', 
-              subtitle: 'Moderate (Recommended)',
-              icon: 'speedometer-outline',
-              description: 'Balanced muscle growth · Moderate sessions · Best effort-to-results ratio'
-            },
-            {
-              id: '16-20',
-              title: '16-20 sets/week',
-              subtitle: 'High Volume',
-              icon: 'flame-outline',
-              description: 'Maximum muscle growth · Longer sessions · Good recovery habits needed'
-            },
-            {
-              id: 'custom',
-              title: 'Custom Volume',
-              subtitle: 'Specify exact sets',
-              icon: 'create-outline',
-              description: 'Enter your preferred sets per week'
-            },
-            {
-              id: 'not_sure',
-              title: "I'm not sure",
-              subtitle: 'Get guidance',
-              icon: 'help-circle-outline',
-              description: 'Answer a few questions to find your ideal volume'
-            }
-          ].map((option, index) => {
+          {(() => {
+            const displayExperience: ExperienceTier = (trainingExperience || 'intermediate') as ExperienceTier;
+            return [
+              {
+                id: '8-12',
+                title: 'Take It Easy',
+                subtitle: 'Conservative',
+                icon: 'leaf-outline',
+                description: 'Slow, sustainable muscle gain · Shorter sessions · Forgiving recovery'
+              },
+              {
+                id: '12-16',
+                title: 'Build Steady',
+                subtitle: 'Moderate (Recommended)',
+                icon: 'speedometer-outline',
+                description: 'Solid muscle gain · Sustainable sessions · Best effort-to-results ratio'
+              },
+              {
+                id: '16-20',
+                title: 'Push Hard',
+                subtitle: 'High Volume',
+                icon: 'flame-outline',
+                description: 'Fast muscle gain · Longer sessions · Good recovery habits essential'
+              },
+              {
+                id: 'not_sure',
+                title: "I'm not sure",
+                subtitle: 'Get guidance',
+                icon: 'help-circle-outline',
+                description: 'Answer a few questions to find your ideal volume'
+              }
+            ];
+          })().map((option, index) => {
             const isSelected = volumePreference === option.id;
             return (
               <Animatable.View
@@ -1383,25 +1484,17 @@ export default function FitnessGoalsQuestionnaireScreen() {
           })}
         </View>
 
-        {/* Custom Volume Input */}
-        {volumePreference === 'custom' && (
-          <Animatable.View
-            animation="fadeInUp"
-            delay={400}
-            style={styles.customInputContainer}
-          >
-            <Text style={styles.customInputLabel}>Enter your preferred sets per week per muscle group:</Text>
-            <TextInput
-              style={[styles.customInput, { borderColor: themeColor }]}
-              value={customVolume}
-              onChangeText={setCustomVolume}
-              placeholder="e.g., 14"
-              placeholderTextColor="#666"
-              keyboardType="numeric"
-              maxLength={2}
-            />
-          </Animatable.View>
-        )}
+        {/* Methodology Link */}
+        <TouchableOpacity 
+          style={styles.methodologyLink} 
+          onPress={() => navigation.navigate('Methodology')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="information-circle-outline" size={16} color={themeColor} />
+          <Text style={[styles.methodologyText, { color: themeColor }]}>
+            How are these targets calculated?
+          </Text>
+        </TouchableOpacity>
 
         {/* Mini Questionnaire for "Not Sure" */}
         {showMiniQuestionnaire && (
@@ -1551,10 +1644,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
                   if (stressAnswer === 'helps') score += 2;
                   else if (stressAnswer === 'maintain') score += 1;
                   
-                  // Gender bonus: Women can typically handle ~15% more volume
-                  if (gender === 'female') score += 1;
-                  
-                  // Set volume based on score (adjusted thresholds for gender)
+                  // Set volume based on score
                   if (score >= 6) {
                     setVolumePreference('16-20');
                   } else if (score >= 3) {
@@ -1816,17 +1906,19 @@ export default function FitnessGoalsQuestionnaireScreen() {
                       volumePreference === '16-20' ? 'flame' :
                       volumePreference === '12-16' ? 'speedometer' :
                       volumePreference === '8-12' ? 'leaf' :
-                      volumePreference === 'custom' ? 'create' : 'help-circle'
+                      'help-circle'
                     } 
                     size={18} 
                     color={themeColor} 
                   />
                 </View>
                 <View style={styles.summaryItemContent}>
-                  <Text style={styles.summaryItemLabel}>Sets per muscle group</Text>
+                  <Text style={styles.summaryItemLabel}>Weekly Volume Target</Text>
                   <Text style={styles.summaryItemValue}>
-                    {volumePreference === 'custom' ? `${customVolume} sets/week` :
-                     volumePreference === 'not_sure' ? 'Assessment needed' :
+                    {volumePreference === 'not_sure' ? 'Assessment needed' :
+                     volumePreference === '8-12' ? 'Take It Easy' :
+                     volumePreference === '12-16' ? 'Build Steady' :
+                     volumePreference === '16-20' ? 'Push Hard' :
                      `${volumePreference} sets/week`}
                   </Text>
                 </View>
@@ -1875,6 +1967,41 @@ export default function FitnessGoalsQuestionnaireScreen() {
             </Animatable.View>
           )}
 
+          {/* Auxiliary Muscle Work */}
+          {auxiliaryMuscles.length > 0 && (
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={1800}
+              duration={500}
+              style={styles.summaryCard}
+            >
+              <Text style={styles.summaryCardTitle}>Auxiliary Muscle Work</Text>
+              
+              <View style={styles.summaryItem}>
+                <View style={[styles.summaryItemIcon, { backgroundColor: `${themeColor}15` }]}>
+                  <Ionicons name="fitness" size={18} color={themeColor} />
+                </View>
+                <View style={styles.summaryItemContent}>
+                  <Text style={styles.summaryItemLabel}>Additional muscles</Text>
+                  <Text style={styles.summaryItemValue}>
+                    {auxiliaryMuscles.map(muscle => {
+                      const muscleLabels: { [key: string]: string } = {
+                        'neck': 'Neck',
+                        'forearms': 'Forearms',
+                        'obliques': 'Obliques', 
+                        'serratus': 'Serratus anterior',
+                        'lower_back': 'Lower back',
+                        'hip_abductors': 'Hip abductors',
+                        'hip_adductors': 'Hip adductors',
+                        'shins': 'Shins (tibialis)'
+                      };
+                      return muscleLabels[muscle] || muscle;
+                    }).join(', ')}
+                  </Text>
+                </View>
+              </View>
+            </Animatable.View>
+          )}
 
           {/* Specific Details */}
           {(specificSport || athleticPerformanceDetails || funSocialDetails || injuryPreventionDetails || flexibilityDetails || customGoals) && (
@@ -2082,6 +2209,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#71717a',
     marginBottom: 20,
+  },
+  muscleGroupHeading: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9ca3af',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  auxiliaryMuscleList: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  auxiliaryMuscleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333334',
+  },
+  auxiliaryMuscleRowSelected: {
+    borderWidth: 2,
+  },
+  auxiliaryMuscleCheckbox: {
+    marginRight: 12,
+  },
+  auxiliaryMuscleContent: {
+    flex: 1,
+  },
+  auxiliaryMuscleLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  auxiliaryMuscleDescription: {
+    fontSize: 14,
+    color: '#71717a',
   },
   goalsContainer: {
     gap: 12,
@@ -3388,26 +3556,6 @@ const styles = StyleSheet.create({
     color: '#71717a',
     marginBottom: 4,
   },
-  customInputContainer: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
-  customInputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 12,
-  },
-  customInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#ffffff',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
   miniQuestionnaireContainer: {
     marginTop: 24,
     padding: 20,
@@ -3524,6 +3672,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#666',
+  },
+  methodologyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 6,
+  },
+  methodologyText: {
+    fontSize: 14,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 
 });

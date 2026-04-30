@@ -80,7 +80,6 @@ export default function WorkoutGeneratorStep3({ onNext, onBack }: WorkoutGenerat
         customTrainingStyle: fitnessGoals.customTrainingStyle,
         trainingExperience: fitnessGoals.trainingExperience,
         volumePreference: fitnessGoals.volumePreference,
-        customVolume: fitnessGoals.customVolume,
         gender: fitnessGoals.gender,
         programDuration: fitnessGoals.programDuration,
         sessionStyle: fitnessGoals.sessionStyle,

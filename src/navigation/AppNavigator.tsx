@@ -62,6 +62,7 @@ import ExerciseDetailScreen from '../screens/ExerciseDetailScreen';
 import AddExerciseSelectionScreen from '../screens/AddExerciseSelectionScreen';
 import ManualExerciseEntryScreen from '../screens/ManualExerciseEntryScreen';
 import ExerciseHelpScreen from '../screens/ExerciseHelpScreen';
+import MethodologyScreen from '../screens/MethodologyScreen';
 import WeightTrackerScreen from '../screens/WeightTrackerScreen';
 
 // Clean meal plan navigation types
@@ -194,9 +195,13 @@ export type RootStackParamList = {
   MealPlanHelp: undefined;
   MealPlanTest: undefined;
   FavoriteExercises: undefined;
+  ExerciseDetail: {
+    exercise: any;
+  };
   AddExercise: undefined;
   ManualExerciseEntry: undefined;
   ExerciseHelp: undefined;
+  Methodology: undefined;
   WeightTracker: undefined;
 };
 
@@ -624,6 +629,14 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen 
                 name="ExerciseHelp" 
                 component={ExerciseHelpScreen}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                }}
+              />
+              <RootStack.Screen 
+                name="Methodology" 
+                component={MethodologyScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',

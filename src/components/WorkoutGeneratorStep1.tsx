@@ -57,6 +57,7 @@ export default function WorkoutGeneratorStep1({ onNext, onBack }: WorkoutGenerat
       const consolidatedData: QuestionnaireData = {
         // From fitnessGoalsData
         primaryGoal: fitnessGoals.primaryGoal,
+        customPrimaryGoal: fitnessGoals.customPrimaryGoal,
         integrationMethods: fitnessGoals.integrationMethods,
         specificSport: fitnessGoals.specificSport,
         athleticPerformanceDetails: fitnessGoals.athleticPerformanceDetails,
@@ -70,15 +71,16 @@ export default function WorkoutGeneratorStep1({ onNext, onBack }: WorkoutGenerat
         customFrequency: fitnessGoals.customFrequency,
         priorityMuscleGroups: fitnessGoals.priorityMuscleGroups,
         customMuscleGroup: fitnessGoals.customMuscleGroup,
+        auxiliaryMuscles: fitnessGoals.auxiliaryMuscles,
         movementLimitations: fitnessGoals.movementLimitations,
         customLimitation: fitnessGoals.customLimitation,
         trainingStylePreference: fitnessGoals.trainingStylePreference,
         customTrainingStyle: fitnessGoals.customTrainingStyle,
         trainingExperience: fitnessGoals.trainingExperience,
         volumePreference: fitnessGoals.volumePreference,
-        customVolume: fitnessGoals.customVolume,
         gender: fitnessGoals.gender,
         programDuration: fitnessGoals.programDuration,
+        customDuration: fitnessGoals.customDuration,
 
         // From equipmentPreferencesData
         selectedEquipment: equipmentPrefs.selectedEquipment,
