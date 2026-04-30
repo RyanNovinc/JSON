@@ -1,5 +1,6 @@
 import { QuestionnaireData, generateProgramSpecs } from './workoutPrompt';
 import { CompletedMesocycleSummary } from './programStorage';
+import { ExperienceTier, VolumeTier } from './volumeRanges';
 
 export interface ProgramContext {
   totalMesocycles: number;
@@ -23,16 +24,18 @@ function getComplementarityRules(data: QuestionnaireData): string {
 }
 
 function getTimeFormula(data: QuestionnaireData): string {
-  return `**Session Duration:** Duration is determined by your chosen rest style. Do not compress rest periods to hit a time target — the rest style setting takes priority. If the user chose Optimal Rest, sessions may run 75-90 minutes and that is acceptable.`;
+  return `**Session Duration:** Calculate session duration for each training day based on exercise count, sets, and the user's chosen rest style. Report this honestly. Do NOT compress rest periods to hit a time target — the user's volume and rest preferences drive session length.
+
+If a session exceeds 2 hours (120 minutes), this is a sanity flag worth reviewing — most natural lifters can't sustain that productively. Sessions in the 60-100 minute range are typical for serious hypertrophy training. Inform the user of session duration in the program output so they know what to expect.`;
 }
 
 function getMuscleAudit(data: QuestionnaireData): string {
   return `**Volume Verification Requirements:**
 
 **Status Indicators (use exactly these):**
-- ✅ = within target range for user's training approach
-- ⚠️ LOW = below experience-scaled minimum (must be fixed before presenting)
-- ⚠️ HIGH = above the target range ceiling for the user's approach (flag for review)
+- ✅ = within target range for that specific muscle (per the per-muscle target table)
+- ⚠️ LOW = below the lower bound of that muscle's target range (must be fixed before presenting)
+- ⚠️ HIGH = above that muscle's ceiling (flag for review)
 - ℹ️ CONSTRAINED = below target but above minimum due to legitimate constraints
 
 For LOW status: immediately revise the program to add volume before presenting. When fixing a LOW muscle: add sets to the day where that muscle is already trained, or add a second training day for that muscle.
@@ -102,7 +105,7 @@ Before presenting the program, complete these verification steps:
 1. **List every exercise per day** with its set count and primary muscle tags.
 2. **Total effective weekly volume per muscle group** — for each non-exempt muscle, list every contributing exercise with its set count, tag type (Primary or Secondary), weight (1.0 for Primary, 0.5 for Secondary), and contribution (sets × weight). Sum the contributions. The table is the calculation — do not narrate or estimate totals.`;
 
-export const VERIFICATION_STEP_3_HYPERTROPHY = `3. **Look up this user's targets** — cross-reference their Training Approach (from the profile) against the Volume Targets table, and their Training Experience against the Experience-Scaled Minimums table. These are the numbers you must hit. If the user's Primary Goal is not muscle building or body recomposition, see Goal-Specific Quality Criteria for adjusted verification rules.`;
+export const VERIFICATION_STEP_3_HYPERTROPHY = `3. **Look up this user's targets** — cross-reference their Training Approach (from the profile) against the Volume Targets table — these are the experience-adjusted ranges they must hit. If the user's Primary Goal is not muscle building or body recomposition, see Goal-Specific Quality Criteria for adjusted verification rules.`;
 
 // Note: getVerificationStep3 will generate the appropriate version
 export const getVerificationStep3 = (goal: string): string => {
@@ -119,7 +122,7 @@ export const getVerificationStep3 = (goal: string): string => {
   }
   
   const goalLabel = goalLabels[goal] || 'this goal';
-  return `3. **Look up this user's targets** — cross-reference their Training Approach (from the profile) against the Volume Targets table, and their Training Experience against the Experience-Scaled Minimums table. These are the numbers you must hit. Since this is a ${goalLabel} program, see Goal-Specific Quality Criteria for how volume verification applies to this goal.`;
+  return `3. **Look up this user's targets** — cross-reference their Training Approach (from the profile) against the Volume Targets table — these are the experience-adjusted ranges they must hit. Since this is a ${goalLabel} program, see Goal-Specific Quality Criteria for how volume verification applies to this goal.`;
 };
 
 export const VERIFICATION_STEPS_4_5 = `4. **If any muscle group is below target**, revise exercise selections and recount. Do not present the summary until all targets are met or explicitly flagged as constrained.
@@ -150,20 +153,40 @@ Write naturally — this is a planning conversation, not a final document. The u
 
 export const EXERCISE_LIBRARY = `---
 
-## EXERCISE LIBRARY
+## EXERCISE LIBRARY — CRITICAL TAGGING RULES
 
-You MUST select exercises ONLY from the JSON.fit exercise library at https://json.fit/exercises.md.
+You MUST select exercises ONLY from the JSON.fit exercise library at https://json.fit/exercises.md. **Fetch that file before generating this program.**
 
-Before generating this program, fetch that file. Then:
+### Tag Faithfulness Is Non-Negotiable
+
+The library specifies Primary and Secondary muscle tags for every exercise. **You MUST copy these tags exactly as written.** This is the most common failure mode in program generation, and it must not happen here.
+
+**Do NOT add muscles to the Primary array based on your biomechanical knowledge.** Even if you believe a muscle is "also a prime mover," if the library says it is Secondary, you write it as Secondary. The library uses ExRx.net classification with one primary muscle per exercise as the convention. Two-muscle Primary arrays exist only where the library explicitly specifies them.
+
+### Common Mistakes To Avoid
+
+These are real failure patterns that have occurred. Do NOT repeat them:
+
+- **Rows (Barbell Row, T-Bar Row, Chest-Supported T-Bar Row, Seated Cable Row, Pendlay Row, Seal Row):** Library says Primary = Upper Back, Secondary = Lats, Biceps, Rear Delts. Do NOT add Lats to Primary even though Lats are biomechanically active. Lats is Secondary on these exercises.
+
+- **Barbell Back Squat, Front Squat, Hack Squat, Leg Press, Bulgarian Split Squat, Walking Lunge, Reverse Lunge:** Library says Primary = Quads only, Secondary = Glutes. Do NOT make these dual-primary. Glutes is Secondary.
+
+- **Romanian Deadlift, Stiff-Leg Deadlift:** Library says Primary = Hamstrings only, Secondary = Glutes, Lower Back. Do NOT add Glutes or Lower Back to Primary.
+
+- **Hip Thrust, Glute Bridge:** Library says Primary = Glutes, Secondary = Hamstrings. Do NOT add Hamstrings to Primary.
+
+### Verification Step
+
+Before finalizing the plan, do a tag audit: for every exercise in your program, look it up in the library and confirm your Primary and Secondary tags match the library exactly. If you have added any muscle to Primary that is not in the library's Primary list, fix it before continuing.
+
+### Other Rules
 
 - Use EXACT exercise names as they appear in the library
-- Use the EXACT primary and secondary muscle tags specified for each exercise in the library
 - Do NOT invent exercises not in the library
-- Do NOT re-tag muscles based on your own judgment
 - If a movement pattern you want to include has no suitable exercise in the library, omit that pattern rather than inventing one
 - When suggesting alternative exercises for a movement, only use exercises from the library
 
-The library is the canonical source of truth for exercise names and muscle tagging. Your job is to select and program these exercises, not to define them.`;
+The library is the canonical source of truth for exercise names and muscle tagging. Your job is to select and program these exercises, not to redefine them.`;
 
 export const MUSCLE_TAXONOMY = `---
 
@@ -171,9 +194,9 @@ export const MUSCLE_TAXONOMY = `---
 
 Use ONLY these exact muscle names — no generic terms like "Shoulders", "Back", "Arms", or "Legs":
 
-Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core
+Chest, Front Delts, Side Delts, Rear Delts, Lats, Upper Back, Traps, Biceps, Triceps, Forearms, Quads, Hamstrings, Glutes, Calves, Core, Lower Back, Neck, Obliques, Serratus Anterior, Hip Abductors, Hip Adductors, Shins
 
-Use "Core" instead of "Lower Back" for spinal stabilization or erector engagement.`;
+Default usage: most programs only need the first 15 (Chest through Core). The remaining muscles are reserved for users who have specifically requested direct work for them — see the Auxiliary Muscle Work section in the user profile if present.`;
 
 export const TAGGING_BODYWEIGHT = `**Bodyweight:**
 - Push-ups (and variations): Primary Chest | Secondary Triceps, Front Delts
@@ -235,9 +258,9 @@ export const STATIC_RULES_4_5_6_7 = `4. **Treat exercise names as identifiers** 
 6. **Respect exercise preferences** — if the profile lists liked exercises, incorporate them where they fit the plan. If it lists disliked exercises, avoid them and use alternatives for that movement pattern.
 7. **Only program working sets** — do not include warm-up sets in the plan. The app tracks working sets only.
 8. **Sets per exercise cap** — do not exceed 5 sets of any single isolation exercise in one session. If volume targets require more sets than this allows, distribute across a second exercise or a second training day rather than stacking onto one exercise.
-9. **RIR (Reps in Reserve) considerations** — consider appropriate intensity levels that optimize stimulus-to-fatigue ratio based on exercise type and user experience level.
+9. **RIR (Reps in Reserve) considerations** — include appropriate RIR targets in the rir_weekly field to optimize stimulus-to-fatigue ratio based on exercise type and user experience level.
 10. **Volume distribution across days** — if a muscle group is below its target range and only appears on 1-2 training days, add sets on a third day. Calves, biceps, and triceps can be placed on any training day regardless of the split's primary focus. Do not leave a muscle below target when adding 2-3 sets to an existing session would fix it.
-11. **Target range, not just minimums** — clearing the experience-scaled minimum floor is not sufficient. Every non-exempt muscle should land within its target range from the Volume Targets table. If a muscle is above its minimum but below its target, treat it as a problem to solve, not an acceptable result.`;
+11. **Target range, not just minimums** — clearing the lower bound of the target range is not sufficient. Every non-exempt muscle should land within its target range from the Volume Targets table. If a muscle is just above the lower bound but well below the upper bound, treat it as a problem to solve, not an acceptable result.`;
 
 // Rule 10 variants by goal
 export const getRule8 = (goal: string): string => {
@@ -373,11 +396,11 @@ export const REST_SECTION_HEADER = `Use evidence-based rest periods appropriate 
 
 export const getRestSection = (restTrigger: string): string => {
   if (restTrigger === 'OPTIMAL') {
-    return "\n- **Optimal Rest:** Use full rest periods (2-3 min compounds, 90-120s isolation). Do not compress rest to hit a session time target. Session duration is whatever the rest periods require.";
+    return "\n- **Optimal Rest:** Use full rest periods (2-3 min compounds, 90-120s isolation). Maximize stimulus per set. Session duration will be whatever the rest periods and volume require.";
   } else if (restTrigger === 'MINIMAL') {
-    return "\n- **Minimal Rest:** Compounds 60-90s, isolation 45-60s. Prioritize time efficiency.";
+    return "\n- **Minimal Rest:** Compounds 60-90s, isolation 45-60s. Prioritize density and time efficiency. Best paired with Conservative or Moderate volume.";
   } else { // MODERATE
-    return "\n- **Moderate Rest:** Compounds 90-120s, isolation 60-90s. Target 60-75 minute sessions.";
+    return "\n- **Moderate Rest:** Compounds 90-120s, isolation 60-90s. A balance between stimulus quality and time efficiency.";
   }
 };
 
@@ -396,75 +419,72 @@ export const VOLUME_RULES_HEADER = `---
 Use the user's specified Volume Preference from their profile:`;
 
 // Volume targets by user preference
-export const getVolumeTargets = (volumePreference: string, customVolume?: string): string => {
-  if (volumePreference === 'custom' && customVolume) {
-    const customSets = parseInt(customVolume);
-    const mediumSets = Math.max(6, Math.round(customSets * 0.75)); // Medium muscles get ~75% of major muscle volume
-    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|---------------|--------------------------|---------------------------|
-| Custom | ${customSets} | ${mediumSets} |`;
-  } else if (volumePreference === '16-20') {
-    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|---------------|--------------------------|---------------------------|
-| High Volume | 16-20 | 12-16 |`;
-  } else if (volumePreference === '12-16') {
-    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|---------------|--------------------------|---------------------------|
-| Moderate | 12-16 | 10-14 |`;
-  } else if (volumePreference === '8-12') {
-    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|---------------|--------------------------|---------------------------|
-| Conservative | 8-12 | 8-10 |`;
-  } else {
-    // Fallback for 'not_sure' or undefined
-    return `| Volume Target | Major Muscles (sets/week) | Medium Muscles (sets/week) |
-|---------------|--------------------------|---------------------------|
-| Moderate (Default) | 12-16 | 10-14 |`;
-  }
+export const getVolumeTargets = (
+  volumePreference: string,
+  experience: ExperienceTier = 'intermediate'
+): string => {
+  const tierLabel = volumePreference === '8-12' ? 'Conservative' :
+                    volumePreference === '16-20' ? 'High Volume' :
+                    'Moderate'; // '12-16' and 'not_sure' both default to Moderate
+
+  return `**Volume Targets — Per-Muscle Landmarks System**
+
+This program uses per-muscle volume landmarks rather than a single major/medium classification. Different muscles have different productive volume ranges based on recovery profile and indirect loading from compounds.
+
+**User Profile for Volume Targeting:**
+- Volume Tier: ${tierLabel}
+- Training Experience: ${experience}
+
+**REQUIRED ACTION before generating the program:**
+
+1. Fetch the canonical volume landmarks file at https://json.fit/volume-landmarks.md
+2. Locate the tier × experience mapping table for the ${tierLabel} tier
+3. Find the position within MAV that corresponds to ${experience} experience (e.g., "MAV-low", "MAV-mid", "MAV-high to MRV")
+4. Build a per-muscle target table by applying that position to each muscle's MAV range from the file's Per-Muscle Volume Landmarks table
+
+Output the per-muscle target table BEFORE the program in this format:
+
+| Muscle | Target Range (effective sets/week) |
+|--------|------------------------------------|
+| Chest | [low]–[high] |
+| Lats | [low]–[high] |
+| Upper Back | [low]–[high] |
+| Front Delts | [low]–[high] |
+| Side Delts | [low]–[high] |
+| Rear Delts | [low]–[high] |
+| Biceps | [low]–[high] |
+| Triceps | [low]–[high] |
+| Quads | [low]–[high] |
+| Hamstrings | [low]–[high] |
+| Glutes | [low]–[high] |
+| Calves | [low]–[high] |
+| (continue for any auxiliary muscles user has selected, using their MAV-low range as floor) |
+
+Use these per-muscle ranges as the targets when designing the program. Do NOT apply a single major/medium range to all muscles. Different muscles will have different target ranges — this is the entire point of the per-muscle landmarks system.`;
 };
 
 export const STATIC_VOLUME_DEFINITIONS = `
-**Major** = Chest, Lats, Upper Back, Quads, Hamstrings, Glutes
-**Medium** = Side Delts, Biceps, Triceps, Calves
+**Volume Definitions**
 
-Going above the target range ceiling for any muscle group has diminishing returns for natural lifters.
+This system uses per-muscle volume landmarks (MEV/MAV/MRV) from https://json.fit/volume-landmarks.md rather than major/medium muscle categories. Each muscle has its own productive volume range based on recovery profile and indirect loading from compounds.
 
-### Experience-Scaled Minimums
+The per-muscle target ranges for this user are computed from the landmarks file and the tier × experience mapping. Reference the per-muscle target table you built above when designing the program.
 
-Look up the user's Training Experience from their profile. No non-exempt muscle should fall below these floors:`;
+For each muscle, the lower bound of the target range is the floor — no non-exempt muscle should fall below it. The upper bound is the ceiling — going above it has diminishing returns and risks exceeding MRV.`;
 
-// Experience minimums by tier
-export const getExperienceMinimums = (expTier: string): string => {
-  if (expTier === 'beginner') {
-    return `| Level | Major Muscles (min sets/week) | Medium Muscles (min sets/week) |
-|-------|-------------------------------|-------------------------------|
-| Beginner | 6-8 | 6 |`;
-  } else if (expTier === 'intermediate') {
-    return `| Level | Major Muscles (min sets/week) | Medium Muscles (min sets/week) |
-|-------|-------------------------------|-------------------------------|
-| Intermediate | 8-10 | 6-8 |`;
-  } else if (expTier === 'advanced') {
-    return `| Level | Major Muscles (min sets/week) | Medium Muscles (min sets/week) |
-|-------|-------------------------------|-------------------------------|
-| Advanced | 10-12 | 8-10 |`;
-  } else {
-    // Fallback
-    return `| Level | Major Muscles (min sets/week) | Medium Muscles (min sets/week) |
-|-------|-------------------------------|-------------------------------|
-| Beginner | 6-8 | 6 |
-| Intermediate | 8-10 | 6-8 |
-| Advanced | 10-12 | 8-10 |`;
-  }
-};
 
 export const STATIC_PRIORITY_MUSCLES = `
 ### Priority Muscle Groups
 
-If the profile specifies priority muscles, increase those toward 16-22 sets/week regardless of training approach. Reduce non-priority muscles toward their minimums to keep total stress recoverable. If no priority muscles are specified, distribute volume evenly across all muscle groups within the target range.
+If the profile specifies priority muscles, target the upper portion of MAV through MRV for each priority muscle (per the landmarks file at https://json.fit/volume-landmarks.md). This is roughly each muscle's MAV-high to MRV range — different per muscle, calibrated to that muscle's specific recovery capacity. Reduce non-priority muscles toward their MEV (the file's MEV column) to keep total stress recoverable.
+
+If no priority muscles are specified, distribute volume so that all non-priority muscles land at similar positions within their respective MAV ranges. This produces balanced programs where no muscle is at its ceiling while another sits at its floor.
 
 ### Exempt Muscles (Can Show 0 Direct Sets)
 
-Front Delts, Traps, Rear Delts, Forearms — these get sufficient indirect work from compounds. Core inclusion is controlled by the Direct Core Work setting in the user's profile — see point 7 in the Volume Verification Requirements above. Do not apply length-based core exemption rules. **Note:** Core being exempt from volume targets means it does not trigger a LOW flag and does not count toward any muscle group's set tally — it does not mean skip core entirely. Whether to include core exercises is determined solely by the Direct Core Work setting.
+The landmarks file defines "Exempt-from-Floor Muscles" — muscles that get sufficient indirect work from compounds: Front Delts, Traps, Rear Delts, Lower Back, Glutes, Forearms. These can show 0 direct sets if compound contributions cover MEV. They are NOT exempt from MRV — going over the ceiling still causes problems.
+
+Core inclusion is controlled by the Direct Core Work setting in the user's profile — see point 7 in the Volume Verification Requirements above. Do not apply length-based core exemption rules. **Note:** Core being exempt from volume targets means it does not trigger a LOW flag and does not count toward any muscle group's set tally — it does not mean skip core entirely. Whether to include core exercises is determined solely by the Direct Core Work setting.
 
 **IMPORTANT:** If a muscle appears in the user's Auxiliary Muscle Work list above, it is NOT exempt — include the specified volume for that muscle.`;
 
@@ -492,9 +512,9 @@ For bodyweight-only profiles, some muscle groups are inherently harder to isolat
 export const STATIC_STATUS_INDICATORS = `
 ### Status Indicators
 
-- ✅ = within target range for the user's approach
-- ⚠️ LOW = below the experience-scaled minimum — **must fix before presenting**
-- ⚠️ HIGH = above the target range ceiling for the user's approach. For priority muscles, ceiling is 22 sets. Exceeding the ceiling has diminishing returns — reduce before presenting.
+- ✅ = within target range for that specific muscle (per the per-muscle target table)
+- ⚠️ LOW = below the lower bound of that muscle's target range — **must fix before presenting**
+- ⚠️ HIGH = above the target range ceiling for that specific muscle (per the landmarks file at https://json.fit/volume-landmarks.md). For priority muscles, the ceiling is each muscle's MRV from the file — different per muscle. Exceeding the ceiling has diminishing returns — reduce before presenting.
 - ℹ️ CONSTRAINED = above minimum but below target due to split/schedule/equipment. Must explain in Recommendations.
 
 ### HIGH Threshold Handling
@@ -502,13 +522,13 @@ export const STATIC_STATUS_INDICATORS = `
 When HIGH occurs on a non-priority muscle:
 - Identify the lowest-priority isolation exercise contributing to the excess
 - Reduce it by 1-2 sets in the session table
-- If reduction would drop below target range, leave at the ceiling for the user's approach and note as acceptable overflow`;
+- If reduction would drop below the target range floor, leave at that muscle's ceiling and note as acceptable overflow`;
 
 // Quality standards with approach-specific additions
 export const getQualityStandards = (volumePreference: string): string => {
   let standards = STATIC_STATUS_INDICATORS;
   
-  if (volumePreference === '16-20' || (volumePreference === 'custom' && parseInt(volumePreference) >= 16)) {
+  if (volumePreference === '16-20') {
     standards += `
 - A High Volume program where most muscles sit at the floor of their target range is underdelivering — **aim for the upper half**.`;
   } else if (volumePreference === '8-12') {
@@ -632,7 +652,6 @@ export function assemblePlanningPrompt(
   const exp = data.trainingExperience || 'intermediate';
   const expTier = ['complete_beginner', 'beginner'].includes(exp) ? 'beginner' : exp;
   const volumePreference = data.volumePreference || '12-16';
-  const customVolume = data.customVolume;
   const equipment = data.selectedEquipment || [];
   const hasGymEquipment = equipment.some(e => ['commercial_gym', 'home_gym'].includes(e));
   const isBodyweightOnly = equipment.length === 1 && equipment[0] === 'bodyweight';
@@ -700,34 +719,7 @@ ${generateProgramSpecs(data)}`;
   // === SECTION 4: Exercise Library + Muscle Taxonomy + Tagging ===
   prompt += '\n\n' + EXERCISE_LIBRARY;
   
-  let muscleTaxonomy = MUSCLE_TAXONOMY;
-  
-  // Add auxiliary muscles to taxonomy if user has selected any
-  if (data.auxiliaryMuscles && Array.isArray(data.auxiliaryMuscles) && data.auxiliaryMuscles.length > 0) {
-    const auxiliaryMuscleNames: { [key: string]: string } = {
-      'neck': 'Neck',
-      'obliques': 'Obliques', 
-      'hip_abductors': 'Hip Abductors',
-      'hip_adductors': 'Hip Adductors',
-      'serratus': 'Serratus Anterior',
-      'shins': 'Tibialis'
-    };
-    
-    const selectedAuxiliaryNames = data.auxiliaryMuscles
-      .map(muscle => auxiliaryMuscleNames[muscle])
-      .filter(Boolean);
-      
-    if (selectedAuxiliaryNames.length > 0) {
-      muscleTaxonomy += `\n\n**Additional muscles for this program:** ${selectedAuxiliaryNames.join(', ')}`;
-    }
-    
-    // Update Lower Back rule if user selected it
-    if (data.auxiliaryMuscles.includes('lower_back')) {
-      muscleTaxonomy += `\n\n**Note:** For this program, use "Lower Back" as a valid muscle tag since the user has specifically requested lower back training.`;
-    }
-  }
-  
-  prompt += '\n\n' + muscleTaxonomy;
+  prompt += '\n\n' + MUSCLE_TAXONOMY;
   if (isBodyweightOnly) {
     prompt += '\n\n' + TAGGING_BODYWEIGHT;
   }
@@ -769,9 +761,8 @@ ${generateProgramSpecs(data)}`;
   
   // === SECTION 7: Volume Rules ===
   prompt += '\n\n' + VOLUME_RULES_HEADER;
-  prompt += '\n' + getVolumeTargets(volumePreference, customVolume);
+  prompt += '\n' + getVolumeTargets(volumePreference, exp as ExperienceTier);
   prompt += '\n' + STATIC_VOLUME_DEFINITIONS;
-  prompt += '\n' + getExperienceMinimums(expTier);
   prompt += '\n' + getExemptMuscles(volumePreference, gymDays);
   if (isBodyweightOnly) prompt += '\n' + BODYWEIGHT_VOLUME_ADJUSTMENTS;
   prompt += '\n' + getQualityStandards(volumePreference);

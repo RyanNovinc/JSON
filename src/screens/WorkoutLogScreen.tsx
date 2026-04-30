@@ -186,6 +186,7 @@ interface SetData {
   completed: boolean;
   selectedExerciseIndex: number; // 0 = primary, 1+ = alternatives
   unit?: 'kg' | 'lbs'; // Store unit for completed sets
+  rir?: string; // Rate of Perceived Exertion (RIR)
   // Store data for each exercise variant separately
   exerciseData?: {
     [exerciseIndex: number]: {
@@ -194,6 +195,7 @@ interface SetData {
       completed: boolean;
       isDropSet?: boolean;
       drops?: DropSet[];
+      rir?: string; // Rate of Perceived Exertion (RIR) for this exercise variant
     };
   };
   isDropSet?: boolean;
@@ -211,7 +213,7 @@ interface ExerciseCardProps {
   setsData: SetData[];
   notes: string;
   workoutStarted: boolean;
-  onSetUpdate: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => void;
+  onSetUpdate: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps' | 'rir', value: string) => void;
   onSetComplete: (exerciseIndex: number, setIndex: number) => void;
   onDropSetComplete: (exerciseIndex: number, setIndex: number, dropIndex: number) => void;
   onDeleteSet: (exerciseIndex: number, setIndex: number) => void;
@@ -309,6 +311,9 @@ function ExerciseCard({
   
   // Use weekly reps if available, otherwise fall back to regular reps
   const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
+  
+  // Use weekly RIR if available
+  const targetRir = exercise.rir_weekly?.[currentWeek.toString()] || '';
   
   // Ensure targetReps is always a string
   const targetRepsString = typeof targetReps === 'string' ? targetReps : String(targetReps);
@@ -816,6 +821,34 @@ function ExerciseCard({
                 placeholderTextColor="#52525b"
                 keyboardType="number-pad"
                 editable={!setData.completed}
+              />
+              
+              <Text style={styles.separator}>RIR</Text>
+              
+              <TextInput
+                style={[
+                  styles.input, 
+                  styles.rirInput,
+                  !workoutStarted && styles.inputDisabled
+                ]}
+                value={setData.rir || ''}
+                onChangeText={(value) => {
+                  if (!workoutStarted) {
+                    onInteractionAttempt && onInteractionAttempt();
+                    return;
+                  }
+                  onSetUpdate(exerciseIndex, setIndex, 'rir', value);
+                }}
+                onFocus={() => {
+                  if (!workoutStarted) {
+                    onInteractionAttempt && onInteractionAttempt();
+                  }
+                }}
+                placeholder={targetRir || "0-10"}
+                placeholderTextColor="#52525b"
+                keyboardType="number-pad"
+                editable={!setData.completed}
+                maxLength={2}
               />
               
               <TouchableOpacity
@@ -1627,7 +1660,7 @@ export default function WorkoutLogScreen() {
     console.log('Exercise added successfully:', newExercise.exercise);
   };
   
-  const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
+  const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps' | 'rir', value: string) => {
     // Validate input - only allow numbers and decimal point for weight
     let sanitizedValue = value;
     if (field === 'weight') {
@@ -1638,9 +1671,16 @@ export default function WorkoutLogScreen() {
       if (parts.length > 2) {
         sanitizedValue = parts[0] + '.' + parts.slice(1).join('');
       }
-    } else {
+    } else if (field === 'reps') {
       // For reps, only allow whole numbers
       sanitizedValue = value.replace(/[^0-9]/g, '');
+    } else if (field === 'rir') {
+      // For RIR, allow numbers 0-10
+      sanitizedValue = value.replace(/[^0-9]/g, '');
+      const numericValue = parseInt(sanitizedValue);
+      if (numericValue > 10) {
+        sanitizedValue = '10';
+      }
     }
     
     const newData = [...allSetsData];
@@ -1684,12 +1724,16 @@ export default function WorkoutLogScreen() {
     
     // Create new set based on the last set or default values
     const lastSet = exerciseSets[exerciseSets.length - 1];
-    const newSet = {
+    const newSet: SetData = {
+      exercise: exercise.exercise,
+      setNumber: newSetIndex + 1,
+      selectedExerciseIndex: lastSet?.selectedExerciseIndex || 0,
       weight: lastSet?.weight || '',
       reps: '', // Leave empty to show placeholder instead
       completed: false,
       unit: lastSet?.unit || getExerciseUnit(exerciseIndex),
-      isDropSet: false
+      isDropSet: false,
+      rir: '' // Initialize RIR as empty
     };
     
     newData[exerciseIndex].push(newSet);
@@ -2869,7 +2913,7 @@ export default function WorkoutLogScreen() {
                       style={styles.addNoteInput}
                       value={currentNote}
                       onChangeText={setCurrentNote}
-                      placeholder="Add a note (e.g., Week 1: used 50kg, felt easy)"
+                      placeholder="Add a note (e.g., Week 1: used 50kg, felt easy, good form)"
                       placeholderTextColor="#52525b"
                       onSubmitEditing={() => {
                         if (currentNote.trim()) {
@@ -3808,6 +3852,9 @@ const styles = StyleSheet.create({
   },
   repsInput: {
     width: 50,
+  },
+  rirInput: {
+    width: 45,
   },
   inputDisabled: {
     opacity: 0.5,
