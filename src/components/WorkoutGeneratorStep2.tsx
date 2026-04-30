@@ -116,6 +116,22 @@ The volume enumeration tables in the next section need correct per-muscle target
 
 Use this per-muscle target table when running volume enumeration in the next section. Each muscle has its own range — do NOT apply a single major/medium range to all muscles.
 
+### RIR Guidance Audit
+
+Verify RIR guidance is present and correct for every exercise in the plan.
+
+**Step 1: Fetch the RIR file.** Read https://json.fit/rir-guidance.md so you have the canonical matrix in context.
+
+**Step 2: Check every exercise has RIR guidance.** Every exercise in the plan should have an RIR note. If any exercise is missing RIR guidance, add it using the matrix from the file.
+
+**Step 3: Verify RIR matches the matrix.** For each exercise, confirm:
+- Exercise category is correctly identified (compound vs isolation vs machine vs unilateral)
+- RIR values match the file's matrix for the user's goal and mesocycle week
+- Within-exercise progression follows the set-count pattern from the file
+- Format matches the user's experience tier (behavioural cues for beginners, numerical for advanced)
+
+**Step 4: Fix any mismatches** silently and re-verify before presenting the corrected plan.
+
 ### Effective Volume Distribution Check
 
 For EVERY non-exempt muscle in the program, you MUST produce an enumeration table. Do not narrate or estimate volume — enumerate exercise by exercise. **Use the tag values from the tag audit above (which match the library), not whatever was in the original plan.**

@@ -325,19 +325,12 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
   return specs;
 };
 
-export const getAIPrompt = (questionnaireData?: QuestionnaireData, outputPreference?: string) => {
-  // Calculate equipment-specific transition tax
-  const equipment = questionnaireData?.selectedEquipment ?? [];
-  const transitionTax = equipment.includes('commercial_gym') 
-    ? 150  // seconds per exercise
-    : equipment.includes('home_gym') 
-    ? 90 
-    : 60;
+export const getAIPrompt = (questionnaireData?: QuestionnaireData) => {
+  // Static transition tax (commercial gym default)
+  const transitionTax = 150; // seconds per exercise (commercial gym default)
 
-  // Determine output format based on user preference
-  const outputInstructions = outputPreference === 'copy_paste' 
-    ? `**Output each block as a \`\`\`json code block in chat. Do not create files.**`
-    : `**DO NOT output JSON to chat** — it will hit token limits for large programs.
+  // Static output format for file creation
+  const outputInstructions = `**DO NOT output JSON to chat** — it will hit token limits for large programs.
 
 **You MUST:**
 1. Create a file (use Code Interpreter on ChatGPT, or computer tool on Claude)
@@ -367,7 +360,7 @@ ${outputInstructions}
 
 **Multi-block programs:**
 Generate one block at a time. After each block:
-1. ${outputPreference === 'copy_paste' ? 'Output the JSON in a code block' : 'Provide the download link for that block\'s JSON file'}
+1. Provide the download link for that block's JSON file
 2. Output a brief **volume summary** showing total primary-tagged sets per muscle group for that block (training weeks, not deload). This gives the reviewer something to check against.
 3. Say: "Block 1 complete. Say 'review' to validate this block before continuing, or 'next' to generate Block 2 directly."
 4. **STOP and wait for user input.** Do not proceed to the next block until the user responds.
@@ -375,7 +368,7 @@ Generate one block at a time. After each block:
 **When user says "next" for subsequent blocks:**
 1. Generate the next block directly as JSON format (do not create text version first)
 2. Apply the same JSON schema and structure established above
-3. ${outputPreference === 'copy_paste' ? 'Output the JSON in a code block' : 'Write the JSON to a file and provide download link'}
+3. Write the JSON to a file and provide download link
 4. Output volume summary for the new block
 5. Say: "Block [X] complete. Say 'review' to validate this block before continuing, or 'next' to generate Block [X+1] directly."
 6. **STOP and wait for user input.** Do not proceed to the next block until the user responds.
@@ -384,7 +377,7 @@ Generate one block at a time. After each block:
 1. Read the workout program document from earlier in the conversation
 2. Apply the embedded review checklist below to the specified block  
 3. Generate the corrected JSON version with all fixes applied
-4. ${outputPreference === 'copy_paste' ? 'Output the corrected JSON in a code block' : 'Write corrected JSON to file and provide download link'}
+4. Write corrected JSON to file and provide download link
 5. Say: "Block [X] reviewed and updated. Say 'next' to continue to Block [X+1]."
 
 ### Embedded Review Checklist
@@ -520,8 +513,7 @@ Before generating JSON, read the canonical exercise library at https://json.fit/
   "superset_group": "string (optional — e.g. 'ss1'; same value on two exercises links them as a superset)",
   "reps_weekly": { "1": "string", "2": "string", ... },
   "sets_weekly": { "1": number, "2": number, ... },
-  "rir_weekly": { "1": "string", "2": "string", ... },
-  "notes": "string (optional — for form cues, equipment notes, etc; do NOT include RIR guidance)",
+  "notes": "string (form cues, RIR guidance, or other coaching notes — multiple notes allowed)",
   "alternatives": [
     { "exercise": "string", "primaryMuscles": [...], "secondaryMuscles": [...] }
   ]
@@ -546,7 +538,7 @@ Before generating JSON, read the canonical exercise library at https://json.fit/
    - Day 3: {"day_number": 3, "type": "rest", "day_name": "REST DAY"}
    - Days 4,5: training, Day 6: rest, Day 7: training
 10. **Sample plan protection** — for sample plans only, include \`"_metadata": {"isSamplePlan": true}\` at the root level to prevent overwriting users' exercise preferences during import.
-11. **RIR (Reps in Reserve) guidance** — include appropriate RIR targets in the rir_weekly field (e.g., "3-4", "2-3", "1-2") for user progression and training quality. Use weekly progression where beneficial.
+11. **RIR** — carry RIR guidance from the approved plan into each exercise's notes field. Do not regenerate or modify RIR values — the plan is authoritative.
 
 ---
 
@@ -558,6 +550,7 @@ Before presenting each block, silently verify:
 - [ ] Exercise names are identical everywhere (across days, notes, superset references)
 - [ ] Superset exercises are adjacent with matching superset_group values and cross-referenced in notes
 - [ ] Rep progressions trend flat-to-decreasing across weeks (not identical every week)
+- [ ] RIR guidance from the plan carried through to every exercise's notes
 - [ ] Deload weeks show reduced sets_weekly (~40-50%) and increased reps
 - [ ] restQuick ≈ 65% of rest for every exercise
 - [ ] Every exercise's muscle tags verified against canonical library at https://json.fit/exercises.md (library tags override plan tags)
