@@ -132,13 +132,12 @@ const MUSCLE_TO_SLUG: { [key: string]: Slug | null } = {
 
   // Unsupported by library
   'hip adductors': 'adductors',
-  'hip abductors': null,
+  'hip abductors': 'gluteal',
   'shins': null,
   'serratus': null,
 };
 
 const setsToIntensity = (sets: number): number => {
-  if (sets >= 10) return 2;
   if (sets >= 1) return 1;
   return 0;
 };
@@ -649,32 +648,6 @@ export default function DaysScreen() {
         };
 
         setLocalBlock(updatedBlock);
-      }
-      return;
-
-      const routineData = await AsyncStorage.getItem('routine_1772009535369');
-      if (routineData) {
-        const routine = JSON.parse(routineData);
-
-        if (routine.data && typeof routine.data === 'object') {
-          const dayObjects = Object.entries(routine.data)
-            .filter(([key, value]) =>
-              value &&
-              typeof value === 'object' &&
-              (value as any).day_name &&
-              !['id', 'routine_name', 'description', 'days_per_week', 'blocks', 'programId'].includes(key)
-            )
-            .map(([key, value]) => value);
-
-          if (dayObjects.length > 0) {
-            const updatedBlock = {
-              ...localBlock,
-              days: dayObjects
-            };
-            console.log('✅ Reloaded from routine.data - converted object to array:', dayObjects.length, 'days');
-            setLocalBlock(updatedBlock);
-          }
-        }
       }
     } catch (error) {
       console.error('Failed to reload block data:', error);
@@ -1310,6 +1283,19 @@ export default function DaysScreen() {
                         scale={0.9}
                         border="#27272a"
                       />
+
+                      {/* Bottom Right Flip Button - positioned over the body diagram */}
+                      <TouchableOpacity
+                        style={styles.bodyFlipIconBottomRight}
+                        onPress={() => setBodyViewSide(bodyViewSide === 'front' ? 'back' : 'front')}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="sync-outline"
+                          size={20}
+                          color={themeColor}
+                        />
+                      </TouchableOpacity>
                     </View>
 
                     {/* Detailed Breakdown */}
@@ -1336,6 +1322,7 @@ export default function DaysScreen() {
                       })}
                     </View>
                   </View>
+
                 )}
               </View>
             )}
@@ -2385,6 +2372,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#27272a',
+    position: 'relative',
   },
   volumeContent: {
     gap: 24,
@@ -2396,6 +2384,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#27272a',
+    position: 'relative',
   },
   bodyDiagramHeader: {
     flexDirection: 'row',
@@ -2420,6 +2409,20 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bodyFlipIconBottomRight: {
+    position: 'absolute',
+    top: 220,
+    right: 20,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   volumeGrid: {
     flexDirection: 'row',
