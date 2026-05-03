@@ -49,6 +49,32 @@ First, read the workout program you just created so you have the full content in
 
    Do NOT pause for user confirmation. Do NOT compress rest periods or reduce volume to fit a time target. Continue with the program as designed unless the user explicitly asks for changes.
 
+## RULE ENFORCEMENT PRINCIPLE
+
+When you find a rule violation, you have exactly two options:
+
+1. **FIX IT** — adjust the program to bring it into compliance, then re-verify with the table.
+2. **DOCUMENT GENUINE IMPOSSIBILITY** — only valid if fixing would create a worse violation elsewhere.
+
+The following are NOT valid reasons to accept a violation:
+- "Acceptable trade-off"
+- "Exempt-from-floor muscle so it's fine"
+- "Appropriate for this user's experience level"
+- "All from compound indirect work"
+- "Slightly over but within MRV"
+- "Worth flagging but no action needed"
+- "Below the guideline but appropriate here"
+
+The following ARE valid reasons to accept a violation:
+- Fixing would push another muscle below MEV
+- Fixing would push another muscle above MRV
+- Fixing would require an exercise not in the library
+- Fixing would violate a hard constraint from the user profile (equipment, movement limitations)
+
+**You must ATTEMPT a fix before accepting any violation.** If your justification sounds like rationalisation, the answer is to fix the program, not defend the violation. Show the attempted fix and its cascade impact in your output. Only after demonstrating that the fix creates a worse violation may you leave the original violation in place.
+
+The user can override your fix if they disagree. Your job is to enforce the rules first.
+
 ## QUALITY CHECKLIST
 
 ### Exercise Library & Tag Audit (DO THIS FIRST)
@@ -86,7 +112,7 @@ The "Match?" column says ✅ MATCH or ❌ MISMATCH. Every column entry must be t
 
 The volume enumeration tables in the next section need correct per-muscle target ranges to verify against. The original plan should already include a per-muscle target table — but rebuild it here from the canonical source to verify it's correct.
 
-**Step 1: Fetch the landmarks file.** Read https://json.fit/volume-landmarks.md so you have the canonical per-muscle MEV/MAV/MRV ranges in context.
+**Step 1: Fetch the landmarks file.** Read https://json.fit/volume-landmarks.md?v=3 so you have the canonical per-muscle MEV/MAV/MRV ranges in context.
 
 **Step 2: Identify the user's tier and experience.** From the original plan or user profile:
 - Volume Tier (Conservative / Moderate / High Volume)
@@ -120,7 +146,7 @@ Use this per-muscle target table when running volume enumeration in the next sec
 
 Verify RIR guidance is present and correct for every exercise in the plan.
 
-**Step 1: Fetch the RIR file.** Read https://json.fit/rir-guidance.md so you have the canonical matrix in context.
+**Step 1: Fetch the RIR file.** Read https://json.fit/rir-guidance.md?v=3 so you have the canonical matrix in context.
 
 **Step 2: Check every exercise has RIR guidance.** Every exercise in the plan should have an RIR note. If any exercise is missing RIR guidance, add it using the matrix from the file.
 
@@ -161,20 +187,27 @@ Do NOT narrate totals separately from the tables. Do NOT round toward target ran
 
 Compare each muscle's summed total against THAT MUSCLE'S target range from the Per-Muscle Volume Targets table above. Each muscle has its own range — do NOT use a single range for all muscles. The targets are in effective (fractional) terms — they already account for secondary contributions.
 
-- Flag as ⚠️ HIGH only if the table's summed total exceeds the ceiling of THAT muscle's target range
-- Flag as ⚠️ LOW only if the table's summed total falls below the floor of THAT muscle's target range
+- Flag as ⚠️ HIGH (must fix) if the table's summed total exceeds the ceiling of THAT muscle's target range
+- Flag as ⚠️ LOW (must fix) if the table's summed total falls below the floor of THAT muscle's target range
 - Auxiliary muscles use the MAV-low range from the landmarks file as their floor (typically 4-6 effective sets) — these MUST appear in the enumeration if the user selected them
-- Exempt muscles (Front Delts, Rear Delts, Traps, Forearms, Lower Back, Glutes — UNLESS the user selected them as auxiliary) don't need enumeration if compound contributions cover MEV. They are NOT exempt from MRV — going over the ceiling still causes problems.
+- Exempt-from-floor muscles (Front Delts, Rear Delts, Traps, Forearms, Lower Back, Glutes — UNLESS user selected as auxiliary) don't need enumeration if compound contributions cover MEV. However, they are NOT exempt from the ceiling — if compound contributions push them above the target range ceiling, this is a HIGH flag that must be fixed per the Rule Enforcement Principle. "Exempt from floor" never means "exempt from ceiling."
 
-If you need to adjust the program, recalculate the tables for affected muscles after the adjustment. Do not claim a fix works without re-running the table.
+**Cascade recount requirement.** When you adjust any exercise (add sets, remove sets, swap exercise, remove exercise), you MUST recount EVERY muscle that exercise tags as Primary OR Secondary. Not just the muscle you were trying to fix.
 
-### Weekly Volume Math Verification
+For example: if you remove a row, recount Upper Back (Primary), Lats (Secondary), Biceps (Secondary), and Rear Delts (Secondary). All four. Do not stop at the muscle you were targeting.
 
-The JSON will include a \`weekly_volume_by_muscle\` field. Manually calculate effective volume for at least three muscles with high training volume (e.g., Chest, Lats, Quads) and compare to what you'll output in that field. If your math is off, correct the plan until both the plan and your calculated totals agree.
+After every fix:
+1. List every muscle the changed exercise tags (Primary OR Secondary)
+2. Recount the volume enumeration table for each of those muscles
+3. Verify each muscle is still in its target range
+4. If any muscle moved outside its range due to the cascade, that's a NEW violation requiring its own fix
+5. Repeat until no muscle is outside its target range
+
+Do not claim a fix works without showing the recount tables for every affected muscle.
 
 ### Exercise Selection Audit  
 
-- **Compound movements**: At least 60% of exercises should be multi-joint movements (adjust per user experience level — beginners may lean higher toward compounds, advanced may need more isolation for specific muscle development)
+- **Movement pattern coverage**: Verify the program includes at least one compound exercise for each major movement pattern: horizontal push, vertical push, horizontal pull, vertical pull, squat, hinge. Do NOT enforce a percentage ratio of compound to isolation exercises — exercise selection is driven by per-muscle volume targets, not a fixed ratio.
 - **Movement patterns**: Balanced push/pull ratios, adequate hip hinge and squat patterns for leg training
 - **Progression potential**: All exercises should allow clear weight/rep/set progression across the mesocycle
 - **Set counts**: Don't exceed 5 sets of any single isolation exercise in one session

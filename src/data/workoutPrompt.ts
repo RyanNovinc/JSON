@@ -205,7 +205,7 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
                       data.volumePreference === '16-20' ? 'High Volume' :
                       'Moderate'; // '12-16' and 'not_sure' both default to Moderate
     specs += `**Volume Tier:** ${tierLabel}\n`;
-    specs += `(Per-muscle target ranges are built from the volume landmarks file at https://json.fit/volume-landmarks.md using this tier × experience mapping. All volume is measured in EFFECTIVE sets — Primary × 1.0 + Secondary × 0.5.)\n`;
+    specs += `(Per-muscle target ranges are built from the volume landmarks file at https://json.fit/volume-landmarks.md?v=3 using this tier × experience mapping. All volume is measured in EFFECTIVE sets — Primary × 1.0 + Secondary × 0.5.)\n`;
   }
 
   // Gender (for volume context)
@@ -429,6 +429,35 @@ Example (5-week block, 4 sets): Week 1: "10, 10, 10, 8" → Week 2: "10, 10, 8, 
 
 \`reps_weekly\` values must be comma-separated rep targets per set (e.g., "10, 10, 10, 8"), not shorthand like "4x10".
 
+**rir_weekly field — REQUIRED whenever the exercise has reps_weekly populated.** 
+
+If an exercise prescribes weekly reps, it must also prescribe weekly RIR. This applies to all resistance training exercises (compound lifts, machines, isolation work). It does NOT apply to cardio, flexibility, or mobility work — those don't have RIR.
+
+Structure: identical to reps_weekly. An object with week numbers as keys ("1", "2", "3", "4") and a comma-separated string of per-set RIR values for each week.
+
+Translation rules:
+1. The number of comma-separated values per week must match the exercise's set count for that week (matches reps_weekly)
+2. Source the values from the exercise's notes field, which contains the RIR progression (e.g., "RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4")
+3. The week-level target from the notes is the middle-set value. Apply within-exercise progression:
+   - Set 1: target + 1 (one rep further from failure)
+   - Middle sets: target
+   - Last set: target - 1 (one rep closer to failure, never below 0)
+4. Values can be single integers ("3", "2", "1", "0") or ranges ("0-1", "1-2")
+5. If the plan notes specify exact per-set values (e.g., "Set 1: 3 RIR. Set 2: 2 RIR. Set 3: 1 RIR."), use those exact values rather than re-deriving
+
+Example: For an exercise with 3 sets per week and notes "RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4":
+
+"rir_weekly": {
+  "1": "4, 3, 2",
+  "2": "3, 2, 1",
+  "3": "2, 1, 0",
+  "4": "1-2, 0-1, 0"
+}
+
+Floor: never go below RIR 0. If within-exercise math produces a negative value, clamp to 0.
+
+Do not regenerate RIR guidance from scratch — translate from the plan notes that already include the RIR progression.
+
 **Match progressions to the plan's rep range focus.** If the plan says "Block B: Strength — 5-8 reps," your compound progressions should work within that range. Isolation exercises can run 2-4 reps higher than the block's stated range (e.g., 8-12 isolation reps in a "5-8" strength block is fine).
 
 ### Rest Periods
@@ -512,6 +541,7 @@ Before generating JSON, read the canonical exercise library at https://json.fit/
   "secondaryMuscles": ["from taxonomy, or empty array"],
   "superset_group": "string (optional — e.g. 'ss1'; same value on two exercises links them as a superset)",
   "reps_weekly": { "1": "string", "2": "string", ... },
+  "rir_weekly": { "1": "string", "2": "string", ... },
   "sets_weekly": { "1": number, "2": number, ... },
   "notes": "string (form cues, RIR guidance, or other coaching notes — multiple notes allowed)",
   "alternatives": [
@@ -551,6 +581,7 @@ Before presenting each block, silently verify:
 - [ ] Superset exercises are adjacent with matching superset_group values and cross-referenced in notes
 - [ ] Rep progressions trend flat-to-decreasing across weeks (not identical every week)
 - [ ] RIR guidance from the plan carried through to every exercise's notes
+- [ ] rir_weekly field populated for every exercise that has reps_weekly (matching structure and set counts)
 - [ ] Deload weeks show reduced sets_weekly (~40-50%) and increased reps
 - [ ] restQuick ≈ 65% of rest for every exercise
 - [ ] Every exercise's muscle tags verified against canonical library at https://json.fit/exercises.md (library tags override plan tags)

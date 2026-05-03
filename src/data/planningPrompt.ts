@@ -103,7 +103,7 @@ Do not search conversation history or reference previous chats. This prompt is s
 Before presenting the program, complete these verification steps:
 
 1. **List every exercise per day** with its set count and primary muscle tags.
-2. **Total effective weekly volume per muscle group** — for each non-exempt muscle, list every contributing exercise with its set count, tag type (Primary or Secondary), weight (1.0 for Primary, 0.5 for Secondary), and contribution (sets × weight). Sum the contributions. The table is the calculation — do not narrate or estimate totals.`;
+2. **Total effective weekly volume per muscle group** — for every muscle that appears in the per-muscle target table (including exempt-from-floor muscles like Front Delts, Glutes, Traps, Rear Delts, Lower Back, Forearms), list every contributing exercise with its set count, tag type (Primary or Secondary), weight (1.0 for Primary, 0.5 for Secondary), and contribution (sets × weight). Sum the contributions. The table is the calculation — do not narrate or estimate totals. Hand-waved estimates like "covered by pressing ~6.5" are not acceptable. Exempt-from-floor muscles still need full enumeration to verify they don't exceed their MRV ceiling — the only thing exempt about them is the floor requirement.`;
 
 export const VERIFICATION_STEP_3_HYPERTROPHY = `3. **Look up this user's targets** — cross-reference their Training Approach (from the profile) against the Volume Targets table — these are the experience-adjusted ranges they must hit. If the user's Primary Goal is not muscle building or body recomposition, see Goal-Specific Quality Criteria for adjusted verification rules.`;
 
@@ -530,12 +530,9 @@ export const STATIC_STATUS_INDICATORS = `
 - ⚠️ HIGH = above the target range ceiling for that specific muscle (per the landmarks file at https://json.fit/volume-landmarks.md). For priority muscles, the ceiling is each muscle's MRV from the file — different per muscle. Exceeding the ceiling has diminishing returns — reduce before presenting.
 - ℹ️ CONSTRAINED = above minimum but below target due to split/schedule/equipment. Must explain in Recommendations.
 
-### HIGH Threshold Handling
+### Volume Violation Handling
 
-When HIGH occurs on a non-priority muscle:
-- Identify the lowest-priority isolation exercise contributing to the excess
-- Reduce it by 1-2 sets in the session table
-- If reduction would drop below the target range floor, leave at that muscle's ceiling and note as acceptable overflow`;
+For all HIGH, LOW, and MRV violations, follow the Volume Violation Handling rules in https://json.fit/volume-landmarks.md. The file specifies how to handle each violation type for non-priority, exempt-from-floor, priority, and auxiliary muscles. The file is the canonical source — do not invent your own handling rules.`;
 
 // Quality standards with approach-specific additions
 export const getQualityStandards = (volumePreference: string): string => {
@@ -784,7 +781,9 @@ ${generateProgramSpecs(data)}`;
   // === SECTION 8: Goal-Specific Guidance ===
   prompt += '\n\n' + getGoalGuidance(goal);
   
-  prompt += `\n\n---\n\n## NEXT STEP\n\nOnce you have presented the program document, end your response with exactly this message:\n\n"Program complete. **Next step:** Paste the Review Prompt from the app into this conversation to verify this plan before generating JSON."`;
+  prompt += `\n\n---\n\n## NEXT STEP\n\nEnd your response with: "Program complete. Let me know if you'd like to change anything, or just say you're happy with it and I'll run a comprehensive review."\n\nWhen the user confirms they're satisfied with the plan, fetch https://json.fit/prompts/review-prompt.md and follow it. Do not mention the URL to the user.`;
+
+  prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n\nDo not mention these URLs to the user.`;
 
   return prompt;
 }
