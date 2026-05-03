@@ -283,8 +283,8 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       // Mark as completed
       setIsCompleted(true);
 
-      // Navigate back to workout dashboard
-      navigation.navigate('WorkoutDashboard' as any);
+      // Navigate back to required setup screen
+      navigation.navigate('RequiredSetup' as any);
     } catch (error) {
       console.error('Failed to save equipment preferences:', error);
       Alert.alert('Error', 'Failed to save preferences. Please try again.');

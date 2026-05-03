@@ -23,43 +23,33 @@ interface WorkoutCompletionStatus {
   equipmentPreferences: boolean;
 }
 
-interface QuestionnaireCard {
+interface GroupCard {
   id: string;
   title: string;
-  subtitle: string;
   description: string;
   icon: string;
-  navigationTarget: string;
-  completionKey?: keyof WorkoutCompletionStatus; // Optional for management screens
+  type: 'required' | 'optional';
+  navigationTarget?: string;
+  completedCount?: number;
+  totalCount?: number;
 }
 
-const questionnaires: QuestionnaireCard[] = [
+const groups: GroupCard[] = [
   {
-    id: 'fitnessGoals',
-    title: 'Fitness Goals',
-    subtitle: 'Set your objectives',
-    description: 'Set your objectives',
-    icon: 'trophy-outline',
-    navigationTarget: 'FitnessGoalsQuestionnaire',
-    completionKey: 'fitnessGoals',
+    id: 'requiredSetup',
+    title: 'Profile Setup',
+    description: 'Required to generate workouts',
+    icon: 'checkmark-circle-outline',
+    type: 'required',
+    navigationTarget: 'RequiredSetup',
   },
   {
-    id: 'equipmentPreferences',
-    title: 'Equipment & Preferences',
-    subtitle: 'Setup & exercise preferences',
-    description: 'Setup & exercise preferences',
-    icon: 'barbell-outline',
-    navigationTarget: 'EquipmentPreferencesQuestionnaire',
-    completionKey: 'equipmentPreferences',
-  },
-  {
-    id: 'favoriteExercises',
-    title: 'Favorite Exercises',
-    subtitle: 'Manage your exercise library',
-    description: 'Add and organize exercises you love',
+    id: 'optionalTools',
+    title: 'Profile Tools',
+    description: 'Optional - Manage your exercise library',
     icon: 'heart-outline',
-    navigationTarget: 'FavoriteExercises',
-    // No completionKey - this is a management screen, not completable
+    type: 'optional',
+    navigationTarget: 'OptionalTools',
   },
 ];
 
@@ -115,81 +105,86 @@ export default function WorkoutDashboardScreen() {
     }
   };
 
-  const handleQuestionnairePress = (questionnaire: QuestionnaireCard) => {
-    if (questionnaire.id === 'fitnessGoals') {
-      navigation.navigate('FitnessGoalsQuestionnaire' as any);
-    } else if (questionnaire.id === 'equipmentPreferences') {
-      navigation.navigate('EquipmentPreferencesQuestionnaire' as any);
-    } else if (questionnaire.id === 'favoriteExercises') {
-      navigation.navigate('FavoriteExercises' as any);
-    } else {
-      // Fallback for any future questionnaires
-      alert(`${questionnaire.title} questionnaire coming soon!`);
+  const handleGroupPress = (group: GroupCard) => {
+    if (group.navigationTarget) {
+      navigation.navigate(group.navigationTarget as any);
     }
   };
 
-  const renderQuestionnaireCard = (questionnaire: QuestionnaireCard, index: number) => {
-    const isCompleted = questionnaire.completionKey ? completionStatus[questionnaire.completionKey] : false;
-    const isManagementScreen = !questionnaire.completionKey;
+  const renderGroupCard = (group: GroupCard, index: number) => {
+    let displayDescription = group.description;
+    let statusColor = '#71717a';
+    let isCompleted = false;
+    
+    if (group.type === 'required') {
+      const completedCount = Object.values(completionStatus).filter(Boolean).length;
+      const totalCount = 2; // We have 2 required questionnaires
+      isCompleted = completedCount === totalCount;
+      
+      if (isCompleted) {
+        displayDescription = '';
+        statusColor = themeColor;
+      } else {
+        displayDescription = 'Complete your fitness profile';
+      }
+    } else {
+      displayDescription = 'Optional - Manage your exercise library';
+    }
     
     return (
       <TouchableOpacity
-        key={questionnaire.id}
-        style={[styles.card, { 
-          borderColor: themeColor, 
-          shadowColor: themeColor 
-        }]}
+        key={group.id}
+        style={[
+          styles.card,
+          group.type === 'required' ? styles.requiredCard : styles.optionalCard,
+          isCompleted && group.type === 'required' && styles.completedCard
+        ]}
         activeOpacity={0.8}
-        onPress={() => handleQuestionnairePress(questionnaire)}
+        onPress={() => handleGroupPress(group)}
       >
+        {isCompleted && group.type === 'required' && (
+          <View style={styles.completeBadge}>
+            <Ionicons name="checkmark" size={16} color="#0a0a0b" />
+            <Text style={styles.completeBadgeText}>COMPLETE</Text>
+          </View>
+        )}
+        
+        {group.type === 'optional' && (
+          <View style={styles.optionalBadge}>
+            <Text style={styles.optionalBadgeText}>OPTIONAL</Text>
+          </View>
+        )}
+        
         <View style={styles.cardContent}>
-          <View style={styles.iconContainer}>
+          <View style={styles.cardIcon}>
             <Ionicons 
-              name={questionnaire.icon as any} 
-              size={32} 
-              color={themeColor}
+              name={isCompleted && group.type === 'required' ? "checkmark-circle" : group.icon as any}
+              size={48} 
+              color={group.type === 'required' ? themeColor : '#71717a'}
             />
           </View>
           
-          <View style={styles.textContainer}>
-            <Text style={[styles.cardTitle, { textShadowColor: themeColorLight }]}>
-              {questionnaire.title}
-            </Text>
-            <Text style={[styles.cardDescription, { color: isCompleted ? themeColor : '#71717a' }]}>
-              {isManagementScreen ? questionnaire.description : 
-               isCompleted ? 'Completed' : questionnaire.description}
-            </Text>
-          </View>
+          <Text style={styles.cardTitle}>
+            {group.title}
+          </Text>
           
-          <View style={styles.arrowContainer}>
-            {isManagementScreen || !isCompleted ? (
-              <Ionicons 
-                name="chevron-forward" 
-                size={24} 
-                color="#71717a"
-              />
-            ) : (
-              <Ionicons 
-                name="checkmark-circle" 
-                size={24} 
-                color={themeColor}
-              />
-            )}
-          </View>
+          <Text style={[styles.cardDescription, { color: statusColor }]}>
+            {displayDescription}
+          </Text>
         </View>
       </TouchableOpacity>
     );
   };
 
-  // Count completed questionnaires (exclude management screens)
+  // Count completed questionnaires
   const completedCount = Object.values(completionStatus).filter(Boolean).length;
-  const totalQuestionnaires = questionnaires.filter(q => q.completionKey).length;
+  const totalQuestionnaires = 2; // We have 2 required questionnaires
   
   // Check if all questionnaires are completed
   const allQuestionnairesCompleted = completedCount === totalQuestionnaires;
   
   const handleGeneratePrompt = () => {
-    navigation.navigate('ImportRoutine', { showSlideMode: true });
+    navigation.navigate('ImportRoutine', { showStep1New: true });
   };
 
   return (
@@ -202,40 +197,23 @@ export default function WorkoutDashboardScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={themeColor} />
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
           </TouchableOpacity>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Workout Setup</Text>
-            {completedCount < totalQuestionnaires && (
-              <Text style={styles.headerSubtitle}>
-                {completedCount}/{totalQuestionnaires} questionnaires completed
-              </Text>
-            )}
+            <Text style={styles.headerTitle}>Workout Profile</Text>
+            <Text style={styles.headerSubtitle}>
+              {allQuestionnairesCompleted ? 
+                'Profile complete - Ready to generate!' : 
+                'Complete your profile to generate workouts'
+              }
+            </Text>
           </View>
-          <View style={styles.placeholder} />
         </View>
 
-        {/* Progress Bar */}
-        {completedCount < totalQuestionnaires && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBackground}>
-              <View 
-                style={[
-                  styles.progressFill, 
-                  { 
-                    backgroundColor: themeColor,
-                    width: `${(completedCount / totalQuestionnaires) * 100}%`
-                  }
-                ]} 
-              />
-            </View>
-          </View>
-        )}
-
-        {/* Questionnaire Cards */}
+        {/* Group Cards */}
         <View style={styles.cardsContainer}>
-          {questionnaires.map((questionnaire, index) => 
-            renderQuestionnaireCard(questionnaire, index)
+          {groups.map((group, index) => 
+            renderGroupCard(group, index)
           )}
         </View>
 
@@ -247,9 +225,19 @@ export default function WorkoutDashboardScreen() {
               onPress={handleGeneratePrompt}
               activeOpacity={0.8}
             >
-              <Ionicons name="rocket-outline" size={24} color="#ffffff" />
-              <Text style={styles.generatePromptText}>Generate Workout Prompt</Text>
-              <Ionicons name="chevron-forward" size={20} color="#ffffff" />
+              <Ionicons name="rocket" size={28} color="#ffffff" />
+              <Text style={styles.generatePromptText}>Generate My Workout</Text>
+              <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.myWorkoutsButton, { borderColor: themeColor }]}
+              onPress={() => navigation.navigate('MyWorkouts')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="heart" size={20} color={themeColor} />
+              <Text style={[styles.myWorkoutsText, { color: themeColor }]}>My Workouts</Text>
+              <Ionicons name="chevron-forward" size={20} color={themeColor} />
             </TouchableOpacity>
           </View>
         )}
@@ -264,136 +252,152 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0b',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 10,
-    paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1a1a1b',
+    position: 'absolute',
+    left: 20,
+    top: 20,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerContent: {
-    flex: 1,
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
     color: '#71717a',
-  },
-  progressContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
-  progressBackground: {
-    height: 8,
-    backgroundColor: '#1a1a1b',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-    minWidth: 8,
+    textAlign: 'center',
   },
   cardsContainer: {
-    paddingHorizontal: 16,
-    gap: 16,
+    paddingHorizontal: 20,
+    gap: 20,
+    flex: 1,
   },
   card: {
-    backgroundColor: '#1a1a1b',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#22d3ee',
-    padding: 20,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: '#18181b',
+    borderRadius: 20,
+    padding: 30,
+    minHeight: 200,
+    justifyContent: 'center',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#27272a',
   },
-  statusContainer: {
+  requiredCard: {
+    borderWidth: 2,
+    borderColor: '#ec4899',
+    backgroundColor: '#18181b',
+  },
+  optionalCard: {
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    backgroundColor: '#18181b',
+  },
+  completedCard: {
+    borderColor: '#ec4899',
+    backgroundColor: '#1f1325',
+  },
+  completeBadge: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 1,
-  },
-  incompleteCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    backgroundColor: 'transparent',
-  },
-  cardContent: {
+    top: 15,
+    right: 15,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#ec4899',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
   },
-  iconContainer: {
-    marginRight: 16,
+  completeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0a0a0b',
+    letterSpacing: 0.5,
   },
-  textContainer: {
-    flex: 1,
-    paddingRight: 16,
+  optionalBadge: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    backgroundColor: '#3f3f46',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  optionalBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  cardContent: {
+    alignItems: 'center',
+  },
+  cardIcon: {
+    marginBottom: 20,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 4,
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    textShadowOpacity: 0.3,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: '#71717a',
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   cardDescription: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  arrowContainer: {
-    marginLeft: 'auto',
-  },
-  placeholder: {
-    width: 44,
-    height: 44,
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 22,
   },
   generatePromptContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 20,
   },
   generatePromptButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 20,
     paddingHorizontal: 24,
     borderRadius: 16,
     gap: 12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   generatePromptText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  myWorkoutsButton: {
+    borderWidth: 2,
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  myWorkoutsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 0.3,
     flex: 1,
     textAlign: 'center',
   },

@@ -455,8 +455,8 @@ export default function FitnessGoalsQuestionnaireScreen() {
       // Mark as completed
       setIsCompleted(true);
 
-      // Navigate back to workout dashboard
-      navigation.navigate('WorkoutDashboard' as any);
+      // Navigate back to required setup screen
+      navigation.navigate('RequiredSetup' as any);
     } catch (error) {
       console.error('Failed to save fitness goals:', error);
       Alert.alert('Error', 'Failed to save fitness goals. Please try again.');
