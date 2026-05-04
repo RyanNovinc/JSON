@@ -160,7 +160,7 @@ export default function SleepOptimizationScreen() {
       features: [
         'Last meal 2 hours before bedtime',
         'First meal within 2 hours of waking',
-        '12-hour eating window'
+        'Up to 14-hour eating window'
       ]
     },
     {
@@ -170,7 +170,7 @@ export default function SleepOptimizationScreen() {
       features: [
         'Last meal 3 hours before bedtime',
         'First meal 30-90 minutes after waking',
-        '8-10 hour eating window'
+        '~12 hour eating window'
       ]
     },
     {
@@ -180,7 +180,7 @@ export default function SleepOptimizationScreen() {
       features: [
         'Last meal 4+ hours before bedtime',
         'First meal 30-60 minutes after waking',
-        '8-hour early eating window'
+        '~10 hour eating window, weighted earlier'
       ]
     }
   ];
@@ -496,12 +496,6 @@ export default function SleepOptimizationScreen() {
         </Animatable.View>
 
         <View style={styles.resultsContent}>
-          <Text style={styles.resultsTitle}>
-            {isFromWorkoutDashboard ? 'Your Optimized Workout Schedule' : 'Your Optimized Meal Schedule'}
-          </Text>
-          <Text style={styles.resultsDescription}>
-            Based on your sleep schedule and optimization level, here's your personalized {isFromWorkoutDashboard ? 'workout' : 'meal'} timing:
-          </Text>
 
           {isFromWorkoutDashboard && workoutTimes ? (
             <View style={styles.mealTimingContainer}>
@@ -652,40 +646,65 @@ export default function SleepOptimizationScreen() {
         contentContainerStyle={styles.researchScrollContent}
       >
         <View style={styles.researchSection}>
-          <Text style={styles.researchSectionTitle}>Recent Studies (2020-2024)</Text>
+          <Text style={styles.researchSectionTitle}>Key Studies We Cite</Text>
           <View style={styles.researchStudies}>
-            <Text style={styles.researchStudyItem}>• Johns Hopkins (Cell Metabolism, 2022)</Text>
-            <Text style={styles.researchStudyItem}>• Harvard/Brigham (Cell Metabolism, 2022)</Text>
-            <Text style={styles.researchStudyItem}>• TIMET Trial (Annals of Internal Medicine, 2024)</Text>
-            <Text style={styles.researchStudyItem}>• NutriNet-Santé Study (103,389 participants)</Text>
+            <Text style={styles.researchStudyItem}>• Iao et al. 2022 (BJN, n=124,239) — eating within 1h of bed increases sleep disruption</Text>
+            <Text style={styles.researchStudyItem}>• Sutton et al. 2018 (Cell Metabolism) — early eating improves insulin sensitivity, independent of weight loss</Text>
+            <Text style={styles.researchStudyItem}>• Manoogian 2024 TIMET Trial (Annals of Internal Medicine) — 10-hour eating window improves HbA1c in metabolic syndrome</Text>
+            <Text style={styles.researchStudyItem}>• Lowe 2020 TREAT Trial (JAMA Internal Medicine) — TRE without protein attention can cause disproportionate lean mass loss</Text>
           </View>
         </View>
 
         <View style={styles.researchSection}>
-          <Text style={styles.researchSectionTitle}>Key Findings</Text>
+          <Text style={styles.researchSectionTitle}>What's Well-Supported</Text>
           <View style={styles.researchFindings}>
             <View style={styles.researchFinding}>
               <Text style={styles.researchBulletText}>•</Text>
               <Text style={styles.researchFindingText}>
-                Insulin sensitivity is <Text style={{ color: themeColor, fontWeight: '700' }}>34% higher</Text> in morning vs evening
+                Eating within 1h of bed disrupts sleep architecture
               </Text>
             </View>
             <View style={styles.researchFinding}>
               <Text style={styles.researchBulletText}>•</Text>
               <Text style={styles.researchFindingText}>
-                Eating 1hr vs 4hrs before bed increases glucose by <Text style={{ color: themeColor, fontWeight: '700' }}>18%</Text>
+                3-hour buffer before bed benefits glucose tolerance
               </Text>
             </View>
             <View style={styles.researchFinding}>
               <Text style={styles.researchBulletText}>•</Text>
               <Text style={styles.researchFindingText}>
-                Early time-restricted eating improves weight loss by <Text style={{ color: themeColor, fontWeight: '700' }}>3.7kg</Text> over 14 weeks
+                Late dinners worsen reflux risk
               </Text>
             </View>
             <View style={styles.researchFinding}>
               <Text style={styles.researchBulletText}>•</Text>
               <Text style={styles.researchFindingText}>
-                Morning protein intake correlates with better muscle mass and HDL levels
+                Pre-sleep casein 20-40g improves overnight muscle protein synthesis
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.researchSection}>
+          <Text style={styles.researchSectionTitle}>What's Practitioner Extrapolation</Text>
+          <Text style={[styles.researchSectionTitle, { fontSize: 14, color: '#71717a', fontWeight: '500', marginBottom: 12 }]}>(not RCT-validated)</Text>
+          <View style={styles.researchFindings}>
+            <View style={styles.researchFinding}>
+              <Text style={styles.researchBulletText}>•</Text>
+              <Text style={styles.researchFindingText}>
+                "8-hour window beats 10-hour" — no head-to-head trial
+              </Text>
+            </View>
+            <View style={styles.researchFinding}>
+              <Text style={styles.researchBulletText}>•</Text>
+              <Text style={styles.researchFindingText}>
+                "First meal within 30 minutes of waking" — supported broadly but exact cutoff isn't tested
+              </Text>
+            </View>
+            <View style={styles.researchFinding}>
+              <Text style={styles.researchBulletText}>•</Text>
+              <Text style={styles.researchFindingText}>
+                "4-hour buffer beats 3-hour" — extrapolation, not validated
               </Text>
             </View>
           </View>
@@ -697,19 +716,19 @@ export default function SleepOptimizationScreen() {
             <View style={styles.researchFinding}>
               <Text style={styles.researchBulletText}>•</Text>
               <Text style={styles.researchFindingText}>
-                Your body's internal clock affects how well you process food
+                Meal timing is a secondary lever behind total calories, protein intake, and food quality
               </Text>
             </View>
             <View style={styles.researchFinding}>
               <Text style={styles.researchBulletText}>•</Text>
               <Text style={styles.researchFindingText}>
-                Meal timing can be as important as what you eat for metabolic health
+                Most valuable for users with reflux, insulin resistance, or active sleep complaints
               </Text>
             </View>
             <View style={styles.researchFinding}>
               <Text style={styles.researchBulletText}>•</Text>
               <Text style={styles.researchFindingText}>
-                Simple timing changes can improve sleep quality and energy levels
+                Honesty about what's proven vs extrapolated helps you make informed choices
               </Text>
             </View>
           </View>
