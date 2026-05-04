@@ -46,6 +46,10 @@ import FridgePantryQuestionnaireScreen from '../screens/FridgePantryQuestionnair
 import SleepOptimizationScreen from '../screens/SleepOptimizationScreen';
 import NutritionDashboardScreen from '../screens/NutritionDashboardScreen';
 import WorkoutDashboardScreen from '../screens/WorkoutDashboardScreen';
+import RequiredSetupScreen from '../screens/RequiredSetupScreen';
+import OptionalToolsScreen from '../screens/OptionalToolsScreen';
+import NutritionRequiredSetupScreen from '../screens/NutritionRequiredSetupScreen';
+import NutritionOptionalToolsScreen from '../screens/NutritionOptionalToolsScreen';
 import FitnessGoalsQuestionnaireScreen from '../screens/FitnessGoalsQuestionnaireScreen';
 import EquipmentPreferencesQuestionnaireScreen from '../screens/EquipmentPreferencesQuestionnaireScreen';
 import MealCalendarScreen from '../screens/MealCalendarScreen';
@@ -78,7 +82,7 @@ interface CleanMealPlanNavigationParams {
 export type RootStackParamList = {
   Main: undefined;
   ImportRoutine: undefined;
-  ImportMealPlan: undefined;
+  ImportMealPlan: { showStep1New?: boolean };
   MyWorkouts: undefined;
   MyMealPlans: undefined;
   SampleMealPlans: undefined;
@@ -179,6 +183,10 @@ export type RootStackParamList = {
   SleepOptimizationScreen: undefined;
   NutritionDashboard: undefined;
   WorkoutDashboard: undefined;
+  RequiredSetup: undefined;
+  OptionalTools: undefined;
+  NutritionRequiredSetup: undefined;
+  NutritionOptionalTools: undefined;
   FitnessGoalsQuestionnaire: undefined;
   EquipmentPreferencesQuestionnaire: undefined;
   MealCalendar: undefined;
@@ -359,6 +367,12 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={PaymentScreen}
                 options={{
                   headerShown: false,
+                  presentation: 'modal',
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
                 }}
               />
               <RootStack.Screen 
@@ -515,6 +529,54 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                       },
                     };
                   },
+                }}
+              />
+              <RootStack.Screen 
+                name="RequiredSetup" 
+                component={RequiredSetupScreen}
+                options={{
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }}
+              />
+              <RootStack.Screen 
+                name="OptionalTools" 
+                component={OptionalToolsScreen}
+                options={{
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }}
+              />
+              <RootStack.Screen 
+                name="NutritionRequiredSetup" 
+                component={NutritionRequiredSetupScreen}
+                options={{
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }}
+              />
+              <RootStack.Screen 
+                name="NutritionOptionalTools" 
+                component={NutritionOptionalToolsScreen}
+                options={{
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
                 }}
               />
               <RootStack.Screen 

@@ -86,6 +86,8 @@ function generateConstraintLayer(data: QuestionnaireData): string {
 // STATIC TEXT CONSTANTS
 // ================================
 
+const CAPABILITY_CHECK = `**FETCH REQUIRED:** This prompt requires fetching files from json.fit. Try to fetch them. If fetch fails for ANY reason (no fetch tool, network blocked, allowlist denied, 404, etc.):\n\nStop immediately. Respond ONLY with this exact text:\n\n"This prompt needs to fetch files from json.fit, but fetching isn't working in your AI. To use JSON.fit:\n- Use Claude.ai with web search enabled in the message composer\n- Or ChatGPT with browsing enabled\nThen paste this prompt again."\n\nDo not offer to proceed without the files. Do not list more alternatives. Do not explain.\n\n`;
+
 export const INSTRUCTIONS_HEADER = `# Create a Complete Workout Program
 
 I'm using a workout app called JSON.fit. I need help creating a personalized workout program.
@@ -262,16 +264,16 @@ export const STATIC_RULES_4_5_6_7 = `4. **Treat exercise names as identifiers** 
 10. **Target range, not just minimums** — clearing the lower bound of the target range is not sufficient. Every non-exempt muscle should land within its target range from the Volume Targets table. If a muscle is just above the lower bound but well below the upper bound, treat it as a problem to solve, not an acceptable result.`;
 
 // Rule 10 variants by goal
-export const getRule8 = (goal: string): string => {
+export const getRule11 = (goal: string): string => {
   if (goal === 'build_muscle' || goal === 'body_recomposition' || goal === 'burn_fat') {
-    return `9. **Exercise count per session** — aim for 6-10 exercises per session. Supersets count as 2 exercises.`;
+    return `11. **Exercise count per session** — aim for 6-10 exercises per session. Supersets count as 2 exercises.`;
   } else if (goal === 'gain_strength' || goal === 'sport_specific') {
-    return `9. **Exercise count per session** — aim for 4-7 exercises per session. Fewer exercises with more sets on primary lifts. Supersets count as 2 exercises.`;
+    return `11. **Exercise count per session** — aim for 4-7 exercises per session. Fewer exercises with more sets on primary lifts. Supersets count as 2 exercises.`;
   } else if (goal === 'general_fitness') {
-    return `9. **Exercise count per session** — aim for 5-8 exercises per session. Supersets count as 2 exercises.`;
+    return `11. **Exercise count per session** — aim for 5-8 exercises per session. Supersets count as 2 exercises.`;
   } else {
     // custom_primary - show all ranges
-    return `9. **Exercise count per session** — aim for 6-10 exercises per session for hypertrophy programs, 4-7 for strength programs, and 5-8 for general fitness. These are guidelines, not hard limits — supersets count as 2 exercises.`;
+    return `11. **Exercise count per session** — aim for 6-10 exercises per session for hypertrophy programs, 4-7 for strength programs, and 5-8 for general fitness. These are guidelines, not hard limits — supersets count as 2 exercises.`;
   }
 };
 
@@ -391,19 +393,33 @@ export const RULE_20 = `22. **Complete block coverage** — the plan must explic
 // REST TIME DEFAULTS
 // ================================
 
-export const REST_SECTION_HEADER = `Use evidence-based rest periods appropriate for exercise type and training goal. Adjust based on user's rest preference if specified.`;
+export const getRestGuidance = (restTier: string, goal: string): string => {
+  const goalLabel = goal === 'gain_strength' ? 'Strength Building' :
+                    goal === 'build_muscle' ? 'Hypertrophy' :
+                    goal === 'burn_fat' ? 'Fat Loss' :
+                    goal === 'sport_specific' ? 'Sport-Specific' :
+                    goal === 'general_fitness' ? 'General Fitness' :
+                    'the primary goal';
 
-export const getRestSection = (restTrigger: string): string => {
-  if (restTrigger === 'OPTIMAL') {
-    return "\n- **Optimal Rest:** Use full rest periods (2-3 min compounds, 90-120s isolation). Maximize stimulus per set. Session duration will be whatever the rest periods and volume require.";
-  } else if (restTrigger === 'MINIMAL') {
-    return "\n- **Minimal Rest:** Compounds 60-90s, isolation 45-60s. Prioritize density and time efficiency. Best paired with Conservative or Moderate volume.";
-  } else { // MODERATE
-    return "\n- **Moderate Rest:** Compounds 90-120s, isolation 60-90s. A balance between stimulus quality and time efficiency.";
-  }
+  const goalOverride = goal === 'gain_strength' 
+    ? 'heavy compounds use 3–5 minutes regardless of tier'
+    : 'apply goal-specific overrides as specified in the file';
+
+  return `**Rest Period Guidelines — Evidence-Based Timing**
+
+**User Profile for Rest Targeting:**
+- Rest Tier: ${restTier}
+- Primary Goal: ${goalLabel}
+
+**REQUIRED ACTION before generating the program:**
+
+1. Fetch the canonical rest guidance file at https://json.fit/rest-guidance.md
+2. Locate the ${restTier} tier column in the per-tier × exercise category matrix
+3. Apply the rest period for each exercise based on its category
+4. Apply goal-specific overrides from the file — for ${goalLabel}, ${goalOverride}
+
+Use these rest periods consistently throughout the program. Rest periods are a critical programming variable — do not compress them to hit arbitrary session time targets.`;
 };
-
-export const STATIC_REST_TABLE = ``;
 
 // ================================
 // VOLUME RULES
@@ -485,6 +501,28 @@ Apply the matrix to every exercise based on:
 Output RIR guidance as part of each exercise's notes in the program document. Format per the user's experience tier as specified in the file. Keep RIR notes separate from form/technique notes.
 `;
 
+export const getRepRangeGuidance = (goal: string): string => {
+  const goalLabel = goal === 'gain_strength' ? 'Strength Building' :
+                    goal === 'build_muscle' ? 'Hypertrophy' :
+                    goal === 'burn_fat' ? 'Fat Loss' :
+                    goal === 'sport_specific' ? 'Sport-Specific' :
+                    goal === 'general_fitness' ? 'General Fitness' :
+                    'the primary goal';
+
+  return `### Rep Range Guidelines — Exercise-Category Based Targeting
+
+**User Profile for Rep Range Targeting:**
+- Primary Goal: ${goalLabel}
+
+**REQUIRED ACTION before generating the program:**
+
+1. Fetch the canonical rep range guidance file at https://json.fit/rep-range-guidance.md
+2. Map rep ranges to exercise category, not abstract goal labels — apply the per-category table from the file
+3. Apply goal-specific adjustments for ${goalLabel} per the file's Goal-Specific Rules section
+
+Use these rep ranges consistently throughout the program. Rep ranges should match the exercise's biomechanical demands and the user's primary training goal.`;
+};
+
 
 export const STATIC_PRIORITY_MUSCLES = `
 ### Priority Muscle Groups
@@ -561,15 +599,15 @@ Adapt the plan based on the user's Primary Goal from their profile.`;
 
 export const BUILD_MUSCLE_GUIDANCE = `
 ### Build Muscle / Body Recomposition
-Prioritize hypertrophy rep ranges (8-12 for compounds, 10-15 for isolation). Volume is the primary driver.`;
+Volume is the primary driver. Apply per-category rep ranges from https://json.fit/rep-range-guidance.md and standard rest periods from https://json.fit/rest-guidance.md.`;
 
 export const BURN_FAT_GUIDANCE = `
 ### Burn Fat
-Include higher-rep metabolic work and compound movements for caloric expenditure. Consider shorter rest periods.`;
+Include compound movements for caloric expenditure. Apply per-category rep ranges from https://json.fit/rep-range-guidance.md (slightly higher ranges acceptable for metabolic stress).`;
 
 export const GAIN_STRENGTH_GUIDANCE = `
 ### Gain Strength
-Prioritize lower rep ranges (3-6 for main compounds, 6-10 for accessories). Longer rest periods and fewer exercises per session.`;
+Prioritize heavy compound work with longer rest. Fewer exercises per session, more sets on primary lifts. Apply strength-specific rep ranges and rest overrides from the hosted guidance files (heavy compounds: 1-6 reps, 3-5 min rest regardless of tier).`;
 
 export const SPORT_SPECIFIC_GUIDANCE = `
 ### Sport-Specific Training
@@ -585,7 +623,7 @@ Design according to the user's custom description. Use the most applicable frame
 
 export const CUSTOM_GOAL_FRAMEWORK_SUMMARY = `
 
-**Available frameworks:** Build Muscle (hypertrophy volume, 8-12 rep compounds), Burn Fat (metabolic + compounds, lower-end volume OK), Gain Strength (3-6 rep compounds, longer rest, fewer exercises), Sport-Specific (lifting supports the sport), General Fitness (balanced, circuits count for volume at rounds × exercises).`;
+**Available frameworks:** Build Muscle (hypertrophy volume, per-category rep ranges from https://json.fit/rep-range-guidance.md), Burn Fat (metabolic + compounds, lower-end volume OK), Gain Strength (heavy compound focus, longer rest, fewer exercises), Sport-Specific (lifting supports the sport), General Fitness (balanced, circuits count for volume at rounds × exercises).`;
 
 // Goal guidance selection function
 export const getGoalGuidance = (goal: string): string => {
@@ -692,6 +730,7 @@ export function assemblePlanningPrompt(
   let prompt = '';
   
   // === SECTION 1: Instructions ===
+  prompt += CAPABILITY_CHECK;
   prompt += INSTRUCTIONS_HEADER;
   prompt += '\n' + getVerificationStep3(goal);
   prompt += '\n' + VERIFICATION_STEPS_4_5;
@@ -740,7 +779,7 @@ ${generateProgramSpecs(data)}`;
   prompt += '\n' + STATIC_RULE_2;
   prompt += '\n' + getRule3(hasActivityGoals);
   prompt += '\n' + STATIC_RULES_4_5_6_7;
-  prompt += '\n' + getRule8(goal);
+  prompt += '\n' + getRule11(goal);
   
   const hasRotationRules = hasActivityGoals || !isShortProgram || isLongProgram;
   if (hasRotationRules) prompt += '\n' + ROTATION_PERIODIZATION_HEADER;
@@ -765,15 +804,14 @@ ${generateProgramSpecs(data)}`;
   if (!isShortProgram) prompt += '\n' + RULE_20;
   
   // === SECTION 6: Rest Time Defaults ===
-  prompt += '\n\n' + REST_SECTION_HEADER;
-  prompt += '\n' + getRestSection(restTrigger);
-  prompt += '\n' + STATIC_REST_TABLE;
+  prompt += '\n\n' + getRestGuidance(restTrigger, goal);
   
   // === SECTION 7: Volume Rules ===
   prompt += '\n\n' + VOLUME_RULES_HEADER;
   prompt += '\n' + getVolumeTargets(volumePreference, exp as ExperienceTier);
   prompt += '\n' + STATIC_VOLUME_DEFINITIONS;
   prompt += '\n' + RIR_GUIDANCE;
+  prompt += '\n' + getRepRangeGuidance(goal);
   prompt += '\n' + getExemptMuscles(volumePreference, gymDays);
   if (isBodyweightOnly) prompt += '\n' + BODYWEIGHT_VOLUME_ADJUSTMENTS;
   prompt += '\n' + getQualityStandards(volumePreference);
@@ -783,7 +821,7 @@ ${generateProgramSpecs(data)}`;
   
   prompt += `\n\n---\n\n## NEXT STEP\n\nEnd your response with: "Program complete. Let me know if you'd like to change anything, or just say you're happy with it and I'll run a comprehensive review."\n\nWhen the user confirms they're satisfied with the plan, fetch https://json.fit/prompts/review-prompt.md and follow it. Do not mention the URL to the user.`;
 
-  prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n\nDo not mention these URLs to the user.`;
+  prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n- https://json.fit/rest-guidance.md (rest period guidelines)\n- https://json.fit/rep-range-guidance.md (rep range guidelines)\n\nDo not mention these URLs to the user.`;
 
   return prompt;
 }

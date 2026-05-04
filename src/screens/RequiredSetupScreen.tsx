@@ -120,12 +120,11 @@ export default function RequiredSetupScreen() {
         
         <View style={styles.titleContainer}>
           <Text style={styles.title}>Required Setup</Text>
-          <Text style={styles.subtitle}>
-            {allCompleted 
-              ? 'All set! Ready to generate workouts' 
-              : `${completedCount}/${SETUP_ITEMS.length} completed`
-            }
-          </Text>
+          {!allCompleted && (
+            <Text style={styles.subtitle}>
+              {`${completedCount}/${SETUP_ITEMS.length} completed`}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -147,8 +146,13 @@ export default function RequiredSetupScreen() {
               key={item.id}
               style={[
                 styles.setupItem,
-                isCompleted && styles.setupItemCompleted,
-                { borderLeftColor: isCompleted ? '#ec4899' : '#27272a' }
+                isCompleted && {
+                  backgroundColor: themeColor === '#ec4899' ? '#1f1325' : 
+                                 themeColor === '#22d3ee' ? '#1e2238' :
+                                 themeColor === '#10b981' ? '#0f1611' : '#1f1325',
+                  borderColor: themeColor + '20',
+                },
+                { borderLeftColor: isCompleted ? themeColor : '#27272a' }
               ]}
               onPress={() => handleItemPress(item)}
               activeOpacity={0.8}
@@ -156,7 +160,7 @@ export default function RequiredSetupScreen() {
               <View style={styles.setupItemContent}>
                 <View style={[
                   styles.iconContainer,
-                  { backgroundColor: isCompleted ? '#ec489920' : '#27272a' }
+                  { backgroundColor: isCompleted ? themeColor + '20' : '#27272a' }
                 ]}>
                   <Ionicons 
                     name={item.icon as any} 
@@ -213,22 +217,23 @@ const styles = StyleSheet.create({
     color: '#71717a',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#27272a',
+    position: 'relative',
   },
   backButton: {
+    position: 'absolute',
+    left: 16,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   titleContainer: {
-    flex: 1,
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,
@@ -268,10 +273,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     marginBottom: 16,
     overflow: 'hidden',
-  },
-  setupItemCompleted: {
-    backgroundColor: '#0d1611',
-    borderColor: '#10b98120',
   },
   setupItemContent: {
     flexDirection: 'row',

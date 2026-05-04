@@ -10,8 +10,8 @@ export interface StrengthExercise {
   rest: number;                    // seconds (optimal rest)
   restQuick?: number;              // seconds (quick mode rest)
   reps_weekly?: { [week: string]: string };
-  sets_weekly?: { [week: string]: number };
   rir_weekly?: { [week: string]: string };
+  sets_weekly?: { [week: string]: number };
   notes?: string;
   alternatives?: Array<{
     exercise: string;

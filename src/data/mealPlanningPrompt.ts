@@ -106,7 +106,9 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
     // Format rate to avoid floating point precision issues
     const displayRate = nutritionData.rate ? parseFloat(String(nutritionData.rate)).toFixed(2) : 'moderate';
     
-    let prompt = `I'm using a nutrition planning app called JSON.fit and need help creating a personalized meal plan.
+    const CAPABILITY_CHECK = `**FETCH REQUIRED:** This prompt requires fetching files from json.fit. Try to fetch them. If fetch fails for ANY reason (no fetch tool, network blocked, allowlist denied, 404, etc.):\n\nStop immediately. Respond ONLY with this exact text:\n\n"This prompt needs to fetch files from json.fit, but fetching isn't working in your AI. To use JSON.fit:\n- Use Claude.ai with web search enabled in the message composer\n- Or ChatGPT with browsing enabled\nThen paste this prompt again."\n\nDo not offer to proceed without the files. Do not list more alternatives. Do not explain.\n\n`;
+    
+    let prompt = CAPABILITY_CHECK + `I'm using a nutrition planning app called JSON.fit and need help creating a personalized meal plan.
 
 **QUICK CREATION INSTRUCTIONS:**
 1. **STANDARD KNOWLEDGE** - Use your existing knowledge base for common foods and recipes
@@ -135,6 +137,22 @@ Sometimes the user's preferences will conflict — for example, a very low budge
 - Snacking style: ${budgetData.snackingStyle || 'Occasional snacker'}
 - Goal: ${nutritionData.goal || 'maintain'} at ${displayRate} rate
 
+**FIBER INTAKE GUIDELINES:**
+
+**User Profile for Fiber Targeting:**
+- Calculated fiber target: ${fiberTarget}g (14g/1000kcal formula)
+- Daily calories: ${macroResults.calories || 2000}
+- Primary goal: ${nutritionData.goal || 'maintain'}
+
+**REQUIRED ACTION before generating the meal plan:**
+
+1. Fetch the canonical fiber guidance file at https://json.fit/fiber-guidance.md
+2. Use ${fiberTarget}g as the starting point, then apply goal-specific overrides from the file
+3. Apply adjustment triggers if relevant (bulking cap 35-45g, cutting preserve 30-38g, pre-training ≤5g)
+4. Consider individual factors from the file (constipation, bloating, LDL, FODMAP sensitivity, carb loading)
+
+The calculated fiber target provides a baseline, but the file contains important modifications based on training context and individual responses.
+
 **MEAL PLAN REQUIREMENTS:**
 1. **BUDGET CONSTRAINT** - ${getBudgetConstraintText(budgetData)}
 2. **MEAL PREP FOCUSED** - ${getMealPrepStyleText(budgetData.planningStyle, budgetData.skillConfidence, budgetData.timeInvestment)}
@@ -145,6 +163,22 @@ Sometimes the user's preferences will conflict — for example, a very low budge
 ${getVarietyRequirements(budgetData, budgetData.skillConfidence, budgetData.timeInvestment)}${getSkillRequirements(budgetData)}${getTimeRequirements(budgetData)}
 
 ${getMealStructure(budgetData.mealsPerDay || 3, macroResults.protein || 150)}
+
+**PROTEIN DISTRIBUTION GUIDELINES:**
+
+**User Profile for Protein Distribution:**
+- Daily protein target: ${macroResults.protein || 150}g
+- Meals per day: ${budgetData.mealsPerDay || 3}
+- Primary goal: ${nutritionData.goal || 'maintain'}
+
+**REQUIRED ACTION before generating the meal plan:**
+
+1. Fetch the canonical protein distribution guidance file at https://json.fit/protein-distribution-guidance.md
+2. Apply per-meal floor targets from the bodyweight × meal frequency tables (0.4 g/kg minimum per meal)
+3. Apply goal-specific daily totals and timing requirements from the file
+4. Apply source quality hierarchy for optimal protein utilization (whey ≥ milk/casein ≥ egg > soy > pea/rice > wheat)
+
+Use these guidelines to ensure optimal protein distribution across all meals and snacks throughout the day.
 
 **Snacking requirements:** ${getSnackingGuidance(budgetData.snackingStyle, budgetData.snackFrequency)}
 
@@ -197,17 +231,35 @@ ${getDiversityRequirements(nutritionData, budgetData)}`;
 Based on my completed Sleep Optimization questionnaire:
 - Sleep schedule: ${sleepData.bedtime} - ${sleepData.wakeTime}
 - Optimization level: ${optimizationLevel}
-- IMPORTANT: Calculate and provide specific meal times for each day based on these sleep parameters:
-  • First meal: ${firstMealTiming}
-  • Last meal: ${lastMealTiming}
-  • Space meals evenly across the eating window. The sleep buffer (first meal and last meal timing above) is a hard constraint — do not move meals outside the eating window to achieve wider spacing. If the number of meals makes gaps shorter than 3 hours, acknowledge this trade-off in the plan notes and distribute meals as evenly as possible. Never schedule two meals less than 2 hours apart.
+
+**REQUIRED ACTION before generating the meal plan:**
+
+1. Fetch the canonical meal timing guidance file at https://json.fit/meal-timing-guidance.md
+2. Apply the ${optimizationLevel} tier requirements from the per-tier matrix
+3. Apply override triggers and exceptions from the file (T2D, reflux, shift workers, eating disorders, athletes, pre-sleep casein, caffeine cutoff)
+4. Apply composition × timing rules for optimal nutrient absorption
+
+**User-specific timing constraints (hard requirements):**
+- First meal: ${firstMealTiming}
+- Last meal: ${lastMealTiming}
 - ${timingGuidance}
-- PROVIDE SPECIFIC TIMES: For each meal in your plan, specify the recommended time (e.g., "7:45 AM", "12:30 PM", "6:00 PM") and briefly explain why that timing supports better sleep and metabolism`;
+
+**IMPORTANT:** Calculate and provide specific meal times for each day based on these sleep parameters. Space meals evenly across the eating window. The sleep buffer (first meal and last meal timing above) is a hard constraint — do not move meals outside the eating window to achieve wider spacing. If the number of meals makes gaps shorter than 3 hours, acknowledge this trade-off in the plan notes and distribute meals as evenly as possible. Never schedule two meals less than 2 hours apart.
+
+PROVIDE SPECIFIC TIMES: For each meal in your plan, specify the recommended time (e.g., "7:45 AM", "12:30 PM", "6:00 PM") and briefly explain why that timing supports better sleep and metabolism`;
     } else {
       // No sleep optimization - add basic meal timing guidance
       prompt += `
 
 **MEAL TIMING:**
+
+**REQUIRED ACTION before generating the meal plan:**
+
+1. Fetch the canonical meal timing guidance file at https://json.fit/meal-timing-guidance.md
+2. Apply general meal timing rules from the file for optimal metabolism and digestion
+3. Check for override triggers that may apply to this user (T2D, reflux, shift work, etc.)
+
+**Basic timing guidelines:**
 - Space meals roughly 3-5 hours apart during waking hours
 - No specific eating window constraint`;
     }
@@ -1337,20 +1389,25 @@ Focus on practical meals matching my planning preferences.`;
 const getFeedbackWorkflow = (): string => {
   return `
 
-**IMPORTANT - FEEDBACK WORKFLOW:**
-After creating the initial meal plan:
-1. Present the complete meal plan with a brief summary
-2. Ask me to review the plan and provide feedback on:
-   - Foods I don't like or want to substitute
-   - Meals that seem too complex or too simple for my skill level
-   - Any ingredients I want to avoid or swap out
-   - Portion sizes or macro distribution adjustments
-   - Meal prep timing or complexity concerns
-   - Grocery list corrections (wrong items, missing items, price adjustments)
-3. **WAIT for my feedback before proceeding**
-4. Make any requested adjustments to the meal plan
-5. Only after I'm satisfied with the plan should you ask if I want the JSON conversion
+---
 
-**Do NOT automatically convert to JSON** - I need to review the plan first. After presenting the plan and receiving my feedback, tell me: "When you're happy with the plan, send me the review prompt to run a final quality check before JSON conversion."`;
+## NEXT STEP
+
+End your response with: "Meal plan complete. Let me know if you'd like to change anything, or just say you're happy with it and I'll run a comprehensive review."
+
+When the user confirms they're satisfied with the plan, fetch https://json.fit/prompts/meal-review-prompt.md and follow it. Do not mention the URL to the user.
+
+---
+
+## REFERENCE URLS
+
+The following URLs may be fetched during the meal plan creation flow. They are listed here so they are available for fetching when needed:
+- https://json.fit/prompts/meal-review-prompt.md (quality audit prompt)
+- https://json.fit/prompts/meal-json-prompt.md (JSON conversion prompt)
+- https://json.fit/meal-timing-guidance.md (meal timing guidelines)
+- https://json.fit/protein-distribution-guidance.md (protein distribution guidelines)
+- https://json.fit/fiber-guidance.md (fiber intake guidelines)
+
+Do not mention these URLs to the user.`;
 };
 

@@ -136,14 +136,23 @@ export default function WorkoutDashboardScreen() {
         key={group.id}
         style={[
           styles.card,
-          group.type === 'required' ? styles.requiredCard : styles.optionalCard,
-          isCompleted && group.type === 'required' && styles.completedCard
+          group.type === 'required' ? {
+            ...styles.requiredCard,
+            borderColor: themeColor
+          } : styles.optionalCard,
+          isCompleted && group.type === 'required' && {
+            ...styles.completedCard,
+            borderColor: themeColor,
+            backgroundColor: themeColor === '#ec4899' ? '#1f1325' : 
+                           themeColor === '#22d3ee' ? '#1e2238' :
+                           themeColor === '#10b981' ? '#0f1611' : '#1f1325'
+          }
         ]}
         activeOpacity={0.8}
         onPress={() => handleGroupPress(group)}
       >
         {isCompleted && group.type === 'required' && (
-          <View style={styles.completeBadge}>
+          <View style={[styles.completeBadge, { backgroundColor: themeColor }]}>
             <Ionicons name="checkmark" size={16} color="#0a0a0b" />
             <Text style={styles.completeBadgeText}>COMPLETE</Text>
           </View>
@@ -201,12 +210,11 @@ export default function WorkoutDashboardScreen() {
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Workout Profile</Text>
-            <Text style={styles.headerSubtitle}>
-              {allQuestionnairesCompleted ? 
-                'Profile complete - Ready to generate!' : 
-                'Complete your profile to generate workouts'
-              }
-            </Text>
+            {!allQuestionnairesCompleted && (
+              <Text style={styles.headerSubtitle}>
+                Complete your profile to generate workouts
+              </Text>
+            )}
           </View>
         </View>
 
@@ -237,7 +245,7 @@ export default function WorkoutDashboardScreen() {
             >
               <Ionicons name="heart" size={20} color={themeColor} />
               <Text style={[styles.myWorkoutsText, { color: themeColor }]}>My Workouts</Text>
-              <Ionicons name="chevron-forward" size={20} color={themeColor} />
+              <Ionicons name="chevron-down" size={20} color={themeColor} />
             </TouchableOpacity>
           </View>
         )}
@@ -297,7 +305,6 @@ const styles = StyleSheet.create({
   },
   requiredCard: {
     borderWidth: 2,
-    borderColor: '#ec4899',
     backgroundColor: '#18181b',
   },
   optionalCard: {
@@ -306,7 +313,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181b',
   },
   completedCard: {
-    borderColor: '#ec4899',
     backgroundColor: '#1f1325',
   },
   completeBadge: {
@@ -315,7 +321,6 @@ const styles = StyleSheet.create({
     right: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ec4899',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,

@@ -14,70 +14,45 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage, NutritionCompletionStatus } from '../utils/storage';
+import { useRevenueCat } from '../contexts/RevenueCatContext';
+import { hasNutritionAccess, REVENUECAT_CONFIG } from '../config/revenueCatConfig';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-interface QuestionnairCard {
+interface GroupCard {
   id: string;
   title: string;
-  subtitle: string;
   description: string;
   icon: string;
-  navigationTarget: string;
-  completionKey: keyof NutritionCompletionStatus;
+  type: 'required' | 'optional';
+  navigationTarget?: string;
+  completedCount?: number;
+  totalCount?: number;
 }
 
-const questionnaires: QuestionnairCard[] = [
+const groups: GroupCard[] = [
   {
-    id: 'nutrition',
-    title: 'Nutrition Goals',
-    subtitle: 'Set your macro targets',
-    description: 'Set your macro targets',
-    icon: 'nutrition-outline',
-    navigationTarget: 'NutritionQuestionnaire',
-    completionKey: 'nutritionGoals',
+    id: 'requiredSetup',
+    title: 'Profile Setup',
+    description: 'Required to generate meal plans',
+    icon: 'checkmark-circle-outline',
+    type: 'required',
+    navigationTarget: 'NutritionRequiredSetup',
   },
   {
-    id: 'budget',
-    title: 'Budget Cooking',
-    subtitle: 'Meal planning preferences',
-    description: 'Meal planning preferences',
-    icon: 'restaurant-outline',
-    navigationTarget: 'BudgetCookingQuestionnaire',
-    completionKey: 'budgetCooking',
-  },
-  {
-    id: 'sleep',
-    title: 'Sleep Optimization',
-    subtitle: 'Meal timing & sleep',
-    description: 'Meal timing & sleep',
-    icon: 'moon-outline',
-    navigationTarget: 'SleepOptimizationScreen',
-    completionKey: 'sleepOptimization',
-  },
-  {
-    id: 'fridgePantry',
-    title: 'My Fridge & Pantry',
-    subtitle: 'Existing ingredients',
-    description: 'Add ingredients you already have',
-    icon: 'storefront-outline',
-    navigationTarget: 'FridgePantryQuestionnaire',
-    completionKey: 'fridgePantry',
-  },
-  {
-    id: 'favorites',
-    title: 'Favorite Meals',
-    subtitle: 'Manage saved meals',
-    description: 'View and manage your saved meals',
+    id: 'optionalTools',
+    title: 'Profile Tools',
+    description: 'Optional - Manage your nutrition preferences',
     icon: 'heart-outline',
-    navigationTarget: 'FavoriteMeals',
-    completionKey: 'favoriteMeals',
+    type: 'optional',
+    navigationTarget: 'NutritionOptionalTools',
   },
 ];
 
 export default function NutritionDashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { themeColor, themeColorLight } = useTheme();
+  const { customerInfo, purchasePackage } = useRevenueCat();
   const [completionStatus, setCompletionStatus] = useState<NutritionCompletionStatus>({
     nutritionGoals: false,
     budgetCooking: false,
@@ -85,22 +60,17 @@ export default function NutritionDashboardScreen() {
     fridgePantry: false,
     favoriteMeals: false,
   });
-  const [fridgePantryCount, setFridgePantryCount] = useState<number>(0);
-  const [useFridgePantry, setUseFridgePantry] = useState<boolean>(false);
-  const [fridgePantryPreferences, setFridgePantryPreferences] = useState<any>(null);
-
+  
+  // DEV ONLY: Toggle entitlement view for testing
+  const [forceNoEntitlement, setForceNoEntitlement] = useState(false);
   useEffect(() => {
     loadCompletionStatus();
-    loadFridgePantryCount();
-    loadUseFridgePantryToggle();
   }, []);
 
   // Reload data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       loadCompletionStatus();
-      loadFridgePantryCount();
-      loadUseFridgePantryToggle();
     }, [])
   );
 
@@ -113,162 +83,86 @@ export default function NutritionDashboardScreen() {
     }
   };
 
-  const loadFridgePantryCount = async () => {
-    try {
-      const results = await WorkoutStorage.loadFridgePantryResults();
-      if (results && results.formData.ingredients) {
-        setFridgePantryCount(results.formData.ingredients.length);
-      }
-      if (results && results.formData.preferences) {
-        setFridgePantryPreferences(results.formData.preferences);
-      }
-    } catch (error) {
-      console.error('Failed to load fridge pantry count:', error);
+
+  const handleGroupPress = (group: GroupCard) => {
+    if (group.navigationTarget) {
+      navigation.navigate(group.navigationTarget as any);
     }
   };
 
-  const loadUseFridgePantryToggle = async () => {
-    try {
-      const results = await WorkoutStorage.loadFridgePantryResults();
-      if (results && results.formData) {
-        setUseFridgePantry(results.formData.wantToUseExistingIngredients || false);
-      }
-    } catch (error) {
-      console.error('Failed to load fridge pantry toggle:', error);
-    }
-  };
-
-  const handleToggleFridgePantry = async (value: boolean) => {
-    try {
-      setUseFridgePantry(value);
+  const renderGroupCard = (group: GroupCard, index: number) => {
+    let displayDescription = group.description;
+    let statusColor = '#71717a';
+    let isCompleted = false;
+    
+    if (group.type === 'required') {
+      const completedCount = [
+        completionStatus.nutritionGoals,
+        completionStatus.budgetCooking,
+        completionStatus.sleepOptimization
+      ].filter(Boolean).length;
+      const totalCount = 3; // We have 3 required questionnaires
+      isCompleted = completedCount === totalCount;
       
-      const results = await WorkoutStorage.loadFridgePantryResults();
-      if (results) {
-        const updatedResults = {
-          ...results,
-          formData: {
-            ...results.formData,
-            wantToUseExistingIngredients: value,
-          },
-        };
-        await WorkoutStorage.saveFridgePantryResults(updatedResults);
+      if (isCompleted) {
+        displayDescription = '';
+        statusColor = themeColor;
+      } else {
+        displayDescription = 'Complete your nutrition profile';
       }
-    } catch (error) {
-      console.error('Failed to save fridge pantry toggle:', error);
-    }
-  };
-
-  const handlePreferencesSave = async (newPreferences: any) => {
-    setFridgePantryPreferences(newPreferences);
-    // Reload data to ensure consistency
-    await loadFridgePantryCount();
-    await loadUseFridgePantryToggle();
-  };
-
-  const getFridgePantryDisplayText = () => {
-    if (!useFridgePantry) return 'Off';
-    
-    if (!fridgePantryPreferences) return 'Set up';
-    
-    switch (fridgePantryPreferences.primaryApproach) {
-      case 'maximize':
-        return 'Maximize inventory';
-      case 'expiry':
-        return 'Expiry focused';
-      case 'ai-led':
-        return 'AI-led planning';
-      default:
-        return 'Set up';
-    }
-  };
-
-  const handleQuestionnairePress = (questionnaire: QuestionnairCard) => {
-    if (questionnaire.id === 'nutrition') {
-      const isCompleted = completionStatus[questionnaire.completionKey];
-      navigation.navigate(questionnaire.navigationTarget as any, {
-        showResults: isCompleted
-      });
-    } else if (questionnaire.id === 'sleep') {
-      const isCompleted = completionStatus[questionnaire.completionKey];
-      navigation.navigate(questionnaire.navigationTarget as any, {
-        showResults: isCompleted
-      });
     } else {
-      navigation.navigate(questionnaire.navigationTarget as any);
+      displayDescription = 'Optional - Manage your nutrition preferences';
     }
-  };
-
-  const renderQuestionnaireCard = (questionnaire: QuestionnairCard, index: number) => {
-    const isCompleted = completionStatus[questionnaire.completionKey];
-    const isFavorites = questionnaire.id === 'favorites';
-    const isFridgePantry = questionnaire.id === 'fridgePantry';
-
+    
     return (
       <TouchableOpacity
-        key={questionnaire.id}
-        style={[styles.card, { 
-          borderColor: isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor, 
-          shadowColor: isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor 
-        }]}
+        key={group.id}
+        style={[
+          styles.card,
+          group.type === 'required' ? {
+            ...styles.requiredCard,
+            borderColor: themeColor
+          } : styles.optionalCard,
+          isCompleted && group.type === 'required' && {
+            ...styles.completedCard,
+            borderColor: themeColor,
+            backgroundColor: themeColor === '#ec4899' ? '#1f1325' : 
+                           themeColor === '#22d3ee' ? '#1e2238' :
+                           themeColor === '#10b981' ? '#0f1611' : '#1f1325'
+          }
+        ]}
         activeOpacity={0.8}
-        onPress={() => handleQuestionnairePress(questionnaire)}
+        onPress={() => handleGroupPress(group)}
       >
-        {/* Fridge Pantry Item Count */}
-        {isFridgePantry && fridgePantryCount > 0 && (
-          <View style={[styles.itemCountContainer, { backgroundColor: useFridgePantry ? themeColor : '#71717a' }]}>
-            <Text style={[styles.itemCountText, { color: useFridgePantry ? '#0a0a0b' : '#ffffff' }]}>{fridgePantryCount}</Text>
+        {isCompleted && group.type === 'required' && (
+          <View style={[styles.completeBadge, { backgroundColor: themeColor }]}>
+            <Ionicons name="checkmark" size={16} color="#0a0a0b" />
+            <Text style={styles.completeBadgeText}>COMPLETE</Text>
           </View>
         )}
-
-        {/* Card Content */}
+        
+        {group.type === 'optional' && (
+          <View style={styles.optionalBadge}>
+            <Text style={styles.optionalBadgeText}>OPTIONAL</Text>
+          </View>
+        )}
+        
         <View style={styles.cardContent}>
-          <View style={styles.iconContainer}>
+          <View style={styles.cardIcon}>
             <Ionicons 
-              name={questionnaire.icon as any} 
-              size={32} 
-              color={isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor}
+              name={isCompleted && group.type === 'required' ? "checkmark-circle" : group.icon as any}
+              size={48} 
+              color={group.type === 'required' ? themeColor : '#71717a'}
             />
           </View>
           
-          <View style={styles.textContainer}>
-            <Text style={[styles.cardTitle, { textShadowColor: themeColorLight }]}>
-              {questionnaire.title}
-            </Text>
-            <Text style={[styles.cardDescription, { color: isFavorites ? themeColor : (isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : isCompleted ? themeColor : '#71717a') }]}>
-              {isFavorites ? questionnaire.description : (isFridgePantry && isCompleted ? getFridgePantryDisplayText() : isCompleted ? 'Completed' : questionnaire.description)}
-            </Text>
-            
-            {/* Toggle for Fridge & Pantry */}
-            {isFridgePantry && (
-              <View style={styles.toggleContainer}>
-                <Text style={styles.toggleLabel}>Include in meal planning</Text>
-                <Switch
-                  value={useFridgePantry}
-                  onValueChange={handleToggleFridgePantry}
-                  trackColor={{ false: '#27272a', true: themeColor + '40' }}
-                  thumbColor={useFridgePantry ? themeColor : '#71717a'}
-                  ios_backgroundColor="#27272a"
-                />
-              </View>
-            )}
-          </View>
-
-          {/* Chevron or Checkmark */}
-          <View style={styles.chevronContainer}>
-            {isFavorites || !isCompleted || (isFridgePantry && !isCompleted) ? (
-              <Ionicons 
-                name="chevron-forward" 
-                size={24} 
-                color="#71717a"
-              />
-            ) : (
-              <Ionicons 
-                name="checkmark-circle" 
-                size={24} 
-                color={isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor}
-              />
-            )}
-          </View>
+          <Text style={styles.cardTitle}>
+            {group.title}
+          </Text>
+          
+          <Text style={[styles.cardDescription, { color: statusColor }]}>
+            {displayDescription}
+          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -282,6 +176,62 @@ export default function NutritionDashboardScreen() {
   ].filter(Boolean).length;
 
   const totalQuestionnaires = 3; // Only 3 actual questionnaires
+  
+  // Check if all questionnaires are completed
+  const allQuestionnairesCompleted = completedCount === totalQuestionnaires;
+  
+  const handleGeneratePrompt = () => {
+    // COMPREHENSIVE LOGGING - Send this to Claude
+    console.log('🔥 [GENERATE BUTTON CLICKED] Full Debug Report:');
+    console.log('==========================================');
+    console.log('📱 App State:', {
+      timestamp: new Date().toISOString(),
+      userHasNutritionAccess,
+      shouldShowLocked,
+    });
+    console.log('🔐 RevenueCat Customer Info:', {
+      customerInfo: customerInfo ? 'EXISTS' : 'NULL',
+      originalAppUserId: customerInfo?.originalAppUserId || 'MISSING',
+      entitlements: customerInfo?.entitlements || 'MISSING',
+      activeEntitlements: customerInfo?.entitlements?.active || 'MISSING',
+      activeEntitlementKeys: customerInfo?.entitlements?.active ? Object.keys(customerInfo.entitlements.active) : 'MISSING',
+      allEntitlements: customerInfo?.entitlements?.all || 'MISSING',
+    });
+    console.log('⚙️ Config Check:', {
+      ENABLE_NUTRITION_PAYWALL: true, // Should be true
+      expectedEntitlement: 'JSON Pro',
+      checkingFor: 'nutrition_access entitlement',
+    });
+    console.log('🧪 Entitlement Logic:', {
+      hasNutritionAccessResult: userHasNutritionAccess,
+      shouldShowLockedResult: shouldShowLocked,
+      logicUsed: '!userHasNutritionAccess',
+    });
+    console.log('==========================================');
+    
+    navigation.navigate('ImportMealPlan', { showStep1New: true });
+  };
+
+  const handlePurchase = () => {
+    // Navigate to the paywall screen with fade-in animation
+    // Pass a flag to force show the paywall regardless of entitlement status
+    navigation.navigate('Payment' as any, { forceShowPaywall: true });
+  };
+
+  // Check if user has nutrition access
+  const userHasNutritionAccess = hasNutritionAccess(customerInfo);
+  
+  // Debug logging
+  console.log('[NutritionDashboard] Debug info:', {
+    customerInfo: customerInfo ? 'present' : 'null',
+    hasAccess: userHasNutritionAccess,
+    entitlements: customerInfo?.entitlements?.active ? Object.keys(customerInfo.entitlements.active) : 'none',
+    ENABLE_NUTRITION_PAYWALL: REVENUECAT_CONFIG.debugMode,
+  });
+  
+  // Use actual entitlement check (production ready)
+  const actualHasAccess = __DEV__ && forceNoEntitlement ? false : userHasNutritionAccess;
+  const shouldShowLocked = !actualHasAccess;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -293,49 +243,85 @@ export default function NutritionDashboardScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={24} color={themeColor} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
           </TouchableOpacity>
-          
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Nutrition Setup</Text>
+            <Text style={styles.headerTitle}>Nutrition Profile</Text>
             {completedCount < totalQuestionnaires && (
               <Text style={styles.headerSubtitle}>
-                {completedCount}/{totalQuestionnaires} questionnaires completed
+                Complete your profile to generate meal plans
               </Text>
             )}
           </View>
-          
-          <View style={styles.placeholder} />
         </View>
 
-        {/* Progress Bar */}
-        {completedCount < totalQuestionnaires && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill, 
-                  { 
-                    backgroundColor: themeColor,
-                    width: `${(completedCount / totalQuestionnaires) * 100}%`
-                  }
-                ]} 
-              />
-            </View>
-          </View>
-        )}
-
-        {/* Questionnaire Cards */}
+        {/* Group Cards */}
         <View style={styles.cardsContainer}>
-          {questionnaires.map((questionnaire, index) => 
-            renderQuestionnaireCard(questionnaire, index)
+          {groups.map((group, index) => 
+            renderGroupCard(group, index)
           )}
         </View>
+
+        {/* Generate Meal Plan Button - shown when all questionnaires are completed */}
+        {allQuestionnairesCompleted && (
+          <View style={styles.generatePromptContainer}>
+            {!shouldShowLocked ? (
+              // User has access - show normal generate button
+              <TouchableOpacity 
+                style={[styles.generatePromptButton, { backgroundColor: themeColor }]}
+                onPress={handleGeneratePrompt}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="rocket" size={28} color="#ffffff" />
+                <Text style={styles.generatePromptText}>Generate My Meal Plan</Text>
+                <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            ) : (
+              // User doesn't have access - show locked generate button
+              <TouchableOpacity 
+                style={[styles.generatePromptButton, { backgroundColor: themeColor }]}
+                onPress={handlePurchase}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="lock-closed" size={28} color="#ffffff" />
+                <Text style={styles.generatePromptText}>Generate My Meal Plan</Text>
+                <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity 
+              style={[styles.myMealPlansButton, { borderColor: themeColor }]}
+              onPress={() => navigation.navigate('MyMealPlans')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="heart" size={20} color={themeColor} />
+              <Text style={[styles.myMealPlansText, { color: themeColor }]}>My Meal Plans</Text>
+              <Ionicons name="chevron-down" size={20} color={themeColor} />
+            </TouchableOpacity>
+            
+            {/* DEV ONLY: Testing button to toggle entitlement view */}
+            {__DEV__ && (
+              <TouchableOpacity 
+                style={[styles.testButton, { 
+                  backgroundColor: forceNoEntitlement ? '#ef4444' : '#22d3ee',
+                  borderColor: forceNoEntitlement ? '#ef4444' : '#22d3ee'
+                }]}
+                onPress={() => setForceNoEntitlement(!forceNoEntitlement)}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={forceNoEntitlement ? "lock-closed" : "lock-open"} 
+                  size={16} 
+                  color="#ffffff" 
+                />
+                <Text style={styles.testButtonText}>
+                  {forceNoEntitlement ? "TESTING: No Entitlement" : "TESTING: Has Entitlement"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -347,164 +333,174 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0b',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 24,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#27272a',
+    position: 'absolute',
+    left: 20,
+    top: 20,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerContent: {
-    flex: 1,
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
     color: '#71717a',
-  },
-  progressContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 32,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#27272a',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 32,
+    paddingBottom: 120,
   },
   cardsContainer: {
-    paddingHorizontal: 16,
-    gap: 16,
+    paddingHorizontal: 20,
+    gap: 20,
+    flex: 1,
   },
   card: {
     backgroundColor: '#18181b',
-    borderRadius: 16,
-    borderWidth: 2,
-    padding: 20,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-    position: 'relative',
-  },
-  statusContainer: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    zIndex: 10,
-  },
-  statusBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    borderRadius: 20,
+    padding: 30,
+    minHeight: 200,
     justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#0a0a0b',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#27272a',
   },
-  statusBadgeIncomplete: {
-    backgroundColor: '#27272a',
+  requiredCard: {
+    borderWidth: 2,
+    backgroundColor: '#18181b',
   },
-  statusNumber: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#71717a',
+  optionalCard: {
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    backgroundColor: '#18181b',
   },
-  cardContent: {
+  completedCard: {
+    backgroundColor: '#1f1325',
+  },
+  completeBadge: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
   },
-  iconContainer: {
-    marginRight: 16,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 4,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowOpacity: 0.5,
-    textShadowRadius: 2,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    marginBottom: 6,
-  },
-  cardDescription: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  chevronContainer: {
-    marginLeft: 12,
-  },
-  itemCountContainer: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#0a0a0b',
-    zIndex: 10,
-  },
-  itemCountText: {
-    fontSize: 14,
+  completeBadgeText: {
+    fontSize: 10,
     fontWeight: '700',
     color: '#0a0a0b',
+    letterSpacing: 0.5,
   },
-  toggleContainer: {
+  optionalBadge: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    backgroundColor: '#3f3f46',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  optionalBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  cardContent: {
+    alignItems: 'center',
+  },
+  cardIcon: {
+    marginBottom: 20,
+  },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  cardDescription: {
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  generatePromptContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 20,
+  },
+  generatePromptButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    gap: 12,
   },
-  toggleLabel: {
-    fontSize: 14,
-    color: '#a1a1aa',
+  generatePromptText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
     flex: 1,
+    textAlign: 'center',
   },
-  placeholder: {
-    width: 44,
-    height: 44,
+  myMealPlansButton: {
+    borderWidth: 2,
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  myMealPlansText: {
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    flex: 1,
+    textAlign: 'center',
+  },
+  testButton: {
+    borderWidth: 2,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  testButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+    letterSpacing: 0.5,
   },
 });

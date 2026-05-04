@@ -8,20 +8,42 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
-import { generateJsonConversionPrompt } from '../data/generateJsonConversionPrompt';
 import { useTheme } from '../contexts/ThemeContext';
+import * as Clipboard from 'expo-clipboard';
+import { assembleMealPlanningPrompt } from '../data/mealPlanningPrompt';
 
-interface NutritionGeneratorStep3Props {
+interface NutritionGeneratorStep1NewProps {
   onNext: () => void;
   onBack: () => void;
 }
 
-export default function NutritionGeneratorStep3({ onNext, onBack }: NutritionGeneratorStep3Props) {
+export default function NutritionGeneratorStep1New({ onNext, onBack }: NutritionGeneratorStep1NewProps) {
   const { themeColor } = useTheme();
-  const [formatPromptCopied, setFormatPromptCopied] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [showInfo, setShowInfo] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
+
+  const handleCopyPrompt = async () => {
+    try {
+      // First test with simple text to see if copy functionality works
+      const testPrompt = "Test meal planning prompt - this is working!";
+      await Clipboard.setStringAsync(testPrompt);
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
+      
+      // Try the real prompt function
+      try {
+        const realPrompt = await assembleMealPlanningPrompt();
+        await Clipboard.setStringAsync(realPrompt);
+      } catch (promptError) {
+        console.error('assembleMealPlanningPrompt error:', promptError);
+        // Keep the test prompt if real one fails
+      }
+    } catch (error) {
+      console.error('Failed to copy prompt:', error);
+      Alert.alert('Error', 'Failed to copy prompt to clipboard');
+    }
+  };
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -30,25 +52,6 @@ export default function NutritionGeneratorStep3({ onNext, onBack }: NutritionGen
       useNativeDriver: true,
     }).start();
   }, []);
-
-  const handleCopyFormatPrompt = async () => {
-    try {
-      const prompt = generateJsonConversionPrompt();
-      
-      await Clipboard.setStringAsync(prompt);
-      setFormatPromptCopied(true);
-      setTimeout(() => {
-        setFormatPromptCopied(false);
-      }, 2000);
-    } catch (error) {
-      console.error('Error generating format prompt:', error);
-      Alert.alert(
-        'Error',
-        'Unable to generate format prompt. Please try again.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -70,8 +73,6 @@ export default function NutritionGeneratorStep3({ onNext, onBack }: NutritionGen
           <View style={styles.headerCenter}>
             <Ionicons name="restaurant" size={24} color={themeColor} style={styles.headerIcon} />
             <View style={styles.progressContainer}>
-              <View style={styles.progressDot} />
-              <View style={styles.progressDot} />
               <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
               <View style={styles.progressDot} />
             </View>
@@ -84,36 +85,37 @@ export default function NutritionGeneratorStep3({ onNext, onBack }: NutritionGen
 
         {showInfo && (
           <View style={styles.infoModal}>
-            <Text style={styles.infoMessage}>
-              Send one prompt at a time before continuing to the next step. Don't send them all in one message.
-            </Text>
+            <View style={styles.infoSteps}>
+              <Text style={styles.infoMessage}>
+                <Text style={[styles.stepNumber, { color: themeColor }]}>1. </Text>
+                Paste this prompt into any AI like Claude or ChatGPT
+              </Text>
+              <Text style={styles.infoMessage}>
+                <Text style={[styles.stepNumber, { color: themeColor }]}>2. </Text>
+                Follow the AI's questions to refine your meal plan
+              </Text>
+              <Text style={styles.infoMessage}>
+                <Text style={[styles.stepNumber, { color: themeColor }]}>3. </Text>
+                The AI will create your meal plan file for import
+              </Text>
+            </View>
           </View>
         )}
 
         <View style={styles.content}>
           <View style={styles.centerContent}>
-            <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-              <Text style={styles.stepText}>3</Text>
-            </View>
-            
-            <Text style={styles.mainTitle}>Get Your Final Plan</Text>
+            <Text style={styles.mainTitle}>Your Prompt is Ready!</Text>
             
             <TouchableOpacity 
               style={[styles.primaryAction, { backgroundColor: themeColor }]}
-              onPress={handleCopyFormatPrompt}
+              onPress={handleCopyPrompt}
               activeOpacity={0.8}
             >
-              <Ionicons 
-                name={formatPromptCopied ? "checkmark" : "sparkles"} 
-                size={20} 
-                color="#000" 
-              />
-              <Text style={styles.actionText}>
-                {formatPromptCopied ? 'Copied!' : 'Copy Format Request'}
-              </Text>
+              <Ionicons name={promptCopied ? "checkmark" : "copy"} size={20} color="#000" />
+              <Text style={styles.actionText}>{promptCopied ? "Copied!" : "Copy Prompt"}</Text>
             </TouchableOpacity>
             
-            <Text style={styles.hintText}>Ask AI to format it for the app</Text>
+            <Text style={styles.hintText}>Then paste and send to any AI</Text>
           </View>
         </View>
 
@@ -140,16 +142,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 30,
   },
   backButton: {
-    position: 'absolute',
-    left: 20,
-    top: 60,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -174,6 +172,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#27272a',
   },
+  infoButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   content: {
     flex: 1,
     justifyContent: 'center',
@@ -182,18 +188,6 @@ const styles = StyleSheet.create({
   centerContent: {
     alignItems: 'center',
     gap: 32,
-  },
-  stepBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepText: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#000',
   },
   mainTitle: {
     fontSize: 36,
@@ -242,17 +236,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
   },
-  infoButton: {
-    position: 'absolute',
-    right: 20,
-    top: 60,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#18181b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   infoModal: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -271,10 +254,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  infoSteps: {
+    gap: 12,
+  },
   infoMessage: {
     fontSize: 15,
     color: '#d1d5db',
     lineHeight: 22,
-    textAlign: 'center',
+  },
+  stepNumber: {
+    fontWeight: '700',
   },
 });

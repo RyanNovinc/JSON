@@ -1284,18 +1284,6 @@ export default function DaysScreen() {
                         border="#27272a"
                       />
 
-                      {/* Bottom Right Flip Button - positioned over the body diagram */}
-                      <TouchableOpacity
-                        style={styles.bodyFlipIconBottomRight}
-                        onPress={() => setBodyViewSide(bodyViewSide === 'front' ? 'back' : 'front')}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name="sync-outline"
-                          size={20}
-                          color={themeColor}
-                        />
-                      </TouchableOpacity>
                     </View>
 
                     {/* Detailed Breakdown */}
@@ -2409,20 +2397,6 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  bodyFlipIconBottomRight: {
-    position: 'absolute',
-    top: 220,
-    right: 20,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
   },
   volumeGrid: {
     flexDirection: 'row',

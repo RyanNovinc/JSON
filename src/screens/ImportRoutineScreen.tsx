@@ -29,10 +29,7 @@ import RobustStorage from '../utils/robustStorage';
 // import * as Crypto from 'expo-crypto';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutProgram, Exercise } from '../types/workout';
-import WorkoutGeneratorStep1 from '../components/WorkoutGeneratorStep1';
-import WorkoutGeneratorStep2 from '../components/WorkoutGeneratorStep2';
-import WorkoutGeneratorStep3 from '../components/WorkoutGeneratorStep3';
-import WorkoutGeneratorStep4 from '../components/WorkoutGeneratorStep4';
+import WorkoutGeneratorStep1New from '../components/WorkoutGeneratorStep1New';
 
 type ImportScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ImportRoutine'>;
 
@@ -46,7 +43,6 @@ export default function ImportRoutineScreen({ route }: any) {
   const [accumulatedPrograms, setAccumulatedPrograms] = useState<WorkoutProgram[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showAddMoreMode, setShowAddMoreMode] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false);
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const [reviewPromptCopied, setReviewPromptCopied] = useState(false);
@@ -59,8 +55,8 @@ export default function ImportRoutineScreen({ route }: any) {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [outputPreference, setOutputPreference] = useState<'copy_paste' | 'save_import'>('copy_paste');
   const [uploadMode, setUploadMode] = useState(false);
-  const [showSlideMode, setShowSlideMode] = useState(route?.params?.showSlideMode || false);
-  const [currentSlide, setCurrentSlide] = useState(1);
+  const [showStep1New, setShowStep1New] = useState(route?.params?.showStep1New || false);
+  const [showInfo, setShowInfo] = useState(false);
 
   // Mesocycle state
   const [currentProgram, setCurrentProgram] = useState<Program | null>(null);
@@ -1761,268 +1757,27 @@ export default function ImportRoutineScreen({ route }: any) {
   };
 
   // Build dynamic profile text from questionnaire data
-  const buildProfileText = (data: QuestionnaireData): string => {
-    const lines: string[] = [];
-
-    // Mapping tables
-    const primaryGoalMap: { [key: string]: string } = {
-      'burn_fat': 'Burn Fat (lose weight while preserving muscle)',
-      'build_muscle': 'Muscle Building (gain lean mass and size)', 
-      'gain_strength': 'Strength Training (increase power and max lifts)',
-      'body_recomposition': 'Body Recomposition (lose fat and gain muscle simultaneously)',
-      'sport_specific': 'Sport-Specific Training (train for {sport_name})',
-      'general_fitness': 'General Fitness (overall health and wellness)',
-      'custom_primary': 'Custom Goal'
-    };
-
-    const secondaryGoalMap: { [key: string]: string } = {
-      'include_cardio': 'Include Cardiovascular Training',
-      'maintain_flexibility': 'Include Flexibility & Mobility Work', 
-      'athletic_performance': 'Improve Athletic Performance',
-      'injury_prevention': 'Include Injury Prevention Work',
-      'fun_social': 'Include Fun & Social Activities',
-      'custom_secondary': 'Custom Focus'
-    };
-
-    const primaryLabelMap: { [key: string]: string } = {
-      'build_muscle': 'Muscle Building',
-      'burn_fat': 'Fat Loss Training',
-      'gain_strength': 'Strength Training', 
-      'body_recomposition': 'Resistance Training',
-      'sport_specific': 'Sport-Specific Training',
-      'general_fitness': 'General Training',
-      'custom_primary': 'Training'
-    };
-
-    const experienceMap: { [key: string]: string } = {
-      'beginner': 'Beginner (under 1 year, still learning form and building base fitness)',
-      'intermediate': 'Intermediate (1-2 years, good technique, consistent progression)',
-      'advanced': 'Advanced (2+ years, excellent technique, slow progression)'
-    };
-
-
-    const durationMap: { [key: string]: string } = {
-      '4_weeks': '4 weeks (short training block)',
-      '8_weeks': '8 weeks (standard training block)',
-      '12_weeks': '12 weeks (full training cycle)',
-      '16_weeks': '16 weeks (extended training cycle)',
-      '6_months': '6 months (medium-term development plan)',
-      '1_year': '1 year (long-term development plan)',
-      'custom': 'Custom duration'
-    };
-
-    const equipmentMap: { [key: string]: string } = {
-      'commercial_gym': 'Commercial Gym (full equipment access)',
-      'home_gym': 'Home Gym (personal equipment setup)',
-      'bodyweight': 'Bodyweight Only (no equipment)', 
-      'basic_equipment': 'Basic Equipment (dumbbells, resistance bands)'
-    };
-
-
-    const noteDetailMap: { [key: string]: string } = {
-      'detailed': 'Detailed instructions for each exercise.',
-      'brief': 'Brief technique cues only.',
-      'minimal': 'Only non-obvious technique tips or specific setup instructions.'
-    };
-
-    // Primary Goal
-    let goalText = primaryGoalMap[data.primaryGoal || ''] || 'Not specified';
-    if (data.primaryGoal === 'custom_primary' && data.customGoals) {
-      goalText += ` — "${data.customGoals}"`;
-    }
-    if (data.primaryGoal === 'sport_specific' && data.specificSport) {
-      goalText = goalText.replace('{sport_name}', data.specificSport);
-    }
-    lines.push(`**Primary Goal:** ${goalText}`);
-
-    // Secondary Goals
-    if (data.integrationMethods && Object.keys(data.integrationMethods).length > 0) {
-      const goalTexts = Object.keys(data.integrationMethods).map(g => {
-        if (g === 'custom_secondary') {
-          return `Custom Focus — "${data.customGoals || 'No description provided'}"`;
-        }
-        return secondaryGoalMap[g] || g;
-      });
-      lines.push(`**Secondary Goals:** ${goalTexts.join(', ')}`);
-    } else {
-      lines.push(`**Secondary Goals:** None selected`);
-    }
-
-    lines.push(''); // blank line
-
-    // Training Schedule
-    lines.push('**Training Schedule:**');
-    lines.push(`- Total training days per week: ${data.totalTrainingDays || 'Not specified'}`);
-    
-    const primaryLabel = primaryLabelMap[data.primaryGoal || ''] || 'Training';
-    lines.push(`- ${primaryLabel} days: ${data.gymTrainingDays || 'Not specified'}`);
-    
-    // Secondary goal integration details
-    if (data.integrationMethods && Object.keys(data.integrationMethods).length > 0) {
-      const integratedGoals = [];
-      const dedicatedGoals = [];
-      
-      Object.keys(data.integrationMethods).forEach(goal => {
-        const goalLabel = {
-          'include_cardio': 'cardiovascular training',
-          'maintain_flexibility': 'flexibility',
-          'athletic_performance': 'athletic performance',
-          'injury_prevention': 'injury prevention',
-          'fun_social': 'fun & social'
-        }[goal] || goal;
-        
-        if (data.integrationMethods[goal] === 'integrated') {
-          integratedGoals.push(goalLabel);
-        } else if (data.integrationMethods[goal] === 'dedicated') {
-          dedicatedGoals.push(goalLabel);
-        }
-      });
-      
-      if (integratedGoals.length > 0) {
-        lines.push(`- Integrated focus areas: ${integratedGoals.join(', ')}`);
-      }
-      if (dedicatedGoals.length > 0) {
-        lines.push(`- Dedicated focus days: ${dedicatedGoals.join(', ')} (${data.otherTrainingDays || dedicatedGoals.length} ${(data.otherTrainingDays || dedicatedGoals.length) === 1 ? 'day' : 'days'})`);
-      }
-    } else if (data.otherTrainingDays && data.otherTrainingDays > 0) {
-      // Fallback for legacy data without integration methods
-      const secondaryLabels = [];
-      if (data.integrationMethods) {
-        Object.keys(data.integrationMethods).forEach(goal => {
-          if (goal === 'include_cardio') secondaryLabels.push('cardiovascular training');
-          if (goal === 'maintain_flexibility') secondaryLabels.push('flexibility');
-          if (goal === 'athletic_performance') secondaryLabels.push('athletic performance');
-          if (goal === 'injury_prevention') secondaryLabels.push('injury prevention');
-          if (goal === 'fun_social') secondaryLabels.push('fun & social');
-        });
-      }
-      const secondaryLabel = secondaryLabels.join(', ') || 'additional focus';
-      lines.push(`- Additional focus days (${secondaryLabel}): ${data.otherTrainingDays}`);
-    }
-
-    lines.push(''); // blank line
-
-    // Experience & Approach  
-    lines.push(`**Training Experience:** ${experienceMap[data.trainingExperience || ''] || 'Not specified'}`);
-    
-    // Volume preference
-    const volumeText = data.volumePreference ? `${data.volumePreference} sets/week` : 'Not specified';
-    lines.push(`**Weekly Volume Target:** ${volumeText} per muscle group`);
-    
-    // Gender
-    const genderText = data.gender === 'prefer_not_to_say' ? 'Prefer not to say' : 
-                      data.gender || 'Not specified';
-    lines.push(`**Gender:** ${genderText} (for volume context)`);
-
-    lines.push(''); // blank line
-
-    // Duration
-    lines.push(`**Program Duration:** ${durationMap[data.programDuration || ''] || 'Not specified'}`);
-
-    // Conditional: Cardio activities
-    if (data.integrationMethods?.hasOwnProperty('include_cardio') && data.cardioPreferences && data.cardioPreferences.length > 0) {
-      const activityMap: { [key: string]: string } = {
-        'treadmill': 'Treadmill / Indoor Running',
-        'stationary_bike': 'Stationary Bike / Cycling', 
-        'rowing_machine': 'Rowing Machine',
-        'swimming': 'Swimming',
-        'stair_climber': 'Stair Climber / StepMill',
-        'elliptical': 'Elliptical',
-        'jump_rope': 'Jump Rope',
-        'outdoor_running': 'Outdoor Running / Walking',
-        'no_preference': 'No Preference (AI chooses)'
-      };
-      const activities = data.cardioPreferences.map(a => activityMap[a] || a);
-      lines.push(`**Preferred Cardio Activities:** ${activities.join(', ')}`);
-    }
-
-    // Conditional: Sport details
-    if (data.primaryGoal === 'sport_specific' && data.specificSport) {
-      const sportDetails = data.athleticPerformanceDetails || 'No additional details provided';
-      lines.push(`**Sport:** ${data.specificSport} — "${sportDetails}"`);
-    }
-
-    // Conditional: Secondary goal details
-    if (data.athleticPerformanceDetails && data.integrationMethods?.hasOwnProperty('athletic_performance')) {
-      lines.push(`**Athletic Performance Focus:** ${data.athleticPerformanceDetails}`);
-    }
-    if (data.injuryPreventionDetails && data.integrationMethods?.hasOwnProperty('injury_prevention')) {
-      lines.push(`**Injury Prevention Focus:** ${data.injuryPreventionDetails}`);
-    }
-    if (data.flexibilityDetails && data.integrationMethods?.hasOwnProperty('maintain_flexibility')) {
-      lines.push(`**Flexibility Focus:** ${data.flexibilityDetails}`);
-    }
-    if (data.funSocialDetails && data.integrationMethods?.hasOwnProperty('fun_social')) {
-      lines.push(`**Fun & Social Activities:** ${data.funSocialDetails}`);
-    }
-
-    lines.push(''); // blank line
-
-    // Equipment
-    const equipmentTypes = Array.isArray(data.selectedEquipment) ? data.selectedEquipment : 
-                          data.selectedEquipment ? [data.selectedEquipment] : [];
-    if (equipmentTypes.length > 0) {
-      const equipmentTexts = equipmentTypes.map(e => equipmentMap[e] || e);
-      lines.push(`**Available Equipment:** ${equipmentTexts.join(', ')}`);
-    } else {
-      lines.push(`**Available Equipment:** Not specified`);
-    }
-    
-    if (data.specificEquipment) {
-      lines.push(`**Specific Equipment:** ${data.specificEquipment}`);
-    }
-    if (data.unavailableEquipment) {
-      lines.push(`**Unavailable Equipment:** ${data.unavailableEquipment}`);
-    }
-
-    // Rest Style
-    const restStyleMap: { [key: string]: string } = {
-      'optimal': 'Optimal — full recovery between sets. Compounds: 2-3 min, Isolation: 90-120s. Session duration is unconstrained.',
-      'moderate': 'Moderate — compounds: 90-120s, isolation: 60-90s. Sessions typically 60-75 minutes.',
-      'minimal': 'Minimal — compounds: 60-90s, isolation: 45-60s. Prioritizes time efficiency.'
-    };
-    lines.push(`**Rest Style:** ${restStyleMap[data.sessionStyle || 'moderate'] || restStyleMap['moderate']}`);
-
-    // Exercise Note Detail
-    lines.push(`**Exercise Note Detail:** ${noteDetailMap[data.exerciseNoteDetail || 'minimal'] || 'Only non-obvious technique tips or specific setup instructions.'}`);
-
-    lines.push(''); // blank line
-
-    // Conditional fields
-    if (data.priorityMuscleGroups && data.priorityMuscleGroups.length > 0) {
-      const muscles = data.priorityMuscleGroups.concat(data.customMuscleGroup ? [data.customMuscleGroup] : []);
-      lines.push(`**Priority Muscle Groups:** ${muscles.join(', ')}`);
-    }
-
-    if (data.movementLimitations && data.movementLimitations.length > 0) {
-      const limitations = data.movementLimitations.concat(data.customLimitation ? [data.customLimitation] : []);
-      lines.push(`**Movement Limitations:** ${limitations.join('. ')}`);
-    }
-
-    if (data.trainingStylePreference) {
-      const style = data.customTrainingStyle || data.trainingStylePreference;
-      lines.push(`**Training Style Preference:** ${style}`);
-    }
-
-    if (data.likedExercises) {
-      lines.push(`**Liked Exercises:** ${data.likedExercises}`);
-    }
-
-    if (data.dislikedExercises) {
-      lines.push(`**Disliked Exercises:** ${data.dislikedExercises}`);
-    }
-
-    return lines.join('\n');
-  };
 
 
   const handleCancel = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation.navigate('Main' as any);
-    }
+    setShowStep1New(true);
   };
+
+  // Show WorkoutGeneratorStep1New if requested
+  if (showStep1New) {
+    return (
+      <WorkoutGeneratorStep1New
+        onNext={() => setShowStep1New(false)}
+        onBack={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate('Main' as any);
+          }
+        }}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -2033,418 +1788,6 @@ export default function ImportRoutineScreen({ route }: any) {
     );
   }
 
-  if (showInstructions) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView 
-          style={styles.instructionsScrollView}
-          contentContainerStyle={styles.instructionsContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => setShowInstructions(false)} style={styles.backButton}>
-              <Ionicons name="close" size={24} color="#ffffff" />
-            </TouchableOpacity>
-            <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Workout Generator</Text>
-            </View>
-          </View>
-            <View style={styles.stepsContainer}>
-              <View style={styles.stepCard}>
-                <View style={styles.stepCardHeader}>
-                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>1</Text>
-                  </View>
-                  <Text style={styles.stepCardTitle}>We Build Your Perfect Prompt</Text>
-                </View>
-                <Text style={styles.stepCardDescription}>
-                  Customized based on your questionnaire answers
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: themeColor }]}
-                  onPress={async () => {
-                    try {
-                      const questionnaireData = await loadQuestionnaireData();
-                      
-                      // Check if user has actually completed questionnaires (not just defaults)
-                      const hasRealData = questionnaireData && (
-                        (questionnaireData.primaryGoal && questionnaireData.primaryGoal !== 'build_muscle') ||
-                        (questionnaireData.selectedEquipment && !questionnaireData.selectedEquipment.includes('commercial_gym')) ||
-                        (questionnaireData.trainingExperience && questionnaireData.trainingExperience !== 'intermediate') ||
-                        questionnaireData.totalTrainingDays ||
-                        questionnaireData.sessionStyle && questionnaireData.sessionStyle !== 'moderate' ||
-                        questionnaireData.programDuration && questionnaireData.programDuration !== '12_weeks'
-                      );
-                      
-                      if (!hasRealData) {
-                        Alert.alert(
-                          'Missing Data',
-                          'Please complete the fitness questionnaire first to generate a personalized workout prompt.',
-                          [{ text: 'OK' }]
-                        );
-                        return;
-                      }
-                      
-                      const notesInstruction = (() => {
-                        const detail = questionnaireData?.exerciseNoteDetail || 'brief';
-                        if (detail === 'detailed') {
-                          return '- Include detailed step-by-step form instructions for EVERY exercise in the notes field';
-                        } else if (detail === 'brief') {
-                          return '- Include brief coaching cues in the notes field for compound lifts only';
-                        } else {
-                          return '- Keep notes minimal — only include non-obvious technique tips or specific setup instructions';
-                        }
-                      })();
-                      
-                      let planningPrompt;
-                      try {
-                        planningPrompt = assemblePlanningPrompt(questionnaireData);
-                      } catch (promptError) {
-                        console.error('Error in assemblePlanningPrompt:', promptError);
-                        console.error('QuestionnaireData that caused error:', JSON.stringify(questionnaireData, null, 2));
-                        console.error('Error stack:', promptError?.stack);
-                        
-                        // Capture error details for on-screen display
-                        const createErrorDetails = async () => {
-                          try {
-                            const rawFitnessData = await AsyncStorage.getItem('fitnessGoalsData');
-                            const rawEquipmentData = await AsyncStorage.getItem('equipmentPreferencesData');
-                            
-                            return `PRODUCTION PROMPT GENERATION ERROR:
-
-ERROR: ${promptError?.message || 'Unknown error'}
-ERROR TYPE: ${promptError?.name || 'Unknown'}
-
-ERROR STACK:
-${promptError?.stack || 'No stack trace available'}
-
-QUESTIONNAIRE DATA STRUCTURE:
-${JSON.stringify(questionnaireData, null, 2)}
-
-QUESTIONNAIRE DATA VALIDATION:
-- primaryGoal type: ${typeof questionnaireData?.primaryGoal} (value: ${questionnaireData?.primaryGoal})
-- selectedEquipment type: ${typeof questionnaireData?.selectedEquipment}, isArray: ${Array.isArray(questionnaireData?.selectedEquipment)}
-- selectedEquipment value: ${JSON.stringify(questionnaireData?.selectedEquipment)}
-- integrationMethods type: ${typeof questionnaireData?.integrationMethods}
-- integrationMethods value: ${JSON.stringify(questionnaireData?.integrationMethods)}
-- cardioPreferences type: ${typeof questionnaireData?.cardioPreferences}, isArray: ${Array.isArray(questionnaireData?.cardioPreferences)}
-- priorityMuscleGroups type: ${typeof questionnaireData?.priorityMuscleGroups}, isArray: ${Array.isArray(questionnaireData?.priorityMuscleGroups)}
-- movementLimitations type: ${typeof questionnaireData?.movementLimitations}, isArray: ${Array.isArray(questionnaireData?.movementLimitations)}
-- likedExercises type: ${typeof questionnaireData?.likedExercises}, isArray: ${Array.isArray(questionnaireData?.likedExercises)}
-- dislikedExercises type: ${typeof questionnaireData?.dislikedExercises}, isArray: ${Array.isArray(questionnaireData?.dislikedExercises)}
-
-ASYNCSTORAGE RAW DATA:
-- fitnessGoalsData: ${rawFitnessData}
-- equipmentPreferencesData: ${rawEquipmentData}
-
-SYSTEM INFO:
-Platform: ${Platform.OS}
-Version: ${Platform.Version}
-Time: ${new Date().toISOString()}
-Locale: ${Intl.DateTimeFormat().resolvedOptions().locale}`;
-                          } catch (logError) {
-                            return `PRODUCTION PROMPT GENERATION ERROR (LOGGING FAILED):
-
-ERROR: ${promptError?.message || 'Unknown error'}
-ERROR TYPE: ${promptError?.name || 'Unknown'}
-
-LOGGING ERROR: ${logError?.message}
-
-BASIC QUESTIONNAIRE DATA:
-${JSON.stringify(questionnaireData, null, 2)}`;
-                          }
-                        };
-                        
-                        createErrorDetails().then(errorDetails => {
-                          setErrorLogs(errorDetails);
-                          setShowErrorModal(true);
-                        });
-                        
-                        // Fallback: use basic prompt if advanced prompt fails
-                        planningPrompt = `# Basic Workout Planning Prompt
-
-Create a workout program based on the following information:
-- Goal: ${questionnaireData.primaryGoal || 'muscle building'}
-- Experience: ${questionnaireData.trainingExperience || 'intermediate'}
-- Equipment: ${(questionnaireData.selectedEquipment || ['commercial_gym']).join(', ')}
-- Volume Target: ${questionnaireData.volumePreference || '12-16'} sets/week per muscle group
-- Gender: ${questionnaireData.gender || 'not specified'} (for volume context)
-
-Please design a complete workout program with exercises, sets, reps, and rest periods.`;
-                      }
-                      
-                      try {
-                        await Clipboard.setStringAsync(planningPrompt);
-                        setPlanningPromptCopied(true);
-                        setTimeout(() => {
-                          setPlanningPromptCopied(false);
-                        }, 2000);
-                      } catch (clipboardError) {
-                        console.error('Clipboard error:', clipboardError);
-                        Alert.alert(
-                          'Copy Failed',
-                          'Unable to copy to clipboard. Please try again or copy manually from the generated prompt.',
-                          [{ text: 'OK' }]
-                        );
-                      }
-                    } catch (error) {
-                      console.error('Error generating prompt:', error);
-                      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-                      Alert.alert(
-                        'Prompt Generation Error',
-                        `Failed to generate workout prompt: ${errorMessage}`,
-                        [{ text: 'OK' }]
-                      );
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="copy-outline" size={18} color="#0a0a0b" />
-                  <Text style={styles.actionButtonText}>
-                    {planningPromptCopied ? 'Copied!' : 'Copy Your Prompt'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.stepCard}>
-                <View style={styles.stepCardHeader}>
-                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>2</Text>
-                  </View>
-                  <Text style={styles.stepCardTitle}>Quality Check Review</Text>
-                </View>
-                <Text style={styles.stepCardDescription}>
-                  Ask AI to review and improve the workout plan quality
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: themeColor }]}
-                  onPress={async () => {
-                    const reviewPrompt = `# Critical Training Plan Review
-// PROMPT 2: Review Prompt - Reviews and fixes workout plans before JSON conversion
-// IMPORTANT: This review checklist must stay synchronized with Step 3 embedded review in workoutPrompt.ts
-// If you update this checklist, update the Step 3 checklist to maintain consistency across the workflow
-
-First, read the workout program you just created so you have the full content in context. Then review it as a skeptical strength coach conducting an independent audit of this training plan. This is an independent quality gate — do not assume your self-check caught everything.
-
-## CRITICAL INSTRUCTIONS
-
-1. **Review the plan** using the checklist below, noting PASS or FAIL for each check.
-2. **If ANY check fails, FIX IT IMMEDIATELY** — do not ask the user for permission to fix. Silently revise the plan to resolve all failures.
-3. **After fixing, re-verify** — run the checklist again on the corrected plan to confirm all checks now pass.
-4. **Present the CORRECTED plan** — output the complete, clean, final version of the workout program with all fixes applied. Do not show the review process, do not show before/after comparisons, do not show your working. Present ONLY the clean corrected plan.
-5. **At the end, provide a brief change log** — a short bullet list of what you changed and why (e.g., "Added 2 sets of lat pulldowns on Day 2 to bring lat volume from 10 to 12 sets weekly").
-6. **Remind the user about JSON conversion** — after presenting the corrected plan, tell the user: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
-7. **USE WEB SEARCH** - If you have web search available, use it during the review to verify current research on volume standards, training frequency, and rest style guidelines.
-
-## Fix Priority
-
-When a check fails, fix it immediately — do not ask for permission. The one non-obvious rule: for volume shortfalls, attempt a concrete fix first (add sets, swap an isolation, add a superset) before accepting CONSTRAINED. Only accept CONSTRAINED if you can state the exact structural blocker. "Split doesn't allow it" is not acceptable.
-
-## Review Checklist
-
-Work through each check. For each, state PASS or FAIL with a brief note. If FAIL, describe the fix you are applying.
-
-### 1. User Requirements Verification
-- Verify all equipment, frequency, time, experience, and goal constraints from the profile are met exactly.
-- **FAIL if** any user requirement is not perfectly met.
-
-### 1b. Diff-Based Block Completeness
-For any block described as changes from a prior block (diff format) rather than a full session table:
-- Every diff entry must include: exercise name, set count, rep range
-- It must be unambiguous which exercise is being replaced and what replaces it
-- If a diff says "rotate to fresh variations" without naming them, **FAIL**
-- If a diff is missing set counts for new exercises, **FAIL**
-- If reconstructing the full session from the diff would require guessing any detail, **FAIL**
-
-This check exists because the JSON generator must reconstruct complete exercise lists from diff-based blocks. Ambiguous diffs cause silent errors in JSON output.
-
-### 2. Volume Analysis (Research-Based Standards)
-- **Web search verification**: Use web search to verify current volume research if available
-- **Major muscles** (chest, lats, quads, etc.): 12+ sets minimum, 16+ optimal
-- **Medium muscles** (biceps, triceps, etc.): 8+ sets minimum, 12+ optimal
-- **FAIL if** ANY muscle falls below research-backed minimums
-- **FAIL if** "structural constraints" are used to excuse inadequate volume
-- **Attempt-first rule**: Before accepting any shortfall as CONSTRAINED or exempt, you must attempt a concrete fix: add sets to an existing exercise, swap a lower-priority isolation for one covering the deficient muscle, or add a superset using rest periods appropriate for the user's chosen rest style. Only accept CONSTRAINED if you can state the exact structural blocker (e.g., "Adding Hamstring sets would violate the user's minimal rest style constraints"). A vague "split doesn't allow it" is not acceptable.
-
-**Additionally verify:**
-- The program document includes a Muscle Group Coverage Audit section
-- Every muscle group with 0 direct sets has an explicit indirect volume justification
-- **FAIL if** the audit section is missing entirely from the document
-- For every ⚠️ LOW flag in the audit: verify the fix was implemented in the session table. **FAIL if** the audit flags LOW but the session table was not updated
-- For every ⚠️ HIGH flag on a non-priority muscle: verify a reduction was either implemented or explicitly justified as recoverable with specific reasoning (not just "within recoverable range")
-- **FAIL if** any audit flag exists without either a session table fix or an explicit justified exception
-
-### 3. Recovery and Fatigue Management
-- **Same-muscle frequency**: Check 48-72h rest between same-muscle sessions
-- **Weekly volume**: Verify total weekly stress is sustainable for user's experience
-- **Session distribution**: Assess difficulty balance across the week
-- **FAIL if** recovery between same muscles is inadequate
-- **FAIL if** total weekly stress appears unsustainable
-
-### 4. Exercise Quality
-- Every exercise must be appropriate for the user's stated experience level and available equipment.
-- **FAIL if** exercises are too advanced or require unavailable equipment.
-
-### 5. Progression and Periodization Logic
-- **Goal alignment**: Rep ranges align with stated goals and current research
-- **Progression clarity**: Scheme is measurable and achievable
-- **Periodization validity**: Phases make scientific sense and are evidence-based
-- **FAIL if** progression is unclear or periodization lacks evidence
-- **FAIL if** plan is overly complex for user's experience level
-
-### 6. Practical Implementation Reality Check
-- **Session durations**: Realistic including warm-up, rest, transitions
-- **Execution simplicity**: Plan is practical for consistent implementation
-- **Real-world factors**: Accounts for gym crowding and equipment availability
-- **FAIL if** plan requires perfect conditions or is overly complicated
-- **FAIL if** estimated session times seem unrealistic
-
-## Output Format
-
-**If all 6 checks PASS on first review:**
-- State "All checks passed — plan is ready."
-- Present the plan as-is (clean, no changes needed).
-- End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."
-
-**If any checks FAIL:**
-1. Show a brief summary table of PASS/FAIL results (one line per check).
-2. Show a brief change log (bullet list of what you fixed and why).
-3. Present the COMPLETE CORRECTED PLAN — the full workout program document with all fixes applied, formatted cleanly. This must be a complete standalone document, not a diff or partial update.
-4. End with: "When you're happy with this plan, send me the JSON generation prompt and I'll convert it for import into JSON.fit."`;
-                    try {
-                      await Clipboard.setStringAsync(reviewPrompt);
-                      setReviewPromptCopied(true);
-                      setTimeout(() => {
-                        setReviewPromptCopied(false);
-                      }, 2000);
-                    } catch (clipboardError) {
-                      console.error('Clipboard error:', clipboardError);
-                      Alert.alert(
-                        'Copy Failed',
-                        'Unable to copy review prompt to clipboard. Please try again.',
-                        [{ text: 'OK' }]
-                      );
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="checkmark-circle" size={18} color="#0a0a0b" />
-                  <Text style={styles.actionButtonText}>
-                    {reviewPromptCopied ? 'Review Copied!' : 'Optional: Copy Review Check'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.stepCard}>
-                <View style={styles.stepCardHeader}>
-                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>3</Text>
-                  </View>
-                  <Text style={styles.stepCardTitle}>Get Your Final Plan</Text>
-                </View>
-                <Text style={styles.stepCardDescription}>
-                  Ask the AI to format it for the app
-                </Text>
-                
-                {/* Output preference toggle */}
-                <View style={styles.outputPreferenceContainer}>
-                  <TouchableOpacity
-                    style={[styles.preferenceOption, outputPreference === 'copy_paste' && { backgroundColor: themeColor + '20' }]}
-                    onPress={() => saveOutputPreference('copy_paste')}
-                  >
-                    <Text style={[styles.preferenceText, outputPreference === 'copy_paste' && { color: themeColor }]}>
-                      Copy & Paste
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.preferenceSeparator}>|</Text>
-                  <TouchableOpacity
-                    style={[styles.preferenceOption, outputPreference === 'save_import' && { backgroundColor: themeColor + '20' }]}
-                    onPress={() => saveOutputPreference('save_import')}
-                  >
-                    <Text style={[styles.preferenceText, outputPreference === 'save_import' && { color: themeColor }]}>
-                      Save & Import
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: themeColor }]}
-                  onPress={async () => {
-                    try {
-                      const questionnaireData = await loadQuestionnaireData();
-                      const prompt = getAIPrompt(questionnaireData, outputPreference);
-                      
-                      try {
-                        await Clipboard.setStringAsync(prompt);
-                        setAiPromptCopied(true);
-                        setTimeout(() => {
-                          setAiPromptCopied(false);
-                        }, 2000);
-                      } catch (clipboardError) {
-                        console.error('Clipboard error:', clipboardError);
-                        Alert.alert(
-                          'Copy Failed',
-                          'Unable to copy format request to clipboard. Please try again.',
-                          [{ text: 'OK' }]
-                        );
-                      }
-                    } catch (error) {
-                      console.error('Error generating prompt:', error);
-                      Alert.alert(
-                        'Error',
-                        'Unable to generate format prompt. Please try again.',
-                        [{ text: 'OK' }]
-                      );
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="sparkles" size={18} color="#0a0a0b" />
-                  <Text style={styles.actionButtonText}>
-                    {aiPromptCopied ? 'Copied!' : 'Copy Format Request'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.stepCard}>
-                <View style={styles.stepCardHeader}>
-                  <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-                    <Text style={styles.stepBadgeText}>4</Text>
-                  </View>
-                  <Text style={styles.stepCardTitle}>Import and Start Training</Text>
-                </View>
-                <Text style={styles.stepCardDescription}>
-                  Just paste or upload what the AI created
-                </Text>
-              </View>
-
-            {/* Need Help Section - Only shown in development */}
-            {__DEV__ && (
-              <View style={styles.helpSection}>
-                <Text style={styles.helpTitle}>Need Help?</Text>
-                
-                <TouchableOpacity 
-                  style={[styles.tutorialButton, { backgroundColor: themeColor }]}
-                  onPress={() => {
-                    // Open YouTube tutorial
-                    const url = 'https://youtube.com/shorts/_l6E9sX-9QQ';
-                    Linking.openURL(url);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="play" size={20} color="#000000" />
-                  <Text style={styles.tutorialButtonText}>Watch Tutorial</Text>
-                  <Text style={styles.tutorialDuration}>30 seconds</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <View style={styles.bottomPadding} />
-            </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
 
 
   if (errorMessage) {
@@ -2484,60 +1827,35 @@ This check exists because the JSON generator must reconstruct complete exercise 
     );
   }
 
-  // Show slide mode if enabled
-  if (showSlideMode && currentSlide === 1) {
-    return (
-      <WorkoutGeneratorStep1
-        onNext={() => setCurrentSlide(2)}
-        onBack={() => setShowSlideMode(false)}
-      />
-    );
-  }
-
-  if (showSlideMode && currentSlide === 2) {
-    return (
-      <WorkoutGeneratorStep2
-        onNext={() => setCurrentSlide(3)}
-        onBack={() => setCurrentSlide(1)}
-      />
-    );
-  }
-
-  if (showSlideMode && currentSlide === 3) {
-    return (
-      <WorkoutGeneratorStep3
-        onNext={() => setCurrentSlide(4)}
-        onBack={() => setCurrentSlide(2)}
-      />
-    );
-  }
-
-  if (showSlideMode && currentSlide === 4) {
-    return (
-      <WorkoutGeneratorStep4
-        onBack={() => setCurrentSlide(3)}
-        onImportSuccess={(program) => {
-          // Handle successful import - use existing import logic
-          setParsedProgram(program);
-          setShowConfirmation(true);
-          // Don't immediately exit slide mode - let confirmation modal handle it
-        }}
-        onExitSlideMode={() => {
-          setShowSlideMode(false);
-          setCurrentSlide(1);
-        }}
-      />
-    );
-  }
 
   return (
     <>
       <View style={styles.container}>
-        <View style={styles.closeButtonWrapper}>
-          <TouchableOpacity onPress={handleCancel} style={styles.closeButton}>
-            <Ionicons name="close" size={28} color="#71717a" />
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
+            <Ionicons name="chevron-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          
+          <View style={styles.headerCenter}>
+            <Ionicons name="barbell" size={24} color={themeColor} style={styles.headerIcon} />
+            <View style={styles.progressContainer}>
+              <View style={styles.progressDot} />
+              <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.infoButton} onPress={() => setShowInfo(!showInfo)}>
+            <Ionicons name="information-circle-outline" size={24} color="#71717a" />
           </TouchableOpacity>
         </View>
+
+        {showInfo && (
+          <View style={styles.headerInfoModal}>
+            <Text style={styles.headerInfoMessage}>
+              The AI will create a JSON file. Either copy this file or save it. Either option works perfectly fine. Import it using the button below.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.content}>
           {/* Mode toggle - positioned above the main button */}
@@ -2571,61 +1889,10 @@ This check exists because the JSON generator must reconstruct complete exercise 
             </Text>
           </TouchableOpacity>
 
-          <View style={styles.orSection}>
-            <View style={styles.orLine} />
-          </View>
-
-          <TouchableOpacity 
-            style={styles.secondaryButton}
-            onPress={() => navigation.navigate('MyWorkouts')}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.secondaryButtonText}>My Workouts</Text>
-          </TouchableOpacity>
 
         </View>
 
 
-        <View style={{
-          position: 'absolute',
-          bottom: 30,
-          left: 20,
-          right: 20,
-          alignItems: 'center',
-          zIndex: 1000,
-        }}>
-          <TouchableOpacity 
-            onPress={() => {
-              console.log('Opening workout generator slideshow');
-              setShowSlideMode(true);
-              setCurrentSlide(1);
-            }}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 16,
-              paddingHorizontal: 20,
-              borderWidth: 1,
-              borderRadius: 12,
-              backgroundColor: 'rgba(255, 255, 255, 0.02)',
-              borderColor: themeColor,
-              gap: 8,
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="bulb-outline" size={20} color={themeColor} />
-            <Text style={{
-              fontSize: 15,
-              fontWeight: '600',
-              textAlign: 'center',
-              color: themeColor,
-            }}>
-              Create your tailored workout routine
-            </Text>
-            <Ionicons name="chevron-forward" size={16} color={themeColor} />
-          </TouchableOpacity>
-        </View>
       </View>
 
       <Modal
@@ -2868,9 +2135,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    paddingTop: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
   },
   backButton: {
     width: 44,
@@ -2879,7 +2147,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181b',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
   headerContent: {
     flex: 1,
@@ -2893,6 +2160,31 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#71717a',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIcon: {
+    marginBottom: 4,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#27272a',
+  },
+  infoButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeButtonWrapper: {
     position: 'absolute',
@@ -2920,7 +2212,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
-    paddingVertical: 60,
+    paddingTop: 0,
+    paddingBottom: 160,
   },
   modeToggle: {
     width: 44,
@@ -3493,5 +2786,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#3f3f46',
     marginHorizontal: 4,
+  },
+  headerInfoModal: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 20,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#333336',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  headerInfoMessage: {
+    fontSize: 15,
+    color: '#d1d5db',
+    lineHeight: 22,
+    textAlign: 'center',
   },
 });

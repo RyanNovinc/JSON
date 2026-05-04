@@ -968,9 +968,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               <Text style={styles.heroSubtitle}>
                 {routine.days} days per week • {routine.blocks} blocks
               </Text>
-              <Text style={[styles.heroDescription, { color: themeColor }]}>
-                Tap to start your workout
-              </Text>
             </View>
             
             <View style={styles.heroActions}>
@@ -1013,9 +1010,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                   <Text style={[styles.dualVerticalTitle, { textShadowColor: themeColorLight }]}>{routine.name}</Text>
                   <Text style={styles.dualVerticalSubtitle}>
                     {routine.days} days per week • {routine.blocks} blocks
-                  </Text>
-                  <Text style={[styles.dualVerticalDescription, { color: themeColor }]}>
-                    Tap to start your workout
                   </Text>
                   
                   <View style={styles.dualVerticalActions}>
@@ -1212,7 +1206,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           onPress={() => navigation.navigate('WorkoutDashboard' as any)}
           activeOpacity={0.9}
         >
-          <Ionicons name="clipboard-outline" size={24} color="#0a0a0b" />
+          <Ionicons name="person-outline" size={24} color="#0a0a0b" />
         </TouchableOpacity>
       </View>
 
@@ -1288,21 +1282,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       </View>
 
 
-      {/* Add Routine FAB - Bottom Right */}
-      <View style={[styles.fab, { backgroundColor: themeColor }]}>
-        <TouchableOpacity
-          style={styles.buttonInner}
-          onPress={() => {
-            if (showOnboarding) {
-              handleOnboardingComplete();
-            }
-            navigation.navigate('ImportRoutine' as any);
-          }}
-          activeOpacity={0.9}
-        >
-          <Ionicons name="add" size={28} color="#0a0a0b" />
-        </TouchableOpacity>
-      </View>
 
       {/* Custom Share Modal */}
       <Modal
@@ -1742,15 +1721,6 @@ const styles = StyleSheet.create({
     color: '#52525b',
     textAlign: 'center',
     paddingHorizontal: 40,
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 32,
-    width: 56,
-    height: 56,
-    borderRadius: 4,
-    backgroundColor: '#22d3ee',
   },
   buttonInner: {
     width: '100%',
@@ -2355,9 +2325,8 @@ const styles = StyleSheet.create({
   // Calendar button styles
   calendarButton: {
     position: 'absolute',
-    left: '50%',
+    right: 16,
     bottom: 32,
-    marginLeft: -28, // Half of width to center
     width: 56,
     height: 56,
     borderRadius: 4,

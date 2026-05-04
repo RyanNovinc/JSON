@@ -147,8 +147,6 @@ Create a personalized meal plan based on the nutrition data provided. Include br
             <View style={styles.progressContainer}>
               <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
               <View style={styles.progressDot} />
-              <View style={styles.progressDot} />
-              <View style={styles.progressDot} />
             </View>
           </View>
 
@@ -160,7 +158,7 @@ Create a personalized meal plan based on the nutrition data provided. Include br
         {showInfo && (
           <View style={styles.infoModal}>
             <Text style={styles.infoMessage}>
-              Send one prompt at a time before continuing to the next step. Don't send them all in one message.
+              Copy this prompt and send it to an AI like Claude or ChatGPT. The AI will generate a meal plan file that you can import back into this app in the next step.
             </Text>
           </View>
         )}

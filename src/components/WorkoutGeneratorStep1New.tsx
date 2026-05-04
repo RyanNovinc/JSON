@@ -8,29 +8,22 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAIPrompt, QuestionnaireData } from '../data/workoutPrompt';
 import { useTheme } from '../contexts/ThemeContext';
+import * as Clipboard from 'expo-clipboard';
+import { assemblePlanningPrompt } from '../data/planningPrompt';
+import { QuestionnaireData } from '../data/workoutPrompt';
+import { WorkoutStorage } from '../utils/storage';
 
-interface WorkoutGeneratorStep3Props {
+interface WorkoutGeneratorStep1NewProps {
   onNext: () => void;
   onBack: () => void;
 }
 
-export default function WorkoutGeneratorStep3({ onNext, onBack }: WorkoutGeneratorStep3Props) {
+export default function WorkoutGeneratorStep1New({ onNext, onBack }: WorkoutGeneratorStep1NewProps) {
   const { themeColor } = useTheme();
-  const [formatPromptCopied, setFormatPromptCopied] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [showInfo, setShowInfo] = useState(false);
-
-  React.useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  const [promptCopied, setPromptCopied] = useState(false);
 
   const loadQuestionnaireData = async (): Promise<QuestionnaireData> => {
     try {
@@ -38,29 +31,17 @@ export default function WorkoutGeneratorStep3({ onNext, onBack }: WorkoutGenerat
         fitnessGoalsData,
         equipmentPreferencesData,
       ] = await Promise.all([
-        AsyncStorage.getItem('fitnessGoalsData'),
-        AsyncStorage.getItem('equipmentPreferencesData'),
+        WorkoutStorage.loadFitnessGoalsResults(),
+        WorkoutStorage.loadEquipmentPreferencesResults(),
       ]);
 
-      let fitnessGoals: any = {};
-      let equipmentPrefs: any = {};
-      
-      try {
-        fitnessGoals = fitnessGoalsData ? JSON.parse(fitnessGoalsData) : {};
-      } catch (parseError) {
-        console.error('Error parsing fitnessGoalsData:', parseError);
-        fitnessGoals = {};
-      }
-      
-      try {
-        equipmentPrefs = equipmentPreferencesData ? JSON.parse(equipmentPreferencesData) : {};
-      } catch (parseError) {
-        console.error('Error parsing equipmentPreferencesData:', parseError);
-        equipmentPrefs = {};
-      }
+      const fitnessGoals: any = fitnessGoalsData || {};
+      const equipmentPrefs: any = equipmentPreferencesData || {};
 
       const consolidatedData: QuestionnaireData = {
+        // From fitnessGoalsData
         primaryGoal: fitnessGoals.primaryGoal,
+        customPrimaryGoal: fitnessGoals.customPrimaryGoal,
         integrationMethods: fitnessGoals.integrationMethods,
         specificSport: fitnessGoals.specificSport,
         athleticPerformanceDetails: fitnessGoals.athleticPerformanceDetails,
@@ -74,6 +55,7 @@ export default function WorkoutGeneratorStep3({ onNext, onBack }: WorkoutGenerat
         customFrequency: fitnessGoals.customFrequency,
         priorityMuscleGroups: fitnessGoals.priorityMuscleGroups,
         customMuscleGroup: fitnessGoals.customMuscleGroup,
+        auxiliaryMuscles: fitnessGoals.auxiliaryMuscles,
         movementLimitations: fitnessGoals.movementLimitations,
         customLimitation: fitnessGoals.customLimitation,
         trainingStylePreference: fitnessGoals.trainingStylePreference,
@@ -82,11 +64,21 @@ export default function WorkoutGeneratorStep3({ onNext, onBack }: WorkoutGenerat
         volumePreference: fitnessGoals.volumePreference,
         gender: fitnessGoals.gender,
         programDuration: fitnessGoals.programDuration,
-        sessionStyle: fitnessGoals.sessionStyle,
-        exerciseNoteDetail: fitnessGoals.exerciseNoteDetail,
+        customDuration: fitnessGoals.customDuration,
+
+        // From equipmentPreferencesData
         selectedEquipment: equipmentPrefs.selectedEquipment,
         specificEquipment: equipmentPrefs.specificEquipment,
         unavailableEquipment: equipmentPrefs.unavailableEquipment,
+        sessionStyle: equipmentPrefs.sessionStyle,
+        likedExercises: equipmentPrefs.likedExercises ? 
+          equipmentPrefs.likedExercises.split(',').map((ex: string) => ex.trim()).filter((ex: string) => ex.length > 0) 
+          : undefined,
+        dislikedExercises: equipmentPrefs.dislikedExercises ? 
+          equipmentPrefs.dislikedExercises.split(',').map((ex: string) => ex.trim()).filter((ex: string) => ex.length > 0) 
+          : undefined,
+        includeDirectCore: equipmentPrefs.includeDirectCore,
+        exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
       };
 
       return consolidatedData;
@@ -96,25 +88,26 @@ export default function WorkoutGeneratorStep3({ onNext, onBack }: WorkoutGenerat
     }
   };
 
-  const handleCopyFormatPrompt = async () => {
+  const handleCopyPrompt = async () => {
     try {
       const questionnaireData = await loadQuestionnaireData();
-      const prompt = getAIPrompt(questionnaireData);
-      
-      await Clipboard.setStringAsync(prompt);
-      setFormatPromptCopied(true);
-      setTimeout(() => {
-        setFormatPromptCopied(false);
-      }, 2000);
+      const planningPrompt = assemblePlanningPrompt(questionnaireData);
+      await Clipboard.setStringAsync(planningPrompt);
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
     } catch (error) {
-      console.error('Error generating format prompt:', error);
-      Alert.alert(
-        'Error',
-        'Unable to generate format prompt. Please try again.',
-        [{ text: 'OK' }]
-      );
+      console.error('Failed to copy prompt:', error);
+      Alert.alert('Error', 'Failed to copy prompt to clipboard');
     }
   };
+
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -128,71 +121,70 @@ export default function WorkoutGeneratorStep3({ onNext, onBack }: WorkoutGenerat
           })
         }]
       }}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Ionicons name="chevron-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        
-        <View style={styles.headerCenter}>
-          <Ionicons name="barbell" size={24} color={themeColor} style={styles.headerIcon} />
-          <View style={styles.progressContainer}>
-            <View style={styles.progressDot} />
-            <View style={styles.progressDot} />
-            <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
-            <View style={styles.progressDot} />
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.infoButton} onPress={() => setShowInfo(!showInfo)}>
-          <Ionicons name="information-circle-outline" size={24} color="#71717a" />
-        </TouchableOpacity>
-      </View>
-
-      {showInfo && (
-        <View style={styles.infoModal}>
-          <Text style={styles.infoMessage}>
-            Send one prompt at a time before continuing to the next step. Don't send them all in one message.
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.content}>
-        <View style={styles.centerContent}>
-          <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
-            <Text style={styles.stepText}>3</Text>
-          </View>
-          
-          <Text style={styles.mainTitle}>Get Your Final Plan</Text>
-          
-          <TouchableOpacity 
-            style={[styles.primaryAction, { backgroundColor: themeColor }]}
-            onPress={handleCopyFormatPrompt}
-            activeOpacity={0.8}
-          >
-            <Ionicons 
-              name={formatPromptCopied ? "checkmark" : "sparkles"} 
-              size={20} 
-              color="#000" 
-            />
-            <Text style={styles.actionText}>
-              {formatPromptCopied ? 'Copied!' : 'Copy Format Request'}
-            </Text>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Ionicons name="chevron-back" size={24} color="#ffffff" />
           </TouchableOpacity>
           
-          <Text style={styles.hintText}>Ask AI to format it for the app</Text>
-        </View>
-      </View>
+          <View style={styles.headerCenter}>
+            <Ionicons name="barbell" size={24} color={themeColor} style={styles.headerIcon} />
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
+              <View style={styles.progressDot} />
+            </View>
+          </View>
 
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity 
-          style={[styles.nextButton, { borderColor: themeColor }]}
-          onPress={onNext}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.nextButtonText, { color: themeColor }]}>Next Step</Text>
-          <Ionicons name="chevron-forward" size={20} color={themeColor} />
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.infoButton} onPress={() => setShowInfo(!showInfo)}>
+            <Ionicons name="information-circle-outline" size={24} color="#71717a" />
+          </TouchableOpacity>
+        </View>
+
+        {showInfo && (
+          <View style={styles.infoModal}>
+            <View style={styles.infoSteps}>
+              <Text style={styles.infoMessage}>
+                <Text style={[styles.stepNumber, { color: themeColor }]}>1. </Text>
+                Paste this prompt into any AI like Claude or ChatGPT
+              </Text>
+              <Text style={styles.infoMessage}>
+                <Text style={[styles.stepNumber, { color: themeColor }]}>2. </Text>
+                Follow the AI's questions to refine your program
+              </Text>
+              <Text style={styles.infoMessage}>
+                <Text style={[styles.stepNumber, { color: themeColor }]}>3. </Text>
+                The AI will create your workout file for import
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.content}>
+          <View style={styles.centerContent}>
+            <Text style={styles.mainTitle}>Your Prompt is Ready!</Text>
+            
+            <TouchableOpacity 
+              style={[styles.primaryAction, { backgroundColor: themeColor }]}
+              onPress={handleCopyPrompt}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={promptCopied ? "checkmark" : "copy"} size={20} color="#000" />
+              <Text style={styles.actionText}>{promptCopied ? "Copied!" : "Copy Prompt"}</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.hintText}>Then paste and send to any AI</Text>
+          </View>
+        </View>
+
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity 
+            style={[styles.nextButton, { borderColor: themeColor }]}
+            onPress={onNext}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.nextButtonText, { color: themeColor }]}>Next Step</Text>
+            <Ionicons name="chevron-forward" size={20} color={themeColor} />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
     </View>
   );
@@ -206,16 +198,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 30,
   },
   backButton: {
-    position: 'absolute',
-    left: 20,
-    top: 60,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -240,6 +228,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#27272a',
   },
+  infoButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   content: {
     flex: 1,
     justifyContent: 'center',
@@ -248,18 +244,6 @@ const styles = StyleSheet.create({
   centerContent: {
     alignItems: 'center',
     gap: 32,
-  },
-  stepBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepText: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#000',
   },
   mainTitle: {
     fontSize: 36,
@@ -308,17 +292,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
   },
-  infoButton: {
-    position: 'absolute',
-    right: 20,
-    top: 60,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#18181b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   infoModal: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -337,10 +310,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  infoSteps: {
+    gap: 12,
+  },
   infoMessage: {
     fontSize: 15,
     color: '#d1d5db',
     lineHeight: 22,
-    textAlign: 'center',
+  },
+  stepNumber: {
+    fontWeight: '700',
   },
 });

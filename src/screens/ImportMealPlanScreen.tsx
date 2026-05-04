@@ -12,7 +12,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -28,16 +28,17 @@ import RobustStorage from '../utils/robustStorage';
 import { Platform } from 'react-native';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 import NutritionGeneratorStep1 from '../components/NutritionGeneratorStep1';
-import NutritionGeneratorStep2 from '../components/NutritionGeneratorStep2';
-import NutritionGeneratorStep3 from '../components/NutritionGeneratorStep3';
 import NutritionGeneratorStep4 from '../components/NutritionGeneratorStep4';
+import NutritionGeneratorStep1New from '../components/NutritionGeneratorStep1New';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
+type ImportMealPlanRouteProp = RouteProp<RootStackParamList, 'ImportMealPlan'>;
 
 import { SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
 
 export default function ImportMealPlanScreen() {
   const navigation = useNavigation<ImportMealPlanNavigationProp>();
+  const route = useRoute<ImportMealPlanRouteProp>();
   const { themeColor } = useTheme();
   const { saveMealPlan } = useSimplifiedMealPlanning();
   const [isLoading, setIsLoading] = useState(false);
@@ -51,12 +52,26 @@ export default function ImportMealPlanScreen() {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [uploadMode, setUploadMode] = useState(false);
   const [reviewPromptCopied, setReviewPromptCopied] = useState(false);
-  const [showSlideMode, setShowSlideMode] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(1);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [parsedMealPlan, setParsedMealPlan] = useState<SimplifiedMealPlan | null>(null);
   const [modalScale] = useState(new Animated.Value(0));
   const [modalOpacity] = useState(new Animated.Value(0));
+
+  // Handle the showStep1New parameter
+  const showStep1New = route.params?.showStep1New;
+
+  // Show NutritionGeneratorStep1New if showStep1New is true
+  if (showStep1New) {
+    return (
+      <NutritionGeneratorStep1New
+        onNext={() => {
+          // Navigate back to this screen without the showStep1New parameter
+          navigation.navigate('ImportMealPlan', {});
+        }}
+        onBack={() => navigation.goBack()}
+      />
+    );
+  }
 
   const getCurrentDate = (): string => {
     const today = new Date();
@@ -617,7 +632,7 @@ export default function ImportMealPlanScreen() {
 
 
   const handleCancel = () => {
-    navigation.goBack();
+    navigation.navigate('ImportMealPlan', { showStep1New: true });
   };
 
   const handleModalCancel = () => {
@@ -679,7 +694,7 @@ export default function ImportMealPlanScreen() {
     );
   }
 
-  if (showSlideMode) {
+  if (false) { // Disabled old slide mode
     const handleSlideBack = () => {
       if (currentSlide === 1) {
         setShowSlideMode(false);
@@ -714,20 +729,6 @@ export default function ImportMealPlanScreen() {
         );
       case 2:
         return (
-          <NutritionGeneratorStep2
-            onNext={handleSlideNext}
-            onBack={handleSlideBack}
-          />
-        );
-      case 3:
-        return (
-          <NutritionGeneratorStep3
-            onNext={handleSlideNext}
-            onBack={handleSlideBack}
-          />
-        );
-      case 4:
-        return (
           <NutritionGeneratorStep4
             onBack={handleSlideBack}
             onImportSuccess={handleImportSuccess}
@@ -739,7 +740,7 @@ export default function ImportMealPlanScreen() {
     }
   }
 
-  if (showInstructions) {
+  if (false) { // Disabled old instructions screen
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.instructionsContainer}>
@@ -976,15 +977,36 @@ export default function ImportMealPlanScreen() {
   return (
     <>
       <View style={styles.container}>
-        <View style={styles.closeButtonWrapper}>
-          <TouchableOpacity onPress={handleCancel} style={styles.closeButtonInner}>
-            <Ionicons name="close" size={28} color="#71717a" />
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
+            <Ionicons name="chevron-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          
+          <View style={styles.headerCenter}>
+            <Ionicons name="restaurant" size={24} color={themeColor} style={styles.headerIcon} />
+            <View style={styles.progressContainer}>
+              <View style={styles.progressDot} />
+              <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.infoButton} onPress={() => setShowInstructions(!showInstructions)}>
+            <Ionicons name="information-circle-outline" size={24} color="#71717a" />
           </TouchableOpacity>
         </View>
 
+        {showInstructions && (
+          <View style={styles.infoModal}>
+            <Text style={styles.infoMessage}>
+              The AI will create a JSON file. Either copy this file or save it. Either option works perfectly fine. Import it using the button below.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.content}>
-          {/* Upload Mode toggle */}
-          <TouchableOpacity 
+          <View style={styles.centerContent}>
+            {/* Upload Mode toggle */}
+            <TouchableOpacity 
             style={[styles.uploadModeToggle, { borderColor: themeColor }]}
             onPress={() => setUploadMode(!uploadMode)}
             activeOpacity={0.8}
@@ -1013,36 +1035,9 @@ export default function ImportMealPlanScreen() {
               {uploadMode ? "Import the AI's file" : "Paste what the AI created"}
             </Text>
           </TouchableOpacity>
-
-
-          <View style={styles.orSection}>
-            <View style={styles.orLine} />
-            <Text style={styles.orText}>OR</Text>
-            <View style={styles.orLine} />
           </View>
-
-          <TouchableOpacity 
-            style={styles.secondaryButton}
-            onPress={() => navigation.navigate('MyMealPlans' as any)}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.secondaryButtonText}>My Meal Plans</Text>
-          </TouchableOpacity>
-
         </View>
 
-        {/* Move help link to bottom of screen */}
-        <View style={styles.helpLinkWrapper}>
-          <TouchableOpacity 
-            style={[styles.helpButton, { borderColor: themeColor }]}
-            onPress={() => setShowSlideMode(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="bulb-outline" size={20} color={themeColor} />
-            <Text style={[styles.helpButtonText, { color: themeColor }]}>Create your personalized nutrition plan</Text>
-            <Ionicons name="chevron-forward" size={16} color={themeColor} />
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Confirmation Modal */}
@@ -1172,7 +1167,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
-    paddingVertical: 60,
+    paddingTop: 0,
+    paddingBottom: 160,
+  },
+  centerContent: {
+    alignItems: 'center',
+    gap: 32,
   },
   modeSection: {
     marginBottom: 32,
@@ -1588,11 +1588,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    paddingTop: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#18181b',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
   },
   backButton: {
     width: 44,
@@ -1601,7 +1600,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181b',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
   headerContent: {
     flex: 1,
@@ -1732,5 +1730,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#27272a',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerIcon: {
+    marginBottom: 4,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#27272a',
+  },
+  infoButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoModal: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 20,
+    backgroundColor: '#1a1a1b',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#333336',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  infoMessage: {
+    fontSize: 15,
+    color: '#d1d5db',
+    lineHeight: 22,
+    textAlign: 'center',
   },
 });

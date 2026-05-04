@@ -153,6 +153,7 @@ function getTargetRepForSet(reps: string, weekNumber: number = 1, setIndex: numb
   return cleanReps || '8';
 }
 
+
 type WorkoutLogScreenNavigationProp = StackNavigationProp<RootStackParamList, 'WorkoutLog'>;
 type WorkoutLogScreenRouteProp = RouteProp<RootStackParamList, 'WorkoutLog'>;
 
@@ -161,6 +162,9 @@ interface Exercise {
   sets: number;
   reps: string;
   reps_weekly?: {
+    [key: string]: string;
+  };
+  rir_weekly?: {
     [key: string]: string;
   };
   rest?: number;
@@ -186,7 +190,6 @@ interface SetData {
   completed: boolean;
   selectedExerciseIndex: number; // 0 = primary, 1+ = alternatives
   unit?: 'kg' | 'lbs'; // Store unit for completed sets
-  rir?: string; // Rate of Perceived Exertion (RIR)
   // Store data for each exercise variant separately
   exerciseData?: {
     [exerciseIndex: number]: {
@@ -195,7 +198,6 @@ interface SetData {
       completed: boolean;
       isDropSet?: boolean;
       drops?: DropSet[];
-      rir?: string; // Rate of Perceived Exertion (RIR) for this exercise variant
     };
   };
   isDropSet?: boolean;
@@ -213,7 +215,7 @@ interface ExerciseCardProps {
   setsData: SetData[];
   notes: string;
   workoutStarted: boolean;
-  onSetUpdate: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps' | 'rir', value: string) => void;
+  onSetUpdate: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => void;
   onSetComplete: (exerciseIndex: number, setIndex: number) => void;
   onDropSetComplete: (exerciseIndex: number, setIndex: number, dropIndex: number) => void;
   onDeleteSet: (exerciseIndex: number, setIndex: number) => void;
@@ -232,8 +234,6 @@ interface ExerciseCardProps {
   isLinkedToNext?: boolean;
   isLinkedToPrev?: boolean;
   themeColor: string;
-  getExerciseUnit: (exerciseIndex: number) => 'kg' | 'lbs';
-  setExerciseUnit: (exerciseIndex: number, unit: 'kg' | 'lbs') => void;
   setGlobalUnit: (unit: 'kg' | 'lbs') => void;
 }
 
@@ -262,7 +262,7 @@ function ExerciseCard({
   onInteractionAttempt,
   isLinkedToNext,
   isLinkedToPrev,
-  themeColor
+  themeColor,
 }: ExerciseCardProps) {
   
   const [showExerciseSelector, setShowExerciseSelector] = useState(false);
@@ -312,8 +312,6 @@ function ExerciseCard({
   // Use weekly reps if available, otherwise fall back to regular reps
   const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
   
-  // Use weekly RIR if available
-  const targetRir = exercise.rir_weekly?.[currentWeek.toString()] || '';
   
   // Ensure targetReps is always a string
   const targetRepsString = typeof targetReps === 'string' ? targetReps : String(targetReps);
@@ -766,7 +764,9 @@ function ExerciseCard({
               delayLongPress={500}
               activeOpacity={0.95}
             >
-              <Text style={styles.setNumber}>{setIndex + 1}</Text>
+              {/* Main Row: Set number, Weight, Reps, Check, Drop */}
+              <View style={styles.setMainRow}>
+                <Text style={styles.setNumber}>{setIndex + 1}</Text>
               
               <View style={styles.weightInputContainer}>
                 <TextInput
@@ -823,34 +823,6 @@ function ExerciseCard({
                 editable={!setData.completed}
               />
               
-              <Text style={styles.separator}>RIR</Text>
-              
-              <TextInput
-                style={[
-                  styles.input, 
-                  styles.rirInput,
-                  !workoutStarted && styles.inputDisabled
-                ]}
-                value={setData.rir || ''}
-                onChangeText={(value) => {
-                  if (!workoutStarted) {
-                    onInteractionAttempt && onInteractionAttempt();
-                    return;
-                  }
-                  onSetUpdate(exerciseIndex, setIndex, 'rir', value);
-                }}
-                onFocus={() => {
-                  if (!workoutStarted) {
-                    onInteractionAttempt && onInteractionAttempt();
-                  }
-                }}
-                placeholder={targetRir || "0-10"}
-                placeholderTextColor="#52525b"
-                keyboardType="number-pad"
-                editable={!setData.completed}
-                maxLength={2}
-              />
-              
               <TouchableOpacity
                 style={[
                   styles.checkButton,
@@ -891,6 +863,8 @@ function ExerciseCard({
                   DROP
                 </Text>
               </TouchableOpacity>
+              </View>
+              
             </TouchableOpacity>
             
             {/* Drop sets */}
@@ -1116,7 +1090,7 @@ const getMuscleGroupsFromExercise = (exercise: any): string[] => {
 const getMuscleHighlighterData = (dailyVolume: { [key: string]: number }) => {
   const muscleToBodyParts: { [key: string]: string | null } = {
     'chest': 'chest',
-    'upper back': 'upper-back',      // CHANGED from 'trapezius' — this was a pre-existing bug
+    'upper back': 'trapezius',       // Fixed: rhomboid region is covered by trapezius slug
     'lats': 'upper-back',            // Lats display on upper-back region (no dedicated lats slug)
     'traps': 'trapezius',            // NEW
     'front delts': 'deltoids',
@@ -1136,7 +1110,7 @@ const getMuscleHighlighterData = (dailyVolume: { [key: string]: number }) => {
     'hip adductors': 'adductors',    // NEW
     'shins': 'tibialis',             // NEW
     'serratus': null,                // Library doesn't support — will be skipped on diagram
-    'hip abductors': null            // Library doesn't support — will be skipped on diagram
+    'hip abductors': 'gluteal'       // Gluteus medius is the primary hip abductor
   };
 
   const bodyData: Array<{slug: string, intensity: number}> = [];
@@ -1154,9 +1128,9 @@ const getMuscleHighlighterData = (dailyVolume: { [key: string]: number }) => {
     }
   });
 
-  // Convert to final data format with proper intensity scaling
+  // Convert to final data format with simple binary intensity
   Object.entries(bodyPartVolumes).forEach(([bodyPart, totalVolume]) => {
-    const intensity = maxVolume > 0 ? (totalVolume >= maxVolume * 0.7 ? 2 : 1) : 1;
+    const intensity = totalVolume >= 1 ? 1 : 0;
     bodyData.push({ slug: bodyPart, intensity });
   });
 
@@ -1301,11 +1275,44 @@ export default function WorkoutLogScreen() {
   };
 
   // Initialize personal notes from existing notes when showNotes changes
+  // Function to separate RIR information from mixed notes
+  const separateRirFromNotes = (notesArray: string[]): string[] => {
+    const separatedNotes: string[] = [];
+    
+    notesArray.forEach(note => {
+      // Regex to match RIR patterns like "RIR 3-4 W1, 2-3 W2, 1-2 W3" or "RIR: 2-3" etc.
+      const rirPattern = /(.+?)(\s*RIR[:\s]*[0-9\-,\sW]+.*)/i;
+      const match = note.match(rirPattern);
+      
+      if (match && match[1] && match[2]) {
+        // Split into main instruction and RIR parts
+        const mainNote = match[1].trim();
+        const rirNote = match[2].trim();
+        
+        if (mainNote) {
+          separatedNotes.push(mainNote);
+        }
+        if (rirNote) {
+          separatedNotes.push(rirNote);
+        }
+      } else {
+        // No RIR found, keep note as is
+        separatedNotes.push(note);
+      }
+    });
+    
+    return separatedNotes;
+  };
+
   useEffect(() => {
     if (showNotes) {
       const exerciseIndex = showNotes.exerciseIndex;
       const existingNotes = exerciseNotes[exerciseIndex] || '';
-      const notesArray = existingNotes ? existingNotes.split('\n').filter(note => note.trim()) : [];
+      let notesArray = existingNotes ? existingNotes.split('\n').filter(note => note.trim()) : [];
+      
+      // Separate RIR information from mixed notes
+      notesArray = separateRirFromNotes(notesArray);
+      
       setPersonalNotes(notesArray);
       setCurrentNote('');
       setActiveTab('reps'); // Reset to reps tab
@@ -1660,7 +1667,7 @@ export default function WorkoutLogScreen() {
     console.log('Exercise added successfully:', newExercise.exercise);
   };
   
-  const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps' | 'rir', value: string) => {
+  const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
     // Validate input - only allow numbers and decimal point for weight
     let sanitizedValue = value;
     if (field === 'weight') {
@@ -1674,13 +1681,6 @@ export default function WorkoutLogScreen() {
     } else if (field === 'reps') {
       // For reps, only allow whole numbers
       sanitizedValue = value.replace(/[^0-9]/g, '');
-    } else if (field === 'rir') {
-      // For RIR, allow numbers 0-10
-      sanitizedValue = value.replace(/[^0-9]/g, '');
-      const numericValue = parseInt(sanitizedValue);
-      if (numericValue > 10) {
-        sanitizedValue = '10';
-      }
     }
     
     const newData = [...allSetsData];
@@ -1733,7 +1733,6 @@ export default function WorkoutLogScreen() {
       completed: false,
       unit: lastSet?.unit || getExerciseUnit(exerciseIndex),
       isDropSet: false,
-      rir: '' // Initialize RIR as empty
     };
     
     newData[exerciseIndex].push(newSet);
@@ -2897,11 +2896,63 @@ export default function WorkoutLogScreen() {
                       );
                     }
                   })()}
-                  {exercise.notes && (
-                    <Text style={styles.repSchemeNotes}>{exercise.notes}</Text>
-                  )}
                 </View>
               </View>
+              )}
+
+              {/* RIR Scheme Section - only show when reps tab is active */}
+              {activeTab === 'reps' && (
+                <View style={styles.repSchemeCard}>
+                <View style={styles.repSchemeTitleContainer}>
+                  <Ionicons name="speedometer-outline" size={24} color="#ffffff" />
+                  <Text style={styles.repSchemeLabel}>Target RIR Scheme</Text>
+                </View>
+                <View style={styles.repSchemeInfo}>
+                  {(() => {
+                    const exercise = dynamicExercises[showNotes.exerciseIndex];
+                    const hasWeeklyRIR = exercise.rir_weekly && Object.keys(exercise.rir_weekly).length > 0;
+                    
+                    // If exercise has weekly RIR progression, show weekly format
+                    if (hasWeeklyRIR) {
+                      return (
+                        <View style={styles.weeklyScheme}>
+                          {Object.entries(exercise.rir_weekly).map(([week, rir]) => (
+                            <View 
+                              key={week} 
+                              style={[
+                                styles.weekBlock,
+                                parseInt(week) === currentWeek && [styles.activeWeekBlock, { backgroundColor: themeColor }]
+                              ]}
+                            >
+                              <Text style={[
+                                styles.weekLabel,
+                                parseInt(week) === currentWeek && styles.activeWeekLabel
+                              ]}>Week {week}</Text>
+                              <Text style={[
+                                styles.weekReps,
+                                { color: themeColor },
+                                parseInt(week) === currentWeek && styles.activeWeekReps
+                              ]}>{String(rir)}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      );
+                    } else {
+                      // Fallback when no RIR weekly data is available
+                      return (
+                        <View style={styles.fallbackContainer}>
+                          <Text style={styles.fallbackText}>No RIR targets specified for this exercise</Text>
+                        </View>
+                      );
+                    }
+                  })()}
+                </View>
+              </View>
+              )}
+
+              {/* Bottom spacing for reps tab */}
+              {activeTab === 'reps' && (
+                <View style={styles.bottomSpacer} />
               )}
 
               {/* Notes Content */}
@@ -3114,6 +3165,7 @@ export default function WorkoutLogScreen() {
             </View>
           </TouchableOpacity>
           
+          
           {showDailyVolume && (
             <View style={styles.volumeOverview}>
               {(() => {
@@ -3223,6 +3275,7 @@ export default function WorkoutLogScreen() {
                 isLinkedToNext={supersetLinks.has(index)}
                 isLinkedToPrev={supersetLinks.has(index - 1)}
                 themeColor={themeColor}
+                setGlobalUnit={setGlobalUnit}
               />
               
               {/* Superset linking button between exercises */}
@@ -3818,13 +3871,17 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   setRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
     paddingVertical: 8,
     paddingHorizontal: 8,
     marginBottom: 4,
     borderRadius: 4,
     backgroundColor: '#0a0a0b',
+  },
+  setMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   setRowCompleted: {
     backgroundColor: '#18181b',
@@ -3853,9 +3910,6 @@ const styles = StyleSheet.create({
   repsInput: {
     width: 50,
   },
-  rirInput: {
-    width: 45,
-  },
   inputDisabled: {
     opacity: 0.5,
     backgroundColor: '#18181b',
@@ -3863,7 +3917,7 @@ const styles = StyleSheet.create({
   separator: {
     fontSize: 16,
     color: '#52525b',
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
   checkButton: {
     marginLeft: 12,
@@ -5319,6 +5373,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   volumeEmptyText: {
+    fontSize: 14,
+    color: '#71717a',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  fallbackContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
+  fallbackText: {
     fontSize: 14,
     color: '#71717a',
     textAlign: 'center',

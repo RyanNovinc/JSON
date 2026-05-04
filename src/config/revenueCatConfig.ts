@@ -75,13 +75,27 @@ export const hasJSONProAccess = (customerInfo: any): boolean => {
 
 // Helper to check if user has nutrition access
 export const hasNutritionAccess = (customerInfo: any): boolean => {
+  console.log('🔍 [hasNutritionAccess] Function called with:', {
+    customerInfo: customerInfo ? 'EXISTS' : 'NULL',
+    ENABLE_NUTRITION_PAYWALL,
+    expectedEntitlement: REVENUECAT_CONFIG.entitlements.nutrition_access,
+  });
+
   // 🚨 MONETIZATION CONTROL: When paywall is disabled, everyone has access
   if (!ENABLE_NUTRITION_PAYWALL) {
+    console.log('🔍 [hasNutritionAccess] Paywall DISABLED - returning TRUE (free access)');
     return true; // FREE ACCESS - Everyone gets nutrition features
   }
   
   // When paywall is enabled, check for entitlement
-  return hasEntitlement(customerInfo, REVENUECAT_CONFIG.entitlements.nutrition_access);
+  const hasEntitlementResult = hasEntitlement(customerInfo, REVENUECAT_CONFIG.entitlements.nutrition_access);
+  console.log('🔍 [hasNutritionAccess] Paywall ENABLED - checking entitlement:', {
+    entitlementKey: REVENUECAT_CONFIG.entitlements.nutrition_access,
+    result: hasEntitlementResult,
+    customerEntitlements: customerInfo?.entitlements?.active || 'MISSING'
+  });
+  
+  return hasEntitlementResult;
 };
 
 // ============================================================================

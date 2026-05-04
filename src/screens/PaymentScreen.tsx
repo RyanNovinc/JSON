@@ -14,11 +14,14 @@ import TermsOfServiceModal from '../components/TermsOfServiceModal';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 import { useTheme } from '../contexts/ThemeContext';
 
-export default function PaymentScreen() {
+export default function PaymentScreen({ route }: any) {
   const navigation = useNavigation();
   const { themeColor } = useTheme();
   const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+  
+  // Check if we should force show the paywall (from locked button)
+  const forceShowPaywall = route?.params?.forceShowPaywall || false;
 
   const handlePurchaseSuccess = () => {
     // Handle successful purchase - custom modal will handle this
@@ -38,6 +41,7 @@ export default function PaymentScreen() {
         onRestoreSuccess={handleRestoreSuccess}
         onTermsPress={() => setTermsModalVisible(true)}
         onPrivacyPress={() => setPrivacyModalVisible(true)}
+        forceShowPaywall={forceShowPaywall}
       />
 
       {/* Terms of Service Modal */}

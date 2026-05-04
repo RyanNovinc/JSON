@@ -825,10 +825,7 @@ ${JSON.stringify(debugData, null, 2)}
             <View style={styles.heroContent}>
               <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
               <Text style={styles.heroSubtitle}>
-                {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
-              </Text>
-              <Text style={[styles.heroDescription, { color: themeColor }]}>
-                Tap to view your meal plan
+                {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''}
               </Text>
             </View>
             
@@ -871,10 +868,7 @@ ${JSON.stringify(debugData, null, 2)}
                 <View style={styles.dualVerticalContent}>
                   <Text style={[styles.dualVerticalTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
                   <Text style={styles.dualVerticalSubtitle}>
-                    {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
-                  </Text>
-                  <Text style={[styles.dualVerticalDescription, { color: themeColor }]}>
-                    Tap to view your meal plan
+                    {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''}
                   </Text>
                   
 
@@ -1005,10 +999,7 @@ ${JSON.stringify(debugData, null, 2)}
               <View style={styles.heroContent}>
                 <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{plan.name}</Text>
                 <Text style={styles.heroSubtitle}>
-                  {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''} planned
-                </Text>
-                <Text style={[styles.heroDescription, { color: themeColor }]}>
-                  Tap to view your meal plan
+                  {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''}
                 </Text>
               </View>
               
@@ -1052,28 +1043,16 @@ ${JSON.stringify(debugData, null, 2)}
         {renderContent()}
       </Animated.View>
 
-      {/* Calendar Button - Bottom Left */}
+      {/* Profile Button - Bottom Left */}
       <View style={[styles.calendarButton, { backgroundColor: themeColor }]}>
         <TouchableOpacity
           style={styles.buttonInner}
           onPress={() => navigation.navigate('NutritionDashboard' as any)}
           activeOpacity={0.9}
         >
-          <Ionicons name="clipboard-outline" size={24} color="#0a0a0b" />
+          <Ionicons name="person-outline" size={24} color="#0a0a0b" />
         </TouchableOpacity>
       </View>
-
-      {/* Weight Tracker Button - Bottom Center */}
-      <View style={[styles.weightButton, { backgroundColor: themeColor }]}>
-        <TouchableOpacity
-          style={styles.buttonInner}
-          onPress={() => navigation.navigate('WeightTracker' as any)}
-          activeOpacity={0.9}
-        >
-          <Ionicons name="scale-outline" size={24} color="#0a0a0b" />
-        </TouchableOpacity>
-      </View>
-
 
       {/* App Mode Toggle - Centered at Top */}
       <View style={styles.centralToggleContainer}>
@@ -1136,35 +1115,16 @@ ${JSON.stringify(debugData, null, 2)}
 
 
 
-      {/* Add Meal Plan FAB - Bottom Right */}
-      <NutritionFeatureGate
-        featureName="nutrition planning"
-        onUpgradePress={() => navigation.navigate('Payment' as any)}
-        fallback={
-          <View style={[styles.fab, { backgroundColor: '#3f3f46' }]}>
-            <TouchableOpacity
-              style={styles.buttonInner}
-              onPress={() => navigation.navigate('Payment' as any)}
-              activeOpacity={0.9}
-            >
-              <View style={styles.lockedFabContent}>
-                <Ionicons name="lock-closed" size={20} color="#a1a1aa" />
-                <Text style={styles.lockedFabText}>$9.99</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        }
-      >
-        <View style={[styles.fab, { backgroundColor: themeColor }]}>
-          <TouchableOpacity
-            style={styles.buttonInner}
-            onPress={() => navigation.navigate('ImportMealPlan' as any)}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="add" size={28} color="#0a0a0b" />
-          </TouchableOpacity>
-        </View>
-      </NutritionFeatureGate>
+      {/* Weight Tracker Button - Bottom Right */}
+      <View style={[styles.fab, { backgroundColor: themeColor }]}>
+        <TouchableOpacity
+          style={styles.buttonInner}
+          onPress={() => navigation.navigate('WeightTracker' as any)}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="scale-outline" size={28} color="#0a0a0b" />
+        </TouchableOpacity>
+      </View>
 
       {/* Action Modal */}
       <Modal

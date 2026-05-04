@@ -21,6 +21,7 @@ interface NutritionPaywallScreenProps {
   onRestoreSuccess?: () => void;
   onTermsPress?: () => void;
   onPrivacyPress?: () => void;
+  forceShowPaywall?: boolean;
 }
 
 const CYAN = '#00E5CC';
@@ -64,7 +65,7 @@ const features = [
   },
 ];
 
-export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuccess, onTermsPress, onPrivacyPress }: NutritionPaywallScreenProps) {
+export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuccess, onTermsPress, onPrivacyPress, forceShowPaywall = false }: NutritionPaywallScreenProps) {
   const navigation = useNavigation();
   const {
     purchasePackage,
@@ -179,8 +180,8 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
     outputRange: [0, -8],
   });
 
-  // Only show "already have access" if user had access BEFORE this session
-  if (hasNutrition && !justPurchased) {
+  // Only show "already have access" if user had access BEFORE this session AND we're not forcing the paywall
+  if (hasNutrition && !justPurchased && !forceShowPaywall) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.purchasedContainer}>
