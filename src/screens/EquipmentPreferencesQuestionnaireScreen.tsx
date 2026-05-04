@@ -428,19 +428,19 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
       {
         id: 'optimal',
         title: 'Optimal Rest',
-        subtitle: 'Full recovery between sets. Sessions may run 75-90 min.',
+        subtitle: 'Full recovery between every set. Longer sessions.',
         icon: 'timer-outline'
       },
       {
         id: 'moderate',
         title: 'Moderate Rest',
-        subtitle: 'Balanced rest and efficiency. Sessions around 60-75 min.',
+        subtitle: 'Balanced recovery. Standard session length.',
         icon: 'swap-horizontal-outline'
       },
       {
         id: 'minimal',
         title: 'Minimal Rest',
-        subtitle: 'Time efficient, shorter rest. Sessions around 45-60 min.',
+        subtitle: 'Shorter rests across the board. Time-efficient sessions.',
         icon: 'speedometer-outline'
       }
     ];
@@ -772,9 +772,9 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
               </View>
               <View style={styles.tronValueSection}>
                 <Text style={styles.tronValue}>
-                  {sessionStyle === 'optimal' ? 'Optimal Rest (full recovery, 75-90 min sessions)' :
-                   sessionStyle === 'moderate' ? 'Moderate Rest (balanced, 60-75 min sessions)' :
-                   sessionStyle === 'minimal' ? 'Minimal Rest (time efficient, 45-60 min sessions)' :
+                  {sessionStyle === 'optimal' ? 'Optimal Rest (full recovery between every set, longer sessions)' :
+                   sessionStyle === 'moderate' ? 'Moderate Rest (balanced recovery, standard session length)' :
+                   sessionStyle === 'minimal' ? 'Minimal Rest (shorter rests across the board, time-efficient sessions)' :
                    'Moderate Rest (default)'}
                 </Text>
               </View>
