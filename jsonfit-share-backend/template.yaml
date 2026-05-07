@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: JSON.fit share backend - QR code + universal link sharing
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref ShareTable
+
+Resources:
+  # DynamoDB table for storing shared workouts/meal plans
+  ShareTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: jsonfit-shares
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: shareId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: shareId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: JSONFit
+        - Key: Component
+          Value: ShareBackend
+
+  # HTTP API Gateway (cheaper than REST API)
+  ShareApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Requested-With
+        MaxAge: 86400
+
+  # Lambda function to create shares
+  CreateShareFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: jsonfit-createShare
+      CodeUri: src/createShare/
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ShareTable
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref ShareTable
+      Events:
+        CreateShare:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ShareApi
+            Path: /shares
+            Method: post
+
+  # Lambda function to get shares
+  GetShareFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: jsonfit-getShare
+      CodeUri: src/getShare/
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ShareTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ShareTable
+      Events:
+        GetShare:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ShareApi
+            Path: /shares/{shareId}
+            Method: get
+
+Outputs:
+  ShareApiUrl:
+    Description: "API Gateway HTTP API URL"
+    Value: !Sub "https://${ShareApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "${AWS::StackName}-ShareApiUrl"
+  
+  ShareTableName:
+    Description: "DynamoDB table name"
+    Value: !Ref ShareTable
+    Export:
+      Name: !Sub "${AWS::StackName}-ShareTableName"

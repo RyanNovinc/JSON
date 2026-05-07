@@ -1,0 +1,10 @@
+{
+  "name": "getShare",
+  "version": "1.0.0",
+  "description": "Lambda function to retrieve shared workout/meal plan data",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.658.0",
+    "@aws-sdk/lib-dynamodb": "^3.658.0"
+  }
+}

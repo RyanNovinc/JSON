@@ -1,0 +1,420 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: JSON.fit share backend - QR code + universal link sharing
+
+Parameters:
+  FunctionCode1:
+    Type: String
+    Default: |
+      const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+      const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+
+      const client = new DynamoDBClient({});
+      const docClient = DynamoDBDocumentClient.from(client);
+
+      // Generate URL-safe 8-character ID (avoiding ambiguous characters)
+      const generateShareId = () => {
+          // Exclude: 0, O, 1, l, I for clarity
+          const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+          let result = '';
+          for (let i = 0; i < 8; i++) {
+              result += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          return result;
+      };
+
+      // Validate JSON payload size and structure
+      const validatePayload = (body) => {
+          if (!body) {
+              return { valid: false, error: 'Request body is required', statusCode: 400 };
+          }
+
+          // Check size (200KB limit)
+          const bodySize = Buffer.byteLength(body, 'utf8');
+          if (bodySize > 200 * 1024) {
+              return { 
+                  valid: false, 
+                  error: `Request body too large: ${Math.round(bodySize/1024)}KB. Maximum allowed: 200KB`, 
+                  statusCode: 413 
+              };
+          }
+
+          // Validate JSON structure
+          try {
+              const parsed = JSON.parse(body);
+              
+              // Basic validation - ensure it's an object
+              if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+                  return { 
+                      valid: false, 
+                      error: 'Request body must be a valid JSON object', 
+                      statusCode: 400 
+                  };
+              }
+
+              return { valid: true, data: parsed };
+          } catch (error) {
+              return { 
+                  valid: false, 
+                  error: `Invalid JSON: ${error.message}`, 
+                  statusCode: 400 
+              };
+          }
+      };
+
+      exports.handler = async (event) => {
+          try {
+              console.log('CreateShare request:', JSON.stringify(event, null, 2));
+
+              // Validate payload
+              const validation = validatePayload(event.body);
+              if (!validation.valid) {
+                  return {
+                      statusCode: validation.statusCode,
+                      headers: {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*'
+                      },
+                      body: JSON.stringify({
+                          error: validation.error
+                      })
+                  };
+              }
+
+              // Generate unique share ID
+              const shareId = generateShareId();
+              
+              // Calculate expiration (30 days from now)
+              const expiresAt = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+
+              // Store in DynamoDB
+              const item = {
+                  shareId,
+                  data: validation.data,
+                  createdAt: Math.floor(Date.now() / 1000),
+                  expiresAt
+              };
+
+              await docClient.send(new PutCommand({
+                  TableName: process.env.TABLE_NAME,
+                  Item: item,
+                  // Prevent overwriting existing items with same ID (very unlikely but good practice)
+                  ConditionExpression: 'attribute_not_exists(shareId)'
+              }));
+
+              console.log(`Share created successfully: ${shareId}`);
+
+              return {
+                  statusCode: 201,
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*'
+                  },
+                  body: JSON.stringify({
+                      shareId,
+                      expiresAt
+                  })
+              };
+
+          } catch (error) {
+              console.error('Error creating share:', error);
+
+              return {
+                  statusCode: 500,
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*'
+                  },
+                  body: JSON.stringify({
+                      error: 'Internal server error'
+                  })
+              };
+          }
+      };
+
+  FunctionCode2:
+    Type: String
+    Default: |
+      const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+      const { DynamoDBDocumentClient, GetCommand } = require('@aws-sdk/lib-dynamodb');
+
+      const client = new DynamoDBClient({});
+      const docClient = DynamoDBDocumentClient.from(client);
+
+      exports.handler = async (event) => {
+          try {
+              console.log('GetShare request:', JSON.stringify(event, null, 2));
+
+              // Extract shareId from path parameters
+              const shareId = event.pathParameters?.shareId;
+
+              if (!shareId) {
+                  return {
+                      statusCode: 400,
+                      headers: {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*'
+                      },
+                      body: JSON.stringify({
+                          error: 'Share ID is required'
+                      })
+                  };
+              }
+
+              // Validate shareId format (8 characters, alphanumeric)
+              if (!/^[A-Za-z0-9]{8}$/.test(shareId)) {
+                  return {
+                      statusCode: 404,
+                      headers: {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*'
+                      },
+                      body: JSON.stringify({
+                          error: 'Share not found'
+                      })
+                  };
+              }
+
+              // Get item from DynamoDB
+              const result = await docClient.send(new GetCommand({
+                  TableName: process.env.TABLE_NAME,
+                  Key: {
+                      shareId: shareId
+                  }
+              }));
+
+              // Check if item exists
+              if (!result.Item) {
+                  console.log(`Share not found: ${shareId}`);
+                  return {
+                      statusCode: 404,
+                      headers: {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*'
+                      },
+                      body: JSON.stringify({
+                          error: 'Share not found'
+                      })
+                  };
+              }
+
+              // Check if item has expired (additional check, TTL should handle this automatically)
+              const currentTime = Math.floor(Date.now() / 1000);
+              if (result.Item.expiresAt && result.Item.expiresAt < currentTime) {
+                  console.log(`Share expired: ${shareId}, expiry: ${result.Item.expiresAt}, current: ${currentTime}`);
+                  return {
+                      statusCode: 404,
+                      headers: {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*'
+                      },
+                      body: JSON.stringify({
+                          error: 'Share not found'
+                      })
+                  };
+              }
+
+              console.log(`Share retrieved successfully: ${shareId}`);
+
+              // Return the data along with metadata
+              return {
+                  statusCode: 200,
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*',
+                      'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
+                  },
+                  body: JSON.stringify({
+                      shareId: result.Item.shareId,
+                      data: result.Item.data,
+                      createdAt: result.Item.createdAt,
+                      expiresAt: result.Item.expiresAt
+                  })
+              };
+
+          } catch (error) {
+              console.error('Error retrieving share:', error);
+
+              return {
+                  statusCode: 500,
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Access-Control-Allow-Origin': '*'
+                  },
+                  body: JSON.stringify({
+                      error: 'Internal server error'
+                  })
+              };
+          }
+      };
+
+Resources:
+  # DynamoDB table for storing shared workouts/meal plans
+  ShareTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: jsonfit-shares
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: shareId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: shareId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: JSONFit
+        - Key: Component
+          Value: ShareBackend
+
+  # HTTP API Gateway (cheaper than REST API)
+  ShareApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: jsonfit-shares-api
+      Description: JSON.fit sharing API
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Requested-With
+        MaxAge: 86400
+
+  # API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref ShareApi
+      StageName: $default
+      AutoDeploy: true
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                Resource: !GetAtt ShareTable.Arn
+
+  # Lambda function to create shares
+  CreateShareFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: jsonfit-createShare
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Code:
+        ZipFile: !Ref FunctionCode1
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ShareTable
+
+  # Lambda function to get shares
+  GetShareFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: jsonfit-getShare
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Code:
+        ZipFile: !Ref FunctionCode2
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ShareTable
+
+  # API Gateway Integration for CreateShare
+  CreateShareIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ShareApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateShareFunction.Arn}/invocations'
+      PayloadFormatVersion: '2.0'
+
+  # API Gateway Integration for GetShare
+  GetShareIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ShareApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetShareFunction.Arn}/invocations'
+      PayloadFormatVersion: '2.0'
+
+  # API Gateway Route for CreateShare
+  CreateShareRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ShareApi
+      RouteKey: 'POST /shares'
+      Target: !Sub 'integrations/${CreateShareIntegration}'
+
+  # API Gateway Route for GetShare
+  GetShareRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ShareApi
+      RouteKey: 'GET /shares/{shareId}'
+      Target: !Sub 'integrations/${GetShareIntegration}'
+
+  # Lambda permissions for API Gateway
+  CreateSharePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CreateShareFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ShareApi}/*/*'
+
+  GetSharePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetShareFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ShareApi}/*/*'
+
+Outputs:
+  ShareApiUrl:
+    Description: "API Gateway HTTP API URL"
+    Value: !Sub "https://${ShareApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "${AWS::StackName}-ShareApiUrl"
+  
+  ShareTableName:
+    Description: "DynamoDB table name"
+    Value: !Ref ShareTable
+    Export:
+      Name: !Sub "${AWS::StackName}-ShareTableName"

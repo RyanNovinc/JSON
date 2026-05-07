@@ -522,6 +522,30 @@ let cableCrossoverBlueEnd: any = null;
 let cableCrossoverPinkStart: any = null;
 let cableCrossoverPinkEnd: any = null;
 
+// Pec deck fly images
+let pecDeckFlyBlueStart: any = null;
+let pecDeckFlyBlueEnd: any = null;
+let pecDeckFlyPinkStart: any = null;
+let pecDeckFlyPinkEnd: any = null;
+
+// Weighted pull-up images
+let weightedPullUpBlueStart: any = null;
+let weightedPullUpBlueEnd: any = null;
+let weightedPullUpPinkStart: any = null;
+let weightedPullUpPinkEnd: any = null;
+
+// Chin-up images
+let chinUpBlueStart: any = null;
+let chinUpBlueEnd: any = null;
+let chinUpPinkStart: any = null;
+let chinUpPinkEnd: any = null;
+
+// Seated cable row images
+let seatedCableRowBlueStart: any = null;
+let seatedCableRowBlueEnd: any = null;
+let seatedCableRowPinkStart: any = null;
+let seatedCableRowPinkEnd: any = null;
+
 try {
   console.log('🔄 ATTEMPTING to load exercise images...');
   
@@ -1385,6 +1409,146 @@ try {
     console.log('❌ No cable-crossover pink end.png found:', e.message);
   }
   
+  // Load pec deck fly images
+  console.log('🏋️ Loading pec deck fly...');
+  
+  // Blue start
+  try {
+    pecDeckFlyBlueStart = require('../../exercise-images/pec-deck-fly/blue/start.png');
+    console.log('✅ Loaded pec-deck-fly blue start.png');
+  } catch (e) {
+    console.log('❌ No pec-deck-fly blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    pecDeckFlyBlueEnd = require('../../exercise-images/pec-deck-fly/blue/end.png');
+    console.log('✅ Loaded pec-deck-fly blue end.png');
+  } catch (e) {
+    console.log('❌ No pec-deck-fly blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    pecDeckFlyPinkStart = require('../../exercise-images/pec-deck-fly/pink/start.png');
+    console.log('✅ Loaded pec-deck-fly pink start.png');
+  } catch (e) {
+    console.log('❌ No pec-deck-fly pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    pecDeckFlyPinkEnd = require('../../exercise-images/pec-deck-fly/pink/end.png');
+    console.log('✅ Loaded pec-deck-fly pink end.png');
+  } catch (e) {
+    console.log('❌ No pec-deck-fly pink end.png found:', e.message);
+  }
+  
+  // Load weighted pull-up images
+  console.log('🏋️ Loading weighted pull-up...');
+  
+  // Blue start
+  try {
+    weightedPullUpBlueStart = require('../../exercise-images/weighted-pull-up/blue/start.png');
+    console.log('✅ Loaded weighted-pull-up blue start.png');
+  } catch (e) {
+    console.log('❌ No weighted-pull-up blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    weightedPullUpBlueEnd = require('../../exercise-images/weighted-pull-up/blue/end.png');
+    console.log('✅ Loaded weighted-pull-up blue end.png');
+  } catch (e) {
+    console.log('❌ No weighted-pull-up blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    weightedPullUpPinkStart = require('../../exercise-images/weighted-pull-up/pink/start.png');
+    console.log('✅ Loaded weighted-pull-up pink start.png');
+  } catch (e) {
+    console.log('❌ No weighted-pull-up pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    weightedPullUpPinkEnd = require('../../exercise-images/weighted-pull-up/pink/end.png');
+    console.log('✅ Loaded weighted-pull-up pink end.png');
+  } catch (e) {
+    console.log('❌ No weighted-pull-up pink end.png found:', e.message);
+  }
+  
+  // Load chin-up images
+  console.log('🏋️ Loading chin-up...');
+  
+  // Blue start
+  try {
+    chinUpBlueStart = require('../../exercise-images/chin-up/blue/start.png');
+    console.log('✅ Loaded chin-up blue start.png');
+  } catch (e) {
+    console.log('❌ No chin-up blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    chinUpBlueEnd = require('../../exercise-images/chin-up/blue/end.png');
+    console.log('✅ Loaded chin-up blue end.png');
+  } catch (e) {
+    console.log('❌ No chin-up blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    chinUpPinkStart = require('../../exercise-images/chin-up/pink/start.png');
+    console.log('✅ Loaded chin-up pink start.png');
+  } catch (e) {
+    console.log('❌ No chin-up pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    chinUpPinkEnd = require('../../exercise-images/chin-up/pink/end.png');
+    console.log('✅ Loaded chin-up pink end.png');
+  } catch (e) {
+    console.log('❌ No chin-up pink end.png found:', e.message);
+  }
+  
+  // Load seated cable row images
+  console.log('🏋️ Loading seated cable row...');
+  
+  // Blue start
+  try {
+    seatedCableRowBlueStart = require('../../exercise-images/seated-cable-row/blue/start.png');
+    console.log('✅ Loaded seated-cable-row blue start.png');
+  } catch (e) {
+    console.log('❌ No seated-cable-row blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    seatedCableRowBlueEnd = require('../../exercise-images/seated-cable-row/blue/end.png');
+    console.log('✅ Loaded seated-cable-row blue end.png');
+  } catch (e) {
+    console.log('❌ No seated-cable-row blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    seatedCableRowPinkStart = require('../../exercise-images/seated-cable-row/pink/start.png');
+    console.log('✅ Loaded seated-cable-row pink start.png');
+  } catch (e) {
+    console.log('❌ No seated-cable-row pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    seatedCableRowPinkEnd = require('../../exercise-images/seated-cable-row/pink/end.png');
+    console.log('✅ Loaded seated-cable-row pink end.png');
+  } catch (e) {
+    console.log('❌ No seated-cable-row pink end.png found:', e.message);
+  }
+  
   console.log('✅ Finished loading all images:', { 
     benchPress: { blue: { barbellBenchPressBlueStart, barbellBenchPressBlueEnd }, pink: { barbellBenchPressPinkStart, barbellBenchPressPinkEnd } },
     backSquat: { blue: { barbellBackSquatBlueStart, barbellBackSquatBlueEnd }, pink: { barbellBackSquatPinkStart, barbellBackSquatPinkEnd } },
@@ -1409,7 +1573,11 @@ try {
     dumbbellBenchPress: { blue: { dumbbellBenchPressBlueStart, dumbbellBenchPressBlueEnd }, pink: { dumbbellBenchPressPinkStart, dumbbellBenchPressPinkEnd } },
     inclineBarbellBenchPress: { blue: { inclineBarbellBenchPressBlueStart, inclineBarbellBenchPressBlueEnd }, pink: { inclineBarbellBenchPressPinkStart, inclineBarbellBenchPressPinkEnd } },
     machineChestPress: { blue: { machineChestPressBlueStart, machineChestPressBlueEnd }, pink: { machineChestPressPinkStart, machineChestPressPinkEnd } },
-    cableCrossover: { blue: { cableCrossoverBlueStart, cableCrossoverBlueEnd }, pink: { cableCrossoverPinkStart, cableCrossoverPinkEnd } }
+    cableCrossover: { blue: { cableCrossoverBlueStart, cableCrossoverBlueEnd }, pink: { cableCrossoverPinkStart, cableCrossoverPinkEnd } },
+    pecDeckFly: { blue: { pecDeckFlyBlueStart, pecDeckFlyBlueEnd }, pink: { pecDeckFlyPinkStart, pecDeckFlyPinkEnd } },
+    weightedPullUp: { blue: { weightedPullUpBlueStart, weightedPullUpBlueEnd }, pink: { weightedPullUpPinkStart, weightedPullUpPinkEnd } },
+    chinUp: { blue: { chinUpBlueStart, chinUpBlueEnd }, pink: { chinUpPinkStart, chinUpPinkEnd } },
+    seatedCableRow: { blue: { seatedCableRowBlueStart, seatedCableRowBlueEnd }, pink: { seatedCableRowPinkStart, seatedCableRowPinkEnd } }
   });
   
   EXERCISE_IMAGE_MAP = {
@@ -1651,6 +1819,46 @@ try {
       pink: {
         start: cableCrossoverPinkStart,
         end: cableCrossoverPinkEnd,
+      }
+    },
+    'pec-deck-fly': {
+      blue: {
+        start: pecDeckFlyBlueStart,
+        end: pecDeckFlyBlueEnd,
+      },
+      pink: {
+        start: pecDeckFlyPinkStart,
+        end: pecDeckFlyPinkEnd,
+      }
+    },
+    'weighted-pull-up': {
+      blue: {
+        start: weightedPullUpBlueStart,
+        end: weightedPullUpBlueEnd,
+      },
+      pink: {
+        start: weightedPullUpPinkStart,
+        end: weightedPullUpPinkEnd,
+      }
+    },
+    'chin-up': {
+      blue: {
+        start: chinUpBlueStart,
+        end: chinUpBlueEnd,
+      },
+      pink: {
+        start: chinUpPinkStart,
+        end: chinUpPinkEnd,
+      }
+    },
+    'seated-cable-row': {
+      blue: {
+        start: seatedCableRowBlueStart,
+        end: seatedCableRowBlueEnd,
+      },
+      pink: {
+        start: seatedCableRowPinkStart,
+        end: seatedCableRowPinkEnd,
       }
     },
     // Add more exercises here as you create them
