@@ -1,2474 +1,453 @@
-import React, { useState, useEffect, useRef } from 'react';
+/**
+ * WorkoutLogScreen.tsx
+ *
+ * Focused exercise view with sticky top + scrollable upcoming list.
+ *
+ * Layout (top to bottom):
+ *  - Header: back button, action icons (chart / refresh / more)
+ *  - SUSPENSION (sticky/fixed area):
+ *      - Exercise media (240px image)
+ *      - Title + 1RM badge
+ *      - Muscle tags (subtle)
+ *      - Sets table (current exercise)
+ *  - SCROLLABLE list (independent scroll):
+ *      - "Up Next" header
+ *      - Mini cards for remaining exercises (tappable to swap focus)
+ *  - Bottom bar: timer + finish workout button
+ *
+ * State preserved across exercise swaps via parent props (this is a presentational
+ * component; the parent owns sets data, completion, weight/reps, etc).
+ *
+ * Designed to match existing JSON.fit aesthetic:
+ *   - bg #000, surfaces #0a0a0f / #111116
+ *   - cyan accent (theme color, defaults to #22d3ee)
+ *   - DM Mono for numbers, Outfit for text
+ */
+
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  SafeAreaView,
+  ScrollView,
   Animated,
+  Easing,
+  ActivityIndicator,
+  Dimensions,
   Modal,
   Pressable,
+  Alert,
+  Image,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler';
-import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BodyHighlighter from 'react-native-body-highlighter';
-import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
-import AsyncStorageDebugger from '../utils/asyncStorageDebug';
-import RobustStorage from '../utils/robustStorage';
-import { TimerNotifications, TimerSettings } from '../utils/timerNotifications';
-import { TimerLiveActivity } from '../utils/liveActivity';
-import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { useWeightUnit } from '../contexts/WeightUnitContext';
-import { AppState } from 'react-native';
-import { TimerModal } from '../components/TimerModal';
-import { MinimizedTimer } from '../components/MinimizedTimer';
 import { useTimer } from '../contexts/TimerContext';
-import { navigate } from '../utils/navigationRef';
-import MaskedView from '@react-native-masked-view/masked-view';
-import { LinearGradient } from 'expo-linear-gradient';
+// Import the actual old working screen from Git history
+import WorkoutLogScreenOld from './WorkoutLogScreenOld';
+// AsyncStorage import — uncomment when wiring up real caching
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SECONDARY_MUSCLE_WEIGHT = 0.5;
+// ── Types ─────────────────────────────────────────────────────────
 
-const getMuscleContributions = (exercise: any): Array<{muscle: string, weight: number}> => {
-  const muscleMapping: { [key: string]: string } = {
-    'Chest': 'chest',
-    'Upper Back': 'upper back',
-    'Lats': 'lats',
-    'Traps': 'traps',
-    'Front Delts': 'front delts',
-    'Side Delts': 'side delts',
-    'Rear Delts': 'rear delts',
-    'Biceps': 'biceps',
-    'Triceps': 'triceps',
-    'Forearms': 'forearms',
-    'Quads': 'quads',
-    'Hamstrings': 'hamstrings',
-    'Glutes': 'glutes',
-    'Calves': 'calves',
-    'Core': 'core',
-    'Neck': 'neck',
-    'Lower Back': 'lower back',
-    'Obliques': 'obliques',
-    'Serratus Anterior': 'serratus',
-    'Hip Abductors': 'hip abductors',
-    'Hip Adductors': 'hip adductors',
-    'Shins': 'shins',
-    'Tibialis': 'shins',
-    'Tibialis Anterior': 'shins',
-  };
-
-  const contributions: Array<{muscle: string, weight: number}> = [];
-
-  (exercise.primaryMuscles || []).forEach((muscle: string) => {
-    const mapped = muscleMapping[muscle];
-    if (mapped) contributions.push({ muscle: mapped, weight: 1.0 });
-  });
-
-  (exercise.secondaryMuscles || []).forEach((muscle: string) => {
-    const mapped = muscleMapping[muscle];
-    if (mapped) contributions.push({ muscle: mapped, weight: SECONDARY_MUSCLE_WEIGHT });
-  });
-
-  return contributions;
-};
-
-// Parse rep scheme into structured format
-function parseRepScheme(reps: string): { type: 'weekly' | 'pyramid' | 'straight', values: string[] } {
-  // Check if it's a weekly progression format
-  if (reps.includes('Week')) {
-    const weekPattern = /Week \d+: ([\d-]+)/g;
-    const ranges: string[] = [];
-    let match;
-    while ((match = weekPattern.exec(reps)) !== null) {
-      ranges.push(match[1]);
-    }
-    return { type: 'weekly', values: ranges };
-  }
-  
-  // Check if it's a pyramid format like "12-10-8"
-  if (/^\d+-\d+-\d+/.test(reps)) {
-    return { type: 'pyramid', values: reps.split('-') };
-  }
-  
-  // Check if it's already formatted with colons (weekly progression)
-  if (reps.includes(':')) {
-    return { type: 'weekly', values: reps.split(':') };
-  }
-  
-  // Single rep range or number
-  return { type: 'straight', values: [reps] };
-}
-
-// Get the current week's reps from a weekly progression
-function getCurrentWeekReps(reps: string, weekNumber: number = 1): string {
-  const scheme = parseRepScheme(reps);
-  
-  if (scheme.type === 'weekly' && scheme.values.length > 0) {
-    // Return the reps for the current week (or first week if not specified)
-    const weekIndex = Math.min(weekNumber - 1, scheme.values.length - 1);
-    return scheme.values[weekIndex];
-  }
-  
-  // For non-weekly schemes, just return the original
-  return reps;
-}
-
-// Extract target rep number for a specific set from the rep scheme
-function getTargetRepForSet(reps: string, weekNumber: number = 1, setIndex: number = 0): string {
-  const currentWeekReps = getCurrentWeekReps(reps, weekNumber);
-  
-  // Clean up any parenthetical notes
-  const cleanReps = currentWeekReps.replace(/\s*\(.*?\)/, '');
-  
-  // Check if it's a comma-separated list of reps per set (like "12, 12, 10, 10")
-  if (cleanReps.includes(',')) {
-    const repsList = cleanReps.split(',').map(r => r.trim());
-    
-    // If we have a specific rep for this set index, use it
-    if (setIndex < repsList.length) {
-      return repsList[setIndex];
-    }
-    
-    // If user adds more sets than defined, repeat the last rep value
-    if (repsList.length > 0) {
-      return repsList[repsList.length - 1];
-    }
-  }
-  
-  // If it's a range like "8-12", return the lower number
-  if (cleanReps.includes('-')) {
-    return cleanReps.split('-')[0];
-  }
-  
-  // Single number or fallback
-  return cleanReps || '8';
-}
-
-
-type WorkoutLogScreenNavigationProp = StackNavigationProp<RootStackParamList, 'WorkoutLog'>;
-type WorkoutLogScreenRouteProp = RouteProp<RootStackParamList, 'WorkoutLog'>;
-
-interface Exercise {
-  exercise: string;
-  sets: number;
-  reps: string;
-  reps_weekly?: {
-    [key: string]: string;
-  };
-  rir_weekly?: {
-    [key: string]: string;
-  };
-  rest?: number;
-  restQuick?: number;
-  notes?: string;
-  alternatives?: string[];
-  superset_group?: string;
-  previous?: { weight: number; reps: number };
-}
-
-interface DropSet {
-  weight: string;
-  reps: string;
-  completed?: boolean;
-  unit?: 'kg' | 'lbs'; // Store unit for completed drop sets
-}
-
-interface SetData {
-  exercise: string;
-  setNumber: number;
+export interface SetData {
   weight: string;
   reps: string;
   completed: boolean;
-  selectedExerciseIndex: number; // 0 = primary, 1+ = alternatives
-  unit?: 'kg' | 'lbs'; // Store unit for completed sets
-  // Store data for each exercise variant separately
-  exerciseData?: {
-    [exerciseIndex: number]: {
-      weight: string;
-      reps: string;
-      completed: boolean;
-      isDropSet?: boolean;
-      drops?: DropSet[];
-    };
-  };
-  isDropSet?: boolean;
-  drops?: DropSet[];
 }
 
-interface ExerciseNotes {
-  [exerciseIndex: number]: string;
+export interface Exercise {
+  id?: string;
+  /** Canonical exercise name (e.g. "Barbell Bench Press") */
+  exercise: string;
+  /** Optional fallback display name */
+  name?: string;
+  sets: number;
+  reps: string | number;
+  rest?: number | string;
+  notes?: string;
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
+  /** Weekly progressions, e.g. { 1: "8, 7, 6", 2: "7, 6, 5" } */
+  reps_weekly?: Record<string, string>;
+  rir_weekly?: Record<string, string>;
+  /** Optional image URL — if not provided, we'll attempt fetch / fallback */
+  imageUrl?: string;
 }
 
-interface ExerciseCardProps {
-  exercise: Exercise;
-  exerciseIndex: number;
-  currentWeek: number;
-  setsData: SetData[];
-  notes: string;
+export interface WorkoutLogScreenProps {
+  exercises: Exercise[];
+  /** Index of the currently focused exercise */
+  currentIndex: number;
+  onIndexChange: (index: number) => void;
+
+  /** Sets data per exercise — outer array indexed by exerciseIndex */
+  allSetsData: SetData[][];
   workoutStarted: boolean;
-  onSetUpdate: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => void;
+  onSetUpdate: (
+    exerciseIndex: number,
+    setIndex: number,
+    field: 'weight' | 'reps',
+    value: string,
+  ) => void;
   onSetComplete: (exerciseIndex: number, setIndex: number) => void;
-  onDropSetComplete: (exerciseIndex: number, setIndex: number, dropIndex: number) => void;
-  onDeleteSet: (exerciseIndex: number, setIndex: number) => void;
-  onAddSet: (exerciseIndex: number) => void;
-  onDeleteExercise: (exerciseIndex: number) => void;
-  onExerciseSettings: (exerciseIndex: number) => void;
-  onHistoryPress: (exerciseName: string) => void;
-  getExerciseUnit: (exerciseIndex: number) => 'kg' | 'lbs';
-  setExerciseUnit: (exerciseIndex: number, unit: 'kg' | 'lbs') => void;
-  isInSettings?: boolean;
-  onExerciseSelect: (exerciseIndex: number, selectedExerciseIndex: number) => void;
-  onNotesPress: (exerciseIndex: number, exerciseName: string) => void;
-  onSetExercisePreference: (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => void;
-  exercisePreferences: { [exerciseName: string]: string };
-  onInteractionAttempt?: () => void;
-  isLinkedToNext?: boolean;
-  isLinkedToPrev?: boolean;
-  themeColor: string;
-  setGlobalUnit: (unit: 'kg' | 'lbs') => void;
+  onSetAdd: (exerciseIndex: number) => void;
+  onSetRemove: (exerciseIndex: number, setIndex: number) => void;
+
+  /** Workout-level handlers */
+  onBack: () => void;
+  onStartWorkout: () => void;
+  onFinishWorkout: () => void;
+
+  /** Optional: custom action handlers */
+  onOpenNotes?: (exerciseIndex: number) => void;
+  onOpenHistory?: (exerciseIndex: number) => void;
+  onOpenSettings?: (exerciseIndex: number) => void;
+
+  /** Theming */
+  themeColor?: string; // default '#22d3ee'
+  globalUnit?: 'kg' | 'lbs'; // default 'kg'
+  currentWeek?: number; // 1-indexed
+  /** Epley-style 1RM calculator: returns 1RM in same unit */
+  calculate1RM?: (weight: number, reps: number) => number;
+
+  /** Optional async resolver: given an exercise, returns a remote image URL */
+  resolveExerciseImage?: (exercise: Exercise) => Promise<string | null>;
+  /** Optional async resolver: given an exercise, returns both start and end images for cycling */
+  resolveExerciseImagePair?: (exercise: Exercise) => Promise<{start: any, end: any} | null>;
 }
 
-function ExerciseCard({ 
-  exercise, 
-  exerciseIndex, 
-  currentWeek,
-  setsData,
-  notes,
-  workoutStarted,
-  onSetUpdate, 
-  onSetComplete,
-  onDropSetComplete,
-  onDeleteSet,
-  onAddSet,
-  onDeleteExercise,
-  onExerciseSettings,
-  onHistoryPress,
-  getExerciseUnit,
-  setExerciseUnit,
-  isInSettings,
-  onExerciseSelect,
-  onNotesPress,
-  onSetExercisePreference,
-  exercisePreferences,
-  onInteractionAttempt,
-  isLinkedToNext,
-  isLinkedToPrev,
-  themeColor,
-}: ExerciseCardProps) {
-  
-  const [showExerciseSelector, setShowExerciseSelector] = useState(false);
-  const [expandedDropSets, setExpandedDropSets] = useState<Set<number>>(new Set());
-  const [isFavorited, setIsFavorited] = useState(false);
-  
-  // Check if exercise is already favorited
-  React.useEffect(() => {
-    const checkFavoriteStatus = async () => {
-      try {
-        const existingData = await RobustStorage.getItem('favoriteExercises', true) || await AsyncStorage.getItem('favoriteExercises');
-        const parsed = existingData ? JSON.parse(existingData) : [];
-        const existingExercises = Array.isArray(parsed) ? parsed : [];
-        const isAlreadyFavorited = existingExercises.some(ex => ex.name?.toLowerCase() === exercise.exercise?.toLowerCase());
-        setIsFavorited(isAlreadyFavorited);
-      } catch (error) {
-        console.error('Error checking favorite status:', error);
-        setIsFavorited(false);
-      }
-    };
-    checkFavoriteStatus();
-  }, [exercise.exercise]);
+// ── Constants ─────────────────────────────────────────────────────
 
-  // Separate animations for each connection type
-  const topConnection = React.useRef(new Animated.Value(0)).current;
-  const bottomConnection = React.useRef(new Animated.Value(0)).current;
-  
-  // Animate each connection independently for smooth transitions
-  React.useEffect(() => {
-    Animated.timing(topConnection, {
-      toValue: isLinkedToPrev ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [isLinkedToPrev, topConnection]);
+const DEFAULT_THEME = '#22d3ee';
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
-  React.useEffect(() => {
-    Animated.timing(bottomConnection, {
-      toValue: isLinkedToNext ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [isLinkedToNext, bottomConnection]);
-  
-  const currentUnit = getExerciseUnit(exerciseIndex);
-  
-  // Use weekly reps if available, otherwise fall back to regular reps
-  const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
-  
-  
-  // Ensure targetReps is always a string
-  const targetRepsString = typeof targetReps === 'string' ? targetReps : String(targetReps);
-  const selectedIndex = setsData.length > 0 ? setsData[0].selectedExerciseIndex : 0;
-  
-  // Create array of all available exercises (primary + alternatives)
-  const alternativeNames = (exercise.alternatives || []).map(alt => 
-    typeof alt === 'string' ? alt : alt.exercise
-  );
-  const allExercises = [exercise.exercise, ...alternativeNames];
-  const currentExerciseName = allExercises[selectedIndex] || exercise.exercise;
+const COMPOUND_HINTS = [
+  'bench', 'squat', 'deadlift', 'press', 'row', 'pull-up', 'pullup',
+  'chin-up', 'chinup', 'clean', 'snatch', 'lunge', 'rdl',
+];
 
-  const toggleDropSet = (setIndex: number) => {
-    const newData = [...setsData];
-    newData[setIndex].isDropSet = !newData[setIndex].isDropSet;
-    
-    if (newData[setIndex].isDropSet) {
-      // Initialize with empty drop set (suggestions will show as placeholders)
-      newData[setIndex].drops = [{ weight: '', reps: '' }];
-      setExpandedDropSets(new Set([...expandedDropSets, setIndex]));
-    } else {
-      // Remove drop sets
-      delete newData[setIndex].drops;
-      const newExpanded = new Set(expandedDropSets);
-      newExpanded.delete(setIndex);
-      setExpandedDropSets(newExpanded);
-    }
-    
-    onSetUpdate(exerciseIndex, setIndex, 'weight', newData[setIndex].weight); // Trigger update
-  };
-
-  const addDropSet = (setIndex: number) => {
-    const newData = [...setsData];
-    if (!newData[setIndex].drops) {
-      newData[setIndex].drops = [];
-    }
-    
-    // Add empty drop set (suggestions will show as placeholders)
-    newData[setIndex].drops.push({ 
-      weight: '', 
-      reps: '' 
-    });
-    onSetUpdate(exerciseIndex, setIndex, 'weight', newData[setIndex].weight); // Trigger update
-  };
-  
-  const getDropSuggestion = (setIndex: number, dropIndex: number, field: 'weight' | 'reps'): string => {
-    const setData = setsData[setIndex];
-    if (!setData) return '0';
-    
-    if (dropIndex === 0) {
-      // First drop - base it on the main set
-      const mainWeight = parseFloat(setData.weight);
-      const mainReps = parseInt(setData.reps);
-      
-      if (mainWeight && mainReps) {
-        if (field === 'weight') {
-          return Math.round(mainWeight * 0.8).toString();
-        } else {
-          return (mainReps + 2).toString();
-        }
-      }
-    } else {
-      // Subsequent drops - base on previous drop
-      const prevDrop = setData.drops?.[dropIndex - 1];
-      if (prevDrop) {
-        const prevWeight = parseFloat(prevDrop.weight);
-        const prevReps = parseInt(prevDrop.reps);
-        
-        if (prevWeight && prevReps) {
-          if (field === 'weight') {
-            return Math.round(prevWeight * 0.85).toString();
-          } else {
-            return (prevReps + 2).toString();
-          }
-        }
-      }
-    }
-    
-    return '0';
-  };
-
-  const removeDropSet = (setIndex: number, dropIndex: number) => {
-    const newData = [...setsData];
-    if (newData[setIndex].drops) {
-      newData[setIndex].drops.splice(dropIndex, 1);
-      // If no drops left, disable drop set mode
-      if (newData[setIndex].drops.length === 0) {
-        newData[setIndex].isDropSet = false;
-        delete newData[setIndex].drops;
-        const newExpanded = new Set(expandedDropSets);
-        newExpanded.delete(setIndex);
-        setExpandedDropSets(newExpanded);
-      }
-      onSetUpdate(exerciseIndex, setIndex, 'weight', newData[setIndex].weight); // Trigger update
-    }
-  };
-
-  const updateDropSet = (setIndex: number, dropIndex: number, field: 'weight' | 'reps', value: string) => {
-    // Validate input - only allow numbers and decimal point for weight
-    let sanitizedValue = value;
-    if (field === 'weight') {
-      // Allow numbers and one decimal point
-      sanitizedValue = value.replace(/[^0-9.]/g, '');
-      // Ensure only one decimal point
-      const parts = sanitizedValue.split('.');
-      if (parts.length > 2) {
-        sanitizedValue = parts[0] + '.' + parts.slice(1).join('');
-      }
-    } else {
-      // For reps, only allow whole numbers
-      sanitizedValue = value.replace(/[^0-9]/g, '');
-    }
-    
-    const newData = [...setsData];
-    if (newData[setIndex].drops && newData[setIndex].drops[dropIndex]) {
-      newData[setIndex].drops[dropIndex][field] = sanitizedValue;
-      onSetUpdate(exerciseIndex, setIndex, 'weight', newData[setIndex].weight); // Trigger update
-    }
-  };
-  
-  const completeDropSet = (setIndex: number, dropIndex: number) => {
-    onDropSetComplete(exerciseIndex, setIndex, dropIndex);
-  };
-  
-  // Create superset border style - base style only
-  const getBaseBorderStyle = () => {
-    return isLinkedToNext || isLinkedToPrev ? styles.exerciseCardSupersetBase : styles.exerciseCard;
-  };
-
-  // Track if we should show overlay (including during fade-out)
-  const [shouldShowOverlay, setShouldShowOverlay] = useState(false);
-  
-  React.useEffect(() => {
-    const hasConnection = isLinkedToNext || isLinkedToPrev;
-    if (hasConnection) {
-      setShouldShowOverlay(true);
-    } else {
-      // Delay hiding overlay to allow fade-out animation to complete
-      const timeout = setTimeout(() => setShouldShowOverlay(false), 300);
-      return () => clearTimeout(timeout);
-    }
-  }, [isLinkedToNext, isLinkedToPrev]);
-
-  // Render smooth transitioning border overlay
-  const renderTaperingBorder = () => {
-    if (!shouldShowOverlay) return null;
-    
-    return (
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }
-        ]}
-        pointerEvents="none"
-      >
-        <MaskedView
-          style={StyleSheet.absoluteFill}
-          maskElement={
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  borderRadius: 4,
-                  borderWidth: 2,
-                  backgroundColor: 'transparent',
-                }
-              ]}
-            />
-          }
-        >
-          <Animated.View style={StyleSheet.absoluteFill}>
-            {/* Top connection layer */}
-            <Animated.View
-              style={[
-                StyleSheet.absoluteFill,
-                { opacity: topConnection }
-              ]}
-            >
-              <LinearGradient
-                style={StyleSheet.absoluteFill}
-                colors={[themeColor, themeColor + '80', themeColor + '20', themeColor + '00']}
-                locations={[0, 0.4, 0.8, 1]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-              />
-            </Animated.View>
-            
-            {/* Bottom connection layer */}
-            <Animated.View
-              style={[
-                StyleSheet.absoluteFill,
-                { opacity: bottomConnection }
-              ]}
-            >
-              <LinearGradient
-                style={StyleSheet.absoluteFill}
-                colors={[themeColor + '00', themeColor + '20', themeColor + '80', themeColor]}
-                locations={[0, 0.2, 0.6, 1]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-              />
-            </Animated.View>
-          </Animated.View>
-        </MaskedView>
-      </Animated.View>
-    );
-  };
-
-  // Settings view
-  if (isInSettings) {
-    return (
-      <View style={styles.exerciseCard}>
-        <View style={styles.exerciseSettingsView}>
-          <View style={styles.exerciseSettingsHeader}>
-            <Text style={styles.exerciseSettingsTitle}>Exercise Settings</Text>
-            <TouchableOpacity 
-              style={styles.exerciseSettingsClose}
-              onPress={() => onExerciseSettings(exerciseIndex)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={20} color="#71717a" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.exerciseSettingsContent}>
-            <Text style={styles.exerciseSettingsExerciseName}>
-              {currentExerciseName}
-            </Text>
-            
-            {/* Unit Toggle */}
-            <TouchableOpacity
-              style={styles.exerciseSettingsOption}
-              onPress={() => {
-                setExerciseUnit(exerciseIndex, currentUnit === 'kg' ? 'lbs' : 'kg');
-              }}
-            >
-              <Ionicons name="scale-outline" size={20} color={themeColor} />
-              <Text style={styles.exerciseSettingsOptionText}>
-                Switch to {currentUnit === 'kg' ? 'lbs' : 'kg'}
-              </Text>
-            </TouchableOpacity>
-            
-            {/* Add to Favorites */}
-            <TouchableOpacity
-              style={styles.exerciseSettingsOption}
-              onPress={async () => {
-                try {
-                  // Get existing favorites
-                  const existingData = await RobustStorage.getItem('favoriteExercises', true) || await AsyncStorage.getItem('favoriteExercises');
-                  const parsed = existingData ? JSON.parse(existingData) : [];
-                  const existingExercises = Array.isArray(parsed) ? parsed : [];
-                  
-                  if (isFavorited) {
-                    // Remove from favorites
-                    const updatedExercises = existingExercises.filter(ex => ex.name.toLowerCase() !== exercise.exercise.toLowerCase());
-                    const saveSuccess = await RobustStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises), true);
-                    if (!saveSuccess) await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
-                    setIsFavorited(false);
-                  } else {
-                    // Create completely clean favorite object with only primitive values
-                    const exerciseName = exercise?.exercise;
-                    const exerciseInstructions = exercise?.instructions;
-                    const exerciseNotes = exercise?.notes;
-                    const exerciseAlternatives = exercise?.alternatives;
-                    
-                    // Ensure all values are primitive types, not objects
-                    const favoriteExercise = {
-                      id: 'exercise_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-                      name: typeof exerciseName === 'string' ? exerciseName : 'Unknown Exercise',
-                      category: 'gym',
-                      muscleGroups: ['Custom'],
-                      primaryMuscles: ['Custom'], 
-                      secondaryMuscles: [],
-                      instructions: typeof exerciseInstructions === 'string' ? exerciseInstructions : '',
-                      notes: typeof exerciseNotes === 'string' ? exerciseNotes : '',
-                      alternatives: Array.isArray(exerciseAlternatives) ? exerciseAlternatives.filter(alt => typeof alt === 'string') : [],
-                      addedAt: new Date().toISOString(),
-                      estimatedCalories: 0,
-                      duration: 0,
-                      intensity: 'moderate',
-                      customCategory: undefined
-                    };
-                    
-                    console.log('=== SAVING FAVORITE FROM WORKOUT SCREEN ===');
-                    console.log('Raw exercise data:', exercise);
-                    console.log('Clean favorite object:', favoriteExercise);
-                    
-                    const updatedExercises = [favoriteExercise, ...existingExercises];
-                    const saveSuccess = await RobustStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises), true);
-                    if (!saveSuccess) await AsyncStorage.setItem('favoriteExercises', JSON.stringify(updatedExercises));
-                    setIsFavorited(true);
-                  }
-                  
-                } catch (error) {
-                  console.error('Error updating favorites:', error);
-                }
-              }}
-            >
-              <Ionicons name={isFavorited ? "heart" : "heart-outline"} size={20} color={isFavorited ? "#ef4444" : themeColor} />
-              <Text style={styles.exerciseSettingsOptionText}>
-                {isFavorited ? "Remove from Favorites" : "Add to Favorites"}
-              </Text>
-            </TouchableOpacity>
-            
-            {/* Delete Exercise */}
-            <TouchableOpacity
-              style={styles.exerciseSettingsOption}
-              onPress={() => {
-                onExerciseSettings(exerciseIndex); // Close settings first
-                Alert.alert(
-                  'Delete Exercise',
-                  `Are you sure you want to delete "${currentExerciseName}" from this workout?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Delete', 
-                      style: 'destructive',
-                      onPress: () => {
-                        onDeleteExercise(exerciseIndex);
-                      }
-                    }
-                  ]
-                );
-              }}
-            >
-              <Ionicons name="trash-outline" size={20} color="#ef4444" />
-              <Text style={[styles.exerciseSettingsOptionText, { color: '#ef4444' }]}>
-                Delete Exercise
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={getBaseBorderStyle()}>
-      {renderTaperingBorder()}
-      <View style={styles.exerciseHeader}>
-        {/* Left side - Exercise name and dropdown */}
-        <View style={styles.exerciseNameSection}>
-          <TouchableOpacity 
-            style={styles.exerciseNameButton}
-            onPress={() => allExercises.length > 1 && setShowExerciseSelector(!showExerciseSelector)}
-            activeOpacity={allExercises.length > 1 ? 0.7 : 1}
-          >
-            <Text style={styles.exerciseName} numberOfLines={2}>
-              {currentExerciseName}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Right side - Action buttons */}
-        <View style={styles.headerButtons}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => onExerciseSettings(exerciseIndex)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="settings-outline" size={18} color={themeColor} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => onNotesPress(exerciseIndex, currentExerciseName)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name={notes ? "document-text" : "document-text-outline"} size={18} color={themeColor} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => onHistoryPress(currentExerciseName)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="time-outline" size={18} color={themeColor} />
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      {showExerciseSelector && allExercises.length > 1 && (
-        <View style={styles.exerciseSelector}>
-          {allExercises.map((exerciseName, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.exerciseOption,
-                index === selectedIndex && [styles.exerciseOptionSelected, { backgroundColor: themeColor + '20' }],
-                index === allExercises.length - 1 && styles.exerciseOptionLast
-              ]}
-              onPress={() => {
-                onExerciseSelect(exerciseIndex, index);
-                setShowExerciseSelector(false);
-              }}
-              onLongPress={() => {
-                const alternativeNames = (exercise.alternatives || []).map(alt => 
-                  typeof alt === 'string' ? alt : alt.exercise
-                );
-                onSetExercisePreference(exerciseIndex, exercise.exercise, alternativeNames, exerciseName);
-                setShowExerciseSelector(false);
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.exerciseOptionTextContainer}>
-                {(() => {
-                  // Show star for preferred exercise if set, otherwise show for primary (index 0)
-                  const preferredExercise = exercisePreferences[exercise.exercise];
-                  const showStar = preferredExercise ? exerciseName === preferredExercise : index === 0;
-                  
-                  return showStar ? (
-                    <Ionicons 
-                      name="star" 
-                      size={14} 
-                      color={index === selectedIndex ? themeColor : "#71717a"} 
-                      style={styles.primaryIcon}
-                    />
-                  ) : null;
-                })()}
-                <Text style={[
-                  styles.exerciseOptionText,
-                  index === selectedIndex && [styles.exerciseOptionTextSelected, { color: themeColor }]
-                ]}>
-                  {exerciseName}
-                </Text>
-              </View>
-              {index === selectedIndex && (
-                <Ionicons name="checkmark" size={16} color={themeColor} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-      
-      {/* Separator line */}
-      <View style={styles.headerSeparator} />
-      
-      <View style={styles.setsContainer}>
-        {setsData.map((setData, setIndex) => (
-          <View key={setIndex}>
-            <TouchableOpacity
-              style={[
-                styles.setRow,
-                setData.completed && styles.setRowCompleted
-              ]}
-              onLongPress={() => onDeleteSet(exerciseIndex, setIndex)}
-              delayLongPress={500}
-              activeOpacity={0.95}
-            >
-              {/* Main Row: Set number, Weight, Reps, Check, Drop */}
-              <View style={styles.setMainRow}>
-                <Text style={styles.setNumber}>{setIndex + 1}</Text>
-              
-              <View style={styles.weightInputContainer}>
-                <TextInput
-                  style={[
-                    styles.input, 
-                    styles.weightInput,
-                    !workoutStarted && styles.inputDisabled
-                  ]}
-                  value={setData.weight}
-                  onChangeText={(value) => {
-                    if (!workoutStarted) {
-                      onInteractionAttempt && onInteractionAttempt();
-                      return;
-                    }
-                    onSetUpdate(exerciseIndex, setIndex, 'weight', value);
-                  }}
-                  onFocus={() => {
-                    if (!workoutStarted) {
-                      onInteractionAttempt && onInteractionAttempt();
-                    }
-                  }}
-                  placeholder="0"
-                  placeholderTextColor="#52525b"
-                  keyboardType="decimal-pad"
-                  editable={!setData.completed}
-                />
-                <Text style={styles.unitLabel}>{setData.completed && setData.unit ? setData.unit : currentUnit}</Text>
-              </View>
-              
-              <Text style={styles.separator}>×</Text>
-              
-              <TextInput
-                style={[
-                  styles.input, 
-                  styles.repsInput,
-                  !workoutStarted && styles.inputDisabled
-                ]}
-                value={setData.reps}
-                onChangeText={(value) => {
-                  if (!workoutStarted) {
-                    onInteractionAttempt && onInteractionAttempt();
-                    return;
-                  }
-                  onSetUpdate(exerciseIndex, setIndex, 'reps', value);
-                }}
-                onFocus={() => {
-                  if (!workoutStarted) {
-                    onInteractionAttempt && onInteractionAttempt();
-                  }
-                }}
-                placeholder={getTargetRepForSet(targetRepsString, currentWeek, setIndex)}
-                placeholderTextColor="#52525b"
-                keyboardType="number-pad"
-                editable={!setData.completed}
-              />
-              
-              <TouchableOpacity
-                style={[
-                  styles.checkButton,
-                  setData.completed && styles.checkButtonCompleted,
-                  !workoutStarted && styles.checkButtonDisabled
-                ]}
-                onPress={() => {
-                  if (!workoutStarted) {
-                    onInteractionAttempt && onInteractionAttempt();
-                    return;
-                  }
-                  onSetComplete(exerciseIndex, setIndex);
-                }}
-                disabled={!setData.weight || !setData.reps}
-              >
-                <Ionicons 
-                  name={setData.completed ? "checkmark-circle" : "checkmark-circle-outline"} 
-                  size={24} 
-                  color={setData.completed ? "#22c55e" : (!setData.weight || !setData.reps) ? "#52525b" : themeColor}
-                />
-              </TouchableOpacity>
-              
-              {/* Drop set button after check */}
-              <TouchableOpacity
-                style={styles.dropSetButton}
-                onPress={() => {
-                  if (!workoutStarted) {
-                    onInteractionAttempt && onInteractionAttempt();
-                    return;
-                  }
-                  toggleDropSet(setIndex);
-                }}
-              >
-                <Text style={[
-                  styles.dropSetButtonText,
-                  setData.isDropSet && [styles.dropSetButtonActive, { color: themeColor }]
-                ]}>
-                  DROP
-                </Text>
-              </TouchableOpacity>
-              </View>
-              
-            </TouchableOpacity>
-            
-            {/* Drop sets */}
-            {setData.isDropSet && setData.drops && (
-              <View style={styles.dropSetsContainer}>
-                {setData.drops.map((drop, dropIndex) => (
-                  <View key={dropIndex} style={styles.dropRowContainer}>
-                    {!setData.completed && (
-                      <TouchableOpacity
-                        style={styles.dropDeleteButton}
-                        onPress={() => removeDropSet(setIndex, dropIndex)}
-                      >
-                        <Ionicons name="close-circle" size={18} color="#52525b" />
-                      </TouchableOpacity>
-                    )}
-                    <View style={[styles.dropRow, { borderLeftColor: themeColor }]}>
-                      <Text style={styles.dropLabel}>Drop {dropIndex + 1}</Text>
-                      
-                      <View style={styles.dropWeightInputContainer}>
-                        <TextInput
-                          style={[styles.input, styles.dropWeightInput]}
-                          value={drop.weight}
-                          onChangeText={(value) => updateDropSet(setIndex, dropIndex, 'weight', value)}
-                          placeholder={getDropSuggestion(setIndex, dropIndex, 'weight')}
-                          placeholderTextColor="#52525b"
-                          keyboardType="decimal-pad"
-                          editable={!drop.completed}
-                        />
-                        <Text style={styles.unitLabel}>{drop.completed && drop.unit ? drop.unit : currentUnit}</Text>
-                      </View>
-                      
-                      <Text style={styles.separator}>×</Text>
-                      
-                      <TextInput
-                        style={[styles.input, styles.dropRepsInput]}
-                        value={drop.reps}
-                        onChangeText={(value) => updateDropSet(setIndex, dropIndex, 'reps', value)}
-                        placeholder={getDropSuggestion(setIndex, dropIndex, 'reps')}
-                        placeholderTextColor="#52525b"
-                        keyboardType="number-pad"
-                        editable={!drop.completed}
-                      />
-                      
-                      {/* Check button for drop sets - only show if main set is completed */}
-                      {setData.completed ? (
-                        <TouchableOpacity
-                          style={[
-                            styles.dropCheckButton,
-                            drop.completed && styles.checkButtonCompleted
-                          ]}
-                          onPress={() => completeDropSet(setIndex, dropIndex)}
-                          disabled={!drop.weight || !drop.reps}
-                        >
-                          <Ionicons 
-                            name={drop.completed ? "checkmark-circle" : "checkmark-circle-outline"} 
-                            size={20} 
-                            color={drop.completed ? "#22c55e" : (!drop.weight || !drop.reps) ? "#52525b" : themeColor}
-                          />
-                        </TouchableOpacity>
-                      ) : (
-                        <View style={styles.dropCheckSpace} />
-                      )}
-                    </View>
-                  </View>
-                ))}
-                
-                {/* Add drop button */}
-                {!setData.completed && (
-                  <TouchableOpacity 
-                    style={styles.addDropButton}
-                    onPress={() => addDropSet(setIndex)}
-                  >
-                    <Ionicons name="add-circle-outline" size={20} color={themeColor} />
-                    <Text style={[styles.addDropText, { color: themeColor }]}>Add Drop</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-        ))}
-        
-        {/* Add Set Button */}
-        <TouchableOpacity 
-          style={styles.addSetButton}
-          onPress={() => onAddSet(exerciseIndex)}
-        >
-          <Ionicons name="add-circle-outline" size={24} color={themeColor} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-// Animated Superset Link Button Component
-interface SupersetLinkButtonProps {
-  isActive: boolean;
-  themeColor: string;
-  onPress: () => void;
-}
-
-function SupersetLinkButton({ isActive, themeColor, onPress }: SupersetLinkButtonProps) {
-  const animatedValue = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    Animated.timing(animatedValue, {
-      toValue: isActive ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false, // Need to animate borderColor
-    }).start();
-  }, [isActive, animatedValue]);
-
-  const animatedBorderColor = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['transparent', themeColor]
-  });
-
-  const animatedScale = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.1]
-  });
-
-  // Use static color based on isActive instead of animated color for Ionicons
-  const iconColor = isActive ? themeColor : '#71717a';
-
-  return (
-    <Animated.View
-      style={[
-        styles.supersetLinkButton,
-        {
-          borderColor: animatedBorderColor,
-          transform: [{ scale: animatedScale }]
-        }
-      ]}
-    >
-      <TouchableOpacity 
-        onPress={onPress} 
-        style={styles.supersetLinkButtonTouchable}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons 
-          name="link" 
-          size={20} 
-          color={iconColor}
-        />
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
-// Animated Superset Label Component
-interface SupersetLabelProps {
-  isActive: boolean;
-  themeColor: string;
-}
-
-function SupersetLabel({ isActive, themeColor }: SupersetLabelProps) {
-  const animatedValue = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    Animated.timing(animatedValue, {
-      toValue: isActive ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [isActive, animatedValue]);
-
-  const animatedStyle = {
-    opacity: animatedValue,
-    transform: [
-      {
-        scale: animatedValue.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.8, 1],
-        }),
-      },
-    ],
-  };
-
-  return (
-    <Animated.View style={animatedStyle}>
-      <Text style={[styles.supersetLabel, { color: themeColor }]}>SUPERSET</Text>
-    </Animated.View>
-  );
-}
-
-// Muscle group calculation functions for daily volume tracking
-
-
-const getMuscleGroupsFromExercise = (exercise: any): string[] => {
-  // Use the primaryMuscles from the AI-generated data
-  const primaryMuscles = exercise.primaryMuscles || [];
-  
-  // Map AI muscle names to display names (same mapping as DaysScreen)
-  const muscleMapping: { [key: string]: string } = {
-    'Chest': 'chest',
-    'Upper Back': 'upper back',
-    'Lats': 'lats', 
-    'Front Delts': 'front delts',
-    'Side Delts': 'side delts', 
-    'Rear Delts': 'rear delts',
-    'Biceps': 'biceps',
-    'Triceps': 'triceps',
-    'Quads': 'quads',
-    'Hamstrings': 'hamstrings',
-    'Glutes': 'glutes',
-    'Calves': 'calves',
-    'Core': 'core',
-    'Forearms': 'forearms'
-  };
-
-  const mappedMuscles: string[] = [];
-  primaryMuscles.forEach((muscle: string) => {
-    const mapped = muscleMapping[muscle];
-    if (mapped && !mappedMuscles.includes(mapped)) {
-      mappedMuscles.push(mapped);
-    }
-  });
-  
-  return mappedMuscles;
+const isCompound = (name: string) => {
+  const n = (name || '').toLowerCase();
+  return COMPOUND_HINTS.some((k) => n.includes(k));
 };
 
-// Map muscle groups to body highlighter muscle IDs (same mapping as DaysScreen)
-const getMuscleHighlighterData = (dailyVolume: { [key: string]: number }) => {
-  const muscleToBodyParts: { [key: string]: string | null } = {
-    'chest': 'chest',
-    'upper back': 'trapezius',       // Fixed: rhomboid region is covered by trapezius slug
-    'lats': 'upper-back',            // Lats display on upper-back region (no dedicated lats slug)
-    'traps': 'trapezius',            // NEW
-    'front delts': 'deltoids',
-    'side delts': 'deltoids', 
-    'rear delts': 'deltoids',
-    'biceps': 'biceps',
-    'triceps': 'triceps',
-    'forearms': 'forearms',
-    'quads': 'quadriceps',
-    'hamstrings': 'hamstring',
-    'glutes': 'gluteal',
-    'calves': 'calves',
-    'core': 'abs',
-    'neck': 'neck',                  // NEW
-    'lower back': 'lower-back',      // NEW
-    'obliques': 'obliques',          // NEW
-    'hip adductors': 'adductors',    // NEW
-    'shins': 'tibialis',             // NEW
-    'serratus': null,                // Library doesn't support — will be skipped on diagram
-    'hip abductors': 'gluteal'       // Gluteus medius is the primary hip abductor
-  };
-
-  const bodyData: Array<{slug: string, intensity: number}> = [];
-  const maxVolume = Math.max(...Object.values(dailyVolume));
-
-  // Combine volumes for muscles that map to the same body part
-  const bodyPartVolumes: { [key: string]: number } = {};
-  
-  Object.entries(dailyVolume).forEach(([muscle, volume]) => {
-    if (volume > 0) {
-      const bodyPart = muscleToBodyParts[muscle];
-      if (bodyPart) {
-        bodyPartVolumes[bodyPart] = (bodyPartVolumes[bodyPart] || 0) + volume;
-      }
-    }
-  });
-
-  // Convert to final data format with simple binary intensity
-  Object.entries(bodyPartVolumes).forEach(([bodyPart, totalVolume]) => {
-    const intensity = totalVolume >= 1 ? 1 : 0;
-    bodyData.push({ slug: bodyPart, intensity });
-  });
-
-  return bodyData;
+// ── Default Epley if not supplied ──────────────────────────────────
+const defaultCalc1RM = (weight: number, reps: number): number => {
+  if (!weight || !reps || reps < 1) return 0;
+  if (reps === 1) return weight;
+  return weight * (1 + reps / 30);
 };
 
-export default function WorkoutLogScreen() {
-  const navigation = useNavigation<WorkoutLogScreenNavigationProp>();
-  const route = useRoute<WorkoutLogScreenRouteProp>();
-  const { themeColor } = useTheme();
-  const { globalUnit, getExerciseUnit, setExerciseUnit, setGlobalUnit, formatWeight, convertWeight } = useWeightUnit();
-  const { startAutoTimer, setExerciseContext, stopTimer } = useTimer();
-  const { day, blockName, currentWeek: passedWeek, block, routineName } = route.params;
-  const { activeWorkout, setActiveWorkout } = useActiveWorkout();
+// ──────────────────────────────────────────────────────────────────
+// Component
+// ──────────────────────────────────────────────────────────────────
 
-  // Setup exercise context for Live Activities
-  useEffect(() => {
-    setExerciseContext((exerciseIndex?: number, setIndex?: number) => {
-      if (exerciseIndex === undefined || !dynamicExercises || !allSetsData) {
-        return {};
-      }
+export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
+  const {
+    exercises,
+    currentIndex,
+    onIndexChange,
+    allSetsData,
+    workoutStarted,
+    onSetUpdate,
+    onSetComplete,
+    onSetAdd,
+    onSetRemove,
+    onBack,
+    onStartWorkout,
+    onFinishWorkout,
+    onOpenNotes,
+    onOpenHistory,
+    onOpenSettings,
+    themeColor = DEFAULT_THEME,
+    globalUnit = 'kg',
+    currentWeek = 1,
+    calculate1RM = defaultCalc1RM,
+    resolveExerciseImage,
+    resolveExerciseImagePair,
+  } = props;
 
-      const currentExercise = dynamicExercises[exerciseIndex];
-      const nextExercise = dynamicExercises[exerciseIndex + 1];
-      const currentSetData = allSetsData[exerciseIndex]?.[setIndex || 0];
-      const totalSets = allSetsData[exerciseIndex]?.length || 0;
+  const currentExercise = exercises[currentIndex];
+  const currentSets = allSetsData[currentIndex] || [];
 
-      return {
-        currentExercise: currentExercise?.exercise || '',
-        nextExercise: nextExercise?.exercise || '',
-        currentSet: (setIndex || 0) + 1,
-        totalSets,
-        weight: currentSetData?.weight || '',
-        reps: currentSetData?.reps || '',
-      };
-    });
+  // Cross-fade animation when swapping focused exercise
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
-    return () => setExerciseContext(null);
-  }, [setExerciseContext, dynamicExercises, allSetsData]);
+  // Image cache (in-memory; pair with AsyncStorage in production)
+  const [imageCache, setImageCache] = useState<Record<string, string | null>>({});
+  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
   
-  // Debug logging
-  console.log('🏋️ WORKOUT SCREEN: === COMPONENT RENDER/MOUNT ===');
-  console.log('🏋️ WORKOUT SCREEN: Route params:', route.params);
-  console.log('🏋️ WORKOUT SCREEN: Day available:', !!day);
-  console.log('🏋️ WORKOUT SCREEN: BlockName available:', !!blockName);
-  if (day) {
-    console.log('🏋️ WORKOUT SCREEN: Day name:', day.day_name);
-    console.log('🏋️ WORKOUT SCREEN: Day exercises count:', day.exercises?.length);
-  }
-  
-  // Early return if required data is not available
-  if (!day || !blockName) {
-    console.log('Missing required data - showing loading screen');
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Loading workout data...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-  
-  // Calculate currentWeek - use passed week or get from storage
-  const [currentWeek, setCurrentWeek] = useState<number>(passedWeek || 1);
-  
-  // Load current week from storage if not passed
-  useEffect(() => {
-    const loadCurrentWeek = async () => {
-      if (!passedWeek) {
-        const savedWeek = await AsyncStorage.getItem(`currentWeek_${blockName}`);
-        if (savedWeek) {
-          setCurrentWeek(parseInt(savedWeek));
-        }
-      }
-    };
-    loadCurrentWeek();
-  }, [passedWeek, blockName]);
-  
-  // Initialize sets data for all exercises
-  const [allSetsData, setAllSetsData] = useState<SetData[][]>([]);
-  const [exerciseNotes, setExerciseNotes] = useState<ExerciseNotes>({});
+  // Image cycling for exercise animations (start/end positions)
+  const [imagePairs, setImagePairs] = useState<Record<string, {start: any, end: any}>>({});
+  const [currentImagePhase, setCurrentImagePhase] = useState<'start' | 'end'>('start');
+  const cyclingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Workout timer
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const startTimestampRef = useRef<number | null>(null);
+
+  // History, Notes, Settings state
   const [showHistory, setShowHistory] = useState<string | null>(null);
   const [exerciseHistory, setExerciseHistory] = useState<WorkoutHistory[]>([]);
   const [showNotes, setShowNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
-  const [showDeloadInfo, setShowDeloadInfo] = useState(false);
-  const toggleAnimatedValue = useRef(new Animated.Value(0)).current; // 0 = countdown (default), 1 = countup
-  const quickModeAnimatedValue = useRef(new Animated.Value(0)).current; // 0 = optimal (default), 1 = quick
-  
-  // Exercise preference states
-  const [showPreferenceDialog, setShowPreferenceDialog] = useState<{
-    exerciseIndex: number;
-    primaryExercise: string;
-    alternatives: string[];
-    selectedAlternative: string;
-  } | null>(null);
-  const [exercisePreferences, setExercisePreferences] = useState<{ [exerciseName: string]: string }>({});
-  const [preferenceModalScale] = useState(new Animated.Value(0));
-  const [preferenceModalOpacity] = useState(new Animated.Value(0));
-  
-  // Exercise settings state - track which exercise is in settings mode
+  const [exerciseNotes, setExerciseNotes] = useState<{ [exerciseIndex: number]: string }>({});
   const [exerciseInSettings, setExerciseInSettings] = useState<number | null>(null);
   
+  // State to show old view from Git history
+  const [showOldView, setShowOldView] = useState(false);
   
-  // Dynamic exercises state to handle runtime additions
-  const [dynamicExercises, setDynamicExercises] = useState<Exercise[]>(day?.exercises || []);
-  
-  // Tab state for notes view - moved outside conditional to follow rules of hooks
-  const [activeTab, setActiveTab] = useState<'reps' | 'notes'>('reps');
-  const [currentNote, setCurrentNote] = useState('');
-  const [personalNotes, setPersonalNotes] = useState<string[]>([]);
-  
-  // Daily volume tracking state
-  const [showDailyVolume, setShowDailyVolume] = useState(false);
-  const [bodyViewSide, setBodyViewSide] = useState<'front' | 'back'>('front');
-  
-  // Rep scheme editing state
-  const [editingRepScheme, setEditingRepScheme] = useState<{
-    exerciseIndex: number;
-    week: string;
-    currentReps: string;
-  } | null>(null);
+  // Timer context
+  const { globalTimer, setGlobalTimer, startAutoTimer } = useTimer();
 
-  const calculateDailyVolume = (day: any): { [muscle: string]: number } => {
-    const volumeMap: { [muscle: string]: number } = {};
+  useEffect(() => {
+    if (!workoutStarted) {
+      startTimestampRef.current = null;
+      setElapsedSec(0);
+      return;
+    }
+    startTimestampRef.current = Date.now();
+    const intervalId = setInterval(() => {
+      if (startTimestampRef.current) {
+        setElapsedSec(Math.floor((Date.now() - startTimestampRef.current) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(intervalId);
+  }, [workoutStarted]);
+
+  // Resolve image for current exercise (lazy, cached)
+  useEffect(() => {
+    console.log('🔴 COLOR CHANGE DEBUG: ===== IMAGE RESOLVER EFFECT TRIGGERED =====');
+    console.log('🔴 COLOR CHANGE DEBUG: Current theme color:', themeColor);
+    console.log('🔴 COLOR CHANGE DEBUG: Current exercise:', currentExercise?.exercise || currentExercise?.name);
+    console.log('🔴 COLOR CHANGE DEBUG: resolveExerciseImagePair function exists:', !!resolveExerciseImagePair);
     
-    if (day.exercises) {
-      day.exercises.forEach((exercise: any) => {
-        const setsForWeek1 = exercise.sets_weekly?.['1'] ?? exercise.sets ?? 0;
-        const contributions = getMuscleContributions(exercise);
-        contributions.forEach(({ muscle, weight }) => {
-          if (!volumeMap[muscle]) volumeMap[muscle] = 0;
-          volumeMap[muscle] += setsForWeek1 * weight;
+    if (!currentExercise) {
+      console.log('🖼️ IMAGE RESOLVER: No current exercise, returning');
+      return;
+    }
+    
+    const key = `${currentExercise.exercise || currentExercise.name || ''}-${themeColor}`;
+    console.log('🔴 COLOR CHANGE DEBUG: Exercise key with color:', key);
+    console.log('🔴 COLOR CHANGE DEBUG: Key in imageCache:', key in imageCache);
+    console.log('🔴 COLOR CHANGE DEBUG: Key in imagePairs:', key in imagePairs);
+    console.log('🔴 COLOR CHANGE DEBUG: Current imageCache value for key:', imageCache[key]);
+    console.log('🔴 COLOR CHANGE DEBUG: Current imagePairs value for key:', imagePairs[key]);
+    
+    if (key in imageCache && key in imagePairs) {
+      console.log('🔴 COLOR CHANGE DEBUG: Image already cached - SKIPPING resolution');
+      console.log('🔴 COLOR CHANGE DEBUG: But RESTARTING cycling for cached images');
+      console.log('🖼️ IMAGE RESOLVER: Image already cached for', key, '- value:', imageCache[key]);
+      
+      // Even though images are cached, we need to restart cycling for the new color theme
+      const cachedImagePair = imagePairs[key];
+      if (cachedImagePair && cachedImagePair.start && cachedImagePair.end) {
+        startImageCycling(key, cachedImagePair);
+      }
+      
+      return; // already resolved (or null)
+    }
+    
+    if (currentExercise.imageUrl) {
+      console.log('🖼️ IMAGE RESOLVER: Using direct imageUrl:', currentExercise.imageUrl);
+      setImageCache((c) => ({ ...c, [key]: currentExercise.imageUrl! }));
+      return;
+    }
+    
+    // Try the new image pair resolver first (for cycling animations)
+    if (resolveExerciseImagePair) {
+      console.log('🖼️ IMAGE RESOLVER: Using resolveExerciseImagePair function for:', key);
+      setImageLoading((s) => ({ ...s, [key]: true }));
+      
+      resolveExerciseImagePair(currentExercise)
+        .then((imagePair) => {
+          console.log('🔴 COLOR CHANGE DEBUG: ImagePair resolution SUCCESS for', key, 'with color', themeColor);
+          console.log('🔴 COLOR CHANGE DEBUG: ImagePair result:', imagePair);
+          if (imagePair && imagePair.start && imagePair.end) {
+            console.log('🔴 COLOR CHANGE DEBUG: Storing imagePair in state');
+            // Store both images for cycling
+            setImagePairs((prev) => ({ ...prev, [key]: imagePair }));
+            // Start with the 'start' image in the cache
+            setImageCache((c) => ({ ...c, [key]: imagePair.start }));
+            // Start cycling between start and end every 1 second
+            startImageCycling(key, imagePair);
+          } else {
+            console.log('🔴 COLOR CHANGE DEBUG: No valid image pair, setting cache to null');
+            setImageCache((c) => ({ ...c, [key]: null }));
+          }
+        })
+        .catch((error) => {
+          console.log('🔴 COLOR CHANGE DEBUG: ImagePair resolution ERROR for', key, '- error:', error);
+          setImageCache((c) => ({ ...c, [key]: null }));
+        })
+        .finally(() => {
+          console.log('🖼️ IMAGE RESOLVER: ImagePair resolution COMPLETE for', key);
+          setImageLoading((s) => ({ ...s, [key]: false }));
         });
+      return;
+    }
+    
+    // Fallback to single image resolver
+    if (!resolveExerciseImage) {
+      console.log('🖼️ IMAGE RESOLVER: No image resolver functions provided');
+      setImageCache((c) => ({ ...c, [key]: null }));
+      return;
+    }
+    
+    console.log('🖼️ IMAGE RESOLVER: Using fallback resolveExerciseImage function for:', key);
+    setImageLoading((s) => ({ ...s, [key]: true }));
+    
+    resolveExerciseImage(currentExercise)
+      .then((url) => {
+        console.log('🖼️ IMAGE RESOLVER: Resolution SUCCESS for', key, '- result:', url);
+        setImageCache((c) => ({ ...c, [key]: url }));
+      })
+      .catch((error) => {
+        console.log('🖼️ IMAGE RESOLVER: Resolution ERROR for', key, '- error:', error);
+        setImageCache((c) => ({ ...c, [key]: null }));
+      })
+      .finally(() => {
+        console.log('🖼️ IMAGE RESOLVER: Resolution COMPLETE for', key);
+        setImageLoading((s) => ({ ...s, [key]: false }));
       });
+  }, [currentExercise, resolveExerciseImage, resolveExerciseImagePair]);
+
+  // Image cycling function
+  const startImageCycling = useCallback((fullKey: string, imagePair: {start: any, end: any}) => {
+    // Clear any existing interval
+    if (cyclingIntervalRef.current) {
+      clearInterval(cyclingIntervalRef.current);
     }
     
-    Object.keys(volumeMap).forEach(k => {
-      volumeMap[k] = Math.round(volumeMap[k] * 10) / 10;
-    });
+    console.log('🎬 IMAGE CYCLING: Starting cycling for', fullKey, 'with images:', imagePair);
     
-    return volumeMap;
-  };
-
-  // Initialize personal notes from existing notes when showNotes changes
-  // Function to separate RIR information from mixed notes
-  const separateRirFromNotes = (notesArray: string[]): string[] => {
-    const separatedNotes: string[] = [];
-    
-    notesArray.forEach(note => {
-      // Regex to match RIR patterns like "RIR 3-4 W1, 2-3 W2, 1-2 W3" or "RIR: 2-3" etc.
-      const rirPattern = /(.+?)(\s*RIR[:\s]*[0-9\-,\sW]+.*)/i;
-      const match = note.match(rirPattern);
-      
-      if (match && match[1] && match[2]) {
-        // Split into main instruction and RIR parts
-        const mainNote = match[1].trim();
-        const rirNote = match[2].trim();
+    cyclingIntervalRef.current = setInterval(() => {
+      setCurrentImagePhase((prevPhase) => {
+        const newPhase = prevPhase === 'start' ? 'end' : 'start';
+        console.log('🎬 IMAGE CYCLING: Switching to', newPhase, 'for', fullKey);
         
-        if (mainNote) {
-          separatedNotes.push(mainNote);
-        }
-        if (rirNote) {
-          separatedNotes.push(rirNote);
-        }
-      } else {
-        // No RIR found, keep note as is
-        separatedNotes.push(note);
-      }
-    });
-    
-    return separatedNotes;
-  };
-
-  useEffect(() => {
-    if (showNotes) {
-      const exerciseIndex = showNotes.exerciseIndex;
-      const existingNotes = exerciseNotes[exerciseIndex] || '';
-      let notesArray = existingNotes ? existingNotes.split('\n').filter(note => note.trim()) : [];
-      
-      // Separate RIR information from mixed notes
-      notesArray = separateRirFromNotes(notesArray);
-      
-      setPersonalNotes(notesArray);
-      setCurrentNote('');
-      setActiveTab('reps'); // Reset to reps tab
-    }
-  }, [showNotes]); // Removed exerciseNotes dependency to prevent infinite loop
-
-  // Sync personalNotes back to exerciseNotes format (with debouncing to prevent loops)
-  useEffect(() => {
-    if (showNotes && personalNotes.length >= 0) { // Only sync when we actually have notes data
-      const notesString = personalNotes.join('\n');
-      const currentNotes = exerciseNotes[showNotes.exerciseIndex] || '';
-      
-      // Only update if the notes actually changed to prevent infinite loops
-      if (notesString !== currentNotes) {
-        handleNotesUpdate(showNotes.exerciseIndex, notesString);
-      }
-    }
-  }, [personalNotes]); // Removed showNotes dependency and added comparison check
-  
-  // Update dynamicExercises when day.exercises becomes available and load any saved changes
-  useEffect(() => {
-    const loadDynamicExercises = async () => {
-      if (day?.exercises && blockName) {
-        let exercisesToUse = day.exercises;
-        let hasCustomization = false;
+        // Update the image cache with the new phase
+        const newImage = newPhase === 'start' ? imagePair.start : imagePair.end;
+        console.log('🎬 IMAGE CYCLING: Updated cache with', newPhase, 'image:', newImage);
         
-        // First check for week-specific customizations (exercise reordering)
-        const customizationKey = `day_customization_${blockName}_${day.day_name}_week${currentWeek}`;
-        try {
-          const savedCustomization = await AsyncStorage.getItem(customizationKey);
-          if (savedCustomization) {
-            const customizationData = JSON.parse(savedCustomization);
-            if (customizationData.exercises) {
-              exercisesToUse = customizationData.exercises;
-              hasCustomization = true;
-            }
-          }
-        } catch (error) {
-          // Use original order if customization fails to load
-        }
+        setImageCache((prev) => {
+          return { ...prev, [fullKey]: newImage };
+        });
         
-        // Only load dynamic exercises if there's no customization, or merge them carefully
-        const savedKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_exercises`;
-        try {
-          const savedData = await AsyncStorage.getItem(savedKey);
-          if (savedData && !hasCustomization) {
-            // Only use saved dynamic exercises if there's no customization
-            const savedExercises = JSON.parse(savedData);
-            setDynamicExercises(savedExercises);
-          } else if (savedData && hasCustomization) {
-            // If there's both customization and saved data, prioritize customization
-            setDynamicExercises(exercisesToUse);
-          } else {
-            // No saved data, use customized or original exercises
-            setDynamicExercises(exercisesToUse);
-          }
-        } catch (error) {
-          console.error('Failed to load saved exercises:', error);
-          setDynamicExercises(exercisesToUse);
-        }
-      }
-    };
-    
-    loadDynamicExercises();
-  }, [day?.exercises, blockName, currentWeek]);
-  
-  // Workout session timer
-  const [workoutStartTime, setWorkoutStartTime] = useState<Date | null>(null);
-  const [workoutDuration, setWorkoutDuration] = useState(0); // in seconds
-  const [dataLoaded, setDataLoaded] = useState(false);
-  
-  // Debug timer state changes
-  React.useEffect(() => {
-    console.log('⏱️ TIMER STATE: workoutStartTime changed:', workoutStartTime ? workoutStartTime.toISOString() : 'null');
-    console.log('⏱️ TIMER STATE: workoutDuration:', workoutDuration);
-  }, [workoutStartTime, workoutDuration]);
-  
-  // Workout start requirement state
-  const [interactionAttempts, setInteractionAttempts] = useState(0);
-  const [showStartModal, setShowStartModal] = useState(false);
-  const [showStartReminderModal, setShowStartReminderModal] = useState(false);
-  const [showActiveWorkoutModal, setShowActiveWorkoutModal] = useState(false);
-  const [isFinishingWorkout, setIsFinishingWorkout] = useState(false);
-  const [shakeAnimation] = useState(new Animated.Value(0));
-  
-  // Workout completion state
-  const [showCompletionModal, setShowCompletionModal] = useState(false);
-  const [workoutStats, setWorkoutStats] = useState<{
-    duration: string;
-    totalVolume: number;
-    completedSets: number;
-    totalSets: number;
-    exercisesCompleted: number;
-    totalExercises: number;
-  } | null>(null);
-
-  // Superset linking state
-  const [supersetLinks, setSupersetLinks] = useState<Set<number>>(new Set());
-  
-  // Auto-detect supersets from superset_group field on component mount
-  useEffect(() => {
-    const detectSupersets = () => {
-      const links = new Set<number>();
-      const supersetGroups: { [group: string]: number[] } = {};
-      
-      // Group exercises by their superset_group
-      dynamicExercises.forEach((exercise, index) => {
-        if (exercise.superset_group) {
-          if (!supersetGroups[exercise.superset_group]) {
-            supersetGroups[exercise.superset_group] = [];
-          }
-          supersetGroups[exercise.superset_group].push(index);
-        }
+        return newPhase;
       });
-      
-      // Create links for consecutive exercises in the same superset group
-      Object.values(supersetGroups).forEach(group => {
-        if (group.length > 1) {
-          // Sort the group to ensure proper order
-          group.sort((a, b) => a - b);
-          // Link each exercise to the next one in the group (except the last)
-          for (let i = 0; i < group.length - 1; i++) {
-            links.add(group[i]);
-          }
-        }
-      });
-      
-      setSupersetLinks(links);
-    };
-    
-    detectSupersets();
-  }, [dynamicExercises]);
-  
-  // TODO: Timer integration will be added here
-  
-  useEffect(() => {
-    const loadSetsData = async () => {
-      if (dynamicExercises.length === 0) return;
-      
-      // Try to load saved sets data first
-      const savedKey = `workout_${blockName}_${day?.day_name}_week${currentWeek}_sets`;
-      try {
-        const savedData = await AsyncStorage.getItem(savedKey);
-        if (savedData) {
-          const savedSetsData = JSON.parse(savedData);
-          console.log('Loaded saved sets data:', savedSetsData.length, 'exercises');
-          
-          // Validate that saved data matches current exercise count
-          if (savedSetsData.length === dynamicExercises.length) {
-            // Restore saved sets data
-            setAllSetsData(savedSetsData);
-            return;
-          } else {
-            console.log('Saved sets data length mismatch, reinitializing');
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load saved sets data:', error);
-      }
-      
-      // No saved data or mismatch, create initial data
-      const initialData = dynamicExercises.map(exercise => {
-        // Use weekly sets if available, otherwise fall back to regular sets
-        const currentSets = exercise.sets_weekly?.[currentWeek.toString()] || exercise.sets;
-        
-        // Get target reps for auto-filling
-        const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
-        
-        return Array.from({ length: currentSets }, (_, index) => ({
-          exercise: exercise.exercise, // This will be the primary exercise name
-          setNumber: index + 1,
-          weight: '',
-          reps: '', // Leave empty to show placeholder instead
-          completed: false,
-          selectedExerciseIndex: 0, // Start with primary exercise
-          exerciseData: {}, // Initialize storage for each exercise variant
-        }));
-      });
-      console.log('Created initial sets data:', initialData.length, 'exercises');
-      setAllSetsData(initialData);
-    };
-    
-    loadSetsData();
-    
-    // Initialize notes from JSON if they exist
-    const initialNotes: ExerciseNotes = {};
-    dynamicExercises.forEach((exercise, index) => {
-      if (exercise.notes) {
-        initialNotes[index] = exercise.notes;
-      }
-    });
-    if (Object.keys(initialNotes).length > 0) {
-      setExerciseNotes(initialNotes);
-    }
-  }, [dynamicExercises, currentWeek]);
+    }, 1000); // Cycle every 1 second
+  }, []);
 
-  // Save sets data whenever it changes
-  useEffect(() => {
-    if (allSetsData.length > 0) {
-      saveSetsData(allSetsData);
-    }
-  }, [allSetsData]);
 
-  // Update exercise selections based on preferences
+
+  // Cleanup cycling when component unmounts or exercise changes (but NOT theme changes)
   useEffect(() => {
-    if (Object.keys(exercisePreferences).length > 0 && allSetsData.length > 0) {
-      const updatedData = allSetsData.map((exerciseSets, exerciseIndex) => {
-        const exercise = dynamicExercises[exerciseIndex];
-        const preferredExercise = exercisePreferences[exercise.exercise];
-        
-        if (preferredExercise && exercise.alternatives) {
-          const alternativeNames = exercise.alternatives.map(alt => 
-            typeof alt === 'string' ? alt : alt.exercise
-          );
-          const allExercises = [exercise.exercise, ...alternativeNames];
-          const preferredIndex = allExercises.indexOf(preferredExercise);
-          
-          if (preferredIndex !== -1) {
-            // Update all sets for this exercise to use the preferred exercise
-            return exerciseSets.map(setData => ({
-              ...setData,
-              selectedExerciseIndex: preferredIndex
-            }));
-          }
-        }
-        return exerciseSets;
-      });
-      
-      setAllSetsData(updatedData);
-    }
-  }, [exercisePreferences, dynamicExercises]);
-  
-  // Workout duration timer - updates based on start time instead of setInterval
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    const exerciseName = currentExercise?.exercise || currentExercise?.name || '';
     
-    console.log('⏰ TIMER UPDATE: Timer effect triggered, workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
-    
-    if (workoutStartTime) {
-      // Update duration every second based on elapsed time
-      const updateDuration = () => {
-        const now = Date.now();
-        const elapsed = Math.floor((now - workoutStartTime.getTime()) / 1000);
-        console.log('⏰ TIMER UPDATE: Updating duration from', workoutDuration, 'to', elapsed);
-        setWorkoutDuration(elapsed);
-      };
-      
-      console.log('⏰ TIMER UPDATE: Starting timer interval for workout started at:', workoutStartTime.toISOString());
-      // Update immediately
-      updateDuration();
-      
-      // Then update every second
-      interval = setInterval(updateDuration, 1000);
-    } else {
-      console.log('⏰ TIMER UPDATE: No workout start time, not starting timer');
+    // Clear any existing cycling interval ONLY if exercise actually changed
+    if (cyclingIntervalRef.current) {
+      clearInterval(cyclingIntervalRef.current);
+      console.log('🎬 IMAGE CYCLING: Cleaned up interval for exercise change');
     }
+    
+    // Reset cycling phase for new exercise
+    setCurrentImagePhase('start');
     
     return () => {
-      if (interval) {
-        console.log('⏰ TIMER UPDATE: Clearing timer interval');
-        clearInterval(interval);
+      if (cyclingIntervalRef.current) {
+        clearInterval(cyclingIntervalRef.current);
+        console.log('🎬 IMAGE CYCLING: Cleaned up interval on unmount');
       }
     };
-  }, [workoutStartTime]);
-  
-  
-  // Timer is now managed by global context for background persistence
+  }, [currentIndex]); // Only reset when exercise INDEX changes, not the object
 
-  
-  // Handle selected exercise from FavoriteExercisesScreen
-  useFocusEffect(
-    React.useCallback(() => {
-      console.log('=== WORKOUT LOG FOCUS EFFECT ===');
-      console.log('Route params in focus effect:', route.params);
-      console.log('Selected exercise present:', !!route.params?.selectedExercise);
-      
-      // Check if returning with a selected exercise
-      if (route.params?.selectedExercise) {
-        console.log('Adding selected exercise to workout:', route.params.selectedExercise.name);
-        handleAddSelectedExercise(route.params.selectedExercise);
-        
-        // Clear the parameter to prevent re-adding
-        navigation.setParams({ selectedExercise: undefined });
-      }
-    }, [route.params?.selectedExercise])
-  );
-  
-  // Function to save dynamic exercises to storage
-  const saveDynamicExercises = async (exercises: Exercise[]) => {
-    if (!blockName || !day?.day_name) return;
-    
-    const savedKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_exercises`;
-    try {
-      await AsyncStorage.setItem(savedKey, JSON.stringify(exercises));
-      console.log('Saved dynamic exercises:', exercises.length, 'exercises to key:', savedKey);
-    } catch (error) {
-      console.error('Failed to save dynamic exercises:', error);
-    }
-  };
-
-  // Function to save sets data to storage
-  const saveSetsData = async (setsData: SetData[][]) => {
-    if (!blockName || !day?.day_name) return;
-    
-    const savedKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_sets`;
-    try {
-      await AsyncStorage.setItem(savedKey, JSON.stringify(setsData));
-      console.log('Saved sets data:', setsData.length, 'exercises to key:', savedKey);
-    } catch (error) {
-      console.error('Failed to save sets data:', error);
-    }
-  };
-
-  // Function to add selected exercise from favorites to the current workout
-  const handleAddSelectedExercise = (favoriteExercise: any) => {
-    // Convert favorite exercise to Exercise interface format
-    const newExercise: Exercise = {
-      exercise: favoriteExercise.name,
-      sets: 3, // Default sets
-      reps: "8-12", // Default reps
-      rest: 120, // Default rest
-      restQuick: 60, // Default quick rest
-      alternatives: favoriteExercise.alternatives || [],
-      notes: favoriteExercise.notes || '',
-    };
-    
-    // Add to dynamic exercises
-    const updatedExercises = [...dynamicExercises, newExercise];
-    setDynamicExercises(updatedExercises);
-    saveDynamicExercises(updatedExercises);
-    
-    // Initialize sets data for the new exercise
-    const newExerciseIndex = dynamicExercises.length;
-    
-    // Get target reps for auto-filling
-    const targetReps = (newExercise.reps_weekly?.[currentWeek.toString()] || newExercise.reps || '').replace(/\s*\(.*?\)/, '');
-    
-    const newSetsData = Array.from({ length: newExercise.sets }, (_, index) => ({
-      exercise: newExercise.exercise,
-      setNumber: index + 1,
-      weight: '',
-      reps: '', // Leave empty to show placeholder instead
-      completed: false,
-      selectedExerciseIndex: 0, // Start with primary exercise
-      exerciseData: {}, // Initialize storage for each exercise variant
-    }));
-    
-    // Add the new sets data to allSetsData
-    setAllSetsData(prev => [...prev, newSetsData]);
-    
-    
-    console.log('Exercise added successfully:', newExercise.exercise);
-  };
-  
-  const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
-    // Validate input - only allow numbers and decimal point for weight
-    let sanitizedValue = value;
-    if (field === 'weight') {
-      // Allow numbers and one decimal point
-      sanitizedValue = value.replace(/[^0-9.]/g, '');
-      // Ensure only one decimal point
-      const parts = sanitizedValue.split('.');
-      if (parts.length > 2) {
-        sanitizedValue = parts[0] + '.' + parts.slice(1).join('');
-      }
-    } else if (field === 'reps') {
-      // For reps, only allow whole numbers
-      sanitizedValue = value.replace(/[^0-9]/g, '');
-    }
-    
-    const newData = [...allSetsData];
-    newData[exerciseIndex][setIndex][field] = sanitizedValue;
-    setAllSetsData(newData);
-  };
-
-  const handleDeleteSet = (exerciseIndex: number, setIndex: number) => {
-    Alert.alert(
-      'Delete Set',
-      'Are you sure you want to delete this set?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => {
-            const newData = [...allSetsData];
-            newData[exerciseIndex].splice(setIndex, 1);
-            setAllSetsData(newData);
-            
-            // Save the updated sets data to AsyncStorage
-            saveSetsData(newData);
-          }
-        }
-      ]
-    );
-  };
-
-  const handleAddSet = (exerciseIndex: number) => {
-    const newData = [...allSetsData];
-    const exerciseSets = newData[exerciseIndex];
-    const exercise = dynamicExercises[exerciseIndex];
-    
-    // Calculate the set index for the new set (0-based)
-    const newSetIndex = exerciseSets.length;
-    
-    // Get target reps for auto-filling based on the new set's position
-    const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
-    const targetRepNumber = getTargetRepForSet(targetReps, currentWeek, newSetIndex);
-    
-    // Create new set based on the last set or default values
-    const lastSet = exerciseSets[exerciseSets.length - 1];
-    const newSet: SetData = {
-      exercise: exercise.exercise,
-      setNumber: newSetIndex + 1,
-      selectedExerciseIndex: lastSet?.selectedExerciseIndex || 0,
-      weight: lastSet?.weight || '',
-      reps: '', // Leave empty to show placeholder instead
-      completed: false,
-      unit: lastSet?.unit || getExerciseUnit(exerciseIndex),
-      isDropSet: false,
-    };
-    
-    newData[exerciseIndex].push(newSet);
-    setAllSetsData(newData);
-    
-    // Save the updated sets data to AsyncStorage
-    saveSetsData(newData);
-  };
-
-  const handleDeleteExercise = (exerciseIndex: number) => {
-    console.log('=== DELETE EXERCISE ===');
-    console.log('Exercise index to delete:', exerciseIndex);
-    console.log('Current dynamicExercises count:', dynamicExercises.length);
-    console.log('Current allSetsData count:', allSetsData.length);
-    console.log('Exercise to delete:', dynamicExercises[exerciseIndex]?.exercise);
-    
-    // Remove the exercise from dynamicExercises
-    const newExercises = [...dynamicExercises];
-    newExercises.splice(exerciseIndex, 1);
-    console.log('New exercises count after splice:', newExercises.length);
-    setDynamicExercises(newExercises);
-    saveDynamicExercises(newExercises);
-    
-    // Remove the corresponding sets data
-    const newSetsData = [...allSetsData];
-    newSetsData.splice(exerciseIndex, 1);
-    console.log('New sets data count after splice:', newSetsData.length);
-    setAllSetsData(newSetsData);
-    
-    // Remove any notes for this exercise and update indices for remaining exercises
-    const newNotes: { [exerciseIndex: number]: string } = {};
-    Object.entries(exerciseNotes).forEach(([index, note]) => {
-      const idx = parseInt(index);
-      if (idx < exerciseIndex) {
-        // Keep notes for exercises before the deleted one
-        newNotes[idx] = note;
-      } else if (idx > exerciseIndex) {
-        // Shift notes for exercises after the deleted one
-        newNotes[idx - 1] = note;
-      }
-      // Skip notes for the deleted exercise (idx === exerciseIndex)
-    });
-    setExerciseNotes(newNotes);
-    
-    console.log('Exercise deletion complete');
-  };
-
-  const handleExerciseSettings = (exerciseIndex: number) => {
-    setExerciseInSettings(exerciseInSettings === exerciseIndex ? null : exerciseIndex);
-  };
-
-  const saveSetToHistory = async (exerciseIndex: number, setIndex: number, setData: SetData) => {
-    const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    console.log('Saving set to history with date:', currentDate);
-    
-    // Get the current exercise name based on selected exercise index
-    const exercise = dynamicExercises[exerciseIndex];
-    const alternativeNames = (exercise.alternatives || []).map(alt => 
-      typeof alt === 'string' ? alt : alt.exercise
-    );
-    const allExercises = [exercise.exercise, ...alternativeNames];
-    const selectedIndex = setData.selectedExerciseIndex || 0;
-    const currentExerciseName = allExercises[selectedIndex] || exercise.exercise;
-    
-    console.log('Saving set for exercise:', currentExerciseName, 'weight:', setData.weight, 'reps:', setData.reps, 'unit:', getExerciseUnit(exerciseIndex));
-    
-    // Load existing history
-    const history = await WorkoutStorage.loadWorkoutHistory();
-    
-    // Find existing entry for this exercise on this date
-    const existingEntryIndex = history.findIndex(entry => 
-      entry.exerciseName === currentExerciseName && 
-      entry.date === currentDate &&
-      entry.dayName === day?.day_name
-    );
-    
-    const currentUnit = getExerciseUnit(exerciseIndex);
-    const newSet = {
-      setNumber: setData.setNumber,
-      weight: setData.weight,
-      reps: setData.reps,
-      completed: setData.completed,
-      unit: currentUnit,
-      drops: setData.isDropSet && setData.drops ? setData.drops.map(drop => ({
-        weight: drop.weight,
-        reps: drop.reps,
-        completed: drop.completed || false,
-        unit: currentUnit,
-      })) : undefined,
-    };
-    
-    if (existingEntryIndex >= 0) {
-      // Update existing entry - replace or add the set
-      const existingSetIndex = history[existingEntryIndex].sets.findIndex(
-        set => set.setNumber === setData.setNumber
-      );
-      
-      if (existingSetIndex >= 0) {
-        // Replace existing set
-        history[existingEntryIndex].sets[existingSetIndex] = newSet;
-      } else {
-        // Add new set to existing entry
-        history[existingEntryIndex].sets.push(newSet);
-        // Sort sets by set number
-        history[existingEntryIndex].sets.sort((a, b) => a.setNumber - b.setNumber);
-      }
-    } else {
-      // Create new entry
-      const historyEntry: WorkoutHistory = {
-        id: `${currentDate}-${currentExerciseName}-${Date.now()}`,
-        routineName: `${blockName}`,
-        dayName: day?.day_name || '',
-        exerciseName: currentExerciseName,
-        date: currentDate,
-        sets: [newSet],
-      };
-      history.push(historyEntry);
-    }
-    
-    // Save updated history
-    await WorkoutStorage.saveWorkoutHistory(history);
-    console.log('Set saved to history successfully:', {
-      exercise: currentExerciseName,
-      setNumber: setData.setNumber,
-      weight: setData.weight,
-      reps: setData.reps,
-      unit: currentUnit
-    });
-  };
-  
-  const handleSetComplete = async (exerciseIndex: number, setIndex: number) => {
-    const newData = [...allSetsData];
-    const wasCompleted = newData[exerciseIndex][setIndex].completed;
-    newData[exerciseIndex][setIndex].completed = !wasCompleted;
-    
-    // When completing a set, store the current unit so it doesn't change later
-    if (!wasCompleted) {
-      newData[exerciseIndex][setIndex].unit = getExerciseUnit(exerciseIndex);
-    }
-    
-    setAllSetsData(newData);
-    
-    console.log('Set completion toggled:', {
-      exerciseIndex,
-      setIndex,
-      wasCompleted,
-      nowCompleted: !wasCompleted,
-      weight: newData[exerciseIndex][setIndex].weight,
-      reps: newData[exerciseIndex][setIndex].reps
-    });
-    
-    
-    // Save to history immediately when set is completed
-    if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
-      console.log('Attempting to save set to history...');
-      await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
-    } else {
-      console.log('Set not saved to history:', {
-        wasAlreadyCompleted: wasCompleted,
-        hasWeight: !!newData[exerciseIndex][setIndex].weight,
-        hasReps: !!newData[exerciseIndex][setIndex].reps
+  // Cross-fade on exercise swap
+  const swapFocus = useCallback(
+    (newIndex: number) => {
+      if (newIndex === currentIndex) return;
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 120,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
+        onIndexChange(newIndex);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
+        }).start();
       });
+    },
+    [currentIndex, onIndexChange, fadeAnim],
+  );
+
+  // Navigation functions for swipe gestures
+  const goToNextExercise = useCallback(() => {
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < exercises.length) {
+      swapFocus(nextIndex);
     }
-    
-    // Start auto-timer when set is completed
-    if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
-      const exercise = dynamicExercises[exerciseIndex];
-      if (exercise?.rest && exercise?.restQuick) {
-        startAutoTimer(exercise.rest, exercise.restQuick, exerciseIndex, setIndex, themeColor);
-      }
+  }, [currentIndex, exercises.length, swapFocus]);
+
+  const goToPreviousExercise = useCallback(() => {
+    const prevIndex = currentIndex - 1;
+    if (prevIndex >= 0) {
+      swapFocus(prevIndex);
     }
-  };
-  
-  
-  const handleDropSetComplete = async (exerciseIndex: number, setIndex: number, dropIndex: number) => {
-    const newData = [...allSetsData];
-    if (newData[exerciseIndex][setIndex].drops && newData[exerciseIndex][setIndex].drops[dropIndex]) {
-      const wasCompleted = newData[exerciseIndex][setIndex].drops[dropIndex].completed;
-      newData[exerciseIndex][setIndex].drops[dropIndex].completed = !wasCompleted;
+  }, [currentIndex, swapFocus]);
+
+  // Swipe gesture configuration
+  const swipeGesture = Gesture.Pan()
+    .minDistance(30)
+    .onEnd((event) => {
+      const { velocityX, translationX, translationY } = event;
+      const swipeThreshold = 50;
+      const velocityThreshold = 500;
       
-      // When completing a drop set, store the current unit so it doesn't change later
-      if (!wasCompleted) {
-        newData[exerciseIndex][setIndex].drops[dropIndex].unit = getExerciseUnit(exerciseIndex);
-      }
+      // Only respond to horizontal swipes (ignore vertical scrolling)
+      const horizontalDistance = Math.abs(translationX);
+      const verticalDistance = Math.abs(translationY);
       
-      setAllSetsData(newData);
-      
-      // No rest timer for drop sets - they're done immediately one after another
-      // Just save progress
-      await saveProgress();
-    }
-  };
-
-
-  // Function to handle setting exercise preference
-  const handleSetExercisePreference = (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => {
-    setShowPreferenceDialog({
-      exerciseIndex,
-      primaryExercise,
-      alternatives,
-      selectedAlternative
-    });
-    
-    // Animate modal entrance
-    preferenceModalScale.setValue(0.7);
-    preferenceModalOpacity.setValue(0);
-    
-    Animated.parallel([
-      Animated.spring(preferenceModalScale, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.timing(preferenceModalOpacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  // Function to load exercise preferences for this block
-  const loadExercisePreferences = async () => {
-    if (!routineName) return;
-    
-    const prefs: { [exerciseName: string]: string } = {};
-    
-    // Load preferences for each exercise in the day
-    for (const exercise of dynamicExercises) {
-      const preferredExercise = await WorkoutStorage.getExercisePreference(
-        routineName, 
-        blockName, 
-        exercise.exercise
-      );
-      if (preferredExercise) {
-        prefs[exercise.exercise] = preferredExercise;
-      }
-    }
-    
-    setExercisePreferences(prefs);
-  };
-
-  // Function to confirm exercise preference setting
-  const confirmExercisePreference = async () => {
-    if (!showPreferenceDialog || !routineName) return;
-
-    const preference: ExercisePreference = {
-      programId: routineName,
-      blockName,
-      primaryExercise: showPreferenceDialog.primaryExercise,
-      preferredExercise: showPreferenceDialog.selectedAlternative
-    };
-
-    await WorkoutStorage.saveExercisePreference(preference);
-
-    // Update local preferences state
-    setExercisePreferences(prev => ({
-      ...prev,
-      [showPreferenceDialog.primaryExercise]: showPreferenceDialog.selectedAlternative
-    }));
-
-    // Update the current exercise selection
-    const allExercises = [showPreferenceDialog.primaryExercise, ...showPreferenceDialog.alternatives];
-    const selectedIndex = allExercises.indexOf(showPreferenceDialog.selectedAlternative);
-    handleExerciseSelect(showPreferenceDialog.exerciseIndex, selectedIndex);
-
-    // Animate modal exit
-    Animated.parallel([
-      Animated.spring(preferenceModalScale, {
-        toValue: 0.7,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.timing(preferenceModalOpacity, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowPreferenceDialog(null);
-    });
-  };
-
-  // Function to cancel preference dialog with animation
-  const cancelExercisePreference = () => {
-    Animated.parallel([
-      Animated.spring(preferenceModalScale, {
-        toValue: 0.7,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.timing(preferenceModalOpacity, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowPreferenceDialog(null);
-    });
-  };
-  
-  const handleExerciseSelect = (exerciseIndex: number, selectedExerciseIndex: number) => {
-    const newData = [...allSetsData];
-    const currentSelection = newData[exerciseIndex][0].selectedExerciseIndex;
-    
-    // Only update if selection actually changed
-    if (currentSelection !== selectedExerciseIndex) {
-      const exercise = dynamicExercises[exerciseIndex];
-      const alternativeNames = (exercise.alternatives || []).map(alt => 
-        typeof alt === 'string' ? alt : alt.exercise
-      );
-      const allExercises = [exercise.exercise, ...alternativeNames];
-      const newExerciseName = allExercises[selectedExerciseIndex] || exercise.exercise;
-      
-      // Update exercise selection for all sets of this exercise
-      for (let i = 0; i < newData[exerciseIndex].length; i++) {
-        const setData = newData[exerciseIndex][i];
-        
-        // Save current data before switching
-        if (!setData.exerciseData) {
-          setData.exerciseData = {};
-        }
-        setData.exerciseData[currentSelection] = {
-          weight: setData.weight,
-          reps: setData.reps,
-          completed: setData.completed,
-          isDropSet: setData.isDropSet,
-          drops: setData.drops ? [...setData.drops] : undefined, // Deep copy drops
-        };
-        
-        // Update to new exercise
-        setData.selectedExerciseIndex = selectedExerciseIndex;
-        setData.exercise = newExerciseName;
-        
-        // Restore previous data for this exercise if it exists
-        if (setData.exerciseData[selectedExerciseIndex]) {
-          setData.weight = setData.exerciseData[selectedExerciseIndex].weight;
-          setData.reps = setData.exerciseData[selectedExerciseIndex].reps;
-          setData.completed = setData.exerciseData[selectedExerciseIndex].completed;
-          setData.isDropSet = setData.exerciseData[selectedExerciseIndex].isDropSet;
-          setData.drops = setData.exerciseData[selectedExerciseIndex].drops ? [...setData.exerciseData[selectedExerciseIndex].drops] : undefined;
-        } else {
-          // First time selecting this exercise - start fresh with set-specific target reps
-          const targetReps = (exercise.reps_weekly?.[currentWeek.toString()] || exercise.reps || '').replace(/\s*\(.*?\)/, '');
-          const targetRepNumber = getTargetRepForSet(targetReps, currentWeek, i); // Use the set index (i)
-          
-          setData.weight = '';
-          setData.reps = ''; // Leave empty to show placeholder instead
-          setData.completed = false;
-          setData.isDropSet = false;
-          setData.drops = undefined;
-        }
-      }
-      
-      setAllSetsData(newData);
-    }
-  };
-  
-  const shakeStartButton = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: 0, duration: 50, useNativeDriver: true }),
-    ]).start();
-  };
-
-  const handleInteractionAttempt = () => {
-    console.log('Interaction attempt - workout started:', !!workoutStartTime);
-    if (workoutStartTime) return; // Already started, allow interaction
-    
-    const newAttempts = interactionAttempts + 1;
-    setInteractionAttempts(newAttempts);
-    console.log('Attempt count:', newAttempts);
-    
-    if (newAttempts >= 3) {
-      console.log('Showing reminder modal');
-      setShowStartReminderModal(true);
-      setInteractionAttempts(0); // Reset counter
-    } else {
-      console.log('Shaking start button');
-      shakeStartButton();
-    }
-  };
-
-  const handleStartWorkout = () => {
-    // Check if there's already an active workout from a different screen
-    if (activeWorkout) {
-      const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
-                                   activeWorkout.routeParams?.blockName === blockName;
-      
-      if (!currentWorkoutMatches) {
-        console.log('🚫 START WORKOUT: Another workout is already active, showing warning modal');
-        setShowActiveWorkoutModal(true);
+      // If the gesture is more vertical than horizontal, ignore it
+      if (verticalDistance > horizontalDistance) {
         return;
       }
-    }
-    
-    setShowStartModal(true);
-  };
-
-  const confirmStartWorkout = () => {
-    console.log('🚀 START WORKOUT: User confirmed workout start');
-    setShowStartModal(false);
-    const now = new Date();
-    console.log('🚀 START WORKOUT: Setting workout start time to:', now.toISOString());
-    setWorkoutStartTime(now);
-    setWorkoutDuration(0);
-    setInteractionAttempts(0); // Reset attempts
-    
-    // Duration will be automatically calculated by the useEffect based on start time
-    // Context will be updated by useEffect below
-  };
-
-  const formatDuration = (seconds: number): string => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Calculate estimated 1RM using Epley formula
-  const calculate1RM = (weight: number, reps: number): number => {
-    if (reps <= 0 || weight <= 0) return 0;
-    if (reps === 1) return weight;
-    return Math.round(weight * (1 + reps / 30));
-  };
-
-  const calculateWorkoutStats = () => {
-    let totalVolume = 0;
-    let completedSets = 0;
-    let totalSets = 0;
-    let exercisesCompleted = 0;
-    
-    allSetsData.forEach((exerciseSets, exerciseIndex) => {
-      let exerciseHasCompletedSets = false;
       
-      exerciseSets.forEach((setData, setIndex) => {
-        totalSets++;
-        
-        if (setData.completed && setData.weight && setData.reps) {
-          completedSets++;
-          exerciseHasCompletedSets = true;
-          // Calculate volume: weight × reps (convert all weights to kg for consistent volume calculation)
-          const weight = parseFloat(setData.weight) || 0;
-          const weightInKg = convertWeight(weight, getExerciseUnit(exerciseIndex), 'kg');
-          const reps = parseInt(setData.reps) || 0;
-          const setVolume = weightInKg * reps;
-          totalVolume += setVolume;
-          
-          // Add drop sets to volume calculation (only completed ones)
-          if (setData.isDropSet && setData.drops) {
-            setData.drops.forEach(drop => {
-              if (drop.completed && drop.weight && drop.reps) {
-                const dropWeight = parseFloat(drop.weight) || 0;
-                const dropWeightInKg = convertWeight(dropWeight, getExerciseUnit(exerciseIndex), 'kg');
-                const dropReps = parseInt(drop.reps) || 0;
-                const dropVolume = dropWeightInKg * dropReps;
-                totalVolume += dropVolume;
-              }
-            });
-          }
-        }
-      });
-      
-      if (exerciseHasCompletedSets) {
-        exercisesCompleted++;
+      // Swipe right-to-left (go to next exercise)
+      if (translationX < -swipeThreshold || velocityX < -velocityThreshold) {
+        goToNextExercise();
       }
-    });
-    
-    const duration = formatDuration(workoutDuration);
-    
-    
-    return {
-      duration,
-      totalVolume: Math.round(totalVolume * 10) / 10, // Round to 1 decimal
-      completedSets,
-      totalSets,
-      exercisesCompleted,
-      totalExercises: dynamicExercises.length
-    };
-  };
-  
+      // Swipe left-to-right (go to previous exercise)  
+      else if (translationX > swipeThreshold || velocityX > velocityThreshold) {
+        goToPreviousExercise();
+      }
+    })
+    .simultaneousWithExternalGesture();
 
-  const handleFinishWorkout = () => {
-    const stats = calculateWorkoutStats();
-    setWorkoutStats(stats);
-    setShowCompletionModal(true);
-  };
-  
-  const confirmFinishWorkout = async () => {
-    try {
-      console.log('Starting confirmFinishWorkout...');
-      console.log('blockName:', blockName);
-      console.log('day.day_name:', day?.day_name);
-      
-      // Set finishing flag to prevent auto-save race condition
-      setIsFinishingWorkout(true);
-      
-      // Clear workout timer by resetting start time
-      setWorkoutStartTime(null);
-      
-      // Stop any active rest timer and clean up Live Activities
-      stopTimer();
-      
-      // Clear active workout from context
-      setActiveWorkout(null);
-      
-      // Save completion stats for the DaysScreen
-      const stats = calculateWorkoutStats();
-      console.log('Calculated stats:', stats);
-      
-      const weekString = currentWeek.toString();
-      const workoutKey = `${day?.day_name || 'unknown'}_week${weekString}`;
-      console.log('Saving for workoutKey:', workoutKey, 'blockName:', blockName, 'currentWeek:', weekString);
-      
-      // Save that this workout is completed using ROBUST STORAGE
-      const completedKey = `completed_${blockName}_week${weekString}`;
-      console.log('🎯 [COMPLETION] Starting ROBUST completion save process...');
-      console.log('🎯 [COMPLETION] Completed key:', completedKey);
-      console.log('🎯 [COMPLETION] Workout key:', workoutKey);
-      
-      // Run health check before critical operation
-      const healthCheck = await RobustStorage.healthCheck();
-      console.log('🎯 [COMPLETION] Storage health check:', healthCheck);
-      
-      // Get existing completions using robust storage
-      const completed = await RobustStorage.getItem(completedKey, true);
-      let completedSet = new Set();
-      
-      if (completed) {
-        try {
-          const parsedCompleted = JSON.parse(completed);
-          // Ensure it's an array before creating Set
-          if (Array.isArray(parsedCompleted)) {
-            completedSet = new Set(parsedCompleted);
-          } else {
-            console.warn('🎯 [COMPLETION] ⚠️ Completed data is not an array, starting fresh:', parsedCompleted);
-          }
-        } catch (parseError) {
-          console.error('🎯 [COMPLETION] ❌ Error parsing completed data:', parseError);
-          // Start with empty set if parsing fails
-        }
-      }
-      completedSet.add(workoutKey);
-      
-      const completedData = JSON.stringify(Array.from(completedSet));
-      console.log('🎯 [COMPLETION] Data to save:', completedData);
-      
-      // Save using robust storage with redundancy
-      const saveSuccess = await RobustStorage.setItem(completedKey, completedData, true);
-      console.log('🎯 [COMPLETION] ROBUST save result:', saveSuccess ? '✅ SUCCESS' : '❌ FAILED');
-      
-      if (!saveSuccess) {
-        console.error('🎯 [COMPLETION] ❌ CRITICAL: ROBUST save failed! Trying emergency fallback...');
-        
-        // Emergency fallback: try saving with multiple different key formats
-        const emergencyKeys = [
-          `${completedKey}_emergency`,
-          `workout_completion_${blockName.replace(/[^a-zA-Z0-9]/g, '_')}_week${weekString}`,
-          `completion_backup_${Date.now()}`
-        ];
-        
-        for (const emergencyKey of emergencyKeys) {
-          try {
-            await AsyncStorage.setItem(emergencyKey, completedData);
-            console.log(`🎯 [COMPLETION] ✅ Emergency save succeeded with key: ${emergencyKey}`);
-            break;
-          } catch (emergencyError) {
-            console.error(`🎯 [COMPLETION] ❌ Emergency save failed for ${emergencyKey}:`, emergencyError);
-          }
-        }
-      }
-      
-      // Immediate verification
-      const verification = await RobustStorage.getItem(completedKey, true);
-      const verificationSuccess = verification === completedData;
-      console.log('🎯 [COMPLETION] Immediate verification:', verificationSuccess ? '✅ SUCCESS' : '❌ FAILED');
-      
-      if (!verificationSuccess) {
-        console.error('🎯 [COMPLETION] ❌ CRITICAL: Data verification failed immediately after save!');
-      }
-      
-      // Save the completion stats
-      const statsKey = `completionStats_${blockName}_week${weekString}`;
-      const existingStats = await AsyncStorage.getItem(statsKey);
-      const statsMap = existingStats ? new Map(JSON.parse(existingStats)) : new Map();
-      
-      statsMap.set(workoutKey, {
-        duration: Math.round(workoutDuration / 60), // Convert to minutes
-        totalVolume: stats.totalVolume,
-        date: new Date().toISOString(),
-      });
-      await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
-      console.log('Saved completion stats for key:', statsKey);
-      
-      // PRODUCTION SAFEGUARD: Save completion data in multiple redundant formats
-      console.log('🔐 [PRODUCTION-SAFEGUARD] Saving completion data in redundant formats...');
-      try {
-        // Format 1: Individual workout completion marker
-        const individualKey = `workout_done_${blockName}_${day?.day_name || 'unknown'}_week${weekString}`;
-        await AsyncStorage.setItem(individualKey, JSON.stringify({
-          completed: true,
-          completedAt: new Date().toISOString(),
-          blockName,
-          dayName: day?.day_name,
-          week: currentWeek,
-          duration: Math.round(workoutDuration / 60),
-          totalVolume: stats.totalVolume
-        }));
-        console.log('🔐 [PRODUCTION-SAFEGUARD] Saved individual marker:', individualKey);
-        
-        // Format 2: Simple completion list
-        const simpleKey = `simple_completed_${blockName.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        const existingSimple = await AsyncStorage.getItem(simpleKey);
-        const simpleList = existingSimple ? JSON.parse(existingSimple) : [];
-        const simpleEntry = `${day?.day_name || 'unknown'}_week${weekString}`;
-        if (!simpleList.includes(simpleEntry)) {
-          simpleList.push(simpleEntry);
-          await AsyncStorage.setItem(simpleKey, JSON.stringify(simpleList));
-          console.log('🔐 [PRODUCTION-SAFEGUARD] Saved simple list:', simpleKey, simpleEntry);
-        }
-        
-        // Format 3: Date-based completion log
-        const dateKey = `completion_log_${new Date().toISOString().split('T')[0]}`; // YYYY-MM-DD
-        const existingLog = await AsyncStorage.getItem(dateKey);
-        const dailyLog = existingLog ? JSON.parse(existingLog) : [];
-        dailyLog.push({
-          blockName,
-          dayName: day?.day_name,
-          week: currentWeek,
-          completedAt: new Date().toISOString(),
-          workoutKey: `${day?.day_name || 'unknown'}_week${weekString}`
-        });
-        await AsyncStorage.setItem(dateKey, JSON.stringify(dailyLog));
-        console.log('🔐 [PRODUCTION-SAFEGUARD] Saved daily log:', dateKey);
-        
-      } catch (safeguardError) {
-        console.error('🔐 [PRODUCTION-SAFEGUARD] Error saving redundant data:', safeguardError);
-      }
-      
-      // Sets are already saved individually when completed via saveSetToHistory()
-      // No need to save them again here to prevent duplicates
-      console.log('🎯 [HISTORY] Sets already saved individually - skipping duplicate save');
-      
-      // Sets are now saved immediately when completed, so no need to save them again here
-      await WorkoutStorage.clearCurrentWorkout(day?.day_name || '', blockName); // Clear any saved progress
-      
-      // Clear saved dynamic exercises and sets data since workout is complete
-      if (day?.day_name) {
-        const exerciseKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_exercises`;
-        const setsKey = `workout_${blockName}_${day.day_name}_week${currentWeek}_sets`;
-        await AsyncStorage.removeItem(exerciseKey);
-        await AsyncStorage.removeItem(setsKey);
-        console.log('Cleared saved data for keys:', exerciseKey, setsKey);
-      }
-      
-      console.log('Navigation back to DaysScreen...');
-      navigation.goBack();
-    } catch (error) {
-      console.error('Error in confirmFinishWorkout:', error);
-      console.error('Error stack:', error.stack);
-    } finally {
-      // Always reset the finishing flag, even if there's an error
-      setIsFinishingWorkout(false);
-    }
-  };
-
-  const saveWorkoutToHistory = async () => {
-    const now = new Date();
-    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-    console.log('Saving workout to history with date:', currentDate);
-    console.log('Current time details:', {
-      fullDate: now,
-      iso: now.toISOString(),
-      dateString: now.toDateString(),
-      localDate: now.toLocaleDateString()
-    });
-    
-    // Save each exercise's completed sets to history
-    for (let exerciseIndex = 0; exerciseIndex < dynamicExercises.length; exerciseIndex++) {
-      const exercise = dynamicExercises[exerciseIndex];
-      const setsData = allSetsData[exerciseIndex] || [];
-      const completedSets = setsData.filter(set => set.completed);
-      
-      if (completedSets.length > 0) {
-        console.log(`Saving exercise ${exercise.exercise} with ${completedSets.length} completed sets`);
-        // Get the current exercise name (primary or alternative)
-        const alternativeNames = (exercise.alternatives || []).map(alt => 
-          typeof alt === 'string' ? alt : alt.exercise
-        );
-        const allExercises = [exercise.exercise, ...alternativeNames];
-        const selectedIndex = setsData[0]?.selectedExerciseIndex || 0;
-        const currentExerciseName = allExercises[selectedIndex] || exercise.exercise;
-        
-        const historyEntry: WorkoutHistory = {
-          id: `${currentDate}-${exerciseIndex}-${Date.now()}`,
-          routineName: `${blockName}`,
-          dayName: day?.day_name || '',
-          exerciseName: currentExerciseName,
-          date: currentDate,
-          sets: completedSets.map(set => ({
-            setNumber: set.setNumber,
-            weight: set.weight,
-            reps: set.reps,
-            completed: set.completed,
-          })),
-        };
-        
-        console.log('Saving workout entry with date:', currentDate, 'for exercise:', currentExerciseName);
-        await WorkoutStorage.addWorkoutEntry(historyEntry);
-      } else {
-        console.log(`Skipping exercise ${exercise.exercise} - no completed sets`);
-      }
-    }
-  };
-  
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
-  const handleHistoryPress = async (exerciseName: string) => {
+  // Handler functions for buttons
+  const handleHistoryPress = async (exerciseIndex: number) => {
+    const exercise = exercises[exerciseIndex];
+    const exerciseName = exercise.exercise || exercise.name || 'Exercise';
     const history = await WorkoutStorage.getExerciseHistory(exerciseName);
     setExerciseHistory(history);
     setShowHistory(exerciseName);
   };
 
-  const handleNotesPress = (exerciseIndex: number, exerciseName: string) => {
+  const handleNotesPress = (exerciseIndex: number) => {
+    const exercise = exercises[exerciseIndex];
+    const exerciseName = exercise.exercise || exercise.name || 'Exercise';
     setShowNotes({ exerciseName, exerciseIndex });
+  };
+
+  const handleExerciseSettings = (exerciseIndex: number) => {
+    setExerciseInSettings(exerciseInSettings === exerciseIndex ? null : exerciseIndex);
   };
 
   const handleNotesUpdate = (exerciseIndex: number, notes: string) => {
@@ -2478,238 +457,61 @@ export default function WorkoutLogScreen() {
     }));
   };
 
-  const toggleSupersetLink = (exerciseIndex: number) => {
-    setSupersetLinks(prev => {
-      const newLinks = new Set(prev);
-      if (newLinks.has(exerciseIndex)) {
-        newLinks.delete(exerciseIndex);
-      } else {
-        newLinks.add(exerciseIndex);
-      }
-      return newLinks;
+  // Compute progress per exercise (used in mini cards)
+  const exerciseProgress = useMemo(() => {
+    return exercises.map((_, idx) => {
+      const sets = allSetsData[idx] || [];
+      const completed = sets.filter((s) => s.completed).length;
+      return { completed, total: sets.length };
     });
-  };
+  }, [exercises, allSetsData]);
 
-  // Auto-save workout progress
-  const saveWorkoutProgress = async () => {
-    const progressData = {
-      day,
-      blockName,
-      allSetsData,
-      exerciseNotes,
-      workoutStartTime,
-      workoutDuration,
-      timestamp: Date.now(),
-    };
-    console.log('💾 SAVING: Saving workout progress with data:', {
-      hasDay: !!progressData.day,
-      blockName: progressData.blockName,
-      setsDataLength: progressData.allSetsData.length,
-      workoutStartTime: progressData.workoutStartTime ? progressData.workoutStartTime.toISOString() : 'null',
-      workoutDuration: progressData.workoutDuration
-    });
-    await WorkoutStorage.saveCurrentWorkout(progressData);
-    console.log('💾 SAVING: Save completed');
-  };
+  // ── Render ────────────────────────────────────────────────────────
 
-  // Auto-save when sets data, notes, or workout state changes
-  useEffect(() => {
-    console.log('💾 AUTO-SAVE: Effect triggered. allSetsData.length =', allSetsData.length);
-    console.log('💾 AUTO-SAVE: workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
-    console.log('💾 AUTO-SAVE: workoutDuration =', workoutDuration);
-    console.log('💾 AUTO-SAVE: dataLoaded =', dataLoaded);
-    console.log('💾 AUTO-SAVE: isFinishingWorkout =', isFinishingWorkout);
-    
-    // Skip auto-save when finishing workout to prevent race condition with completion saving
-    if (isFinishingWorkout) {
-      console.log('💾 AUTO-SAVE: Skipping save - workout is being finished');
-      return;
-    }
-    
-    // Only save if we have sets data AND data loading is complete
-    // This prevents overwriting good data during component remount
-    if (allSetsData.length > 0 && dataLoaded) {
-      console.log('💾 AUTO-SAVE: Triggering saveWorkoutProgress...');
-      saveWorkoutProgress();
-    } else {
-      console.log('💾 AUTO-SAVE: Skipping save - either no sets data or data not yet loaded');
-    }
-  }, [allSetsData, exerciseNotes, workoutStartTime, workoutDuration, dataLoaded, isFinishingWorkout]);
+  if (!currentExercise) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No exercise loaded</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  // No cleanup needed - timer is based on workoutStartTime
-
-  // Load saved progress and timer settings on mount
-  useEffect(() => {
-    const loadSavedData = async () => {
-      console.log('💾 DATA LOADING: Starting loadSavedData...');
-      
-      // Load exercise preferences
-      console.log('💾 DATA LOADING: Loading exercise preferences...');
-      await loadExercisePreferences();
-      
-      // Load workout progress
-      console.log('💾 DATA LOADING: Loading workout progress for:', day?.day_name, blockName);
-      const savedWorkout = await WorkoutStorage.loadCurrentWorkout(day?.day_name || '', blockName);
-      console.log('💾 DATA LOADING: Saved workout data:', savedWorkout);
-      
-      if (savedWorkout && 
-          savedWorkout.day?.day_name === day?.day_name && 
-          savedWorkout.blockName === blockName) {
-        console.log('💾 DATA LOADING: Found matching saved workout, restoring data...');
-        console.log('💾 DATA LOADING: Saved workout start time:', savedWorkout.workoutStartTime);
-        
-        // Restore saved workout data
-        setAllSetsData(savedWorkout.allSetsData);
-        if (savedWorkout.exerciseNotes) {
-          setExerciseNotes(savedWorkout.exerciseNotes);
-        }
-        
-        // Restore workout timer state if it was active
-        if (savedWorkout.workoutStartTime) {
-          console.log('💾 DATA LOADING: Restoring workout timer with start time:', savedWorkout.workoutStartTime);
-          const startTime = new Date(savedWorkout.workoutStartTime);
-          console.log('💾 DATA LOADING: Parsed start time:', startTime.toISOString());
-          setWorkoutStartTime(startTime);
-          
-          // Duration will be automatically calculated by the useEffect based on start time
-          // Context will be updated by useEffect below
-        }
-        
-        // Timer restoration is now handled by global context
-      } else {
-        console.log('💾 DATA LOADING: No saved workout start time found');
-          
-          // Check if there's an active workout context for this screen that has a timer
-          if (activeWorkout) {
-            const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
-                                         activeWorkout.routeParams?.blockName === blockName;
-            const contextHasTimer = activeWorkout.duration > 0;
-            
-            console.log('💾 DATA LOADING: Checking active workout context for timer restoration');
-            console.log('💾 DATA LOADING: Current workout matches active workout?', currentWorkoutMatches);
-            console.log('💾 DATA LOADING: Context has timer (duration > 0)?', contextHasTimer);
-            
-            if (currentWorkoutMatches && contextHasTimer) {
-              // Calculate what the start time should be based on current duration
-              const estimatedStartTime = new Date(Date.now() - (activeWorkout.duration * 1000));
-              console.log('💾 DATA LOADING: Restoring timer from context. Estimated start time:', estimatedStartTime.toISOString());
-              setWorkoutStartTime(estimatedStartTime);
-            }
-          }
-        }
-      
-      // Load timer settings
-      console.log('💾 DATA LOADING: Loading timer settings...');
-      const settings = await TimerNotifications.loadSettings();
-      setTimerSettings(settings);
-      
-      // Mark data loading as complete
-      console.log('💾 DATA LOADING: Data loading complete, setting dataLoaded = true');
-      setDataLoaded(true);
-    };
-    
-    console.log('💾 DATA LOADING: useEffect triggered, calling loadSavedData...');
-    loadSavedData();
-  }, []);
-
-  // Restore timer from active workout context when navigating back to active workout
-  useEffect(() => {
-    // Only try to restore if data is loaded, we don't have a timer, but context has a timer
-    if (dataLoaded && !workoutStartTime && activeWorkout) {
-      const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
-                                   activeWorkout.routeParams?.blockName === blockName;
-      const contextHasTimer = activeWorkout.duration > 0;
-      
-      console.log('🔄 TIMER RESTORATION: Checking if timer should be restored from context');
-      console.log('🔄 TIMER RESTORATION: Data loaded?', dataLoaded, 'No local timer?', !workoutStartTime);
-      console.log('🔄 TIMER RESTORATION: Current workout matches active workout?', currentWorkoutMatches);
-      console.log('🔄 TIMER RESTORATION: Context has timer (duration > 0)?', contextHasTimer);
-      
-      if (currentWorkoutMatches && contextHasTimer) {
-        // Calculate what the start time should be based on current duration
-        const estimatedStartTime = new Date(Date.now() - (activeWorkout.duration * 1000));
-        console.log('🔄 TIMER RESTORATION: Restoring timer! Estimated start time:', estimatedStartTime.toISOString());
-        setWorkoutStartTime(estimatedStartTime);
-      }
-    }
-  }, [dataLoaded, workoutStartTime, activeWorkout, day?.day_name, blockName]);
-
-  // Clear stale active workout only if it belongs to this screen and has no timer
-  useEffect(() => {
-    console.log('🧹 CLEANUP CHECK: dataLoaded =', dataLoaded, 'workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
-    
-    if (dataLoaded && !workoutStartTime) {
-      // Only clear active workout if it belongs to this specific workout screen
-      const currentWorkoutMatches = activeWorkout && 
-        activeWorkout.routeParams?.day?.day_name === day?.day_name &&
-        activeWorkout.routeParams?.blockName === blockName;
-        
-      console.log('🧹 CLEANUP: Active workout day/block:', activeWorkout?.routeParams?.day?.day_name, '/', activeWorkout?.routeParams?.blockName);
-      console.log('🧹 CLEANUP: Current screen day/block:', day?.day_name, '/', blockName);
-      console.log('🧹 CLEANUP: Current workout matches?', currentWorkoutMatches);
-        
-      if (currentWorkoutMatches) {
-        // Check if the active workout context indicates there should be a timer (duration > 0)
-        // If so, don't clear it - the timer will be restored when saved data loads
-        const contextHasTimer = activeWorkout.duration > 0;
-        console.log('🧹 CLEANUP: Context has active timer (duration > 0)?', contextHasTimer);
-        
-        if (!contextHasTimer) {
-          console.log('🧹 CLEANUP: No active timer in context for THIS workout, clearing active workout');
-          setActiveWorkout(null);
-        } else {
-          console.log('🧹 CLEANUP: Active workout has timer in context, keeping it (timer will be restored)');
-        }
-      } else {
-        console.log('🧹 CLEANUP: No timer for this workout, but active workout belongs to different workout - keeping it');
-      }
-    } else if (dataLoaded && workoutStartTime) {
-      console.log('🧹 CLEANUP: Active workout found after loading, keeping it');
-    } else {
-      console.log('🧹 CLEANUP: Data not yet loaded, waiting...');
-    }
-  }, [dataLoaded, workoutStartTime, day?.day_name, blockName, activeWorkout]);
-
-  // Update active workout context when workout timer state changes
-  useEffect(() => {
-    console.log('🎯 CONTEXT UPDATE: workoutStartTime =', workoutStartTime ? workoutStartTime.toISOString() : 'null');
-    console.log('🎯 CONTEXT UPDATE: workoutDuration =', workoutDuration);
-    
-    if (workoutStartTime) {
-      console.log('🎯 CONTEXT UPDATE: Setting active workout context');
-      const contextData = {
-        dayName: day?.day_name || '',
-        blockName,
-        duration: workoutDuration,
-        routeParams: { day, blockName, currentWeek, block, routineName }
-      };
-      console.log('🎯 CONTEXT UPDATE: Context data:', contextData);
-      setActiveWorkout(contextData);
-    } else {
-      console.log('🎯 CONTEXT UPDATE: No workout start time, not setting context');
-    }
-    // Don't clear the active workout when workoutStartTime is null
-    // Only clear it when explicitly finishing the workout
-  }, [workoutStartTime, workoutDuration, day?.day_name, blockName]);
+  const exKey = `${currentExercise.exercise || currentExercise.name || ''}-${themeColor}`;
+  const exImage = imageCache[exKey];
+  const exImageLoading = imageLoading[exKey];
   
+  
+  // Debug logs for image rendering
+  console.log('🔴 COLOR CHANGE DEBUG: ===== RENDER PHASE =====');
+  console.log('🔴 COLOR CHANGE DEBUG: Current themeColor in render:', themeColor);
+  console.log('🔴 COLOR CHANGE DEBUG: Exercise key for image lookup:', exKey);
+  console.log('🔴 COLOR CHANGE DEBUG: Image cache state:', imageCache);
+  console.log('🔴 COLOR CHANGE DEBUG: Image loading state:', imageLoading);
+  console.log('🔴 COLOR CHANGE DEBUG: Current image for', exKey, ':', exImage);
+  console.log('🔴 COLOR CHANGE DEBUG: Currently loading for', exKey, ':', exImageLoading);
+  console.log('🔴 COLOR CHANGE DEBUG: Will show image?', !!exImage);
+  console.log('🔴 COLOR CHANGE DEBUG: Will show loading?', !!exImageLoading);
+
   // History view for a specific exercise
   if (showHistory) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.root}>
         <View style={styles.header}>
           <TouchableOpacity 
-            style={styles.backButton} 
+            style={styles.headerBtn} 
             onPress={() => setShowHistory(null)}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+            <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.title}>{showHistory} History</Text>
-          <View style={styles.finishButton} />
+          <Text style={styles.headerTitle}>{showHistory} History</Text>
+          <View style={styles.headerBtn} />
         </View>
         
         <ScrollView
-          style={styles.scrollView}
+          style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -2717,51 +519,26 @@ export default function WorkoutLogScreen() {
             <Text style={styles.historyTitle}>Previous Workouts</Text>
             
             {exerciseHistory.length === 0 ? (
-              <View style={styles.emptyHistoryState}>
-                <Text style={styles.emptyHistoryText}>No previous workouts</Text>
-                <Text style={styles.emptyHistorySubtext}>
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No previous workouts</Text>
+                <Text style={styles.emptyText}>
                   Your workout history will appear here after you complete sets
                 </Text>
               </View>
             ) : (
               exerciseHistory.map((workout, index) => (
-                <View key={workout.id} style={styles.historyWorkout}>
+                <View key={workout.id} style={styles.historyEntry}>
                   <Text style={styles.historyDate}>
                     {new Date(workout.date).toLocaleDateString()} • {workout.dayName}
                   </Text>
                   {workout.sets.map((set, setIndex) => (
-                    <View key={setIndex}>
-                      <View style={styles.historySet}>
-                        <Text style={styles.historySetNumber}>
-                          {set.setNumber}
-                        </Text>
-                        <Text style={styles.historySetData}>
-                          {set.weight}{set.unit || globalUnit} × {set.reps}
-                          {set.reps > 1 && (
-                            <Text style={styles.oneRMText}> (~{calculate1RM(parseFloat(set.weight) || 0, parseInt(set.reps) || 0)}{set.unit || globalUnit} 1RM)</Text>
-                          )}
-                          {set.drops && set.drops.length > 0 && (
-                            <Text style={[styles.dropIndicator, { color: themeColor }]}> + {set.drops.length} drops</Text>
-                          )}
-                        </Text>
-                      </View>
-                      {set.drops && set.drops.length > 0 && (
-                        <View style={styles.historyDropSets}>
-                          {set.drops.map((drop, dropIndex) => (
-                            <View key={dropIndex} style={styles.historyDropSet}>
-                              <Text style={styles.historyDropLabel}>
-                                Drop {dropIndex + 1}
-                              </Text>
-                              <Text style={styles.historyDropData}>
-                                {drop.weight}{drop.unit || globalUnit} × {drop.reps}
-                                {drop.reps > 1 && (
-                                  <Text style={styles.oneRMText}> (~{calculate1RM(parseFloat(drop.weight) || 0, parseInt(drop.reps) || 0)}{drop.unit || globalUnit} 1RM)</Text>
-                                )}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
+                    <View key={setIndex} style={styles.historySet}>
+                      <Text style={styles.historySetNumber}>
+                        {set.setNumber}
+                      </Text>
+                      <Text style={styles.historyDetails}>
+                        {set.weight}{globalUnit} × {set.reps}
+                      </Text>
                     </View>
                   ))}
                 </View>
@@ -2773,2621 +550,1001 @@ export default function WorkoutLogScreen() {
     );
   }
 
+  // Show old workout view from Git history
+  if (showOldView) {
+    return <WorkoutLogScreenOld />;
+  }
+
   // Notes view for a specific exercise
   if (showNotes) {
-    const exerciseIndex = showNotes.exerciseIndex;
-    const exercise = dynamicExercises[exerciseIndex];
-    const targetReps = exercise.reps || '';
-    const targetSets = exercise.sets || 0;
-    
+    const exercise = exercises[showNotes.exerciseIndex];
     
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.root}>
         <View style={styles.header}>
           <TouchableOpacity 
-            style={styles.backButton} 
+            style={styles.headerBtn} 
             onPress={() => setShowNotes(null)}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+            <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.title}>{showNotes.exerciseName}</Text>
-          <View style={styles.finishButton} />
+          <Text style={styles.headerTitle}>{showNotes.exerciseName}</Text>
+          <View style={styles.headerBtn} />
         </View>
         
-        <KeyboardAvoidingView 
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.notesModalContainer}>
+          <View style={styles.historyContainer}>
+            <Text style={styles.historyTitle}>Exercise Notes</Text>
+            
+            <View style={styles.notesContainer}>
+              <TextInput
+                style={styles.notesInput}
+                value={exerciseNotes[showNotes.exerciseIndex] || ''}
+                onChangeText={(text) => handleNotesUpdate(showNotes.exerciseIndex, text)}
+                placeholder="Add your notes here..."
+                placeholderTextColor="#666"
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
 
-              {/* Rep Scheme Section - only show when reps tab is active */}
-              {activeTab === 'reps' && (
-                <View style={styles.repSchemeCard}>
-                <View style={styles.repSchemeTitleContainer}>
-                  <Ionicons name="analytics-outline" size={24} color="#ffffff" />
-                  <Text style={styles.repSchemeLabel}>Target Rep Scheme</Text>
-                </View>
-                <View style={styles.repSchemeInfo}>
-                  {(() => {
-                    const exercise = dynamicExercises[showNotes.exerciseIndex];
-                    const hasWeeklyReps = exercise.reps_weekly && Object.keys(exercise.reps_weekly).length > 0;
-                    
-                    // If exercise has weekly progression, show weekly format
-                    if (hasWeeklyReps) {
-                      return (
-                        <View style={styles.weeklyScheme}>
-                          {Object.entries(exercise.reps_weekly).map(([week, reps]) => (
-                            <TouchableOpacity 
-                              key={week} 
-                              style={[
-                                styles.weekBlock,
-                                parseInt(week) === currentWeek && [styles.activeWeekBlock, { backgroundColor: themeColor }]
-                              ]}
-                              onLongPress={() => {
-                                // Store exercise index before closing notes view
-                                const exerciseIndex = showNotes.exerciseIndex;
-                                setShowNotes(null);
-                                setTimeout(() => {
-                                  setEditingRepScheme({
-                                    exerciseIndex: exerciseIndex,
-                                    week: week,
-                                    currentReps: reps.replace(/\s*\(.*?\)/, '')
-                                  });
-                                }, 100);
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={[
-                                styles.weekLabel,
-                                parseInt(week) === currentWeek && styles.activeWeekLabel
-                              ]}>Week {week}</Text>
-                              <Text style={[
-                                styles.weekReps,
-                                { color: themeColor },
-                                parseInt(week) === currentWeek && styles.activeWeekReps
-                              ]}>{reps.replace(/\s*\(.*?\)/, '')}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      );
-                    }
-                    
-                    // Fallback to original parsing for non-weekly exercises
-                    const scheme = parseRepScheme(targetRepsString);
-                    
-                    if (scheme.type === 'weekly') {
-                      return (
-                        <View style={styles.weeklyScheme}>
-                          {scheme.values.map((reps, index) => (
-                            <View key={index} style={styles.weekBlock}>
-                              <Text style={styles.weekLabel}>Week {index + 1}</Text>
-                              <Text style={[styles.weekReps, { color: themeColor }]}>{reps}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    } else if (scheme.type === 'pyramid') {
-                      return (
-                        <View style={styles.pyramidScheme}>
-                          {scheme.values.map((reps, index) => (
-                            <View key={index} style={styles.setBlock}>
-                              <Text style={styles.setLabel}>Set {index + 1}</Text>
-                              <Text style={[styles.setReps, { color: themeColor }]}>{reps}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    } else {
-                      return (
-                        <View style={styles.straightScheme}>
-                          <Text style={[styles.repSchemeText, { color: themeColor }]}>{targetRepsString}</Text>
-                          <View style={styles.repeatIndicator}>
-                            <Ionicons name="repeat" size={16} color="#71717a" />
-                            <Text style={styles.repeatText}>× {targetSets} sets</Text>
-                          </View>
-                        </View>
-                      );
-                    }
-                  })()}
-                </View>
-              </View>
-              )}
-
-              {/* RIR Scheme Section - only show when reps tab is active */}
-              {activeTab === 'reps' && (
-                <View style={styles.repSchemeCard}>
-                <View style={styles.repSchemeTitleContainer}>
-                  <Ionicons name="speedometer-outline" size={24} color="#ffffff" />
-                  <Text style={styles.repSchemeLabel}>Target RIR Scheme</Text>
-                </View>
-                <View style={styles.repSchemeInfo}>
-                  {(() => {
-                    const exercise = dynamicExercises[showNotes.exerciseIndex];
-                    const hasWeeklyRIR = exercise.rir_weekly && Object.keys(exercise.rir_weekly).length > 0;
-                    
-                    // If exercise has weekly RIR progression, show weekly format
-                    if (hasWeeklyRIR) {
-                      return (
-                        <View style={styles.weeklyScheme}>
-                          {Object.entries(exercise.rir_weekly).map(([week, rir]) => (
-                            <View 
-                              key={week} 
-                              style={[
-                                styles.weekBlock,
-                                parseInt(week) === currentWeek && [styles.activeWeekBlock, { backgroundColor: themeColor }]
-                              ]}
-                            >
-                              <Text style={[
-                                styles.weekLabel,
-                                parseInt(week) === currentWeek && styles.activeWeekLabel
-                              ]}>Week {week}</Text>
-                              <Text style={[
-                                styles.weekReps,
-                                { color: themeColor },
-                                parseInt(week) === currentWeek && styles.activeWeekReps
-                              ]}>{String(rir)}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    } else {
-                      // Fallback when no RIR weekly data is available
-                      return (
-                        <View style={styles.fallbackContainer}>
-                          <Text style={styles.fallbackText}>No RIR targets specified for this exercise</Text>
-                        </View>
-                      );
-                    }
-                  })()}
-                </View>
-              </View>
-              )}
-
-              {/* Bottom spacing for reps tab */}
-              {activeTab === 'reps' && (
-                <View style={styles.bottomSpacer} />
-              )}
-
-              {/* Notes Content */}
-              {activeTab === 'notes' && (
-                <View style={styles.notesContainer}>
-                  {/* Add Note Input */}
-                  <View style={styles.addNoteContainer}>
-                    <TextInput
-                      style={styles.addNoteInput}
-                      value={currentNote}
-                      onChangeText={setCurrentNote}
-                      placeholder="Add a note (e.g., Week 1: used 50kg, felt easy, good form)"
-                      placeholderTextColor="#52525b"
-                      onSubmitEditing={() => {
-                        if (currentNote.trim()) {
-                          const now = new Date();
-                          const dateString = now.toLocaleDateString();
-                          const noteWithDate = {
-                            text: currentNote.trim(),
-                            date: dateString,
-                            timestamp: now.getTime()
-                          };
-                          setPersonalNotes(prev => [noteWithDate, ...prev]);
-                          setCurrentNote('');
-                        }
-                      }}
-                      returnKeyType="done"
-                      autoFocus={activeTab === 'notes'}
-                    />
-                    <TouchableOpacity
-                      style={[styles.addNoteButton, { backgroundColor: themeColor }]}
-                      onPress={() => {
-                        if (currentNote.trim()) {
-                          const now = new Date();
-                          const dateString = now.toLocaleDateString();
-                          const noteWithDate = {
-                            text: currentNote.trim(),
-                            date: dateString,
-                            timestamp: now.getTime()
-                          };
-                          setPersonalNotes(prev => [noteWithDate, ...prev]);
-                          setCurrentNote('');
-                        }
-                      }}
-                    >
-                      <Ionicons name="add" size={20} color="#000000" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Separator */}
-                  <View style={styles.notesSeparator} />
-
-                  {/* Notes List */}
-                  <View style={styles.notesList}>
-                    {personalNotes.map((note, index) => (
-                      <View key={index} style={styles.noteItem}>
-                        <View style={styles.noteContent}>
-                          <Text style={styles.noteDate}>{typeof note === 'string' ? 'Today' : note.date}</Text>
-                          <Text style={styles.noteText}>{typeof note === 'string' ? note : note.text}</Text>
-                        </View>
-                        <TouchableOpacity
-                          style={styles.deleteNoteButton}
-                          onPress={() => setPersonalNotes(prev => prev.filter((_, i) => i !== index))}
-                        >
-                          <Ionicons name="close" size={18} color="#71717a" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                </View>
+            <Text style={styles.historyTitle}>Exercise Details</Text>
+            <View style={styles.historyEntry}>
+              <Text style={styles.historyDetails}>
+                Target: {exercise.sets} sets × {exercise.reps} reps
+              </Text>
+              {exercise.rest && (
+                <Text style={styles.historyDetails}>
+                  Rest: {exercise.rest}
+                </Text>
               )}
             </View>
-          </ScrollView>
-          
-          {/* Bottom Navigation */}
-          <View style={styles.bottomNavigation}>
-            <TouchableOpacity
-              style={styles.navButton}
-              onPress={() => setActiveTab('reps')}
-            >
-              <Ionicons 
-                name={activeTab === 'reps' ? 'barbell' : 'barbell-outline'}
-                size={24} 
-                color={activeTab === 'reps' ? '#ffffff' : '#71717a'} 
-              />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.navButton}
-              onPress={() => setActiveTab('notes')}
-            >
-              <Ionicons 
-                name={activeTab === 'notes' ? 'document-text' : 'document-text-outline'}
-                size={24} 
-                color={activeTab === 'notes' ? '#ffffff' : '#71717a'} 
-              />
-            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.backButton} 
-              onPress={handleBack}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={24} color="#ffffff" />
-            </TouchableOpacity>
-            <View style={styles.titleContainer}>
-              <Text style={styles.title}>{day?.day_name || 'Workout'}</Text>
-              {(() => {
-                // Parse the block weeks to get total week count
-                const weeksRange = block?.weeks || '1-4';
-                const totalWeeks = weeksRange.includes('-') 
-                  ? parseInt(weeksRange.split('-')[1]) - parseInt(weeksRange.split('-')[0]) + 1
-                  : 1;
-                
-                // Check if current week is a deload week
-                const isDeloadWeek = block?.deload_weeks?.includes(currentWeek) || false;
-                const weekDisplay = `WEEK ${currentWeek} / ${totalWeeks}`;
-                const deloadLabel = isDeloadWeek ? ' — DELOAD' : '';
-                
-                return (
-                  <Text style={[styles.weekLabel, { color: themeColor }]}>
-                    {weekDisplay}
-                    {isDeloadWeek && <Text style={[styles.deloadLabel, { color: themeColor }]}>{deloadLabel}</Text>}
-                  </Text>
-                );
-              })()}
-              {workoutStartTime && (
-                <Text style={[styles.workoutDuration, { color: themeColor }]}>{formatDuration(workoutDuration)}</Text>
-              )}
-            </View>
-            <View style={styles.headerButtons}>
-              {/* Deload Info Button */}
-          {block?.deload_weeks?.includes(currentWeek) && (
-            <TouchableOpacity 
-              style={[styles.deloadHeaderButton, { borderColor: themeColor }]}
-              onPress={() => {
-                const deloadGuidance = block?.deload_guidance;
-                const previousWeek = currentWeek - 1;
-                
-                let message = '';
-                if (deloadGuidance) {
-                  message = `Use ${deloadGuidance.weight_percentage}% of your Week ${previousWeek} weight.\n\nRep Range: ${deloadGuidance.rep_range}\n\n${deloadGuidance.notes}`;
-                } else {
-                  // Fallback to generic advice if no deload_guidance is provided
-                  message = `Use 40-60% of your Week ${previousWeek} weight (50% is most common).\n\nExample: If you used 100kg for ${previousWeek === 3 ? '6-8' : 'your'} reps in Week ${previousWeek}, use 50kg for 12 reps this week.`;
-                }
-                
-                Alert.alert(
-                  'Deload Week Info',
-                  message,
-                  [{ text: 'OK' }]
-                );
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="information-circle-outline" size={20} color={themeColor} />
-            </TouchableOpacity>
-          )}
-          
-          
-          <Animated.View style={{ transform: [{ translateX: shakeAnimation }] }}>
-            <TouchableOpacity 
-              style={styles.finishButton}
-              onPress={workoutStartTime ? handleFinishWorkout : handleStartWorkout}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.finishButtonText, { color: themeColor }]}>
-                {workoutStartTime ? 'Finish' : 'Start'}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </View>
+    <>
+    <GestureDetector gesture={swipeGesture}>
+      <View style={styles.root}>
 
-          {/* Daily Volume Overview */}
-          <TouchableOpacity 
-            style={styles.volumeToggle}
-            onPress={() => setShowDailyVolume(!showDailyVolume)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.volumeToggleContent}>
-              <Ionicons name="barbell-outline" size={16} color={themeColor} />
-              <Text style={[styles.volumeToggleText, { color: themeColor }]}>
-                Today's Volume
-              </Text>
-              <Ionicons 
-                name={showDailyVolume ? "chevron-up" : "chevron-down"} 
-                size={16} 
-                color={themeColor} 
-              />
-            </View>
-          </TouchableOpacity>
-          
-          
-          {showDailyVolume && (
-            <View style={styles.volumeOverview}>
-              {(() => {
-                const dailyVolume = calculateDailyVolume(day);
-                console.log('🏋️ Daily Volume Calculation:', dailyVolume);
-                const sortedMuscles = Object.entries(dailyVolume)
-                  .sort(([,a], [,b]) => b - a) // Sort by volume descending
-                  .filter(([,sets]) => sets > 0); // Show all muscle groups with volume
-                
-                if (sortedMuscles.length === 0) {
-                  return (
-                    <Text style={styles.volumeEmptyText}>
-                      No exercises found for volume calculation
-                    </Text>
-                  );
-                }
-                
-                const maxVolume = Math.max(...sortedMuscles.map(([,sets]) => sets));
-                const muscleHighlighterData = getMuscleHighlighterData(dailyVolume);
-                
+      {/* ── SCROLLABLE CONTENT ──────────────────────────── */}
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── SCROLLABLE IMAGE ──────────────────────── */}
+        <View style={styles.imageContainer}>
+          {/* Full screen media */}
+          <View style={styles.fullScreenMediaContainer}>
+            {(() => {
+              if (exImage) {
                 return (
-                  <View style={styles.volumeContent}>
-                    {/* Body Diagram */}
-                    <View style={styles.bodyDiagramContainer}>
-                      <View style={styles.bodyDiagramHeader}>
-                        <Text style={styles.bodyDiagramTitle}>Today's Training Heatmap</Text>
-                        
-                        {/* Small Flip Icon */}
-                        <TouchableOpacity 
-                          style={styles.bodyFlipIcon}
-                          onPress={() => setBodyViewSide(bodyViewSide === 'front' ? 'back' : 'front')}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons 
-                            name="sync-outline" 
-                            size={20} 
-                            color={themeColor} 
-                          />
-                        </TouchableOpacity>
-                      </View>
-                      
-                      <BodyHighlighter
-                        data={muscleHighlighterData}
-                        colors={[themeColor, '#ff6b9d']}
-                        side={bodyViewSide}
-                        scale={0.9}
-                        border="#27272a"
-                      />
-                    </View>
-                    
-                    {/* Detailed Breakdown */}
-                    <View style={styles.volumeGrid}>
-                    {sortedMuscles.map(([muscle, sets]) => {
-                      const intensity = Math.max(0.2, sets / maxVolume); // Min 20% opacity
-                      return (
-                        <View key={muscle} style={styles.volumeItem}>
-                          <View 
-                            style={[
-                              styles.volumeBar, 
-                              { 
-                                backgroundColor: `${themeColor}${Math.round(intensity * 255).toString(16).padStart(2, '0')}`,
-                                borderColor: themeColor,
-                              }
-                            ]} 
-                          />
-                          <Text style={styles.volumeNumber}>{sets}</Text>
-                          <Text style={styles.volumeMuscle} numberOfLines={1}>
-                            {muscle.charAt(0).toUpperCase() + muscle.slice(1)}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                  </View>
-                );
-              })()}
-            </View>
-          )}
-          
-          {/* Exercise content */}
-          {dynamicExercises.map((exercise: Exercise, index: number) => (
-            <React.Fragment key={index}>
-              <View style={index === 0 ? { marginTop: 24 } : {}}>
-                <ExerciseCard
-                  exercise={exercise}
-                  exerciseIndex={index}
-                currentWeek={currentWeek}
-                setsData={allSetsData[index] || []}
-                notes={exerciseNotes[index] || ''}
-                workoutStarted={!!workoutStartTime}
-                onSetUpdate={handleSetUpdate}
-                onSetComplete={handleSetComplete}
-                onDropSetComplete={handleDropSetComplete}
-                onDeleteSet={handleDeleteSet}
-                onAddSet={handleAddSet}
-                onDeleteExercise={handleDeleteExercise}
-                onExerciseSettings={handleExerciseSettings}
-                onHistoryPress={handleHistoryPress}
-                getExerciseUnit={getExerciseUnit}
-                setExerciseUnit={setExerciseUnit}
-                isInSettings={exerciseInSettings === index}
-                onExerciseSelect={handleExerciseSelect}
-                onNotesPress={handleNotesPress}
-                onSetExercisePreference={handleSetExercisePreference}
-                exercisePreferences={exercisePreferences}
-                onInteractionAttempt={handleInteractionAttempt}
-                isLinkedToNext={supersetLinks.has(index)}
-                isLinkedToPrev={supersetLinks.has(index - 1)}
-                themeColor={themeColor}
-                setGlobalUnit={setGlobalUnit}
-              />
-              
-              {/* Superset linking button between exercises */}
-              {index < dynamicExercises.length - 1 && (
-                <View style={styles.supersetLinkContainer}>
-                  <SupersetLinkButton 
-                    isActive={supersetLinks.has(index)}
-                    themeColor={themeColor}
-                    onPress={() => toggleSupersetLink(index)}
+                  <Image
+                    key={exKey}
+                    source={typeof exImage === 'string' ? { uri: exImage } : exImage}
+                    style={styles.fullScreenImage}
+                    resizeMode="cover"
+                    onLoad={() => console.log('🖼️ MEDIA RENDER: Image loaded successfully')}
+                    onError={(error) => console.log('🖼️ MEDIA RENDER: Image load error:', error)}
                   />
-                  <SupersetLabel isActive={supersetLinks.has(index)} themeColor={themeColor} />
-                </View>
-              )}
-              </View>
-            </React.Fragment>
-          ))}
-          
-          {/* Add Exercise Button */}
-          <TouchableOpacity 
-            style={[styles.addExerciseButton, { borderColor: themeColor }]}
-            onPress={() => {
-              navigation.navigate('AddExercise' as any, {
-                programId: route.params.programId,
-                weekId: route.params.weekId,
-                dayId: route.params.dayId,
-                workoutStarted: !!workoutStartTime
-              });
-            }}
-          >
-            <Ionicons name="add-circle-outline" size={24} color={themeColor} />
-            <Text style={[styles.addExerciseText, { color: themeColor }]}>Add Exercise</Text>
-          </TouchableOpacity>
-          
-          {/* Bottom Finish Workout Button */}
-          {workoutStartTime && dynamicExercises.length > 0 && (
+                );
+              } else if (exImageLoading) {
+                return (
+                  <View style={styles.fullScreenPlaceholder}>
+                    <ActivityIndicator color={themeColor} size="large" />
+                  </View>
+                );
+              } else {
+                return (
+                  <View style={styles.fullScreenPlaceholder}>
+                    <Ionicons name="barbell-outline" size={60} color="#3a3a44" />
+                    <Text style={styles.mediaPlaceholderText}>No preview</Text>
+                  </View>
+                );
+              }
+            })()}
+            {/* Dark overlay for text legibility */}
+            <View style={styles.imageOverlay} />
+          </View>
+
+          {/* ── HEADER BUTTONS OVERLAID ON IMAGE ──────────────────────── */}
+          <View style={styles.overlayHeader}>
             <TouchableOpacity
-              style={[styles.bottomFinishButton, { borderColor: themeColor }]}
-              onPress={handleFinishWorkout}
-              activeOpacity={0.7}
+              onPress={onBack}
+              style={styles.overlayBtn}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Ionicons name="checkmark-circle-outline" size={24} color={themeColor} />
-              <Text style={[styles.bottomFinishButtonText, { color: themeColor }]}>
-                Finish Workout
-              </Text>
+              <Ionicons name="chevron-back" size={22} color="#fff" />
             </TouchableOpacity>
-          )}
 
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-      
-      {/* Timer Components */}
-      <TimerModal />
-      <MinimizedTimer />
+            <View style={styles.overlayHeaderActions}>
+              <TouchableOpacity
+                onPress={() => setShowOldView(true)}
+                style={styles.overlayBtn}
+              >
+                <Ionicons name="list" size={20} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleHistoryPress(currentIndex)}
+                style={styles.overlayBtn}
+              >
+                <Ionicons name="bar-chart-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleExerciseSettings(currentIndex)}
+                style={styles.overlayBtn}
+              >
+                <Ionicons name="refresh" size={20} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleNotesPress(currentIndex)}
+                style={styles.overlayBtn}
+              >
+                <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
 
-      {/* Start Workout Confirmation Modal */}
-      <Modal
-        visible={showStartModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowStartModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.newConfirmModalContainer}>
-            <View style={styles.newConfirmModalHeader}>
-              <View style={[styles.newConfirmModalIconContainer, { backgroundColor: `${themeColor}20` }]}>
-                <Ionicons name="play-circle" size={32} color={themeColor} />
-              </View>
-              <Text style={styles.newConfirmModalTitle}>Ready to Start?</Text>
-              <Text style={styles.newConfirmModalSubtitle}>
-                {day?.day_name || 'Workout'} • Week {currentWeek}
+        <Animated.View style={[styles.focusArea, { opacity: fadeAnim }]}>
+          {/* Exercise title and info */}
+          <View style={styles.titleRow}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={styles.title} numberOfLines={2}>
+                {currentExercise.exercise || currentExercise.name || 'Exercise'}
               </Text>
+              {!!(currentExercise.primaryMuscles?.length ||
+                currentExercise.secondaryMuscles?.length) && (
+                <Text style={styles.muscles}>
+                  {[
+                    ...(currentExercise.primaryMuscles || []),
+                    ...(currentExercise.secondaryMuscles || []),
+                  ].join(' · ')}
+                </Text>
+              )}
             </View>
-            
-            <View style={styles.newConfirmModalButtons}>
-              <TouchableOpacity
-                style={styles.newConfirmModalCancelButton}
-                onPress={() => setShowStartModal(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.newConfirmModalCancelText}>Not Yet</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.newConfirmModalStartButton, { backgroundColor: themeColor }]}
-                onPress={confirmStartWorkout}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="play" size={18} color="white" style={styles.newConfirmModalStartIcon} />
-                <Text style={styles.newConfirmModalStartText}>Start Workout</Text>
-              </TouchableOpacity>
-            </View>
+            <OneRMBadge
+              sets={currentSets}
+              themeColor={themeColor}
+              calculate1RM={calculate1RM}
+              unit={globalUnit}
+            />
           </View>
+
+          {/* Prescription banner (week + sets × reps + RIR) */}
+          <PrescriptionBanner
+            exercise={currentExercise}
+            currentWeek={currentWeek}
+            themeColor={themeColor}
+          />
+
+          {/* Sets table */}
+          <SetsTable
+            exerciseIndex={currentIndex}
+            sets={currentSets}
+            unit={globalUnit}
+            themeColor={themeColor}
+            onUpdate={onSetUpdate}
+            onComplete={onSetComplete}
+            onAdd={onSetAdd}
+            onRemove={onSetRemove}
+          />
+        </Animated.View>
+
+        {/* ── UPCOMING LIST ──────────────────────────────── */}
+        <View style={styles.upcomingSection}>
+          <Text style={styles.upcomingHeader}>UP NEXT</Text>
+          {exercises.map((ex, idx) => {
+            const progress = exerciseProgress[idx];
+            const isActive = idx === currentIndex;
+            return (
+              <ExerciseMiniCard
+                key={ex.id || `${ex.exercise}-${idx}`}
+                exercise={ex}
+                progress={progress}
+                themeColor={themeColor}
+                isActive={isActive}
+                onPress={() => swapFocus(idx)}
+              />
+            );
+          })}
         </View>
-      </Modal>
+      </ScrollView>
 
-      {/* Active Workout Warning Modal */}
-      <Modal
-        visible={showActiveWorkoutModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowActiveWorkoutModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.newConfirmModalContainer}>
-            <View style={styles.newConfirmModalHeader}>
-              <View style={[styles.newConfirmModalIconContainer, { backgroundColor: '#ef444415' }]}>
-                <Ionicons name="warning" size={32} color="#ef4444" />
-              </View>
-              <Text style={styles.newConfirmModalTitle}>Workout In Progress</Text>
-              <Text style={styles.newConfirmModalSubtitle}>
-                You have an active workout: {activeWorkout?.dayName}
-              </Text>
-            </View>
-            
-            <View style={styles.newConfirmModalButtons}>
-              <TouchableOpacity
-                style={styles.newConfirmModalCancelButton}
-                onPress={() => setShowActiveWorkoutModal(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.newConfirmModalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.newConfirmModalStartButton, { backgroundColor: '#ef4444' }]}
-                onPress={() => {
-                  setShowActiveWorkoutModal(false);
-                  navigate('WorkoutLog', activeWorkout!.routeParams);
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-forward" size={18} color="white" style={styles.newConfirmModalStartIcon} />
-                <Text style={styles.newConfirmModalStartText}>Go to Active</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      {/* ── BOTTOM BAR ─────────────────────────────────────────── */}
+      <View style={styles.bottomBar}>
+        <View style={styles.timerBadge}>
+          <Ionicons name="time-outline" size={16} color="#9898a4" />
+          <Text style={styles.timerText}>{formatTime(elapsedSec)}</Text>
         </View>
-      </Modal>
 
-      {/* Workout Completion Summary Modal */}
-      <Modal
-        visible={showCompletionModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowCompletionModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.completionModalContainer}>
-            <View style={[styles.completionIconContainer, { backgroundColor: themeColor + '1A' }]}>
-              <Ionicons name="fitness" size={32} color={themeColor} />
-            </View>
-            <Text style={styles.completionModalTitle}>Session Complete</Text>
-            <Text style={styles.completionModalSubtitle}>{day?.day_name || 'Workout'}</Text>
-            
-            {workoutStats && (
-              <View style={styles.summaryContainer}>
-                <View style={styles.durationContainer}>
-                  <Text style={styles.durationLabel}>Session Duration</Text>
-                  <Text style={styles.durationValue}>{workoutStats.duration}</Text>
-                </View>
-                
-                <View style={styles.volumeCard}>
-                  <Text style={styles.volumeLabel}>Total Volume</Text>
-                  <Text style={styles.volumeValue}>{workoutStats.totalVolume}</Text>
-                  <Text style={[styles.volumeUnit, { color: themeColor }]}>{globalUnit}</Text>
-                </View>
-              </View>
-            )}
-            
-            <View style={styles.completionModalButtons}>
-              <TouchableOpacity
-                style={[styles.completionModalButton, styles.completionModalContinueButton]}
-                onPress={() => setShowCompletionModal(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.completionModalContinueText}>Continue Session</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.completionModalButton, styles.completionModalFinishButton, { backgroundColor: themeColor }]}
-                onPress={() => {
-                  setShowCompletionModal(false);
-                  confirmFinishWorkout();
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.completionModalFinishText}>Save & Exit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        <TouchableOpacity
+          style={[styles.primaryBtn, { backgroundColor: themeColor }]}
+          onPress={workoutStarted ? onFinishWorkout : onStartWorkout}
+        >
+          <Text style={styles.primaryBtnText}>
+            {workoutStarted ? 'Finish Workout' : 'Start Workout'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+    </GestureDetector>
 
-
-
-    </SafeAreaView>
+    </>
   );
 }
 
+// ──────────────────────────────────────────────────────────────────
+// Sub-components
+// ──────────────────────────────────────────────────────────────────
+
+interface OneRMBadgeProps {
+  sets: SetData[];
+  themeColor: string;
+  unit: string;
+  calculate1RM: (w: number, r: number) => number;
+}
+
+function OneRMBadge({ sets, themeColor, unit, calculate1RM }: OneRMBadgeProps) {
+  // Use the heaviest completed set's 1RM
+  const oneRM = useMemo(() => {
+    let best = 0;
+    for (const s of sets) {
+      if (!s.completed) continue;
+      const w = parseFloat(s.weight);
+      const r = parseInt(s.reps, 10);
+      if (!isNaN(w) && !isNaN(r) && w > 0 && r > 0) {
+        best = Math.max(best, calculate1RM(w, r));
+      }
+    }
+    return best;
+  }, [sets, calculate1RM]);
+
+  if (oneRM <= 0) return null;
+  return (
+    <View style={styles.oneRMBadge}>
+      <Text style={styles.oneRMLabel}>1RM</Text>
+      <Text style={[styles.oneRMValue, { color: themeColor }]}>
+        {oneRM.toFixed(1)} {unit}
+      </Text>
+    </View>
+  );
+}
+
+interface PrescriptionBannerProps {
+  exercise: Exercise;
+  currentWeek: number;
+  themeColor: string;
+}
+
+function PrescriptionBanner({
+  exercise,
+  currentWeek,
+  themeColor,
+}: PrescriptionBannerProps) {
+  const reps = exercise.reps_weekly?.[String(currentWeek)] || exercise.reps;
+  const rir = exercise.rir_weekly?.[String(currentWeek)];
+
+  if (!reps && !rir) return null;
+
+  return (
+    <View style={[styles.prescription, { borderColor: hexA(themeColor, 0.25) }]}>
+      <Text style={[styles.prescriptionLabel, { color: themeColor }]}>
+        Week {currentWeek}
+      </Text>
+      <Text style={styles.prescriptionText}>
+        {exercise.sets} × {reps}
+        {rir ? ` · RIR ${rir}` : ''}
+      </Text>
+    </View>
+  );
+}
+
+interface SetsTableProps {
+  exerciseIndex: number;
+  sets: SetData[];
+  unit: string;
+  themeColor: string;
+  onUpdate: (
+    exerciseIndex: number,
+    setIndex: number,
+    field: 'weight' | 'reps',
+    value: string,
+  ) => void;
+  onComplete: (exerciseIndex: number, setIndex: number) => void;
+  onAdd: (exerciseIndex: number) => void;
+  onRemove: (exerciseIndex: number, setIndex: number) => void;
+}
+
+function SetsTable({
+  exerciseIndex,
+  sets,
+  unit,
+  themeColor,
+  onUpdate,
+  onComplete,
+  onAdd,
+  onRemove,
+}: SetsTableProps) {
+  return (
+    <View style={styles.setsTable}>
+      {/* Header row */}
+      <View style={styles.setsHeader}>
+        <Text style={[styles.setsHeaderCell, { width: 36 }]}>SET</Text>
+        <Text style={[styles.setsHeaderCell, { flex: 1 }]}>{unit.toUpperCase()}</Text>
+        <Text style={[styles.setsHeaderCell, { flex: 1 }]}>REPS</Text>
+        <Text style={[styles.setsHeaderCell, { width: 36, textAlign: 'center' }]}>
+          ✓
+        </Text>
+      </View>
+
+      {/* Rows */}
+      {sets.map((s, i) => (
+        <SetRow
+          key={i}
+          set={s}
+          index={i}
+          themeColor={themeColor}
+          onUpdate={(field, val) => onUpdate(exerciseIndex, i, field, val)}
+          onComplete={() => onComplete(exerciseIndex, i)}
+          onLongPress={() => onRemove(exerciseIndex, i)}
+        />
+      ))}
+
+      {/* Add set */}
+      <TouchableOpacity
+        style={styles.addSetBtn}
+        onPress={() => onAdd(exerciseIndex)}
+      >
+        <Ionicons name="add" size={18} color="#9898a4" />
+        <Text style={styles.addSetText}>Add set</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+interface SetRowProps {
+  set: SetData;
+  index: number;
+  themeColor: string;
+  onUpdate: (field: 'weight' | 'reps', val: string) => void;
+  onComplete: () => void;
+  onLongPress: () => void;
+}
+
+function SetRow({
+  set,
+  index,
+  themeColor,
+  onUpdate,
+  onComplete,
+  onLongPress,
+}: SetRowProps) {
+  const completed = set.completed;
+  return (
+    <Pressable onLongPress={onLongPress}>
+      <View style={[styles.setRow, completed && styles.setRowCompleted]}>
+        <Text style={[styles.setNum, { width: 36 }]}>{index + 1}</Text>
+
+        <TextInput
+          style={[styles.setInput, { flex: 1 }]}
+          value={set.weight}
+          onChangeText={(v) => onUpdate('weight', v)}
+          keyboardType="decimal-pad"
+          placeholder="0"
+          placeholderTextColor="#3a3a44"
+          editable={!completed}
+        />
+
+        <TextInput
+          style={[styles.setInput, { flex: 1 }]}
+          value={set.reps}
+          onChangeText={(v) => onUpdate('reps', v)}
+          keyboardType="number-pad"
+          placeholder="0"
+          placeholderTextColor="#3a3a44"
+          editable={!completed}
+        />
+
+        <TouchableOpacity
+          onPress={onComplete}
+          style={{ width: 36, alignItems: 'center', paddingVertical: 8 }}
+        >
+          {completed ? (
+            <Ionicons name="checkmark-circle" size={26} color={themeColor} />
+          ) : (
+            <Ionicons name="ellipse-outline" size={26} color="#3a3a44" />
+          )}
+        </TouchableOpacity>
+      </View>
+    </Pressable>
+  );
+}
+
+interface ExerciseMiniCardProps {
+  exercise: Exercise;
+  progress: { completed: number; total: number };
+  themeColor: string;
+  isActive?: boolean;
+  onPress: () => void;
+}
+
+function ExerciseMiniCard({
+  exercise,
+  progress,
+  themeColor,
+  isActive = false,
+  onPress,
+}: ExerciseMiniCardProps) {
+  const allDone = progress.total > 0 && progress.completed === progress.total;
+  return (
+    <TouchableOpacity
+      style={[
+        styles.miniCard, 
+        allDone && styles.miniCardDone,
+        isActive && styles.miniCardActive
+      ]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <View style={styles.miniIcon}>
+        <Ionicons
+          name={allDone ? 'checkmark-circle' : isActive ? 'play-circle' : 'barbell-outline'}
+          size={20}
+          color={allDone ? themeColor : isActive ? themeColor : '#9898a4'}
+        />
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <View style={styles.miniTitleRow}>
+          <Text style={[
+            styles.miniTitle, 
+            allDone && styles.miniTitleDone,
+            isActive && styles.miniTitleActive
+          ]}>
+            {exercise.exercise || exercise.name || 'Exercise'}
+          </Text>
+          {isActive && (
+            <View style={[styles.currentBadge, { backgroundColor: themeColor }]}>
+              <Text style={styles.currentBadgeText}>CURRENT</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.miniMeta}>
+          {exercise.sets} × {exercise.reps}
+          {progress.total > 0 ? `  ·  ${progress.completed}/${progress.total} done` : ''}
+        </Text>
+      </View>
+
+      {/* progress bar */}
+      <View style={styles.miniProgressTrack}>
+        <View
+          style={[
+            styles.miniProgressFill,
+            {
+              width: progress.total
+                ? `${(progress.completed / progress.total) * 100}%`
+                : '0%',
+              backgroundColor: themeColor,
+            },
+          ]}
+        />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────
+
+function formatTime(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function hexA(hex: string, alpha: number): string {
+  // Convert #RRGGBB or #RGB to rgba(r,g,b,a)
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Styles
+// ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: '#0a0a0b',
+    backgroundColor: '#000',
   },
-  errorContainer: {
+  emptyState: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    justifyContent: 'center',
   },
-  errorText: {
-    fontSize: 18,
-    color: '#ffffff',
-    textAlign: 'center',
+  emptyText: {
+    color: '#55555f',
+    fontFamily: 'DMMono-Regular',
+    fontSize: 14,
   },
-  flex: {
-    flex: 1,
-  },
+
+  // ── Header ─────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    letterSpacing: 0.5,
-    flex: 1,
-  },
-  workoutDuration: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  weekLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-    textAlign: 'center',
-    color: '#ffffff',
-  },
-  deloadLabel: {
-    fontWeight: '700',
-  },
-  deloadHeaderButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  deloadHeaderButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  deloadInfoButton: {
-    position: 'absolute',
-    bottom: 100,
-    right: 20,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    zIndex: 1000,
-  },
-  deloadInfoButtonText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  deloadInfoModal: {
-    backgroundColor: '#1f1f23',
-    borderRadius: 16,
-    padding: 24,
-    margin: 20,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  deloadInfoHeader: {
+  headerActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  deloadInfoTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#f9fafb',
-  },
-  deloadInfoClose: {
-    padding: 4,
-  },
-  deloadInfoText: {
-    fontSize: 16,
-    color: '#d1d5db',
-    lineHeight: 24,
-    marginBottom: 16,
-  },
-  deloadInfoExample: {
-    fontSize: 14,
-    color: '#9ca3af',
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     gap: 8,
   },
-  finishButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  headerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#0a0a0f',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  finishButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  scrollView: {
+
+  // ── Unified scroll layout ─────────────────────
+  scrollContainer: {
     flex: 1,
   },
   scrollContent: {
+    paddingBottom: 140, // Space for bottom bar
+  },
+  
+  // ── Focus area ─────────────────────────────────
+  focusArea: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingBottom: 8,
   },
-  exerciseCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 16,
-    marginBottom: 16,
+  mediaContainer: {
+    aspectRatio: 16/9,
+    width: '100%',
+    borderRadius: 16,
+    backgroundColor: '#0a0a0f',
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 14,
   },
-  exerciseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    minHeight: 48,
+  mediaImage: {
+    width: '100%',
+    height: '100%',
   },
-  exerciseNameSection: {
+  mediaPlaceholder: {
     flex: 1,
-    marginRight: 12,
-    alignItems: 'flex-start',
-  },
-  exerciseNameButton: {
-    alignItems: 'flex-start',
-    alignSelf: 'flex-start',
-  },
-  exerciseName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    lineHeight: 26,
-    marginRight: 6,
-    letterSpacing: -0.3,
-    textAlign: 'left',
-    alignSelf: 'flex-start',
-  },
-  dropdownIcon: {
-    marginTop: 3,
-  },
-  exerciseSelector: {
-    backgroundColor: '#27272a',
-    borderRadius: 4,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  exerciseOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#3f3f46',
-  },
-  exerciseOptionSelected: {
-    // backgroundColor will be set inline
-  },
-  exerciseOptionLast: {
-    borderBottomWidth: 0,
-  },
-  exerciseOptionTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  primaryIcon: {
-    marginRight: 8,
-  },
-  exerciseOptionText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#ffffff',
-    flex: 1,
-  },
-  exerciseOptionTextSelected: {
-    fontWeight: '600',
-  },
-  historyButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  actionButton: {
-    padding: 6,
-    borderRadius: 6,
-    backgroundColor: '#27272a',
-    minWidth: 32,
-    minHeight: 32,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  notesModalContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  repSchemeCard: {
-    backgroundColor: '#0f0f0f',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
+    backgroundColor: '#0a0a0f',
   },
-  repSchemeTitleContainer: {
+  mediaPlaceholderText: {
+    color: '#3a3a44',
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginTop: 8,
+    fontFamily: 'DMMono-Regular',
+  },
+  mediaShade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: 'rgba(0,0,0,0)', // expand if you want gradient via expo-linear-gradient
+  },
+
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  title: {
+    color: '#f0f0f2',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    fontFamily: 'Outfit-Bold',
+    lineHeight: 26,
+  },
+  muscles: {
+    color: '#55555f',
+    fontSize: 12,
+    marginTop: 4,
+    fontFamily: 'DMMono-Regular',
+    letterSpacing: 0.2,
+  },
+
+  // ── 1RM badge ─────────────────────────────────
+  oneRMBadge: {
+    alignItems: 'flex-end',
+  },
+  oneRMLabel: {
+    color: '#55555f',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontFamily: 'DMMono-Regular',
+  },
+  oneRMValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    fontFamily: 'DMMono-Medium',
+    letterSpacing: -0.2,
+    marginTop: 2,
+  },
+
+  // ── Prescription banner ───────────────────────
+  prescription: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: 'rgba(34,211,238,0.04)',
+    marginTop: 8,
+    marginBottom: 12,
   },
-  repSchemeLabel: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: 0.5,
+  prescriptionLabel: {
+    fontSize: 10,
+    letterSpacing: 1.2,
+    fontFamily: 'DMMono-Medium',
+    marginRight: 10,
+  },
+  prescriptionText: {
+    color: '#9898a4',
+    fontSize: 12,
+    fontFamily: 'DMMono-Regular',
     flex: 1,
   },
-  repSchemeInfo: {
-    gap: 8,
+
+  // ── Sets table ─────────────────────────────────
+  setsTable: {
+    backgroundColor: 'transparent',
   },
-  repSchemeText: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  repSchemeNotes: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  weeklyScheme: {
-    flexDirection: 'column',
-    gap: 12,
-    marginTop: 8,
-  },
-  weekBlock: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    padding: 16,
-    width: '100%',
+  setsHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  activeWeekBlock: {
-    borderWidth: 2,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    transform: [{ scale: 1.02 }],
-  },
-  weekLabelHeader: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#a1a1aa',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  activeWeekLabel: {
-    color: '#000000',
-  },
-  weekReps: {
-    fontSize: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-    lineHeight: 26,
-    letterSpacing: 0.3,
-  },
-  activeWeekReps: {
-    color: '#000000',
-  },
-  pyramidScheme: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  setBlock: {
-    backgroundColor: '#0a0a0b',
-    borderRadius: 8,
-    padding: 12,
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  setLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#71717a',
+    paddingHorizontal: 4,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
     marginBottom: 4,
   },
-  setReps: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  straightScheme: {
-    alignItems: 'center',
-  },
-  repeatIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 4,
-  },
-  repeatText: {
-    fontSize: 14,
-    color: '#71717a',
-    fontWeight: '500',
-  },
-  notesModalLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-    marginBottom: 8,
-  },
-  notesModalHint: {
-    fontSize: 14,
-    color: '#52525b',
-    marginBottom: 16,
-  },
-  notesModalInput: {
-    backgroundColor: '#18181b',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 16,
-    fontSize: 16,
-    color: '#ffffff',
-    minHeight: 200,
-  },
-  headerSeparator: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: 12,
-  },
-  setsContainer: {
-    marginTop: 8,
+  setsHeaderCell: {
+    color: '#55555f',
+    fontSize: 10,
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Regular',
   },
   setRow: {
-    flexDirection: 'column',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    marginBottom: 4,
-    borderRadius: 4,
-    backgroundColor: '#0a0a0b',
-  },
-  setMainRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
   },
   setRowCompleted: {
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#22c55e20',
+    opacity: 0.55,
   },
-  setNumber: {
-    width: 24,
+  setNum: {
+    color: '#9898a4',
     fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-    textAlign: 'center',
+    fontFamily: 'DMMono-Medium',
   },
-  input: {
-    backgroundColor: '#27272a',
-    borderRadius: 4,
+  setInput: {
+    backgroundColor: '#111116',
+    color: '#f0f0f2',
+    fontSize: 16,
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 16,
-    color: '#ffffff',
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    fontFamily: 'DMMono-Medium',
     textAlign: 'center',
+    minHeight: 44,
   },
-  weightInput: {
-    width: 60,
-  },
-  repsInput: {
-    width: 50,
-  },
-  inputDisabled: {
-    opacity: 0.5,
-    backgroundColor: '#18181b',
-  },
-  separator: {
-    fontSize: 16,
-    color: '#52525b',
-    marginHorizontal: 6,
-  },
-  checkButton: {
-    marginLeft: 12,
-    marginRight: 8,
-    padding: 4,
-    minWidth: 32,
-  },
-  checkButtonCompleted: {
-    opacity: 0.8,
-  },
-  checkButtonDisabled: {
-    opacity: 0.4,
-  },
-  dropSetButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginLeft: 8,
-    borderRadius: 4,
-    backgroundColor: '#18181b',
-  },
-  dropSetButtonText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#52525b',
-    letterSpacing: 0.5,
-  },
-  dropSetButtonActive: {
-    // color will be set inline
-  },
-  dropSetsContainer: {
-    marginTop: 4,
-    marginBottom: 8,
-    marginLeft: 8,
-  },
-  dropRowContainer: {
+  addSetBtn: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  dropRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    marginLeft: 8,
-    borderRadius: 4,
-    backgroundColor: '#0a0a0b',
-    borderLeftWidth: 2,
-  },
-  dropIndent: {
-    width: 24,
-  },
-  dropLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#52525b',
-    marginRight: 12,
-  },
-  dropWeightInput: {
-    width: 50,
-  },
-  dropRepsInput: {
-    width: 60,
-    marginLeft: 8,
-  },
-  dropCheckSpace: {
-    width: 40,
-  },
-  dropCheckButton: {
-    marginLeft: 8,
-    padding: 2,
-  },
-  dropDeleteButton: {
-    padding: 4,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addDropButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginTop: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    borderStyle: 'dashed',
-    gap: 6,
   },
-  addDropText: {
+  addSetText: {
+    color: '#9898a4',
     fontSize: 13,
-    fontWeight: '600',
+    marginLeft: 6,
+    fontFamily: 'DMMono-Regular',
+    letterSpacing: 0.4,
   },
-  addSetButton: {
-    alignItems: 'flex-start',
-    padding: 8,
+
+  // ── Up Next list ───────────────────────────────
+  upcomingSection: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
     marginTop: 8,
   },
-  addExerciseButton: {
+  upcomingHeader: {
+    color: '#55555f',
+    fontSize: 10,
+    letterSpacing: 1.6,
+    fontFamily: 'DMMono-Medium',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+
+  // ── Mini card ─────────────────────────────────
+  miniCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    marginTop: 20,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    gap: 8,
-  },
-  addExerciseText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bottomFinishButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    marginTop: 16,
-    marginHorizontal: 16,
+    backgroundColor: '#0a0a0f',
     borderRadius: 12,
-    borderWidth: 2,
-    gap: 8,
-  },
-  bottomFinishButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  bottomSpacer: {
-    height: 180,
-  },
-  historyContainer: {
-    flex: 1,
-  },
-  historyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-    marginBottom: 16,
-  },
-  historyWorkout: {
-    backgroundColor: '#18181b',
-    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 16,
-    marginBottom: 12,
+    borderColor: 'rgba(255,255,255,0.04)',
+    position: 'relative',
+    overflow: 'hidden',
   },
-  historyDate: {
+  miniCardDone: {
+    opacity: 0.6,
+  },
+  miniCardActive: {
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  miniIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#111116',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  miniTitle: {
+    color: '#f0f0f2',
     fontSize: 14,
     fontWeight: '600',
-    color: '#71717a',
+    fontFamily: 'Outfit-SemiBold',
+  },
+  miniTitleDone: {
+    textDecorationLine: 'line-through',
+    color: '#9898a4',
+  },
+  miniTitleActive: {
+    color: '#ffffff',
+  },
+  miniTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  currentBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  currentBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
+    letterSpacing: 0.5,
+  },
+  miniMeta: {
+    color: '#55555f',
+    fontSize: 11,
+    marginTop: 3,
+    fontFamily: 'DMMono-Regular',
+  },
+  miniProgressTrack: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  miniProgressFill: {
+    height: '100%',
+  },
+
+  // ── Bottom bar ─────────────────────────────────
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 28,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+    gap: 12,
+  },
+  timerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#0a0a0f',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  timerText: {
+    color: '#9898a4',
+    fontSize: 13,
+    marginLeft: 6,
+    fontFamily: 'DMMono-Medium',
+  },
+  primaryBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
+    letterSpacing: 0.2,
+  },
+
+  // ── History View Styles ──────────────
+  headerTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
+  },
+  historyContainer: {
+    padding: 16,
+  },
+  historyTitle: {
+    color: '#f0f0f2',
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
+    marginBottom: 16,
+  },
+  historyEntry: {
+    backgroundColor: '#0a0a0f',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  historyDate: {
+    color: '#9898a4',
+    fontSize: 12,
+    fontFamily: 'DMMono-Regular',
     marginBottom: 8,
   },
   historySet: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
+    marginBottom: 4,
   },
   historySetNumber: {
-    width: 20,
-    fontSize: 14,
-    color: '#52525b',
-  },
-  historySetData: {
-    fontSize: 14,
-    color: '#ffffff',
-    marginLeft: 8,
-  },
-  oneRMText: {
+    color: '#9898a4',
     fontSize: 12,
-    color: '#71717a',
-    fontStyle: 'italic',
+    fontFamily: 'DMMono-Regular',
+    width: 30,
   },
-  dropIndicator: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  historyDropSets: {
-    marginLeft: 28,
-    marginTop: 4,
-    paddingLeft: 8,
-    borderLeftWidth: 2,
-  },
-  historyDropSet: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 2,
-  },
-  historyDropLabel: {
-    fontSize: 12,
-    color: '#52525b',
-    fontWeight: '600',
-    minWidth: 60,
-  },
-  historyDropData: {
-    fontSize: 12,
-    color: '#71717a',
-    marginLeft: 8,
-  },
-  emptyHistoryState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-  },
-  emptyHistoryText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-    marginBottom: 8,
-  },
-  emptyHistorySubtext: {
+  historyDetails: {
+    color: '#f0f0f2',
     fontSize: 14,
-    color: '#52525b',
-    textAlign: 'center',
-    paddingHorizontal: 32,
-  },
-  // New Timer Overlay
-  timerOverlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingBottom: 34,
-  },
-  timerCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    overflow: 'hidden',
-    maxHeight: 400,
-  },
-  timerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
-  },
-  timerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  timerHeaderButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  timerIconButton: {
-    padding: 8,
-  },
-  
-  // Timer Display
-  timerDisplay: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  timerMainDisplay: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  timerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
-  },
-  timerCenterDisplay: {
-    alignItems: 'center',
-  },
-  mainTimeAdjustButton: {
-    backgroundColor: '#27272a',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  mainTimeAdjustText: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  timerCountdown: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  timerMode: {
-    fontSize: 16,
-    color: '#71717a',
-    fontWeight: '500',
-  },
-  primaryActionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  secondaryControls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#27272a',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-    minWidth: 90,
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#71717a',
-  },
-  
-  // Settings
-  settingsScroll: {
-    maxHeight: 280,
-  },
-  settingsContainer: {
-    padding: 20,
-  },
-  settingsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 20,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  toggle: {
-    width: 50,
-    height: 28,
-    backgroundColor: '#27272a',
-    borderRadius: 14,
-    padding: 2,
-    justifyContent: 'center',
-  },
-  toggleOn: {
-    // backgroundColor will be set inline
-  },
-  toggleKnob: {
-    width: 24,
-    height: 24,
-    backgroundColor: '#71717a',
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  toggleKnobOn: {
-    backgroundColor: '#ffffff',
-    alignSelf: 'flex-end',
-  },
-  infoBox: {
-    backgroundColor: '#18181b',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    textAlign: 'center',
-  },
-  timerModeToggleContainer: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  timerModeLabel: {
-    fontSize: 12,
-    color: '#a1a1aa',
-    fontWeight: '500',
-  },
-  timerQuickModeToggleContainer: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  timerModeToggle: {
-    padding: 2,
-  },
-  timerToggleTrack: {
-    width: 40,
-    height: 20,
-    backgroundColor: '#27272a',
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  timerToggleOption: {
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  timerToggleKnob: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    left: 2,
-    zIndex: 2,
-  },
-  optionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  optionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#27272a',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  optionSelected: {
-    // backgroundColor and borderColor will be set inline
-  },
-  optionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  optionTextSelected: {
-    // color will be set inline
-  },
-  minimizedTimer: {
-    position: 'absolute',
-    bottom: 34,
-    alignSelf: 'center',
-    backgroundColor: '#18181b',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    zIndex: 1000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  minimizedTimerText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  startTimerButton: {
-    position: 'absolute',
-    bottom: 34,
-    alignSelf: 'center',
-    backgroundColor: '#18181b',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    zIndex: 1000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  startTimerText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  completedTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  completedSubtitle: {
-    fontSize: 16,
-    color: '#71717a',
-    marginBottom: 32,
-  },
-  completionActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  completionButton: {
-    borderRadius: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  completionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0a0a0b',
-  },
-  dismissButton: {
-    borderWidth: 1,
-    borderColor: '#27272a',
-    borderRadius: 4,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  dismissButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  confirmModalContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 32,
-    width: '100%',
-    maxWidth: 300,
-    alignItems: 'center',
-  },
-  confirmModalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  confirmModalMessage: {
-    fontSize: 14,
-    color: '#71717a',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  confirmModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  confirmModalButton: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-  },
-  confirmModalCancelButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  confirmModalConfirmButton: {
-    // backgroundColor will be set inline
-  },
-  confirmModalCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-  },
-  confirmModalConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0a0a0b',
-  },
-  // New modal styles
-  newConfirmModalContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 0,
-    width: '100%',
-    maxWidth: 320,
-    overflow: 'hidden',
-  },
-  newConfirmModalHeader: {
-    alignItems: 'center',
-    paddingTop: 32,
-    paddingHorizontal: 24,
-    paddingBottom: 20,
-  },
-  newConfirmModalIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  newConfirmModalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  newConfirmModalSubtitle: {
-    fontSize: 15,
-    color: '#71717a',
-    textAlign: 'center',
-  },
-  newConfirmModalButtons: {
-    flexDirection: 'column',
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    gap: 12,
-  },
-  newConfirmModalCancelButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: '#3f3f46',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  newConfirmModalCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#a1a1aa',
-  },
-  newConfirmModalStartButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  newConfirmModalStartIcon: {
-    marginRight: 4,
-  },
-  newConfirmModalStartText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  confirmModalDescription: {
-    fontSize: 15,
-    color: '#e4e4e7',
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  confirmModalNote: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 18,
-    fontStyle: 'italic',
-  },
-  // New preference modal styles
-  preferenceModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 50,
-  },
-  preferenceModalContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    width: '100%',
-    maxWidth: 340,
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  preferenceModalHeader: {
-    alignItems: 'center',
-    paddingTop: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
-  },
-  preferenceModalIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  preferenceModalContent: {
-    padding: 20,
-  },
-  preferenceModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  preferenceModalExerciseCard: {
-    backgroundColor: '#27272a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  preferenceModalExerciseName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  preferenceModalBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  preferenceModalBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  preferenceModalDescription: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    lineHeight: 20,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  preferenceModalHighlight: {
-    fontWeight: '600',
-  },
-  preferenceModalActions: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 12,
-  },
-  preferenceModalButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    minHeight: 52,
-  },
-  preferenceModalCancelButton: {
-    backgroundColor: '#27272a',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  preferenceModalConfirmButton: {
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  preferenceModalCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#a1a1aa',
-  },
-  preferenceModalConfirmText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0a0a0b',
-  },
-  reminderModalContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 32,
-    width: '100%',
-    maxWidth: 300,
-    alignItems: 'center',
-  },
-  reminderModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  reminderModalMessage: {
-    fontSize: 14,
-    color: '#71717a',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  reminderModalPrimaryButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    marginTop: 24,
-    marginBottom: 12,
-    width: '100%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  reminderModalPrimaryButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0a0a0b',
-    textAlign: 'center',
-  },
-  reminderModalSecondaryLink: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  reminderModalSecondaryLinkText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#71717a',
-    textAlign: 'center',
-  },
-  completionModalContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 40,
-    width: '100%',
-    maxWidth: 340,
-    alignItems: 'center',
-  },
-  completionIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  completionModalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-    textAlign: 'center',
-    letterSpacing: -0.5,
-  },
-  completionModalSubtitle: {
-    fontSize: 16,
-    color: '#71717a',
-    marginBottom: 32,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  summaryContainer: {
-    width: '100%',
-    marginBottom: 32,
-    gap: 20,
-  },
-  durationContainer: {
-    alignItems: 'center',
-  },
-  durationLabel: {
-    fontSize: 12,
-    color: '#71717a',
-    fontWeight: '500',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  durationValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  volumeCard: {
-    backgroundColor: '#0a0a0b',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-  },
-  volumeLabel: {
-    fontSize: 14,
-    color: '#71717a',
-    fontWeight: '500',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  volumeValue: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#ffffff',
-    lineHeight: 52,
-    marginBottom: 4,
-  },
-  volumeUnit: {
-    fontSize: 18,
-    fontWeight: '500',
-  },
-  completionModalButtons: {
-    flexDirection: 'column',
-    gap: 12,
-    width: '100%',
-  },
-  completionModalButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  completionModalContinueButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  completionModalFinishButton: {
-    // backgroundColor will be set inline
-  },
-  completionModalContinueText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#71717a',
-    textAlign: 'center',
-  },
-  completionModalFinishText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0a0a0b',
-    textAlign: 'center',
-  },
-  
-  // Superset linking styles
-  supersetLinkContainer: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    marginHorizontal: 16,
-  },
-  supersetLinkButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#27272a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  supersetLinkButtonActive: {
-    backgroundColor: '#164e63',
-    // borderColor will be set inline
-  },
-  supersetLinkButtonTouchable: {
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  supersetLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 4,
-    letterSpacing: 0.5,
-  },
-  exerciseCardLinked: {
-    borderWidth: 1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    backgroundColor: '#1a1a1d',
-  },
-  exerciseCardSupersetBase: {
-    backgroundColor: '#18181b',
-    borderRadius: 4,
-    borderWidth: 0, // No border - gradient overlay handles it
-    borderColor: 'transparent',
-    padding: 16,
-    marginBottom: 16,
-    shadowOpacity: 0, // No uniform shadow - gradient glow handles it
-    elevation: 0,
-  },
-  weightInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 12,
-  },
-  dropWeightInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  unitLabel: {
-    fontSize: 12,
-    color: '#52525b',
-    marginLeft: 2,
-    minWidth: 20,
-  },
-  unitToggleButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#27272a',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-    minWidth: 40,
-    minHeight: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  unitToggleText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  exerciseSettingsView: {
-    padding: 16,
-  },
-  exerciseSettingsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  exerciseSettingsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  exerciseSettingsClose: {
-    padding: 4,
-  },
-  exerciseSettingsContent: {
-    gap: 8,
-  },
-  exerciseSettingsExerciseName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  exerciseSettingsOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    marginVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#27272a',
-    gap: 12,
-  },
-  exerciseSettingsOptionText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#ffffff',
+    fontFamily: 'Outfit-Medium',
     flex: 1,
   },
-  addExerciseModal: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    margin: 20,
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  addExerciseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
-  },
-  addExerciseTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  addExerciseCloseButton: {
-    padding: 8,
-  },
-  addExerciseOptions: {
-    padding: 20,
-    gap: 16,
-  },
-  addExerciseCard: {
-    backgroundColor: '#27272a',
-    borderRadius: 12,
-    padding: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  addExerciseCardText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  
-  // Bottom Navigation - Following 2024 best practices
-  bottomNavigation: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: '#18181b',
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
-    height: 80,
-    paddingBottom: 20,
-  },
-  navButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  activeNavButton: {
-    // Active styling handled by text/icon color
-  },
-  navButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#71717a',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  activeNavButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  // Simple Notes Styling
   notesContainer: {
-    flex: 1,
-    paddingTop: 8,
+    marginBottom: 24,
   },
-  addNoteContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    marginBottom: 0,
-  },
-  notesSeparator: {
-    height: 40,
-  },
-  notesList: {
-    gap: 8,
-  },
-  noteItem: {
-    backgroundColor: '#18181b',
+  notesInput: {
+    backgroundColor: '#0a0a0f',
     borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    padding: 16,
+    color: '#f0f0f2',
+    fontSize: 14,
+    fontFamily: 'Outfit-Regular',
     borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  noteContent: {
-    flex: 1,
-  },
-  noteDate: {
-    fontSize: 11,
-    color: '#71717a',
-    fontWeight: '600',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  noteText: {
-    fontSize: 15,
-    color: '#ffffff',
-    lineHeight: 20,
-  },
-  deleteNoteButton: {
-    padding: 8,
-  },
-  addNoteInput: {
-    flex: 1,
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#ffffff',
-  },
-  addNoteButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabContent: {
-    flex: 1,
-  },
-  
-  // Rep scheme editing modal styles
-  repSchemeEditModal: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    margin: 20,
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  repSchemeEditHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
-  },
-  repSchemeEditTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  repSchemeEditCloseButton: {
-    padding: 4,
-  },
-  repSchemeEditContent: {
-    padding: 20,
-  },
-  repSchemeEditLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  repSchemeEditInput: {
-    backgroundColor: '#27272a',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  repSchemeEditHint: {
-    fontSize: 12,
-    color: '#71717a',
-    fontStyle: 'italic',
-  },
-  repSchemeEditButtons: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 12,
-  },
-  repSchemeEditCancelButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-    alignItems: 'center',
-  },
-  repSchemeEditCancelText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#71717a',
-  },
-  repSchemeEditSaveButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  repSchemeEditSaveText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
+    borderColor: 'rgba(255,255,255,0.04)',
+    minHeight: 200,
+    textAlignVertical: 'top',
   },
 
-  // Daily Volume Overview Styles (copied from DaysScreen.tsx)
-  volumeToggle: {
-    marginTop: 16,
-    marginHorizontal: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#18181b',
+  // ── Full Screen Image Overlay Styles ──────────────
+  imageContainer: {
+    aspectRatio: 16/9, // Classic 16:9 aspect ratio
+    width: '100%',
+    position: 'relative',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden', // Ensures content respects border radius
   },
-  volumeToggleContent: {
-    flexDirection: 'row',
+  fullScreenMediaContainer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  fullScreenPlaceholder: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    backgroundColor: '#0a0a0f',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  volumeToggleText: {
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)', // Dark overlay for text legibility
   },
-  volumeOverview: {
-    marginTop: 12,
-    marginHorizontal: 16,
-    padding: 16,
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  volumeContent: {
-    gap: 24,
-  },
-  bodyDiagramContainer: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    backgroundColor: '#0f0f10',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  bodyDiagramHeader: {
+  overlayHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
     paddingHorizontal: 16,
-    width: '100%',
+    paddingTop: 50, // Account for status bar
+    paddingBottom: 16,
+    zIndex: 100, // High z-index to stay on top
+    backgroundColor: 'transparent',
   },
-  bodyDiagramTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    flex: 1,
-    textAlign: 'center',
-  },
-  bodyFlipIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  volumeGrid: {
+  overlayHeaderActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'center',
-  },
-  volumeItem: {
     alignItems: 'center',
-    minWidth: 60,
-    maxWidth: 80,
-    gap: 4,
-    flex: 1,
-    flexBasis: '22%', // Fit 4 per row with some spacing
+    gap: 8,
   },
-  volumeBar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
+  overlayBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  volumeNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginTop: 2,
-  },
-  volumeMuscle: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#a1a1aa',
-    textAlign: 'center',
-  },
-  volumeEmptyText: {
-    fontSize: 14,
-    color: '#71717a',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  fallbackContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  fallbackText: {
-    fontSize: 14,
-    color: '#71717a',
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
 });
