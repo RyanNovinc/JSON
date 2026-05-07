@@ -18,6 +18,7 @@ import {
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -30,6 +31,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMealPlan } from '../types/nutrition';
 import { NutritionFeatureGate, IfNutritionPro, IfNutritionFree } from '../components/NutritionFeatureGate';
 import { PremiumFeature } from '../utils/premiumFeatures';
+import { createShare, ShareError } from '../services/shareService';
 
 type NutritionNavigationProp = StackNavigationProp<RootStackParamList, 'NutritionHome'>;
 
@@ -268,9 +270,18 @@ export default function NutritionHomeScreen({ route, transitionProgress, panGest
   // Convert SimplifiedMealPlans to legacy format for UI compatibility
   const convertedMealPlans = mealPlans.map(plan => convertToLegacyFormat(plan));
   
-  const [shareModal, setShareModal] = useState<{ visible: boolean; plan: MealPlan | null }>({
+  const [shareModal, setShareModal] = useState<{ 
+    visible: boolean; 
+    plan: MealPlan | null;
+    qrCode?: string;
+    shareUrl?: string;
+    isGenerating?: boolean;
+  }>({
     visible: false,
     plan: null,
+    qrCode: undefined,
+    shareUrl: undefined,
+    isGenerating: false,
   });
   const [successModal, setSuccessModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{ visible: boolean; plan: MealPlan | null }>({
@@ -585,8 +596,62 @@ export default function NutritionHomeScreen({ route, transitionProgress, panGest
   // Legacy function for compatibility (can be removed later)
   const handleSaveMealPlan = handleToggleSaveMealPlan;
 
-  const handleExport = (plan: MealPlan) => {
-    setShareModal({ visible: true, plan });
+  // Create universal link using our backend API
+  const createUniversalLink = async (mealPlanData: any): Promise<string | null> => {
+    try {
+      // Use the proper createShare service with correct data structure
+      const shareResult = await createShare({
+        mealPlanData: mealPlanData
+      });
+      return shareResult.shareUrl || null;
+    } catch (error) {
+      console.error('Failed to create universal link:', error);
+      return null;
+    }
+  };
+
+  const handleExport = async (plan: MealPlan) => {
+    // Set initial modal state with loading
+    setShareModal({ 
+      visible: true, 
+      plan,
+      qrCode: undefined,
+      shareUrl: undefined,
+      isGenerating: true 
+    });
+
+    // Generate universal link
+    try {
+      if (!currentPlan) {
+        console.error('❌ No current plan to export');
+        setShareModal(prev => ({ ...prev, isGenerating: false }));
+        return;
+      }
+
+      const mealPlanToShare = {
+        ...currentPlan,
+        exported_with_customizations: true,
+        export_timestamp: new Date().toISOString(),
+        export_note: "This export includes all customizations: manually added meals and permanently deleted meals"
+      };
+
+      const shareUrl = await createUniversalLink(mealPlanToShare);
+      
+      if (shareUrl) {
+        setShareModal(prev => ({ 
+          ...prev, 
+          qrCode: shareUrl,
+          shareUrl,
+          isGenerating: false 
+        }));
+      } else {
+        // Fallback to legacy sharing if API fails
+        setShareModal(prev => ({ ...prev, isGenerating: false }));
+      }
+    } catch (error) {
+      console.error('Error generating share link:', error);
+      setShareModal(prev => ({ ...prev, isGenerating: false }));
+    }
   };
 
   // Debug function to capture all relevant state
@@ -750,11 +815,21 @@ ${JSON.stringify(debugData, null, 2)}
     }
   };
 
-  const handleShare = async (action: 'copy' | 'share') => {
+  const handleShare = async (action: 'copy' | 'share' | 'copyUrl') => {
     if (!shareModal.plan) return;
 
     try {
-      // Export the current SimplifiedMealPlan directly (no conversion needed)
+      if (action === 'copyUrl' && shareModal.shareUrl) {
+        // Copy the universal link URL
+        await Clipboard.setStringAsync(shareModal.shareUrl);
+        setShareModal({ ...shareModal, visible: false });
+        setTimeout(() => {
+          setSuccessModal(true);
+        }, 100);
+        return;
+      }
+
+      // Fallback to JSON sharing if no universal link available
       console.log('📤 Exporting SimplifiedMealPlan with all customizations');
       
       if (!currentPlan) {
@@ -779,20 +854,24 @@ ${JSON.stringify(debugData, null, 2)}
       
       if (action === 'copy') {
         await Clipboard.setStringAsync(mealPlanData);
-        setShareModal({ visible: false, plan: null });
+        setShareModal({ ...shareModal, visible: false });
         setTimeout(() => {
           setSuccessModal(true);
         }, 100);
       } else {
+        const shareContent = shareModal.shareUrl 
+          ? `Check out this meal plan: ${shareModal.plan.name}\n\n${shareModal.shareUrl}`
+          : `Check out this meal plan: ${shareModal.plan.name}\n\n${mealPlanData}`;
+        
         await Share.share({
-          message: `Check out this meal plan: ${shareModal.plan.name}\n\n${mealPlanData}`,
+          message: shareContent,
           title: shareModal.plan.name,
         });
-        setShareModal({ visible: false, plan: null });
+        setShareModal({ ...shareModal, visible: false });
       }
     } catch (error) {
       console.error('Error sharing:', error);
-      setShareModal({ visible: false, plan: null });
+      setShareModal({ ...shareModal, visible: false });
     }
   };
 
@@ -1243,13 +1322,13 @@ ${JSON.stringify(debugData, null, 2)}
         visible={shareModal.visible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShareModal({ visible: false, plan: null })}
+        onRequestClose={() => setShareModal({ visible: false, plan: null, qrCode: undefined, shareUrl: undefined, isGenerating: false })}
       >
         <View style={styles.newShareOverlay}>
           <TouchableOpacity 
             style={styles.newShareBackdrop}
             activeOpacity={1}
-            onPress={() => setShareModal({ visible: false, plan: null })}
+            onPress={() => setShareModal({ visible: false, plan: null, qrCode: undefined, shareUrl: undefined, isGenerating: false })}
           />
           
           <View style={[styles.newShareModal, { borderColor: themeColor }]}>
@@ -1257,7 +1336,7 @@ ${JSON.stringify(debugData, null, 2)}
             <View style={styles.newShareHeader}>
               <TouchableOpacity
                 style={styles.newShareClose}
-                onPress={() => setShareModal({ visible: false, plan: null })}
+                onPress={() => setShareModal({ visible: false, plan: null, qrCode: undefined, shareUrl: undefined, isGenerating: false })}
                 activeOpacity={0.7}
               >
                 <Ionicons name="close" size={24} color="#ffffff" />
@@ -1279,38 +1358,44 @@ ${JSON.stringify(debugData, null, 2)}
               <Text style={[styles.newShareTitle, { color: themeColor }]}>
                 {shareModal.plan?.name?.toUpperCase()}
               </Text>
-              <Text style={styles.newShareSubtitle}>Share your meal plan</Text>
               
-              {/* Action Buttons */}
-              <View style={styles.shareActionButtons}>
-                <TouchableOpacity
-                  style={[styles.shareActionPrimary, { backgroundColor: themeColor }]}
-                  onPress={() => handleShare('copy')}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.shareButtonContent}>
-                    <Ionicons name="copy" size={22} color="#0a0a0b" />
-                    <View style={styles.shareButtonText}>
-                      <Text style={styles.shareButtonTitle}>COPY MEAL PLAN</Text>
-                      <Text style={styles.shareButtonSubtitle}>JSON to clipboard</Text>
-                    </View>
+              {/* QR Code Section */}
+              {shareModal.isGenerating ? (
+                <View style={styles.qrCodeContainer}>
+                  <View style={styles.qrCodePlaceholder}>
+                    <Ionicons name="refresh" size={32} color={themeColor} />
+                    <Text style={styles.qrCodeLoadingText}>Generating QR code...</Text>
                   </View>
-                </TouchableOpacity>
-                
+                </View>
+              ) : shareModal.qrCode ? (
+                <View style={styles.qrCodeContainer}>
+                  <View style={styles.qrCodeWrapper}>
+                    <QRCode
+                      value={shareModal.qrCode}
+                      size={240}
+                      backgroundColor="white"
+                      color="black"
+                    />
+                  </View>
+                </View>
+              ) : null}
+              
+              {/* Send Link Button - Match workout share pattern exactly */}
+              {shareModal.qrCode && (
                 <TouchableOpacity
-                  style={styles.shareActionSecondary}
+                  style={[styles.sendLinkButton, { backgroundColor: themeColor }]}
                   onPress={() => handleShare('share')}
-                  activeOpacity={0.9}
+                  activeOpacity={0.8}
                 >
-                  <View style={styles.shareButtonContent}>
-                    <Ionicons name="share-social" size={22} color="#22d3ee" />
-                    <View style={styles.shareButtonText}>
-                      <Text style={[styles.shareButtonTitle, { color: '#ffffff' }]}>SHARE</Text>
-                      <Text style={[styles.shareButtonSubtitle, { color: '#a1a1aa' }]}>Send to others</Text>
-                    </View>
-                  </View>
+                  <Ionicons name="share" size={20} color="#0a0a0b" />
+                  <Text style={styles.sendLinkText}>SEND LINK</Text>
                 </TouchableOpacity>
-              </View>
+              )}
+              
+              {/* Footer - Match workout share pattern exactly */}
+              {shareModal.qrCode && (
+                <Text style={styles.linkExpiryText}>Link expires in 7 days</Text>
+              )}
             </View>
           </View>
         </View>
@@ -2373,6 +2458,29 @@ const styles = StyleSheet.create({
     color: 'rgba(10, 10, 11, 0.7)',
     letterSpacing: 0.2,
   },
+  
+  // New share styles to match workout modal
+  sendLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    marginTop: 24,
+    gap: 12,
+  },
+  sendLinkText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0a0a0b',
+  },
+  linkExpiryText: {
+    fontSize: 12,
+    color: '#71717a',
+    textAlign: 'center',
+    marginTop: 24,
+  },
   successContainer: {
     backgroundColor: '#18181b',
     borderRadius: 12,
@@ -2432,6 +2540,44 @@ const styles = StyleSheet.create({
   emptyActionText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  // QR Code styles
+  qrCodeContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  qrCodeWrapper: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  qrCodePlaceholder: {
+    width: 152,
+    height: 152,
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#3f3f46',
+  },
+  qrCodeLoadingText: {
+    color: '#a1a1aa',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  qrCodeDescription: {
+    color: '#a1a1aa',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 12,
+    textAlign: 'center',
   },
 
 });

@@ -314,6 +314,20 @@ export default function BlocksScreen() {
   useFocusEffect(
     React.useCallback(() => {
       const reloadOnFocus = async () => {
+        // Reload routine from storage in case blocks were added
+        try {
+          const allRoutines = await WorkoutStorage.loadRoutines();
+          const updatedRoutine = allRoutines.find(r => r.id === routine.id);
+          if (updatedRoutine && updatedRoutine.blocks !== routine.blocks) {
+            console.log('🔄 [BLOCKS-SCREEN] Routine updated, refreshing...');
+            // Force re-render by updating the route params or state
+            // Since we can't directly update props, we'll trigger navigation refresh
+            navigation.setParams({ routine: updatedRoutine } as any);
+          }
+        } catch (error) {
+          console.error('Error reloading routine:', error);
+        }
+        
         if (activeBlockIndex !== -1) {
           calculateCompletionBasedWeek();
         }
@@ -682,6 +696,63 @@ export default function BlocksScreen() {
   const handleCancel = () => {
     setShowModal(false);
     setSelectedBlock(null);
+  };
+
+  const handleDeleteBlock = () => {
+    if (!selectedBlock) return;
+    
+    Alert.alert(
+      'Delete Block',
+      `Are you sure you want to delete "${selectedBlock.block.block_name}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Remove the block from the routine
+              const updatedBlocks = routine.data.blocks.filter((_, index) => index !== selectedBlock.index);
+              const updatedRoutine = {
+                ...routine,
+                data: {
+                  ...routine.data,
+                  blocks: updatedBlocks
+                },
+                blocks: updatedBlocks.length
+              };
+
+              // Update storage
+              const allRoutines = await WorkoutStorage.loadRoutines();
+              const updatedRoutines = allRoutines.map(r => 
+                r.id === routine.id ? updatedRoutine : r
+              );
+              await WorkoutStorage.saveRoutines(updatedRoutines);
+
+              // If we deleted the active block, reset active block
+              if (selectedBlock.index === activeBlockIndex) {
+                await AsyncStorage.removeItem(`activeBlock_${routine.id}`);
+                setActiveBlockIndex(-1);
+              } else if (selectedBlock.index < activeBlockIndex) {
+                // If we deleted a block before the active one, adjust the active index
+                const newActiveIndex = activeBlockIndex - 1;
+                await AsyncStorage.setItem(`activeBlock_${routine.id}`, newActiveIndex.toString());
+                setActiveBlockIndex(newActiveIndex);
+              }
+
+              // Refresh the screen
+              navigation.setParams({ routine: updatedRoutine } as any);
+              
+              setShowModal(false);
+              setSelectedBlock(null);
+            } catch (error) {
+              console.error('Error deleting block:', error);
+              Alert.alert('Error', 'Failed to delete block');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleMesocycleLongPress = (mesocycle: MesocycleCard) => {
@@ -1210,6 +1281,20 @@ export default function BlocksScreen() {
               themeColor={themeColor}
             />
           )}
+          ListFooterComponent={() => (
+            <TouchableOpacity 
+              style={[styles.addBlockButton, { borderColor: themeColor }]}
+              onPress={() => {
+                navigation.navigate('ImportRoutine', {
+                  mode: 'append-block',
+                  targetWorkoutId: routine.id
+                });
+              }}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={themeColor} />
+              <Text style={[styles.addBlockText, { color: themeColor }]}>Add Block</Text>
+            </TouchableOpacity>
+          )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
@@ -1259,21 +1344,56 @@ export default function BlocksScreen() {
               Set <Text style={{ fontWeight: '600', color: themeColor }}>"{selectedBlock?.block.block_name}"</Text> as your active training block?
             </Text>
             
-            <View style={{
-              flexDirection: 'row',
-              width: '100%',
-              gap: 12,
-            }}>
+            <View style={{ width: '100%', gap: 12 }}>
+              {/* Set Active Button */}
               <TouchableOpacity
                 style={{
-                  flex: 1,
-                  backgroundColor: '#27272a',
+                  width: '100%',
+                  backgroundColor: themeColor,
                   borderRadius: 8,
-                  paddingVertical: 20,
-                  paddingHorizontal: 24,
+                  paddingVertical: 16,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minHeight: 60,
+                }}
+                onPress={handleSetActive}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ffffff',
+                }}>Set Active</Text>
+              </TouchableOpacity>
+              
+              {/* Delete Button */}
+              <TouchableOpacity
+                style={{
+                  width: '100%',
+                  backgroundColor: '#ef4444',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={handleDeleteBlock}
+                activeOpacity={0.8}
+              >
+                <Text style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: '#ffffff',
+                }}>Delete Block</Text>
+              </TouchableOpacity>
+              
+              {/* Cancel Button */}
+              <TouchableOpacity
+                style={{
+                  width: '100%',
+                  backgroundColor: '#27272a',
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
                 onPress={handleCancel}
                 activeOpacity={0.8}
@@ -1283,27 +1403,6 @@ export default function BlocksScreen() {
                   fontWeight: '600',
                   color: '#ffffff',
                 }}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: themeColor,
-                  borderRadius: 8,
-                  paddingVertical: 20,
-                  paddingHorizontal: 24,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: 60,
-                }}
-                onPress={handleSetActive}
-                activeOpacity={0.8}
-              >
-                <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#0a0a0b',
-                }}>Set Active</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1814,6 +1913,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   addMesocycleText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  addBlockButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    gap: 8,
+  },
+  addBlockText: {
     fontSize: 16,
     fontWeight: '600',
   },

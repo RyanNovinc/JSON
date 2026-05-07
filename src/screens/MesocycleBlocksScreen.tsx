@@ -1057,7 +1057,45 @@ export default function MesocycleBlocksScreen() {
         </View>
       </View>
 
-
+      {/* TEST BUTTON FOR IMPORT DEBUGGING */}
+      {__DEV__ && (
+        <TouchableOpacity 
+          style={{
+            backgroundColor: '#ff0000',
+            padding: 15,
+            borderRadius: 12,
+            margin: 20,
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+          }}
+          onPress={() => {
+            console.log('🧪 [TEST BUTTON] Triggering import test with shareId: 7QqkkEmL');
+            navigation.navigate('ImportSharedContent', { shareId: '7QqkkEmL' });
+          }}
+        >
+          <Text style={{ 
+            color: 'white', 
+            fontWeight: 'bold', 
+            fontSize: 16,
+            textAlign: 'center',
+            letterSpacing: 0.5 
+          }}>
+            🧪 TEST IMPORT (7QqkkEmL)
+          </Text>
+          <Text style={{ 
+            color: 'rgba(255,255,255,0.8)', 
+            fontSize: 12, 
+            marginTop: 4,
+            textAlign: 'center'
+          }}>
+            Tap to test share import flow
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <FlatList
         key={refreshKey}
@@ -1078,7 +1116,12 @@ export default function MesocycleBlocksScreen() {
         ListFooterComponent={() => (
           <TouchableOpacity 
             style={[styles.addBlockButton, { borderColor: themeColor }]}
-            onPress={() => handleAddBlock()}
+            onPress={() => {
+              navigation.navigate('ImportRoutine', {
+                mode: 'append-block',
+                targetWorkoutId: routine.id
+              });
+            }}
           >
             <Ionicons name="add-circle-outline" size={24} color={themeColor} />
             <Text style={[styles.addBlockText, { color: themeColor }]}>Add Block</Text>

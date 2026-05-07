@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Animated, StyleSheet } from 'react-native';
+import { Linking } from 'react-native';
 import { navigationRef } from '../utils/navigationRef';
 
 // Import screens
@@ -11,6 +12,7 @@ import HomeScreen from '../screens/HomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ModeTransitionContainer from '../components/ModeTransitionContainer';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
+import ImportSharedContent from '../screens/ImportSharedContent';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
 import MyWorkoutsScreen from '../screens/MyWorkoutsScreen';
 import MyMealPlansScreen from '../screens/MyMealPlansScreen';
@@ -24,7 +26,7 @@ import MealPlanMealDetailScreen from '../screens/MealPlanMealDetailScreen';
 import MealPrepSessionScreen from '../screens/MealPrepSessionScreen';
 import MealPrepDetailScreen from '../screens/MealPrepDetailScreen';
 import DaysScreen from '../screens/DaysScreen';
-import WorkoutLogScreen from '../screens/WorkoutLogScreen';
+import WorkoutLogScreenAdapter from '../screens/WorkoutLogScreenAdapter';
 import WorkoutReviewScreen from '../screens/WorkoutReviewScreen';
 import AppIconScreen from '../screens/AppIconScreen';
 import PaymentScreen from '../screens/PaymentScreen';
@@ -81,8 +83,9 @@ interface CleanMealPlanNavigationParams {
 
 export type RootStackParamList = {
   Main: undefined;
-  ImportRoutine: undefined;
-  ImportMealPlan: { showStep1New?: boolean };
+  ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string };
+  ImportSharedContent: { shareId: string };
+  ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
   MyWorkouts: undefined;
   MyMealPlans: undefined;
   SampleMealPlans: undefined;
@@ -257,6 +260,97 @@ interface AppNavigatorProps {
   appReady: boolean;
 }
 
+// Configure deep linking
+const linking = {
+  prefixes: ['https://json.fit', 'json-app://'],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Home: '',
+        },
+      },
+      ImportSharedContent: {
+        path: 'p/:shareId',
+        parse: {
+          shareId: (shareId: string) => shareId,
+        },
+      },
+    },
+  },
+  // Custom URL matcher to handle multiple patterns
+  async getInitialURL() {
+    const url = await Linking.getInitialURL();
+    console.log('🔗 [DEEP LINK] getInitialURL called, url:', url);
+    console.log('🔗 [DEEP LINK] App launch scenario - checking if URL contains share pattern');
+    
+    if (url) {
+      console.log('🔗 [DEEP LINK] URL found:', url);
+      console.log('🔗 [DEEP LINK] URL analysis:', {
+        isHttpsJsonFit: url.includes('https://json.fit'),
+        isJsonAppScheme: url.includes('json-app://'),
+        isSharePattern: url.includes('/share/'),
+        isPPattern: url.includes('/p/'),
+      });
+      
+      // Handle json-app://share/xyz pattern
+      if (url.includes('json-app://share/')) {
+        const shareId = url.replace('json-app://share/', '');
+        const newUrl = `json-app://p/${shareId}`;
+        console.log('🔗 [DEEP LINK] Converting share URL:', url, '→', newUrl, 'shareId:', shareId);
+        return newUrl;
+      }
+      
+      // Extract shareId for logging purposes
+      let extractedShareId = null;
+      if (url.includes('/p/')) {
+        extractedShareId = url.split('/p/')[1];
+        console.log('🔗 [DEEP LINK] Extracted shareId from URL:', extractedShareId);
+      }
+    } else {
+      console.log('🔗 [DEEP LINK] No initial URL found - app not launched via link');
+    }
+    
+    console.log('🔗 [DEEP LINK] Returning URL:', url);
+    return url;
+  },
+  subscribe(listener) {
+    const onReceiveURL = ({ url }: { url: string }) => {
+      console.log('🔗 [DEEP LINK] Runtime URL received:', url);
+      console.log('🔗 [DEEP LINK] Runtime URL analysis:', {
+        isHttpsJsonFit: url.includes('https://json.fit'),
+        isJsonAppScheme: url.includes('json-app://'),
+        isSharePattern: url.includes('/share/'),
+        isPPattern: url.includes('/p/'),
+      });
+      
+      // Handle json-app://share/xyz pattern in runtime
+      if (url.includes('json-app://share/')) {
+        const shareId = url.replace('json-app://share/', '');
+        const newUrl = `json-app://p/${shareId}`;
+        console.log('🔗 [DEEP LINK] Converting share URL in runtime:', url, '→', newUrl, 'shareId:', shareId);
+        console.log('🔗 [DEEP LINK] About to call listener with converted URL');
+        listener(newUrl);
+        console.log('🔗 [DEEP LINK] Listener called successfully');
+      } else {
+        console.log('🔗 [DEEP LINK] Passing URL through without conversion');
+        // Extract shareId for logging if it's a /p/ pattern
+        if (url.includes('/p/')) {
+          const extractedShareId = url.split('/p/')[1];
+          console.log('🔗 [DEEP LINK] Runtime extracted shareId:', extractedShareId);
+        }
+        console.log('🔗 [DEEP LINK] About to call listener with original URL');
+        listener(url);
+        console.log('🔗 [DEEP LINK] Listener called successfully');
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', onReceiveURL);
+
+    return () => subscription?.remove?.();
+  },
+};
+
 export default function AppNavigator({ isAuthenticated, appReady }: AppNavigatorProps) {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
@@ -280,7 +374,7 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 <TimerProvider>
                 <MealPlanningProvider>
                 <SimplifiedMealPlanningProvider>
-                <NavigationContainer ref={navigationRef}>
+                <NavigationContainer ref={navigationRef} linking={linking}>
                 <ShareIntentHandler />
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <>
@@ -288,6 +382,29 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen 
                 name="ImportRoutine" 
                 component={ImportRoutineScreen}
+                options={{
+                  headerShown: false,
+                  animationTypeForReplace: 'push',
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    };
+                  },
+                }}
+              />
+              <RootStack.Screen 
+                name="ImportSharedContent" 
+                component={ImportSharedContent}
                 options={{
                   headerShown: false,
                   animationTypeForReplace: 'push',
@@ -440,7 +557,7 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="WorkoutLog" 
-                component={WorkoutLogScreen}
+                component={WorkoutLogScreenAdapter}
                 options={{
                   headerShown: false,
                 }}

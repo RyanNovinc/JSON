@@ -22,6 +22,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
+import QRCode from 'react-native-qrcode-svg';
+import { createShare, ShareError } from '../services/shareService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
 import WorkoutCalendar from '../components/WorkoutCalendar';
@@ -72,12 +74,28 @@ function RoutineCard({ routine, onExport, onPress, onLongPress, isPinkTheme, the
 export default function HomeScreen({ route, transitionProgress, panGestureRef }: any) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   
+  // TEST: DISABLED auto-test to stop the loop
+  const [hasRunTest, setHasRunTest] = useState(true); // Set to true to disable auto-test
+  
   // NEW: Use WorkoutRoutineContext instead of local state
   const { routines, isLoading, saveRoutine, deleteRoutine: deleteRoutineFromContext, loadRoutines } = useWorkoutRoutines();
   
-  const [shareModal, setShareModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null }>({
+  const [shareModal, setShareModal] = useState<{ 
+    visible: boolean; 
+    routine: WorkoutRoutine | null;
+    qrCode?: string;
+    shareUrl?: string;
+    isGenerating?: boolean;
+    error?: string;
+    isAnimating?: boolean;
+  }>({
     visible: false,
     routine: null,
+    qrCode: undefined,
+    shareUrl: undefined,
+    isGenerating: false,
+    error: undefined,
+    isAnimating: false,
   });
   const [successModal, setSuccessModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null }>({
@@ -106,11 +124,54 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   const [showOnboarding, setShowOnboarding] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const shareModalOpacity = useRef(new Animated.Value(0)).current;
   
   const { showFeedbackModal, submitFeedback, skipFeedback, triggerFeedbackModal } = useImportFeedback();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode, isTransitioning, setIsTransitioning } = useAppMode();
   const hasNutritionAccess = useHasNutritionAccess();
+
+  // Clean animation functions for share modal
+  const showShareModal = (routine: WorkoutRoutine) => {
+    setShareModal({
+      visible: true,
+      routine,
+      qrCode: undefined,
+      shareUrl: undefined,
+      isGenerating: true,
+      error: undefined,
+      isAnimating: true,
+    });
+
+    shareModalOpacity.setValue(0);
+    Animated.timing(shareModalOpacity, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setShareModal(prev => ({ ...prev, isAnimating: false }));
+    });
+  };
+
+  const hideShareModal = () => {
+    setShareModal(prev => ({ ...prev, isAnimating: true }));
+    
+    Animated.timing(shareModalOpacity, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setShareModal({
+        visible: false,
+        routine: null,
+        qrCode: undefined,
+        shareUrl: undefined,
+        isGenerating: false,
+        error: undefined,
+        isAnimating: false,
+      });
+    });
+  };
 
   // Load additional data on mount (context handles main routines automatically)
   useEffect(() => {
@@ -250,14 +311,149 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
 
   // addRoutine function removed - now using saveRoutine from context directly
 
-  const handleExport = (routine: WorkoutRoutine) => {
+  const handleExport = async (routine: WorkoutRoutine) => {
     if (!routine.data) return;
-    setShareModal({ visible: true, routine });
+    
+    // Set initial modal state with loading
+    showShareModal(routine);
+
+    try {
+      // Prepare the same data that would be copied to clipboard
+      let exportData = { ...routine.data };
+      
+      // Clean exercisePreferences from sample plans at the source
+      if (routine.data?._metadata?.isSamplePlan && exportData._metadata?.exercisePreferences) {
+        delete exportData._metadata.exercisePreferences;
+      }
+      let programData = null;
+      
+      // Load program data if available
+      if (routine.programId) {
+        const { ProgramStorage } = await import('../data/programStorage');
+        programData = await ProgramStorage.getProgram(routine.programId);
+      }
+      
+      // Collect all manual blocks across all mesocycles (same logic as existing handleShare)
+      const manualBlocks = [];
+      const completionStatus = {};
+      const workoutHistory = [];
+      
+      if (programData && programData.totalMesocycles > 1) {
+        // Multi-mesocycle program - collect manual blocks from each mesocycle
+        for (let mesocycleNum = 1; mesocycleNum <= programData.totalMesocycles; mesocycleNum++) {
+          const manualBlocksKey = `manual_blocks_mesocycle_${mesocycleNum}`;
+          try {
+            const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
+            if (manualBlocksData) {
+              const mesocycleManualBlocks = JSON.parse(manualBlocksData);
+              manualBlocks.push(...mesocycleManualBlocks.map(block => ({
+                ...block,
+                mesocycleNumber: mesocycleNum
+              })));
+            }
+          } catch (error) {
+            console.log(`Could not load manual blocks for mesocycle ${mesocycleNum}`);
+          }
+        }
+      } else {
+        // Single mesocycle or no program data
+        try {
+          const manualBlocksData = await AsyncStorage.getItem('manual_blocks');
+          if (manualBlocksData) {
+            const parsedManualBlocks = JSON.parse(manualBlocksData);
+            manualBlocks.push(...parsedManualBlocks);
+          }
+        } catch (error) {
+          console.log('Could not load manual blocks');
+        }
+      }
+
+      // Load completion status and workout history (simplified version)
+      try {
+        const statusData = await AsyncStorage.getItem('workout_completion_status');
+        if (statusData) {
+          Object.assign(completionStatus, JSON.parse(statusData));
+        }
+      } catch (error) {
+        console.log('Could not load completion status');
+      }
+
+      // Build the complete export object
+      const completeExport = {
+        workoutData: exportData,
+        manualBlocks: manualBlocks,
+        completionStatus: completionStatus,
+        workoutHistory: workoutHistory,
+        exportMetadata: {
+          routineName: routine.name,
+          routineId: routine.id,
+          exportDate: new Date().toISOString(),
+          source: "JSON.fit",
+          includesCustomizations: manualBlocks.length > 0
+        }
+      };
+
+      // Create universal link
+      const shareResult = await createShare(completeExport);
+      
+      setShareModal(prev => ({ 
+        ...prev, 
+        qrCode: shareResult.shareUrl,
+        shareUrl: shareResult.shareUrl,
+        isGenerating: false 
+      }));
+    } catch (error) {
+      console.error('Error generating share link:', error);
+      let errorMessage = 'Failed to create share link';
+      
+      if (error instanceof ShareError) {
+        switch (error.code) {
+          case 'TOO_LARGE':
+            errorMessage = 'Workout is too large to share';
+            break;
+          case 'NETWORK_ERROR':
+            errorMessage = 'Check your connection';
+            break;
+          case 'TIMEOUT':
+            errorMessage = 'Request timed out';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+      }
+      
+      setShareModal(prev => ({ 
+        ...prev, 
+        isGenerating: false,
+        error: errorMessage
+      }));
+    }
   };
 
-  const handleShare = async (action: 'copy' | 'share') => {
+  const handleShare = async (action: 'copy' | 'share' | 'shareUrl' | 'retry') => {
     const routine = shareModal.routine;
     if (!routine?.data) return;
+
+    // Handle retry action
+    if (action === 'retry') {
+      handleExport(routine);
+      return;
+    }
+
+    // Handle share URL action
+    if (action === 'shareUrl' && shareModal.shareUrl) {
+      try {
+        await Share.share({
+          url: shareModal.shareUrl,
+          message: shareModal.shareUrl,
+        });
+        hideShareModal();
+        return;
+      } catch (error) {
+        console.error('Error sharing URL:', error);
+        return;
+      }
+    }
     
     try {
       // Enhanced export with complete state including manual modifications
@@ -308,10 +504,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               if (customMeso.customId) {
                 const customManualBlocksKey = `manual_blocks_${customMeso.customId}`;
                 const customManualBlocksData = await AsyncStorage.getItem(customManualBlocksKey);
-                console.log(`📤 Export: Checking custom mesocycle ${customMeso.customId} manual blocks:`, customManualBlocksData ? 'FOUND' : 'NOT FOUND');
                 if (customManualBlocksData) {
                   const customManualBlocks = JSON.parse(customManualBlocksData);
-                  console.log(`📤 Export: Adding ${customManualBlocks.length} manual blocks with customMesocycleId: ${customMeso.customId}`);
                   manualBlocks.push(...customManualBlocks.map(block => ({
                     ...block,
                     customMesocycleId: customMeso.customId
@@ -569,7 +763,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         console.log('📋 Starting clipboard copy...');
         await Clipboard.setStringAsync(jsonString);
         console.log('📋 Clipboard copy completed');
-        setShareModal({ visible: false, routine: null });
+        hideShareModal();
         console.log('📋 Share modal closed');
         setTimeout(() => {
           console.log('📋 Showing success modal');
@@ -585,7 +779,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           message: jsonString,
           title: `${routine.name} Workout`,
         });
-        setShareModal({ visible: false, routine: null });
+        hideShareModal();
       }
     } catch (error) {
       console.error('Error sharing:', error);
@@ -1169,23 +1363,17 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         {renderContent()}
       </Animated.View>
 
-      {/* Debug Button - Above Calendar Button (Development Only) */}
-      {__DEV__ && (
-        <View style={[styles.debugButton, { backgroundColor: '#ff6b6b' }]}>
-          <TouchableOpacity
-            style={styles.buttonInner}
-            onPress={() => {
-              debugLog('🐛 [DEBUG] Debug button pressed, opening debug modal...');
-              debugLog(`🎨 [HOMESCREEN] Current routines.length: ${routines.length}`);
-              debugLog(`🎨 [HOMESCREEN] Current state: ${routines.length === 0 ? 'Should show empty state' : `${routines.length} routines loaded`}`);
-              setDebugModal(true);
-            }}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="bug-outline" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* RED TEST BUTTON - Universal Link Debug */}
+      <TouchableOpacity
+        style={styles.debugTestButton}
+        onPress={() => {
+          console.log('🔴 [TEST] Simulating universal link import for shareId: BVFdmcwG');
+          navigation.navigate('ImportSharedContent', { shareId: 'BVFdmcwG' });
+        }}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.debugTestButtonText}>TEST UNIVERSAL LINK</Text>
+      </TouchableOpacity>
 
       {/* Calendar Button - Bottom Left */}
       <View style={[styles.calendarButton, { backgroundColor: themeColor }]}>
@@ -1287,14 +1475,14 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       <Modal
         visible={shareModal.visible}
         transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShareModal({ visible: false, routine: null })}
+        animationType="none"
+        onRequestClose={hideShareModal}
       >
-        <View style={styles.newShareOverlay}>
+        <Animated.View style={[styles.newShareOverlay, { opacity: shareModalOpacity }]}>
           <TouchableOpacity 
             style={styles.newShareBackdrop}
             activeOpacity={1}
-            onPress={() => setShareModal({ visible: false, routine: null })}
+            onPress={hideShareModal}
           />
           
           <View style={[styles.newShareModal, { borderColor: themeColor }]}>
@@ -1302,7 +1490,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             <View style={styles.newShareHeader}>
               <TouchableOpacity
                 style={styles.newShareClose}
-                onPress={() => setShareModal({ visible: false, routine: null })}
+                onPress={hideShareModal}
                 activeOpacity={0.7}
               >
                 <Ionicons name="close" size={24} color="#ffffff" />
@@ -1324,41 +1512,68 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               <Text style={[styles.newShareTitle, { color: themeColor }]}>
                 {shareModal.routine?.name?.toUpperCase()}
               </Text>
-              <Text style={styles.newShareSubtitle}>Share your workout routine</Text>
+              
+              {/* QR Code Section */}
+              {shareModal.isGenerating ? (
+                <View style={styles.qrCodeContainer}>
+                  <View style={styles.qrCodePlaceholder}>
+                    <Ionicons name="refresh" size={32} color={themeColor} />
+                    <Text style={styles.qrCodeLoadingText}>Generating QR code...</Text>
+                  </View>
+                </View>
+              ) : shareModal.error ? (
+                <View style={styles.qrCodeContainer}>
+                  <View style={styles.qrCodePlaceholder}>
+                    <Ionicons name="warning" size={32} color="#ef4444" />
+                    <Text style={styles.qrCodeErrorText}>{shareModal.error}</Text>
+                  </View>
+                </View>
+              ) : shareModal.qrCode ? (
+                <View style={styles.qrCodeContainer}>
+                  <View style={styles.qrCodeWrapper}>
+                    <QRCode
+                      value={shareModal.qrCode}
+                      size={240}
+                      backgroundColor="white"
+                      color="black"
+                    />
+                  </View>
+                </View>
+              ) : null}
               
               {/* Action Buttons */}
               <View style={styles.shareActionButtons}>
-                <TouchableOpacity
-                  style={[styles.shareActionPrimary, { backgroundColor: themeColor }]}
-                  onPress={() => handleShare('copy')}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.shareButtonContent}>
-                    <Ionicons name="copy" size={22} color="#0a0a0b" />
-                    <View style={styles.shareButtonText}>
-                      <Text style={styles.shareButtonTitle}>COPY ROUTINE</Text>
-                      <Text style={styles.shareButtonSubtitle}>JSON to clipboard</Text>
+                {shareModal.error ? (
+                  <TouchableOpacity
+                    style={[styles.shareActionPrimary, { backgroundColor: themeColor }]}
+                    onPress={() => handleShare('retry')}
+                    activeOpacity={0.9}
+                  >
+                    <View style={styles.shareButtonSimple}>
+                      <Ionicons name="refresh" size={20} color="#0a0a0b" />
+                      <Text style={styles.shareButtonTitleSimple}>TRY AGAIN</Text>
                     </View>
-                  </View>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={styles.shareActionSecondary}
-                  onPress={() => handleShare('share')}
-                  activeOpacity={0.9}
-                >
-                  <View style={styles.shareButtonContent}>
-                    <Ionicons name="share-social" size={22} color="#22d3ee" />
-                    <View style={styles.shareButtonText}>
-                      <Text style={[styles.shareButtonTitle, { color: '#ffffff' }]}>SHARE</Text>
-                      <Text style={[styles.shareButtonSubtitle, { color: '#a1a1aa' }]}>Send to others</Text>
+                  </TouchableOpacity>
+                ) : shareModal.qrCode ? (
+                  <TouchableOpacity
+                    style={[styles.shareActionPrimary, { backgroundColor: themeColor }]}
+                    onPress={() => handleShare('shareUrl')}
+                    activeOpacity={0.9}
+                  >
+                    <View style={styles.shareButtonSimple}>
+                      <Ionicons name="share" size={20} color="#0a0a0b" />
+                      <Text style={styles.shareButtonTitleSimple}>SEND LINK</Text>
                     </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                ) : null}
               </View>
+              
+              {shareModal.qrCode && (
+                <Text style={styles.shareFooterText}>Link expires in 7 days</Text>
+              )}
             </View>
           </View>
-        </View>
+        </Animated.View>
       </Modal>
 
       {/* Custom Success Modal */}
@@ -2660,22 +2875,17 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 24,
   },
-  shareButtonContent: {
+  shareButtonSimple: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 16,
+    justifyContent: 'center',
+    gap: 12,
   },
-  shareButtonText: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  shareButtonTitle: {
+  shareButtonTitleSimple: {
     fontSize: 16,
     fontWeight: '700',
     color: '#0a0a0b',
     letterSpacing: 0.5,
-    marginBottom: 2,
   },
   shareButtonSubtitle: {
     fontSize: 13,
@@ -3023,5 +3233,82 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  
+  // QR Code styles
+  qrCodeContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  qrCodeWrapper: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  qrCodePlaceholder: {
+    width: 272,
+    height: 272,
+    backgroundColor: '#27272a',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#3f3f46',
+  },
+  qrCodeLoadingText: {
+    color: '#a1a1aa',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  qrCodeErrorText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  qrCodeDescription: {
+    color: '#a1a1aa',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  shareFooterText: {
+    color: '#71717a',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  debugTestButton: {
+    position: 'absolute',
+    top: 80,
+    left: 16,
+    right: 16,
+    backgroundColor: '#ef4444',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  debugTestButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
 });

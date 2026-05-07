@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -30,15 +30,20 @@ import RobustStorage from '../utils/robustStorage';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutProgram, Exercise } from '../types/workout';
 import WorkoutGeneratorStep1New from '../components/WorkoutGeneratorStep1New';
+import { fetchShare } from '../services/shareService';
 
 type ImportScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ImportRoutine'>;
+type ImportScreenRouteProp = RouteProp<RootStackParamList, 'ImportRoutine'>;
 
 // Interface moved to types/workout.ts - importing from there
 
-export default function ImportRoutineScreen({ route }: any) {
+export default function ImportRoutineScreen() {
   const navigation = useNavigation<ImportScreenNavigationProp>();
+  const route = useRoute<ImportScreenRouteProp>();
   const { themeColor } = useTheme();
-  const [isLoading, setIsLoading] = useState(false);
+  // Check if we have shareId and should show loading immediately
+  const { shareId } = route.params || {};
+  const [isLoading, setIsLoading] = useState(!!shareId); // Start loading if we have shareId
   const [parsedProgram, setParsedProgram] = useState<WorkoutProgram | null>(null);
   const [accumulatedPrograms, setAccumulatedPrograms] = useState<WorkoutProgram[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -55,7 +60,9 @@ export default function ImportRoutineScreen({ route }: any) {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [outputPreference, setOutputPreference] = useState<'copy_paste' | 'save_import'>('copy_paste');
   const [uploadMode, setUploadMode] = useState(false);
-  const [showStep1New, setShowStep1New] = useState(route?.params?.showStep1New || false);
+  const [showStep1New, setShowStep1New] = useState(
+    (route?.params?.mode === 'append-block') ? false : (route?.params?.showStep1New || false)
+  );
   const [showInfo, setShowInfo] = useState(false);
 
   // Mesocycle state
@@ -70,6 +77,10 @@ export default function ImportRoutineScreen({ route }: any) {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorLogs, setErrorLogs] = useState<string>('');
   const [errorLogsCopied, setErrorLogsCopied] = useState(false);
+
+  // Track if user cancelled prefilledJson import to prevent re-processing
+  const [prefilledCancelled, setPrefilledCancelled] = useState(false);
+
 
   // Handle schema version migration on component mount
   useEffect(() => {
@@ -100,6 +111,84 @@ export default function ImportRoutineScreen({ route }: any) {
   useEffect(() => {
     loadMesocycleContext();
   }, []);
+
+  // Handle shareId by fetching and converting to prefilledJson
+  useEffect(() => {
+    const { shareId } = route.params || {};
+    if (shareId && !parsedProgram && !prefilledCancelled) {
+      console.log('🔄 [SHARE-IMPORT] Starting share import with shareId:', shareId);
+      handleShareImport(shareId);
+    }
+  }, [route.params?.shareId, parsedProgram, prefilledCancelled]);
+
+  // Handle auto-import when prefilledJson is provided
+  useEffect(() => {
+    console.log('🏋️ [IMPORT ROUTINE] Auto-import useEffect triggered');
+    console.log('🏋️ [IMPORT ROUTINE] Route params:', route.params);
+    console.log('🏋️ [IMPORT ROUTINE] State check:', { 
+      isLoading, 
+      parsedProgram: !!parsedProgram, 
+      prefilledCancelled,
+      hasRouteParams: !!route.params 
+    });
+    
+    const { prefilledJson } = route.params || {};
+    console.log('🏋️ [IMPORT ROUTINE] prefilledJson present:', !!prefilledJson);
+    
+    if (prefilledJson) {
+      console.log('🏋️ [IMPORT ROUTINE] prefilledJson length:', prefilledJson.length);
+      console.log('🏋️ [IMPORT ROUTINE] prefilledJson sample:', prefilledJson.substring(0, 100) + '...');
+    }
+    
+    if (prefilledJson && !isLoading && !parsedProgram && !prefilledCancelled) {
+      console.log('🔄 [AUTO-IMPORT] All conditions met - starting auto-import');
+      console.log('🔄 [AUTO-IMPORT] JSON length:', prefilledJson.length);
+      console.log('🔄 [AUTO-IMPORT] About to call processWorkoutData');
+      processWorkoutData(prefilledJson);
+      console.log('🔄 [AUTO-IMPORT] processWorkoutData call completed');
+    } else {
+      console.log('🔄 [AUTO-IMPORT] Conditions not met for auto-import:', {
+        hasPrefilledJson: !!prefilledJson,
+        isNotLoading: !isLoading,
+        noParsedProgram: !parsedProgram,
+        notCancelled: !prefilledCancelled
+      });
+    }
+  }, [route.params?.prefilledJson, isLoading, parsedProgram, prefilledCancelled]);
+
+  // Handle share import by fetching and processing
+  const handleShareImport = async (shareId: string) => {
+    try {
+      const sharedData = await fetchShare(shareId);
+      
+      // Extract the workout data from the shared structure
+      const sharedDataAny = sharedData as any;
+      let workoutData;
+      if (sharedDataAny.data && sharedDataAny.data.workoutData) {
+        workoutData = sharedDataAny.data.workoutData;
+      } else if (sharedDataAny.workoutData) {
+        workoutData = sharedDataAny.workoutData;
+      } else {
+        workoutData = sharedDataAny;
+      }
+      
+      if (!workoutData || typeof workoutData !== 'object') {
+        throw new Error('Invalid workout data received');
+      }
+      
+      // Convert to JSON string and process directly
+      const jsonString = JSON.stringify(workoutData);
+      processWorkoutData(jsonString);
+      
+    } catch (error) {
+      console.error('Share import error:', error);
+      // For now, just set an error message - could enhance with better error handling
+      setErrorMessage('Failed to load shared workout: ' + (error?.message || 'Unknown error'));
+    }
+  };
+
+  // Auto-confirm import when we have a parsed program from prefilledJson
+  // REMOVED: Let user see confirmation screen and click "Start Training" to create workout
 
   // Handle schema version migration - clear old format data
   const handleSchemaMigration = async () => {
@@ -772,40 +861,71 @@ export default function ImportRoutineScreen({ route }: any) {
   };
 
   const processWorkoutData = async (text: string) => {
+    console.log('⚙️ [PROCESS WORKOUT] Starting processWorkoutData');
+    console.log('⚙️ [PROCESS WORKOUT] Text length:', text.length);
+    console.log('⚙️ [PROCESS WORKOUT] Text sample:', text.substring(0, 200) + '...');
+    console.log('⚙️ [PROCESS WORKOUT] Current state:', { isLoading, showAddMoreMode, accumulatedProgramsCount: accumulatedPrograms.length });
+    
     setIsLoading(true);
+    console.log('⚙️ [PROCESS WORKOUT] Set isLoading to true');
+    
     const startTime = Date.now();
     setGenerationStartTime(startTime);
+    console.log('⚙️ [PROCESS WORKOUT] Set generation start time:', startTime);
     
     // Simulate processing time for better UX
     setTimeout(() => {
-      const program = validateAndParseJSON(text);
-      const endTime = Date.now();
-      const totalTime = (endTime - startTime) / 1000; // Convert to seconds
-      setGenerationTime(totalTime);
-      setIsLoading(false);
+      console.log('⚙️ [PROCESS WORKOUT] Timeout callback started - about to call validateAndParseJSON');
+      
+      try {
+        const program = validateAndParseJSON(text);
+        console.log('⚙️ [PROCESS WORKOUT] validateAndParseJSON result:', program ? 'SUCCESS' : 'FAILED');
+        
+        if (program) {
+          console.log('⚙️ [PROCESS WORKOUT] Program keys:', Object.keys(program));
+          console.log('⚙️ [PROCESS WORKOUT] Program name:', program.routine_name);
+        }
+        
+        const endTime = Date.now();
+        const totalTime = (endTime - startTime) / 1000; // Convert to seconds
+        console.log('⚙️ [PROCESS WORKOUT] Processing completed in:', totalTime, 'seconds');
+        
+        setGenerationTime(totalTime);
+        setIsLoading(false);
+        console.log('⚙️ [PROCESS WORKOUT] Set isLoading to false');
       
       if (program) {
+        console.log('⚙️ [PROCESS WORKOUT] Program validation successful - starting import flow');
+        
         // Generate unique ID for this program import
         const programId = Date.now().toString() + Math.random().toString(36);
         program.id = programId;
+        console.log('⚙️ [PROCESS WORKOUT] Assigned program ID:', programId);
         
         // If we're in add more mode, add to existing programs
         // If we're in main import mode, start fresh
         const newAccumulated = showAddMoreMode ? [...accumulatedPrograms, program] : [program];
+        console.log('⚙️ [PROCESS WORKOUT] Accumulated programs count:', newAccumulated.length, 'showAddMoreMode:', showAddMoreMode);
         setAccumulatedPrograms(newAccumulated);
         
         // Create the merged program for display
         try {
+          console.log('⚙️ [PROCESS WORKOUT] About to merge programs');
           const mergedProgram = mergePrograms(newAccumulated);
+          console.log('⚙️ [PROCESS WORKOUT] Program merge successful');
           setParsedProgram(mergedProgram);
+          console.log('⚙️ [PROCESS WORKOUT] setParsedProgram called with merged program');
           
           // If we're in add more mode, go back to confirmation view
           if (showAddMoreMode) {
+            console.log('⚙️ [PROCESS WORKOUT] Add more mode - setting showAddMoreMode to false');
             setShowAddMoreMode(false);
           } else {
+            console.log('⚙️ [PROCESS WORKOUT] Main import mode - showing confirmation modal');
             setShowConfirmation(true);
             
             // Animate modal entrance with futuristic easing
+            console.log('⚙️ [PROCESS WORKOUT] Starting modal animations');
             Animated.parallel([
               Animated.timing(modalScale, {
                 toValue: 1,
@@ -818,13 +938,26 @@ export default function ImportRoutineScreen({ route }: any) {
                 useNativeDriver: true,
               }),
             ]).start();
+            console.log('⚙️ [PROCESS WORKOUT] Modal animations started');
           }
         } catch (mergeError) {
           const error = mergeError as Error;
+          console.error('⚙️ [PROCESS WORKOUT] Program merge failed:', error);
+          console.error('⚙️ [PROCESS WORKOUT] Merge error details:', error.stack);
           setErrorMessage(`Cannot combine programs: ${error.message}`);
           // Reset accumulated programs on error
           setAccumulatedPrograms([]);
+          console.log('⚙️ [PROCESS WORKOUT] Reset accumulated programs due to merge error');
         }
+      } else {
+        console.error('⚙️ [PROCESS WORKOUT] Program validation failed - no program returned from validateAndParseJSON');
+      }
+      
+      } catch (outerError) {
+        console.error('⚙️ [PROCESS WORKOUT] Outer try-catch error:', outerError);
+        console.error('⚙️ [PROCESS WORKOUT] Outer error stack:', outerError?.stack);
+        setIsLoading(false);
+        setErrorMessage('Failed to process workout data: ' + (outerError?.message || 'Unknown error'));
       }
     }, 800);
   };
@@ -832,6 +965,13 @@ export default function ImportRoutineScreen({ route }: any) {
   const handleConfirmImport = async () => {
     if (parsedProgram) {
       try {
+        // Check if this is append-block mode
+        const { mode, targetWorkoutId } = route.params || {};
+        if (mode === 'append-block' && targetWorkoutId) {
+          await handleAppendBlocks(parsedProgram, targetWorkoutId);
+          return;
+        }
+        
         // Handle mesocycle program association if applicable
         await handleMesocycleProgramAssociation(parsedProgram);
 
@@ -909,6 +1049,15 @@ export default function ImportRoutineScreen({ route }: any) {
 
 
   const handleModalCancel = () => {
+    // If this was from a shared import (shareId or prefilledJson), navigate back to home instead of staying here
+    const { prefilledJson, shareId } = route.params || {};
+    if (prefilledJson || shareId) {
+      setPrefilledCancelled(true);
+      // Navigate to home screen for shared imports
+      navigation.navigate('Main');
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(modalScale, {
         toValue: 0,
@@ -1539,7 +1688,6 @@ export default function ImportRoutineScreen({ route }: any) {
         
         // Restore custom mesocycles
         const customMesocycles = (metadata.importedProgram as any)._customMesocycles;
-        console.log(`📥 Import: _customMesocycles in import data:`, customMesocycles ? `${customMesocycles.length} custom mesocycles` : 'NOT FOUND');
         if (customMesocycles && customMesocycles.length > 0) {
           const customMesocyclesKey = `custom_mesocycles_${newRoutineId}`;
           
@@ -1553,20 +1701,16 @@ export default function ImportRoutineScreen({ route }: any) {
           console.log(`🎯 Restored ${customMesocycles.length} custom mesocycles`);
           
           // Restore manual blocks for custom mesocycles
-          console.log(`📥 Import: Processing ${customMesocycles.length} custom mesocycles for manual blocks`);
-          console.log(`📥 Import: Total manual blocks in metadata: ${metadata.manualBlocks?.length || 0}`);
           
           for (let i = 0; i < customMesocycles.length; i++) {
             const originalCustomId = customMesocycles[i].customId;
             const newCustomId = updatedCustomMesocycles[i].customId;
             
-            console.log(`📥 Import: Checking custom mesocycle ${originalCustomId} -> ${newCustomId}`);
             
             const customManualBlocks = metadata.manualBlocks?.filter(
               block => block.customMesocycleId === originalCustomId
             );
             
-            console.log(`📥 Import: Found ${customManualBlocks?.length || 0} manual blocks for custom mesocycle ${originalCustomId}`);
             
             if (customManualBlocks && customManualBlocks.length > 0) {
               const cleanBlocks = customManualBlocks.map(block => {
@@ -1577,7 +1721,6 @@ export default function ImportRoutineScreen({ route }: any) {
               
               const customManualBlocksKey = `manual_blocks_${newCustomId}`;
               await AsyncStorage.setItem(customManualBlocksKey, JSON.stringify(cleanBlocks));
-              console.log(`📥 Import: Restored ${cleanBlocks.length} manual blocks for custom mesocycle ${newCustomId}`);
             }
           }
         }
@@ -1644,6 +1787,113 @@ export default function ImportRoutineScreen({ route }: any) {
     } catch (error) {
       console.error('Error checking mesocycle completion:', error);
       // Don't throw - this is not critical to the import flow
+    }
+  };
+
+  const handleAppendBlocks = async (parsedProgram: WorkoutProgram, targetWorkoutId: string) => {
+    try {
+      console.log('🔄 [APPEND-BLOCKS] Starting append blocks process');
+      console.log('🔄 [APPEND-BLOCKS] Target workout ID:', targetWorkoutId);
+      console.log('🔄 [APPEND-BLOCKS] Parsed program:', JSON.stringify(parsedProgram, null, 2));
+      
+      // Load the existing workout
+      const existingRoutines = await WorkoutStorage.loadRoutines();
+      console.log('🔄 [APPEND-BLOCKS] Found routines:', existingRoutines.map(r => ({ id: r.id, name: r.name })));
+      
+      const targetRoutine = existingRoutines.find(r => r.id === targetWorkoutId);
+      console.log('🔄 [APPEND-BLOCKS] Target routine found:', !!targetRoutine);
+      
+      if (!targetRoutine) {
+        console.error('❌ [APPEND-BLOCKS] Target workout not found');
+        Alert.alert('Error', 'Target workout not found');
+        return;
+      }
+
+      // Extract blocks from the parsed program
+      let blocksToAppend: any[] = [];
+      
+      if (parsedProgram.blocks && Array.isArray(parsedProgram.blocks)) {
+        // If pasted JSON is a full workout with blocks array
+        blocksToAppend = parsedProgram.blocks;
+        console.log('🔄 [APPEND-BLOCKS] Extracted blocks from workout:', blocksToAppend.length);
+      } else if ((parsedProgram as any).block_name && (parsedProgram as any).days) {
+        // If pasted JSON is a single block object
+        blocksToAppend = [parsedProgram];
+        console.log('🔄 [APPEND-BLOCKS] Using single block object');
+      } else {
+        console.error('❌ [APPEND-BLOCKS] Invalid block format');
+        Alert.alert('Error', 'Invalid block format. Please paste a valid block or workout JSON.');
+        return;
+      }
+      
+      console.log('🔄 [APPEND-BLOCKS] Blocks to append:', blocksToAppend.length);
+
+      // Append blocks to the existing workout
+      const originalBlockCount = targetRoutine.data.blocks?.length || 0;
+      const updatedWorkout = {
+        ...targetRoutine,
+        data: {
+          ...targetRoutine.data,
+          blocks: [...(targetRoutine.data.blocks || []), ...blocksToAppend]
+        },
+        blocks: originalBlockCount + blocksToAppend.length
+      };
+
+      console.log('🔄 [APPEND-BLOCKS] Original block count:', originalBlockCount);
+      console.log('🔄 [APPEND-BLOCKS] New block count:', updatedWorkout.blocks);
+      console.log('🔄 [APPEND-BLOCKS] Updated workout blocks:', updatedWorkout.data.blocks.map(b => b.block_name));
+
+      // Save the updated workout
+      const updatedRoutines = existingRoutines.map(r => 
+        r.id === targetWorkoutId ? updatedWorkout : r
+      );
+      
+      console.log('🔄 [APPEND-BLOCKS] Saving updated routines...');
+      await WorkoutStorage.saveRoutines(updatedRoutines);
+      console.log('✅ [APPEND-BLOCKS] Successfully saved updated routines');
+
+      // Success animation
+      Animated.sequence([
+        Animated.spring(successScale, {
+          toValue: 1.2,
+          useNativeDriver: true,
+        }),
+        Animated.spring(successScale, {
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      setTimeout(() => {
+        // Animate modal exit
+        Animated.parallel([
+          Animated.timing(modalScale, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(modalOpacity, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setShowConfirmation(false);
+          modalScale.setValue(0);
+          modalOpacity.setValue(0);
+          successScale.setValue(0);
+          
+          // Navigate back to the block list with refresh trigger
+          navigation.navigate('Blocks', {
+            routine: targetRoutine,
+            refresh: Date.now() // Force refresh with timestamp
+          } as any);
+        });
+      }, 500);
+
+    } catch (error) {
+      console.error('Error appending blocks:', error);
+      Alert.alert('Error', 'Failed to append blocks to workout');
     }
   };
 
@@ -1760,7 +2010,12 @@ export default function ImportRoutineScreen({ route }: any) {
 
 
   const handleCancel = () => {
-    setShowStep1New(true);
+    // Don't show Step1 if we're in append-block mode
+    if (route?.params?.mode === 'append-block') {
+      navigation.goBack();
+    } else {
+      setShowStep1New(true);
+    }
   };
 
   // Show WorkoutGeneratorStep1New if requested
@@ -1783,7 +2038,9 @@ export default function ImportRoutineScreen({ route }: any) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={themeColor} />
-        <Text style={styles.loadingText}>Processing routine...</Text>
+        <Text style={styles.loadingText}>
+          {shareId ? "Loading shared workout..." : "Processing routine..."}
+        </Text>
       </View>
     );
   }
@@ -1852,7 +2109,10 @@ export default function ImportRoutineScreen({ route }: any) {
         {showInfo && (
           <View style={styles.headerInfoModal}>
             <Text style={styles.headerInfoMessage}>
-              The AI will create a JSON file. Either copy this file or save it. Either option works perfectly fine. Import it using the button below.
+              {route?.params?.mode === 'append-block' 
+                ? "Add one block to this workout by importing a JSON file below."
+                : "The AI will create a JSON file. Either copy this file or save it. Either option works perfectly fine. Import it using the button below."
+              }
             </Text>
           </View>
         )}
@@ -2001,11 +2261,34 @@ export default function ImportRoutineScreen({ route }: any) {
 
                   {/* Main Content */}
                   <View style={styles.mainContent}>
-                    <Text style={styles.title}>Workout Ready</Text>
-                    <Text style={styles.routineName}>{parsedProgram?.routine_name}</Text>
+                    <Text style={styles.title}>
+                      {route.params?.mode === 'append-block' ? 'Blocks Ready' : 'Workout Ready'}
+                    </Text>
+                    <Text style={styles.routineName}>
+                      {route.params?.mode === 'append-block' 
+                        ? (() => {
+                            // Extract block names for display
+                            if (parsedProgram?.blocks && Array.isArray(parsedProgram.blocks)) {
+                              // Multiple blocks case
+                              const blockNames = parsedProgram.blocks.map(block => block.block_name).filter(Boolean);
+                              return blockNames.length > 1 
+                                ? `${blockNames.length} Blocks`
+                                : blockNames[0] || 'Block';
+                            } else if ((parsedProgram as any)?.block_name) {
+                              // Single block case
+                              return (parsedProgram as any).block_name;
+                            }
+                            return 'Block';
+                          })()
+                        : parsedProgram?.routine_name
+                      }
+                    </Text>
                     
                     {/* Program Summary */}
-                    <View style={styles.summaryCard}>
+                    <View style={[
+                      styles.summaryCard,
+                      route.params?.mode === 'append-block' && { paddingVertical: 28 }
+                    ]}>
                       <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Training Days</Text>
                         <Text style={[styles.summaryValue, { color: themeColor }]}>{parsedProgram?.days_per_week} per week</Text>
@@ -2055,10 +2338,12 @@ export default function ImportRoutineScreen({ route }: any) {
                       onPress={handleConfirmImport}
                       activeOpacity={0.9}
                     >
-                      <Text style={styles.createButtonText}>Start Training</Text>
+                      <Text style={styles.createButtonText}>
+                        {route.params?.mode === 'append-block' ? 'Add Block' : 'Start Training'}
+                      </Text>
                     </TouchableOpacity>
 
-                    {accumulatedPrograms.length > 0 && (
+                    {accumulatedPrograms.length > 0 && route.params?.mode !== 'append-block' && (
                       <TouchableOpacity
                         style={[styles.secondaryActionButton, { borderColor: themeColor, marginTop: 12, marginBottom: 0 }]}
                         onPress={handleAddMoreFiles}

@@ -29,6 +29,7 @@ interface WorkoutForDisplay {
 }
 
 export default function MyWorkoutsScreen() {
+  console.log('🏋️ [MY WORKOUTS] MyWorkoutsScreen rendering...');
   const { themeColor } = useTheme();
   const navigation = useNavigation<MyWorkoutsNavigationProp>();
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -126,6 +127,7 @@ export default function MyWorkoutsScreen() {
           <Text style={styles.headerTitle}>My Workouts</Text>
           <View style={styles.placeholder} />
         </View>
+
 
         {/* User Workouts */}
         {userWorkouts.length === 0 ? (

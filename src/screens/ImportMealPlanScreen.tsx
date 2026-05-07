@@ -59,6 +59,16 @@ export default function ImportMealPlanScreen() {
 
   // Handle the showStep1New parameter
   const showStep1New = route.params?.showStep1New;
+  
+  // Handle prefilledJson parameter for shared meal plans
+  const prefilledJson = route.params?.prefilledJson;
+  
+  // Auto-trigger import if prefilledJson is provided
+  useEffect(() => {
+    if (prefilledJson && !showStep1New) {
+      processMealPlanData(prefilledJson);
+    }
+  }, [prefilledJson, showStep1New]);
 
   // Show NutritionGeneratorStep1New if showStep1New is true
   if (showStep1New) {

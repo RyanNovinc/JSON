@@ -10,7 +10,7 @@ export const generateJsonConversionPrompt = (outputPreference?: string): string 
 **You MUST:**
 1. Create a file (use Code Interpreter on ChatGPT, or computer tool on Claude)
 2. Write the complete JSON structure to the file
-3. If you reach output limits, STOP at the end of a complete day, then continue appending to the same file
+3. If you reach output limits, STOP at the end of a complete day, then continue appending to the same file\
 4. Never stop mid-day or mid-meal
 5. When finished, provide the download link`;
 
