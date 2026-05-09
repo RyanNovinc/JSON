@@ -546,6 +546,66 @@ let seatedCableRowBlueEnd: any = null;
 let seatedCableRowPinkStart: any = null;
 let seatedCableRowPinkEnd: any = null;
 
+// Chest-supported T-bar row images
+let chestSupportedTBarRowBlueStart: any = null;
+let chestSupportedTBarRowBlueEnd: any = null;
+let chestSupportedTBarRowPinkStart: any = null;
+let chestSupportedTBarRowPinkEnd: any = null;
+
+// T-bar row images
+let tBarRowBlueStart: any = null;
+let tBarRowBlueEnd: any = null;
+let tBarRowPinkStart: any = null;
+let tBarRowPinkEnd: any = null;
+
+// Chest-supported dumbbell row images
+let chestSupportedDumbbellRowBlueStart: any = null;
+let chestSupportedDumbbellRowBlueEnd: any = null;
+let chestSupportedDumbbellRowPinkStart: any = null;
+let chestSupportedDumbbellRowPinkEnd: any = null;
+
+// Single-arm dumbbell row images
+let singleArmDumbbellRowBlueStart: any = null;
+let singleArmDumbbellRowBlueEnd: any = null;
+let singleArmDumbbellRowPinkStart: any = null;
+let singleArmDumbbellRowPinkEnd: any = null;
+
+// Seated barbell overhead press images
+let seatedBarbellOverheadPressBlueStart: any = null;
+let seatedBarbellOverheadPressBlueEnd: any = null;
+let seatedBarbellOverheadPressPinkStart: any = null;
+let seatedBarbellOverheadPressPinkEnd: any = null;
+
+// Machine shoulder press images
+let machineShoulderPressBlueStart: any = null;
+let machineShoulderPressBlueEnd: any = null;
+let machineShoulderPressPinkStart: any = null;
+let machineShoulderPressPinkEnd: any = null;
+
+// Cable lateral raise images
+let cableLateralRaiseBlueStart: any = null;
+let cableLateralRaiseBlueEnd: any = null;
+let cableLateralRaisePinkStart: any = null;
+let cableLateralRaisePinkEnd: any = null;
+
+// Face pull images
+let facePullBlueStart: any = null;
+let facePullBlueEnd: any = null;
+let facePullPinkStart: any = null;
+let facePullPinkEnd: any = null;
+
+// Reverse pec deck images
+let reversePecDeckBlueStart: any = null;
+let reversePecDeckBlueEnd: any = null;
+let reversePecDeckPinkStart: any = null;
+let reversePecDeckPinkEnd: any = null;
+
+// EZ-bar curl images
+let ezBarCurlBlueStart: any = null;
+let ezBarCurlBlueEnd: any = null;
+let ezBarCurlPinkStart: any = null;
+let ezBarCurlPinkEnd: any = null;
+
 try {
   console.log('🔄 ATTEMPTING to load exercise images...');
   
@@ -1549,6 +1609,356 @@ try {
     console.log('❌ No seated-cable-row pink end.png found:', e.message);
   }
   
+  // Load chest-supported T-bar row images
+  console.log('🏋️ Loading chest-supported T-bar row...');
+  
+  // Blue start
+  try {
+    chestSupportedTBarRowBlueStart = require('../../exercise-images/chest-supported-t-bar-row/blue/start.png');
+    console.log('✅ Loaded chest-supported-t-bar-row blue start.png');
+  } catch (e) {
+    console.log('❌ No chest-supported-t-bar-row blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    chestSupportedTBarRowBlueEnd = require('../../exercise-images/chest-supported-t-bar-row/blue/end.png');
+    console.log('✅ Loaded chest-supported-t-bar-row blue end.png');
+  } catch (e) {
+    console.log('❌ No chest-supported-t-bar-row blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    chestSupportedTBarRowPinkStart = require('../../exercise-images/chest-supported-t-bar-row/pink/start.png');
+    console.log('✅ Loaded chest-supported-t-bar-row pink start.png');
+  } catch (e) {
+    console.log('❌ No chest-supported-t-bar-row pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    chestSupportedTBarRowPinkEnd = require('../../exercise-images/chest-supported-t-bar-row/pink/end.png');
+    console.log('✅ Loaded chest-supported-t-bar-row pink end.png');
+  } catch (e) {
+    console.log('❌ No chest-supported-t-bar-row pink end.png found:', e.message);
+  }
+  
+  // Load T-bar row images
+  console.log('🏋️ Loading T-bar row...');
+  
+  // Blue start
+  try {
+    tBarRowBlueStart = require('../../exercise-images/t-bar-row/blue/start.png');
+    console.log('✅ Loaded t-bar-row blue start.png');
+  } catch (e) {
+    console.log('❌ No t-bar-row blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    tBarRowBlueEnd = require('../../exercise-images/t-bar-row/blue/end.png');
+    console.log('✅ Loaded t-bar-row blue end.png');
+  } catch (e) {
+    console.log('❌ No t-bar-row blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    tBarRowPinkStart = require('../../exercise-images/t-bar-row/pink/start.png');
+    console.log('✅ Loaded t-bar-row pink start.png');
+  } catch (e) {
+    console.log('❌ No t-bar-row pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    tBarRowPinkEnd = require('../../exercise-images/t-bar-row/pink/end.png');
+    console.log('✅ Loaded t-bar-row pink end.png');
+  } catch (e) {
+    console.log('❌ No t-bar-row pink end.png found:', e.message);
+  }
+  
+  // Load chest-supported dumbbell row images
+  console.log('🏋️ Loading chest-supported dumbbell row...');
+  
+  // Blue start
+  try {
+    chestSupportedDumbbellRowBlueStart = require('../../exercise-images/chest-supported-dumbbell-row/blue/start.png');
+    console.log('✅ Loaded chest-supported-dumbbell-row blue start.png');
+  } catch (e) {
+    console.log('❌ No chest-supported-dumbbell-row blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    chestSupportedDumbbellRowBlueEnd = require('../../exercise-images/chest-supported-dumbbell-row/blue/end.png');
+    console.log('✅ Loaded chest-supported-dumbbell-row blue end.png');
+  } catch (e) {
+    console.log('❌ No chest-supported-dumbbell-row blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    chestSupportedDumbbellRowPinkStart = require('../../exercise-images/chest-supported-dumbbell-row/pink/start.png');
+    console.log('✅ Loaded chest-supported-dumbbell-row pink start.png');
+  } catch (e) {
+    console.log('❌ No chest-supported-dumbbell-row pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    chestSupportedDumbbellRowPinkEnd = require('../../exercise-images/chest-supported-dumbbell-row/pink/end.png');
+    console.log('✅ Loaded chest-supported-dumbbell-row pink end.png');
+  } catch (e) {
+    console.log('❌ No chest-supported-dumbbell-row pink end.png found:', e.message);
+  }
+  
+  // Load single-arm dumbbell row images
+  console.log('🏋️ Loading single-arm dumbbell row...');
+  
+  // Blue start
+  try {
+    singleArmDumbbellRowBlueStart = require('../../exercise-images/single-arm-dumbbell-row/blue/start.png');
+    console.log('✅ Loaded single-arm-dumbbell-row blue start.png');
+  } catch (e) {
+    console.log('❌ No single-arm-dumbbell-row blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    singleArmDumbbellRowBlueEnd = require('../../exercise-images/single-arm-dumbbell-row/blue/end.png');
+    console.log('✅ Loaded single-arm-dumbbell-row blue end.png');
+  } catch (e) {
+    console.log('❌ No single-arm-dumbbell-row blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    singleArmDumbbellRowPinkStart = require('../../exercise-images/single-arm-dumbbell-row/pink/start.png');
+    console.log('✅ Loaded single-arm-dumbbell-row pink start.png');
+  } catch (e) {
+    console.log('❌ No single-arm-dumbbell-row pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    singleArmDumbbellRowPinkEnd = require('../../exercise-images/single-arm-dumbbell-row/pink/end.png');
+    console.log('✅ Loaded single-arm-dumbbell-row pink end.png');
+  } catch (e) {
+    console.log('❌ No single-arm-dumbbell-row pink end.png found:', e.message);
+  }
+  
+  // Load seated barbell overhead press images
+  console.log('🏋️ Loading seated barbell overhead press...');
+  
+  // Blue start
+  try {
+    seatedBarbellOverheadPressBlueStart = require('../../exercise-images/seated-barbell-overhead-press/blue/start.png');
+    console.log('✅ Loaded seated-barbell-overhead-press blue start.png');
+  } catch (e) {
+    console.log('❌ No seated-barbell-overhead-press blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    seatedBarbellOverheadPressBlueEnd = require('../../exercise-images/seated-barbell-overhead-press/blue/end.png');
+    console.log('✅ Loaded seated-barbell-overhead-press blue end.png');
+  } catch (e) {
+    console.log('❌ No seated-barbell-overhead-press blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    seatedBarbellOverheadPressPinkStart = require('../../exercise-images/seated-barbell-overhead-press/pink/start.png');
+    console.log('✅ Loaded seated-barbell-overhead-press pink start.png');
+  } catch (e) {
+    console.log('❌ No seated-barbell-overhead-press pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    seatedBarbellOverheadPressPinkEnd = require('../../exercise-images/seated-barbell-overhead-press/pink/end.png');
+    console.log('✅ Loaded seated-barbell-overhead-press pink end.png');
+  } catch (e) {
+    console.log('❌ No seated-barbell-overhead-press pink end.png found:', e.message);
+  }
+  
+  // Load machine shoulder press images
+  console.log('🏋️ Loading machine shoulder press...');
+  
+  // Blue start
+  try {
+    machineShoulderPressBlueStart = require('../../exercise-images/machine-shoulder-press/blue/start.png');
+    console.log('✅ Loaded machine-shoulder-press blue start.png');
+  } catch (e) {
+    console.log('❌ No machine-shoulder-press blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    machineShoulderPressBlueEnd = require('../../exercise-images/machine-shoulder-press/blue/end.png');
+    console.log('✅ Loaded machine-shoulder-press blue end.png');
+  } catch (e) {
+    console.log('❌ No machine-shoulder-press blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    machineShoulderPressPinkStart = require('../../exercise-images/machine-shoulder-press/pink/start.png');
+    console.log('✅ Loaded machine-shoulder-press pink start.png');
+  } catch (e) {
+    console.log('❌ No machine-shoulder-press pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    machineShoulderPressPinkEnd = require('../../exercise-images/machine-shoulder-press/pink/end.png');
+    console.log('✅ Loaded machine-shoulder-press pink end.png');
+  } catch (e) {
+    console.log('❌ No machine-shoulder-press pink end.png found:', e.message);
+  }
+  
+  // Load cable lateral raise images
+  console.log('🏋️ Loading cable lateral raise...');
+  
+  // Blue start
+  try {
+    cableLateralRaiseBlueStart = require('../../exercise-images/cable-lateral-raise/blue/start.png');
+    console.log('✅ Loaded cable-lateral-raise blue start.png');
+  } catch (e) {
+    console.log('❌ No cable-lateral-raise blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    cableLateralRaiseBlueEnd = require('../../exercise-images/cable-lateral-raise/blue/end.png');
+    console.log('✅ Loaded cable-lateral-raise blue end.png');
+  } catch (e) {
+    console.log('❌ No cable-lateral-raise blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    cableLateralRaisePinkStart = require('../../exercise-images/cable-lateral-raise/pink/start.png');
+    console.log('✅ Loaded cable-lateral-raise pink start.png');
+  } catch (e) {
+    console.log('❌ No cable-lateral-raise pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    cableLateralRaisePinkEnd = require('../../exercise-images/cable-lateral-raise/pink/end.png');
+    console.log('✅ Loaded cable-lateral-raise pink end.png');
+  } catch (e) {
+    console.log('❌ No cable-lateral-raise pink end.png found:', e.message);
+  }
+  
+  // Load face pull images
+  console.log('🏋️ Loading face pull...');
+  
+  // Blue start
+  try {
+    facePullBlueStart = require('../../exercise-images/face-pull/blue/start.png');
+    console.log('✅ Loaded face-pull blue start.png');
+  } catch (e) {
+    console.log('❌ No face-pull blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    facePullBlueEnd = require('../../exercise-images/face-pull/blue/end.png');
+    console.log('✅ Loaded face-pull blue end.png');
+  } catch (e) {
+    console.log('❌ No face-pull blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    facePullPinkStart = require('../../exercise-images/face-pull/pink/start.png');
+    console.log('✅ Loaded face-pull pink start.png');
+  } catch (e) {
+    console.log('❌ No face-pull pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    facePullPinkEnd = require('../../exercise-images/face-pull/pink/end.png');
+    console.log('✅ Loaded face-pull pink end.png');
+  } catch (e) {
+    console.log('❌ No face-pull pink end.png found:', e.message);
+  }
+  
+  // Load reverse pec deck images
+  console.log('🏋️ Loading reverse pec deck...');
+  
+  // Blue start
+  try {
+    reversePecDeckBlueStart = require('../../exercise-images/reverse-pec-deck/blue/start.png');
+    console.log('✅ Loaded reverse-pec-deck blue start.png');
+  } catch (e) {
+    console.log('❌ No reverse-pec-deck blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    reversePecDeckBlueEnd = require('../../exercise-images/reverse-pec-deck/blue/end.png');
+    console.log('✅ Loaded reverse-pec-deck blue end.png');
+  } catch (e) {
+    console.log('❌ No reverse-pec-deck blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    reversePecDeckPinkStart = require('../../exercise-images/reverse-pec-deck/pink/start.png');
+    console.log('✅ Loaded reverse-pec-deck pink start.png');
+  } catch (e) {
+    console.log('❌ No reverse-pec-deck pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    reversePecDeckPinkEnd = require('../../exercise-images/reverse-pec-deck/pink/end.png');
+    console.log('✅ Loaded reverse-pec-deck pink end.png');
+  } catch (e) {
+    console.log('❌ No reverse-pec-deck pink end.png found:', e.message);
+  }
+  
+  // Load EZ-bar curl images
+  console.log('🏋️ Loading EZ-bar curl...');
+  
+  // Blue start
+  try {
+    ezBarCurlBlueStart = require('../../exercise-images/ez-bar-curl/blue/start.png');
+    console.log('✅ Loaded ez-bar-curl blue start.png');
+  } catch (e) {
+    console.log('❌ No ez-bar-curl blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    ezBarCurlBlueEnd = require('../../exercise-images/ez-bar-curl/blue/end.png');
+    console.log('✅ Loaded ez-bar-curl blue end.png');
+  } catch (e) {
+    console.log('❌ No ez-bar-curl blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    ezBarCurlPinkStart = require('../../exercise-images/ez-bar-curl/pink/start.png');
+    console.log('✅ Loaded ez-bar-curl pink start.png');
+  } catch (e) {
+    console.log('❌ No ez-bar-curl pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    ezBarCurlPinkEnd = require('../../exercise-images/ez-bar-curl/pink/end.png');
+    console.log('✅ Loaded ez-bar-curl pink end.png');
+  } catch (e) {
+    console.log('❌ No ez-bar-curl pink end.png found:', e.message);
+  }
+  
   console.log('✅ Finished loading all images:', { 
     benchPress: { blue: { barbellBenchPressBlueStart, barbellBenchPressBlueEnd }, pink: { barbellBenchPressPinkStart, barbellBenchPressPinkEnd } },
     backSquat: { blue: { barbellBackSquatBlueStart, barbellBackSquatBlueEnd }, pink: { barbellBackSquatPinkStart, barbellBackSquatPinkEnd } },
@@ -1577,7 +1987,17 @@ try {
     pecDeckFly: { blue: { pecDeckFlyBlueStart, pecDeckFlyBlueEnd }, pink: { pecDeckFlyPinkStart, pecDeckFlyPinkEnd } },
     weightedPullUp: { blue: { weightedPullUpBlueStart, weightedPullUpBlueEnd }, pink: { weightedPullUpPinkStart, weightedPullUpPinkEnd } },
     chinUp: { blue: { chinUpBlueStart, chinUpBlueEnd }, pink: { chinUpPinkStart, chinUpPinkEnd } },
-    seatedCableRow: { blue: { seatedCableRowBlueStart, seatedCableRowBlueEnd }, pink: { seatedCableRowPinkStart, seatedCableRowPinkEnd } }
+    seatedCableRow: { blue: { seatedCableRowBlueStart, seatedCableRowBlueEnd }, pink: { seatedCableRowPinkStart, seatedCableRowPinkEnd } },
+    chestSupportedTBarRow: { blue: { chestSupportedTBarRowBlueStart, chestSupportedTBarRowBlueEnd }, pink: { chestSupportedTBarRowPinkStart, chestSupportedTBarRowPinkEnd } },
+    tBarRow: { blue: { tBarRowBlueStart, tBarRowBlueEnd }, pink: { tBarRowPinkStart, tBarRowPinkEnd } },
+    chestSupportedDumbbellRow: { blue: { chestSupportedDumbbellRowBlueStart, chestSupportedDumbbellRowBlueEnd }, pink: { chestSupportedDumbbellRowPinkStart, chestSupportedDumbbellRowPinkEnd } },
+    singleArmDumbbellRow: { blue: { singleArmDumbbellRowBlueStart, singleArmDumbbellRowBlueEnd }, pink: { singleArmDumbbellRowPinkStart, singleArmDumbbellRowPinkEnd } },
+    seatedBarbellOverheadPress: { blue: { seatedBarbellOverheadPressBlueStart, seatedBarbellOverheadPressBlueEnd }, pink: { seatedBarbellOverheadPressPinkStart, seatedBarbellOverheadPressPinkEnd } },
+    machineShoulderPress: { blue: { machineShoulderPressBlueStart, machineShoulderPressBlueEnd }, pink: { machineShoulderPressPinkStart, machineShoulderPressPinkEnd } },
+    cableLateralRaise: { blue: { cableLateralRaiseBlueStart, cableLateralRaiseBlueEnd }, pink: { cableLateralRaisePinkStart, cableLateralRaisePinkEnd } },
+    facePull: { blue: { facePullBlueStart, facePullBlueEnd }, pink: { facePullPinkStart, facePullPinkEnd } },
+    reversePecDeck: { blue: { reversePecDeckBlueStart, reversePecDeckBlueEnd }, pink: { reversePecDeckPinkStart, reversePecDeckPinkEnd } },
+    ezBarCurl: { blue: { ezBarCurlBlueStart, ezBarCurlBlueEnd }, pink: { ezBarCurlPinkStart, ezBarCurlPinkEnd } }
   });
   
   EXERCISE_IMAGE_MAP = {
@@ -1859,6 +2279,106 @@ try {
       pink: {
         start: seatedCableRowPinkStart,
         end: seatedCableRowPinkEnd,
+      }
+    },
+    'chest-supported-t-bar-row': {
+      blue: {
+        start: chestSupportedTBarRowBlueStart,
+        end: chestSupportedTBarRowBlueEnd,
+      },
+      pink: {
+        start: chestSupportedTBarRowPinkStart,
+        end: chestSupportedTBarRowPinkEnd,
+      }
+    },
+    't-bar-row': {
+      blue: {
+        start: tBarRowBlueStart,
+        end: tBarRowBlueEnd,
+      },
+      pink: {
+        start: tBarRowPinkStart,
+        end: tBarRowPinkEnd,
+      }
+    },
+    'chest-supported-dumbbell-row': {
+      blue: {
+        start: chestSupportedDumbbellRowBlueStart,
+        end: chestSupportedDumbbellRowBlueEnd,
+      },
+      pink: {
+        start: chestSupportedDumbbellRowPinkStart,
+        end: chestSupportedDumbbellRowPinkEnd,
+      }
+    },
+    'single-arm-dumbbell-row': {
+      blue: {
+        start: singleArmDumbbellRowBlueStart,
+        end: singleArmDumbbellRowBlueEnd,
+      },
+      pink: {
+        start: singleArmDumbbellRowPinkStart,
+        end: singleArmDumbbellRowPinkEnd,
+      }
+    },
+    'seated-barbell-overhead-press': {
+      blue: {
+        start: seatedBarbellOverheadPressBlueStart,
+        end: seatedBarbellOverheadPressBlueEnd,
+      },
+      pink: {
+        start: seatedBarbellOverheadPressPinkStart,
+        end: seatedBarbellOverheadPressPinkEnd,
+      }
+    },
+    'machine-shoulder-press': {
+      blue: {
+        start: machineShoulderPressBlueStart,
+        end: machineShoulderPressBlueEnd,
+      },
+      pink: {
+        start: machineShoulderPressPinkStart,
+        end: machineShoulderPressPinkEnd,
+      }
+    },
+    'cable-lateral-raise': {
+      blue: {
+        start: cableLateralRaiseBlueStart,
+        end: cableLateralRaiseBlueEnd,
+      },
+      pink: {
+        start: cableLateralRaisePinkStart,
+        end: cableLateralRaisePinkEnd,
+      }
+    },
+    'face-pull': {
+      blue: {
+        start: facePullBlueStart,
+        end: facePullBlueEnd,
+      },
+      pink: {
+        start: facePullPinkStart,
+        end: facePullPinkEnd,
+      }
+    },
+    'reverse-pec-deck': {
+      blue: {
+        start: reversePecDeckBlueStart,
+        end: reversePecDeckBlueEnd,
+      },
+      pink: {
+        start: reversePecDeckPinkStart,
+        end: reversePecDeckPinkEnd,
+      }
+    },
+    'ez-bar-curl': {
+      blue: {
+        start: ezBarCurlBlueStart,
+        end: ezBarCurlBlueEnd,
+      },
+      pink: {
+        start: ezBarCurlPinkStart,
+        end: ezBarCurlPinkEnd,
       }
     },
     // Add more exercises here as you create them
