@@ -1,0 +1,749 @@
+{"workoutData":
+{
+  "routine_name": "5-Day Strength Build",
+  "description": "4-week strength-focused program. Heavy compound work on Days 1 and 3 (Bench/Pull-up and Squat focus) at 3-6 reps, with hypertrophy accessory volume across all five days. Includes auxiliary work for neck, forearms, and lower back. Week 4 is a deload week with ~50% set reduction.",
+  "days_per_week": 5,
+  "blocks": [
+    {
+      "block_name": "Block 1 — Strength Build",
+      "weeks": "1-4",
+      "structure": "Upper Lower Lower Push Pull",
+      "weekly_schedule": [
+        {"day_number": 1, "type": "training", "day_name": "Upper Strength"},
+        {"day_number": 2, "type": "training", "day_name": "Lower (Hams/Quads)"},
+        {"day_number": 3, "type": "rest", "day_name": "REST DAY"},
+        {"day_number": 4, "type": "training", "day_name": "Lower Strength"},
+        {"day_number": 5, "type": "training", "day_name": "Push"},
+        {"day_number": 6, "type": "rest", "day_name": "REST DAY"},
+        {"day_number": 7, "type": "training", "day_name": "Pull"}
+      ],
+      "deload_weeks": [4],
+      "days": [
+        {
+          "day_name": "Upper Strength",
+          "estimated_duration": 75,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Barbell Bench Press",
+              "sets": 4,
+              "reps": "3-6",
+              "rest": 240,
+              "restQuick": 156,
+              "primaryMuscles": ["Chest"],
+              "secondaryMuscles": ["Triceps", "Front Delts"],
+              "reps_weekly": {"1": "6, 6, 5, 5", "2": "5, 5, 5, 4", "3": "5, 4, 4, 3", "4": "8, 8"},
+              "rir_weekly": {"1": "4, 3, 3, 2", "2": "3, 2, 2, 1", "3": "2, 1, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "Drive feet, retract scapulae, controlled descent to lower chest. RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4. First set easier, last set hardest. Stay technical — never sacrifice form for RIR target.",
+              "alternatives": [
+                {"exercise": "Dumbbell Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"]},
+                {"exercise": "Smith Machine Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Weighted Pull-up",
+              "sets": 4,
+              "reps": "4-8",
+              "rest": 180,
+              "restQuick": 117,
+              "primaryMuscles": ["Lats"],
+              "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"],
+              "reps_weekly": {"1": "8, 7, 6, 6", "2": "7, 6, 6, 5", "3": "6, 5, 5, 4", "4": "10, 10"},
+              "rir_weekly": {"1": "4, 3, 3, 2", "2": "3, 2, 2, 1", "3": "2, 1, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "Use weight belt. Full hang at bottom, chin clears bar. RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4. Stay technical.",
+              "alternatives": [
+                {"exercise": "Lat Pulldown", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"]},
+                {"exercise": "Neutral-Grip Pull-up", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Seated Barbell Overhead Press",
+              "sets": 3,
+              "reps": "4-8",
+              "rest": 180,
+              "restQuick": 117,
+              "primaryMuscles": ["Front Delts"],
+              "secondaryMuscles": ["Triceps", "Side Delts"],
+              "reps_weekly": {"1": "8, 7, 6", "2": "7, 6, 5", "3": "6, 5, 4", "4": "10, 10"},
+              "rir_weekly": {"1": "4, 3, 2", "2": "3, 2, 1", "3": "2, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "Brace ribs down, press to full lockout. RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4. Stay technical.",
+              "alternatives": [
+                {"exercise": "Seated Dumbbell Shoulder Press", "primaryMuscles": ["Front Delts"], "secondaryMuscles": ["Triceps", "Side Delts"]},
+                {"exercise": "Machine Shoulder Press", "primaryMuscles": ["Front Delts"], "secondaryMuscles": ["Triceps", "Side Delts"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Chest-Supported T-Bar Row",
+              "sets": 2,
+              "reps": "6-10",
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Upper Back"],
+              "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"],
+              "reps_weekly": {"1": "10, 8", "2": "9, 7", "3": "8, 6", "4": "12"},
+              "rir_weekly": {"1": "3, 1", "2": "2-3, 0", "3": "2, 0", "4": "4"},
+              "sets_weekly": {"1": 2, "2": 2, "3": 2, "4": 1},
+              "notes": "Pull to lower ribs, squeeze shoulder blades. RIR 2 W1 → 1-2 W2 → 1 W3 → 0-1 W4.",
+              "alternatives": [
+                {"exercise": "Seated Cable Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"]},
+                {"exercise": "Pendlay Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Dumbbell Lateral Raise",
+              "sets": 3,
+              "reps": "12-20",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Side Delts"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 18, 15", "2": "18, 15, 12", "3": "15, 12, 12", "4": "20, 18"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4. Last set: true failure W4.",
+              "alternatives": [
+                {"exercise": "Cable Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []},
+                {"exercise": "Machine Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "EZ-Bar Skullcrusher",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Triceps"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12", "2": "13, 12, 10", "3": "12, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4. Last set: true failure W4.",
+              "alternatives": [
+                {"exercise": "Overhead Cable Triceps Extension", "primaryMuscles": ["Triceps"], "secondaryMuscles": []},
+                {"exercise": "Dumbbell Skullcrusher", "primaryMuscles": ["Triceps"], "secondaryMuscles": []}
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Lower (Hams/Quads)",
+          "estimated_duration": 90,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Romanian Deadlift",
+              "sets": 4,
+              "reps": "5-8",
+              "rest": 180,
+              "restQuick": 117,
+              "primaryMuscles": ["Hamstrings"],
+              "secondaryMuscles": ["Glutes", "Lower Back"],
+              "reps_weekly": {"1": "8, 7, 7, 6", "2": "7, 7, 6, 5", "3": "7, 6, 5, 5", "4": "10, 10"},
+              "rir_weekly": {"1": "4, 3, 3, 2", "2": "3, 2, 2, 1", "3": "2, 1, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "Hinge at hips, neutral spine, bar tracks down legs to mid-shin. RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4. Stay technical.",
+              "alternatives": [
+                {"exercise": "Stiff-Leg Deadlift", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": ["Glutes", "Lower Back"]},
+                {"exercise": "Dumbbell Romanian Deadlift", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": ["Glutes", "Lower Back"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Leg Press",
+              "sets": 4,
+              "reps": "8-12",
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Quads"],
+              "secondaryMuscles": ["Glutes"],
+              "reps_weekly": {"1": "12, 11, 10, 10", "2": "11, 10, 10, 9", "3": "10, 10, 9, 8", "4": "13, 13"},
+              "rir_weekly": {"1": "3, 2, 2, 1", "2": "2-3, 1-2, 1-2, 0-1", "3": "2, 1, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "Full ROM, knees track over toes. RIR 2 W1 → 1-2 W2 → 1 W3 → 0-1 W4.",
+              "alternatives": [
+                {"exercise": "Hack Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"]},
+                {"exercise": "Pendulum Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Lying Leg Curl",
+              "sets": 4,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Hamstrings"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12, 11", "2": "13, 12, 11, 10", "3": "12, 11, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 2, 1", "2": "2, 1, 1, 0", "3": "1, 0-1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Seated Leg Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": []},
+                {"exercise": "Single-Leg Hamstring Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Leg Extension",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Quads"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12", "2": "13, 12, 10", "3": "12, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Sissy Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": []},
+                {"exercise": "Hack Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Standing Calf Raise",
+              "sets": 5,
+              "reps": "8-12",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Calves"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "12, 11, 10, 10, 9", "2": "11, 10, 10, 9, 8", "3": "10, 10, 9, 8, 8", "4": "12, 12, 12"},
+              "rir_weekly": {"1": "3, 2, 2, 2, 1", "2": "2, 1, 1, 1, 0", "3": "1, 1, 0-1, 0-1, 0", "4": "4, 4, 4"},
+              "sets_weekly": {"1": 5, "2": 5, "3": 5, "4": 3},
+              "notes": "Full stretch at bottom, controlled tempo, full contraction at top. RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Smith Machine Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": []},
+                {"exercise": "Leg Press Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Cable Lateral Raise",
+              "sets": 3,
+              "reps": "12-20",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Side Delts"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 18, 15", "2": "18, 15, 12", "3": "15, 12, 12", "4": "20, 18"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Dumbbell Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []},
+                {"exercise": "Machine Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Back Extension",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Lower Back"],
+              "secondaryMuscles": ["Glutes", "Hamstrings"],
+              "reps_weekly": {"1": "15, 13, 12", "2": "13, 12, 10", "3": "12, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Reverse Hyperextension", "primaryMuscles": ["Glutes"], "secondaryMuscles": ["Hamstrings"]},
+                {"exercise": "Good Morning", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": ["Glutes"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Hanging Leg Raise",
+              "sets": 3,
+              "reps": "8-15",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Core"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 10", "2": "13, 11, 9", "3": "11, 9, 8", "4": "15, 12"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "Controlled, no swinging. RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Cable Crunch", "primaryMuscles": ["Core"], "secondaryMuscles": []},
+                {"exercise": "Ab Wheel Rollout", "primaryMuscles": ["Core"], "secondaryMuscles": []}
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
+          "day_name": "Lower Strength",
+          "estimated_duration": 85,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Barbell Back Squat",
+              "sets": 4,
+              "reps": "3-6",
+              "rest": 240,
+              "restQuick": 156,
+              "primaryMuscles": ["Quads"],
+              "secondaryMuscles": ["Glutes"],
+              "reps_weekly": {"1": "6, 6, 5, 5", "2": "5, 5, 5, 4", "3": "5, 4, 4, 3", "4": "8, 8"},
+              "rir_weekly": {"1": "4, 3, 3, 2", "2": "3, 2, 2, 1", "3": "2, 1, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "Brace hard, sit between hips, drive through midfoot, depth at or below parallel. RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4. Stay technical.",
+              "alternatives": [
+                {"exercise": "Barbell Front Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"]},
+                {"exercise": "Safety Bar Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Barbell Hip Thrust",
+              "sets": 3,
+              "reps": "6-10",
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Glutes"],
+              "secondaryMuscles": ["Hamstrings"],
+              "reps_weekly": {"1": "10, 9, 8", "2": "9, 8, 7", "3": "8, 7, 6", "4": "12, 12"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2-3, 1-2, 0-1", "3": "2, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "Chin tucked, full hip extension, ribs down at lockout. RIR 2 W1 → 1-2 W2 → 1 W3 → 0-1 W4.",
+              "alternatives": [
+                {"exercise": "Machine Hip Thrust", "primaryMuscles": ["Glutes"], "secondaryMuscles": ["Hamstrings"]},
+                {"exercise": "Single-Leg Hip Thrust", "primaryMuscles": ["Glutes"], "secondaryMuscles": ["Hamstrings"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Bulgarian Split Squat",
+              "sets": 3,
+              "reps": "8-12",
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Quads"],
+              "secondaryMuscles": ["Glutes"],
+              "reps_weekly": {"1": "12, 10, 10", "2": "11, 10, 9", "3": "10, 9, 8", "4": "12, 12"},
+              "rir_weekly": {"1": "4, 3, 2", "2": "3, 2, 1", "3": "2-3, 1-2, 0-1", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "Front foot far enough forward that knee tracks over ankle. Reps per side. 90s between sides, 2min between pairs. RIR 3 W1 → 2 W2 → 1-2 W3 → 1 W4.",
+              "alternatives": [
+                {"exercise": "Walking Lunge", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"]},
+                {"exercise": "Reverse Lunge", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Seated Leg Curl",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Hamstrings"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12", "2": "13, 12, 10", "3": "12, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Lying Leg Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": []},
+                {"exercise": "Single-Leg Hamstring Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Seated Calf Raise",
+              "sets": 5,
+              "reps": "10-15",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Calves"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12, 12, 11", "2": "13, 12, 11, 11, 10", "3": "12, 11, 10, 10, 10", "4": "15, 15, 15"},
+              "rir_weekly": {"1": "3, 2, 2, 2, 1", "2": "2, 1, 1, 1, 0", "3": "1, 1, 0-1, 0-1, 0", "4": "4, 4, 4"},
+              "sets_weekly": {"1": 5, "2": 5, "3": 5, "4": 3},
+              "notes": "Full stretch, slow eccentric. RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Standing Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": []},
+                {"exercise": "Single-Leg Dumbbell Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Machine Lateral Raise",
+              "sets": 3,
+              "reps": "12-20",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Side Delts"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 18, 15", "2": "18, 15, 12", "3": "15, 12, 12", "4": "20, 18"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Dumbbell Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []},
+                {"exercise": "Cable Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Plate Neck Extension",
+              "sets": 2,
+              "reps": "12-20",
+              "rest": 45,
+              "restQuick": 29,
+              "primaryMuscles": ["Neck"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 17", "2": "17, 14", "3": "14, 12", "4": "20"},
+              "rir_weekly": {"1": "3, 1", "2": "2, 0", "3": "1, 0", "4": "4"},
+              "sets_weekly": {"1": 2, "2": 2, "3": 2, "4": 1},
+              "notes": "Build slow. No jerky movement. Lie face down on bench with plate cushioned by towel on back of head. RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Neck Harness Extension", "primaryMuscles": ["Neck"], "secondaryMuscles": []},
+                {"exercise": "Plate Neck Flexion", "primaryMuscles": ["Neck"], "secondaryMuscles": []}
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "Push",
+          "estimated_duration": 90,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Incline Barbell Bench Press",
+              "sets": 4,
+              "reps": "5-8",
+              "rest": 180,
+              "restQuick": 117,
+              "primaryMuscles": ["Chest"],
+              "secondaryMuscles": ["Front Delts", "Triceps"],
+              "reps_weekly": {"1": "8, 7, 7, 6", "2": "7, 6, 6, 5", "3": "6, 6, 5, 5", "4": "10, 10"},
+              "rir_weekly": {"1": "4, 3, 3, 2", "2": "3, 2, 2, 1", "3": "2, 1, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "~30° incline, control descent to upper chest. RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4. Stay technical.",
+              "alternatives": [
+                {"exercise": "Incline Dumbbell Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Front Delts", "Triceps"]},
+                {"exercise": "Machine Chest Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Machine Shoulder Press",
+              "sets": 3,
+              "reps": "8-12",
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Front Delts"],
+              "secondaryMuscles": ["Triceps", "Side Delts"],
+              "reps_weekly": {"1": "12, 11, 10", "2": "11, 10, 9", "3": "10, 9, 8", "4": "13, 13"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2-3, 1-2, 0-1", "3": "2, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1-2 W2 → 1 W3 → 0-1 W4.",
+              "alternatives": [
+                {"exercise": "Seated Dumbbell Shoulder Press", "primaryMuscles": ["Front Delts"], "secondaryMuscles": ["Triceps", "Side Delts"]},
+                {"exercise": "Arnold Press", "primaryMuscles": ["Front Delts"], "secondaryMuscles": ["Side Delts", "Triceps"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Cable Crossover",
+              "sets": 4,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Chest"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12, 12", "2": "13, 12, 11, 10", "3": "12, 11, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 2, 1", "2": "2, 1, 1, 0", "3": "1, 0-1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Dumbbell Fly", "primaryMuscles": ["Chest"], "secondaryMuscles": []},
+                {"exercise": "Incline Dumbbell Fly", "primaryMuscles": ["Chest"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Pec Deck Fly",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Chest"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12", "2": "13, 12, 10", "3": "12, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Cable Crossover", "primaryMuscles": ["Chest"], "secondaryMuscles": []},
+                {"exercise": "Dumbbell Fly", "primaryMuscles": ["Chest"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Cable Lateral Raise",
+              "sets": 4,
+              "reps": "12-20",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Side Delts"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 18, 15, 15", "2": "18, 15, 13, 12", "3": "15, 13, 12, 12", "4": "20, 18"},
+              "rir_weekly": {"1": "3, 2, 2, 1", "2": "2, 1, 1, 0", "3": "1, 0-1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Dumbbell Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []},
+                {"exercise": "Machine Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Rope Triceps Pushdown",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Triceps"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12", "2": "13, 12, 10", "3": "12, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Triceps Pushdown", "primaryMuscles": ["Triceps"], "secondaryMuscles": []},
+                {"exercise": "Overhead Cable Triceps Extension", "primaryMuscles": ["Triceps"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Smith Machine Calf Raise",
+              "sets": 4,
+              "reps": "8-12",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Calves"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "12, 11, 10, 10", "2": "11, 10, 10, 9", "3": "10, 10, 9, 8", "4": "12, 12"},
+              "rir_weekly": {"1": "3, 2, 2, 1", "2": "2, 1, 1, 0", "3": "1, 1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Leg Press Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": []},
+                {"exercise": "Standing Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Dumbbell Wrist Curl",
+              "sets": 2,
+              "reps": "12-20",
+              "rest": 45,
+              "restQuick": 29,
+              "primaryMuscles": ["Forearms"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 17", "2": "17, 14", "3": "14, 12", "4": "20"},
+              "rir_weekly": {"1": "3, 1", "2": "2, 0", "3": "1, 0", "4": "4"},
+              "sets_weekly": {"1": 2, "2": 2, "3": 2, "4": 1},
+              "notes": "Light, controlled. Forearms supported on bench. RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Barbell Wrist Curl", "primaryMuscles": ["Forearms"], "secondaryMuscles": []},
+                {"exercise": "Reverse Wrist Curl", "primaryMuscles": ["Forearms"], "secondaryMuscles": []}
+              ]
+            }
+          ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
+          "day_name": "Pull",
+          "estimated_duration": 85,
+          "exercises": [
+            {
+              "type": "strength",
+              "exercise": "Barbell Row",
+              "sets": 4,
+              "reps": "5-8",
+              "rest": 180,
+              "restQuick": 117,
+              "primaryMuscles": ["Upper Back"],
+              "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"],
+              "reps_weekly": {"1": "8, 7, 7, 6", "2": "7, 6, 6, 5", "3": "6, 6, 5, 5", "4": "10, 10"},
+              "rir_weekly": {"1": "4, 3, 3, 2", "2": "3, 2, 2, 1", "3": "2, 1, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "Hinge ~45°, pull to lower sternum, control eccentric. RIR 3 W1 → 2 W2 → 1 W3 → 0-1 W4. Stay technical.",
+              "alternatives": [
+                {"exercise": "Pendlay Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"]},
+                {"exercise": "Seal Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Lat Pulldown",
+              "sets": 3,
+              "reps": "8-12",
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Lats"],
+              "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"],
+              "reps_weekly": {"1": "12, 11, 10", "2": "11, 10, 9", "3": "10, 9, 8", "4": "13, 13"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2-3, 1-2, 0-1", "3": "2, 1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "Pull to upper chest, lead with elbows down and back. RIR 2 W1 → 1-2 W2 → 1 W3 → 0-1 W4.",
+              "alternatives": [
+                {"exercise": "Pull-up", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"]},
+                {"exercise": "Neutral-Grip Lat Pulldown", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Reverse Pec Deck",
+              "sets": 3,
+              "reps": "12-20",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Rear Delts"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 18, 15", "2": "18, 15, 12", "3": "15, 12, 12", "4": "20, 18"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Cable Rear Delt Fly", "primaryMuscles": ["Rear Delts"], "secondaryMuscles": []},
+                {"exercise": "Face Pull", "primaryMuscles": ["Rear Delts"], "secondaryMuscles": ["Upper Back"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Barbell Curl",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Biceps"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12", "2": "13, 12, 10", "3": "12, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "EZ-Bar Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": []},
+                {"exercise": "Cable Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Incline Dumbbell Curl",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Biceps"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "15, 13, 12", "2": "13, 12, 10", "3": "12, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "Full stretch at bottom. RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Preacher Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": []},
+                {"exercise": "Concentration Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Hammer Curl",
+              "sets": 4,
+              "reps": "10-15",
+              "rest": 75,
+              "restQuick": 49,
+              "primaryMuscles": ["Biceps"],
+              "secondaryMuscles": ["Forearms"],
+              "reps_weekly": {"1": "15, 13, 12, 12", "2": "13, 12, 11, 10", "3": "12, 11, 10, 10", "4": "15, 15"},
+              "rir_weekly": {"1": "3, 2, 2, 1", "2": "2, 1, 1, 0", "3": "1, 0-1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 4, "2": 4, "3": 4, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Cable Hammer Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": ["Forearms"]},
+                {"exercise": "Reverse Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": ["Forearms"]}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Machine Lateral Raise",
+              "sets": 3,
+              "reps": "12-20",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Side Delts"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 18, 15", "2": "18, 15, 12", "3": "15, 12, 12", "4": "20, 18"},
+              "rir_weekly": {"1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0-1, 0", "4": "4, 4"},
+              "sets_weekly": {"1": 3, "2": 3, "3": 3, "4": 2},
+              "notes": "RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Dumbbell Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []},
+                {"exercise": "Cable Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Reverse Wrist Curl",
+              "sets": 2,
+              "reps": "12-20",
+              "rest": 45,
+              "restQuick": 29,
+              "primaryMuscles": ["Forearms"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 17", "2": "17, 14", "3": "14, 12", "4": "20"},
+              "rir_weekly": {"1": "3, 1", "2": "2, 0", "3": "1, 0", "4": "4"},
+              "sets_weekly": {"1": 2, "2": 2, "3": 2, "4": 1},
+              "notes": "Light, controlled. Forearms supported on bench. RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Barbell Wrist Curl", "primaryMuscles": ["Forearms"], "secondaryMuscles": []},
+                {"exercise": "Dumbbell Wrist Curl", "primaryMuscles": ["Forearms"], "secondaryMuscles": []}
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Plate Neck Flexion",
+              "sets": 2,
+              "reps": "12-20",
+              "rest": 45,
+              "restQuick": 29,
+              "primaryMuscles": ["Neck"],
+              "secondaryMuscles": [],
+              "reps_weekly": {"1": "20, 17", "2": "17, 14", "3": "14, 12", "4": "20"},
+              "rir_weekly": {"1": "3, 1", "2": "2, 0", "3": "1, 0", "4": "4"},
+              "sets_weekly": {"1": 2, "2": 2, "3": 2, "4": 1},
+              "notes": "Build slow. No jerky movement. Lie face up on bench with plate cushioned by towel on forehead. RIR 2 W1 → 1 W2 → 0-1 W3 → 0 W4.",
+              "alternatives": [
+                {"exercise": "Neck Harness Flexion", "primaryMuscles": ["Neck"], "secondaryMuscles": []},
+                {"exercise": "Plate Neck Extension", "primaryMuscles": ["Neck"], "secondaryMuscles": []}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+},"exportMetadata":{"routineName":"5-Day Strength Build","source":"JSON.fit","exportDate":"2026-05-05T00:00:00Z"}}

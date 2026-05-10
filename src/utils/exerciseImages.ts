@@ -606,6 +606,72 @@ let ezBarCurlBlueEnd: any = null;
 let ezBarCurlPinkStart: any = null;
 let ezBarCurlPinkEnd: any = null;
 
+// Preacher curl images
+let preacherCurlBlueStart: any = null;
+let preacherCurlBlueEnd: any = null;
+let preacherCurlPinkStart: any = null;
+let preacherCurlPinkEnd: any = null;
+
+// Cable curl images
+let cableCurlBlueStart: any = null;
+let cableCurlBlueEnd: any = null;
+let cableCurlPinkStart: any = null;
+let cableCurlPinkEnd: any = null;
+
+// Incline dumbbell curl images
+let inclineDumbbellCurlBlueStart: any = null;
+let inclineDumbbellCurlBlueEnd: any = null;
+let inclineDumbbellCurlPinkStart: any = null;
+let inclineDumbbellCurlPinkEnd: any = null;
+
+// Overhead cable triceps extension images
+let overheadCableTricepsExtensionBlueStart: any = null;
+let overheadCableTricepsExtensionBlueEnd: any = null;
+let overheadCableTricepsExtensionPinkStart: any = null;
+let overheadCableTricepsExtensionPinkEnd: any = null;
+
+// Overhead dumbbell triceps extension images
+let overheadDumbbellTricepsExtensionBlueStart: any = null;
+let overheadDumbbellTricepsExtensionBlueEnd: any = null;
+let overheadDumbbellTricepsExtensionPinkStart: any = null;
+let overheadDumbbellTricepsExtensionPinkEnd: any = null;
+
+// EZ-bar skullcrusher images
+let ezBarSkullcrusherBlueStart: any = null;
+let ezBarSkullcrusherBlueEnd: any = null;
+let ezBarSkullcrusherPinkStart: any = null;
+let ezBarSkullcrusherPinkEnd: any = null;
+
+// Close grip bench press images
+let closeGripBenchPressBlueStart: any = null;
+let closeGripBenchPressBlueEnd: any = null;
+let closeGripBenchPressPinkStart: any = null;
+let closeGripBenchPressPinkEnd: any = null;
+
+// Dips chest focus images
+let dipsChestFocusBlueStart: any = null;
+let dipsChestFocusBlueEnd: any = null;
+let dipsChestFocusPinkStart: any = null;
+let dipsChestFocusPinkEnd: any = null;
+
+// Hack squat images
+let hackSquatBlueStart: any = null;
+let hackSquatBlueEnd: any = null;
+let hackSquatPinkStart: any = null;
+let hackSquatPinkEnd: any = null;
+
+// Bulgarian split squat images
+let bulgarianSplitSquatBlueStart: any = null;
+let bulgarianSplitSquatBlueEnd: any = null;
+let bulgarianSplitSquatPinkStart: any = null;
+let bulgarianSplitSquatPinkEnd: any = null;
+
+// Barbell front squat images
+let barbellFrontSquatBlueStart: any = null;
+let barbellFrontSquatBlueEnd: any = null;
+let barbellFrontSquatPinkStart: any = null;
+let barbellFrontSquatPinkEnd: any = null;
+
 try {
   console.log('🔄 ATTEMPTING to load exercise images...');
   
@@ -1959,6 +2025,391 @@ try {
     console.log('❌ No ez-bar-curl pink end.png found:', e.message);
   }
   
+  // Load preacher curl images
+  console.log('🏋️ Loading preacher curl...');
+  
+  // Blue start
+  try {
+    preacherCurlBlueStart = require('../../exercise-images/preacher-curl/blue/start.png');
+    console.log('✅ Loaded preacher-curl blue start.png');
+  } catch (e) {
+    console.log('❌ No preacher-curl blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    preacherCurlBlueEnd = require('../../exercise-images/preacher-curl/blue/end.png');
+    console.log('✅ Loaded preacher-curl blue end.png');
+  } catch (e) {
+    console.log('❌ No preacher-curl blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    preacherCurlPinkStart = require('../../exercise-images/preacher-curl/pink/start.png');
+    console.log('✅ Loaded preacher-curl pink start.png');
+  } catch (e) {
+    console.log('❌ No preacher-curl pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    preacherCurlPinkEnd = require('../../exercise-images/preacher-curl/pink/end.png');
+    console.log('✅ Loaded preacher-curl pink end.png');
+  } catch (e) {
+    console.log('❌ No preacher-curl pink end.png found:', e.message);
+  }
+  
+  // Load cable curl images
+  console.log('🏋️ Loading cable curl...');
+  
+  // Blue start
+  try {
+    cableCurlBlueStart = require('../../exercise-images/cable-curl/blue/start.png');
+    console.log('✅ Loaded cable-curl blue start.png');
+  } catch (e) {
+    console.log('❌ No cable-curl blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    cableCurlBlueEnd = require('../../exercise-images/cable-curl/blue/end.png');
+    console.log('✅ Loaded cable-curl blue end.png');
+  } catch (e) {
+    console.log('❌ No cable-curl blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    cableCurlPinkStart = require('../../exercise-images/cable-curl/pink/start.png');
+    console.log('✅ Loaded cable-curl pink start.png');
+  } catch (e) {
+    console.log('❌ No cable-curl pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    cableCurlPinkEnd = require('../../exercise-images/cable-curl/pink/end.png');
+    console.log('✅ Loaded cable-curl pink end.png');
+  } catch (e) {
+    console.log('❌ No cable-curl pink end.png found:', e.message);
+  }
+  
+  // Load incline dumbbell curl images
+  console.log('🏋️ Loading incline dumbbell curl...');
+  
+  // Blue start
+  try {
+    inclineDumbbellCurlBlueStart = require('../../exercise-images/incline-dumbbell-curl/blue/start.png');
+    console.log('✅ Loaded incline-dumbbell-curl blue start.png');
+  } catch (e) {
+    console.log('❌ No incline-dumbbell-curl blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    inclineDumbbellCurlBlueEnd = require('../../exercise-images/incline-dumbbell-curl/blue/end.png');
+    console.log('✅ Loaded incline-dumbbell-curl blue end.png');
+  } catch (e) {
+    console.log('❌ No incline-dumbbell-curl blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    inclineDumbbellCurlPinkStart = require('../../exercise-images/incline-dumbbell-curl/pink/start.png');
+    console.log('✅ Loaded incline-dumbbell-curl pink start.png');
+  } catch (e) {
+    console.log('❌ No incline-dumbbell-curl pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    inclineDumbbellCurlPinkEnd = require('../../exercise-images/incline-dumbbell-curl/pink/end.png');
+    console.log('✅ Loaded incline-dumbbell-curl pink end.png');
+  } catch (e) {
+    console.log('❌ No incline-dumbbell-curl pink end.png found:', e.message);
+  }
+  
+  // Load overhead cable triceps extension images
+  console.log('🏋️ Loading overhead cable triceps extension...');
+  
+  // Blue start
+  try {
+    overheadCableTricepsExtensionBlueStart = require('../../exercise-images/overhead-cable-triceps-extension/blue/start.png');
+    console.log('✅ Loaded overhead-cable-triceps-extension blue start.png');
+  } catch (e) {
+    console.log('❌ No overhead-cable-triceps-extension blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    overheadCableTricepsExtensionBlueEnd = require('../../exercise-images/overhead-cable-triceps-extension/blue/end.png');
+    console.log('✅ Loaded overhead-cable-triceps-extension blue end.png');
+  } catch (e) {
+    console.log('❌ No overhead-cable-triceps-extension blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    overheadCableTricepsExtensionPinkStart = require('../../exercise-images/overhead-cable-triceps-extension/pink/start.png');
+    console.log('✅ Loaded overhead-cable-triceps-extension pink start.png');
+  } catch (e) {
+    console.log('❌ No overhead-cable-triceps-extension pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    overheadCableTricepsExtensionPinkEnd = require('../../exercise-images/overhead-cable-triceps-extension/pink/end.png');
+    console.log('✅ Loaded overhead-cable-triceps-extension pink end.png');
+  } catch (e) {
+    console.log('❌ No overhead-cable-triceps-extension pink end.png found:', e.message);
+  }
+  
+  // Load overhead dumbbell triceps extension images
+  console.log('🏋️ Loading overhead dumbbell triceps extension...');
+  
+  // Blue start
+  try {
+    overheadDumbbellTricepsExtensionBlueStart = require('../../exercise-images/overhead-dumbbell-triceps-extension/blue/start.png');
+    console.log('✅ Loaded overhead-dumbbell-triceps-extension blue start.png');
+  } catch (e) {
+    console.log('❌ No overhead-dumbbell-triceps-extension blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    overheadDumbbellTricepsExtensionBlueEnd = require('../../exercise-images/overhead-dumbbell-triceps-extension/blue/end.png');
+    console.log('✅ Loaded overhead-dumbbell-triceps-extension blue end.png');
+  } catch (e) {
+    console.log('❌ No overhead-dumbbell-triceps-extension blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    overheadDumbbellTricepsExtensionPinkStart = require('../../exercise-images/overhead-dumbbell-triceps-extension/pink/start.png');
+    console.log('✅ Loaded overhead-dumbbell-triceps-extension pink start.png');
+  } catch (e) {
+    console.log('❌ No overhead-dumbbell-triceps-extension pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    overheadDumbbellTricepsExtensionPinkEnd = require('../../exercise-images/overhead-dumbbell-triceps-extension/pink/end.png');
+    console.log('✅ Loaded overhead-dumbbell-triceps-extension pink end.png');
+  } catch (e) {
+    console.log('❌ No overhead-dumbbell-triceps-extension pink end.png found:', e.message);
+  }
+  
+  // Load EZ-bar skullcrusher images
+  console.log('🏋️ Loading EZ-bar skullcrusher...');
+  
+  // Blue start
+  try {
+    ezBarSkullcrusherBlueStart = require('../../exercise-images/ez-bar-skullcrusher/blue/start.png');
+    console.log('✅ Loaded ez-bar-skullcrusher blue start.png');
+  } catch (e) {
+    console.log('❌ No ez-bar-skullcrusher blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    ezBarSkullcrusherBlueEnd = require('../../exercise-images/ez-bar-skullcrusher/blue/end.png');
+    console.log('✅ Loaded ez-bar-skullcrusher blue end.png');
+  } catch (e) {
+    console.log('❌ No ez-bar-skullcrusher blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    ezBarSkullcrusherPinkStart = require('../../exercise-images/ez-bar-skullcrusher/pink/start.png');
+    console.log('✅ Loaded ez-bar-skullcrusher pink start.png');
+  } catch (e) {
+    console.log('❌ No ez-bar-skullcrusher pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    ezBarSkullcrusherPinkEnd = require('../../exercise-images/ez-bar-skullcrusher/pink/end.png');
+    console.log('✅ Loaded ez-bar-skullcrusher pink end.png');
+  } catch (e) {
+    console.log('❌ No ez-bar-skullcrusher pink end.png found:', e.message);
+  }
+  
+  // Load close grip bench press images
+  console.log('🏋️ Loading close grip bench press...');
+  
+  // Blue start
+  try {
+    closeGripBenchPressBlueStart = require('../../exercise-images/close-grip-bench-press/blue/start.png');
+    console.log('✅ Loaded close-grip-bench-press blue start.png');
+  } catch (e) {
+    console.log('❌ No close-grip-bench-press blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    closeGripBenchPressBlueEnd = require('../../exercise-images/close-grip-bench-press/blue/end.png');
+    console.log('✅ Loaded close-grip-bench-press blue end.png');
+  } catch (e) {
+    console.log('❌ No close-grip-bench-press blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    closeGripBenchPressPinkStart = require('../../exercise-images/close-grip-bench-press/pink/start.png');
+    console.log('✅ Loaded close-grip-bench-press pink start.png');
+  } catch (e) {
+    console.log('❌ No close-grip-bench-press pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    closeGripBenchPressPinkEnd = require('../../exercise-images/close-grip-bench-press/pink/end.png');
+    console.log('✅ Loaded close-grip-bench-press pink end.png');
+  } catch (e) {
+    console.log('❌ No close-grip-bench-press pink end.png found:', e.message);
+  }
+  
+  // Load dips chest focus images
+  console.log('🏋️ Loading dips chest focus...');
+  
+  // Blue start
+  try {
+    dipsChestFocusBlueStart = require('../../exercise-images/dips-chest-focus/blue/start.png');
+    console.log('✅ Loaded dips-chest-focus blue start.png');
+  } catch (e) {
+    console.log('❌ No dips-chest-focus blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    dipsChestFocusBlueEnd = require('../../exercise-images/dips-chest-focus/blue/end.png');
+    console.log('✅ Loaded dips-chest-focus blue end.png');
+  } catch (e) {
+    console.log('❌ No dips-chest-focus blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    dipsChestFocusPinkStart = require('../../exercise-images/dips-chest-focus/pink/start.png');
+    console.log('✅ Loaded dips-chest-focus pink start.png');
+  } catch (e) {
+    console.log('❌ No dips-chest-focus pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    dipsChestFocusPinkEnd = require('../../exercise-images/dips-chest-focus/pink/end.png');
+    console.log('✅ Loaded dips-chest-focus pink end.png');
+  } catch (e) {
+    console.log('❌ No dips-chest-focus pink end.png found:', e.message);
+  }
+  
+  // Load hack squat images
+  console.log('🏋️ Loading hack squat...');
+  
+  // Blue start
+  try {
+    hackSquatBlueStart = require('../../exercise-images/hack-squat/blue/start.png');
+    console.log('✅ Loaded hack-squat blue start.png');
+  } catch (e) {
+    console.log('❌ No hack-squat blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    hackSquatBlueEnd = require('../../exercise-images/hack-squat/blue/end.png');
+    console.log('✅ Loaded hack-squat blue end.png');
+  } catch (e) {
+    console.log('❌ No hack-squat blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    hackSquatPinkStart = require('../../exercise-images/hack-squat/pink/start.png');
+    console.log('✅ Loaded hack-squat pink start.png');
+  } catch (e) {
+    console.log('❌ No hack-squat pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    hackSquatPinkEnd = require('../../exercise-images/hack-squat/pink/end.png');
+    console.log('✅ Loaded hack-squat pink end.png');
+  } catch (e) {
+    console.log('❌ No hack-squat pink end.png found:', e.message);
+  }
+  
+  // Load bulgarian split squat images
+  console.log('🏋️ Loading bulgarian split squat...');
+  
+  // Blue start
+  try {
+    bulgarianSplitSquatBlueStart = require('../../exercise-images/bulgarian-split-squat/blue/start.png');
+    console.log('✅ Loaded bulgarian-split-squat blue start.png');
+  } catch (e) {
+    console.log('❌ No bulgarian-split-squat blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    bulgarianSplitSquatBlueEnd = require('../../exercise-images/bulgarian-split-squat/blue/end.png');
+    console.log('✅ Loaded bulgarian-split-squat blue end.png');
+  } catch (e) {
+    console.log('❌ No bulgarian-split-squat blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    bulgarianSplitSquatPinkStart = require('../../exercise-images/bulgarian-split-squat/pink/start.png');
+    console.log('✅ Loaded bulgarian-split-squat pink start.png');
+  } catch (e) {
+    console.log('❌ No bulgarian-split-squat pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    bulgarianSplitSquatPinkEnd = require('../../exercise-images/bulgarian-split-squat/pink/end.png');
+    console.log('✅ Loaded bulgarian-split-squat pink end.png');
+  } catch (e) {
+    console.log('❌ No bulgarian-split-squat pink end.png found:', e.message);
+  }
+  
+  // Load barbell front squat images
+  console.log('🏋️ Loading barbell front squat...');
+  
+  // Blue start
+  try {
+    barbellFrontSquatBlueStart = require('../../exercise-images/barbell-front-squat/blue/start.png');
+    console.log('✅ Loaded barbell-front-squat blue start.png');
+  } catch (e) {
+    console.log('❌ No barbell-front-squat blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    barbellFrontSquatBlueEnd = require('../../exercise-images/barbell-front-squat/blue/end.png');
+    console.log('✅ Loaded barbell-front-squat blue end.png');
+  } catch (e) {
+    console.log('❌ No barbell-front-squat blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    barbellFrontSquatPinkStart = require('../../exercise-images/barbell-front-squat/pink/start.png');
+    console.log('✅ Loaded barbell-front-squat pink start.png');
+  } catch (e) {
+    console.log('❌ No barbell-front-squat pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    barbellFrontSquatPinkEnd = require('../../exercise-images/barbell-front-squat/pink/end.png');
+    console.log('✅ Loaded barbell-front-squat pink end.png');
+  } catch (e) {
+    console.log('❌ No barbell-front-squat pink end.png found:', e.message);
+  }
+  
   console.log('✅ Finished loading all images:', { 
     benchPress: { blue: { barbellBenchPressBlueStart, barbellBenchPressBlueEnd }, pink: { barbellBenchPressPinkStart, barbellBenchPressPinkEnd } },
     backSquat: { blue: { barbellBackSquatBlueStart, barbellBackSquatBlueEnd }, pink: { barbellBackSquatPinkStart, barbellBackSquatPinkEnd } },
@@ -1997,7 +2448,18 @@ try {
     cableLateralRaise: { blue: { cableLateralRaiseBlueStart, cableLateralRaiseBlueEnd }, pink: { cableLateralRaisePinkStart, cableLateralRaisePinkEnd } },
     facePull: { blue: { facePullBlueStart, facePullBlueEnd }, pink: { facePullPinkStart, facePullPinkEnd } },
     reversePecDeck: { blue: { reversePecDeckBlueStart, reversePecDeckBlueEnd }, pink: { reversePecDeckPinkStart, reversePecDeckPinkEnd } },
-    ezBarCurl: { blue: { ezBarCurlBlueStart, ezBarCurlBlueEnd }, pink: { ezBarCurlPinkStart, ezBarCurlPinkEnd } }
+    ezBarCurl: { blue: { ezBarCurlBlueStart, ezBarCurlBlueEnd }, pink: { ezBarCurlPinkStart, ezBarCurlPinkEnd } },
+    preacherCurl: { blue: { preacherCurlBlueStart, preacherCurlBlueEnd }, pink: { preacherCurlPinkStart, preacherCurlPinkEnd } },
+    cableCurl: { blue: { cableCurlBlueStart, cableCurlBlueEnd }, pink: { cableCurlPinkStart, cableCurlPinkEnd } },
+    inclineDumbbellCurl: { blue: { inclineDumbbellCurlBlueStart, inclineDumbbellCurlBlueEnd }, pink: { inclineDumbbellCurlPinkStart, inclineDumbbellCurlPinkEnd } },
+    overheadCableTricepsExtension: { blue: { overheadCableTricepsExtensionBlueStart, overheadCableTricepsExtensionBlueEnd }, pink: { overheadCableTricepsExtensionPinkStart, overheadCableTricepsExtensionPinkEnd } },
+    overheadDumbbellTricepsExtension: { blue: { overheadDumbbellTricepsExtensionBlueStart, overheadDumbbellTricepsExtensionBlueEnd }, pink: { overheadDumbbellTricepsExtensionPinkStart, overheadDumbbellTricepsExtensionPinkEnd } },
+    ezBarSkullcrusher: { blue: { ezBarSkullcrusherBlueStart, ezBarSkullcrusherBlueEnd }, pink: { ezBarSkullcrusherPinkStart, ezBarSkullcrusherPinkEnd } },
+    closeGripBenchPress: { blue: { closeGripBenchPressBlueStart, closeGripBenchPressBlueEnd }, pink: { closeGripBenchPressPinkStart, closeGripBenchPressPinkEnd } },
+    dipsChestFocus: { blue: { dipsChestFocusBlueStart, dipsChestFocusBlueEnd }, pink: { dipsChestFocusPinkStart, dipsChestFocusPinkEnd } },
+    hackSquat: { blue: { hackSquatBlueStart, hackSquatBlueEnd }, pink: { hackSquatPinkStart, hackSquatPinkEnd } },
+    bulgarianSplitSquat: { blue: { bulgarianSplitSquatBlueStart, bulgarianSplitSquatBlueEnd }, pink: { bulgarianSplitSquatPinkStart, bulgarianSplitSquatPinkEnd } },
+    barbellFrontSquat: { blue: { barbellFrontSquatBlueStart, barbellFrontSquatBlueEnd }, pink: { barbellFrontSquatPinkStart, barbellFrontSquatPinkEnd } }
   });
   
   EXERCISE_IMAGE_MAP = {
@@ -2379,6 +2841,116 @@ try {
       pink: {
         start: ezBarCurlPinkStart,
         end: ezBarCurlPinkEnd,
+      }
+    },
+    'preacher-curl': {
+      blue: {
+        start: preacherCurlBlueStart,
+        end: preacherCurlBlueEnd,
+      },
+      pink: {
+        start: preacherCurlPinkStart,
+        end: preacherCurlPinkEnd,
+      }
+    },
+    'cable-curl': {
+      blue: {
+        start: cableCurlBlueStart,
+        end: cableCurlBlueEnd,
+      },
+      pink: {
+        start: cableCurlPinkStart,
+        end: cableCurlPinkEnd,
+      }
+    },
+    'incline-dumbbell-curl': {
+      blue: {
+        start: inclineDumbbellCurlBlueStart,
+        end: inclineDumbbellCurlBlueEnd,
+      },
+      pink: {
+        start: inclineDumbbellCurlPinkStart,
+        end: inclineDumbbellCurlPinkEnd,
+      }
+    },
+    'overhead-cable-triceps-extension': {
+      blue: {
+        start: overheadCableTricepsExtensionBlueStart,
+        end: overheadCableTricepsExtensionBlueEnd,
+      },
+      pink: {
+        start: overheadCableTricepsExtensionPinkStart,
+        end: overheadCableTricepsExtensionPinkEnd,
+      }
+    },
+    'overhead-dumbbell-triceps-extension': {
+      blue: {
+        start: overheadDumbbellTricepsExtensionBlueStart,
+        end: overheadDumbbellTricepsExtensionBlueEnd,
+      },
+      pink: {
+        start: overheadDumbbellTricepsExtensionPinkStart,
+        end: overheadDumbbellTricepsExtensionPinkEnd,
+      }
+    },
+    'ez-bar-skullcrusher': {
+      blue: {
+        start: ezBarSkullcrusherBlueStart,
+        end: ezBarSkullcrusherBlueEnd,
+      },
+      pink: {
+        start: ezBarSkullcrusherPinkStart,
+        end: ezBarSkullcrusherPinkEnd,
+      }
+    },
+    'close-grip-bench-press': {
+      blue: {
+        start: closeGripBenchPressBlueStart,
+        end: closeGripBenchPressBlueEnd,
+      },
+      pink: {
+        start: closeGripBenchPressPinkStart,
+        end: closeGripBenchPressPinkEnd,
+      }
+    },
+    'dips-chest-focus': {
+      blue: {
+        start: dipsChestFocusBlueStart,
+        end: dipsChestFocusBlueEnd,
+      },
+      pink: {
+        start: dipsChestFocusPinkStart,
+        end: dipsChestFocusPinkEnd,
+      }
+    },
+    'hack-squat': {
+      blue: {
+        start: hackSquatBlueStart,
+        end: hackSquatBlueEnd,
+      },
+      pink: {
+        start: hackSquatPinkStart,
+        end: hackSquatPinkEnd,
+      }
+    },
+    'bulgarian-split-squat': {
+      blue: {
+        start: bulgarianSplitSquatBlueStart,
+        end: bulgarianSplitSquatBlueEnd,
+      },
+      pink: {
+        start: bulgarianSplitSquatPinkStart,
+        end: bulgarianSplitSquatPinkEnd,
+      }
+    },
+    'barbell-front-squat': {
+      blue: {
+        start: barbellFrontSquatBlueStart,
+        end: barbellFrontSquatBlueEnd,
+      },
+      pink: {
+        start: barbellFrontSquatPinkStart,
+        end: barbellFrontSquatPinkEnd,
       }
     },
     // Add more exercises here as you create them

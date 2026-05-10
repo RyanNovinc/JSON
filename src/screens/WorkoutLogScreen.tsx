@@ -39,6 +39,7 @@ import {
   Pressable,
   Alert,
   Image,
+  Modal,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -190,6 +191,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [currentImagePhase, setCurrentImagePhase] = useState<'start' | 'end'>('start');
   const cyclingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Finish workout confirmation modal
+  const [showFinishModal, setShowFinishModal] = useState(false);
+
   // Rest timer logic
   const startRestTimer = (exerciseIndex: number, setIndex: number) => {
     const exercise = exercises[exerciseIndex];
@@ -269,6 +273,34 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate total volume lifted
+  const calculateTotalVolume = (): number => {
+    let totalVolume = 0;
+    allSetsData.forEach((exerciseSets) => {
+      exerciseSets.forEach((set) => {
+        if (set.completed && set.weight && set.reps) {
+          const weight = parseFloat(set.weight);
+          const reps = parseInt(set.reps);
+          if (!isNaN(weight) && !isNaN(reps)) {
+            totalVolume += weight * reps;
+          }
+        }
+      });
+    });
+    return totalVolume;
+  };
+
+  // Handle finish workout button press
+  const handleFinishWorkoutPress = () => {
+    setShowFinishModal(true);
+  };
+
+  // Confirm finish workout
+  const confirmFinishWorkout = () => {
+    setShowFinishModal(false);
+    onFinishWorkout();
   };
 
   // Load history data when showWorkoutHistory changes
@@ -728,7 +760,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 }}
                 style={styles.overlayBtn}
               >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+                <Ionicons name="time-outline" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
           </View>
@@ -813,7 +845,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
         <TouchableOpacity
           style={[styles.primaryBtn, { backgroundColor: themeColor }]}
-          onPress={workoutStarted ? onFinishWorkout : onStartWorkout}
+          onPress={workoutStarted ? handleFinishWorkoutPress : onStartWorkout}
         >
           <View style={styles.primaryBtnContent}>
             <Text style={styles.primaryBtnText}>
@@ -835,6 +867,62 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
     {/* Exercise History Modal */}
     {historyModalProps && <ExerciseHistoryModal {...historyModalProps} />}
+
+    {/* Finish Workout Confirmation Modal */}
+    <Modal
+      visible={showFinishModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowFinishModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={() => setShowFinishModal(false)}
+        />
+        
+        <View style={styles.finishModalContent}>
+          <View style={styles.finishModalHeader}>
+            <Text style={styles.finishModalTitle}>Finish Workout?</Text>
+          </View>
+          
+          <View style={styles.finishModalStats}>
+            <View style={styles.finishStatItem}>
+              <Text style={styles.finishStatLabel}>Duration</Text>
+              <Text style={styles.finishStatValue}>
+                {formatWorkoutDuration(workoutDuration)}
+              </Text>
+            </View>
+            
+            <View style={styles.finishStatDivider} />
+            
+            <View style={styles.finishStatItem}>
+              <Text style={styles.finishStatLabel}>Total Volume</Text>
+              <Text style={styles.finishStatValue}>
+                {calculateTotalVolume().toFixed(1)} {globalUnit}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.finishModalButtons}>
+            <TouchableOpacity
+              style={styles.finishCancelButton}
+              onPress={() => setShowFinishModal(false)}
+            >
+              <Text style={styles.finishCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.finishConfirmButton, { backgroundColor: themeColor }]}
+              onPress={confirmFinishWorkout}
+            >
+              <Text style={styles.finishConfirmText}>Finish Workout</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
     </>
   );
 }
@@ -1667,5 +1755,103 @@ const styles = StyleSheet.create({
   },
   settingsOptionTextDanger: {
     color: '#ef4444',
+  },
+
+  // Finish Workout Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  finishModalContent: {
+    backgroundColor: '#111116',
+    borderRadius: 20,
+    padding: 24,
+    marginHorizontal: 24,
+    width: '90%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  finishModalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  finishModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#ffffff',
+    fontFamily: 'Outfit-SemiBold',
+  },
+  finishModalStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingVertical: 16,
+    backgroundColor: '#0a0a0f',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+  },
+  finishStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  finishStatDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 16,
+  },
+  finishStatLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#888',
+    marginBottom: 4,
+    fontFamily: 'Outfit-Medium',
+  },
+  finishStatValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    fontFamily: 'DM-Mono-Medium',
+  },
+  finishModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  finishCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#1a1a1f',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+  },
+  finishCancelText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#888',
+    fontFamily: 'Outfit-Medium',
+  },
+  finishConfirmButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  finishConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    fontFamily: 'Outfit-SemiBold',
   },
 });

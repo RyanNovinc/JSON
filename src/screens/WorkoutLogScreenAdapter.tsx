@@ -44,6 +44,13 @@ export default function WorkoutLogScreenAdapter() {
     // imageUrl: getExerciseImageUrl(exercise.exercise),
   }));
 
+  // Debug: Check exercise rest data
+  console.log('🔥 EXERCISE REST DEBUG:', exercises.map(ex => ({ 
+    exercise: ex.exercise, 
+    rest: ex.rest,
+    restType: typeof ex.rest 
+  })));
+
   // Initialize sets data and load saved progress
   useEffect(() => {
     const loadSavedData = async () => {
@@ -108,6 +115,7 @@ export default function WorkoutLogScreenAdapter() {
       exerciseSets.some(set => set.weight !== '' || set.reps !== '')
     )) {
       setWorkoutStartTime(new Date());
+      setWorkoutStarted(true);
     }
   }, [allSetsData, workoutStartTime]);
 
@@ -157,12 +165,25 @@ export default function WorkoutLogScreenAdapter() {
       
       // Start rest timer for completed set
       const exercise = exercises[exerciseIndex];
+      console.log('🔥 REST TIMER DEBUG:', {
+        exerciseIndex,
+        setIndex,
+        exercise: exercise?.exercise,
+        rest: exercise?.rest,
+        restType: typeof exercise?.rest
+      });
+      
       if (exercise?.rest) {
         const restSeconds = typeof exercise.rest === 'string' ? parseInt(exercise.rest) : exercise.rest;
+        console.log('🔥 PARSED REST SECONDS:', restSeconds);
         if (restSeconds && restSeconds > 0) {
-          console.log(`Starting rest timer: ${restSeconds}s for ${exercise.exercise}`);
+          console.log(`🔥 CALLING startTimer: ${restSeconds}s for ${exercise.exercise}`);
           startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
+        } else {
+          console.log('🔥 REST SECONDS IS INVALID:', restSeconds);
         }
+      } else {
+        console.log('🔥 NO REST DATA FOUND FOR EXERCISE:', exercise?.exercise);
       }
     }
   };
