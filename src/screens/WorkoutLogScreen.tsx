@@ -36,7 +36,6 @@ import {
   Easing,
   ActivityIndicator,
   Dimensions,
-  Modal,
   Pressable,
   Alert,
   Image,
@@ -49,8 +48,9 @@ import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/sto
 import { useTimer } from '../contexts/TimerContext';
 // Import the actual old working screen from Git history
 import WorkoutLogScreenOld from './WorkoutLogScreenOld';
-// AsyncStorage import — uncomment when wiring up real caching
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// Import existing modals and components
+import { TimerModal } from '../components/TimerModal';
+import { ExerciseHistoryModal } from '../../ExerciseHistoryScreen';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -88,6 +88,8 @@ export interface WorkoutLogScreenProps {
   /** Sets data per exercise — outer array indexed by exerciseIndex */
   allSetsData: SetData[][];
   workoutStarted: boolean;
+  /** When the workout was started (for duration calculation) */
+  workoutStartTime?: Date | null;
   onSetUpdate: (
     exerciseIndex: number,
     setIndex: number,
@@ -154,6 +156,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     onIndexChange,
     allSetsData,
     workoutStarted,
+    workoutStartTime,
     onSetUpdate,
     onSetComplete,
     onSetAdd,
@@ -201,8 +204,56 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // State to show old view from Git history
   const [showOldView, setShowOldView] = useState(false);
   
+  // Workout History Modal state
+  const [showWorkoutHistory, setShowWorkoutHistory] = useState<{
+    exerciseName: string;
+    exerciseIndex: number;
+  } | null>(null);
+  
   // Timer context
-  const { globalTimer, setGlobalTimer, startAutoTimer } = useTimer();
+  const { globalTimer, setGlobalTimer, startAutoTimer, showModal: showTimerModal } = useTimer();
+
+  // Calculate workout duration for display on finish button
+  const [workoutDuration, setWorkoutDuration] = useState(0);
+
+  // Update workout duration in real-time
+  useEffect(() => {
+    if (!workoutStartTime) {
+      setWorkoutDuration(0);
+      return;
+    }
+
+    const updateDuration = () => {
+      const elapsed = Math.floor((Date.now() - workoutStartTime.getTime()) / 1000);
+      setWorkoutDuration(elapsed);
+    };
+
+    // Update immediately
+    updateDuration();
+
+    // Update every second
+    const interval = setInterval(updateDuration, 1000);
+
+    return () => clearInterval(interval);
+  }, [workoutStartTime]);
+
+  // Format workout duration as MM:SS
+  const formatWorkoutDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Load history data when showWorkoutHistory changes
+  useEffect(() => {
+    const loadHistoryData = async () => {
+      if (showWorkoutHistory) {
+        const history = await WorkoutStorage.getExerciseHistory(showWorkoutHistory.exerciseName);
+        setExerciseHistory(history);
+      }
+    };
+    loadHistoryData();
+  }, [showWorkoutHistory]);
 
   useEffect(() => {
     if (!workoutStarted) {
@@ -555,60 +606,31 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     return <WorkoutLogScreenOld />;
   }
 
-  // Notes view for a specific exercise
-  if (showNotes) {
-    const exercise = exercises[showNotes.exerciseIndex];
-    
-    return (
-      <SafeAreaView style={styles.root}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.headerBtn} 
-            onPress={() => setShowNotes(null)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chevron-back" size={22} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{showNotes.exerciseName}</Text>
-          <View style={styles.headerBtn} />
-        </View>
-        
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.historyContainer}>
-            <Text style={styles.historyTitle}>Exercise Notes</Text>
-            
-            <View style={styles.notesContainer}>
-              <TextInput
-                style={styles.notesInput}
-                value={exerciseNotes[showNotes.exerciseIndex] || ''}
-                onChangeText={(text) => handleNotesUpdate(showNotes.exerciseIndex, text)}
-                placeholder="Add your notes here..."
-                placeholderTextColor="#666"
-                multiline
-                textAlignVertical="top"
-              />
-            </View>
-
-            <Text style={styles.historyTitle}>Exercise Details</Text>
-            <View style={styles.historyEntry}>
-              <Text style={styles.historyDetails}>
-                Target: {exercise.sets} sets × {exercise.reps} reps
-              </Text>
-              {exercise.rest && (
-                <Text style={styles.historyDetails}>
-                  Rest: {exercise.rest}
-                </Text>
-              )}
-            </View>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+  // Workout History Modal - rendered alongside main content
+  const historyModalProps = showWorkoutHistory ? {
+    visible: true,
+    exerciseName: showWorkoutHistory.exerciseName,
+    sessions: exerciseHistory
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Newest first
+      .map(workout => ({
+        date: workout.date,
+        workoutLabel: workout.dayName,
+        sets: workout.sets.map(set => {
+          const weight = parseFloat(set.weight) || 0;
+          const reps = parseInt(set.reps) || 0;
+          const oneRM = weight > 0 && reps > 0 ? calculate1RM(weight, reps) : 0;
+          console.log(`🧮 1RM calc: ${weight}kg × ${reps}reps = ${oneRM} (formatted: ${oneRM > 0 ? (oneRM + 0.0).toFixed(1) : null})`);
+          return {
+            weight: set.weight,
+            reps: set.reps,
+            rir: oneRM > 0 ? (oneRM + 0.0).toFixed(1) : null, // Force 1 decimal place for all values
+          };
+        })
+      })),
+    onClose: () => setShowWorkoutHistory(null),
+    themeColor,
+    globalUnit,
+  } : null;
 
   return (
     <>
@@ -686,7 +708,11 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 <Ionicons name="refresh" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => handleNotesPress(currentIndex)}
+                onPress={() => {
+                  const exercise = exercises[currentIndex];
+                  const exerciseName = exercise.exercise || exercise.name || 'Exercise';
+                  setShowWorkoutHistory({ exerciseName, exerciseIndex: currentIndex });
+                }}
                 style={styles.overlayBtn}
               >
                 <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
@@ -733,6 +759,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             sets={currentSets}
             unit={globalUnit}
             themeColor={themeColor}
+            workoutStarted={workoutStarted}
             onUpdate={onSetUpdate}
             onComplete={onSetComplete}
             onAdd={onSetAdd}
@@ -762,10 +789,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
       {/* ── BOTTOM BAR ─────────────────────────────────────────── */}
       <View style={styles.bottomBar}>
-        <View style={styles.timerBadge}>
+        <TouchableOpacity 
+          style={styles.timerBadge}
+          onPress={showTimerModal}
+          activeOpacity={0.7}
+        >
           <Ionicons name="time-outline" size={16} color="#9898a4" />
           <Text style={styles.timerText}>{formatTime(elapsedSec)}</Text>
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.primaryBtn, { backgroundColor: themeColor }]}
@@ -774,11 +805,21 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           <Text style={styles.primaryBtnText}>
             {workoutStarted ? 'Finish Workout' : 'Start Workout'}
           </Text>
+          {workoutStarted && workoutStartTime && (
+            <Text style={styles.workoutDurationText}>
+              {formatWorkoutDuration(workoutDuration)}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
     </GestureDetector>
 
+    {/* Existing Timer Modal */}
+    <TimerModal />
+
+    {/* Exercise History Modal */}
+    {historyModalProps && <ExerciseHistoryModal {...historyModalProps} />}
     </>
   );
 }
@@ -854,6 +895,7 @@ interface SetsTableProps {
   sets: SetData[];
   unit: string;
   themeColor: string;
+  workoutStarted: boolean;
   onUpdate: (
     exerciseIndex: number,
     setIndex: number,
@@ -870,6 +912,7 @@ function SetsTable({
   sets,
   unit,
   themeColor,
+  workoutStarted,
   onUpdate,
   onComplete,
   onAdd,
@@ -894,6 +937,7 @@ function SetsTable({
           set={s}
           index={i}
           themeColor={themeColor}
+          workoutStarted={workoutStarted}
           onUpdate={(field, val) => onUpdate(exerciseIndex, i, field, val)}
           onComplete={() => onComplete(exerciseIndex, i)}
           onLongPress={() => onRemove(exerciseIndex, i)}
@@ -916,6 +960,7 @@ interface SetRowProps {
   set: SetData;
   index: number;
   themeColor: string;
+  workoutStarted: boolean;
   onUpdate: (field: 'weight' | 'reps', val: string) => void;
   onComplete: () => void;
   onLongPress: () => void;
@@ -925,6 +970,7 @@ function SetRow({
   set,
   index,
   themeColor,
+  workoutStarted,
   onUpdate,
   onComplete,
   onLongPress,
@@ -942,7 +988,7 @@ function SetRow({
           keyboardType="decimal-pad"
           placeholder="0"
           placeholderTextColor="#3a3a44"
-          editable={!completed}
+          editable={workoutStarted && !completed}
         />
 
         <TextInput
@@ -952,7 +998,7 @@ function SetRow({
           keyboardType="number-pad"
           placeholder="0"
           placeholderTextColor="#3a3a44"
-          editable={!completed}
+          editable={workoutStarted && !completed}
         />
 
         <TouchableOpacity
@@ -1425,6 +1471,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-Bold',
     letterSpacing: 0.2,
   },
+  workoutDurationText: {
+    color: 'rgba(0, 0, 0, 0.6)',
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: 'DMMono-Medium',
+    letterSpacing: 0.3,
+    marginTop: 2,
+  },
 
   // ── History View Styles ──────────────
   headerTitle: {
@@ -1441,6 +1495,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     fontFamily: 'Outfit-SemiBold',
+    marginBottom: 8,
+  },
+  historySubtitle: {
+    color: '#9898a4',
+    fontSize: 14,
+    fontFamily: 'DMMono-Regular',
     marginBottom: 16,
   },
   historyEntry: {
@@ -1546,5 +1606,44 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // ── Settings Modal Styles ──────────────
+  settingsContainer: {
+    padding: 16,
+  },
+  settingsExerciseName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#f0f0f2',
+    marginBottom: 24,
+    textAlign: 'center',
+    fontFamily: 'Outfit-SemiBold',
+  },
+  settingsOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#0a0a0f',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+    gap: 12,
+  },
+  settingsOptionDanger: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  settingsOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#f0f0f2',
+    flex: 1,
+    fontFamily: 'Outfit-Medium',
+  },
+  settingsOptionTextDanger: {
+    color: '#ef4444',
   },
 });
