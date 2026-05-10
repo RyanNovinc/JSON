@@ -15,6 +15,7 @@ export default function WorkoutLogScreenAdapter() {
   const route = useRoute();
   const { themeColor, isPinkTheme } = useTheme();
   const { globalUnit } = useWeightUnit();
+  const { startTimer } = useTimer();
   
   // Extract data from your existing route params
   const { day, blockName, currentWeek, block } = route.params || {};
@@ -153,6 +154,16 @@ export default function WorkoutLogScreenAdapter() {
     if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
       console.log('Saving completed set to history...');
       await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
+      
+      // Start rest timer for completed set
+      const exercise = exercises[exerciseIndex];
+      if (exercise?.rest) {
+        const restSeconds = typeof exercise.rest === 'string' ? parseInt(exercise.rest) : exercise.rest;
+        if (restSeconds && restSeconds > 0) {
+          console.log(`Starting rest timer: ${restSeconds}s for ${exercise.exercise}`);
+          startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
+        }
+      }
     }
   };
 

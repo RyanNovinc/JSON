@@ -190,9 +190,36 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [currentImagePhase, setCurrentImagePhase] = useState<'start' | 'end'>('start');
   const cyclingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Workout timer
-  const [elapsedSec, setElapsedSec] = useState(0);
-  const startTimestampRef = useRef<number | null>(null);
+  // Rest timer logic
+  const startRestTimer = (exerciseIndex: number, setIndex: number) => {
+    const exercise = exercises[exerciseIndex];
+    if (exercise?.rest) {
+      const restSeconds = typeof exercise.rest === 'string' ? parseInt(exercise.rest) : exercise.rest;
+      if (restSeconds && restSeconds > 0) {
+        // Start countdown timer for rest period
+        startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
+      }
+    }
+  };
+
+  // Format timer display for rest timer badge
+  const getRestTimerDisplay = (): string => {
+    if (!timer) return '0:00';
+    
+    if (timer.isCountUp) {
+      // Count up mode - show elapsed time
+      const elapsed = timer.timeElapsed;
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    } else {
+      // Countdown mode - show remaining time  
+      const remaining = Math.max(0, timer.targetTime - timer.timeElapsed);
+      const minutes = Math.floor(remaining / 60);
+      const seconds = remaining % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  };
 
   // History, Notes, Settings state
   const [showHistory, setShowHistory] = useState<string | null>(null);
@@ -211,7 +238,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   } | null>(null);
   
   // Timer context
-  const { globalTimer, setGlobalTimer, startAutoTimer, showModal: showTimerModal } = useTimer();
+  const { timer, startTimer, showModal: showTimerModal } = useTimer();
 
   // Calculate workout duration for display on finish button
   const [workoutDuration, setWorkoutDuration] = useState(0);
@@ -255,20 +282,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     loadHistoryData();
   }, [showWorkoutHistory]);
 
-  useEffect(() => {
-    if (!workoutStarted) {
-      startTimestampRef.current = null;
-      setElapsedSec(0);
-      return;
-    }
-    startTimestampRef.current = Date.now();
-    const intervalId = setInterval(() => {
-      if (startTimestampRef.current) {
-        setElapsedSec(Math.floor((Date.now() - startTimestampRef.current) / 1000));
-      }
-    }, 1000);
-    return () => clearInterval(intervalId);
-  }, [workoutStarted]);
 
   // Resolve image for current exercise (lazy, cached)
   useEffect(() => {
@@ -795,21 +808,23 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           activeOpacity={0.7}
         >
           <Ionicons name="time-outline" size={16} color="#9898a4" />
-          <Text style={styles.timerText}>{formatTime(elapsedSec)}</Text>
+          <Text style={styles.timerText}>{getRestTimerDisplay()}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.primaryBtn, { backgroundColor: themeColor }]}
           onPress={workoutStarted ? onFinishWorkout : onStartWorkout}
         >
-          <Text style={styles.primaryBtnText}>
-            {workoutStarted ? 'Finish Workout' : 'Start Workout'}
-          </Text>
-          {workoutStarted && workoutStartTime && (
-            <Text style={styles.workoutDurationText}>
-              {formatWorkoutDuration(workoutDuration)}
+          <View style={styles.primaryBtnContent}>
+            <Text style={styles.primaryBtnText}>
+              {workoutStarted ? 'Finish Workout' : 'Start Workout'}
             </Text>
-          )}
+            {workoutStarted && workoutStartTime && (
+              <Text style={styles.workoutDurationText}>
+                {formatWorkoutDuration(workoutDuration)}
+              </Text>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -1464,6 +1479,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  primaryBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   primaryBtnText: {
     color: '#000',
     fontSize: 15,
@@ -1472,12 +1492,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   workoutDurationText: {
-    color: 'rgba(0, 0, 0, 0.6)',
-    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.5)',
+    fontSize: 13,
     fontWeight: '500',
     fontFamily: 'DMMono-Medium',
     letterSpacing: 0.3,
-    marginTop: 2,
+    minWidth: 45,
+    textAlign: 'center',
+    paddingHorizontal: 4,
   },
 
   // ── History View Styles ──────────────
