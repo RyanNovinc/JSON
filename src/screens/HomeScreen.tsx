@@ -26,7 +26,6 @@ import QRCode from 'react-native-qrcode-svg';
 import { createShare, ShareError } from '../services/shareService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
-import WorkoutCalendar from '../components/WorkoutCalendar';
 import ImportFeedbackModal from '../components/ImportFeedbackModal';
 import OnboardingSlideshow from '../components/OnboardingSlideshow';
 import { useImportFeedback } from '../hooks/useImportFeedback';
@@ -120,7 +119,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     routine: null,
     newName: '',
   });
-  const [calendarModal, setCalendarModal] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -1379,7 +1377,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       <View style={[styles.calendarButton, { backgroundColor: themeColor }]}>
         <TouchableOpacity
           style={styles.buttonInner}
-          onPress={() => setCalendarModal(true)}
+          onPress={() => navigation.navigate('WorkoutCalendar' as any)}
           activeOpacity={0.9}
         >
           <Ionicons name="calendar-outline" size={24} color="#0a0a0b" />
@@ -1696,11 +1694,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
-      {/* Workout Calendar */}
-      <WorkoutCalendar
-        visible={calendarModal}
-        onClose={() => setCalendarModal(false)}
-      />
 
       {/* Import Feedback Modal */}
       <ImportFeedbackModal

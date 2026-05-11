@@ -5,12 +5,18 @@ import {
   StyleSheet,
   ScrollView,
   Modal,
+  Dimensions,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { WorkoutStorage } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+// Calendar inner width = screen width - (16 horizontal margin × 2) - (6 horizontal padding × 2) = 12px buffer
+const CALENDAR_INNER_WIDTH = SCREEN_WIDTH - 32 - 12;
+const DAY_CELL_WIDTH = Math.floor(CALENDAR_INNER_WIDTH / 7);
 
 interface WorkoutCalendarProps {
   visible: boolean;
@@ -214,14 +220,16 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
     return { totalSets, totalVolume };
   };
 
-  const renderCalendarDays = () => {
+  const renderCalendarRows = () => {
     const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
-    const days = [];
+    const cells: React.ReactNode[] = [];
 
+    // Empty leading cells
     for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(<View key={`empty-${i}`} style={styles.dayCell} />);
+      cells.push(<View key={`empty-${i}`} style={styles.dayCell} />);
     }
 
+    // Day cells
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
       const dateKey = date.toDateString();
@@ -246,7 +254,7 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
         textStyle.push({ color: '#f0f0f2' });
       }
 
-      days.push(
+      cells.push(
         <TouchableOpacity
           key={day}
           style={cellStyle}
@@ -262,7 +270,17 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
       );
     }
 
-    return days;
+    // Group cells into rows of 7
+    const rows: React.ReactNode[] = [];
+    for (let i = 0; i < cells.length; i += 7) {
+      rows.push(
+        <View key={`row-${i}`} style={styles.calendarRow}>
+          {cells.slice(i, i + 7)}
+        </View>
+      );
+    }
+
+    return rows;
   };
 
   const monthNames = [
@@ -282,8 +300,9 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
   return (
     <Modal
       visible={visible}
-      transparent={true}
-      animationType="fade"
+      transparent={false}
+      animationType="slide"
+      presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
       <View style={styles.container}>
@@ -352,13 +371,15 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
           {/* Day names */}
           <View style={styles.dayNamesRow}>
             {dayNames.map((day, idx) => (
-              <Text key={idx} style={styles.dayName}>{day}</Text>
+              <View key={idx} style={styles.dayNameCell}>
+                <Text style={styles.dayName}>{day}</Text>
+              </View>
             ))}
           </View>
 
           {/* Calendar grid */}
           <View style={styles.calendarGrid}>
-            {renderCalendarDays()}
+            {renderCalendarRows()}
           </View>
 
           {/* Stats grid 2x2 */}
@@ -649,15 +670,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Day names row
+  // Day names row — explicit pixel cell widths
   dayNamesRow: {
     flexDirection: 'row',
-    paddingHorizontal: 22,
+    marginHorizontal: 16,
+    paddingHorizontal: 6,
     paddingBottom: 8,
   },
+  dayNameCell: {
+    width: DAY_CELL_WIDTH,
+    alignItems: 'center',
+  },
   dayName: {
-    flex: 1,
-    textAlign: 'center',
     fontSize: 10,
     color: '#55555f',
     fontWeight: '500',
@@ -665,22 +689,23 @@ const styles = StyleSheet.create({
     fontFamily: 'DMMono-Medium',
   },
 
-  // Calendar grid
+  // Calendar grid — uses rows of 7 cells
   calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     marginHorizontal: 16,
     backgroundColor: '#0a0a0f',
     borderRadius: 14,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 6,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
   },
-  // Day cell — flat, no nested wrapper
+  calendarRow: {
+    flexDirection: 'row',
+  },
+  // Day cell — explicit pixel width, fixed height
   dayCell: {
-    width: `${100 / 7}%`,
-    height: 44,
+    width: DAY_CELL_WIDTH,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 9,

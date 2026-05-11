@@ -55,6 +55,7 @@ import NutritionOptionalToolsScreen from '../screens/NutritionOptionalToolsScree
 import FitnessGoalsQuestionnaireScreen from '../screens/FitnessGoalsQuestionnaireScreen';
 import EquipmentPreferencesQuestionnaireScreen from '../screens/EquipmentPreferencesQuestionnaireScreen';
 import MealCalendarScreen from '../screens/MealCalendarScreen';
+import WorkoutCalendar from '../components/WorkoutCalendar';
 import MealDetailScreen from '../screens/MealDetailScreen';
 import GroceryListScreen from '../screens/GroceryListScreen';
 import MealRatingsScreen from '../screens/MealRatingsScreen';
@@ -187,6 +188,7 @@ export type RootStackParamList = {
   SleepOptimizationScreen: undefined;
   NutritionDashboard: undefined;
   WorkoutDashboard: undefined;
+  WorkoutCalendar: undefined;
   RequiredSetup: undefined;
   OptionalTools: undefined;
   NutritionRequiredSetup: undefined;
@@ -647,6 +649,29 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                             translateX: current.progress.interpolate({
                               inputRange: [0, 1],
                               outputRange: [-layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    };
+                  },
+                }}
+              />
+              <RootStack.Screen 
+                name="WorkoutCalendar" 
+                component={WorkoutCalendar}
+                options={{
+                  headerShown: false,
+                  animationTypeForReplace: 'push',
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts.screen.width, 0],
                             }),
                           },
                         ],
