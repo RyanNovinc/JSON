@@ -932,64 +932,54 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           {/* Exercise selector dropdown */}
           {showExerciseSelector === currentIndex && allExercises.length > 1 && (
             <View style={styles.exerciseSelector}>
-              {allExercises.map((exerciseName, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.exerciseOption,
-                    index === selectedIndex && [styles.exerciseOptionSelected, { backgroundColor: themeColor + '20' }],
-                    index === allExercises.length - 1 && styles.exerciseOptionLast
-                  ]}
-                  onPress={() => {
-                    console.log(`🔧 [EXERCISE-SELECT] Selecting: ${exerciseName} for ${currentExercise.exercise} (index: ${index})`);
-                    // Update the visual selection
-                    onExerciseSelect(currentIndex, index);
-                    // Handle preference saving
-                    const alternativeNames = (currentExercise.alternatives || [])
-                      .filter(alt => alt && typeof alt === 'string')
-                      .map(alt => String(alt));
-                    
-                    if (index === 0) {
-                      // Going back to original exercise - clear the preference
-                      console.log(`🔧 [EXERCISE-SELECT] Clearing preference for ${currentExercise.exercise}`);
-                      onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, '');
-                    } else {
-                      // Selecting an alternative
-                      console.log(`🔧 [EXERCISE-SELECT] Setting preference for ${currentExercise.exercise} to ${exerciseName}`);
-                      onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, exerciseName);
-                    }
-                    setShowExerciseSelector(null);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.exerciseOptionTextContainer}>
-                    <View style={styles.exerciseOptionTextRow}>
+              {allExercises.map((exerciseName, index) => {
+                const preferredExercise = exercisePreferences[currentExercise.exercise];
+                const isSelected = index === selectedIndex;
+                const isPrimary = index === 0;
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.exerciseOption,
+                      isSelected && [styles.exerciseOptionSelected, { borderLeftColor: themeColor }]
+                    ]}
+                    onPress={() => {
+                      console.log(`🔧 [EXERCISE-SELECT] Selecting: ${exerciseName} for ${currentExercise.exercise} (index: ${index})`);
+                      // Update the visual selection
+                      onExerciseSelect(currentIndex, index);
+                      // Handle preference saving
+                      const alternativeNames = (currentExercise.alternatives || [])
+                        .filter(alt => alt && typeof alt === 'string')
+                        .map(alt => String(alt));
+                      
+                      if (index === 0) {
+                        // Going back to original exercise - clear the preference
+                        console.log(`🔧 [EXERCISE-SELECT] Clearing preference for ${currentExercise.exercise}`);
+                        onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, '');
+                      } else {
+                        // Selecting an alternative
+                        console.log(`🔧 [EXERCISE-SELECT] Setting preference for ${currentExercise.exercise} to ${exerciseName}`);
+                        onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, exerciseName);
+                      }
+                      setShowExerciseSelector(null);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.exerciseOptionContent}>
                       <Text style={[
                         styles.exerciseOptionText,
-                        index === selectedIndex && { color: themeColor }
+                        isSelected && { color: themeColor }
                       ]}>
                         {exerciseName}
                       </Text>
-                      {(() => {
-                        // Show star for preferred exercise if set, otherwise show for primary (index 0)
-                        const preferredExercise = exercisePreferences[currentExercise.exercise];
-                        const showStar = preferredExercise ? exerciseName === preferredExercise : index === 0;
-                        return showStar && (
-                          <Ionicons 
-                            name="star" 
-                            size={14} 
-                            color={themeColor} 
-                            style={{ marginLeft: 6 }}
-                          />
-                        );
-                      })()}
+                      {isSelected && (
+                        <View style={[styles.exerciseSelectedDot, { backgroundColor: themeColor }]} />
+                      )}
                     </View>
-                    {index === 0 && (
-                      <Text style={styles.exerciseOptionSubtext}>Primary</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
@@ -2369,44 +2359,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   exerciseSelector: {
-    backgroundColor: '#0a0a0f',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    marginTop: 12,
-    overflow: 'hidden',
+    marginTop: 8,
+    gap: 4,
   },
   exerciseOption: {
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  exerciseOptionLast: {
-    borderBottomWidth: 0,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: 'transparent',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
   },
   exerciseOptionSelected: {
-    borderLeftWidth: 3,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  exerciseOptionTextContainer: {
-    flex: 1,
-  },
-  exerciseOptionTextRow: {
+  exerciseOptionContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   exerciseOptionText: {
-    color: '#f0f0f2',
-    fontSize: 15,
+    color: '#e0e0e4',
+    fontSize: 14,
     fontWeight: '500',
     fontFamily: 'Outfit-Medium',
-    flex: 1,
   },
-  exerciseOptionSubtext: {
-    color: '#9898a4',
-    fontSize: 12,
-    marginTop: 2,
-    fontFamily: 'DMMono-Regular',
+  exerciseSelectedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 
   // ── Superset Connector Styles ──────────────────
