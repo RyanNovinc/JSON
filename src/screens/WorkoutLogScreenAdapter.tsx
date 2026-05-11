@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Animated } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import WorkoutLogScreen from './WorkoutLogScreen';
 import type { Exercise, SetData } from './WorkoutLogScreen';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { useTimer } from '../contexts/TimerContext';
+import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { resolveExerciseImagePair } from '../utils/exerciseImages';
 import { WorkoutStorage } from '../utils/storage';
+import RobustStorage from '../utils/robustStorage';
 
 // This adapter connects the new beautiful WorkoutLogScreen with your existing app navigation and data structures
 
@@ -16,6 +20,7 @@ export default function WorkoutLogScreenAdapter() {
   const { themeColor, isPinkTheme } = useTheme();
   const { globalUnit } = useWeightUnit();
   const { startTimer } = useTimer();
+  const { activeWorkout, setActiveWorkout } = useActiveWorkout();
   
   // Extract data from your existing route params
   const { day, blockName, currentWeek, block } = route.params || {};
@@ -25,7 +30,11 @@ export default function WorkoutLogScreenAdapter() {
   const [allSetsData, setAllSetsData] = useState<SetData[][]>([]);
   const [workoutStarted, setWorkoutStarted] = useState(false);
   const [workoutStartTime, setWorkoutStartTime] = useState<Date | null>(null);
+  const [workoutDuration, setWorkoutDuration] = useState(0); // in seconds
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [isFinishingWorkout, setIsFinishingWorkout] = useState(false);
+  const [workoutCompleted, setWorkoutCompleted] = useState(false);
+  const shakeAnimation = useRef(new Animated.Value(0)).current;
   
   // Transform your existing exercise data to the new interface
   const exercises: Exercise[] = (day?.exercises || []).map((exercise: any, index: number) => ({
@@ -44,26 +53,46 @@ export default function WorkoutLogScreenAdapter() {
     // imageUrl: getExerciseImageUrl(exercise.exercise),
   }));
 
-  // Debug: Check exercise rest data
-  console.log('🔥 EXERCISE REST DEBUG:', exercises.map(ex => ({ 
-    exercise: ex.exercise, 
-    rest: ex.rest,
-    restType: typeof ex.rest 
-  })));
 
   // Initialize sets data and load saved progress
   useEffect(() => {
     const loadSavedData = async () => {
-      console.log('💾 DATA LOADING: Loading workout progress for:', day?.day_name, blockName);
       const savedWorkout = await WorkoutStorage.loadCurrentWorkout(day?.day_name || '', blockName);
       
       if (savedWorkout && savedWorkout.allSetsData) {
-        console.log('💾 DATA LOADING: Found saved workout data, restoring...');
         setAllSetsData(savedWorkout.allSetsData);
-        setWorkoutStartTime(savedWorkout.workoutStartTime ? new Date(savedWorkout.workoutStartTime) : null);
-        setWorkoutStarted(!!savedWorkout.workoutStartTime);
+        
+        // Restore workout timer state if it was active
+        if (savedWorkout.workoutStartTime) {
+          const startTime = new Date(savedWorkout.workoutStartTime);
+          setWorkoutStartTime(startTime);
+          setWorkoutDuration(savedWorkout.workoutDuration || 0); // Restore saved duration
+          setWorkoutStarted(true);
+        } else {
+          
+          // Check if there's an active workout context for this screen that has a timer (matching old screen logic)
+          if (activeWorkout) {
+            const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
+                                         activeWorkout.routeParams?.blockName === blockName;
+            const contextHasTimer = activeWorkout.duration > 0;
+            
+            
+            if (currentWorkoutMatches && contextHasTimer && !workoutCompleted) {
+              // Calculate what the start time should be based on current duration
+              const estimatedStartTime = new Date(Date.now() - (activeWorkout.duration * 1000));
+              setWorkoutStartTime(estimatedStartTime);
+              setWorkoutDuration(activeWorkout.duration); // Initialize duration to match context
+              setWorkoutStarted(true);
+            } else {
+              setWorkoutStartTime(null);
+              setWorkoutStarted(false);
+            }
+          } else {
+            setWorkoutStartTime(null);
+            setWorkoutStarted(false);
+          }
+        }
       } else {
-        console.log('💾 DATA LOADING: No saved data, initializing fresh sets...');
         const initialSetsData = exercises.map((exercise) => {
           const setsCount = exercise.sets;
           return Array(setsCount).fill(null).map(() => ({
@@ -82,7 +111,7 @@ export default function WorkoutLogScreenAdapter() {
     }
   }, [exercises.length, day?.day_name, blockName]);
 
-  // Auto-save workout progress when sets data changes
+  // Auto-save workout progress when sets data or workout state changes
   useEffect(() => {
     const saveWorkoutProgress = async () => {
       const progressData = {
@@ -91,33 +120,87 @@ export default function WorkoutLogScreenAdapter() {
         allSetsData,
         exerciseNotes: {}, // TODO: Add notes support if needed
         workoutStartTime,
-        workoutDuration: workoutStartTime ? Math.floor((Date.now() - workoutStartTime.getTime()) / 1000) : 0,
+        workoutDuration,
         timestamp: Date.now(),
       };
-      console.log('💾 AUTO-SAVE: Saving workout progress...', {
-        setsDataLength: allSetsData.length,
-        workoutStarted: !!workoutStartTime,
-        dataLoaded
-      });
       await WorkoutStorage.saveCurrentWorkout(progressData);
     };
 
-    // Only auto-save if data is loaded and we have sets data
-    if (dataLoaded && allSetsData.length > 0) {
-      console.log('💾 AUTO-SAVE: Triggering save due to sets data change...');
+    // Save if data is loaded AND (we have sets data OR we have a workout start time)
+    // This ensures timer state is saved even before any sets are entered
+    if (dataLoaded && (allSetsData.length > 0 || workoutStartTime)) {
       saveWorkoutProgress();
+    } else {
     }
   }, [allSetsData, workoutStartTime, dataLoaded, day, blockName]);
 
   // Update workout start time when first set is logged
   useEffect(() => {
-    if (!workoutStartTime && allSetsData.some(exerciseSets => 
+    const hasSetsWithData = allSetsData.some(exerciseSets => 
       exerciseSets.some(set => set.weight !== '' || set.reps !== '')
-    )) {
+    );
+    
+    
+    // Only create a new timer if data is loaded, we don't have a start time, and there are sets with data
+    // This prevents overwriting restored timer data during the loading process
+    // Also don't auto-start if workout was already completed
+    if (!workoutStartTime && hasSetsWithData && dataLoaded && !workoutCompleted) {
       setWorkoutStartTime(new Date());
       setWorkoutStarted(true);
     }
-  }, [allSetsData, workoutStartTime]);
+  }, [allSetsData, workoutStartTime, dataLoaded]);
+
+  // Workout duration timer - updates based on start time (matching old screen)
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    
+    if (workoutStartTime) {
+      // Update duration every second based on elapsed time
+      const updateDuration = () => {
+        const now = Date.now();
+        const elapsed = Math.floor((now - workoutStartTime.getTime()) / 1000);
+        setWorkoutDuration(elapsed);
+      };
+      
+      // Update immediately
+      updateDuration();
+      
+      // Then update every second
+      interval = setInterval(updateDuration, 1000);
+    } else {
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [workoutStartTime]);
+
+  // Update active workout context when workout timer state changes (matching old screen)
+  useEffect(() => {
+    // Skip context updates during workout completion to prevent re-starting timer
+    if (isFinishingWorkout) {
+      console.log('⏱️ [TIMER-DEBUG] Skipping activeWorkout update - finishing workout');
+      return;
+    }
+    
+    if (workoutStartTime) {
+      const contextData = {
+        dayName: day?.day_name || '',
+        blockName: blockName || '',
+        duration: workoutDuration,
+        routeParams: { day, blockName, currentWeek, block, routineName: block?.routineName }
+      };
+      console.log('⏱️ [TIMER-DEBUG] Setting activeWorkout context:', contextData);
+      setActiveWorkout(contextData);
+    } else {
+      console.log('⏱️ [TIMER-DEBUG] workoutStartTime is null, NOT clearing activeWorkout (only clear on explicit finish)');
+    }
+    // Don't clear the active workout when workoutStartTime is null
+    // Only clear it when explicitly finishing the workout
+  }, [workoutStartTime, workoutDuration, day?.day_name, blockName, currentWeek, block, isFinishingWorkout]);
 
   // Epley formula for 1RM calculation (preserving decimal precision)
   const calculate1RM = (weight: number, reps: number): number => {
@@ -160,30 +243,18 @@ export default function WorkoutLogScreenAdapter() {
     
     // Save to history when set is completed (not when uncompleted)
     if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
-      console.log('Saving completed set to history...');
       await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
       
       // Start rest timer for completed set
       const exercise = exercises[exerciseIndex];
-      console.log('🔥 REST TIMER DEBUG:', {
-        exerciseIndex,
-        setIndex,
-        exercise: exercise?.exercise,
-        rest: exercise?.rest,
-        restType: typeof exercise?.rest
-      });
       
       if (exercise?.rest) {
         const restSeconds = typeof exercise.rest === 'string' ? parseInt(exercise.rest) : exercise.rest;
-        console.log('🔥 PARSED REST SECONDS:', restSeconds);
         if (restSeconds && restSeconds > 0) {
-          console.log(`🔥 CALLING startTimer: ${restSeconds}s for ${exercise.exercise}`);
           startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
         } else {
-          console.log('🔥 REST SECONDS IS INVALID:', restSeconds);
         }
       } else {
-        console.log('🔥 NO REST DATA FOUND FOR EXERCISE:', exercise?.exercise);
       }
     }
   };
@@ -224,13 +295,174 @@ export default function WorkoutLogScreenAdapter() {
     }
   };
 
-  const handleFinishWorkout = async () => {
+  const shakeStartButton = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleSetTapWhenNotStarted = () => {
+    if (!workoutStarted) {
+      shakeStartButton();
+    }
+  };
+
+
+  const handleConfirmFinish = async () => {
+    console.log('🏁 FINISH WORKOUT: User confirmed workout completion');
+    console.log('🏁 FINISH WORKOUT: currentWeek =', currentWeek, 'blockName =', blockName);
+    
+    // Set flags to prevent useEffect from re-setting ActiveWorkout and auto-starting
+    setIsFinishingWorkout(true);
+    setWorkoutCompleted(true);
+    
+    // Clear workout timer state FIRST to prevent useEffect from re-setting ActiveWorkout
+    setWorkoutStartTime(null);
+    
+    // Clear active workout context (matching old screen order)  
+    console.log('🏁 FINISH WORKOUT: Clearing active workout context');
+    setActiveWorkout(null);
+    
+    // Mark workout as completed using ROBUST STORAGE (matching old screen logic)
+    try {
+      const weekString = (currentWeek || 1).toString();
+      const workoutKey = `${day?.day_name || 'unknown'}_week${weekString}`;
+      const completedKey = `completed_${blockName}_week${weekString}`;
+      
+      console.log('🎯 [COMPLETION] Starting ROBUST completion save process...');
+      console.log('🎯 [COMPLETION] Completed key:', completedKey);
+      console.log('🎯 [COMPLETION] Workout key:', workoutKey);
+      
+      // Run health check before critical operation
+      const healthCheck = await RobustStorage.healthCheck();
+      console.log('🎯 [COMPLETION] Storage health check:', healthCheck);
+      
+      // Get existing completions using robust storage
+      const completed = await RobustStorage.getItem(completedKey, true);
+      let completedSet = new Set();
+      
+      if (completed) {
+        try {
+          const parsedCompleted = JSON.parse(completed);
+          // Ensure it's an array before creating Set
+          if (Array.isArray(parsedCompleted)) {
+            // Filter out any objects that may have corrupted the data - keep only strings
+            const cleanedCompleted = parsedCompleted.filter(item => typeof item === 'string');
+            console.log('🎯 [COMPLETION] Cleaned completion data: removed', parsedCompleted.length - cleanedCompleted.length, 'non-string items');
+            completedSet = new Set(cleanedCompleted);
+          } else {
+            console.warn('🎯 [COMPLETION] ⚠️ Completed data is not an array, starting fresh:', parsedCompleted);
+          }
+        } catch (parseError) {
+          console.error('🎯 [COMPLETION] ❌ Error parsing completed data:', parseError);
+          // Start with empty set if parsing fails
+        }
+      }
+      
+      completedSet.add(workoutKey);
+      
+      const completedData = JSON.stringify(Array.from(completedSet));
+      console.log('🎯 [COMPLETION] Data to save:', completedData);
+      
+      // Save using robust storage with redundancy
+      const saveSuccess = await RobustStorage.setItem(completedKey, completedData, true);
+      console.log('🎯 [COMPLETION] ROBUST save result:', saveSuccess ? '✅ SUCCESS' : '❌ FAILED');
+      
+      if (!saveSuccess) {
+        console.error('🎯 [COMPLETION] ❌ CRITICAL: ROBUST save failed! Trying emergency fallback...');
+        
+        // Emergency fallback: try saving with multiple different key formats
+        const emergencyKeys = [
+          `${completedKey}_emergency`,
+          `workout_completion_${blockName.replace(/[^a-zA-Z0-9]/g, '_')}_week${weekString}`,
+          `completion_backup_${Date.now()}`
+        ];
+        
+        for (const emergencyKey of emergencyKeys) {
+          try {
+            await AsyncStorage.setItem(emergencyKey, completedData);
+            console.log(`🎯 [COMPLETION] ✅ Emergency save succeeded with key: ${emergencyKey}`);
+            break;
+          } catch (emergencyError) {
+            console.error(`🎯 [COMPLETION] ❌ Emergency save failed for ${emergencyKey}:`, emergencyError);
+          }
+        }
+      }
+      
+      // Immediate verification
+      const verification = await RobustStorage.getItem(completedKey, true);
+      const verificationSuccess = verification === completedData;
+      console.log('🎯 [COMPLETION] Immediate verification:', verificationSuccess ? '✅ SUCCESS' : '❌ FAILED');
+      
+      if (!verificationSuccess) {
+        console.error('🎯 [COMPLETION] ❌ CRITICAL: Data verification failed immediately after save!');
+      }
+      
+      // Save completion stats (matching old screen logic)
+      const statsKey = `completionStats_${blockName}_week${weekString}`;
+      const existingStats = await AsyncStorage.getItem(statsKey);
+      const statsMap = existingStats ? new Map(JSON.parse(existingStats)) : new Map();
+      
+      // Calculate stats from current workout
+      const calculateTotalVolume = () => {
+        let totalVolume = 0;
+        allSetsData.forEach((exerciseSets) => {
+          exerciseSets.forEach((setData) => {
+            if (setData.completed && setData.weight && setData.reps) {
+              const weight = parseFloat(setData.weight) || 0;
+              const reps = parseInt(setData.reps) || 0;
+              totalVolume += weight * reps;
+            }
+          });
+        });
+        return Math.round(totalVolume * 10) / 10; // Round to 1 decimal
+      };
+
+      const stats = {
+        duration: Math.round(workoutDuration / 60), // Convert to minutes
+        totalVolume: calculateTotalVolume(),
+        date: new Date().toISOString(),
+      };
+      
+      statsMap.set(workoutKey, stats);
+      await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
+      console.log('🎯 [COMPLETION] Saved completion stats:', stats);
+      
+    } catch (error) {
+      console.error('🏁 FINISH WORKOUT: Error marking workout as completed:', error);
+    }
+    
     // Clear saved workout data since workout is complete
     await WorkoutStorage.clearCurrentWorkout(day?.day_name, blockName);
     setWorkoutStarted(false);
-    setWorkoutStartTime(null);
-    // Navigate to completion screen or back
-    navigation.goBack();
+    setWorkoutDuration(0);
+    
+    // Navigate back to dashboard
+    console.log('🏁 FINISH WORKOUT: Navigating back to dashboard...');
+    console.log('🧭 [NAVIGATION] About to call navigation.goBack()');
+    console.log('🧭 [NAVIGATION] Navigation object:', navigation);
+    console.log('🧭 [NAVIGATION] Can go back:', navigation.canGoBack());
+    try {
+      navigation.goBack();
+      console.log('🧭 [NAVIGATION] ✅ navigation.goBack() called successfully');
+    } catch (error) {
+      console.error('🧭 [NAVIGATION] ❌ Error calling navigation.goBack():', error);
+    } finally {
+      // Always reset the finishing flag
+      setIsFinishingWorkout(false);
+    }
+  };
+
+  // Wrapper for the new screen that expects synchronous function
+  const handleFinishWorkout = () => {
+    // Fire and forget the async completion logic
+    handleConfirmFinish().catch(error => {
+      console.error('🏁 FINISH WORKOUT: Error in completion:', error);
+    });
   };
 
   // Optional handlers - implement these based on your app's features
@@ -249,13 +481,11 @@ export default function WorkoutLogScreenAdapter() {
   // Save set to workout history
   const saveSetToHistory = async (exerciseIndex: number, setIndex: number, setData: SetData) => {
     const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    console.log('Saving set to history with date:', currentDate);
     
     // Get the exercise name
     const exercise = exercises[exerciseIndex];
     const exerciseName = exercise?.exercise || exercise?.name || 'Unknown Exercise';
     
-    console.log('Saving set for exercise:', exerciseName, 'weight:', setData.weight, 'reps:', setData.reps, 'unit:', globalUnit);
     
     // Load existing history
     const history = await WorkoutStorage.loadWorkoutHistory();
@@ -303,30 +533,18 @@ export default function WorkoutLogScreenAdapter() {
     
     // Save updated history
     await WorkoutStorage.saveWorkoutHistory(history);
-    console.log('Set saved to history successfully:', {
-      exercise: exerciseName,
-      setNumber: setIndex + 1,
-      weight: setData.weight,
-      reps: setData.reps,
-      unit: globalUnit
-    });
   };
 
   // Create themed image resolver
   const themedResolveExerciseImagePair = async (exercise: Exercise) => {
     const theme = isPinkTheme ? 'pink' : 'blue';
-    console.log('🎨 ADAPTER: Using theme:', theme, 'for exercise:', exercise.exercise);
     return resolveExerciseImagePair(exercise, theme);
   };
 
-  console.log('🔌 ADAPTER: Rendering WorkoutLogScreen with exercises:', exercises.map(e => e.exercise));
-  console.log('🔌 ADAPTER: Current exercise index:', currentIndex);
-  console.log('🔌 ADAPTER: Current exercise:', exercises[currentIndex]);
-  console.log('🔌 ADAPTER: isPinkTheme:', isPinkTheme);
-  console.log('🔌 ADAPTER: themedResolveExerciseImagePair function:', themedResolveExerciseImagePair);
 
   return (
-    <WorkoutLogScreen
+    <>
+      <WorkoutLogScreen
       exercises={exercises}
       currentIndex={currentIndex}
       onIndexChange={setCurrentIndex}
@@ -348,6 +566,10 @@ export default function WorkoutLogScreenAdapter() {
       currentWeek={currentWeek || 1}
       calculate1RM={calculate1RM}
       resolveExerciseImagePair={themedResolveExerciseImagePair}
+      shakeAnimation={shakeAnimation}
+      onSetTapWhenNotStarted={handleSetTapWhenNotStarted}
     />
+    
+    </>
   );
 }

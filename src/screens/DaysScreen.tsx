@@ -891,6 +891,9 @@ export default function DaysScreen() {
         console.log(`🔍 [LOAD-COMPLETION] Found completed workouts (${dataSource}):`, parsedCompleted);
         const validArray = Array.isArray(parsedCompleted) ? parsedCompleted : [];
         setCompletedWorkouts(new Set(validArray));
+        
+        // Force a re-render to ensure UI updates
+        setRefreshTrigger(prev => prev + 1);
 
         if (dataSource !== 'robust') {
           setTimeout(async () => {
@@ -929,7 +932,15 @@ export default function DaysScreen() {
   };
 
   const isWorkoutCompleted = (dayName: string) => {
-    return completedWorkouts.has(getWorkoutKey(dayName, currentWeek));
+    const workoutKey = getWorkoutKey(dayName, currentWeek);
+    const isCompleted = completedWorkouts.has(workoutKey);
+    console.log('🔍 [COMPLETION-CHECK] Checking workout completion:', {
+      dayName,
+      workoutKey,
+      isCompleted,
+      completedWorkouts: Array.from(completedWorkouts)
+    });
+    return isCompleted;
   };
 
   const getCompletionStats = (dayName: string) => {
@@ -1321,7 +1332,18 @@ export default function DaysScreen() {
             day={item}
             onPress={() => handleDayPress(item)}
             onLongPress={() => handleDayLongPress(item)}
-            isCompleted={isWorkoutCompleted(item.day_name)}
+            isCompleted={(() => {
+              const completed = isWorkoutCompleted(item.day_name);
+              const stats = getCompletionStats(item.day_name);
+              console.log('🎨 [UI-RENDER] Rendering workout card:', {
+                dayName: item.day_name,
+                isCompleted: completed,
+                completionStats: stats,
+                willShowDone: completed && !!stats,
+                willShowStart: !(completed && !!stats)
+              });
+              return completed;
+            })()}
             currentWeek={currentWeek}
             completionStats={getCompletionStats(item.day_name)}
             themeColor={themeColor}

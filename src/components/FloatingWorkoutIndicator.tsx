@@ -48,17 +48,11 @@ export function FloatingWorkoutIndicator() {
     const isSameWorkout = currentParams?.day?.day_name === activeParams?.day?.day_name &&
                          currentParams?.blockName === activeParams?.blockName;
     
-    console.log('🔍 FLOATING INDICATOR: On WorkoutLog screen');
-    console.log('🔍 FLOATING INDICATOR: Current workout:', currentParams?.day?.day_name, '|', currentParams?.blockName);
-    console.log('🔍 FLOATING INDICATOR: Active workout:', activeParams?.day?.day_name, '|', activeParams?.blockName);
-    console.log('🔍 FLOATING INDICATOR: Same workout?', isSameWorkout);
     
     // Only hide if it's the same workout
     if (isSameWorkout) {
-      console.log('🔍 FLOATING INDICATOR: Hiding - same workout');
       return null;
     } else {
-      console.log('🔍 FLOATING INDICATOR: Showing - different workout');
     }
   }
 

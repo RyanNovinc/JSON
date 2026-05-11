@@ -52,6 +52,10 @@ import WorkoutLogScreenOld from './WorkoutLogScreenOld';
 // Import existing modals and components
 import { TimerModal } from '../components/TimerModal';
 import { ExerciseHistoryModal } from '../../ExerciseHistoryScreen';
+import FinishWorkoutModal from './FinishWorkoutModal';
+import RepSchemeModal from '../components/RepSchemeModal';
+import ExerciseNotesModal, { NoteEntry } from '../components/ExerciseNotesModal';
+import WorkoutHeatmapModal from '../components/WorkoutHeatmapModal';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -122,9 +126,15 @@ export interface WorkoutLogScreenProps {
   resolveExerciseImage?: (exercise: Exercise) => Promise<string | null>;
   /** Optional async resolver: given an exercise, returns both start and end images for cycling */
   resolveExerciseImagePair?: (exercise: Exercise) => Promise<{start: any, end: any} | null>;
+  /** Shake animation for start button when user taps sets before starting workout */
+  shakeAnimation?: Animated.Value;
+  /** Handler called when user taps sets before starting workout */
+  onSetTapWhenNotStarted?: () => void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 const DEFAULT_THEME = '#22d3ee';
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -174,6 +184,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     calculate1RM = defaultCalc1RM,
     resolveExerciseImage,
     resolveExerciseImagePair,
+    shakeAnimation,
+    onSetTapWhenNotStarted,
   } = props;
 
   const currentExercise = exercises[currentIndex];
@@ -229,11 +241,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [showHistory, setShowHistory] = useState<string | null>(null);
   const [exerciseHistory, setExerciseHistory] = useState<WorkoutHistory[]>([]);
   const [showNotes, setShowNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
-  const [exerciseNotes, setExerciseNotes] = useState<{ [exerciseIndex: number]: string }>({});
+  const [showExerciseNotes, setShowExerciseNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
+  const [exerciseNotes, setExerciseNotes] = useState<{ [exerciseIndex: number]: NoteEntry[] }>({});
   const [exerciseInSettings, setExerciseInSettings] = useState<number | null>(null);
   
   // State to show old view from Git history
   const [showOldView, setShowOldView] = useState(false);
+  
+  // Workout Heatmap Modal state
+  const [showWorkoutHeatmap, setShowWorkoutHeatmap] = useState(false);
   
   // Workout History Modal state
   const [showWorkoutHistory, setShowWorkoutHistory] = useState<{
@@ -275,23 +291,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calculate total volume lifted
-  const calculateTotalVolume = (): number => {
-    let totalVolume = 0;
-    allSetsData.forEach((exerciseSets) => {
-      exerciseSets.forEach((set) => {
-        if (set.completed && set.weight && set.reps) {
-          const weight = parseFloat(set.weight);
-          const reps = parseInt(set.reps);
-          if (!isNaN(weight) && !isNaN(reps)) {
-            totalVolume += weight * reps;
-          }
-        }
-      });
-    });
-    return totalVolume;
-  };
-
   // Handle finish workout button press
   const handleFinishWorkoutPress = () => {
     setShowFinishModal(true);
@@ -317,54 +316,37 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Resolve image for current exercise (lazy, cached)
   useEffect(() => {
-    console.log('🔴 COLOR CHANGE DEBUG: ===== IMAGE RESOLVER EFFECT TRIGGERED =====');
-    console.log('🔴 COLOR CHANGE DEBUG: Current theme color:', themeColor);
-    console.log('🔴 COLOR CHANGE DEBUG: Current exercise:', currentExercise?.exercise || currentExercise?.name);
-    console.log('🔴 COLOR CHANGE DEBUG: resolveExerciseImagePair function exists:', !!resolveExerciseImagePair);
-    
     if (!currentExercise) {
-      console.log('🖼️ IMAGE RESOLVER: No current exercise, returning');
       return;
     }
     
     const key = `${currentExercise.exercise || currentExercise.name || ''}-${themeColor}`;
-    console.log('🔴 COLOR CHANGE DEBUG: Exercise key with color:', key);
-    console.log('🔴 COLOR CHANGE DEBUG: Key in imageCache:', key in imageCache);
-    console.log('🔴 COLOR CHANGE DEBUG: Key in imagePairs:', key in imagePairs);
-    console.log('🔴 COLOR CHANGE DEBUG: Current imageCache value for key:', imageCache[key]);
-    console.log('🔴 COLOR CHANGE DEBUG: Current imagePairs value for key:', imagePairs[key]);
     
     if (key in imageCache && key in imagePairs) {
-      console.log('🔴 COLOR CHANGE DEBUG: Image already cached - SKIPPING resolution');
-      console.log('🔴 COLOR CHANGE DEBUG: But RESTARTING cycling for cached images');
-      console.log('🖼️ IMAGE RESOLVER: Image already cached for', key, '- value:', imageCache[key]);
-      
       // Even though images are cached, we need to restart cycling for the new color theme
       const cachedImagePair = imagePairs[key];
       if (cachedImagePair && cachedImagePair.start && cachedImagePair.end) {
-        startImageCycling(key, cachedImagePair);
+        // Use setTimeout to ensure this runs after any cleanup effects
+        setTimeout(() => {
+          startImageCycling(key, cachedImagePair);
+        }, 50);
       }
       
       return; // already resolved (or null)
     }
     
     if (currentExercise.imageUrl) {
-      console.log('🖼️ IMAGE RESOLVER: Using direct imageUrl:', currentExercise.imageUrl);
       setImageCache((c) => ({ ...c, [key]: currentExercise.imageUrl! }));
       return;
     }
     
     // Try the new image pair resolver first (for cycling animations)
     if (resolveExerciseImagePair) {
-      console.log('🖼️ IMAGE RESOLVER: Using resolveExerciseImagePair function for:', key);
       setImageLoading((s) => ({ ...s, [key]: true }));
       
       resolveExerciseImagePair(currentExercise)
         .then((imagePair) => {
-          console.log('🔴 COLOR CHANGE DEBUG: ImagePair resolution SUCCESS for', key, 'with color', themeColor);
-          console.log('🔴 COLOR CHANGE DEBUG: ImagePair result:', imagePair);
           if (imagePair && imagePair.start && imagePair.end) {
-            console.log('🔴 COLOR CHANGE DEBUG: Storing imagePair in state');
             // Store both images for cycling
             setImagePairs((prev) => ({ ...prev, [key]: imagePair }));
             // Start with the 'start' image in the cache
@@ -372,16 +354,13 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             // Start cycling between start and end every 1 second
             startImageCycling(key, imagePair);
           } else {
-            console.log('🔴 COLOR CHANGE DEBUG: No valid image pair, setting cache to null');
             setImageCache((c) => ({ ...c, [key]: null }));
           }
         })
         .catch((error) => {
-          console.log('🔴 COLOR CHANGE DEBUG: ImagePair resolution ERROR for', key, '- error:', error);
           setImageCache((c) => ({ ...c, [key]: null }));
         })
         .finally(() => {
-          console.log('🖼️ IMAGE RESOLVER: ImagePair resolution COMPLETE for', key);
           setImageLoading((s) => ({ ...s, [key]: false }));
         });
       return;
@@ -389,28 +368,23 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     
     // Fallback to single image resolver
     if (!resolveExerciseImage) {
-      console.log('🖼️ IMAGE RESOLVER: No image resolver functions provided');
       setImageCache((c) => ({ ...c, [key]: null }));
       return;
     }
     
-    console.log('🖼️ IMAGE RESOLVER: Using fallback resolveExerciseImage function for:', key);
     setImageLoading((s) => ({ ...s, [key]: true }));
     
     resolveExerciseImage(currentExercise)
       .then((url) => {
-        console.log('🖼️ IMAGE RESOLVER: Resolution SUCCESS for', key, '- result:', url);
         setImageCache((c) => ({ ...c, [key]: url }));
       })
       .catch((error) => {
-        console.log('🖼️ IMAGE RESOLVER: Resolution ERROR for', key, '- error:', error);
         setImageCache((c) => ({ ...c, [key]: null }));
       })
       .finally(() => {
-        console.log('🖼️ IMAGE RESOLVER: Resolution COMPLETE for', key);
         setImageLoading((s) => ({ ...s, [key]: false }));
       });
-  }, [currentExercise, resolveExerciseImage, resolveExerciseImagePair]);
+  }, [currentExercise, resolveExerciseImage, resolveExerciseImagePair, themeColor]);
 
   // Image cycling function
   const startImageCycling = useCallback((fullKey: string, imagePair: {start: any, end: any}) => {
@@ -419,16 +393,12 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       clearInterval(cyclingIntervalRef.current);
     }
     
-    console.log('🎬 IMAGE CYCLING: Starting cycling for', fullKey, 'with images:', imagePair);
-    
     cyclingIntervalRef.current = setInterval(() => {
       setCurrentImagePhase((prevPhase) => {
         const newPhase = prevPhase === 'start' ? 'end' : 'start';
-        console.log('🎬 IMAGE CYCLING: Switching to', newPhase, 'for', fullKey);
         
         // Update the image cache with the new phase
         const newImage = newPhase === 'start' ? imagePair.start : imagePair.end;
-        console.log('🎬 IMAGE CYCLING: Updated cache with', newPhase, 'image:', newImage);
         
         setImageCache((prev) => {
           return { ...prev, [fullKey]: newImage };
@@ -448,7 +418,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     // Clear any existing cycling interval ONLY if exercise actually changed
     if (cyclingIntervalRef.current) {
       clearInterval(cyclingIntervalRef.current);
-      console.log('🎬 IMAGE CYCLING: Cleaned up interval for exercise change');
     }
     
     // Reset cycling phase for new exercise
@@ -457,7 +426,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     return () => {
       if (cyclingIntervalRef.current) {
         clearInterval(cyclingIntervalRef.current);
-        console.log('🎬 IMAGE CYCLING: Cleaned up interval on unmount');
       }
     };
   }, [currentIndex]); // Only reset when exercise INDEX changes, not the object
@@ -542,14 +510,32 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     setShowNotes({ exerciseName, exerciseIndex });
   };
 
+  const handleExerciseNotesPress = (exerciseIndex: number) => {
+    const exercise = exercises[exerciseIndex];
+    const exerciseName = exercise.exercise || exercise.name || 'Exercise';
+    setShowExerciseNotes({ exerciseName, exerciseIndex });
+  };
+
   const handleExerciseSettings = (exerciseIndex: number) => {
     setExerciseInSettings(exerciseInSettings === exerciseIndex ? null : exerciseIndex);
   };
 
-  const handleNotesUpdate = (exerciseIndex: number, notes: string) => {
+  const handleAddNote = (exerciseIndex: number, text: string) => {
+    const newNote: NoteEntry = {
+      id: Date.now().toString(),
+      text,
+      createdAt: new Date().toISOString(),
+    };
     setExerciseNotes(prev => ({
       ...prev,
-      [exerciseIndex]: notes
+      [exerciseIndex]: [newNote, ...(prev[exerciseIndex] || [])],
+    }));
+  };
+
+  const handleDeleteNote = (exerciseIndex: number, noteId: string) => {
+    setExerciseNotes(prev => ({
+      ...prev,
+      [exerciseIndex]: (prev[exerciseIndex] || []).filter(note => note.id !== noteId),
     }));
   };
 
@@ -577,18 +563,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const exKey = `${currentExercise.exercise || currentExercise.name || ''}-${themeColor}`;
   const exImage = imageCache[exKey];
   const exImageLoading = imageLoading[exKey];
-  
-  
-  // Debug logs for image rendering
-  console.log('🔴 COLOR CHANGE DEBUG: ===== RENDER PHASE =====');
-  console.log('🔴 COLOR CHANGE DEBUG: Current themeColor in render:', themeColor);
-  console.log('🔴 COLOR CHANGE DEBUG: Exercise key for image lookup:', exKey);
-  console.log('🔴 COLOR CHANGE DEBUG: Image cache state:', imageCache);
-  console.log('🔴 COLOR CHANGE DEBUG: Image loading state:', imageLoading);
-  console.log('🔴 COLOR CHANGE DEBUG: Current image for', exKey, ':', exImage);
-  console.log('🔴 COLOR CHANGE DEBUG: Currently loading for', exKey, ':', exImageLoading);
-  console.log('🔴 COLOR CHANGE DEBUG: Will show image?', !!exImage);
-  console.log('🔴 COLOR CHANGE DEBUG: Will show loading?', !!exImageLoading);
 
   // History view for a specific exercise
   if (showHistory) {
@@ -699,9 +673,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                     key={exKey}
                     source={typeof exImage === 'string' ? { uri: exImage } : exImage}
                     style={styles.fullScreenImage}
-                    resizeMode="cover"
-                    onLoad={() => console.log('🖼️ MEDIA RENDER: Image loaded successfully')}
-                    onError={(error) => console.log('🖼️ MEDIA RENDER: Image load error:', error)}
+                    resizeMode="contain"
+                    onLoad={() => {}}
+                    onError={(error) => {}}
                   />
                 );
               } else if (exImageLoading) {
@@ -741,16 +715,22 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 <Ionicons name="list" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => handleHistoryPress(currentIndex)}
+                onPress={() => handleExerciseNotesPress(currentIndex)}
                 style={styles.overlayBtn}
               >
-                <Ionicons name="bar-chart-outline" size={20} color="#fff" />
+                <Ionicons name="document-text-outline" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => handleExerciseSettings(currentIndex)}
+                onPress={() => handleNotesPress(currentIndex)}
                 style={styles.overlayBtn}
               >
-                <Ionicons name="refresh" size={20} color="#fff" />
+                <Ionicons name="barbell-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowWorkoutHeatmap(true)}
+                style={styles.overlayBtn}
+              >
+                <Ionicons name="body-outline" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -805,10 +785,13 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             unit={globalUnit}
             themeColor={themeColor}
             workoutStarted={workoutStarted}
+            exercise={currentExercise}
+            currentWeek={currentWeek}
             onUpdate={onSetUpdate}
             onComplete={onSetComplete}
             onAdd={onSetAdd}
             onRemove={onSetRemove}
+            onSetTapWhenNotStarted={onSetTapWhenNotStarted}
           />
         </Animated.View>
 
@@ -843,9 +826,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           <Text style={styles.timerText}>{getRestTimerDisplay()}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.primaryBtn, { backgroundColor: themeColor }]}
-          onPress={workoutStarted ? handleFinishWorkoutPress : onStartWorkout}
+        <AnimatedTouchableOpacity
+          style={[
+            styles.primaryBtn, 
+            { 
+              backgroundColor: themeColor,
+              transform: [{ translateX: shakeAnimation || 0 }]
+            }
+          ]}
+          onPress={workoutStarted ? onFinishWorkout : onStartWorkout}
         >
           <View style={styles.primaryBtnContent}>
             <Text style={styles.primaryBtnText}>
@@ -857,7 +846,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
               </Text>
             )}
           </View>
-        </TouchableOpacity>
+        </AnimatedTouchableOpacity>
       </View>
     </View>
     </GestureDetector>
@@ -868,61 +857,50 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     {/* Exercise History Modal */}
     {historyModalProps && <ExerciseHistoryModal {...historyModalProps} />}
 
-    {/* Finish Workout Confirmation Modal */}
-    <Modal
+    {/* Enhanced Finish Workout Modal */}
+    <FinishWorkoutModal
       visible={showFinishModal}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowFinishModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalBackdrop} 
-          activeOpacity={1} 
-          onPress={() => setShowFinishModal(false)}
-        />
-        
-        <View style={styles.finishModalContent}>
-          <View style={styles.finishModalHeader}>
-            <Text style={styles.finishModalTitle}>Finish Workout?</Text>
-          </View>
-          
-          <View style={styles.finishModalStats}>
-            <View style={styles.finishStatItem}>
-              <Text style={styles.finishStatLabel}>Duration</Text>
-              <Text style={styles.finishStatValue}>
-                {formatWorkoutDuration(workoutDuration)}
-              </Text>
-            </View>
-            
-            <View style={styles.finishStatDivider} />
-            
-            <View style={styles.finishStatItem}>
-              <Text style={styles.finishStatLabel}>Total Volume</Text>
-              <Text style={styles.finishStatValue}>
-                {calculateTotalVolume().toFixed(1)} {globalUnit}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.finishModalButtons}>
-            <TouchableOpacity
-              style={styles.finishCancelButton}
-              onPress={() => setShowFinishModal(false)}
-            >
-              <Text style={styles.finishCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.finishConfirmButton, { backgroundColor: themeColor }]}
-              onPress={confirmFinishWorkout}
-            >
-              <Text style={styles.finishConfirmText}>Finish Workout</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
+      onCancel={() => setShowFinishModal(false)}
+      onConfirm={confirmFinishWorkout}
+      allSetsData={allSetsData}
+      durationSeconds={workoutDuration}
+      themeColor={themeColor}
+      globalUnit={globalUnit}
+    />
+
+    {/* Exercise Rep Scheme Modal */}
+    {showNotes && (
+      <RepSchemeModal
+        visible={true}
+        onClose={() => setShowNotes(null)}
+        exercise={exercises[showNotes.exerciseIndex]}
+        exerciseName={showNotes.exerciseName}
+        currentWeek={currentWeek}
+        themeColor={themeColor}
+      />
+    )}
+
+    {/* Exercise Notes Modal */}
+    {showExerciseNotes && (
+      <ExerciseNotesModal
+        visible={true}
+        onClose={() => setShowExerciseNotes(null)}
+        exerciseName={showExerciseNotes.exerciseName}
+        exerciseIndex={showExerciseNotes.exerciseIndex}
+        notes={exerciseNotes[showExerciseNotes.exerciseIndex] || []}
+        onAddNote={handleAddNote}
+        onDeleteNote={handleDeleteNote}
+        themeColor={themeColor}
+      />
+    )}
+
+    {/* Workout Heatmap Modal */}
+    <WorkoutHeatmapModal
+      visible={showWorkoutHeatmap}
+      onClose={() => setShowWorkoutHeatmap(false)}
+      exercises={exercises}
+      themeColor={themeColor}
+    />
     </>
   );
 }
@@ -993,12 +971,29 @@ function PrescriptionBanner({
   );
 }
 
+// Helper function to parse target reps from weekly format
+// Converts "6, 6, 5, 5" or "8-12" to array of rep targets
+function parseTargetReps(repsString: string): string[] {
+  if (!repsString) return [];
+  
+  // Handle comma-separated format like "6, 6, 5, 5"
+  if (repsString.includes(',')) {
+    return repsString.split(',').map(rep => rep.trim());
+  }
+  
+  // Handle single rep scheme like "8-12" or "10" - return empty array for now
+  // since we don't know how many sets there will be
+  return [];
+}
+
 interface SetsTableProps {
   exerciseIndex: number;
   sets: SetData[];
   unit: string;
   themeColor: string;
   workoutStarted: boolean;
+  exercise: Exercise; // For accessing weekly reps
+  currentWeek: number; // For determining which week's reps to use
   onUpdate: (
     exerciseIndex: number,
     setIndex: number,
@@ -1008,6 +1003,7 @@ interface SetsTableProps {
   onComplete: (exerciseIndex: number, setIndex: number) => void;
   onAdd: (exerciseIndex: number) => void;
   onRemove: (exerciseIndex: number, setIndex: number) => void;
+  onSetTapWhenNotStarted?: () => void;
 }
 
 function SetsTable({
@@ -1016,11 +1012,18 @@ function SetsTable({
   unit,
   themeColor,
   workoutStarted,
+  exercise,
+  currentWeek,
   onUpdate,
   onComplete,
   onAdd,
   onRemove,
+  onSetTapWhenNotStarted,
 }: SetsTableProps) {
+  // Parse target reps for this week
+  const weeklyReps = exercise.reps_weekly?.[String(currentWeek)] || exercise.reps;
+  const targetRepsArray = weeklyReps ? parseTargetReps(String(weeklyReps)) : [];
+  
   return (
     <View style={styles.setsTable}>
       {/* Header row */}
@@ -1041,9 +1044,25 @@ function SetsTable({
           index={i}
           themeColor={themeColor}
           workoutStarted={workoutStarted}
+          targetReps={targetRepsArray[i] || undefined}
+          isLastSet={i === sets.length - 1}
           onUpdate={(field, val) => onUpdate(exerciseIndex, i, field, val)}
           onComplete={() => onComplete(exerciseIndex, i)}
-          onLongPress={() => onRemove(exerciseIndex, i)}
+          onLongPress={() => {
+            Alert.alert(
+              'Delete Set',
+              `Remove set ${i + 1}?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Delete', 
+                  style: 'destructive',
+                  onPress: () => onRemove(exerciseIndex, i)
+                }
+              ]
+            );
+          }}
+          onSetTapWhenNotStarted={onSetTapWhenNotStarted}
         />
       ))}
 
@@ -1064,9 +1083,12 @@ interface SetRowProps {
   index: number;
   themeColor: string;
   workoutStarted: boolean;
+  targetReps?: string; // Target reps for this specific set
+  isLastSet: boolean; // Whether this is the last set in the array
   onUpdate: (field: 'weight' | 'reps', val: string) => void;
   onComplete: () => void;
   onLongPress: () => void;
+  onSetTapWhenNotStarted?: () => void;
 }
 
 function SetRow({
@@ -1074,20 +1096,46 @@ function SetRow({
   index,
   themeColor,
   workoutStarted,
+  targetReps,
+  isLastSet,
   onUpdate,
   onComplete,
   onLongPress,
+  onSetTapWhenNotStarted,
 }: SetRowProps) {
   const completed = set.completed;
   return (
-    <Pressable onLongPress={onLongPress}>
-      <View style={[styles.setRow, completed && styles.setRowCompleted]}>
-        <Text style={[styles.setNum, { width: 36 }]}>{index + 1}</Text>
+    <View style={[styles.setRow, completed && styles.setRowCompleted]}>
+        <Pressable 
+          onLongPress={onLongPress}
+          delayLongPress={500}
+          style={{ width: 36, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <View style={{ alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <Text style={[styles.setNum]}>{index + 1}</Text>
+            {isLastSet && (
+              <Text style={{ 
+                position: 'absolute',
+                left: -18,
+                color: '#55555f', 
+                fontSize: 16, 
+                fontFamily: 'DMMono-Regular'
+              }}>
+                ×
+              </Text>
+            )}
+          </View>
+        </Pressable>
 
         <TextInput
           style={[styles.setInput, { flex: 1 }]}
           value={set.weight}
           onChangeText={(v) => onUpdate('weight', v)}
+          onPressIn={() => {
+            if (!workoutStarted && onSetTapWhenNotStarted) {
+              onSetTapWhenNotStarted();
+            }
+          }}
           keyboardType="decimal-pad"
           placeholder="0"
           placeholderTextColor="#3a3a44"
@@ -1098,14 +1146,24 @@ function SetRow({
           style={[styles.setInput, { flex: 1 }]}
           value={set.reps}
           onChangeText={(v) => onUpdate('reps', v)}
+          onPressIn={() => {
+            if (!workoutStarted && onSetTapWhenNotStarted) {
+              onSetTapWhenNotStarted();
+            }
+          }}
           keyboardType="number-pad"
-          placeholder="0"
+          placeholder={targetReps || "0"}
           placeholderTextColor="#3a3a44"
           editable={workoutStarted && !completed}
         />
 
         <TouchableOpacity
-          onPress={onComplete}
+          onPress={workoutStarted ? onComplete : undefined}
+          onPressIn={() => {
+            if (!workoutStarted && onSetTapWhenNotStarted) {
+              onSetTapWhenNotStarted();
+            }
+          }}
           style={{ width: 36, alignItems: 'center', paddingVertical: 8 }}
         >
           {completed ? (
@@ -1114,8 +1172,7 @@ function SetRow({
             <Ionicons name="ellipse-outline" size={26} color="#3a3a44" />
           )}
         </TouchableOpacity>
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -1671,6 +1728,7 @@ const styles = StyleSheet.create({
   },
   fullScreenMediaContainer: {
     ...StyleSheet.absoluteFillObject,
+    paddingTop: 45, // Shift image down while keeping header buttons at top
   },
   fullScreenImage: {
     width: '100%',
@@ -1755,103 +1813,5 @@ const styles = StyleSheet.create({
   },
   settingsOptionTextDanger: {
     color: '#ef4444',
-  },
-
-  // Finish Workout Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  finishModalContent: {
-    backgroundColor: '#111116',
-    borderRadius: 20,
-    padding: 24,
-    marginHorizontal: 24,
-    width: '90%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  finishModalHeader: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  finishModalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#ffffff',
-    fontFamily: 'Outfit-SemiBold',
-  },
-  finishModalStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingVertical: 16,
-    backgroundColor: '#0a0a0f',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-  },
-  finishStatItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  finishStatDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginHorizontal: 16,
-  },
-  finishStatLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#888',
-    marginBottom: 4,
-    fontFamily: 'Outfit-Medium',
-  },
-  finishStatValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    fontFamily: 'DM-Mono-Medium',
-  },
-  finishModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  finishCancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#1a1a1f',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-  },
-  finishCancelText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#888',
-    fontFamily: 'Outfit-Medium',
-  },
-  finishConfirmButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  finishConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    fontFamily: 'Outfit-SemiBold',
   },
 });

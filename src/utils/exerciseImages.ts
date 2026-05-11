@@ -672,6 +672,24 @@ let barbellFrontSquatBlueEnd: any = null;
 let barbellFrontSquatPinkStart: any = null;
 let barbellFrontSquatPinkEnd: any = null;
 
+// Walking lunge images
+let walkingLungeBlueStart: any = null;
+let walkingLungeBlueEnd: any = null;
+let walkingLungePinkStart: any = null;
+let walkingLungePinkEnd: any = null;
+
+// Barbell hip thrust images
+let barbellHipThrustBlueStart: any = null;
+let barbellHipThrustBlueEnd: any = null;
+let barbellHipThrustPinkStart: any = null;
+let barbellHipThrustPinkEnd: any = null;
+
+// Seated calf raise images
+let seatedCalfRaiseBlueStart: any = null;
+let seatedCalfRaiseBlueEnd: any = null;
+let seatedCalfRaisePinkStart: any = null;
+let seatedCalfRaisePinkEnd: any = null;
+
 try {
   console.log('🔄 ATTEMPTING to load exercise images...');
   
@@ -2410,6 +2428,111 @@ try {
     console.log('❌ No barbell-front-squat pink end.png found:', e.message);
   }
   
+  // Load walking lunge images
+  console.log('🏋️ Loading walking lunge...');
+  
+  // Blue start
+  try {
+    walkingLungeBlueStart = require('../../exercise-images/walking-lunge/blue/start.png');
+    console.log('✅ Loaded walking-lunge blue start.png');
+  } catch (e) {
+    console.log('❌ No walking-lunge blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    walkingLungeBlueEnd = require('../../exercise-images/walking-lunge/blue/end.png');
+    console.log('✅ Loaded walking-lunge blue end.png');
+  } catch (e) {
+    console.log('❌ No walking-lunge blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    walkingLungePinkStart = require('../../exercise-images/walking-lunge/pink/start.png');
+    console.log('✅ Loaded walking-lunge pink start.png');
+  } catch (e) {
+    console.log('❌ No walking-lunge pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    walkingLungePinkEnd = require('../../exercise-images/walking-lunge/pink/end.png');
+    console.log('✅ Loaded walking-lunge pink end.png');
+  } catch (e) {
+    console.log('❌ No walking-lunge pink end.png found:', e.message);
+  }
+  
+  // Load barbell hip thrust images
+  console.log('🏋️ Loading barbell hip thrust...');
+  
+  // Blue start
+  try {
+    barbellHipThrustBlueStart = require('../../exercise-images/barbell-hip-thrust/blue/start.png');
+    console.log('✅ Loaded barbell-hip-thrust blue start.png');
+  } catch (e) {
+    console.log('❌ No barbell-hip-thrust blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    barbellHipThrustBlueEnd = require('../../exercise-images/barbell-hip-thrust/blue/end.png');
+    console.log('✅ Loaded barbell-hip-thrust blue end.png');
+  } catch (e) {
+    console.log('❌ No barbell-hip-thrust blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    barbellHipThrustPinkStart = require('../../exercise-images/barbell-hip-thrust/pink/start.png');
+    console.log('✅ Loaded barbell-hip-thrust pink start.png');
+  } catch (e) {
+    console.log('❌ No barbell-hip-thrust pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    barbellHipThrustPinkEnd = require('../../exercise-images/barbell-hip-thrust/pink/end.png');
+    console.log('✅ Loaded barbell-hip-thrust pink end.png');
+  } catch (e) {
+    console.log('❌ No barbell-hip-thrust pink end.png found:', e.message);
+  }
+  
+  // Load seated calf raise images
+  console.log('🏋️ Loading seated calf raise...');
+  
+  // Blue start
+  try {
+    seatedCalfRaiseBlueStart = require('../../exercise-images/seated-calf-raise/blue/start.png');
+    console.log('✅ Loaded seated-calf-raise blue start.png');
+  } catch (e) {
+    console.log('❌ No seated-calf-raise blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    seatedCalfRaiseBlueEnd = require('../../exercise-images/seated-calf-raise/blue/end.png');
+    console.log('✅ Loaded seated-calf-raise blue end.png');
+  } catch (e) {
+    console.log('❌ No seated-calf-raise blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    seatedCalfRaisePinkStart = require('../../exercise-images/seated-calf-raise/pink/start.png');
+    console.log('✅ Loaded seated-calf-raise pink start.png');
+  } catch (e) {
+    console.log('❌ No seated-calf-raise pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    seatedCalfRaisePinkEnd = require('../../exercise-images/seated-calf-raise/pink/end.png');
+    console.log('✅ Loaded seated-calf-raise pink end.png');
+  } catch (e) {
+    console.log('❌ No seated-calf-raise pink end.png found:', e.message);
+  }
+  
   console.log('✅ Finished loading all images:', { 
     benchPress: { blue: { barbellBenchPressBlueStart, barbellBenchPressBlueEnd }, pink: { barbellBenchPressPinkStart, barbellBenchPressPinkEnd } },
     backSquat: { blue: { barbellBackSquatBlueStart, barbellBackSquatBlueEnd }, pink: { barbellBackSquatPinkStart, barbellBackSquatPinkEnd } },
@@ -2459,7 +2582,10 @@ try {
     dipsChestFocus: { blue: { dipsChestFocusBlueStart, dipsChestFocusBlueEnd }, pink: { dipsChestFocusPinkStart, dipsChestFocusPinkEnd } },
     hackSquat: { blue: { hackSquatBlueStart, hackSquatBlueEnd }, pink: { hackSquatPinkStart, hackSquatPinkEnd } },
     bulgarianSplitSquat: { blue: { bulgarianSplitSquatBlueStart, bulgarianSplitSquatBlueEnd }, pink: { bulgarianSplitSquatPinkStart, bulgarianSplitSquatPinkEnd } },
-    barbellFrontSquat: { blue: { barbellFrontSquatBlueStart, barbellFrontSquatBlueEnd }, pink: { barbellFrontSquatPinkStart, barbellFrontSquatPinkEnd } }
+    barbellFrontSquat: { blue: { barbellFrontSquatBlueStart, barbellFrontSquatBlueEnd }, pink: { barbellFrontSquatPinkStart, barbellFrontSquatPinkEnd } },
+    walkingLunge: { blue: { walkingLungeBlueStart, walkingLungeBlueEnd }, pink: { walkingLungePinkStart, walkingLungePinkEnd } },
+    barbellHipThrust: { blue: { barbellHipThrustBlueStart, barbellHipThrustBlueEnd }, pink: { barbellHipThrustPinkStart, barbellHipThrustPinkEnd } },
+    seatedCalfRaise: { blue: { seatedCalfRaiseBlueStart, seatedCalfRaiseBlueEnd }, pink: { seatedCalfRaisePinkStart, seatedCalfRaisePinkEnd } }
   });
   
   EXERCISE_IMAGE_MAP = {
@@ -2953,6 +3079,36 @@ try {
         end: barbellFrontSquatPinkEnd,
       }
     },
+    'walking-lunge': {
+      blue: {
+        start: walkingLungeBlueStart,
+        end: walkingLungeBlueEnd,
+      },
+      pink: {
+        start: walkingLungePinkStart,
+        end: walkingLungePinkEnd,
+      }
+    },
+    'barbell-hip-thrust': {
+      blue: {
+        start: barbellHipThrustBlueStart,
+        end: barbellHipThrustBlueEnd,
+      },
+      pink: {
+        start: barbellHipThrustPinkStart,
+        end: barbellHipThrustPinkEnd,
+      }
+    },
+    'seated-calf-raise': {
+      blue: {
+        start: seatedCalfRaiseBlueStart,
+        end: seatedCalfRaiseBlueEnd,
+      },
+      pink: {
+        start: seatedCalfRaisePinkStart,
+        end: seatedCalfRaisePinkEnd,
+      }
+    },
     // Add more exercises here as you create them
   };
   
@@ -2971,7 +3127,6 @@ try {
  * Returns the start position image for the blue theme by default
  */
 export async function resolveExerciseImage(exercise: { exercise?: string; name?: string }): Promise<string | null> {
-  console.log('🔍 RESOLVE_IMAGE: Function called with exercise:', exercise);
   
   const exerciseName = exercise.exercise || exercise.name || '';
   if (!exerciseName) {
@@ -2980,9 +3135,6 @@ export async function resolveExerciseImage(exercise: { exercise?: string; name?:
   }
   
   const folderName = exerciseNameToFolder(exerciseName);
-  console.log(`🔍 RESOLVE_IMAGE: Looking for image for exercise: "${exerciseName}" -> folder: "${folderName}"`);
-  console.log('🔍 RESOLVE_IMAGE: Available exercises in map:', Object.keys(EXERCISE_IMAGE_MAP));
-  console.log('🔍 RESOLVE_IMAGE: Map for barbell-bench-press:', EXERCISE_IMAGE_MAP['barbell-bench-press']);
   
   try {
     // Check if exercise exists in our static mapping
@@ -3012,7 +3164,6 @@ export async function resolveExerciseImagePair(
   exercise: { exercise?: string; name?: string }, 
   theme: 'blue' | 'pink' = 'blue'
 ): Promise<{start: any, end: any} | null> {
-  console.log('🔍 RESOLVE_IMAGE_PAIR: Function called with exercise:', exercise, 'theme:', theme);
   
   const exerciseName = exercise.exercise || exercise.name || '';
   if (!exerciseName) {
@@ -3021,7 +3172,6 @@ export async function resolveExerciseImagePair(
   }
   
   const folderName = exerciseNameToFolder(exerciseName);
-  console.log(`🔍 RESOLVE_IMAGE_PAIR: Looking for ${theme} images for exercise: "${exerciseName}" -> folder: "${folderName}"`);
   
   try {
     // First, check if exercise exists in our static mapping
