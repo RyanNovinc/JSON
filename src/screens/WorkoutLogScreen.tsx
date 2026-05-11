@@ -58,6 +58,7 @@ import FinishWorkoutModal from './FinishWorkoutModal';
 import RepSchemeModal from '../components/RepSchemeModal';
 import ExerciseNotesModal, { NoteEntry } from '../components/ExerciseNotesModal';
 import WorkoutHeatmapModal from '../components/WorkoutHeatmapModal';
+import DeleteSetModal from '../components/DeleteSetModal';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -359,6 +360,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [showExerciseNotes, setShowExerciseNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
   const [exerciseNotes, setExerciseNotes] = useState<{ [exerciseIndex: number]: NoteEntry[] }>({});
   const [exerciseInSettings, setExerciseInSettings] = useState<number | null>(null);
+  
+  // Delete set modal state
+  const [showDeleteSetModal, setShowDeleteSetModal] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
   
   // State to show old view from Git history
   const [showOldView, setShowOldView] = useState(false);
@@ -1167,6 +1171,20 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       exercises={exercises}
       themeColor={themeColor}
     />
+
+    {/* Delete Set Modal */}
+    {showDeleteSetModal && (
+      <DeleteSetModal
+        visible={true}
+        onClose={() => setShowDeleteSetModal(null)}
+        onDelete={() => {
+          onRemove(showDeleteSetModal.exerciseIndex, showDeleteSetModal.setIndex);
+          setShowDeleteSetModal(null);
+        }}
+        setNumber={showDeleteSetModal.setIndex + 1}
+        themeColor={themeColor}
+      />
+    )}
     </>
   );
 }
@@ -1315,18 +1333,7 @@ function SetsTable({
           onUpdate={(field, val) => onUpdate(exerciseIndex, i, field, val)}
           onComplete={() => onComplete(exerciseIndex, i)}
           onLongPress={() => {
-            Alert.alert(
-              'Delete Set',
-              `Remove set ${i + 1}?`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Delete', 
-                  style: 'destructive',
-                  onPress: () => onRemove(exerciseIndex, i)
-                }
-              ]
-            );
+            setShowDeleteSetModal({ exerciseIndex, setIndex: i });
           }}
           onSetTapWhenNotStarted={onSetTapWhenNotStarted}
         />
