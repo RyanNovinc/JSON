@@ -201,7 +201,7 @@ export default function WeekVolumeScreen() {
           <Ionicons name="chevron-back" size={22} color="#fff" />
         </TouchableOpacity>
 
-        <Text style={styles.headerLabel}>MUSCLES</Text>
+        <Text style={styles.headerLabel}>MUSCLE MAP</Text>
 
         <View style={styles.iconButtonSpacer} />
       </View>
@@ -209,9 +209,6 @@ export default function WeekVolumeScreen() {
       {/* Title */}
       <View style={styles.titleBlock}>
         <Text style={styles.title}>Muscles worked</Text>
-        <Text style={styles.subtitle}>
-          {muscleBreakdown.length} MUSCLE GROUP{muscleBreakdown.length !== 1 ? 'S' : ''} · {totalSets} SET{totalSets !== 1 ? 'S' : ''}
-        </Text>
       </View>
 
       <ScrollView

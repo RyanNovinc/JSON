@@ -60,28 +60,61 @@ export default function WorkoutLogScreenAdapter() {
   
   // Initialize exercises from route params
   useEffect(() => {
-    if (day?.exercises && exercises.length === 0) {
-      const transformedExercises = (day.exercises || []).map((exercise: any, index: number) => ({
-        id: `${exercise.exercise}-${index}`,
-        exercise: exercise.exercise,
-        name: exercise.exercise,
-        sets: exercise.sets_weekly?.[currentWeek?.toString()] || exercise.sets || 3,
-        reps: exercise.reps_weekly?.[currentWeek?.toString()] || exercise.reps || "8-12",
-        rest: exercise.rest,
-        notes: exercise.notes,
-        primaryMuscles: Array.isArray(exercise.primaryMuscles) ? exercise.primaryMuscles : [],
-        secondaryMuscles: Array.isArray(exercise.secondaryMuscles) ? exercise.secondaryMuscles : [],
-        reps_weekly: exercise.reps_weekly,
-        rir_weekly: exercise.rir_weekly,
-        superset_group: exercise.superset_group, // Preserve existing superset data
-        alternatives: Array.isArray(exercise.alternatives) ? 
-          exercise.alternatives
-            .filter(alt => alt && (typeof alt === 'string' || (typeof alt === 'object' && alt.exercise)))
-            .map(alt => typeof alt === 'string' ? alt : alt.exercise) : [],
-      }));
-      setExercises(transformedExercises);
-    }
-  }, [day?.exercises, currentWeek]);
+    const loadExercisesWithSupersets = async () => {
+      if (day?.exercises) {
+        // Only initialize if exercises is empty or if the day data has changed
+        if (exercises.length === 0 || exercises.length !== day.exercises.length) {
+          const transformedExercises = (day.exercises || []).map((exercise: any, index: number) => ({
+            id: `${exercise.exercise}-${index}`,
+            exercise: exercise.exercise,
+            name: exercise.exercise,
+            sets: exercise.sets_weekly?.[currentWeek?.toString()] || exercise.sets || 3,
+            reps: exercise.reps_weekly?.[currentWeek?.toString()] || exercise.reps || "8-12",
+            rest: exercise.rest,
+            notes: exercise.notes,
+            primaryMuscles: Array.isArray(exercise.primaryMuscles) ? exercise.primaryMuscles : [],
+            secondaryMuscles: Array.isArray(exercise.secondaryMuscles) ? exercise.secondaryMuscles : [],
+            reps_weekly: exercise.reps_weekly,
+            rir_weekly: exercise.rir_weekly,
+            superset_group: exercise.superset_group, // Preserve existing superset data from AI
+            alternatives: Array.isArray(exercise.alternatives) ? 
+              exercise.alternatives
+                .filter(alt => alt && (typeof alt === 'string' || (typeof alt === 'object' && alt.exercise)))
+                .map(alt => typeof alt === 'string' ? alt : alt.exercise) : [],
+          }));
+          
+          // Load saved superset data from storage
+          try {
+            const supersetKey = `supersets_${blockName}_${day?.day_name}_week${currentWeek}`;
+            const savedSupersets = await AsyncStorage.getItem(supersetKey);
+            
+            if (savedSupersets) {
+              const supersetData = JSON.parse(savedSupersets);
+              console.log('🔗 [SUPERSET] Loading saved supersets:', supersetData);
+              
+              // Apply saved superset groups to exercises
+              transformedExercises.forEach((ex, idx) => {
+                const savedData = supersetData.find(s => s.exercise === ex.exercise);
+                if (savedData && savedData.superset_group) {
+                  transformedExercises[idx].superset_group = savedData.superset_group;
+                }
+              });
+            }
+          } catch (error) {
+            console.error('🔗 [SUPERSET] Failed to load saved supersets:', error);
+          }
+          
+          setExercises(transformedExercises);
+          console.log('📋 [EXERCISES] Initialized exercises with supersets:', transformedExercises.map(e => ({
+            name: e.exercise,
+            superset_group: e.superset_group
+          })));
+        }
+      }
+    };
+    
+    loadExercisesWithSupersets();
+  }, [day?.exercises, currentWeek, blockName]);
 
 
   // Initialize sets data and load saved progress
@@ -277,16 +310,48 @@ export default function WorkoutLogScreenAdapter() {
     if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
       await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
       
-      // Start rest timer for completed set
-      const exercise = exercises[exerciseIndex];
+      const currentExercise = exercises[exerciseIndex];
+      const nextExercise = exercises[exerciseIndex + 1];
       
-      if (exercise?.rest) {
-        const restSeconds = typeof exercise.rest === 'string' ? parseInt(exercise.rest) : exercise.rest;
-        if (restSeconds && restSeconds > 0) {
-          startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
+      console.log('🔗 [SUPERSET CHECK] Current exercise:', currentExercise?.exercise, 'Group:', currentExercise?.superset_group);
+      console.log('🔗 [SUPERSET CHECK] Next exercise:', nextExercise?.exercise, 'Group:', nextExercise?.superset_group);
+      
+      // Check if this exercise is supersetted with the next one
+      const isSuperset = currentExercise?.superset_group && 
+                        nextExercise?.superset_group && 
+                        currentExercise.superset_group === nextExercise.superset_group &&
+                        currentExercise.superset_group.trim() !== '';
+      
+      if (isSuperset) {
+        console.log('🔗 [SUPERSET] ✅ Superset detected! Switching immediately');
+        console.log('🔗 [SUPERSET] Current:', currentExercise?.exercise, '→ Next:', nextExercise?.exercise);
+        console.log('🔗 [SUPERSET] Current index:', currentIndex, 'Exercise index:', exerciseIndex);
+        
+        // Check if we're currently on this exercise
+        if (exerciseIndex === currentIndex && exerciseIndex < exercises.length - 1) {
+          // Switch to next exercise IMMEDIATELY
+          console.log(`🔗 [SUPERSET] ⏩ Switching NOW to ${nextExercise?.exercise}`);
+          setCurrentIndex(exerciseIndex + 1);
+          
+          // Start a 5-second transition timer on the NEW exercise
+          // This gives user time to get ready for the next exercise
+          setTimeout(() => {
+            console.log('🔗 [SUPERSET] Starting 5-second transition timer on new exercise');
+            startTimer(5, exerciseIndex + 1, 0, themeColor);
+          }, 100); // Small delay to ensure the view has switched
         } else {
+          console.log('🔗 [SUPERSET] ⚠️ Not transitioning - exercise index mismatch or last exercise');
         }
       } else {
+        // Regular rest timer for non-superset exercises
+        const exercise = exercises[exerciseIndex];
+        
+        if (exercise?.rest) {
+          const restSeconds = typeof exercise.rest === 'string' ? parseInt(exercise.rest) : exercise.rest;
+          if (restSeconds && restSeconds > 0) {
+            startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
+          }
+        }
       }
     }
   };
@@ -416,7 +481,7 @@ export default function WorkoutLogScreenAdapter() {
     });
   };
 
-  const handleSuperset = (exerciseIndex1: number, exerciseIndex2: number, action: 'link' | 'unlink') => {
+  const handleSuperset = async (exerciseIndex1: number, exerciseIndex2: number, action: 'link' | 'unlink') => {
     console.log(`🔗 [SUPERSET] ${action} exercises ${exerciseIndex1} and ${exerciseIndex2}`);
     
     setExercises(prevExercises => {
@@ -536,6 +601,17 @@ export default function WorkoutLogScreenAdapter() {
           console.log(`🔗 [SUPERSET] Unlinked exercises ${upperIndex} and ${lowerIndex}`);
         }
       }
+      
+      // Save superset data to AsyncStorage
+      const supersetKey = `supersets_${blockName}_${day?.day_name}_week${currentWeek}`;
+      const supersetData = updatedExercises.map(ex => ({
+        exercise: ex.exercise,
+        superset_group: ex.superset_group
+      }));
+      
+      AsyncStorage.setItem(supersetKey, JSON.stringify(supersetData))
+        .then(() => console.log('🔗 [SUPERSET] Saved to storage'))
+        .catch(err => console.error('🔗 [SUPERSET] Failed to save:', err));
       
       return updatedExercises;
     });

@@ -274,7 +274,7 @@ export default function WorkoutHeatmapModal({
               <Ionicons name="chevron-back" size={22} color="#fff" />
             </TouchableOpacity>
 
-            <Text style={styles.headerLabel}>MUSCLES</Text>
+            <Text style={styles.headerLabel}>MUSCLE MAP</Text>
 
             <View style={styles.iconButtonSpacer} />
           </View>

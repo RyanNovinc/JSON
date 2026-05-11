@@ -49,8 +49,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
 import { useTimer } from '../contexts/TimerContext';
-// Import the actual old working screen from Git history
-import WorkoutLogScreenOld from './WorkoutLogScreenOld';
 // Import existing modals and components
 import { TimerModal } from '../components/TimerModal';
 import { ExerciseHistoryModal } from '../../ExerciseHistoryScreen';
@@ -365,7 +363,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [showDeleteSetModal, setShowDeleteSetModal] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
   
   // State to show old view from Git history
-  const [showOldView, setShowOldView] = useState(false);
   
   // Workout Heatmap Modal state
   const [showWorkoutHeatmap, setShowWorkoutHeatmap] = useState(false);
@@ -768,10 +765,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     );
   }
 
-  // Show old workout view from Git history
-  if (showOldView) {
-    return <WorkoutLogScreenOld />;
-  }
 
   // Workout History Modal - rendered alongside main content
   const historyModalProps = showWorkoutHistory ? {
@@ -857,16 +850,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
             <View style={styles.overlayHeaderActions}>
               <TouchableOpacity
-                onPress={() => setShowOldView(true)}
+                onPress={() => setShowWorkoutHeatmap(true)}
                 style={styles.overlayBtn}
               >
-                <Ionicons name="list" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleExerciseNotesPress(currentIndex)}
-                style={styles.overlayBtn}
-              >
-                <Ionicons name="document-text-outline" size={20} color="#fff" />
+                <Ionicons name="body-outline" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => handleNotesPress(currentIndex)}
@@ -875,10 +862,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 <Ionicons name="barbell-outline" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setShowWorkoutHeatmap(true)}
+                onPress={() => handleExerciseNotesPress(currentIndex)}
                 style={styles.overlayBtn}
               >
-                <Ionicons name="body-outline" size={20} color="#fff" />
+                <Ionicons name="document-text-outline" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -1008,6 +995,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             onAdd={onSetAdd}
             onRemove={onSetRemove}
             onSetTapWhenNotStarted={onSetTapWhenNotStarted}
+            onShowDeleteModal={(exerciseIndex, setIndex) => {
+              setShowDeleteSetModal({ exerciseIndex, setIndex });
+            }}
           />
         </TouchableOpacity>
 
@@ -1178,7 +1168,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         visible={true}
         onClose={() => setShowDeleteSetModal(null)}
         onDelete={() => {
-          onRemove(showDeleteSetModal.exerciseIndex, showDeleteSetModal.setIndex);
+          const { exerciseIndex, setIndex } = showDeleteSetModal;
+          onSetRemove(exerciseIndex, setIndex);
           setShowDeleteSetModal(null);
         }}
         setNumber={showDeleteSetModal.setIndex + 1}
@@ -1288,6 +1279,7 @@ interface SetsTableProps {
   onAdd: (exerciseIndex: number) => void;
   onRemove: (exerciseIndex: number, setIndex: number) => void;
   onSetTapWhenNotStarted?: () => void;
+  onShowDeleteModal: (exerciseIndex: number, setIndex: number) => void;
 }
 
 function SetsTable({
@@ -1303,6 +1295,7 @@ function SetsTable({
   onAdd,
   onRemove,
   onSetTapWhenNotStarted,
+  onShowDeleteModal,
 }: SetsTableProps) {
   // Parse target reps for this week
   const weeklyReps = exercise.reps_weekly?.[String(currentWeek)] || exercise.reps;
@@ -1333,7 +1326,7 @@ function SetsTable({
           onUpdate={(field, val) => onUpdate(exerciseIndex, i, field, val)}
           onComplete={() => onComplete(exerciseIndex, i)}
           onLongPress={() => {
-            setShowDeleteSetModal({ exerciseIndex, setIndex: i });
+            onShowDeleteModal(exerciseIndex, i);
           }}
           onSetTapWhenNotStarted={onSetTapWhenNotStarted}
         />
