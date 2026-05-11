@@ -850,6 +850,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={WeekVolumeScreen}
                 options={{
                   headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
                 }}
               />
             </>
