@@ -40,9 +40,11 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
@@ -245,6 +247,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [imagePairs, setImagePairs] = useState<Record<string, {start: any, end: any}>>({});
   const [currentImagePhase, setCurrentImagePhase] = useState<'start' | 'end'>('start');
   const cyclingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentCyclingKeyRef = useRef<string | null>(null);
 
   // Finish workout confirmation modal
   const [showFinishModal, setShowFinishModal] = useState(false);
@@ -382,10 +385,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       // Even though images are cached, we need to restart cycling for the new color theme
       const cachedImagePair = imagePairs[key];
       if (cachedImagePair && cachedImagePair.start && cachedImagePair.end) {
-        // Use setTimeout to ensure this runs after any cleanup effects
-        setTimeout(() => {
-          startImageCycling(key, cachedImagePair);
-        }, 50);
+        // Start cycling immediately (the startImageCycling function now prevents duplicates)
+        startImageCycling(key, cachedImagePair);
       }
       
       return; // already resolved (or null)
@@ -444,21 +445,41 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Image cycling function
   const startImageCycling = useCallback((fullKey: string, imagePair: {start: any, end: any}) => {
+    // Only start cycling if this is a new exercise (prevent duplicate intervals)
+    if (currentCyclingKeyRef.current === fullKey) {
+      return; // Already cycling this exercise
+    }
+    
     // Clear any existing interval
     if (cyclingIntervalRef.current) {
       clearInterval(cyclingIntervalRef.current);
+      cyclingIntervalRef.current = null;
     }
     
+    // Set the new cycling key
+    currentCyclingKeyRef.current = fullKey;
+    
+    // Reset to start phase
+    setCurrentImagePhase('start');
+    setImageCache(prev => ({ ...prev, [fullKey]: imagePair.start }));
+    
+    // Start the cycling interval
     cyclingIntervalRef.current = setInterval(() => {
+      // Check if we're still supposed to be cycling this exercise
+      if (currentCyclingKeyRef.current !== fullKey) {
+        if (cyclingIntervalRef.current) {
+          clearInterval(cyclingIntervalRef.current);
+          cyclingIntervalRef.current = null;
+        }
+        return;
+      }
+      
       setCurrentImagePhase((prevPhase) => {
         const newPhase = prevPhase === 'start' ? 'end' : 'start';
-        
-        // Update the image cache with the new phase
         const newImage = newPhase === 'start' ? imagePair.start : imagePair.end;
         
-        setImageCache((prev) => {
-          return { ...prev, [fullKey]: newImage };
-        });
+        // Batch the state updates
+        setImageCache((prev) => ({ ...prev, [fullKey]: newImage }));
         
         return newPhase;
       });
@@ -467,14 +488,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
 
 
-  // Cleanup cycling when component unmounts or exercise changes (but NOT theme changes)
+  // Cleanup cycling when component unmounts or exercise changes
   useEffect(() => {
-    const exerciseName = effectiveCurrentExercise?.exercise || effectiveCurrentExercise?.name || '';
-    
-    // Clear any existing cycling interval ONLY if exercise actually changed
+    // Clear cycling interval and reset cycling key when exercise changes
     if (cyclingIntervalRef.current) {
       clearInterval(cyclingIntervalRef.current);
+      cyclingIntervalRef.current = null;
     }
+    currentCyclingKeyRef.current = null;
     
     // Reset cycling phase for new exercise
     setCurrentImagePhase('start');
@@ -482,7 +503,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     return () => {
       if (cyclingIntervalRef.current) {
         clearInterval(cyclingIntervalRef.current);
+        cyclingIntervalRef.current = null;
       }
+      currentCyclingKeyRef.current = null;
     };
   }, [currentIndex, selectedIndex]); // Reset when exercise or alternative changes
 
@@ -1479,7 +1502,50 @@ function SupersetSelectionModal({
   onSuperset,
   themeColor,
 }: SupersetSelectionModalProps) {
-  if (!visible || sourceExerciseIndex === null) return null;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setIsVisible(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.9,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setIsVisible(false));
+    }
+  }, [visible]);
+
+  if (!isVisible || sourceExerciseIndex === null) return null;
 
   const sourceExercise = exercises[sourceExerciseIndex];
   const adjacentOptions = [];
@@ -1490,6 +1556,7 @@ function SupersetSelectionModal({
       index: sourceExerciseIndex - 1,
       exercise: exercises[sourceExerciseIndex - 1],
       position: 'above' as const,
+      icon: 'chevron-up' as const,
     });
   }
 
@@ -1499,6 +1566,7 @@ function SupersetSelectionModal({
       index: sourceExerciseIndex + 1,
       exercise: exercises[sourceExerciseIndex + 1],
       position: 'below' as const,
+      icon: 'chevron-down' as const,
     });
   }
 
@@ -1508,76 +1576,157 @@ function SupersetSelectionModal({
     const targetSuperset = exercises[targetIndex]?.superset_group;
     const areLinked = sourceSuperset && targetSuperset && sourceSuperset === targetSuperset;
     
+    // Add haptic feedback
+    if (Platform.OS === 'ios') {
+      const impactStyle = areLinked ? 'light' : 'medium';
+      Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle?.[impactStyle.charAt(0).toUpperCase() + impactStyle.slice(1)]);
+    }
+    
     onSuperset(
       sourceExerciseIndex,
       targetIndex,
       areLinked ? 'unlink' : 'link'
     );
-    onClose();
   };
 
   return (
     <Modal
-      visible={visible}
+      visible={isVisible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <TouchableOpacity 
-        style={styles.modalBackdrop} 
-        activeOpacity={1} 
-        onPress={onClose}
+      <Animated.View 
+        style={[
+          styles.modalBackdrop,
+          { opacity: fadeAnim }
+        ]}
       >
         <TouchableOpacity 
-          style={[styles.supersetModal, { borderColor: themeColor + '40' }]}
-          activeOpacity={1}
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1} 
+          onPress={onClose}
+        />
+        
+        <Animated.View
+          style={[
+            styles.supersetModal,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { scale: scaleAnim },
+                {
+                  translateY: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <Text style={styles.supersetModalTitle}>Create Superset</Text>
-          <Text style={styles.supersetModalSubtitle}>
-            Link "{sourceExercise?.exercise}" with:
-          </Text>
-          
-          {adjacentOptions.map((option) => {
-            const sourceSuperset = sourceExercise?.superset_group;
-            const targetSuperset = option.exercise?.superset_group;
-            const areLinked = sourceSuperset && targetSuperset && sourceSuperset === targetSuperset;
+          {/* Header with exercise name */}
+          <View style={styles.supersetModalHeader}>
+            <View style={[styles.supersetModalIcon, { backgroundColor: themeColor + '20' }]}>
+              <Ionicons name="link" size={20} color={themeColor} />
+            </View>
+            <Text style={styles.supersetModalTitle}>SUPERSET</Text>
+            <TouchableOpacity 
+              onPress={onClose}
+              style={styles.supersetModalClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={20} color="#55555f" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Current exercise card */}
+          <View style={[styles.supersetCurrentExercise, { borderColor: themeColor + '40' }]}>
+            <Text style={styles.supersetCurrentLabel}>SELECTED</Text>
+            <Text style={styles.supersetCurrentName}>{sourceExercise?.exercise}</Text>
+          </View>
+
+          {/* Link options */}
+          <View style={styles.supersetOptions}>
+            {adjacentOptions.map((option, index) => {
+              const sourceSuperset = sourceExercise?.superset_group;
+              const targetSuperset = option.exercise?.superset_group;
+              const areLinked = sourceSuperset && targetSuperset && sourceSuperset === targetSuperset;
+              
+              return (
+                <React.Fragment key={option.index}>
+                  {index > 0 && <View style={styles.supersetDivider} />}
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.supersetOption,
+                      areLinked && styles.supersetOptionLinked,
+                      areLinked && { backgroundColor: themeColor + '10', borderColor: themeColor + '60' }
+                    ]}
+                    onPress={() => handleSelection(option.index)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.supersetOptionLeft}>
+                      <View style={[
+                        styles.supersetOptionIcon,
+                        { backgroundColor: areLinked ? themeColor + '20' : '#18181b' }
+                      ]}>
+                        <Ionicons 
+                          name={option.icon} 
+                          size={16} 
+                          color={areLinked ? themeColor : '#55555f'} 
+                        />
+                      </View>
+                      
+                      <View style={styles.supersetOptionInfo}>
+                        <Text style={[
+                          styles.supersetOptionLabel,
+                          areLinked && { color: themeColor }
+                        ]}>
+                          {option.position === 'above' ? 'PREVIOUS' : 'NEXT'} EXERCISE
+                        </Text>
+                        <Text style={[
+                          styles.supersetOptionName,
+                          areLinked && styles.supersetOptionNameLinked
+                        ]}>
+                          {option.exercise?.exercise}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.supersetToggleBtn,
+                        areLinked ? 
+                          { backgroundColor: themeColor, borderColor: themeColor } : 
+                          { backgroundColor: '#0a0a0f', borderColor: 'rgba(255,255,255,0.1)' }
+                      ]}
+                      onPress={() => handleSelection(option.index)}
+                    >
+                      <Ionicons 
+                        name={areLinked ? "link" : "add"} 
+                        size={16} 
+                        color={areLinked ? '#000' : '#9898a4'} 
+                      />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                </React.Fragment>
+              );
+            })}
             
-            return (
-              <TouchableOpacity
-                key={option.index}
-                style={[
-                  styles.supersetOption,
-                  areLinked && { backgroundColor: themeColor + '20', borderColor: themeColor }
-                ]}
-                onPress={() => handleSelection(option.index)}
-              >
-                <View style={styles.supersetOptionContent}>
-                  <Ionicons 
-                    name={areLinked ? "link" : "add"} 
-                    size={20} 
-                    color={areLinked ? themeColor : '#9898a4'} 
-                  />
-                  <Text style={[
-                    styles.supersetOptionText,
-                    areLinked && { color: themeColor }
-                  ]}>
-                    {option.exercise?.exercise} ({option.position})
-                  </Text>
-                </View>
-                <Text style={styles.supersetOptionAction}>
-                  {areLinked ? 'UNLINK' : 'LINK'}
+            {adjacentOptions.length === 0 && (
+              <View style={styles.supersetEmptyState}>
+                <Ionicons name="information-circle-outline" size={32} color="#55555f" />
+                <Text style={styles.supersetNoOptions}>
+                  This exercise has no adjacent exercises to link
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-          
-          {adjacentOptions.length === 0 && (
-            <Text style={styles.supersetNoOptions}>
-              No adjacent exercises available for superset
-            </Text>
-          )}
-        </TouchableOpacity>
-      </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 }
@@ -2228,71 +2377,156 @@ const styles = StyleSheet.create({
   // ── Superset Modal Styles ─────────────────────────
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   supersetModal: {
     backgroundColor: '#0a0a0f',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    minWidth: 300,
-    maxWidth: 350,
+    borderColor: 'rgba(255,255,255,0.08)',
+    width: '90%',
+    maxWidth: 380,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 30,
+    elevation: 25,
+  },
+  supersetModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  supersetModalIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   supersetModalTitle: {
-    color: '#f0f0f2',
-    fontSize: 18,
-    fontWeight: '700',
-    fontFamily: 'Outfit-Bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  supersetModalSubtitle: {
+    flex: 1,
     color: '#9898a4',
-    fontSize: 14,
-    fontFamily: 'Outfit-Regular',
-    marginBottom: 20,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Medium',
     textAlign: 'center',
+    marginHorizontal: 12,
+  },
+  supersetModalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  supersetCurrentExercise: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 16,
+    backgroundColor: '#18181b',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  supersetCurrentLabel: {
+    color: '#55555f',
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    fontFamily: 'DMMono-Medium',
+    marginBottom: 8,
+  },
+  supersetCurrentName: {
+    color: '#f0f0f2',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
+  },
+  supersetOptions: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  supersetDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 8,
   },
   supersetOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: '#18181b',
-    marginBottom: 8,
+    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#0a0a0f',
   },
-  supersetOptionContent: {
+  supersetOptionLinked: {
+    borderWidth: 1,
+  },
+  supersetOptionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  supersetOptionText: {
-    color: '#f0f0f2',
-    fontSize: 15,
-    fontFamily: 'Outfit-Regular',
-    marginLeft: 12,
+  supersetOptionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  supersetOptionInfo: {
     flex: 1,
   },
-  supersetOptionAction: {
-    color: '#9898a4',
-    fontSize: 11,
+  supersetOptionLabel: {
+    color: '#55555f',
+    fontSize: 9,
     fontWeight: '600',
     letterSpacing: 1,
     fontFamily: 'DMMono-Medium',
+    marginBottom: 4,
+  },
+  supersetOptionName: {
+    color: '#d4d4d8',
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
+  },
+  supersetOptionNameLinked: {
+    color: '#f0f0f2',
+    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
+  },
+  supersetToggleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  supersetEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
   },
   supersetNoOptions: {
     color: '#55555f',
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: 'Outfit-Regular',
     textAlign: 'center',
-    fontStyle: 'italic',
-    paddingVertical: 20,
+    marginTop: 12,
+    lineHeight: 18,
   },
 
 });
