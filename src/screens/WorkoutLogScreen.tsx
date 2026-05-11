@@ -225,15 +225,80 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const allExercises = [currentExercise?.exercise || 'Exercise', ...alternativeNames];
   const currentExerciseName = allExercises[selectedIndex] || currentExercise?.exercise || currentExercise?.name || 'Exercise';
 
+  // Helper function to get muscle groups for specific exercises
+  const getExerciseMuscles = useCallback((exerciseName: string): { primary: string[], secondary: string[] } => {
+    const name = exerciseName.toLowerCase();
+    
+    // Common exercise muscle mappings
+    if (name.includes('bench press')) {
+      return { primary: ['Chest'], secondary: ['Triceps', 'Front Delts'] };
+    } else if (name.includes('incline') && name.includes('press')) {
+      return { primary: ['Upper Chest'], secondary: ['Front Delts', 'Triceps'] };
+    } else if (name.includes('decline') && name.includes('press')) {
+      return { primary: ['Lower Chest'], secondary: ['Triceps', 'Front Delts'] };
+    } else if (name.includes('dumbbell press') && !name.includes('shoulder')) {
+      return { primary: ['Chest'], secondary: ['Triceps', 'Front Delts'] };
+    } else if (name.includes('flye') || name.includes('fly')) {
+      return { primary: ['Chest'], secondary: ['Front Delts'] };
+    } else if (name.includes('overhead press') || name.includes('shoulder press') || name.includes('military press')) {
+      return { primary: ['Shoulders'], secondary: ['Triceps', 'Upper Chest'] };
+    } else if (name.includes('lateral raise') || name.includes('side raise')) {
+      return { primary: ['Side Delts'], secondary: [] };
+    } else if (name.includes('rear delt') || (name.includes('reverse') && name.includes('fly'))) {
+      return { primary: ['Rear Delts'], secondary: ['Rhomboids'] };
+    } else if (name.includes('row') && !name.includes('upright')) {
+      return { primary: ['Lats', 'Middle Traps'], secondary: ['Rear Delts', 'Rhomboids', 'Biceps'] };
+    } else if (name.includes('pulldown') || name.includes('pull-up') || name.includes('pullup')) {
+      return { primary: ['Lats'], secondary: ['Biceps', 'Middle Traps', 'Rear Delts'] };
+    } else if (name.includes('squat')) {
+      return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
+    } else if (name.includes('deadlift')) {
+      if (name.includes('romanian') || name.includes('rdl')) {
+        return { primary: ['Hamstrings', 'Glutes'], secondary: ['Lower Back', 'Traps'] };
+      } else {
+        return { primary: ['Hamstrings', 'Glutes', 'Quads'], secondary: ['Lower Back', 'Traps', 'Lats'] };
+      }
+    } else if (name.includes('lunge')) {
+      return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
+    } else if (name.includes('bicep') || name.includes('curl')) {
+      return { primary: ['Biceps'], secondary: ['Forearms'] };
+    } else if (name.includes('tricep') || (name.includes('extension') && !name.includes('leg'))) {
+      return { primary: ['Triceps'], secondary: [] };
+    } else if (name.includes('calf')) {
+      return { primary: ['Calves'], secondary: [] };
+    } else if (name.includes('leg press')) {
+      return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
+    } else if (name.includes('leg curl')) {
+      return { primary: ['Hamstrings'], secondary: [] };
+    } else if (name.includes('leg extension')) {
+      return { primary: ['Quads'], secondary: [] };
+    }
+    
+    // Default fallback to original exercise muscles if no mapping found
+    return { 
+      primary: currentExercise?.primaryMuscles || [], 
+      secondary: currentExercise?.secondaryMuscles || [] 
+    };
+  }, [currentExercise]);
+
   // Create effective current exercise (primary or selected alternative) - memoized to prevent infinite loops
   const effectiveCurrentExercise = useMemo(() => {
-    return selectedIndex === 0 ? currentExercise : {
+    if (selectedIndex === 0) {
+      return currentExercise;
+    }
+    
+    // For alternatives, get specific muscle groups for the exercise
+    const muscles = getExerciseMuscles(currentExerciseName);
+    
+    return {
       ...currentExercise,
       exercise: currentExerciseName,
       name: currentExerciseName,
+      primaryMuscles: muscles.primary,
+      secondaryMuscles: muscles.secondary,
       // Note: We keep the same reps_weekly, rir_weekly, etc. as alternatives typically follow the same progression
     };
-  }, [selectedIndex, currentExercise, currentExerciseName]);
+  }, [selectedIndex, currentExercise, currentExerciseName, getExerciseMuscles]);
 
 
   // Cross-fade animation when swapping focused exercise
