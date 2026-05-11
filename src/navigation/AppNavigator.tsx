@@ -70,6 +70,7 @@ import ManualExerciseEntryScreen from '../screens/ManualExerciseEntryScreen';
 import ExerciseHelpScreen from '../screens/ExerciseHelpScreen';
 import MethodologyScreen from '../screens/MethodologyScreen';
 import WeightTrackerScreen from '../screens/WeightTrackerScreen';
+import WeekVolumeScreen from '../screens/WeekVolumeScreen';
 
 // Clean meal plan navigation types
 interface CleanMealPlanNavigationParams {
@@ -214,6 +215,12 @@ export type RootStackParamList = {
   ExerciseHelp: undefined;
   Methodology: undefined;
   WeightTracker: undefined;
+  WeekVolumeScreen: {
+    exercises: any[];
+    blockName: string;
+    weekNumber: number;
+    themeColor: string;
+  };
 };
 
 
@@ -836,6 +843,13 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                       },
                     };
                   },
+                }}
+              />
+              <RootStack.Screen 
+                name="WeekVolumeScreen" 
+                component={WeekVolumeScreen}
+                options={{
+                  headerShown: false,
                 }}
               />
             </>
