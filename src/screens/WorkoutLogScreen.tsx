@@ -63,6 +63,15 @@ export interface SetData {
   weight: string;
   reps: string;
   completed: boolean;
+  selectedExerciseIndex: number; // 0 = primary, 1+ = alternatives
+  // Store data for each exercise variant separately
+  exerciseData?: {
+    [exerciseIndex: number]: {
+      weight: string;
+      reps: string;
+      completed: boolean;
+    };
+  };
 }
 
 export interface Exercise {
@@ -80,8 +89,12 @@ export interface Exercise {
   /** Weekly progressions, e.g. { 1: "8, 7, 6", 2: "7, 6, 5" } */
   reps_weekly?: Record<string, string>;
   rir_weekly?: Record<string, string>;
+  /** Superset grouping - exercises with same superset_group are performed together */
+  superset_group?: string;
   /** Optional image URL — if not provided, we'll attempt fetch / fallback */
   imageUrl?: string;
+  /** Array of alternative exercise names */
+  alternatives?: string[];
 }
 
 export interface WorkoutLogScreenProps {
@@ -114,6 +127,13 @@ export interface WorkoutLogScreenProps {
   onOpenNotes?: (exerciseIndex: number) => void;
   onOpenHistory?: (exerciseIndex: number) => void;
   onOpenSettings?: (exerciseIndex: number) => void;
+
+  /** Exercise alternatives functionality */
+  onExerciseSelect: (exerciseIndex: number, selectedExerciseIndex: number) => void;
+  onSetExercisePreference: (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => void;
+  exercisePreferences: { [exerciseName: string]: string };
+  /** Superset management */
+  onSuperset: (exerciseIndex1: number, exerciseIndex2: number, action: 'link' | 'unlink') => void;
 
   /** Theming */
   themeColor?: string; // default '#22d3ee'
@@ -178,6 +198,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     onOpenNotes,
     onOpenHistory,
     onOpenSettings,
+    onExerciseSelect,
+    onSetExercisePreference,
+    exercisePreferences,
+    onSuperset,
     themeColor = DEFAULT_THEME,
     globalUnit = 'kg',
     currentWeek = 1,
@@ -190,6 +214,25 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   const currentExercise = exercises[currentIndex];
   const currentSets = allSetsData[currentIndex] || [];
+
+  // Calculate current exercise alternatives
+  const selectedIndex = currentSets.length > 0 ? currentSets[0].selectedExerciseIndex || 0 : 0;
+  const alternativeNames = (currentExercise?.alternatives || [])
+    .filter(alt => alt && typeof alt === 'string')
+    .map(alt => String(alt));
+  const allExercises = [currentExercise?.exercise || 'Exercise', ...alternativeNames];
+  const currentExerciseName = allExercises[selectedIndex] || currentExercise?.exercise || currentExercise?.name || 'Exercise';
+
+  // Create effective current exercise (primary or selected alternative) - memoized to prevent infinite loops
+  const effectiveCurrentExercise = useMemo(() => {
+    return selectedIndex === 0 ? currentExercise : {
+      ...currentExercise,
+      exercise: currentExerciseName,
+      name: currentExerciseName,
+      // Note: We keep the same reps_weekly, rir_weekly, etc. as alternatives typically follow the same progression
+    };
+  }, [selectedIndex, currentExercise, currentExerciseName]);
+
 
   // Cross-fade animation when swapping focused exercise
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -205,6 +248,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Finish workout confirmation modal
   const [showFinishModal, setShowFinishModal] = useState(false);
+  
+  // Superset selection modal
+  const [showSupersetModal, setShowSupersetModal] = useState(false);
+  const [supersetSourceIndex, setSupersetSourceIndex] = useState<number | null>(null);
 
   // Rest timer logic
   const startRestTimer = (exerciseIndex: number, setIndex: number) => {
@@ -250,6 +297,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   
   // Workout Heatmap Modal state
   const [showWorkoutHeatmap, setShowWorkoutHeatmap] = useState(false);
+  
+  // Exercise selector dropdown state
+  const [showExerciseSelector, setShowExerciseSelector] = useState<number | null>(null);
   
   // Workout History Modal state
   const [showWorkoutHistory, setShowWorkoutHistory] = useState<{
@@ -302,6 +352,11 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     onFinishWorkout();
   };
 
+  const handleExerciseLongPress = (exerciseIndex: number) => {
+    setSupersetSourceIndex(exerciseIndex);
+    setShowSupersetModal(true);
+  };
+
   // Load history data when showWorkoutHistory changes
   useEffect(() => {
     const loadHistoryData = async () => {
@@ -316,13 +371,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Resolve image for current exercise (lazy, cached)
   useEffect(() => {
-    if (!currentExercise) {
+    if (!effectiveCurrentExercise) {
       return;
     }
     
-    const key = `${currentExercise.exercise || currentExercise.name || ''}-${themeColor}`;
+    const key = `${effectiveCurrentExercise.exercise || effectiveCurrentExercise.name || ''}-${themeColor}`;
     
-    if (key in imageCache && key in imagePairs) {
+    // Don't try to reload if we already tried and failed (null means we tried and failed)
+    if (key in imageCache) {
       // Even though images are cached, we need to restart cycling for the new color theme
       const cachedImagePair = imagePairs[key];
       if (cachedImagePair && cachedImagePair.start && cachedImagePair.end) {
@@ -335,8 +391,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       return; // already resolved (or null)
     }
     
-    if (currentExercise.imageUrl) {
-      setImageCache((c) => ({ ...c, [key]: currentExercise.imageUrl! }));
+    if (effectiveCurrentExercise.imageUrl) {
+      setImageCache((c) => ({ ...c, [key]: effectiveCurrentExercise.imageUrl! }));
       return;
     }
     
@@ -344,7 +400,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     if (resolveExerciseImagePair) {
       setImageLoading((s) => ({ ...s, [key]: true }));
       
-      resolveExerciseImagePair(currentExercise)
+      resolveExerciseImagePair(effectiveCurrentExercise)
         .then((imagePair) => {
           if (imagePair && imagePair.start && imagePair.end) {
             // Store both images for cycling
@@ -374,7 +430,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     
     setImageLoading((s) => ({ ...s, [key]: true }));
     
-    resolveExerciseImage(currentExercise)
+    resolveExerciseImage(effectiveCurrentExercise)
       .then((url) => {
         setImageCache((c) => ({ ...c, [key]: url }));
       })
@@ -384,7 +440,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       .finally(() => {
         setImageLoading((s) => ({ ...s, [key]: false }));
       });
-  }, [currentExercise, resolveExerciseImage, resolveExerciseImagePair, themeColor]);
+  }, [effectiveCurrentExercise, resolveExerciseImage, resolveExerciseImagePair, themeColor]);
 
   // Image cycling function
   const startImageCycling = useCallback((fullKey: string, imagePair: {start: any, end: any}) => {
@@ -413,7 +469,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Cleanup cycling when component unmounts or exercise changes (but NOT theme changes)
   useEffect(() => {
-    const exerciseName = currentExercise?.exercise || currentExercise?.name || '';
+    const exerciseName = effectiveCurrentExercise?.exercise || effectiveCurrentExercise?.name || '';
     
     // Clear any existing cycling interval ONLY if exercise actually changed
     if (cyclingIntervalRef.current) {
@@ -428,7 +484,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         clearInterval(cyclingIntervalRef.current);
       }
     };
-  }, [currentIndex]); // Only reset when exercise INDEX changes, not the object
+  }, [currentIndex, selectedIndex]); // Reset when exercise or alternative changes
 
   // Cross-fade on exercise swap
   const swapFocus = useCallback(
@@ -497,22 +553,22 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Handler functions for buttons
   const handleHistoryPress = async (exerciseIndex: number) => {
-    const exercise = exercises[exerciseIndex];
-    const exerciseName = exercise.exercise || exercise.name || 'Exercise';
+    // Use the effective exercise name (including alternatives)
+    const exerciseName = exerciseIndex === currentIndex ? effectiveCurrentExercise.exercise : exercises[exerciseIndex].exercise;
     const history = await WorkoutStorage.getExerciseHistory(exerciseName);
     setExerciseHistory(history);
     setShowHistory(exerciseName);
   };
 
   const handleNotesPress = (exerciseIndex: number) => {
-    const exercise = exercises[exerciseIndex];
-    const exerciseName = exercise.exercise || exercise.name || 'Exercise';
+    // Use the effective exercise name (including alternatives)
+    const exerciseName = exerciseIndex === currentIndex ? effectiveCurrentExercise.exercise : exercises[exerciseIndex].exercise;
     setShowNotes({ exerciseName, exerciseIndex });
   };
 
   const handleExerciseNotesPress = (exerciseIndex: number) => {
-    const exercise = exercises[exerciseIndex];
-    const exerciseName = exercise.exercise || exercise.name || 'Exercise';
+    // Use the effective exercise name (including alternatives)
+    const exerciseName = exerciseIndex === currentIndex ? effectiveCurrentExercise.exercise : exercises[exerciseIndex].exercise;
     setShowExerciseNotes({ exerciseName, exerciseIndex });
   };
 
@@ -550,7 +606,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // ── Render ────────────────────────────────────────────────────────
 
-  if (!currentExercise) {
+  if (!effectiveCurrentExercise) {
     return (
       <SafeAreaView style={styles.root}>
         <View style={styles.emptyState}>
@@ -560,7 +616,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     );
   }
 
-  const exKey = `${currentExercise.exercise || currentExercise.name || ''}-${themeColor}`;
+  const exKey = `${effectiveCurrentExercise.exercise || effectiveCurrentExercise.name || ''}-${themeColor}`;
   const exImage = imageCache[exKey];
   const exImageLoading = imageLoading[exKey];
 
@@ -734,8 +790,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
-                  const exercise = exercises[currentIndex];
-                  const exerciseName = exercise.exercise || exercise.name || 'Exercise';
+                  // Use the effective exercise name (including alternatives)
+                  const exerciseName = effectiveCurrentExercise.exercise;
                   setShowWorkoutHistory({ exerciseName, exerciseIndex: currentIndex });
                 }}
                 style={styles.overlayBtn}
@@ -746,19 +802,33 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           </View>
         </View>
 
-        <Animated.View style={[styles.focusArea, { opacity: fadeAnim }]}>
+        <TouchableOpacity 
+          style={[styles.focusArea, { opacity: fadeAnim }]}
+          onLongPress={() => handleExerciseLongPress(currentIndex)}
+          activeOpacity={1}
+          delayLongPress={600}
+        >
           {/* Exercise title and info */}
           <View style={styles.titleRow}>
             <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={styles.title} numberOfLines={2}>
-                {currentExercise.exercise || currentExercise.name || 'Exercise'}
-              </Text>
-              {!!(currentExercise.primaryMuscles?.length ||
-                currentExercise.secondaryMuscles?.length) && (
+              <TouchableOpacity
+                style={styles.titleButton}
+                onPress={() => allExercises.length > 1 && setShowExerciseSelector(showExerciseSelector === currentIndex ? null : currentIndex)}
+                activeOpacity={allExercises.length > 1 ? 0.7 : 1}
+              >
+                <Text style={styles.title} numberOfLines={2}>
+                  {currentExerciseName}
+                </Text>
+                {allExercises.length > 1 && (
+                  <Ionicons name="chevron-down" size={18} color={themeColor} style={{ marginLeft: 8 }} />
+                )}
+              </TouchableOpacity>
+              {!!(effectiveCurrentExercise.primaryMuscles?.length ||
+                effectiveCurrentExercise.secondaryMuscles?.length) && (
                 <Text style={styles.muscles}>
                   {[
-                    ...(currentExercise.primaryMuscles || []),
-                    ...(currentExercise.secondaryMuscles || []),
+                    ...(effectiveCurrentExercise.primaryMuscles || []),
+                    ...(effectiveCurrentExercise.secondaryMuscles || []),
                   ].join(' · ')}
                 </Text>
               )}
@@ -771,9 +841,73 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             />
           </View>
 
+          {/* Exercise selector dropdown */}
+          {showExerciseSelector === currentIndex && allExercises.length > 1 && (
+            <View style={styles.exerciseSelector}>
+              {allExercises.map((exerciseName, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.exerciseOption,
+                    index === selectedIndex && [styles.exerciseOptionSelected, { backgroundColor: themeColor + '20' }],
+                    index === allExercises.length - 1 && styles.exerciseOptionLast
+                  ]}
+                  onPress={() => {
+                    console.log(`🔧 [EXERCISE-SELECT] Selecting: ${exerciseName} for ${currentExercise.exercise} (index: ${index})`);
+                    // Update the visual selection
+                    onExerciseSelect(currentIndex, index);
+                    // Handle preference saving
+                    const alternativeNames = (currentExercise.alternatives || [])
+                      .filter(alt => alt && typeof alt === 'string')
+                      .map(alt => String(alt));
+                    
+                    if (index === 0) {
+                      // Going back to original exercise - clear the preference
+                      console.log(`🔧 [EXERCISE-SELECT] Clearing preference for ${currentExercise.exercise}`);
+                      onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, '');
+                    } else {
+                      // Selecting an alternative
+                      console.log(`🔧 [EXERCISE-SELECT] Setting preference for ${currentExercise.exercise} to ${exerciseName}`);
+                      onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, exerciseName);
+                    }
+                    setShowExerciseSelector(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.exerciseOptionTextContainer}>
+                    <View style={styles.exerciseOptionTextRow}>
+                      <Text style={[
+                        styles.exerciseOptionText,
+                        index === selectedIndex && { color: themeColor }
+                      ]}>
+                        {exerciseName}
+                      </Text>
+                      {(() => {
+                        // Show star for preferred exercise if set, otherwise show for primary (index 0)
+                        const preferredExercise = exercisePreferences[currentExercise.exercise];
+                        const showStar = preferredExercise ? exerciseName === preferredExercise : index === 0;
+                        return showStar && (
+                          <Ionicons 
+                            name="star" 
+                            size={14} 
+                            color={themeColor} 
+                            style={{ marginLeft: 6 }}
+                          />
+                        );
+                      })()}
+                    </View>
+                    {index === 0 && (
+                      <Text style={styles.exerciseOptionSubtext}>Primary</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           {/* Prescription banner (week + sets × reps + RIR) */}
           <PrescriptionBanner
-            exercise={currentExercise}
+            exercise={effectiveCurrentExercise}
             currentWeek={currentWeek}
             themeColor={themeColor}
           />
@@ -785,7 +919,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             unit={globalUnit}
             themeColor={themeColor}
             workoutStarted={workoutStarted}
-            exercise={currentExercise}
+            exercise={effectiveCurrentExercise}
             currentWeek={currentWeek}
             onUpdate={onSetUpdate}
             onComplete={onSetComplete}
@@ -793,7 +927,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             onRemove={onSetRemove}
             onSetTapWhenNotStarted={onSetTapWhenNotStarted}
           />
-        </Animated.View>
+        </TouchableOpacity>
 
         {/* ── UPCOMING LIST ──────────────────────────────── */}
         <View style={styles.upcomingSection}>
@@ -801,15 +935,55 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           {exercises.map((ex, idx) => {
             const progress = exerciseProgress[idx];
             const isActive = idx === currentIndex;
+            
+            // Get the effective exercise name (considering selected alternatives)
+            // Use exercise name as key instead of index
+            const primaryExerciseName = ex.exercise || ex.name || '';
+            const selectedAlternative = exercisePreferences[primaryExerciseName];
+            let effectiveExercise = ex;
+            
+            if (selectedAlternative && ex.alternatives && ex.alternatives.includes(selectedAlternative)) {
+              effectiveExercise = {
+                ...ex,
+                exercise: selectedAlternative,
+                name: selectedAlternative,
+              };
+            }
+            
+            // Check if this exercise is part of a superset
+            const isPartOfSuperset = ex.superset_group && ex.superset_group.trim() !== '';
+            const nextExercise = exercises[idx + 1];
+            const isLastInSuperset = !nextExercise || nextExercise.superset_group !== ex.superset_group;
+            const hasNextExercise = idx < exercises.length - 1;
+            
+            // Check if current and next exercise are linked
+            const isLinkedToNext = hasNextExercise && 
+              ex.superset_group && 
+              nextExercise && 
+              ex.superset_group === nextExercise.superset_group &&
+              ex.superset_group.trim() !== '';
+            
             return (
-              <ExerciseMiniCard
-                key={ex.id || `${ex.exercise}-${idx}`}
-                exercise={ex}
-                progress={progress}
-                themeColor={themeColor}
-                isActive={isActive}
-                onPress={() => swapFocus(idx)}
-              />
+              <React.Fragment key={ex.id || `${ex.exercise}-${idx}`}>
+                <ExerciseMiniCard
+                  exercise={effectiveExercise}
+                  progress={progress}
+                  themeColor={themeColor}
+                  isActive={isActive}
+                  onPress={() => swapFocus(idx)}
+                />
+                
+                {/* Show appropriate UI between exercises */}
+                {hasNextExercise && (
+                  <>
+                    {/* Show superset connector if linked */}
+                    {isLinkedToNext && (
+                      <SupersetConnector themeColor={themeColor} />
+                    )}
+                    
+                  </>
+                )}
+              </React.Fragment>
             );
           })}
         </View>
@@ -856,6 +1030,19 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
     {/* Exercise History Modal */}
     {historyModalProps && <ExerciseHistoryModal {...historyModalProps} />}
+
+    {/* Superset Selection Modal */}
+    <SupersetSelectionModal
+      visible={showSupersetModal}
+      onClose={() => {
+        setShowSupersetModal(false);
+        setSupersetSourceIndex(null);
+      }}
+      exercises={exercises}
+      sourceExerciseIndex={supersetSourceIndex}
+      onSuperset={onSuperset}
+      themeColor={themeColor}
+    />
 
     {/* Enhanced Finish Workout Modal */}
     <FinishWorkoutModal
@@ -1248,6 +1435,148 @@ function ExerciseMiniCard({
     </TouchableOpacity>
   );
 }
+
+// ── Superset Connector Component ──────────────────────────────────
+
+interface SupersetConnectorProps {
+  themeColor: string;
+}
+
+function SupersetConnector({ themeColor }: SupersetConnectorProps) {
+  return (
+    <View style={styles.supersetConnector}>
+      <View style={styles.supersetLine} />
+      <View style={[styles.supersetBadge, { borderColor: themeColor }]}>
+        <Ionicons name="link" size={14} color={themeColor} />
+        <Text style={[styles.supersetText, { color: themeColor }]}>SUPERSET</Text>
+      </View>
+      <View style={styles.supersetLine} />
+    </View>
+  );
+}
+
+// ── Superset Selection Modal ──────────────────────────────────────
+
+interface SupersetSelectionModalProps {
+  visible: boolean;
+  onClose: () => void;
+  exercises: Exercise[];
+  sourceExerciseIndex: number | null;
+  onSuperset: (exerciseIndex1: number, exerciseIndex2: number, action: 'link' | 'unlink') => void;
+  themeColor: string;
+}
+
+function SupersetSelectionModal({
+  visible,
+  onClose,
+  exercises,
+  sourceExerciseIndex,
+  onSuperset,
+  themeColor,
+}: SupersetSelectionModalProps) {
+  if (!visible || sourceExerciseIndex === null) return null;
+
+  const sourceExercise = exercises[sourceExerciseIndex];
+  const adjacentOptions = [];
+
+  // Add previous exercise option
+  if (sourceExerciseIndex > 0) {
+    adjacentOptions.push({
+      index: sourceExerciseIndex - 1,
+      exercise: exercises[sourceExerciseIndex - 1],
+      position: 'above' as const,
+    });
+  }
+
+  // Add next exercise option
+  if (sourceExerciseIndex < exercises.length - 1) {
+    adjacentOptions.push({
+      index: sourceExerciseIndex + 1,
+      exercise: exercises[sourceExerciseIndex + 1],
+      position: 'below' as const,
+    });
+  }
+
+  const handleSelection = (targetIndex: number) => {
+    // Check if exercises are already linked
+    const sourceSuperset = sourceExercise?.superset_group;
+    const targetSuperset = exercises[targetIndex]?.superset_group;
+    const areLinked = sourceSuperset && targetSuperset && sourceSuperset === targetSuperset;
+    
+    onSuperset(
+      sourceExerciseIndex,
+      targetIndex,
+      areLinked ? 'unlink' : 'link'
+    );
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity 
+        style={styles.modalBackdrop} 
+        activeOpacity={1} 
+        onPress={onClose}
+      >
+        <TouchableOpacity 
+          style={[styles.supersetModal, { borderColor: themeColor + '40' }]}
+          activeOpacity={1}
+        >
+          <Text style={styles.supersetModalTitle}>Create Superset</Text>
+          <Text style={styles.supersetModalSubtitle}>
+            Link "{sourceExercise?.exercise}" with:
+          </Text>
+          
+          {adjacentOptions.map((option) => {
+            const sourceSuperset = sourceExercise?.superset_group;
+            const targetSuperset = option.exercise?.superset_group;
+            const areLinked = sourceSuperset && targetSuperset && sourceSuperset === targetSuperset;
+            
+            return (
+              <TouchableOpacity
+                key={option.index}
+                style={[
+                  styles.supersetOption,
+                  areLinked && { backgroundColor: themeColor + '20', borderColor: themeColor }
+                ]}
+                onPress={() => handleSelection(option.index)}
+              >
+                <View style={styles.supersetOptionContent}>
+                  <Ionicons 
+                    name={areLinked ? "link" : "add"} 
+                    size={20} 
+                    color={areLinked ? themeColor : '#9898a4'} 
+                  />
+                  <Text style={[
+                    styles.supersetOptionText,
+                    areLinked && { color: themeColor }
+                  ]}>
+                    {option.exercise?.exercise} ({option.position})
+                  </Text>
+                </View>
+                <Text style={styles.supersetOptionAction}>
+                  {areLinked ? 'UNLINK' : 'LINK'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          
+          {adjacentOptions.length === 0 && (
+            <Text style={styles.supersetNoOptions}>
+              No adjacent exercises available for superset
+            </Text>
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 
 // ──────────────────────────────────────────────────────────────────
 // Helpers
@@ -1814,4 +2143,151 @@ const styles = StyleSheet.create({
   settingsOptionTextDanger: {
     color: '#ef4444',
   },
+  
+  // Exercise alternatives
+  titleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  exerciseSelector: {
+    backgroundColor: '#0a0a0f',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  exerciseOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  exerciseOptionLast: {
+    borderBottomWidth: 0,
+  },
+  exerciseOptionSelected: {
+    borderLeftWidth: 3,
+  },
+  exerciseOptionTextContainer: {
+    flex: 1,
+  },
+  exerciseOptionTextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  exerciseOptionText: {
+    color: '#f0f0f2',
+    fontSize: 15,
+    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
+    flex: 1,
+  },
+  exerciseOptionSubtext: {
+    color: '#9898a4',
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: 'DMMono-Regular',
+  },
+
+  // ── Superset Connector Styles ──────────────────
+  supersetConnector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  supersetLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  supersetBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    gap: 6,
+  },
+  supersetText: {
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    fontFamily: 'DMMono-Medium',
+  },
+
+  // ── Superset Modal Styles ─────────────────────────
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  supersetModal: {
+    backgroundColor: '#0a0a0f',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    minWidth: 300,
+    maxWidth: 350,
+  },
+  supersetModalTitle: {
+    color: '#f0f0f2',
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: 'Outfit-Bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  supersetModalSubtitle: {
+    color: '#9898a4',
+    fontSize: 14,
+    fontFamily: 'Outfit-Regular',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  supersetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#18181b',
+    marginBottom: 8,
+  },
+  supersetOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  supersetOptionText: {
+    color: '#f0f0f2',
+    fontSize: 15,
+    fontFamily: 'Outfit-Regular',
+    marginLeft: 12,
+    flex: 1,
+  },
+  supersetOptionAction: {
+    color: '#9898a4',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    fontFamily: 'DMMono-Medium',
+  },
+  supersetNoOptions: {
+    color: '#55555f',
+    fontSize: 14,
+    fontFamily: 'Outfit-Regular',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: 20,
+  },
+
 });

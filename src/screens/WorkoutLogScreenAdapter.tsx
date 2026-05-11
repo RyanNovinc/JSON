@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,6 +38,9 @@ export default function WorkoutLogScreenAdapter() {
   
   // Exercise alternatives state
   const [exercisePreferences, setExercisePreferences] = useState<{ [exerciseName: string]: string }>({});
+  
+  // Local exercises state for superset modifications
+  const [exercises, setExercises] = useState<Exercise[]>([]);
 
   // Load exercise preferences on mount
   useEffect(() => {
@@ -55,23 +58,30 @@ export default function WorkoutLogScreenAdapter() {
   }, []);
   
   
-  // Transform your existing exercise data to the new interface
-  const exercises: Exercise[] = (day?.exercises || []).map((exercise: any, index: number) => ({
-    id: `${exercise.exercise}-${index}`,
-    exercise: exercise.exercise,
-    name: exercise.exercise,
-    sets: exercise.sets_weekly?.[currentWeek?.toString()] || exercise.sets || 3,
-    reps: exercise.reps_weekly?.[currentWeek?.toString()] || exercise.reps || "8-12",
-    rest: exercise.rest,
-    notes: exercise.notes,
-    primaryMuscles: Array.isArray(exercise.primaryMuscles) ? exercise.primaryMuscles : [],
-    secondaryMuscles: Array.isArray(exercise.secondaryMuscles) ? exercise.secondaryMuscles : [],
-    reps_weekly: exercise.reps_weekly,
-    rir_weekly: exercise.rir_weekly,
-    alternatives: Array.isArray(exercise.alternatives) ? exercise.alternatives.filter(alt => alt && typeof alt === 'string') : [],
-    // Add imageUrl if you have exercise images
-    // imageUrl: getExerciseImageUrl(exercise.exercise),
-  }));
+  // Initialize exercises from route params
+  useEffect(() => {
+    if (day?.exercises && exercises.length === 0) {
+      const transformedExercises = (day.exercises || []).map((exercise: any, index: number) => ({
+        id: `${exercise.exercise}-${index}`,
+        exercise: exercise.exercise,
+        name: exercise.exercise,
+        sets: exercise.sets_weekly?.[currentWeek?.toString()] || exercise.sets || 3,
+        reps: exercise.reps_weekly?.[currentWeek?.toString()] || exercise.reps || "8-12",
+        rest: exercise.rest,
+        notes: exercise.notes,
+        primaryMuscles: Array.isArray(exercise.primaryMuscles) ? exercise.primaryMuscles : [],
+        secondaryMuscles: Array.isArray(exercise.secondaryMuscles) ? exercise.secondaryMuscles : [],
+        reps_weekly: exercise.reps_weekly,
+        rir_weekly: exercise.rir_weekly,
+        superset_group: exercise.superset_group, // Preserve existing superset data
+        alternatives: Array.isArray(exercise.alternatives) ? 
+          exercise.alternatives
+            .filter(alt => alt && (typeof alt === 'string' || (typeof alt === 'object' && alt.exercise)))
+            .map(alt => typeof alt === 'string' ? alt : alt.exercise) : [],
+      }));
+      setExercises(transformedExercises);
+    }
+  }, [day?.exercises, currentWeek]);
 
 
   // Initialize sets data and load saved progress
@@ -345,8 +355,8 @@ export default function WorkoutLogScreenAdapter() {
       if (currentSelection !== selectedExerciseIndex) {
         const exercise = exercises[exerciseIndex];
         const alternativeNames = (exercise.alternatives || [])
-          .filter(alt => alt && typeof alt === 'string')
-          .map(alt => String(alt));
+          .filter(alt => alt && (typeof alt === 'string' || (typeof alt === 'object' && alt.exercise)))
+          .map(alt => typeof alt === 'string' ? alt : alt.exercise);
         const allExercises = [exercise.exercise, ...alternativeNames];
         const newExerciseName = allExercises[selectedExerciseIndex] || exercise.exercise;
         
@@ -384,16 +394,65 @@ export default function WorkoutLogScreenAdapter() {
   };
 
   const handleSetExercisePreference = (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => {
-    setExercisePreferences(prev => ({
-      ...prev,
-      [primaryExercise]: selectedAlternative
-    }));
+    console.log(`🔧 [ADAPTER] Setting preference for ${primaryExercise} to "${selectedAlternative}"`);
     
-    // Also save to AsyncStorage
-    AsyncStorage.setItem('exercisePreferences', JSON.stringify({
-      ...exercisePreferences,
-      [primaryExercise]: selectedAlternative
-    }));
+    setExercisePreferences(prev => {
+      const newPrefs = { ...prev };
+      
+      if (selectedAlternative === '' || selectedAlternative === primaryExercise) {
+        // Clear the preference (back to original)
+        delete newPrefs[primaryExercise];
+        console.log(`🔧 [ADAPTER] Cleared preference for ${primaryExercise}`);
+      } else {
+        // Set the preference to the alternative
+        newPrefs[primaryExercise] = selectedAlternative;
+        console.log(`🔧 [ADAPTER] Set preference for ${primaryExercise} to ${selectedAlternative}`);
+      }
+      
+      // Save to AsyncStorage
+      AsyncStorage.setItem('exercisePreferences', JSON.stringify(newPrefs));
+      
+      return newPrefs;
+    });
+  };
+
+  const handleSuperset = (exerciseIndex1: number, exerciseIndex2: number, action: 'link' | 'unlink') => {
+    console.log(`🔗 [SUPERSET] ${action} exercises ${exerciseIndex1} and ${exerciseIndex2}`);
+    
+    setExercises(prevExercises => {
+      const updatedExercises = [...prevExercises];
+      
+      if (action === 'link') {
+        // Generate a unique superset group ID
+        const supersetGroupId = `superset_${Date.now()}`;
+        
+        // Link both exercises to the same superset group
+        updatedExercises[exerciseIndex1] = {
+          ...updatedExercises[exerciseIndex1],
+          superset_group: supersetGroupId
+        };
+        updatedExercises[exerciseIndex2] = {
+          ...updatedExercises[exerciseIndex2],
+          superset_group: supersetGroupId
+        };
+        
+        console.log(`🔗 [SUPERSET] Linked exercises to group: ${supersetGroupId}`);
+      } else {
+        // Unlink - remove superset_group from both exercises
+        updatedExercises[exerciseIndex1] = {
+          ...updatedExercises[exerciseIndex1],
+          superset_group: undefined
+        };
+        updatedExercises[exerciseIndex2] = {
+          ...updatedExercises[exerciseIndex2],
+          superset_group: undefined
+        };
+        
+        console.log(`🔗 [SUPERSET] Unlinked exercises`);
+      }
+      
+      return updatedExercises;
+    });
   };
 
   const handleConfirmFinish = async () => {
@@ -647,6 +706,7 @@ export default function WorkoutLogScreenAdapter() {
       onOpenSettings={handleOpenSettings}
       onExerciseSelect={handleExerciseSelect}
       onSetExercisePreference={handleSetExercisePreference}
+      onSuperset={handleSuperset}
       exercisePreferences={exercisePreferences}
       themeColor={themeColor}
       globalUnit={globalUnit}
