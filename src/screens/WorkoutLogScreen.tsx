@@ -971,6 +971,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                   themeColor={themeColor}
                   isActive={isActive}
                   onPress={() => swapFocus(idx)}
+                  onLongPress={() => handleExerciseLongPress(idx)}
                 />
                 
                 {/* Show appropriate UI between exercises */}
@@ -1369,6 +1370,7 @@ interface ExerciseMiniCardProps {
   themeColor: string;
   isActive?: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
 }
 
 function ExerciseMiniCard({
@@ -1377,6 +1379,7 @@ function ExerciseMiniCard({
   themeColor,
   isActive = false,
   onPress,
+  onLongPress,
 }: ExerciseMiniCardProps) {
   const allDone = progress.total > 0 && progress.completed === progress.total;
   return (
@@ -1387,6 +1390,8 @@ function ExerciseMiniCard({
         isActive && styles.miniCardActive
       ]}
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={600}
       activeOpacity={0.75}
     >
       <View style={styles.miniIcon}>

@@ -422,33 +422,119 @@ export default function WorkoutLogScreenAdapter() {
     setExercises(prevExercises => {
       const updatedExercises = [...prevExercises];
       
+      // Determine which exercise is above (lower index)
+      const upperIndex = Math.min(exerciseIndex1, exerciseIndex2);
+      const lowerIndex = Math.max(exerciseIndex1, exerciseIndex2);
+      
+      // Only process if they are adjacent
+      if (lowerIndex !== upperIndex + 1) {
+        console.warn('Can only superset adjacent exercises');
+        return updatedExercises;
+      }
+      
+      const upperExercise = updatedExercises[upperIndex];
+      const lowerExercise = updatedExercises[lowerIndex];
+      
       if (action === 'link') {
-        // Generate a unique superset group ID
-        const supersetGroupId = `superset_${Date.now()}`;
+        // Check if either exercise is already in a superset group
+        const upperGroup = upperExercise.superset_group;
+        const lowerGroup = lowerExercise.superset_group;
         
-        // Link both exercises to the same superset group
-        updatedExercises[exerciseIndex1] = {
-          ...updatedExercises[exerciseIndex1],
-          superset_group: supersetGroupId
-        };
-        updatedExercises[exerciseIndex2] = {
-          ...updatedExercises[exerciseIndex2],
-          superset_group: supersetGroupId
-        };
+        let newGroupId;
         
-        console.log(`🔗 [SUPERSET] Linked exercises to group: ${supersetGroupId}`);
+        if (upperGroup && lowerGroup && upperGroup !== lowerGroup) {
+          // Both have different groups - merge them (use the upper group)
+          newGroupId = upperGroup;
+          // Update all exercises with the lower group to use the upper group
+          updatedExercises.forEach((ex, idx) => {
+            if (ex.superset_group === lowerGroup) {
+              updatedExercises[idx] = {
+                ...ex,
+                superset_group: newGroupId
+              };
+            }
+          });
+        } else if (upperGroup) {
+          // Upper has a group, extend it to lower
+          newGroupId = upperGroup;
+          updatedExercises[lowerIndex] = {
+            ...lowerExercise,
+            superset_group: newGroupId
+          };
+        } else if (lowerGroup) {
+          // Lower has a group, extend it to upper
+          newGroupId = lowerGroup;
+          updatedExercises[upperIndex] = {
+            ...upperExercise,
+            superset_group: newGroupId
+          };
+        } else {
+          // Neither has a group, create a new one
+          newGroupId = `superset_${Date.now()}`;
+          updatedExercises[upperIndex] = {
+            ...upperExercise,
+            superset_group: newGroupId
+          };
+          updatedExercises[lowerIndex] = {
+            ...lowerExercise,
+            superset_group: newGroupId
+          };
+        }
+        
+        console.log(`🔗 [SUPERSET] Linked exercises ${upperIndex} and ${lowerIndex} with group: ${newGroupId}`);
       } else {
-        // Unlink - remove superset_group from both exercises
-        updatedExercises[exerciseIndex1] = {
-          ...updatedExercises[exerciseIndex1],
-          superset_group: undefined
-        };
-        updatedExercises[exerciseIndex2] = {
-          ...updatedExercises[exerciseIndex2],
-          superset_group: undefined
-        };
-        
-        console.log(`🔗 [SUPERSET] Unlinked exercises`);
+        // Unlink - need to split the superset group if they share one
+        if (upperExercise.superset_group === lowerExercise.superset_group && upperExercise.superset_group) {
+          // They're in the same group, need to split it
+          const sharedGroup = upperExercise.superset_group;
+          
+          // Find all exercises in this group
+          const groupExercises: number[] = [];
+          updatedExercises.forEach((ex, idx) => {
+            if (ex.superset_group === sharedGroup) {
+              groupExercises.push(idx);
+            }
+          });
+          
+          // Split the group at the break point
+          // Exercises before and including upperIndex keep the original group
+          // Exercises after and including lowerIndex get a new group (if there are more than just lowerIndex)
+          
+          // Check if lower exercise is connected to anything after it
+          const hasLowerChain = groupExercises.some(idx => idx > lowerIndex);
+          
+          if (hasLowerChain) {
+            // Create a new group for the lower chain
+            const newGroupId = `superset_${Date.now()}`;
+            groupExercises.forEach(idx => {
+              if (idx >= lowerIndex) {
+                updatedExercises[idx] = {
+                  ...updatedExercises[idx],
+                  superset_group: newGroupId
+                };
+              }
+            });
+          } else {
+            // Lower exercise is standalone now
+            updatedExercises[lowerIndex] = {
+              ...lowerExercise,
+              superset_group: undefined
+            };
+          }
+          
+          // Check if upper exercise is connected to anything before it
+          const hasUpperChain = groupExercises.some(idx => idx < upperIndex);
+          
+          if (!hasUpperChain) {
+            // Upper exercise is standalone now
+            updatedExercises[upperIndex] = {
+              ...upperExercise,
+              superset_group: undefined
+            };
+          }
+          
+          console.log(`🔗 [SUPERSET] Unlinked exercises ${upperIndex} and ${lowerIndex}`);
+        }
       }
       
       return updatedExercises;
