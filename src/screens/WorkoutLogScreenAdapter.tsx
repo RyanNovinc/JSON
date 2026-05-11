@@ -36,6 +36,25 @@ export default function WorkoutLogScreenAdapter() {
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   
+  // Exercise alternatives state
+  const [exercisePreferences, setExercisePreferences] = useState<{ [exerciseName: string]: string }>({});
+
+  // Load exercise preferences on mount
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('exercisePreferences');
+        if (saved) {
+          setExercisePreferences(JSON.parse(saved));
+        }
+      } catch (error) {
+        console.log('Could not load exercise preferences:', error);
+      }
+    };
+    loadPreferences();
+  }, []);
+  
+  
   // Transform your existing exercise data to the new interface
   const exercises: Exercise[] = (day?.exercises || []).map((exercise: any, index: number) => ({
     id: `${exercise.exercise}-${index}`,
@@ -45,10 +64,11 @@ export default function WorkoutLogScreenAdapter() {
     reps: exercise.reps_weekly?.[currentWeek?.toString()] || exercise.reps || "8-12",
     rest: exercise.rest,
     notes: exercise.notes,
-    primaryMuscles: exercise.primaryMuscles || [],
-    secondaryMuscles: exercise.secondaryMuscles || [],
+    primaryMuscles: Array.isArray(exercise.primaryMuscles) ? exercise.primaryMuscles : [],
+    secondaryMuscles: Array.isArray(exercise.secondaryMuscles) ? exercise.secondaryMuscles : [],
     reps_weekly: exercise.reps_weekly,
     rir_weekly: exercise.rir_weekly,
+    alternatives: Array.isArray(exercise.alternatives) ? exercise.alternatives.filter(alt => alt && typeof alt === 'string') : [],
     // Add imageUrl if you have exercise images
     // imageUrl: getExerciseImageUrl(exercise.exercise),
   }));
@@ -99,6 +119,8 @@ export default function WorkoutLogScreenAdapter() {
             weight: '',
             reps: '',
             completed: false,
+            selectedExerciseIndex: 0,
+            exerciseData: {},
           }));
         });
         setAllSetsData(initialSetsData);
@@ -217,7 +239,7 @@ export default function WorkoutLogScreenAdapter() {
         newData[exerciseIndex] = [];
       }
       if (!newData[exerciseIndex][setIndex]) {
-        newData[exerciseIndex][setIndex] = { weight: '', reps: '', completed: false };
+        newData[exerciseIndex][setIndex] = { weight: '', reps: '', completed: false, selectedExerciseIndex: 0, exerciseData: {} };
       }
       newData[exerciseIndex][setIndex] = {
         ...newData[exerciseIndex][setIndex],
@@ -269,6 +291,8 @@ export default function WorkoutLogScreenAdapter() {
         weight: '',
         reps: '',
         completed: false,
+        selectedExerciseIndex: 0,
+        exerciseData: {},
       });
       return newData;
     });
@@ -311,6 +335,66 @@ export default function WorkoutLogScreenAdapter() {
     }
   };
 
+  // Exercise alternatives handlers
+  const handleExerciseSelect = (exerciseIndex: number, selectedExerciseIndex: number) => {
+    setAllSetsData(prev => {
+      const newData = [...prev];
+      const currentSelection = newData[exerciseIndex][0]?.selectedExerciseIndex || 0;
+      
+      // Only update if selection actually changed
+      if (currentSelection !== selectedExerciseIndex) {
+        const exercise = exercises[exerciseIndex];
+        const alternativeNames = (exercise.alternatives || [])
+          .filter(alt => alt && typeof alt === 'string')
+          .map(alt => String(alt));
+        const allExercises = [exercise.exercise, ...alternativeNames];
+        const newExerciseName = allExercises[selectedExerciseIndex] || exercise.exercise;
+        
+        // Update exercise selection for all sets of this exercise
+        for (let i = 0; i < newData[exerciseIndex].length; i++) {
+          const setData = newData[exerciseIndex][i];
+          
+          // Store current data before switching
+          if (!setData.exerciseData) setData.exerciseData = {};
+          setData.exerciseData[currentSelection] = {
+            weight: setData.weight,
+            reps: setData.reps,
+            completed: setData.completed,
+          };
+          
+          // Update selected exercise index
+          setData.selectedExerciseIndex = selectedExerciseIndex;
+          
+          // Restore previous data for this exercise if it exists
+          if (setData.exerciseData[selectedExerciseIndex]) {
+            setData.weight = setData.exerciseData[selectedExerciseIndex].weight;
+            setData.reps = setData.exerciseData[selectedExerciseIndex].reps;
+            setData.completed = setData.exerciseData[selectedExerciseIndex].completed;
+          } else {
+            // First time selecting this exercise - start fresh
+            setData.weight = '';
+            setData.reps = '';
+            setData.completed = false;
+          }
+        }
+      }
+      
+      return newData;
+    });
+  };
+
+  const handleSetExercisePreference = (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => {
+    setExercisePreferences(prev => ({
+      ...prev,
+      [primaryExercise]: selectedAlternative
+    }));
+    
+    // Also save to AsyncStorage
+    AsyncStorage.setItem('exercisePreferences', JSON.stringify({
+      ...exercisePreferences,
+      [primaryExercise]: selectedAlternative
+    }));
+  };
 
   const handleConfirmFinish = async () => {
     console.log('🏁 FINISH WORKOUT: User confirmed workout completion');
@@ -561,6 +645,9 @@ export default function WorkoutLogScreenAdapter() {
       onOpenNotes={handleOpenNotes}
       onOpenHistory={handleOpenHistory}
       onOpenSettings={handleOpenSettings}
+      onExerciseSelect={handleExerciseSelect}
+      onSetExercisePreference={handleSetExercisePreference}
+      exercisePreferences={exercisePreferences}
       themeColor={themeColor}
       globalUnit={globalUnit}
       currentWeek={currentWeek || 1}

@@ -889,8 +889,22 @@ export default function DaysScreen() {
       if (completed) {
         const parsedCompleted = JSON.parse(completed);
         console.log(`🔍 [LOAD-COMPLETION] Found completed workouts (${dataSource}):`, parsedCompleted);
-        const validArray = Array.isArray(parsedCompleted) ? parsedCompleted : [];
-        setCompletedWorkouts(new Set(validArray));
+        
+        // Handle different data structures that might be stored
+        let workoutKeys: string[] = [];
+        if (Array.isArray(parsedCompleted)) {
+          workoutKeys = parsedCompleted
+            .filter(item => typeof item === 'string') // Only keep strings (workout keys)
+            .filter(item => item.includes('_week')); // Only keep valid workout keys
+          
+          // If no valid workout keys found but we have objects, this might be corrupted data
+          if (workoutKeys.length === 0 && parsedCompleted.length > 0) {
+            console.warn('🔍 [LOAD-COMPLETION] Found corrupted completion data - resetting');
+            workoutKeys = [];
+          }
+        }
+        
+        setCompletedWorkouts(new Set(workoutKeys));
         
         // Force a re-render to ensure UI updates
         setRefreshTrigger(prev => prev + 1);
@@ -933,14 +947,7 @@ export default function DaysScreen() {
 
   const isWorkoutCompleted = (dayName: string) => {
     const workoutKey = getWorkoutKey(dayName, currentWeek);
-    const isCompleted = completedWorkouts.has(workoutKey);
-    console.log('🔍 [COMPLETION-CHECK] Checking workout completion:', {
-      dayName,
-      workoutKey,
-      isCompleted,
-      completedWorkouts: Array.from(completedWorkouts)
-    });
-    return isCompleted;
+    return completedWorkouts.has(workoutKey);
   };
 
   const getCompletionStats = (dayName: string) => {
@@ -1332,18 +1339,7 @@ export default function DaysScreen() {
             day={item}
             onPress={() => handleDayPress(item)}
             onLongPress={() => handleDayLongPress(item)}
-            isCompleted={(() => {
-              const completed = isWorkoutCompleted(item.day_name);
-              const stats = getCompletionStats(item.day_name);
-              console.log('🎨 [UI-RENDER] Rendering workout card:', {
-                dayName: item.day_name,
-                isCompleted: completed,
-                completionStats: stats,
-                willShowDone: completed && !!stats,
-                willShowStart: !(completed && !!stats)
-              });
-              return completed;
-            })()}
+            isCompleted={isWorkoutCompleted(item.day_name)}
             currentWeek={currentWeek}
             completionStats={getCompletionStats(item.day_name)}
             themeColor={themeColor}
