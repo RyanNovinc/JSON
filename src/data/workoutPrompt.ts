@@ -52,7 +52,6 @@ export interface QuestionnaireData {
   // Exercise Preferences
   likedExercises?: string[];
   dislikedExercises?: string[];
-  exerciseNoteDetail?: 'detailed' | 'brief' | 'minimal';
   includeDirectCore?: boolean;
   
   // Auxiliary Muscle Work
@@ -285,15 +284,6 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
     specs += `**Exercises to Avoid:** ${data.dislikedExercises.join(', ')}\n`;
   }
 
-  // Exercise Note Detail
-  if (data.exerciseNoteDetail && typeof data.exerciseNoteDetail === 'string') {
-    const detailLabels: { [key: string]: string } = {
-      'detailed': 'Include detailed step-by-step form instructions for every exercise',
-      'brief': 'Include brief coaching cues for compound lifts only',
-      'minimal': 'Only include non-obvious technique tips or specific setup instructions — do not explain standard exercises'
-    };
-    specs += `**Exercise Note Detail:** ${detailLabels[data.exerciseNoteDetail] || data.exerciseNoteDetail}\n`;
-  }
 
   if (data.includeDirectCore !== undefined) {
     specs += `**Direct Core Work:** ${data.includeDirectCore ? 'Yes — include dedicated core exercises' : 'No — omit direct core work'}\n`;
@@ -409,7 +399,7 @@ The plan is fully self-contained: it lists all exercise pools, block structures,
 
 1. **The plan is authoritative for structure; the exercise library is authoritative for tags** — use the exercise names, sets, superset pairings, and day structure exactly as specified from the plan. However, before finalizing any JSON, verify every exercise's primaryMuscles and secondaryMuscles tags against the canonical exercise library at https://json.fit/exercises.md. If the plan's tags differ from the library, use the library's tags (the library is authoritative). Do not add, remove, or rename exercises. If the plan declares a mesocycle structure, append the mesocycle name to routine_name in every JSON file. The reviewed plan's set counts are final — do not adjust them based on your own volume recalculation.
 2. **Treat exercise names as identifiers** — use the exact same string for the same exercise across all blocks, days, notes, and superset references. Never vary naming.
-3. **Design what the plan doesn't specify** — you are responsible for rest periods, alternative exercises, and technique notes. For rep progressions: follow the plan's scheme if stated, otherwise use the defaults below.
+3. **Design what the plan doesn't specify** — you are responsible for rest periods and alternative exercises. For rep progressions: follow the plan's scheme if stated, otherwise use the defaults below.
 4. **Only program working sets** — do not include warm-up sets.
 
 ---
@@ -472,11 +462,11 @@ Each exercise must include 2 alternatives (1 for bodyweight-only programs). Alte
 
 ### Notes
 
-Only include non-obvious technique tips or specific setup instructions. Do not add notes for standard exercises performed in standard ways. If the plan includes notes for an exercise, carry them through.
+Include RIR guidance from the plan in the notes field.
 
 ### Supersets
 
-Place superset exercises adjacent in the exercises array. Include "Superset with [exact exercise name]" in both exercises' notes field. Add "superset_group": "ss1" (or "ss2", "ss3" etc.) to both exercises in the pair — use the same string value for both. The plan marks supersets with SS[n]a/SS[n]b notation — translate these to adjacent array entries with matching superset_group values.
+Place superset exercises adjacent in the exercises array. Add "superset_group": "ss1" (or "ss2", "ss3" etc.) to both exercises in the pair — use the same string value for both. The plan marks supersets with SS[n]a/SS[n]b notation — translate these to adjacent array entries with matching superset_group values.
 
 ---
 
@@ -543,7 +533,7 @@ Before generating JSON, read the canonical exercise library at https://json.fit/
   "reps_weekly": { "1": "string", "2": "string", ... },
   "rir_weekly": { "1": "string", "2": "string", ... },
   "sets_weekly": { "1": number, "2": number, ... },
-  "notes": "string (form cues, RIR guidance, or other coaching notes — multiple notes allowed)",
+  "notes": "string (RIR guidance, e.g. '2 RIR')",
   "alternatives": [
     { "exercise": "string", "primaryMuscles": [...], "secondaryMuscles": [...] }
   ]

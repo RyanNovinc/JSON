@@ -306,10 +306,12 @@ export default function WorkoutLogScreenAdapter() {
     
     setAllSetsData(newData);
     
-    // Save to history when set is completed (not when uncompleted)
+    // Handle history based on completion state
     if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
+      // Save to history when set is completed
       await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
       
+      // Handle superset transitions and rest timers only when completing a set
       const currentExercise = exercises[exerciseIndex];
       const nextExercise = exercises[exerciseIndex + 1];
       
@@ -353,6 +355,9 @@ export default function WorkoutLogScreenAdapter() {
           }
         }
       }
+    } else if (wasCompleted) {
+      // Remove from history when set is uncompleted
+      await removeSetFromHistory(exerciseIndex, setIndex);
     }
   };
 
@@ -783,9 +788,12 @@ export default function WorkoutLogScreenAdapter() {
     // Navigate to exercise settings screen
   };
 
+
   // Save set to workout history
   const saveSetToHistory = async (exerciseIndex: number, setIndex: number, setData: SetData) => {
-    const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    // Use local date instead of UTC to match user's timezone
+    const now = new Date();
+    const currentDate = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
     
     // Get the exercise name
     const exercise = exercises[exerciseIndex];
@@ -838,6 +846,48 @@ export default function WorkoutLogScreenAdapter() {
     
     // Save updated history
     await WorkoutStorage.saveWorkoutHistory(history);
+  };
+
+  // Remove set from workout history when uncompleted
+  const removeSetFromHistory = async (exerciseIndex: number, setIndex: number) => {
+    // Use local date instead of UTC to match user's timezone
+    const now = new Date();
+    const currentDate = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+    
+    // Get the exercise name
+    const exercise = exercises[exerciseIndex];
+    const exerciseName = exercise?.exercise || exercise?.name || 'Unknown Exercise';
+    
+    // Load existing history
+    const history = await WorkoutStorage.loadWorkoutHistory();
+    
+    // Find existing entry for this exercise on this date
+    const existingEntryIndex = history.findIndex(entry => 
+      entry.exerciseName === exerciseName && 
+      entry.date === currentDate &&
+      entry.dayName === day?.day_name
+    );
+    
+    if (existingEntryIndex >= 0) {
+      // Remove the set from existing entry
+      const setNumber = setIndex + 1; // Convert 0-based index to 1-based set number
+      history[existingEntryIndex].sets = history[existingEntryIndex].sets.filter(
+        set => set.setNumber !== setNumber
+      );
+      
+      // If no sets remain, remove the entire entry
+      if (history[existingEntryIndex].sets.length === 0) {
+        history.splice(existingEntryIndex, 1);
+      }
+      
+      // Save updated history
+      await WorkoutStorage.saveWorkoutHistory(history);
+      console.log('🗑️ [HISTORY] Removed set from history:', {
+        exercise: exerciseName,
+        setNumber,
+        date: currentDate
+      });
+    }
   };
 
   // Create themed image resolver

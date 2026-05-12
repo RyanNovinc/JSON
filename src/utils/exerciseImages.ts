@@ -690,6 +690,36 @@ let seatedCalfRaiseBlueEnd: any = null;
 let seatedCalfRaisePinkStart: any = null;
 let seatedCalfRaisePinkEnd: any = null;
 
+// Back extension images
+let backExtensionBlueStart: any = null;
+let backExtensionBlueEnd: any = null;
+let backExtensionPinkStart: any = null;
+let backExtensionPinkEnd: any = null;
+
+// Hanging leg raise images
+let hangingLegRaiseBlueStart: any = null;
+let hangingLegRaiseBlueEnd: any = null;
+let hangingLegRaisePinkStart: any = null;
+let hangingLegRaisePinkEnd: any = null;
+
+// Smith machine calf raise images
+let smithMachineCalfRaiseBlueStart: any = null;
+let smithMachineCalfRaiseBlueEnd: any = null;
+let smithMachineCalfRaisePinkStart: any = null;
+let smithMachineCalfRaisePinkEnd: any = null;
+
+// Dumbbell wrist curl images
+let dumbbellWristCurlBlueStart: any = null;
+let dumbbellWristCurlBlueEnd: any = null;
+let dumbbellWristCurlPinkStart: any = null;
+let dumbbellWristCurlPinkEnd: any = null;
+
+// Reverse wrist curl images
+let reverseWristCurlBlueStart: any = null;
+let reverseWristCurlBlueEnd: any = null;
+let reverseWristCurlPinkStart: any = null;
+let reverseWristCurlPinkEnd: any = null;
+
 try {
   console.log('🔄 ATTEMPTING to load exercise images...');
   
@@ -2533,6 +2563,181 @@ try {
     console.log('❌ No seated-calf-raise pink end.png found:', e.message);
   }
   
+  // Load back extension images
+  console.log('🏋️ Loading back extension...');
+  
+  // Blue start
+  try {
+    backExtensionBlueStart = require('../../exercise-images/back-extension/blue/start.png');
+    console.log('✅ Loaded back-extension blue start.png');
+  } catch (e) {
+    console.log('❌ No back-extension blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    backExtensionBlueEnd = require('../../exercise-images/back-extension/blue/end.png');
+    console.log('✅ Loaded back-extension blue end.png');
+  } catch (e) {
+    console.log('❌ No back-extension blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    backExtensionPinkStart = require('../../exercise-images/back-extension/pink/start.png');
+    console.log('✅ Loaded back-extension pink start.png');
+  } catch (e) {
+    console.log('❌ No back-extension pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    backExtensionPinkEnd = require('../../exercise-images/back-extension/pink/end.png');
+    console.log('✅ Loaded back-extension pink end.png');
+  } catch (e) {
+    console.log('❌ No back-extension pink end.png found:', e.message);
+  }
+  
+  // Load hanging leg raise images
+  console.log('🏋️ Loading hanging leg raise...');
+  
+  // Blue start
+  try {
+    hangingLegRaiseBlueStart = require('../../exercise-images/hanging-leg-raise/blue/start.png');
+    console.log('✅ Loaded hanging-leg-raise blue start.png');
+  } catch (e) {
+    console.log('❌ No hanging-leg-raise blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    hangingLegRaiseBlueEnd = require('../../exercise-images/hanging-leg-raise/blue/end.png');
+    console.log('✅ Loaded hanging-leg-raise blue end.png');
+  } catch (e) {
+    console.log('❌ No hanging-leg-raise blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    hangingLegRaisePinkStart = require('../../exercise-images/hanging-leg-raise/pink/start.png');
+    console.log('✅ Loaded hanging-leg-raise pink start.png');
+  } catch (e) {
+    console.log('❌ No hanging-leg-raise pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    hangingLegRaisePinkEnd = require('../../exercise-images/hanging-leg-raise/pink/end.png');
+    console.log('✅ Loaded hanging-leg-raise pink end.png');
+  } catch (e) {
+    console.log('❌ No hanging-leg-raise pink end.png found:', e.message);
+  }
+  
+  // Load smith machine calf raise images
+  console.log('🏋️ Loading smith machine calf raise...');
+  
+  // Blue start
+  try {
+    smithMachineCalfRaiseBlueStart = require('../../exercise-images/smith-machine-calf-raise/blue/start.png');
+    console.log('✅ Loaded smith-machine-calf-raise blue start.png');
+  } catch (e) {
+    console.log('❌ No smith-machine-calf-raise blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    smithMachineCalfRaiseBlueEnd = require('../../exercise-images/smith-machine-calf-raise/blue/end.png');
+    console.log('✅ Loaded smith-machine-calf-raise blue end.png');
+  } catch (e) {
+    console.log('❌ No smith-machine-calf-raise blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    smithMachineCalfRaisePinkStart = require('../../exercise-images/smith-machine-calf-raise/pink/start.png');
+    console.log('✅ Loaded smith-machine-calf-raise pink start.png');
+  } catch (e) {
+    console.log('❌ No smith-machine-calf-raise pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    smithMachineCalfRaisePinkEnd = require('../../exercise-images/smith-machine-calf-raise/pink/end.png');
+    console.log('✅ Loaded smith-machine-calf-raise pink end.png');
+  } catch (e) {
+    console.log('❌ No smith-machine-calf-raise pink end.png found:', e.message);
+  }
+  
+  // Load dumbbell wrist curl images
+  console.log('🏋️ Loading dumbbell wrist curl...');
+  
+  // Blue start
+  try {
+    dumbbellWristCurlBlueStart = require('../../exercise-images/dumbbell-wrist-curl/blue/start.png');
+    console.log('✅ Loaded dumbbell-wrist-curl blue start.png');
+  } catch (e) {
+    console.log('❌ No dumbbell-wrist-curl blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    dumbbellWristCurlBlueEnd = require('../../exercise-images/dumbbell-wrist-curl/blue/end.png');
+    console.log('✅ Loaded dumbbell-wrist-curl blue end.png');
+  } catch (e) {
+    console.log('❌ No dumbbell-wrist-curl blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    dumbbellWristCurlPinkStart = require('../../exercise-images/dumbbell-wrist-curl/pink/start.png');
+    console.log('✅ Loaded dumbbell-wrist-curl pink start.png');
+  } catch (e) {
+    console.log('❌ No dumbbell-wrist-curl pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    dumbbellWristCurlPinkEnd = require('../../exercise-images/dumbbell-wrist-curl/pink/end.png');
+    console.log('✅ Loaded dumbbell-wrist-curl pink end.png');
+  } catch (e) {
+    console.log('❌ No dumbbell-wrist-curl pink end.png found:', e.message);
+  }
+  
+  // Load reverse wrist curl images
+  console.log('🏋️ Loading reverse wrist curl...');
+  
+  // Blue start
+  try {
+    reverseWristCurlBlueStart = require('../../exercise-images/reverse-wrist-curl/blue/start.png');
+    console.log('✅ Loaded reverse-wrist-curl blue start.png');
+  } catch (e) {
+    console.log('❌ No reverse-wrist-curl blue start.png found:', e.message);
+  }
+  
+  // Blue end
+  try {
+    reverseWristCurlBlueEnd = require('../../exercise-images/reverse-wrist-curl/blue/end.png');
+    console.log('✅ Loaded reverse-wrist-curl blue end.png');
+  } catch (e) {
+    console.log('❌ No reverse-wrist-curl blue end.png found:', e.message);
+  }
+  
+  // Pink start
+  try {
+    reverseWristCurlPinkStart = require('../../exercise-images/reverse-wrist-curl/pink/start.png');
+    console.log('✅ Loaded reverse-wrist-curl pink start.png');
+  } catch (e) {
+    console.log('❌ No reverse-wrist-curl pink start.png found:', e.message);
+  }
+  
+  // Pink end
+  try {
+    reverseWristCurlPinkEnd = require('../../exercise-images/reverse-wrist-curl/pink/end.png');
+    console.log('✅ Loaded reverse-wrist-curl pink end.png');
+  } catch (e) {
+    console.log('❌ No reverse-wrist-curl pink end.png found:', e.message);
+  }
+  
   console.log('✅ Finished loading all images:', { 
     benchPress: { blue: { barbellBenchPressBlueStart, barbellBenchPressBlueEnd }, pink: { barbellBenchPressPinkStart, barbellBenchPressPinkEnd } },
     backSquat: { blue: { barbellBackSquatBlueStart, barbellBackSquatBlueEnd }, pink: { barbellBackSquatPinkStart, barbellBackSquatPinkEnd } },
@@ -3107,6 +3312,56 @@ try {
       pink: {
         start: seatedCalfRaisePinkStart,
         end: seatedCalfRaisePinkEnd,
+      }
+    },
+    'back-extension': {
+      blue: {
+        start: backExtensionBlueStart,
+        end: backExtensionBlueEnd,
+      },
+      pink: {
+        start: backExtensionPinkStart,
+        end: backExtensionPinkEnd,
+      }
+    },
+    'hanging-leg-raise': {
+      blue: {
+        start: hangingLegRaiseBlueStart,
+        end: hangingLegRaiseBlueEnd,
+      },
+      pink: {
+        start: hangingLegRaisePinkStart,
+        end: hangingLegRaisePinkEnd,
+      }
+    },
+    'smith-machine-calf-raise': {
+      blue: {
+        start: smithMachineCalfRaiseBlueStart,
+        end: smithMachineCalfRaiseBlueEnd,
+      },
+      pink: {
+        start: smithMachineCalfRaisePinkStart,
+        end: smithMachineCalfRaisePinkEnd,
+      }
+    },
+    'dumbbell-wrist-curl': {
+      blue: {
+        start: dumbbellWristCurlBlueStart,
+        end: dumbbellWristCurlBlueEnd,
+      },
+      pink: {
+        start: dumbbellWristCurlPinkStart,
+        end: dumbbellWristCurlPinkEnd,
+      }
+    },
+    'reverse-wrist-curl': {
+      blue: {
+        start: reverseWristCurlBlueStart,
+        end: reverseWristCurlBlueEnd,
+      },
+      pink: {
+        start: reverseWristCurlPinkStart,
+        end: reverseWristCurlPinkEnd,
       }
     },
     // Add more exercises here as you create them

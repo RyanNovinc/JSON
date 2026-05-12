@@ -210,7 +210,7 @@ export default function ExerciseNotesModal({
                   </View>
                   <Text style={styles.emptyTitle}>No notes yet</Text>
                   <Text style={styles.emptySubtitle}>
-                    Start tracking how this exercise felt, weights you tried, or form cues that worked.
+                    Start tracking how this exercise felt, weights you tried, or notes that helped you.
                   </Text>
                 </View>
               ) : (

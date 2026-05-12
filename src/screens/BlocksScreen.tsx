@@ -45,235 +45,274 @@ interface MesocycleCard {
   customId?: string;
 }
 
-interface BlockCardProps {
+// ── Helper ────────────────────────────────────────────────────────
+
+function hexA(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Extract a short label for the row status icon
+// e.g. "Block A: Hypertrophy" → "A", "Block 1" → "1", "Hypertrophy Phase" → "H"
+function getBlockStatusLabel(name: string): string {
+  if (!name) return '·';
+  // Match "Block X" pattern first
+  const blockMatch = name.match(/Block\s+([A-Za-z0-9]+)/i);
+  if (blockMatch) return blockMatch[1].toUpperCase();
+  // Fallback to first character
+  return name.charAt(0).toUpperCase();
+}
+
+// ── BlockHeroCard ────────────────────────────────────────────────
+
+interface BlockHeroCardProps {
   block: Block;
-  onPress: () => void;
-  themeColor: string;
-  onLongPress: () => void;
-  isActive?: boolean;
-  weekProgress?: {
+  weekProgress: {
     current: number;
     total: number;
     remaining: number;
     isComplete: boolean;
     isOverdue: boolean;
   };
+  onPress: () => void;
+  onLongPress: () => void;
+  themeColor: string;
 }
 
-interface MesocycleCardProps {
+function BlockHeroCard({ block, weekProgress, onPress, onLongPress, themeColor }: BlockHeroCardProps) {
+  const dayCount = block.days.length;
+
+  const remainingText = weekProgress.remaining === 1
+    ? 'FINAL WEEK'
+    : `${weekProgress.remaining} WEEKS LEFT`;
+  const progressPct = Math.min((weekProgress.current / weekProgress.total) * 100, 100);
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.heroCard,
+        {
+          backgroundColor: hexA(themeColor, 0.05),
+          borderColor: hexA(themeColor, 0.3),
+        },
+      ]}
+      activeOpacity={0.85}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={500}
+    >
+      <View style={styles.heroTopRow}>
+        <View style={styles.heroTextBlock}>
+          <Text style={styles.heroName} numberOfLines={2}>{block.block_name}</Text>
+          <View style={styles.heroMetaRow}>
+            <Text style={styles.heroMetaText}>
+              {block.weeks.includes('-') ? `Weeks ${block.weeks}` : `Week ${block.weeks}`}
+            </Text>
+            <View style={styles.heroMetaDot} />
+            <Text style={styles.heroMetaText}>{dayCount} {dayCount === 1 ? 'day' : 'days'}</Text>
+          </View>
+        </View>
+        <View style={[styles.heroOpenButton, { backgroundColor: themeColor }]}>
+          <Text style={styles.heroOpenButtonText}>Open</Text>
+          <Ionicons name="arrow-forward" size={12} color="#000" />
+        </View>
+      </View>
+
+      {weekProgress.isComplete ? (
+        <View style={styles.heroCompleteRow}>
+          <Ionicons name="trophy" size={13} color={themeColor} />
+          <Text style={[styles.heroCompleteTitle, { color: themeColor }]}>
+            BLOCK COMPLETE · {weekProgress.total} WEEK{weekProgress.total !== 1 ? 'S' : ''} DONE
+          </Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.heroProgressLabels}>
+            <Text style={[styles.heroProgressLabel, { color: themeColor }]}>
+              WEEK {weekProgress.current} OF {weekProgress.total}
+            </Text>
+            <Text style={styles.heroProgressMeta}>{remainingText}</Text>
+          </View>
+          <View style={styles.heroProgressBar}>
+            <View
+              style={[
+                styles.heroProgressFill,
+                { width: `${progressPct}%`, backgroundColor: themeColor },
+              ]}
+            />
+          </View>
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ── BlockRow ─────────────────────────────────────────────────────
+
+interface BlockRowProps {
+  block: Block;
+  onPress: () => void;
+  onLongPress: () => void;
+  isComplete: boolean;
+  themeColor: string;
+}
+
+function BlockRow({ block, onPress, onLongPress, isComplete, themeColor }: BlockRowProps) {
+  const dayCount = block.days.length;
+
+  return (
+    <TouchableOpacity
+      style={styles.blockRow}
+      activeOpacity={0.8}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={500}
+    >
+      <View
+        style={[
+          styles.blockRowStatus,
+          isComplete && {
+            backgroundColor: hexA(themeColor, 0.15),
+            borderColor: hexA(themeColor, 0.3),
+          },
+        ]}
+      >
+        {isComplete ? (
+          <Ionicons name="checkmark" size={14} color={themeColor} />
+        ) : (
+          <Text style={styles.blockRowStatusText}>{getBlockStatusLabel(block.block_name)}</Text>
+        )}
+      </View>
+      <View style={styles.blockRowContent}>
+        <Text style={styles.blockRowName} numberOfLines={1}>{block.block_name}</Text>
+        <Text style={styles.blockRowMeta} numberOfLines={1}>
+          {block.weeks.includes('-') ? `Weeks ${block.weeks}` : `Week ${block.weeks}`} · {dayCount} {dayCount === 1 ? 'day' : 'days'}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color="#3a3a44" />
+    </TouchableOpacity>
+  );
+}
+
+// ── MesocycleHeroCard ────────────────────────────────────────────
+
+interface MesocycleHeroCardProps {
   mesocycle: MesocycleCard;
   onPress: () => void;
   onLongPress: () => void;
   themeColor: string;
 }
 
-function MesocycleCard({ mesocycle, onPress, onLongPress, themeColor }: MesocycleCardProps) {
-  const progressPercentage = mesocycle.totalBlocks > 0 
-    ? (mesocycle.completedBlocks / mesocycle.totalBlocks) * 100 
+function MesocycleHeroCard({ mesocycle, onPress, onLongPress, themeColor }: MesocycleHeroCardProps) {
+  const title = mesocycle.phase?.phaseName || `Mesocycle ${mesocycle.mesocycleNumber}`;
+  const progressPct = mesocycle.totalBlocks > 0
+    ? (mesocycle.completedBlocks / mesocycle.totalBlocks) * 100
     : 0;
 
-  const phaseColor = mesocycle.isActive ? themeColor : '#6b7280';
+  return (
+    <TouchableOpacity
+      style={[
+        styles.heroCard,
+        {
+          backgroundColor: hexA(themeColor, 0.05),
+          borderColor: hexA(themeColor, 0.3),
+        },
+      ]}
+      activeOpacity={0.85}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={800}
+    >
+      <View style={styles.heroTopRow}>
+        <View style={styles.heroTextBlock}>
+          <Text style={styles.heroName} numberOfLines={2}>{title}</Text>
+          <View style={styles.heroMetaRow}>
+            <Text style={styles.heroMetaText}>Mesocycle {mesocycle.mesocycleNumber}</Text>
+            <View style={styles.heroMetaDot} />
+            <Text style={styles.heroMetaText}>
+              {mesocycle.totalBlocks} {mesocycle.totalBlocks === 1 ? 'block' : 'blocks'}
+            </Text>
+          </View>
+        </View>
+        <View style={[styles.heroOpenButton, { backgroundColor: themeColor }]}>
+          <Text style={styles.heroOpenButtonText}>Open</Text>
+          <Ionicons name="arrow-forward" size={12} color="#000" />
+        </View>
+      </View>
+
+      {mesocycle.totalBlocks > 0 && (
+        <>
+          <View style={styles.heroProgressLabels}>
+            <Text style={[styles.heroProgressLabel, { color: themeColor }]}>
+              {mesocycle.completedBlocks} OF {mesocycle.totalBlocks} BLOCKS DONE
+            </Text>
+            <Text style={styles.heroProgressMeta}>{Math.round(progressPct)}%</Text>
+          </View>
+          <View style={styles.heroProgressBar}>
+            <View
+              style={[
+                styles.heroProgressFill,
+                { width: `${progressPct}%`, backgroundColor: themeColor },
+              ]}
+            />
+          </View>
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ── MesocycleRow ─────────────────────────────────────────────────
+
+interface MesocycleRowProps {
+  mesocycle: MesocycleCard;
+  onPress: () => void;
+  onLongPress: () => void;
+  themeColor: string;
+}
+
+function MesocycleRow({ mesocycle, onPress, onLongPress, themeColor }: MesocycleRowProps) {
   const title = mesocycle.phase?.phaseName || `Mesocycle ${mesocycle.mesocycleNumber}`;
 
   return (
-    <TouchableOpacity 
-      style={[styles.card, { borderLeftColor: phaseColor }]} 
+    <TouchableOpacity
+      style={styles.blockRow}
       activeOpacity={0.8}
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={800}
     >
-      <View style={styles.cardHeader}>
-        <View style={styles.cardTitle}>
-          <Text style={styles.blockName}>{title}</Text>
-        </View>
-        
-        <View style={styles.headerRight}>
-          {mesocycle.isActive ? (
-            <View style={[styles.activeBadge, { backgroundColor: themeColor }]}>
-              <Text style={styles.activeBadgeText}>ACTIVE</Text>
-            </View>
-          ) : mesocycle.isCompleted ? (
-            <View style={styles.completedBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-              <Text style={styles.completedBadgeText}>COMPLETE</Text>
-            </View>
-          ) : null}
-          <Ionicons name="chevron-forward" size={24} color={phaseColor} />
-        </View>
-      </View>
-      
-      <View style={styles.cardBody}>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Ionicons name="apps-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>
-              {mesocycle.totalBlocks} {mesocycle.totalBlocks === 1 ? 'block' : 'blocks'}
-            </Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="checkmark-circle-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>
-              {mesocycle.completedBlocks}/{mesocycle.totalBlocks} completed
-            </Text>
-          </View>
-        </View>
-
-        {mesocycle.totalBlocks > 0 && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>
-                Progress: {Math.round(progressPercentage)}%
-              </Text>
-              <Text style={[
-                styles.progressStatus,
-                { 
-                  color: mesocycle.isCompleted 
-                    ? '#22c55e' 
-                    : mesocycle.isActive 
-                      ? themeColor 
-                      : '#71717a'
-                }
-              ]}>
-                {mesocycle.isCompleted 
-                  ? 'Complete' 
-                  : mesocycle.isActive 
-                    ? 'In Progress'
-                    : 'Upcoming'
-                }
-              </Text>
-            </View>
-            <View style={styles.progressBarContainer}>
-              <View 
-                style={[styles.progressBar, { 
-                  width: `${progressPercentage}%`,
-                  backgroundColor: mesocycle.isCompleted ? '#22c55e' : phaseColor
-                }]} 
-              />
-            </View>
-          </View>
+      <View
+        style={[
+          styles.blockRowStatus,
+          mesocycle.isCompleted && {
+            backgroundColor: hexA(themeColor, 0.15),
+            borderColor: hexA(themeColor, 0.3),
+          },
+        ]}
+      >
+        {mesocycle.isCompleted ? (
+          <Ionicons name="checkmark" size={14} color={themeColor} />
+        ) : (
+          <Text style={styles.blockRowStatusText}>{mesocycle.mesocycleNumber}</Text>
         )}
       </View>
+      <View style={styles.blockRowContent}>
+        <Text style={styles.blockRowName} numberOfLines={1}>{title}</Text>
+        <Text style={styles.blockRowMeta} numberOfLines={1}>
+          {mesocycle.completedBlocks}/{mesocycle.totalBlocks} {mesocycle.totalBlocks === 1 ? 'block' : 'blocks'} complete
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color="#3a3a44" />
     </TouchableOpacity>
   );
 }
 
-function BlockCard({ block, onPress, onLongPress, isActive, weekProgress, themeColor }: BlockCardProps) {
-  const dayCount = block.days.length;
-  
-  const exercises = new Set<string>();
-  block.days.forEach(day => {
-    day.exercises?.forEach((exercise: any) => {
-      exercises.add(exercise.exercise);
-    });
-  });
-  
-  const phaseColor = isActive ? themeColor : '#6b7280';
-  
-  return (
-    <TouchableOpacity 
-      style={[styles.card, { borderLeftColor: phaseColor }]} 
-      activeOpacity={0.8}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={500}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.cardTitle}>
-          <Text style={styles.blockName}>{block.block_name}</Text>
-          <View style={[styles.phaseBadge, { backgroundColor: phaseColor + '20' }]}>
-            <Text style={[styles.phaseText, { color: phaseColor }]}>
-              {block.weeks.includes('-') ? 'Weeks' : 'Week'} {block.weeks}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.headerRight}>
-          {isActive ? (
-            <View style={[styles.activeBadge, { backgroundColor: themeColor }]}>
-              <Text style={styles.activeBadgeText}>ACTIVE</Text>
-            </View>
-          ) : weekProgress?.isComplete ? (
-            <View style={styles.completedBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-              <Text style={styles.completedBadgeText}>COMPLETE</Text>
-            </View>
-          ) : null}
-          <Ionicons name="chevron-forward" size={24} color={isActive ? themeColor : "#6b7280"} />
-        </View>
-      </View>
-      
-      <View style={styles.cardBody}>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Ionicons name="calendar-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>{dayCount} {dayCount === 1 ? 'day' : 'days'}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="barbell-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>{Array.from(exercises).length} exercises</Text>
-          </View>
-        </View>
-        
-        {block.structure && (
-          <View style={styles.exercisePreview}>
-            <Text style={styles.previewLabel}>Training Split:</Text>
-            <Text style={styles.previewText}>
-              {block.structure}
-            </Text>
-          </View>
-        )}
-
-        {isActive && weekProgress && (
-          <View style={styles.progressSection}>
-            {weekProgress.isComplete ? (
-              <View style={styles.completedSection}>
-                <View style={styles.completedHeader}>
-                  <Ionicons name="trophy" size={20} color={themeColor} />
-                  <Text style={[styles.completedTitle, { color: themeColor }]}>Block Complete!</Text>
-                </View>
-                <Text style={styles.completedSubtext}>
-                  All {weekProgress.total} weeks completed
-                </Text>
-              </View>
-            ) : (
-              <>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>
-                    Week {weekProgress.current} of {weekProgress.total}
-                  </Text>
-                  <Text style={[
-                    styles.progressStatus,
-                    { 
-                      color: weekProgress.remaining <= 1 
-                        ? '#fbbf24' 
-                        : themeColor 
-                    }
-                  ]}>
-                    {weekProgress.remaining === 1 
-                      ? 'Final week' 
-                      : `${weekProgress.remaining} weeks left`
-                    }
-                  </Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View 
-                    style={[
-                      styles.progressBar, 
-                      { 
-                        width: `${Math.min((weekProgress.current / weekProgress.total) * 100, 100)}%`,
-                        backgroundColor: themeColor
-                      }
-                    ]} 
-                  />
-                </View>
-              </>
-            )}
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-}
+// ── BlocksScreen ─────────────────────────────────────────────────
 
 export default function BlocksScreen() {
   const navigation = useNavigation<BlocksScreenNavigationProp>();
@@ -294,7 +333,7 @@ export default function BlocksScreen() {
   const [mesocycleCards, setMesocycleCards] = useState<MesocycleCard[]>([]);
   const [showAddMesocycleModal, setShowAddMesocycleModal] = useState(false);
   const [newMesocycleName, setNewMesocycleName] = useState('');
-  
+
   const totalWeeks = calculateTotalWeeks(routine.data.blocks);
   const hasMesocycles = program && program.totalMesocycles > 1;
 
@@ -314,32 +353,29 @@ export default function BlocksScreen() {
   useFocusEffect(
     React.useCallback(() => {
       const reloadOnFocus = async () => {
-        // Reload routine from storage in case blocks were added
         try {
           const allRoutines = await WorkoutStorage.loadRoutines();
           const updatedRoutine = allRoutines.find(r => r.id === routine.id);
           if (updatedRoutine && updatedRoutine.blocks !== routine.blocks) {
             console.log('🔄 [BLOCKS-SCREEN] Routine updated, refreshing...');
-            // Force re-render by updating the route params or state
-            // Since we can't directly update props, we'll trigger navigation refresh
             navigation.setParams({ routine: updatedRoutine } as any);
           }
         } catch (error) {
           console.error('Error reloading routine:', error);
         }
-        
+
         if (activeBlockIndex !== -1) {
           calculateCompletionBasedWeek();
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, 100));
         await checkAllBlocksCompletion();
-        
+
         if (program && hasMesocycles) {
           await updateMesocycleCards();
         }
       };
-      
+
       reloadOnFocus();
     }, [activeBlockIndex, program, hasMesocycles])
   );
@@ -373,7 +409,6 @@ export default function BlocksScreen() {
   };
 
   const updateMesocycleCards = async () => {
-    
     if (!program || program.totalMesocycles <= 1) {
       return;
     }
@@ -382,28 +417,27 @@ export default function BlocksScreen() {
     const currentMesocycle = program.currentMesocycle;
     const totalBlocks = routine.data.blocks.length;
     const blocksPerMesocycle = Math.ceil(totalBlocks / program.totalMesocycles);
-    
+
     for (let i = 0; i < program.totalMesocycles; i++) {
       const mesocycleNumber = i + 1;
       const phase = program.mesocycleRoadmap?.find(p => p.mesocycleNumber === mesocycleNumber);
-      
+
       const startIdx = i * blocksPerMesocycle;
       const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
       const mesocycleBlocks = routine.data.blocks.slice(startIdx, endIdx);
-      
+
       if (mesocycleBlocks.length === 0) continue;
-      
-      
-      const completedBlocks = mesocycleBlocks.filter(block => 
+
+      const completedBlocks = mesocycleBlocks.filter(block =>
         completionStatus[block.block_name] || false
       ).length;
-      
+
       const isCompleted = completedBlocks === mesocycleBlocks.length;
       const isActive = mesocycleNumber === currentMesocycle;
-      
+
       const manualBlocksCount = await getManualBlocksCount(mesocycleNumber, routine);
       const totalBlocksWithManual = mesocycleBlocks.length + manualBlocksCount;
-      
+
       cards.push({
         mesocycleNumber,
         phase,
@@ -414,10 +448,10 @@ export default function BlocksScreen() {
         isActive
       });
     }
-    
+
     const customMesocycles = await loadCustomMesocycles();
     const allMesocycles = [...cards, ...customMesocycles];
-    
+
     setMesocycleCards(allMesocycles);
   };
 
@@ -461,7 +495,7 @@ export default function BlocksScreen() {
     try {
       await AsyncStorage.setItem(`activeBlock_${routine.id}`, blockIndex.toString());
       setActiveBlockIndex(blockIndex);
-      
+
       const today = new Date().toISOString();
       await saveWeekProgress(1, today);
     } catch (error) {
@@ -471,10 +505,10 @@ export default function BlocksScreen() {
 
   const calculateCompletionBasedWeek = async () => {
     if (activeBlockIndex === -1) return;
-    
+
     const block = routine.data.blocks[activeBlockIndex];
     const totalWeeks = getBlockWeekCount(block.weeks);
-    
+
     try {
       const bookmarkKey = `bookmark_${block.block_name}`;
       const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
@@ -484,45 +518,45 @@ export default function BlocksScreen() {
           if (week === totalWeeks) {
             const weekKey = `completed_${block.block_name}_week${week}`;
             const completed = await AsyncStorage.getItem(weekKey);
-            
+
             if (completed) {
               const completedSet = new Set(JSON.parse(completed));
-              const allDaysCompleted = block.days.every(day => 
+              const allDaysCompleted = block.days.every(day =>
                 completedSet.has(`${day.day_name}_week${week}`)
               );
-              
+
               if (allDaysCompleted) {
                 setCompletionBasedWeek(totalWeeks + 1);
                 return;
               }
             }
           }
-          
+
           setCompletionBasedWeek(week);
           return;
         }
       }
-      
+
       for (let week = 1; week <= totalWeeks; week++) {
         const weekKey = `completed_${block.block_name}_week${week}`;
         const completed = await AsyncStorage.getItem(weekKey);
-        
+
         if (!completed) {
           setCompletionBasedWeek(week);
           return;
         }
-        
+
         const completedSet = new Set(JSON.parse(completed));
-        const allDaysCompleted = block.days.every(day => 
+        const allDaysCompleted = block.days.every(day =>
           completedSet.has(`${day.day_name}_week${week}`)
         );
-        
+
         if (!allDaysCompleted) {
           setCompletionBasedWeek(week);
           return;
         }
       }
-      
+
       setCompletionBasedWeek(totalWeeks + 1);
     } catch (error) {
       console.error('Failed to calculate completion-based week:', error);
@@ -533,17 +567,17 @@ export default function BlocksScreen() {
   const checkAllWeeksCompleted = async (block: Block, totalWeeks: number) => {
     try {
       const allDays = block.days || [];
-      
+
       for (let week = 1; week <= totalWeeks; week++) {
         const weekKey = `completed_${block.block_name}_week${week}`;
         const completed = await AsyncStorage.getItem(weekKey);
-        
+
         if (!completed) {
           return false;
         }
-        
+
         const completedArray = JSON.parse(completed);
-        
+
         if (allDays.length === 0) {
           if (!completedArray.includes('empty_block_completed')) {
             return false;
@@ -554,7 +588,7 @@ export default function BlocksScreen() {
           }
         }
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error checking all weeks completed:', error);
@@ -573,12 +607,12 @@ export default function BlocksScreen() {
   const getWeekProgress = (blockIndex: number) => {
     const block = routine.data.blocks[blockIndex];
     const totalWeeks = getBlockWeekCount(block.weeks);
-    
+
     if (blockIndex === activeBlockIndex) {
       const currentWeekInBlock = completionBasedWeek;
       const remaining = Math.max(0, totalWeeks - currentWeekInBlock + 1);
       const isComplete = currentWeekInBlock > totalWeeks;
-      
+
       return {
         current: Math.min(currentWeekInBlock, totalWeeks),
         total: totalWeeks,
@@ -588,7 +622,7 @@ export default function BlocksScreen() {
       };
     } else {
       const isComplete = checkBlockCompletionSync(block, totalWeeks);
-      
+
       return {
         current: isComplete ? totalWeeks : 1,
         total: totalWeeks,
@@ -605,13 +639,13 @@ export default function BlocksScreen() {
 
   const checkAllBlocksCompletion = async () => {
     const newCompletionStatus: {[blockName: string]: boolean} = {};
-    
+
     for (const block of routine.data.blocks) {
       const totalWeeks = getBlockWeekCount(block.weeks);
       const isComplete = await checkAllWeeksCompleted(block, totalWeeks);
       newCompletionStatus[block.block_name] = isComplete;
     }
-    
+
     if (program && program.totalMesocycles > 1) {
       for (let mesocycleNum = 1; mesocycleNum <= program.totalMesocycles; mesocycleNum++) {
         const manualBlocksKey = `manual_blocks_mesocycle_${mesocycleNum}`;
@@ -630,7 +664,7 @@ export default function BlocksScreen() {
         }
       }
     }
-    
+
     const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
     try {
       const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
@@ -654,7 +688,7 @@ export default function BlocksScreen() {
     } catch (error) {
       console.error('Error loading custom mesocycle manual blocks:', error);
     }
-    
+
     setCompletionStatus(newCompletionStatus);
   };
 
@@ -672,15 +706,15 @@ export default function BlocksScreen() {
   }
 
   const handleBlockPress = (block: Block) => {
-    navigation.navigate('Days' as any, { 
-      block, 
-      routineName: routine.name 
+    navigation.navigate('Days' as any, {
+      block,
+      routineName: routine.name
     });
   };
 
   const handleBlockLongPress = (block: Block, index: number) => {
     if (index === activeBlockIndex) return;
-    
+
     setSelectedBlock({ block, index });
     setShowModal(true);
   };
@@ -700,18 +734,17 @@ export default function BlocksScreen() {
 
   const handleDeleteBlock = () => {
     if (!selectedBlock) return;
-    
+
     Alert.alert(
       'Delete Block',
       `Are you sure you want to delete "${selectedBlock.block.block_name}"? This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
-              // Remove the block from the routine
               const updatedBlocks = routine.data.blocks.filter((_, index) => index !== selectedBlock.index);
               const updatedRoutine = {
                 ...routine,
@@ -722,27 +755,23 @@ export default function BlocksScreen() {
                 blocks: updatedBlocks.length
               };
 
-              // Update storage
               const allRoutines = await WorkoutStorage.loadRoutines();
-              const updatedRoutines = allRoutines.map(r => 
+              const updatedRoutines = allRoutines.map(r =>
                 r.id === routine.id ? updatedRoutine : r
               );
               await WorkoutStorage.saveRoutines(updatedRoutines);
 
-              // If we deleted the active block, reset active block
               if (selectedBlock.index === activeBlockIndex) {
                 await AsyncStorage.removeItem(`activeBlock_${routine.id}`);
                 setActiveBlockIndex(-1);
               } else if (selectedBlock.index < activeBlockIndex) {
-                // If we deleted a block before the active one, adjust the active index
                 const newActiveIndex = activeBlockIndex - 1;
                 await AsyncStorage.setItem(`activeBlock_${routine.id}`, newActiveIndex.toString());
                 setActiveBlockIndex(newActiveIndex);
               }
 
-              // Refresh the screen
               navigation.setParams({ routine: updatedRoutine } as any);
-              
+
               setShowModal(false);
               setSelectedBlock(null);
             } catch (error) {
@@ -763,12 +792,12 @@ export default function BlocksScreen() {
   const handleSetActiveMesocycle = async () => {
     if (selectedMesocycle && program) {
       try {
-        await ProgramStorage.updateProgram(program.id, { 
-          currentMesocycle: selectedMesocycle.mesocycleNumber 
+        await ProgramStorage.updateProgram(program.id, {
+          currentMesocycle: selectedMesocycle.mesocycleNumber
         });
-        
+
         await loadProgramData();
-        
+
         setShowMesocycleModal(false);
         setSelectedMesocycle(null);
         setShowMesocycleMoreOptions(false);
@@ -789,7 +818,7 @@ export default function BlocksScreen() {
       };
 
       const jsonString = JSON.stringify(mesocycleData, null, 2);
-      
+
       try {
         await Share.share({
           message: jsonString,
@@ -818,7 +847,7 @@ export default function BlocksScreen() {
       };
 
       const jsonString = JSON.stringify(mesocycleData, null, 2);
-      
+
       try {
         await Clipboard.setStringAsync(jsonString);
         setShowMesocycleModal(false);
@@ -837,26 +866,26 @@ export default function BlocksScreen() {
         `Are you sure you want to delete Mesocycle ${selectedMesocycle.mesocycleNumber}? This action cannot be undone.`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Delete', 
+          {
+            text: 'Delete',
             style: 'destructive',
             onPress: async () => {
               try {
                 if (!selectedMesocycle) return;
-                
+
                 const updatedMesocycles = mesocycleCards.filter(m => m !== selectedMesocycle);
                 setMesocycleCards(updatedMesocycles);
-                
+
                 if (selectedMesocycle.isCustomMesocycle) {
                   const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
                   const existingCustomMesocycles = await AsyncStorage.getItem(customMesocyclesKey);
                   const customMesocycles = existingCustomMesocycles ? JSON.parse(existingCustomMesocycles) : [];
-                  
-                  const updatedCustomMesocycles = customMesocycles.filter((m: any) => 
+
+                  const updatedCustomMesocycles = customMesocycles.filter((m: any) =>
                     m.customId !== selectedMesocycle.customId
                   );
                   await AsyncStorage.setItem(customMesocyclesKey, JSON.stringify(updatedCustomMesocycles));
-                  
+
                   if (selectedMesocycle.customId) {
                     const manualBlocksKey = `manual_blocks_${selectedMesocycle.customId}`;
                     await AsyncStorage.removeItem(manualBlocksKey);
@@ -865,16 +894,16 @@ export default function BlocksScreen() {
                   if (program && !(routine as any).mesocycleNumber) {
                     const totalBlocks = routine.data.blocks.length;
                     const blocksPerMesocycle = Math.ceil(totalBlocks / program.totalMesocycles);
-                    
+
                     const mesocycleIndex = selectedMesocycle.mesocycleNumber - 1;
                     const startIdx = mesocycleIndex * blocksPerMesocycle;
                     const endIdx = Math.min(startIdx + blocksPerMesocycle, totalBlocks);
-                    
+
                     const updatedBlocks = [
                       ...routine.data.blocks.slice(0, startIdx),
                       ...routine.data.blocks.slice(endIdx)
                     ];
-                    
+
                     const updatedRoutine = {
                       ...routine,
                       data: {
@@ -882,40 +911,40 @@ export default function BlocksScreen() {
                         blocks: updatedBlocks
                       }
                     };
-                    
+
                     const routines = await WorkoutStorage.loadRoutines();
                     const routineIndex = routines.findIndex(r => r.id === routine.id);
                     if (routineIndex !== -1) {
                       routines[routineIndex] = updatedRoutine;
                       await WorkoutStorage.saveRoutines(routines);
                     }
-                    
+
                     Object.assign(routine, updatedRoutine);
                   }
-                  
+
                   if (program) {
-                    const updatedRoadmap = program.mesocycleRoadmap.filter(phase => 
+                    const updatedRoadmap = program.mesocycleRoadmap.filter(phase =>
                       phase.mesocycleNumber !== selectedMesocycle.mesocycleNumber
                     );
-                    
+
                     updatedRoadmap.forEach((phase, index) => {
                       phase.mesocycleNumber = index + 1;
                     });
-                    
+
                     await ProgramStorage.updateProgram(program.id, {
                       mesocycleRoadmap: updatedRoadmap,
                       totalMesocycles: updatedRoadmap.length,
                       currentMesocycle: Math.min(program.currentMesocycle, updatedRoadmap.length)
                     });
-                    
+
                     await loadProgramData();
                   }
                 }
-                
+
                 setShowMesocycleModal(false);
                 setSelectedMesocycle(null);
                 setShowMesocycleMoreOptions(false);
-                
+
               } catch (error) {
                 console.error('Error deleting mesocycle:', error);
                 Alert.alert('Error', 'Failed to delete mesocycle. Please try again.');
@@ -946,12 +975,12 @@ export default function BlocksScreen() {
               if (newName && newName.trim().length > 0) {
                 try {
                   if (program && selectedMesocycle.phase) {
-                    const updatedRoadmap = program.mesocycleRoadmap.map(phase => 
-                      phase.mesocycleNumber === selectedMesocycle.mesocycleNumber 
+                    const updatedRoadmap = program.mesocycleRoadmap.map(phase =>
+                      phase.mesocycleNumber === selectedMesocycle.mesocycleNumber
                         ? { ...phase, phaseName: newName.trim() }
                         : phase
                     );
-                    
+
                     await ProgramStorage.updateProgram(program.id, {
                       mesocycleRoadmap: updatedRoadmap
                     });
@@ -986,9 +1015,9 @@ export default function BlocksScreen() {
       try {
         const blocksInMesocycle = selectedMesocycle.blocksInMesocycle;
         const isCurrentlyCompleted = selectedMesocycle.isCompleted;
-        
+
         for (const block of blocksInMesocycle) {
-          const totalWeeks = block.weeks.includes('-') 
+          const totalWeeks = block.weeks.includes('-')
             ? parseInt(block.weeks.split('-')[1]) - parseInt(block.weeks.split('-')[0]) + 1
             : 1;
 
@@ -1011,7 +1040,7 @@ export default function BlocksScreen() {
         setShowMesocycleModal(false);
         setSelectedMesocycle(null);
         setShowMesocycleMoreOptions(false);
-        
+
       } catch (error) {
         console.error('Error toggling mesocycle completion:', error);
         Alert.alert('Error', 'Failed to update mesocycle completion status. Please try again.');
@@ -1026,8 +1055,8 @@ export default function BlocksScreen() {
         'Enter a name for this mesocycle:',
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Create', 
+          {
+            text: 'Create',
             onPress: (text) => {
               if (text && text.trim()) {
                 createNewMesocycle(text.trim());
@@ -1077,7 +1106,7 @@ export default function BlocksScreen() {
       setMesocycleCards(updatedMesocycles);
 
       await saveCustomMesocycle(newMesocycle);
-      
+
     } catch (error) {
       console.error('Error creating mesocycle:', error);
       Alert.alert('Error', 'Failed to create mesocycle. Please try again.');
@@ -1089,7 +1118,7 @@ export default function BlocksScreen() {
       const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
       const existingCustomMesocycles = await AsyncStorage.getItem(customMesocyclesKey);
       const customMesocycles = existingCustomMesocycles ? JSON.parse(existingCustomMesocycles) : [];
-      
+
       const updatedCustomMesocycles = [...customMesocycles, mesocycle];
       await AsyncStorage.setItem(customMesocyclesKey, JSON.stringify(updatedCustomMesocycles));
     } catch (error) {
@@ -1100,21 +1129,21 @@ export default function BlocksScreen() {
   const getManualBlocksCount = async (mesocycleNumber: number, routine: any, customId?: string): Promise<number> => {
     try {
       let mesocycleId;
-      
+
       if (customId) {
         mesocycleId = customId;
       } else {
         mesocycleId = `mesocycle_${mesocycleNumber}`;
       }
-      
+
       const manualBlocksKey = `manual_blocks_${mesocycleId}`;
       const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
-      
+
       if (manualBlocksData) {
         const manualBlocks = JSON.parse(manualBlocksData);
         return manualBlocks.length;
       }
-      
+
       return 0;
     } catch (error) {
       console.error('Error counting manual blocks:', error);
@@ -1125,21 +1154,21 @@ export default function BlocksScreen() {
   const getManualBlocks = async (mesocycleNumber: number, routine: any, customId?: string): Promise<Block[]> => {
     try {
       let mesocycleId;
-      
+
       if (customId) {
         mesocycleId = customId;
       } else {
         mesocycleId = `mesocycle_${mesocycleNumber}`;
       }
-      
+
       const manualBlocksKey = `manual_blocks_${mesocycleId}`;
       const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
-      
+
       if (manualBlocksData) {
         const manualBlocks = JSON.parse(manualBlocksData);
         return manualBlocks;
       }
-      
+
       return [];
     } catch (error) {
       console.error('Error loading manual blocks:', error);
@@ -1154,17 +1183,17 @@ export default function BlocksScreen() {
       const manualDaysData = await AsyncStorage.getItem(manualDaysKey);
       const manualDays = manualDaysData ? JSON.parse(manualDaysData) : [];
       const allDays = [...originalDays, ...manualDays];
-      
+
       for (let week = 1; week <= totalWeeks; week++) {
         const weekKey = `completed_${block.block_name}_week${week}`;
         const completed = await AsyncStorage.getItem(weekKey);
-        
+
         if (!completed) {
           return false;
         }
-        
+
         const completedArray = JSON.parse(completed);
-        
+
         if (allDays.length === 0) {
           if (!completedArray.includes('empty_block_completed')) {
             return false;
@@ -1187,21 +1216,20 @@ export default function BlocksScreen() {
       const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
       const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
       const customMesocycles = customMesocyclesData ? JSON.parse(customMesocyclesData) : [];
-      
-      
+
       const updatedCustomMesocycles = await Promise.all(
         customMesocycles.map(async (mesocycle: any) => {
           const manualBlocks = await getManualBlocks(mesocycle.mesocycleNumber, routine, mesocycle.customId);
-          
+
           const completedBlocksPromises = manualBlocks.map(async (block) => {
             const totalWeeks = getBlockWeekCount(block.weeks);
             const isComplete = await checkAllWeeksCompletedFresh(block, totalWeeks);
             return isComplete;
           });
-          
+
           const completionResults = await Promise.all(completedBlocksPromises);
           const completedBlocks = completionResults.filter(Boolean).length;
-          
+
           return {
             ...mesocycle,
             isCustomMesocycle: true,
@@ -1212,7 +1240,7 @@ export default function BlocksScreen() {
           };
         })
       );
-      
+
       return updatedCustomMesocycles;
     } catch (error) {
       console.error('Failed to load custom mesocycles:', error);
@@ -1224,31 +1252,104 @@ export default function BlocksScreen() {
     navigation.goBack();
   };
 
+  // ── Derived UI data ─────────────────────────────────────────────
+
+  // Count completed blocks for the routine subtitle
+  const completedBlocksCount = routine.data.blocks.filter(
+    block => completionStatus[block.block_name]
+  ).length;
+  const totalBlocksCount = routine.data.blocks.length;
+
+  // Find current week across all blocks for the global progress indicator
+  const computeCumulativeWeek = (): number => {
+    let weeks = 0;
+    for (let i = 0; i < activeBlockIndex; i++) {
+      weeks += getBlockWeekCount(routine.data.blocks[i]?.weeks || '1');
+    }
+    return weeks + Math.min(completionBasedWeek, getBlockWeekCount(routine.data.blocks[activeBlockIndex]?.weeks || '1'));
+  };
+  const cumulativeWeek = activeBlockIndex >= 0 ? computeCumulativeWeek() : 0;
+  const globalProgressPct = totalWeeks > 0 ? (cumulativeWeek / totalWeeks) * 100 : 0;
+
+  // For block mode, separate active from other blocks
+  const activeBlock = activeBlockIndex >= 0 ? routine.data.blocks[activeBlockIndex] : null;
+  const otherBlocksWithIndex = routine.data.blocks
+    .map((block, idx) => ({ block, idx }))
+    .filter(({ idx }) => idx !== activeBlockIndex);
+
+  // For mesocycle mode, separate active from others
+  const activeMesocycle = mesocycleCards.find(m => m.isActive);
+  const otherMesocycles = mesocycleCards.filter(m => !m.isActive);
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton} 
+          <TouchableOpacity
+            style={styles.backButton}
             onPress={handleBack}
             activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+            <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={styles.programLabel}>PROGRAM</Text>
-            <Text style={styles.programName}>{routine.name}</Text>
-          </View>
-          <View style={styles.placeholder} />
+          <Text style={styles.headerLabel}>PROGRAM</Text>
+          <View style={styles.headerSpacer} />
         </View>
       </View>
 
       {hasMesocycles ? (
         <FlatList
-          data={mesocycleCards}
-          keyExtractor={(item) => `mesocycle-${item.mesocycleNumber}`}
+          data={otherMesocycles}
+          keyExtractor={(item) => `mesocycle-${item.mesocycleNumber}-${item.customId || ''}`}
+          ListHeaderComponent={() => (
+            <>
+              {/* Title block */}
+              <View style={styles.titleBlock}>
+                <Text style={styles.routineName} numberOfLines={2}>{routine.name}</Text>
+                <Text style={styles.routineSubtitle}>
+                  {mesocycleCards.filter(m => m.isCompleted).length} OF {mesocycleCards.length} MESOCYCLES COMPLETE
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: mesocycleCards.length > 0
+                          ? `${(mesocycleCards.filter(m => m.isCompleted).length / mesocycleCards.length) * 100}%`
+                          : '0%',
+                        backgroundColor: themeColor,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Active mesocycle hero */}
+              {activeMesocycle && (
+                <>
+                  <Text style={[styles.sectionLabel, styles.sectionLabelAccent, { color: themeColor }]}>
+                    ACTIVE MESOCYCLE
+                  </Text>
+                  <MesocycleHeroCard
+                    mesocycle={activeMesocycle}
+                    onPress={() => handleMesocyclePress(activeMesocycle)}
+                    onLongPress={() => handleMesocycleLongPress(activeMesocycle)}
+                    themeColor={themeColor}
+                  />
+                </>
+              )}
+
+              {otherMesocycles.length > 0 && (
+                <Text style={[styles.sectionLabel, styles.sectionLabelMuted]}>
+                  {activeMesocycle ? 'ALL MESOCYCLES' : 'MESOCYCLES'}
+                </Text>
+              )}
+            </>
+          )}
           renderItem={({ item }) => (
-            <MesocycleCard
+            <MesocycleRow
               mesocycle={item}
               onPress={() => handleMesocyclePress(item)}
               onLongPress={() => handleMesocycleLongPress(item)}
@@ -1256,12 +1357,13 @@ export default function BlocksScreen() {
             />
           )}
           ListFooterComponent={() => (
-            <TouchableOpacity 
-              style={[styles.addMesocycleButton, { borderColor: themeColor }]}
+            <TouchableOpacity
+              style={[styles.addButton, { borderColor: themeColor }]}
               onPress={() => handleAddMesocycle()}
+              activeOpacity={0.7}
             >
-              <Ionicons name="add-circle-outline" size={24} color={themeColor} />
-              <Text style={[styles.addMesocycleText, { color: themeColor }]}>Add Mesocycle</Text>
+              <Ionicons name="add-circle-outline" size={18} color={themeColor} />
+              <Text style={[styles.addButtonText, { color: themeColor }]}>Add Mesocycle</Text>
             </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
@@ -1269,30 +1371,75 @@ export default function BlocksScreen() {
         />
       ) : (
         <FlatList
-          data={routine.data.blocks}
-          keyExtractor={(item, index) => `${item.block_name}-${index}`}
-          renderItem={({ item, index }) => (
-            <BlockCard
-              block={item}
-              onPress={() => handleBlockPress(item)}
-              onLongPress={() => handleBlockLongPress(item, index)}
-              isActive={index === activeBlockIndex}
-              weekProgress={getWeekProgress(index)}
+          data={otherBlocksWithIndex}
+          keyExtractor={(item) => `${item.block.block_name}-${item.idx}`}
+          ListHeaderComponent={() => (
+            <>
+              {/* Title block */}
+              <View style={styles.titleBlock}>
+                <Text style={styles.routineName} numberOfLines={2}>{routine.name}</Text>
+                <Text style={styles.routineSubtitle}>
+                  {completedBlocksCount} OF {totalBlocksCount} BLOCK{totalBlocksCount !== 1 ? 'S' : ''} COMPLETE
+                  {totalWeeks > 0 && activeBlock ? ` · WEEK ${Math.min(cumulativeWeek, totalWeeks)} OF ${totalWeeks}` : ''}
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${Math.min(globalProgressPct, 100)}%`,
+                        backgroundColor: themeColor,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Active block hero */}
+              {activeBlock && (
+                <>
+                  <Text style={[styles.sectionLabel, styles.sectionLabelAccent, { color: themeColor }]}>
+                    ACTIVE BLOCK
+                  </Text>
+                  <BlockHeroCard
+                    block={activeBlock}
+                    weekProgress={getWeekProgress(activeBlockIndex)}
+                    onPress={() => handleBlockPress(activeBlock)}
+                    onLongPress={() => handleBlockLongPress(activeBlock, activeBlockIndex)}
+                    themeColor={themeColor}
+                  />
+                </>
+              )}
+
+              {otherBlocksWithIndex.length > 0 && (
+                <Text style={[styles.sectionLabel, styles.sectionLabelMuted]}>
+                  {activeBlock ? 'ALL BLOCKS' : 'BLOCKS'}
+                </Text>
+              )}
+            </>
+          )}
+          renderItem={({ item }) => (
+            <BlockRow
+              block={item.block}
+              onPress={() => handleBlockPress(item.block)}
+              onLongPress={() => handleBlockLongPress(item.block, item.idx)}
+              isComplete={completionStatus[item.block.block_name] || false}
               themeColor={themeColor}
             />
           )}
           ListFooterComponent={() => (
-            <TouchableOpacity 
-              style={[styles.addBlockButton, { borderColor: themeColor }]}
+            <TouchableOpacity
+              style={[styles.addButton, { borderColor: themeColor }]}
               onPress={() => {
                 navigation.navigate('ImportRoutine', {
                   mode: 'append-block',
                   targetWorkoutId: routine.id
                 });
               }}
+              activeOpacity={0.7}
             >
-              <Ionicons name="add-circle-outline" size={24} color={themeColor} />
-              <Text style={[styles.addBlockText, { color: themeColor }]}>Add Block</Text>
+              <Ionicons name="add-circle-outline" size={18} color={themeColor} />
+              <Text style={[styles.addButtonText, { color: themeColor }]}>Add Block</Text>
             </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
@@ -1300,6 +1447,7 @@ export default function BlocksScreen() {
         />
       )}
 
+      {/* Set Active Block Modal */}
       <Modal
         visible={showModal}
         transparent
@@ -1314,94 +1462,116 @@ export default function BlocksScreen() {
           paddingHorizontal: 32,
         }}>
           <View style={{
-            backgroundColor: '#18181b',
-            borderRadius: 12,
+            backgroundColor: '#0a0a0f',
+            borderRadius: 16,
             borderWidth: 1,
-            borderColor: '#27272a',
-            padding: 24,
+            borderColor: 'rgba(255,255,255,0.06)',
+            padding: 22,
             width: '100%',
             maxWidth: 340,
             alignItems: 'center',
           }}>
-            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-              <Ionicons name="checkmark-circle-outline" size={32} color={themeColor} />
+            <View style={{ alignItems: 'center', marginBottom: 18 }}>
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 13,
+                  backgroundColor: hexA(themeColor, 0.15),
+                  borderWidth: 1,
+                  borderColor: hexA(themeColor, 0.3),
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 14,
+                }}
+              >
+                <Ionicons name="checkmark-circle-outline" size={26} color={themeColor} />
+              </View>
               <Text style={{
-                fontSize: 20,
-                fontWeight: '700',
-                color: '#ffffff',
-                marginTop: 12,
+                fontSize: 18,
+                fontWeight: '600',
+                color: '#f0f0f2',
                 textAlign: 'center',
+                fontFamily: 'Outfit-SemiBold',
+                letterSpacing: -0.3,
               }}>Set Active Block</Text>
             </View>
-            
+
             <Text style={{
-              fontSize: 16,
-              color: '#71717a',
+              fontSize: 13,
+              color: '#9898a4',
               textAlign: 'center',
-              lineHeight: 24,
-              marginBottom: 24,
+              lineHeight: 19,
+              marginBottom: 20,
+              fontFamily: 'Outfit-Regular',
             }}>
-              Set <Text style={{ fontWeight: '600', color: themeColor }}>"{selectedBlock?.block.block_name}"</Text> as your active training block?
+              Set <Text style={{ fontWeight: '600', color: themeColor, fontFamily: 'Outfit-SemiBold' }}>"{selectedBlock?.block.block_name}"</Text> as your active training block?
             </Text>
-            
-            <View style={{ width: '100%', gap: 12 }}>
-              {/* Set Active Button */}
+
+            <View style={{ width: '100%', gap: 8 }}>
               <TouchableOpacity
                 style={{
                   width: '100%',
                   backgroundColor: themeColor,
-                  borderRadius: 8,
-                  paddingVertical: 16,
+                  borderRadius: 11,
+                  paddingVertical: 13,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
                 onPress={handleSetActive}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
                 <Text style={{
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: '600',
-                  color: '#ffffff',
+                  color: '#000',
+                  fontFamily: 'Outfit-SemiBold',
+                  letterSpacing: -0.2,
                 }}>Set Active</Text>
               </TouchableOpacity>
-              
-              {/* Delete Button */}
+
               <TouchableOpacity
                 style={{
                   width: '100%',
-                  backgroundColor: '#ef4444',
-                  borderRadius: 8,
-                  paddingVertical: 16,
+                  backgroundColor: 'rgba(239,68,68,0.1)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(239,68,68,0.3)',
+                  borderRadius: 11,
+                  paddingVertical: 13,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
                 onPress={handleDeleteBlock}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
                 <Text style={{
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: '600',
-                  color: '#ffffff',
+                  color: '#f87171',
+                  fontFamily: 'Outfit-SemiBold',
+                  letterSpacing: -0.2,
                 }}>Delete Block</Text>
               </TouchableOpacity>
-              
-              {/* Cancel Button */}
+
               <TouchableOpacity
                 style={{
                   width: '100%',
-                  backgroundColor: '#27272a',
-                  borderRadius: 8,
-                  paddingVertical: 16,
+                  backgroundColor: 'transparent',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  borderRadius: 11,
+                  paddingVertical: 13,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
                 onPress={handleCancel}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
                 <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#ffffff',
+                  fontSize: 14,
+                  fontWeight: '500',
+                  color: '#9898a4',
+                  fontFamily: 'Outfit-Medium',
                 }}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -1409,6 +1579,7 @@ export default function BlocksScreen() {
         </View>
       </Modal>
 
+      {/* Mesocycle Options Modal */}
       <Modal
         visible={showMesocycleModal}
         transparent
@@ -1423,108 +1594,131 @@ export default function BlocksScreen() {
           paddingHorizontal: 24,
         }}>
           <View style={{
-            backgroundColor: '#18181b',
-            borderRadius: 12,
+            backgroundColor: '#0a0a0f',
+            borderRadius: 16,
             borderWidth: 1,
-            borderColor: '#27272a',
-            padding: 24,
+            borderColor: 'rgba(255,255,255,0.06)',
+            padding: 22,
             width: '100%',
             maxWidth: 360,
             alignItems: 'center',
           }}>
-            <View style={{ alignItems: 'center', marginBottom: 24 }}>
-              <Ionicons name="options-outline" size={32} color={themeColor} />
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 13,
+                  backgroundColor: hexA(themeColor, 0.15),
+                  borderWidth: 1,
+                  borderColor: hexA(themeColor, 0.3),
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 14,
+                }}
+              >
+                <Ionicons name="options-outline" size={24} color={themeColor} />
+              </View>
               <Text style={{
-                fontSize: 20,
-                fontWeight: '700',
-                color: '#ffffff',
-                marginTop: 12,
+                fontSize: 18,
+                fontWeight: '600',
+                color: '#f0f0f2',
                 textAlign: 'center',
+                fontFamily: 'Outfit-SemiBold',
+                letterSpacing: -0.3,
               }}>Mesocycle {selectedMesocycle?.mesocycleNumber}</Text>
               <Text style={{
-                fontSize: 14,
-                color: '#71717a',
+                fontSize: 12,
+                color: '#9898a4',
                 textAlign: 'center',
                 marginTop: 4,
+                fontFamily: 'Outfit-Regular',
               }}>{selectedMesocycle?.phase?.phaseName || 'Training Phase'}</Text>
             </View>
-            
-            <View style={{ width: '100%', gap: 12 }}>
+
+            <View style={{ width: '100%', gap: 8 }}>
               {!selectedMesocycle?.isActive && (
                 <TouchableOpacity
                   style={{
                     backgroundColor: themeColor,
-                    borderRadius: 8,
-                    paddingVertical: 16,
-                    paddingHorizontal: 20,
+                    borderRadius: 11,
+                    paddingVertical: 13,
+                    paddingHorizontal: 16,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 12,
+                    gap: 8,
                   }}
                   onPress={handleSetActiveMesocycle}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                 >
-                  <Ionicons name="checkmark-circle" size={20} color="#0a0a0b" />
+                  <Ionicons name="checkmark-circle" size={16} color="#000" />
                   <Text style={{
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: '600',
-                    color: '#0a0a0b',
+                    color: '#000',
+                    fontFamily: 'Outfit-SemiBold',
+                    letterSpacing: -0.2,
                   }}>Set as Active</Text>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity
                 style={{
-                  backgroundColor: selectedMesocycle?.isCompleted ? '#ef4444' : '#22c55e',
-                  borderRadius: 8,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
+                  backgroundColor: selectedMesocycle?.isCompleted ? 'rgba(239,68,68,0.1)' : hexA(themeColor, 0.1),
+                  borderWidth: 1,
+                  borderColor: selectedMesocycle?.isCompleted ? 'rgba(239,68,68,0.3)' : hexA(themeColor, 0.3),
+                  borderRadius: 11,
+                  paddingVertical: 13,
+                  paddingHorizontal: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 12,
+                  gap: 8,
                 }}
                 onPress={handleToggleMesocycleCompletion}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                <Ionicons 
-                  name={selectedMesocycle?.isCompleted ? "close-circle" : "checkmark-done"} 
-                  size={20} 
-                  color="#0a0a0b" 
+                <Ionicons
+                  name={selectedMesocycle?.isCompleted ? "close-circle-outline" : "checkmark-done"}
+                  size={16}
+                  color={selectedMesocycle?.isCompleted ? '#f87171' : themeColor}
                 />
                 <Text style={{
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: '600',
-                  color: '#0a0a0b',
+                  color: selectedMesocycle?.isCompleted ? '#f87171' : themeColor,
+                  fontFamily: 'Outfit-SemiBold',
+                  letterSpacing: -0.2,
                 }}>{selectedMesocycle?.isCompleted ? 'Mark Incomplete' : 'Mark Complete'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={{
-                  backgroundColor: '#27272a',
+                  backgroundColor: 'transparent',
                   borderWidth: 1,
-                  borderColor: '#3a3a3a',
-                  borderRadius: 8,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  borderRadius: 11,
+                  paddingVertical: 13,
+                  paddingHorizontal: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 12,
+                  gap: 8,
                 }}
                 onPress={() => setShowMesocycleMoreOptions(!showMesocycleMoreOptions)}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                <Ionicons 
-                  name={showMesocycleMoreOptions ? "chevron-up" : "ellipsis-horizontal"} 
-                  size={20} 
-                  color="#ffffff" 
+                <Ionicons
+                  name={showMesocycleMoreOptions ? "chevron-up" : "ellipsis-horizontal"}
+                  size={16}
+                  color="#9898a4"
                 />
                 <Text style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: '#ffffff',
+                  fontSize: 14,
+                  fontWeight: '500',
+                  color: '#9898a4',
+                  fontFamily: 'Outfit-Medium',
                 }}>{showMesocycleMoreOptions ? 'Less Options' : 'More Options'}</Text>
               </TouchableOpacity>
 
@@ -1532,116 +1726,129 @@ export default function BlocksScreen() {
                 <>
                   <TouchableOpacity
                     style={{
-                      backgroundColor: '#27272a',
-                      borderRadius: 8,
-                      paddingVertical: 16,
-                      paddingHorizontal: 20,
+                      backgroundColor: 'transparent',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.08)',
+                      borderRadius: 11,
+                      paddingVertical: 13,
+                      paddingHorizontal: 16,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 12,
+                      gap: 8,
                     }}
                     onPress={handleRenameMesocycle}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
-                    <Ionicons name="pencil-outline" size={20} color="#ffffff" />
+                    <Ionicons name="pencil-outline" size={16} color="#f0f0f2" />
                     <Text style={{
-                      fontSize: 16,
-                      fontWeight: '600',
-                      color: '#ffffff',
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#f0f0f2',
+                      fontFamily: 'Outfit-Medium',
                     }}>Rename</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={{
-                      backgroundColor: '#27272a',
-                      borderRadius: 8,
-                      paddingVertical: 16,
-                      paddingHorizontal: 20,
+                      backgroundColor: 'transparent',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.08)',
+                      borderRadius: 11,
+                      paddingVertical: 13,
+                      paddingHorizontal: 16,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 12,
+                      gap: 8,
                     }}
                     onPress={handleCopyMesocycle}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
-                    <Ionicons name="copy-outline" size={20} color="#ffffff" />
+                    <Ionicons name="copy-outline" size={16} color="#f0f0f2" />
                     <Text style={{
-                      fontSize: 16,
-                      fontWeight: '600',
-                      color: '#ffffff',
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#f0f0f2',
+                      fontFamily: 'Outfit-Medium',
                     }}>Copy JSON</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
                     style={{
-                      backgroundColor: '#27272a',
-                      borderRadius: 8,
-                      paddingVertical: 16,
-                      paddingHorizontal: 20,
+                      backgroundColor: 'transparent',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.08)',
+                      borderRadius: 11,
+                      paddingVertical: 13,
+                      paddingHorizontal: 16,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 12,
+                      gap: 8,
                     }}
                     onPress={handleShareMesocycle}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
-                    <Ionicons name="share-outline" size={20} color="#ffffff" />
+                    <Ionicons name="share-outline" size={16} color="#f0f0f2" />
                     <Text style={{
-                      fontSize: 16,
-                      fontWeight: '600',
-                      color: '#ffffff',
+                      fontSize: 14,
+                      fontWeight: '500',
+                      color: '#f0f0f2',
+                      fontFamily: 'Outfit-Medium',
                     }}>Share</Text>
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
                     style={{
                       backgroundColor: 'rgba(239, 68, 68, 0.1)',
                       borderWidth: 1,
                       borderColor: 'rgba(239, 68, 68, 0.3)',
-                      borderRadius: 8,
-                      paddingVertical: 16,
-                      paddingHorizontal: 20,
+                      borderRadius: 11,
+                      paddingVertical: 13,
+                      paddingHorizontal: 16,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 12,
+                      gap: 8,
                     }}
                     onPress={handleDeleteMesocycle}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                   >
-                    <Ionicons name="trash-outline" size={20} color="#ef4444" />
+                    <Ionicons name="trash-outline" size={16} color="#f87171" />
                     <Text style={{
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: '600',
-                      color: '#ef4444',
+                      color: '#f87171',
+                      fontFamily: 'Outfit-SemiBold',
+                      letterSpacing: -0.2,
                     }}>Delete</Text>
                   </TouchableOpacity>
                 </>
               )}
             </View>
-            
+
             <TouchableOpacity
               style={{
-                marginTop: 20,
-                paddingVertical: 12,
-                paddingHorizontal: 24,
+                marginTop: 16,
+                paddingVertical: 10,
+                paddingHorizontal: 22,
               }}
               onPress={handleCancelMesocycle}
               activeOpacity={0.7}
             >
               <Text style={{
-                fontSize: 16,
+                fontSize: 13,
                 fontWeight: '500',
-                color: '#71717a',
+                color: '#55555f',
+                fontFamily: 'Outfit-Medium',
               }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
+      {/* Android Add Mesocycle Modal */}
       {Platform.OS === 'android' && (
         <Modal
           visible={showAddMesocycleModal}
@@ -1652,7 +1859,7 @@ export default function BlocksScreen() {
           <View style={styles.overlay}>
             <View style={styles.modal}>
               <Text style={styles.modalTitle}>Add New Mesocycle</Text>
-              
+
               <TextInput
                 style={styles.input}
                 value={newMesocycleName}
@@ -1662,7 +1869,7 @@ export default function BlocksScreen() {
                 autoFocus={true}
                 maxLength={30}
               />
-              
+
               <View style={styles.buttonContainer}>
                 <View style={styles.buttonWrapper}>
                   <Button
@@ -1687,4 +1894,3 @@ export default function BlocksScreen() {
     </SafeAreaView>
   );
 }
-

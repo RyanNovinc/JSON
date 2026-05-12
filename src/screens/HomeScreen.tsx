@@ -26,6 +26,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { createShare, ShareError } from '../services/shareService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
+import WorkoutCalendar from '../components/WorkoutCalendar';
 import ImportFeedbackModal from '../components/ImportFeedbackModal';
 import OnboardingSlideshow from '../components/OnboardingSlideshow';
 import { useImportFeedback } from '../hooks/useImportFeedback';
@@ -96,6 +97,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     error: undefined,
     isAnimating: false,
   });
+  const [calendarModal, setCalendarModal] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null }>({
     visible: false,
@@ -1694,6 +1696,12 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
+
+      {/* Workout Calendar */}
+      <WorkoutCalendar
+        visible={calendarModal}
+        onClose={() => setCalendarModal(false)}
+      />
 
       {/* Import Feedback Modal */}
       <ImportFeedbackModal

@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   backButton: {
     width: 38,
@@ -25,114 +25,15 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  blockLabel: {
+  headerLabel: {
     fontSize: 10,
-    fontWeight: '500',
-    color: '#55555f',
-    textTransform: 'uppercase',
+    color: '#9898a4',
     letterSpacing: 1.4,
-    marginBottom: 2,
     fontFamily: 'DMMono-Medium',
   },
-  blockPhase: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#f0f0f2',
-    letterSpacing: -0.2,
-    fontFamily: 'Outfit-SemiBold',
-  },
-
-  // ── List ─────────────────────────────────────────────────────────
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 16,
-  },
-
-  // ── Card (incomplete day) ────────────────────────────────────────
-  card: {
-    backgroundColor: '#0a0a0f',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    borderLeftWidth: 3,
-    padding: 16,
-    marginBottom: 10,
-  },
-
-  // ── Card (completed) ─────────────────────────────────────────────
-  cardCompleted: {
-    backgroundColor: '#0a0a0f',
-    borderColor: 'rgba(34,211,238,0.18)',
-    padding: 14,
-  },
-  completedCardContent: {
-    alignItems: 'stretch',
-  },
-  completedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    gap: 10,
-  },
-  completedTitleContainer: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  completedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(34,211,238,0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  completedBadgeText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#22d3ee',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Medium',
-  },
-  completedStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 14,
-  },
-  completedStat: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  completedStatValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#f0f0f2',
-    letterSpacing: -0.3,
-    fontFamily: 'Outfit-SemiBold',
-  },
-  completedStatLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#55555f',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Regular',
-  },
-  completedStatDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  redoButton: {
-    width: 34,
-    height: 34,
+  restToggleButton: {
+    width: 38,
+    height: 38,
     borderRadius: 10,
     backgroundColor: '#0a0a0f',
     borderWidth: 1,
@@ -141,186 +42,66 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Card header ──────────────────────────────────────────────────
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  cardTitle: {
-    flex: 1,
-  },
-  dayNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  dayName: {
-    fontSize: 19,
-    fontWeight: '700',
-    color: '#f0f0f2',
-    lineHeight: 24,
-    letterSpacing: -0.4,
-    fontFamily: 'Outfit-Bold',
-  },
-  dayNameCompleted: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#f0f0f2',
-    lineHeight: 20,
-    letterSpacing: -0.2,
-    fontFamily: 'Outfit-SemiBold',
-  },
-  checkIcon: {
-    marginLeft: 8,
-  },
-  completionInfo: {
-    marginBottom: 4,
-  },
-  completionInfoText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#22d3ee',
-    marginBottom: 2,
-    fontFamily: 'Outfit-Medium',
-  },
-  completionDate: {
-    fontSize: 11,
-    color: '#55555f',
-    fontFamily: 'DMMono-Regular',
-  },
-  dayBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  dayBadgeText: {
-    fontSize: 9,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Medium',
-  },
-  startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 9,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 5,
-    backgroundColor: 'rgba(34,211,238,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(34,211,238,0.3)',
-  },
-  startButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Medium',
-  },
-  completedButton: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  completedButtonText: {
-    color: '#55555f',
-  },
-
-  // ── Week navigation ──────────────────────────────────────────────
-  weekNavigationContainer: {
-    marginBottom: 14,
-    paddingTop: 4,
-  },
-  weekNavigation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    backgroundColor: '#0a0a0f',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  weekNavButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  weekNavButtonDisabled: {
-    backgroundColor: 'transparent',
-    borderColor: 'rgba(255,255,255,0.03)',
-  },
-  weekDisplay: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  // ── Title block ──────────────────────────────────────────────────
+  titleBlock: {
     paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 18,
   },
-  weekHeader: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    justifyContent: 'space-between',
   },
-  weekLabel: {
-    fontSize: 10,
-    color: '#55555f',
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    fontWeight: '500',
-    fontFamily: 'DMMono-Medium',
-  },
-  bookmarkButton: {
-    padding: 2,
-  },
-  bookmarkIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingTop: 10,
-    paddingBottom: 2,
-  },
-  bookmarkText: {
-    fontSize: 10,
-    color: '#f7b220',
-    fontWeight: '500',
-    letterSpacing: 0.3,
-    fontFamily: 'Outfit-Medium',
-  },
-  weekNumberContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 8,
-  },
-  weekNumber: {
+  weekTitle: {
+    color: '#f0f0f2',
     fontSize: 26,
     fontWeight: '700',
-    letterSpacing: -0.6,
+    letterSpacing: -0.5,
     fontFamily: 'Outfit-Bold',
+    lineHeight: 30,
   },
-  weekTotal: {
-    fontSize: 14,
+  bookmarkButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  weekSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  weekSubtitle: {
     color: '#55555f',
-    marginLeft: 4,
-    fontFamily: 'Outfit-Regular',
+    fontSize: 10,
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Medium',
   },
-  weekProgress: {
-    width: 120,
-    height: 3,
+  bookmarkPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    backgroundColor: 'rgba(247,178,32,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(247,178,32,0.3)',
+  },
+  bookmarkPillText: {
+    fontSize: 8,
+    letterSpacing: 1.2,
+    color: '#f7b220',
+    fontFamily: 'DMMono-Medium',
+  },
+  weekProgressTrack: {
+    height: 2,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 2,
+    marginTop: 12,
     overflow: 'hidden',
   },
   weekProgressFill: {
@@ -328,111 +109,206 @@ export const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // ── Completion stats (inline) ────────────────────────────────────
-  completionStats: {
-    backgroundColor: 'rgba(34,211,238,0.04)',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(34,211,238,0.18)',
-  },
-  completionStatsHeader: {
+  // ── Week pager row ───────────────────────────────────────────────
+  weekPagerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    gap: 6,
+    justifyContent: 'space-between',
+    marginTop: 12,
   },
-  completionStatsTitle: {
+  weekPagerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  weekPagerButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: '#0a0a0f',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekPagerButtonDisabled: {
+    opacity: 0.35,
+  },
+  weekPagerLabel: {
     fontSize: 10,
-    fontWeight: '500',
-    color: '#22d3ee',
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
+    color: '#9898a4',
+    letterSpacing: 1.3,
     fontFamily: 'DMMono-Medium',
   },
-  completionStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  completionStat: {
-    alignItems: 'center',
-  },
-  completionStatValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#f0f0f2',
-    marginBottom: 2,
-    fontFamily: 'Outfit-SemiBold',
-  },
-  completionStatLabel: {
-    fontSize: 9,
-    color: '#55555f',
-    textTransform: 'uppercase',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Regular',
-  },
-
-  // ── Card body ────────────────────────────────────────────────────
-  cardBody: {
-    gap: 12,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 18,
-  },
-  statItem: {
+  volumeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-  },
-  statText: {
-    fontSize: 12,
-    color: '#9898a4',
-    fontWeight: '500',
-    fontFamily: 'Outfit-Medium',
-  },
-  exerciseGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  exerciseChip: {
-    backgroundColor: '#111116',
-    borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(34,211,238,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,211,238,0.25)',
+  },
+  volumeButtonText: {
+    fontSize: 10,
+    letterSpacing: 1.2,
+    fontFamily: 'DMMono-Medium',
+    fontWeight: '600',
+  },
+
+  // ── Section labels ───────────────────────────────────────────────
+  sectionLabel: {
+    fontSize: 10,
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Medium',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sectionLabelMuted: {
+    color: '#55555f',
+  },
+  sectionLabelAccent: {
+    color: '#22d3ee',
+  },
+
+  // ── NEXT UP hero card ────────────────────────────────────────────
+  nextUpCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 18,
+  },
+  nextUpContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  nextUpTextBlock: {
+    flex: 1,
+  },
+  nextUpDayName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#f0f0f2',
+    letterSpacing: -0.3,
+    fontFamily: 'Outfit-SemiBold',
+    marginBottom: 4,
+  },
+  nextUpMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  nextUpMetaText: {
+    fontSize: 11,
+    color: '#9898a4',
+    fontFamily: 'Outfit-Regular',
+  },
+  nextUpMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#3a3a44',
+  },
+  nextUpStartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  nextUpStartButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#000',
+    fontFamily: 'Outfit-SemiBold',
+    letterSpacing: -0.1,
+  },
+
+  // ── Day rows (compact) ───────────────────────────────────────────
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#0a0a0f',
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
-    minWidth: 100,
-    maxWidth: '48%',
+    marginBottom: 8,
   },
-  exerciseChipText: {
-    fontSize: 11,
+  dayRowStatus: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayRowStatusNumber: {
+    fontSize: 13,
+    color: '#9898a4',
+    fontFamily: 'DMMono-Medium',
+    fontWeight: '600',
+  },
+  dayRowContent: {
+    flex: 1,
+    gap: 4,
+  },
+  dayRowName: {
+    fontSize: 17,
+    fontWeight: '600',
     color: '#f0f0f2',
-    fontWeight: '500',
-    marginBottom: 2,
+    fontFamily: 'Outfit-SemiBold',
+    letterSpacing: -0.3,
+  },
+  dayRowMeta: {
+    fontSize: 11,
+    color: '#9898a4',
+    fontFamily: 'DMMono-Regular',
+    letterSpacing: 0.3,
+  },
+
+  // ── Rest row (collapsed/muted) ───────────────────────────────────
+  restRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 6,
+    opacity: 0.55,
+  },
+  restIconWrap: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restText: {
+    fontSize: 14,
+    color: '#9898a4',
     fontFamily: 'Outfit-Medium',
   },
-  exerciseChipSets: {
+  restDayNameText: {
     fontSize: 10,
-    fontWeight: '500',
-    fontFamily: 'DMMono-Medium',
-    letterSpacing: 0.2,
-  },
-  moreChip: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 40,
-    borderStyle: 'dashed',
-  },
-  moreChipText: {
-    fontSize: 11,
     color: '#55555f',
-    fontWeight: '500',
-    fontFamily: 'DMMono-Medium',
+    fontFamily: 'DMMono-Regular',
     letterSpacing: 0.3,
+  },
+
+  // ── List ─────────────────────────────────────────────────────────
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 24,
   },
 
   // ── Add day button ───────────────────────────────────────────────
@@ -440,8 +316,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
-    marginVertical: 4,
+    padding: 13,
+    marginTop: 12,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderRadius: 12,
@@ -451,11 +327,11 @@ export const styles = StyleSheet.create({
   addDayText: {
     fontSize: 13,
     fontWeight: '500',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
     fontFamily: 'Outfit-Medium',
   },
 
-  // ── Dark modal (basic, used for Android Add Day) ─────────────────
+  // ── Dark modal (Android Add Day) ─────────────────────────────────
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -496,155 +372,6 @@ export const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     overflow: 'hidden',
-  },
-
-  // ── "New" modal variant (legacy alt modal) ───────────────────────
-  newModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  newModalBackdrop: {
-    flex: 1,
-  },
-  newModalContainer: {
-    backgroundColor: '#0a0a0f',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 32,
-    maxHeight: '85%',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  newModalHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  newModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  newModalTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    color: '#f0f0f2',
-    flex: 1,
-    letterSpacing: -0.3,
-    fontFamily: 'Outfit-Bold',
-  },
-  newModalCloseButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  newModalContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    alignItems: 'center',
-  },
-  newModalIconWrapper: {
-    marginBottom: 20,
-  },
-  newModalIconBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  newModalDescription: {
-    fontSize: 14,
-    color: '#9898a4',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-    paddingHorizontal: 8,
-    fontFamily: 'Outfit-Regular',
-  },
-  newInputSection: {
-    width: '100%',
-  },
-  newInputLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#9898a4',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    fontFamily: 'DMMono-Medium',
-  },
-  newModalInput: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#f0f0f2',
-    marginBottom: 6,
-    backgroundColor: '#111116',
-    fontFamily: 'Outfit-Regular',
-  },
-  newCharacterCount: {
-    fontSize: 11,
-    color: '#55555f',
-    textAlign: 'right',
-    marginBottom: 14,
-    fontFamily: 'DMMono-Regular',
-  },
-  newModalActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 6,
-    gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-  },
-  newCancelButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 50,
-  },
-  newCreateButton: {
-    flex: 1.4,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 50,
-  },
-  newCancelText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#9898a4',
-    fontFamily: 'Outfit-Medium',
-  },
-  newCreateText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
-    fontFamily: 'Outfit-SemiBold',
   },
 
   // ── Exercise management modal ────────────────────────────────────
@@ -702,21 +429,11 @@ export const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  modalContent: {
+  modalScrollContent: {
     paddingHorizontal: 18,
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  modalIconContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingTop: 14,
+    paddingBottom: 14,
+    flex: 1,
   },
   modalSubtitle: {
     fontSize: 13,
@@ -803,13 +520,7 @@ export const styles = StyleSheet.create({
     fontFamily: 'Outfit-SemiBold',
   },
 
-  // ── Exercise list inside modal ───────────────────────────────────
-  modalScrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 14,
-    flex: 1,
-  },
+  // ── Exercise list inside management modal ────────────────────────
   exerciseListContainer: {
     marginTop: 20,
   },
@@ -863,183 +574,5 @@ export const styles = StyleSheet.create({
   },
   moveButtonDisabled: {
     backgroundColor: 'transparent',
-  },
-
-  // ── Rest day card ────────────────────────────────────────────────
-  restDayName: {
-    color: '#55555f',
-  },
-  restDayCard: {
-    backgroundColor: '#0a0a0f',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-    borderLeftWidth: 3,
-    padding: 18,
-    marginBottom: 10,
-  },
-  restDayContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 6,
-  },
-  restDayTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#9898a4',
-    marginTop: 6,
-    letterSpacing: -0.2,
-    fontFamily: 'Outfit-SemiBold',
-  },
-  restDaySubtitle: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#55555f',
-    letterSpacing: 1.3,
-    textTransform: 'uppercase',
-    fontFamily: 'DMMono-Medium',
-  },
-
-  // ── Rest toggle (header) ─────────────────────────────────────────
-  restToggle: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  restToggleTrack: {
-    width: 30,
-    height: 17,
-    borderRadius: 9,
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  restToggleThumb: {
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-  },
-  restToggleLabel: {
-    fontSize: 9,
-    fontWeight: '500',
-    color: '#55555f',
-    textTransform: 'uppercase',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Medium',
-  },
-
-  // ── Volume overview ──────────────────────────────────────────────
-  volumeToggle: {
-    marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 11,
-    backgroundColor: '#0a0a0f',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  volumeToggleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  volumeToggleText: {
-    fontSize: 11,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    fontFamily: 'DMMono-Medium',
-  },
-  volumeOverview: {
-    marginTop: 10,
-    padding: 14,
-    backgroundColor: '#0a0a0f',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    position: 'relative',
-  },
-  volumeContent: {
-    gap: 18,
-  },
-  bodyDiagramContainer: {
-    alignItems: 'center',
-    paddingVertical: 14,
-    backgroundColor: '#000',
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-    position: 'relative',
-  },
-  bodyDiagramHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingHorizontal: 14,
-  },
-  bodyDiagramTitle: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#9898a4',
-    flex: 1,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    fontFamily: 'DMMono-Medium',
-  },
-  bodyFlipIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  volumeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'center',
-  },
-  volumeItem: {
-    alignItems: 'center',
-    minWidth: 58,
-    maxWidth: 78,
-    gap: 3,
-    flex: 1,
-    flexBasis: '22%',
-  },
-  volumeBar: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  volumeNumber: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#f0f0f2',
-    marginTop: 2,
-    fontFamily: 'Outfit-SemiBold',
-    letterSpacing: -0.2,
-  },
-  volumeMuscle: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#9898a4',
-    textAlign: 'center',
-    fontFamily: 'Outfit-Medium',
-  },
-  volumeEmptyText: {
-    fontSize: 12,
-    color: '#55555f',
-    textAlign: 'center',
-    fontStyle: 'italic',
-    fontFamily: 'Outfit-Regular',
   },
 });

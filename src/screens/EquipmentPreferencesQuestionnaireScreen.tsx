@@ -111,7 +111,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
   const [sessionStyle, setSessionStyle] = useState<'optimal' | 'moderate' | 'minimal'>('moderate');
   const [likedExercises, setLikedExercises] = useState<string>('');
   const [dislikedExercises, setDislikedExercises] = useState<string>('');
-  const [exerciseNoteDetail, setExerciseNoteDetail] = useState<'detailed' | 'brief' | 'minimal'>('brief');
   const [includeDirectCore, setIncludeDirectCore] = useState<boolean>(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [showResults, setShowResults] = useState(false);
@@ -139,7 +138,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         setSessionStyle(data.sessionStyle || 'moderate');
         setLikedExercises(data.likedExercises || '');
         setDislikedExercises(data.dislikedExercises || '');
-        setExerciseNoteDetail(data.exerciseNoteDetail || 'brief');
         setIncludeDirectCore(data.includeDirectCore !== undefined ? data.includeDirectCore : true);
         
         // If questionnaire was completed, show summary directly
@@ -173,7 +171,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         sessionStyle,
         likedExercises,
         dislikedExercises,
-        exerciseNoteDetail,
         includeDirectCore,
         currentStep,
         // Note: no completedAt field - this indicates it's in progress
@@ -190,7 +187,7 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
     if (!isLoading && !isCompleted) {
       saveProgress();
     }
-  }, [selectedEquipment, specificEquipment, unavailableEquipment, sessionStyle, likedExercises, dislikedExercises, exerciseNoteDetail, includeDirectCore]);
+  }, [selectedEquipment, specificEquipment, unavailableEquipment, sessionStyle, likedExercises, dislikedExercises, includeDirectCore]);
 
   const handleRetakeQuestions = async () => {
     // Don't clear existing answers - just allow user to review and modify them
@@ -271,7 +268,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
         sessionStyle,
         likedExercises,
         dislikedExercises,
-        exerciseNoteDetail,
         includeDirectCore,
         completedAt: new Date().toISOString(),
       };
@@ -625,69 +621,6 @@ export default function EquipmentPreferencesQuestionnaireScreen() {
             </KeyboardAvoidingView>
           </Animatable.View>
 
-          {/* Exercise Note Detail */}
-          <Animatable.View
-            animation="fadeInUp"
-            delay={300}
-            style={styles.inputContainer}
-          >
-            <Text style={styles.inputLabel}>
-              How detailed should exercise instructions be?
-            </Text>
-            
-            {/* Exercise Note Detail Options */}
-            <View style={styles.optionsList}>
-              {[
-                {
-                  id: 'detailed',
-                  title: 'Detailed instructions',
-                  subtitle: 'Step-by-step form guidance for every exercise (recommended for beginners — generates longer output)'
-                },
-                {
-                  id: 'brief',
-                  title: 'Brief coaching cues',
-                  subtitle: 'Short tips for compound lifts only (recommended for most users)'
-                },
-                {
-                  id: 'minimal',
-                  title: 'Minimal notes',
-                  subtitle: 'Only non-obvious setup tips (fastest generation, smallest file size)'
-                }
-              ].map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={[
-                    styles.optionItem,
-                    exerciseNoteDetail === option.id && { backgroundColor: `${themeColor}10`, borderColor: themeColor }
-                  ]}
-                  onPress={() => setExerciseNoteDetail(option.id as 'detailed' | 'brief' | 'minimal')}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionContent}>
-                    <View style={styles.optionHeader}>
-                      <Text style={[
-                        styles.optionTitle,
-                        exerciseNoteDetail === option.id && { color: themeColor }
-                      ]}>
-                        {option.title}
-                      </Text>
-                      <View style={[
-                        styles.radioCircle,
-                        exerciseNoteDetail === option.id && { borderColor: themeColor, backgroundColor: themeColor }
-                      ]}>
-                        {exerciseNoteDetail === option.id && (
-                          <View style={styles.radioInner} />
-                        )}
-                      </View>
-                    </View>
-                    <Text style={styles.optionSubtitle}>
-                      {option.subtitle}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </Animatable.View>
 
         </Animatable.View>
       </ScrollView>
@@ -1792,7 +1725,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Exercise Note Detail styles
   optionsList: {
     marginTop: 16,
   },

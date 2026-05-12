@@ -1961,7 +1961,6 @@ export default function ImportRoutineScreen() {
         sessionStyle: equipmentPrefs.sessionStyle,
         likedExercises: equipmentPrefs.likedExercises,
         dislikedExercises: equipmentPrefs.dislikedExercises,
-        exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
       };
 
       // Filter out undefined/null values and ensure data integrity

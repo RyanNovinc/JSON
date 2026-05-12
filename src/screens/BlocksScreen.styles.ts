@@ -10,11 +10,12 @@ export const styles = StyleSheet.create({
   // ── Header ───────────────────────────────────────────────────────
   header: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   backButton: {
     width: 38,
@@ -26,269 +27,241 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
+  headerLabel: {
+    fontSize: 10,
+    color: '#9898a4',
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Medium',
   },
-  placeholder: {
+  headerSpacer: {
     width: 38,
     height: 38,
   },
-  programLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#55555f',
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    marginBottom: 2,
-    textAlign: 'center',
-    width: '100%',
-    fontFamily: 'DMMono-Medium',
-  },
-  programName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#f0f0f2',
-    textAlign: 'center',
-    width: '100%',
-    letterSpacing: -0.2,
-    fontFamily: 'Outfit-SemiBold',
-  },
 
-  // ── List ─────────────────────────────────────────────────────────
-  listContent: {
+  // ── Title block ──────────────────────────────────────────────────
+  titleBlock: {
     paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 16,
+    paddingTop: 6,
+    paddingBottom: 18,
   },
-
-  // ── Card (block or mesocycle) ────────────────────────────────────
-  card: {
-    backgroundColor: '#0a0a0f',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    borderLeftWidth: 3,
-    padding: 16,
-    marginBottom: 10,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardTitle: {
-    flex: 1,
-  },
-  blockName: {
-    fontSize: 19,
+  routineName: {
+    color: '#f0f0f2',
+    fontSize: 26,
     fontWeight: '700',
-    color: '#f0f0f2',
-    lineHeight: 24,
-    marginBottom: 6,
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
     fontFamily: 'Outfit-Bold',
+    lineHeight: 30,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-
-  // ── Status badges ────────────────────────────────────────────────
-  activeBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  activeBadgeText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#000',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Medium',
-  },
-  completedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(34,211,238,0.12)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 4,
-  },
-  completedBadgeText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#22d3ee',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Medium',
-  },
-
-  // ── Phase badge (Week N indicator) ───────────────────────────────
-  phaseBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginBottom: 0,
-  },
-  phaseText: {
-    fontSize: 9,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Medium',
-  },
-
-  // ── Card body ────────────────────────────────────────────────────
-  cardBody: {
-    gap: 10,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 18,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  statText: {
-    fontSize: 12,
-    color: '#9898a4',
-    fontWeight: '500',
-    fontFamily: 'Outfit-Medium',
-  },
-
-  // ── Training split preview ───────────────────────────────────────
-  exercisePreview: {
-    backgroundColor: '#111116',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-  },
-  previewLabel: {
-    fontSize: 10,
-    fontWeight: '500',
+  routineSubtitle: {
     color: '#55555f',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 1.3,
-    fontFamily: 'DMMono-Medium',
-  },
-  previewText: {
-    fontSize: 13,
-    color: '#f0f0f2',
-    lineHeight: 19,
-    fontFamily: 'Outfit-Regular',
-  },
-
-  // ── Progress section ─────────────────────────────────────────────
-  progressSection: {
-    backgroundColor: '#111116',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#f0f0f2',
-    fontFamily: 'Outfit-SemiBold',
-  },
-  progressStatus: {
     fontSize: 10,
-    fontWeight: '500',
-    textTransform: 'uppercase',
     letterSpacing: 1.3,
+    marginTop: 6,
     fontFamily: 'DMMono-Medium',
   },
-  progressBarContainer: {
-    height: 3,
+  progressTrack: {
+    height: 2,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 2,
+    marginTop: 12,
     overflow: 'hidden',
   },
-  progressBar: {
+  progressFill: {
     height: '100%',
     borderRadius: 2,
   },
 
-  // ── Block complete celebration ───────────────────────────────────
-  completedSection: {
-    alignItems: 'center',
-    paddingVertical: 6,
+  // ── Section labels ───────────────────────────────────────────────
+  sectionLabel: {
+    fontSize: 10,
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Medium',
+    marginBottom: 8,
+    paddingHorizontal: 18,
   },
-  completedHeader: {
+  sectionLabelMuted: {
+    color: '#55555f',
+  },
+  sectionLabelAccent: {
+    color: '#22d3ee',
+  },
+
+  // ── ACTIVE hero card ─────────────────────────────────────────────
+  heroCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 18,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  heroTextBlock: {
+    flex: 1,
+  },
+  heroName: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#f0f0f2',
+    letterSpacing: -0.3,
+    fontFamily: 'Outfit-SemiBold',
+    marginBottom: 5,
+  },
+  heroMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 4,
   },
-  completedTitle: {
-    fontSize: 13,
+  heroMetaText: {
+    fontSize: 11,
+    color: '#9898a4',
+    fontFamily: 'Outfit-Regular',
+  },
+  heroMetaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#3a3a44',
+  },
+  heroOpenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  heroOpenButtonText: {
+    fontSize: 12,
     fontWeight: '600',
+    color: '#000',
+    fontFamily: 'Outfit-SemiBold',
+    letterSpacing: -0.1,
+  },
+  heroProgressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  heroProgressLabel: {
+    fontSize: 9,
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Medium',
+    fontWeight: '600',
+  },
+  heroProgressMeta: {
+    fontSize: 9,
+    color: '#9898a4',
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Regular',
+  },
+  heroProgressBar: {
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  heroProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  // Completed hero variant (only shown if active block is fully done)
+  heroCompleteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  heroCompleteTitle: {
+    fontSize: 11,
+    letterSpacing: 1.3,
+    fontWeight: '600',
+    fontFamily: 'DMMono-Medium',
+  },
+
+  // ── Compact list rows ────────────────────────────────────────────
+  blockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: '#0a0a0f',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    marginHorizontal: 16,
+    marginBottom: 7,
+  },
+  blockRowStatus: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  blockRowStatusText: {
+    fontSize: 13,
+    color: '#9898a4',
+    fontFamily: 'Outfit-SemiBold',
+    fontWeight: '600',
+  },
+  blockRowContent: {
+    flex: 1,
+    gap: 3,
+  },
+  blockRowName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#f0f0f2',
     fontFamily: 'Outfit-SemiBold',
     letterSpacing: -0.2,
   },
-  completedSubtext: {
+  blockRowMeta: {
     fontSize: 11,
-    color: '#55555f',
-    fontWeight: '500',
-    fontFamily: 'DMMono-Regular',
-    letterSpacing: 0.3,
+    color: '#9898a4',
+    fontFamily: 'Outfit-Regular',
   },
 
-  // ── Add buttons (mesocycle / block) ──────────────────────────────
-  addMesocycleButton: {
+  // ── List ─────────────────────────────────────────────────────────
+  listContent: {
+    paddingTop: 4,
+    paddingBottom: 32,
+  },
+
+  // ── Add button (block + mesocycle) ───────────────────────────────
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
-    marginVertical: 4,
+    padding: 13,
+    marginHorizontal: 16,
+    marginTop: 12,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderRadius: 12,
     backgroundColor: 'transparent',
     gap: 8,
   },
-  addMesocycleText: {
+  addButtonText: {
     fontSize: 13,
     fontWeight: '500',
-    letterSpacing: 0.3,
-    fontFamily: 'Outfit-Medium',
-  },
-  addBlockButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 14,
-    marginVertical: 4,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-    gap: 8,
-  },
-  addBlockText: {
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
     fontFamily: 'Outfit-Medium',
   },
 
-  // ── Android-only add mesocycle modal ─────────────────────────────
+  // ── Android Add Mesocycle modal ──────────────────────────────────
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -306,9 +279,8 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#f0f0f2',
-    marginBottom: 16,
     textAlign: 'center',
-    letterSpacing: -0.3,
+    marginBottom: 20,
     fontFamily: 'Outfit-SemiBold',
   },
   input: {

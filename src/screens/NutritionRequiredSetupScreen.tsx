@@ -52,9 +52,20 @@ const requiredQuestionnaires: QuestionnaireCard[] = [
   },
 ];
 
+// ── Helper ────────────────────────────────────────────────────────
+
+function hexA(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function NutritionRequiredSetupScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { themeColor, themeColorLight } = useTheme();
+  const { themeColor } = useTheme();
   const [completionStatus, setCompletionStatus] = useState<NutritionCompletionStatus>({
     nutritionGoals: false,
     budgetCooking: false,
@@ -86,123 +97,171 @@ export default function NutritionRequiredSetupScreen() {
     if (questionnaire.id === 'nutrition') {
       const isCompleted = completionStatus[questionnaire.completionKey];
       navigation.navigate(questionnaire.navigationTarget as any, {
-        showResults: isCompleted
+        showResults: isCompleted,
       });
     } else if (questionnaire.id === 'sleep') {
       const isCompleted = completionStatus[questionnaire.completionKey];
       navigation.navigate(questionnaire.navigationTarget as any, {
-        showResults: isCompleted
+        showResults: isCompleted,
       });
     } else {
       navigation.navigate(questionnaire.navigationTarget as any);
     }
   };
 
-  const renderQuestionnaireCard = (questionnaire: QuestionnaireCard, index: number) => {
+  const completedCount = [
+    completionStatus.nutritionGoals,
+    completionStatus.budgetCooking,
+    completionStatus.sleepOptimization,
+  ].filter(Boolean).length;
+  const totalQuestionnaires = requiredQuestionnaires.length;
+  const allCompleted = completedCount === totalQuestionnaires;
+
+  const renderQuestionnaireCard = (questionnaire: QuestionnaireCard) => {
     const isCompleted = completionStatus[questionnaire.completionKey];
-    
+
     return (
       <TouchableOpacity
         key={questionnaire.id}
         style={[
           styles.setupItem,
-          isCompleted && {
-            backgroundColor: themeColor === '#ec4899' ? '#1f1325' : 
-                           themeColor === '#22d3ee' ? '#1e2238' :
-                           themeColor === '#10b981' ? '#0f1611' : '#1f1325',
-            borderColor: themeColor + '20',
+          {
+            backgroundColor: isCompleted ? hexA(themeColor, 0.05) : '#0a0a0f',
+            borderColor: isCompleted
+              ? hexA(themeColor, 0.3)
+              : 'rgba(255,255,255,0.05)',
           },
-          { borderLeftColor: isCompleted ? themeColor : '#27272a' }
         ]}
         onPress={() => handleQuestionnairePress(questionnaire)}
         activeOpacity={0.8}
       >
-        <View style={styles.setupItemContent}>
-          <View style={[
+        <View
+          style={[
             styles.iconContainer,
-            { backgroundColor: isCompleted ? themeColor + '20' : '#27272a' }
-          ]}>
-            <Ionicons 
-              name={questionnaire.icon as any} 
-              size={24} 
-              color={isCompleted ? themeColor : '#71717a'} 
-            />
-          </View>
-          
-          <View style={styles.itemDetails}>
+            {
+              backgroundColor: isCompleted
+                ? hexA(themeColor, 0.15)
+                : 'rgba(255,255,255,0.04)',
+              borderColor: isCompleted
+                ? hexA(themeColor, 0.3)
+                : 'rgba(255,255,255,0.06)',
+            },
+          ]}
+        >
+          <Ionicons
+            name={isCompleted ? 'checkmark' : (questionnaire.icon as any)}
+            size={22}
+            color={isCompleted ? themeColor : '#9898a4'}
+          />
+        </View>
+
+        <View style={styles.itemDetails}>
+          <View style={styles.itemTitleRow}>
             <Text style={styles.itemTitle}>{questionnaire.title}</Text>
-            <Text style={styles.itemDescription}>{questionnaire.description}</Text>
             {isCompleted && (
-              <View style={styles.completedIndicator}>
-                <Ionicons name="checkmark" size={16} color={themeColor} />
-                <Text style={[styles.completedText, { color: themeColor }]}>
-                  Completed
-                </Text>
+              <View
+                style={[
+                  styles.statusPill,
+                  {
+                    backgroundColor: hexA(themeColor, 0.15),
+                    borderColor: hexA(themeColor, 0.4),
+                  },
+                ]}
+              >
+                <Text style={[styles.statusPillText, { color: themeColor }]}>DONE</Text>
               </View>
             )}
           </View>
-          
-          <View style={styles.itemAction}>
-            {isCompleted ? (
-              <Ionicons name="chevron-forward" size={20} color="#71717a" />
-            ) : (
-              <View style={[styles.actionButton, { borderColor: themeColor }]}>
-                <Text style={[styles.actionButtonText, { color: themeColor }]}>
-                  Start
-                </Text>
-              </View>
-            )}
-          </View>
+          <Text style={styles.itemDescription}>{questionnaire.description}</Text>
+        </View>
+
+        <View style={styles.itemAction}>
+          {isCompleted ? (
+            <Ionicons name="chevron-forward" size={18} color="#55555f" />
+          ) : (
+            <View
+              style={[
+                styles.startButton,
+                {
+                  borderColor: hexA(themeColor, 0.4),
+                  backgroundColor: hexA(themeColor, 0.08),
+                },
+              ]}
+            >
+              <Text style={[styles.startButtonText, { color: themeColor }]}>START</Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
   };
 
-  const completedCount = [
-    completionStatus.nutritionGoals,
-    completionStatus.budgetCooking,
-    completionStatus.sleepOptimization
-  ].filter(Boolean).length;
-  const totalQuestionnaires = requiredQuestionnaires.length;
-  const allCompleted = completedCount === totalQuestionnaires;
-
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
       >
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            style={styles.backButton}
             onPress={() => navigation.goBack()}
+            style={styles.backButton}
             activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+            <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
-          
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>Profile Setup</Text>
-            {!allCompleted && (
-              <Text style={styles.subtitle}>
-                {completedCount}/{totalQuestionnaires} completed
-              </Text>
-            )}
-          </View>
+
+          <Text style={styles.headerLabel}>SETUP</Text>
+          <View style={styles.backButtonSpacer} />
         </View>
 
-        {allCompleted && (
-          <View style={[styles.completionBanner, { backgroundColor: themeColor + '20' }]}>
-            <Ionicons name="checkmark-circle" size={24} color={themeColor} />
-            <Text style={[styles.completionText, { color: themeColor }]}>
-              Profile setup complete - Ready to generate!
-            </Text>
-          </View>
-        )}
+        {/* Title block */}
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>Profile setup</Text>
+          <Text style={styles.subtitle}>
+            {allCompleted
+              ? 'ALL REQUIRED STEPS COMPLETE'
+              : `${completedCount} OF ${totalQuestionnaires} COMPLETE`}
+          </Text>
+        </View>
 
         <View style={styles.content}>
-          {requiredQuestionnaires.map((questionnaire, index) => 
-            renderQuestionnaireCard(questionnaire, index)
+          {/* Completion banner */}
+          {allCompleted && (
+            <View
+              style={[
+                styles.completionBanner,
+                {
+                  backgroundColor: hexA(themeColor, 0.06),
+                  borderColor: hexA(themeColor, 0.3),
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.completionIconWrap,
+                  {
+                    backgroundColor: hexA(themeColor, 0.15),
+                    borderColor: hexA(themeColor, 0.4),
+                  },
+                ]}
+              >
+                <Ionicons name="checkmark" size={16} color={themeColor} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.completionTitle, { color: themeColor }]}>
+                  Profile setup complete
+                </Text>
+                <Text style={styles.completionSubtitle}>READY TO GENERATE MEAL PLANS</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Questionnaire items */}
+          {requiredQuestionnaires.map((questionnaire) =>
+            renderQuestionnaireCard(questionnaire)
           )}
         </View>
       </ScrollView>
@@ -213,118 +272,162 @@ export default function NutritionRequiredSetupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0b',
+    backgroundColor: '#000',
   },
+
+  // Header
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272a',
-    position: 'relative',
+    paddingVertical: 10,
   },
   backButton: {
-    position: 'absolute',
-    left: 16,
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#0a0a0f',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  titleContainer: {
-    alignItems: 'center',
+  backButtonSpacer: {
+    width: 38,
+    height: 38,
+  },
+  headerLabel: {
+    color: '#9898a4',
+    fontSize: 11,
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Medium',
+  },
+
+  // Title block
+  titleBlock: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   title: {
-    fontSize: 24,
+    color: '#f0f0f2',
+    fontSize: 26,
     fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 2,
+    letterSpacing: -0.5,
+    fontFamily: 'Outfit-Bold',
+    lineHeight: 30,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#71717a',
-    fontWeight: '500',
+    color: '#55555f',
+    fontSize: 11,
+    letterSpacing: 1.3,
+    marginTop: 6,
+    fontFamily: 'DMMono-Medium',
   },
+
+  // Content
+  content: {
+    paddingHorizontal: 16,
+  },
+
+  // Completion banner
   completionBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
     gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  completionText: {
+  completionIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completionTitle: {
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
+    letterSpacing: -0.2,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 20,
+  completionSubtitle: {
+    color: '#55555f',
+    fontSize: 9,
+    letterSpacing: 1.3,
+    marginTop: 2,
+    fontFamily: 'DMMono-Medium',
   },
+
+  // Questionnaire item rows
   setupItem: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    borderLeftWidth: 4,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  setupItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 11,
+    borderWidth: 1,
     alignItems: 'center',
-    marginRight: 16,
+    justifyContent: 'center',
   },
   itemDetails: {
     flex: 1,
-  },
-  itemTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  itemDescription: {
-    fontSize: 14,
-    color: '#71717a',
-    lineHeight: 20,
-  },
-  completedIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
     gap: 4,
   },
-  completedText: {
-    fontSize: 12,
+  itemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itemTitle: {
+    fontSize: 15,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: '#f0f0f2',
+    letterSpacing: -0.2,
+    fontFamily: 'Outfit-SemiBold',
+  },
+  itemDescription: {
+    fontSize: 12,
+    color: '#9898a4',
+    lineHeight: 16,
+    fontFamily: 'Outfit-Regular',
+  },
+  statusPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  statusPillText: {
+    fontSize: 8,
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Medium',
   },
   itemAction: {
-    marginLeft: 12,
+    paddingLeft: 4,
   },
-  actionButton: {
+  startButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 7,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
   },
-  actionButtonText: {
-    fontSize: 12,
+  startButtonText: {
+    fontSize: 9,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Medium',
   },
 });

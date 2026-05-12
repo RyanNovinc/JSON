@@ -14,12 +14,12 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { styles } from './DaysScreen.styles';
+import DayRow from './DayRow';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BodyHighlighter, { ExtendedBodyPart, Slug } from 'react-native-body-highlighter';
+import { Slug, ExtendedBodyPart } from 'react-native-body-highlighter';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import AsyncStorageDebugger from '../utils/asyncStorageDebug';
 import RobustStorage from '../utils/robustStorage';
@@ -98,39 +98,25 @@ const SLUG_RENDER_ORDER: Slug[] = [
 ];
 
 // Map our muscle groups to body highlighter muscle slugs.
-// Hoisted out of component since it's a pure constant.
 const MUSCLE_TO_SLUG: { [key: string]: Slug | null } = {
-  // Core torso
   'chest': 'chest',
   'core': 'abs',
-
-  // Back regions
   'upper back': 'trapezius',
   'lats': 'upper-back',
   'traps': 'trapezius',
   'lower back': 'lower-back',
-
-  // Shoulders (library only has 'deltoids' - no front/back variants)
   'front delts': 'deltoids',
   'side delts': 'deltoids',
   'rear delts': 'deltoids',
-
-  // Arms
   'biceps': 'biceps',
   'triceps': 'triceps',
   'forearms': 'forearm',
-
-  // Legs
   'quads': 'quadriceps',
   'hamstrings': 'hamstring',
   'glutes': 'gluteal',
   'calves': 'calves',
-
-  // Other
   'neck': 'neck',
   'obliques': 'obliques',
-
-  // Unsupported by library
   'hip adductors': 'adductors',
   'hip abductors': 'gluteal',
   'shins': null,
@@ -142,11 +128,7 @@ const setsToIntensity = (sets: number): number => {
   return 0;
 };
 
-// Pure function: convert weekly volume map to body highlighter data array.
-// 1. Aggregates volume by slug (so 'upper back' + 'lats' both feed 'upper-back')
-// 2. Sorts in deterministic render order to prevent overlap-painting bugs
 const buildHighlighterData = (weeklyVolume: { [key: string]: number }): ExtendedBodyPart[] => {
-  // Aggregate volume by slug
   const slugVolume: Partial<Record<Slug, number>> = {};
 
   Object.entries(weeklyVolume).forEach(([muscle, volume]) => {
@@ -161,7 +143,6 @@ const buildHighlighterData = (weeklyVolume: { [key: string]: number }): Extended
   console.log('🔧 AGGREGATED SLUG VOLUMES:', slugVolume);
   console.log('🔧 Verification - upper-back total:', slugVolume['upper-back'], '(expected: upper back + lats)');
 
-  // Build array, then sort by deterministic render order
   return Object.entries(slugVolume)
     .map(([slug, totalSets]) => ({
       slug: slug as Slug,
@@ -170,7 +151,6 @@ const buildHighlighterData = (weeklyVolume: { [key: string]: number }): Extended
     .sort((a, b) => {
       const aIdx = SLUG_RENDER_ORDER.indexOf(a.slug);
       const bIdx = SLUG_RENDER_ORDER.indexOf(b.slug);
-      // Unknown slugs go to the end
       const aRank = aIdx === -1 ? 999 : aIdx;
       const bRank = bIdx === -1 ? 999 : bIdx;
       return aRank - bRank;
@@ -227,290 +207,6 @@ interface Day {
   exercises: Exercise[];
 }
 
-interface DayCardProps {
-  day: Day;
-  onPress: () => void;
-  onLongPress?: () => void;
-  isCompleted?: boolean;
-  currentWeek: number;
-  themeColor: string;
-  blockName: string;
-  refreshTrigger?: number;
-  completionStats?: {
-    duration: number;
-    totalVolume: number;
-    date: string;
-  };
-}
-
-function DayCard({ day, onPress, onLongPress, isCompleted, currentWeek, completionStats, themeColor, blockName, refreshTrigger }: DayCardProps) {
-  const [modifiedExercises, setModifiedExercises] = useState<Exercise[]>(day.exercises || []);
-  const [dynamicExercises, setDynamicExercises] = useState<Exercise[]>([]);
-  const [customizedDuration, setCustomizedDuration] = useState<number | undefined>(day.estimated_duration);
-
-  const exerciseCount = (modifiedExercises?.length || 0) + (dynamicExercises?.length || 0);
-
-  const loadWeekCustomizations = async () => {
-    try {
-      const customizationKey = `day_customization_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}`;
-      const savedCustomization = await AsyncStorage.getItem(customizationKey);
-      if (savedCustomization) {
-        const customizationData = JSON.parse(savedCustomization);
-
-        if (customizationData.exercises) {
-          setModifiedExercises(customizationData.exercises);
-        }
-
-        if (customizationData.estimated_duration !== undefined) {
-          setCustomizedDuration(customizationData.estimated_duration);
-        }
-
-        setDynamicExercises([]);
-        return;
-      } else {
-        setModifiedExercises(day.exercises || []);
-        setCustomizedDuration(day.estimated_duration);
-      }
-    } catch (error) {
-      setModifiedExercises(day.exercises || []);
-      setCustomizedDuration(day.estimated_duration);
-    }
-  };
-
-  const loadDynamicExercises = async () => {
-    const customizationKey = `day_customization_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}`;
-    try {
-      const savedCustomization = await AsyncStorage.getItem(customizationKey);
-      if (savedCustomization) {
-        setDynamicExercises([]);
-        return;
-      }
-    } catch (error) {
-      // Continue to load dynamic exercises if customization check fails
-    }
-
-    try {
-      const dynamicKey = `workout_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}_exercises`;
-      const savedDynamic = await AsyncStorage.getItem(dynamicKey);
-      if (savedDynamic) {
-        const parsedDynamic = JSON.parse(savedDynamic);
-        setDynamicExercises(parsedDynamic);
-      } else {
-        setDynamicExercises([]);
-      }
-    } catch (error) {
-      setDynamicExercises([]);
-    }
-  };
-
-  const loadSetsData = async () => {
-    try {
-      const savedKey = `workout_${blockName}_${day.day_name || 'unknown'}_week${currentWeek}_sets`;
-      const savedData = await AsyncStorage.getItem(savedKey);
-      if (savedData) {
-        const savedSetsData = JSON.parse(savedData);
-        const updatedExercises = (day.exercises || []).map((exercise, index) => {
-          if (savedSetsData[index] && savedSetsData[index].length > 0) {
-            return {
-              ...exercise,
-              sets: savedSetsData[index].length
-            };
-          }
-          return exercise;
-        });
-        setModifiedExercises(updatedExercises);
-      }
-    } catch (error) {
-      // Use template data if no saved sets
-    }
-  };
-
-  useEffect(() => {
-    loadWeekCustomizations();
-    loadSetsData();
-    loadDynamicExercises();
-  }, [blockName, day.day_name, currentWeek, refreshTrigger]);
-
-  const allExercises = [...(modifiedExercises || []), ...(dynamicExercises || [])];
-
-  const estimatedDuration = (() => {
-    if (exerciseCount === 0) {
-      return 0;
-    }
-
-    if (customizedDuration !== undefined) {
-      return customizedDuration;
-    }
-
-    if (day.estimated_duration && (day.exercises?.length || 0) > 0) {
-      return day.estimated_duration;
-    }
-
-    const totalRestTime = allExercises.reduce((total, ex) => {
-      const sets = ex.sets;
-      const restPerSet = (ex.rest || 120) / 60;
-      return total + (sets * restPerSet);
-    }, 0);
-
-    const executionTime = allExercises.reduce((total, ex) => {
-      const name = (ex.exercise || '').toLowerCase();
-      const isCompound = name.includes('squat') || name.includes('deadlift') ||
-                        name.includes('press') || name.includes('row') ||
-                        name.includes('pull up') || name.includes('chin up');
-      const timePerSet = isCompound ? 1.5 : 1;
-      return total + (ex.sets * timePerSet);
-    }, 0);
-
-    const warmupTime = 5;
-    const setupTime = exerciseCount * 0.5;
-
-    return Math.round(totalRestTime + executionTime + warmupTime + setupTime);
-  })();
-
-  const exercisesByType = {
-    compound: [] as string[],
-    isolation: [] as string[],
-    cardio: [] as string[]
-  };
-
-  allExercises.forEach(ex => {
-    const name = (ex.exercise || '').toLowerCase();
-    if (name.includes('squat') || name.includes('deadlift') || name.includes('press') ||
-        name.includes('row') || name.includes('pull up') || name.includes('chin up')) {
-      exercisesByType.compound.push(ex.exercise || 'Unknown Exercise');
-    } else if (name.includes('curl') || name.includes('extension') || name.includes('fly') ||
-              name.includes('raise') || name.includes('isolation')) {
-      exercisesByType.isolation.push(ex.exercise || 'Unknown Exercise');
-    } else if (name.includes('cardio') || name.includes('run') || name.includes('bike')) {
-      exercisesByType.cardio.push(ex.exercise || (ex as any).activity || 'Unknown Cardio');
-    } else {
-      exercisesByType.compound.push(ex.exercise || 'Unknown Exercise');
-    }
-  });
-
-  const getDayTypeColor = (dayName: string) => {
-    const name = (dayName || '').toLowerCase();
-    if (name.includes('push') || name.includes('chest') || name.includes('shoulder')) return '#f59e0b';
-    if (name.includes('pull') || name.includes('back') || name.includes('bicep')) return '#10b981';
-    if (name.includes('legs') || name.includes('lower') || name.includes('glute')) return '#a855f7';
-    if (name.includes('upper')) return themeColor;
-    if (name.includes('full') || name.includes('total')) return '#ef4444';
-    return themeColor;
-  };
-
-  const dayColor = getDayTypeColor(day.day_name || '');
-
-  if (isCompleted && completionStats) {
-    return (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          styles.cardCompleted,
-          { borderLeftColor: '#10b981' }
-        ]}
-        activeOpacity={0.8}
-        onPress={onPress}
-      >
-        <View style={styles.completedCardContent}>
-          <View style={styles.completedHeader}>
-            <View style={styles.completedTitleContainer}>
-              <Text style={styles.dayNameCompleted} numberOfLines={2}>
-                {day.day_name || 'Untitled Day'}
-              </Text>
-            </View>
-            <View style={styles.completedBadge}>
-              <Ionicons name="checkmark" size={12} color="#0a0a0b" />
-              <Text style={styles.completedBadgeText}>DONE</Text>
-            </View>
-          </View>
-          <View style={styles.completedStatsRow}>
-            <View style={styles.completedStat}>
-              <Text style={styles.completedStatValue}>{completionStats.duration}</Text>
-              <Text style={styles.completedStatLabel}>MIN</Text>
-            </View>
-            <View style={styles.completedStatDivider} />
-            <View style={styles.completedStat}>
-              <Text style={styles.completedStatValue}>{completionStats.totalVolume.toFixed(0)}</Text>
-              <Text style={styles.completedStatLabel}>KG</Text>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  }
-
-  if (exerciseCount === 0 && day.day_name && day.day_name.toUpperCase().includes('REST')) {
-    return (
-      <View style={[styles.restDayCard, { borderLeftColor: '#6b7280' }]}>
-        <View style={styles.restDayContent}>
-          <Ionicons name="bed-outline" size={24} color="#6b7280" />
-          <Text style={styles.restDayTitle}>{day.day_name}</Text>
-          <Text style={styles.restDaySubtitle}>Recovery & Rest</Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        { borderLeftColor: dayColor }
-      ]}
-      activeOpacity={0.8}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={800}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.cardTitle}>
-          <Text style={styles.dayName}>{day.day_name || 'Untitled Day'}</Text>
-          {exerciseCount > 0 && (
-            <View style={[styles.dayBadge, { backgroundColor: dayColor + '20' }]}>
-              <Text style={[styles.dayBadgeText, { color: dayColor }]}>
-                {estimatedDuration} min estimated
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={[styles.startButton, { backgroundColor: themeColor + '20' }]}>
-          <Ionicons name="play" size={16} color={themeColor} />
-          <Text style={[styles.startButtonText, { color: themeColor }]}>START</Text>
-        </View>
-      </View>
-
-      <View style={styles.cardBody}>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Ionicons name="barbell-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>{exerciseCount} exercises</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="fitness-outline" size={16} color="#71717a" />
-            <Text style={styles.statText}>{exercisesByType.compound.length} compound</Text>
-          </View>
-        </View>
-
-        <View style={styles.exerciseGrid}>
-          {allExercises.slice(0, 6).map((exercise, index) => (
-            <View key={index} style={styles.exerciseChip}>
-              <Text style={styles.exerciseChipText} numberOfLines={1}>
-                {exercise.exercise}
-              </Text>
-              <Text style={[styles.exerciseChipSets, { color: themeColor }]}>{exercise.sets}×{exercise.reps}</Text>
-            </View>
-          ))}
-          {exerciseCount > 6 && (
-            <View style={[styles.exerciseChip, styles.moreChip]}>
-              <Text style={styles.moreChipText}>+{exerciseCount - 6} more</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 export default function DaysScreen() {
   const navigation = useNavigation<DaysScreenNavigationProp>();
   const route = useRoute<DaysScreenRouteProp>();
@@ -534,9 +230,7 @@ export default function DaysScreen() {
   const [showRestDays, setShowRestDays] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Memoized volume calculation - only recomputes when localBlock actually changes.
-  // This prevents the body highlighter data from being rebuilt on every render,
-  // which was causing inconsistent rendering due to non-deterministic timing.
+  // Memoized volume calculation
   const weeklyVolume = useMemo(
     () => calculateWeeklyVolume(localBlock),
     [localBlock]
@@ -547,7 +241,6 @@ export default function DaysScreen() {
     [weeklyVolume]
   );
 
-  // Sorted muscle list for the volume grid (separate from highlighter sort).
   const sortedMuscles = useMemo(
     () => Object.entries(weeklyVolume)
       .sort(([, a], [, b]) => b - a)
@@ -887,24 +580,20 @@ export default function DaysScreen() {
       if (completed) {
         const parsedCompleted = JSON.parse(completed);
         console.log(`🔍 [LOAD-COMPLETION] Found completed workouts (${dataSource}):`, parsedCompleted);
-        
-        // Handle different data structures that might be stored
+
         let workoutKeys: string[] = [];
         if (Array.isArray(parsedCompleted)) {
           workoutKeys = parsedCompleted
-            .filter(item => typeof item === 'string') // Only keep strings (workout keys)
-            .filter(item => item.includes('_week')); // Only keep valid workout keys
-          
-          // If no valid workout keys found but we have objects, this might be corrupted data
+            .filter(item => typeof item === 'string')
+            .filter(item => item.includes('_week'));
+
           if (workoutKeys.length === 0 && parsedCompleted.length > 0) {
             console.warn('🔍 [LOAD-COMPLETION] Found corrupted completion data - resetting');
             workoutKeys = [];
           }
         }
-        
+
         setCompletedWorkouts(new Set(workoutKeys));
-        
-        // Force a re-render to ensure UI updates
         setRefreshTrigger(prev => prev + 1);
 
         if (dataSource !== 'robust') {
@@ -1027,7 +716,6 @@ export default function DaysScreen() {
 
       if (savedCustomization) {
         const customizationData = JSON.parse(savedCustomization);
-
         setExerciseList([...(customizationData.exercises || day.exercises)]);
         setEditedDuration(customizationData.estimated_duration?.toString() || day.estimated_duration?.toString() || '');
       } else {
@@ -1103,13 +791,6 @@ export default function DaysScreen() {
     setExerciseList(newList);
   };
 
-  const vibrantThemeColor = themeColor === '#10b981' ? '#059669' :
-                           themeColor === '#3b82f6' ? '#2563eb' :
-                           themeColor === '#8b5cf6' ? '#7c3aed' :
-                           themeColor === '#f59e0b' ? '#d97706' :
-                           themeColor === '#ef4444' ? '#dc2626' :
-                           themeColor;
-
   const createNewDay = async (dayName: string) => {
     try {
       const newDay: Day = {
@@ -1141,151 +822,213 @@ export default function DaysScreen() {
     }
   };
 
+  // ── Derived UI data ─────────────────────────────────────────────
+
+  const visibleDays = localBlock.days.filter(day => {
+    const isRestDay = day.day_name && day.day_name.toUpperCase().includes('REST');
+    return showRestDays || !isRestDay;
+  });
+
+  // Workout days (non-rest) for completion counting
+  const workoutDays = localBlock.days.filter(day => {
+    const isRestDay = day.day_name && day.day_name.toUpperCase().includes('REST');
+    return !isRestDay;
+  });
+  const completedCount = workoutDays.filter(day => isWorkoutCompleted(day.day_name || 'unknown')).length;
+  const totalWorkoutCount = workoutDays.length;
+
+  // Find the next incomplete non-rest day (becomes the NEXT UP hero)
+  const nextUpDay = workoutDays.find(day => !isWorkoutCompleted(day.day_name || 'unknown'));
+  const nextUpDayName = nextUpDay?.day_name;
+
+  // Block phase label
+  const blockPhaseLabel = (() => {
+    const name = localBlock.block_name || '';
+    const phase = name.includes('Hypertrophy')
+      ? 'HYPERTROPHY'
+      : name.includes('Strength')
+        ? 'STRENGTH'
+        : 'TRAINING';
+    const letter = name.split(' ')[1] || 'A';
+    return `BLOCK ${letter} · ${phase}`;
+  })();
+
+  // Filter days for the FlatList — exclude the NEXT UP day from the list (rendered separately)
+  const listDays = visibleDays.filter(day => day.day_name !== nextUpDayName);
+
+  // For pending day rows we need a 1-based position within the workout days (not visibleDays)
+  // so the index badge is stable regardless of rest-toggle state.
+  const dayPositionMap = useMemo(() => {
+    const map = new Map<string, number>();
+    workoutDays.forEach((day, idx) => {
+      map.set(day.day_name || 'unknown', idx + 1);
+    });
+    return map;
+  }, [workoutDays]);
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={handleBack}
           activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          <Ionicons name="chevron-back" size={22} color="#fff" />
         </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text style={styles.blockLabel}>BLOCK {localBlock.block_name.split(' ')[1] || 'A'}</Text>
-          <Text style={styles.blockPhase}>{localBlock.block_name.includes('Hypertrophy') ? 'Hypertrophy' : localBlock.block_name.includes('Strength') ? 'Strength' : 'Training'}</Text>
-        </View>
+
+        <Text style={styles.headerLabel}>{blockPhaseLabel}</Text>
 
         <TouchableOpacity
-          style={styles.restToggle}
+          style={styles.restToggleButton}
           onPress={() => {
             const newValue = !showRestDays;
             setShowRestDays(newValue);
             saveRestDayPreference(newValue);
           }}
           activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <View style={[styles.restToggleTrack, { backgroundColor: showRestDays ? themeColor : '#3f3f46' }]}>
-            <View style={[styles.restToggleThumb, {
-              transform: [{ translateX: showRestDays ? 14 : 0 }],
-              backgroundColor: '#ffffff'
-            }]} />
-          </View>
-          <Text style={styles.restToggleLabel}>Rest</Text>
+          <Ionicons
+            name={showRestDays ? 'bed' : 'bed-outline'}
+            size={16}
+            color={showRestDays ? themeColor : '#9898a4'}
+          />
         </TouchableOpacity>
       </View>
 
       <FlatList
-        data={localBlock.days.filter(day => {
-          const isRestDay = day.day_name && day.day_name.toUpperCase().includes('REST');
-          return showRestDays || !isRestDay;
-        })}
+        data={listDays}
         keyExtractor={(item, index) => `${item.day_name}-${index}`}
         ListHeaderComponent={() => (
-          <View style={styles.weekNavigationContainer}>
-            <View style={styles.weekNavigation}>
-              <TouchableOpacity
-                style={[styles.weekNavButton, currentWeek === 1 && styles.weekNavButtonDisabled]}
-                onPress={() => currentWeek > 1 && saveCurrentWeek(currentWeek - 1)}
-                disabled={currentWeek === 1}
-              >
-                <Ionicons
-                  name="chevron-back"
-                  size={20}
-                  color={currentWeek === 1 ? "#3f3f46" : "#71717a"}
-                />
-              </TouchableOpacity>
+          <>
+            {/* Title block */}
+            <View style={styles.titleBlock}>
+              <View style={styles.titleRow}>
+                <Text style={styles.weekTitle}>Week {currentWeek}</Text>
+                <TouchableOpacity
+                  style={styles.bookmarkButton}
+                  onPress={toggleBookmark}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name={isBookmarked && currentWeek === bookmarkedWeek ? 'bookmark' : 'bookmark-outline'}
+                    size={18}
+                    color={isBookmarked && currentWeek === bookmarkedWeek ? '#f7b220' : '#55555f'}
+                  />
+                </TouchableOpacity>
+              </View>
 
-              <View style={styles.weekDisplay}>
-                <View style={styles.weekHeader}>
-                  <Text style={styles.weekLabel}>Week</Text>
+              <View style={styles.weekSubtitleRow}>
+                <Text style={styles.weekSubtitle}>
+                  {completedCount} OF {totalWorkoutCount} COMPLETE THIS WEEK
+                </Text>
+                {isBookmarked && bookmarkedWeek && (
+                  <View style={styles.bookmarkPill}>
+                    <Ionicons name="bookmark" size={9} color="#f7b220" />
+                    <Text style={styles.bookmarkPillText}>WEEK {bookmarkedWeek}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Progress bar */}
+              <View style={styles.weekProgressTrack}>
+                <View
+                  style={[
+                    styles.weekProgressFill,
+                    {
+                      width: totalWorkoutCount > 0
+                        ? `${(completedCount / totalWorkoutCount) * 100}%`
+                        : '0%',
+                      backgroundColor: themeColor,
+                    },
+                  ]}
+                />
+              </View>
+
+              {/* Week pager */}
+              <View style={styles.weekPagerRow}>
+                <View style={styles.weekPagerLeft}>
                   <TouchableOpacity
-                    style={styles.bookmarkButton}
-                    onPress={toggleBookmark}
+                    style={[styles.weekPagerButton, currentWeek === 1 && styles.weekPagerButtonDisabled]}
+                    onPress={() => currentWeek > 1 && saveCurrentWeek(currentWeek - 1)}
+                    disabled={currentWeek === 1}
                     activeOpacity={0.7}
                   >
-                    <Ionicons
-                      name={isBookmarked && currentWeek === bookmarkedWeek ? "bookmark" : "bookmark-outline"}
-                      size={16}
-                      color={isBookmarked && currentWeek === bookmarkedWeek ? "#f59e0b" : "#71717a"}
-                    />
+                    <Ionicons name="chevron-back" size={13} color={currentWeek === 1 ? '#3a3a44' : '#9898a4'} />
+                  </TouchableOpacity>
+                  <Text style={styles.weekPagerLabel}>WEEK {currentWeek}/{totalWeeks}</Text>
+                  <TouchableOpacity
+                    style={[styles.weekPagerButton, currentWeek === totalWeeks && styles.weekPagerButtonDisabled]}
+                    onPress={() => currentWeek < totalWeeks && saveCurrentWeek(currentWeek + 1)}
+                    disabled={currentWeek === totalWeeks}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="chevron-forward" size={13} color={currentWeek === totalWeeks ? '#3a3a44' : '#fff'} />
                   </TouchableOpacity>
                 </View>
-                <View style={styles.weekNumberContainer}>
-                  <Text style={[styles.weekNumber, { color: themeColor }]}>{currentWeek}</Text>
-                  <Text style={[styles.weekTotal, { color: themeColor }]}>/ {totalWeeks}</Text>
-                </View>
-                <View style={styles.weekProgress}>
-                  <View
-                    style={[
-                      styles.weekProgressFill,
-                      {
-                        width: `${(currentWeek / totalWeeks) * 100}%`,
-                        backgroundColor: themeColor
-                      }
-                    ]}
-                  />
-                </View>
-              </View>
 
-              <TouchableOpacity
-                style={[styles.weekNavButton, currentWeek === totalWeeks && styles.weekNavButtonDisabled]}
-                onPress={() => currentWeek < totalWeeks && saveCurrentWeek(currentWeek + 1)}
-                disabled={currentWeek === totalWeeks}
-              >
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={currentWeek === totalWeeks ? "#3f3f46" : "#71717a"}
-                />
-              </TouchableOpacity>
-            </View>
-            {isBookmarked && bookmarkedWeek && (
-              <View style={styles.bookmarkIndicator}>
-                <Ionicons name="bookmark" size={10} color="#f59e0b" />
-                <Text style={styles.bookmarkText}>Bookmarked - Always opens to Week {bookmarkedWeek}</Text>
+                <TouchableOpacity
+                  style={styles.volumeButton}
+                  onPress={() => {
+                    const allExercises = (localBlock.days || []).flatMap((day: any) =>
+                      (day.exercises || []).map((ex: any) => ({
+                        ...ex,
+                        sets: ex.sets || 3,
+                      }))
+                    );
+
+                    navigation.navigate('WeekVolumeScreen', {
+                      exercises: allExercises,
+                      blockName: localBlock.name || 'Block',
+                      weekNumber: currentWeek,
+                      themeColor: themeColor,
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="barbell-outline" size={12} color={themeColor} />
+                  <Text style={[styles.volumeButtonText, { color: themeColor }]}>VOLUME</Text>
+                </TouchableOpacity>
               </View>
+            </View>
+
+            {/* NEXT UP hero */}
+            {nextUpDay && (
+              <>
+                <Text style={[styles.sectionLabel, styles.sectionLabelAccent, { color: themeColor }]}>
+                  NEXT UP
+                </Text>
+                <DayRow
+                  day={nextUpDay}
+                  dayNumber={dayPositionMap.get(nextUpDay.day_name || 'unknown') || 1}
+                  onPress={() => handleDayPress(nextUpDay)}
+                  onLongPress={() => handleDayLongPress(nextUpDay)}
+                  isCompleted={false}
+                  isNextUp={true}
+                  currentWeek={currentWeek}
+                  themeColor={themeColor}
+                  blockName={localBlock.block_name}
+                  refreshTrigger={refreshTrigger}
+                />
+              </>
             )}
 
-            {/* Volume Overview Section */}
-            <TouchableOpacity
-              style={styles.volumeToggle}
-              onPress={() => {
-                // Get all exercises from all days in the current week
-                const allExercises = (localBlock.days || []).flatMap((day: any) => 
-                  (day.exercises || []).map((ex: any) => ({
-                    ...ex,
-                    sets: ex.sets || 3
-                  }))
-                );
-                
-                navigation.navigate('WeekVolumeScreen', {
-                  exercises: allExercises,
-                  blockName: localBlock.name || 'Block',
-                  weekNumber: currentWeek,
-                  themeColor: themeColor,
-                });
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.volumeToggleContent}>
-                <Ionicons name="barbell-outline" size={16} color={themeColor} />
-                <Text style={[styles.volumeToggleText, { color: themeColor }]}>
-                  WEEK VOLUME
-                </Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={themeColor}
-                />
-              </View>
-            </TouchableOpacity>
-
-          </View>
+            {/* THIS WEEK label — only show when there are more days */}
+            {listDays.length > 0 && (
+              <Text style={[styles.sectionLabel, styles.sectionLabelMuted]}>
+                {nextUpDay ? 'THIS WEEK' : 'WORKOUTS'}
+              </Text>
+            )}
+          </>
         )}
         renderItem={({ item }) => (
-          <DayCard
+          <DayRow
             day={item}
+            dayNumber={dayPositionMap.get(item.day_name || 'unknown') || 1}
             onPress={() => handleDayPress(item)}
             onLongPress={() => handleDayLongPress(item)}
             isCompleted={isWorkoutCompleted(item.day_name)}
@@ -1300,8 +1043,9 @@ export default function DaysScreen() {
           <TouchableOpacity
             style={[styles.addDayButton, { borderColor: themeColor }]}
             onPress={() => handleAddDay()}
+            activeOpacity={0.7}
           >
-            <Ionicons name="add-circle-outline" size={24} color={themeColor} />
+            <Ionicons name="add-circle-outline" size={18} color={themeColor} />
             <Text style={[styles.addDayText, { color: themeColor }]}>Add Day</Text>
           </TouchableOpacity>
         )}
@@ -1374,7 +1118,7 @@ export default function DaysScreen() {
                 style={styles.modalCloseButton}
                 onPress={() => setShowExerciseModal(false)}
               >
-                <Ionicons name="close" size={24} color="#71717a" />
+                <Ionicons name="close" size={20} color="#9898a4" />
               </TouchableOpacity>
             </View>
 
@@ -1426,7 +1170,7 @@ export default function DaysScreen() {
                             <Ionicons
                               name="chevron-up"
                               size={16}
-                              color={index === 0 ? "#3f3f46" : themeColor}
+                              color={index === 0 ? '#3f3f46' : themeColor}
                             />
                           </TouchableOpacity>
                           <TouchableOpacity
@@ -1437,7 +1181,7 @@ export default function DaysScreen() {
                             <Ionicons
                               name="chevron-down"
                               size={16}
-                              color={index === exerciseList.length - 1 ? "#3f3f46" : themeColor}
+                              color={index === exerciseList.length - 1 ? '#3f3f46' : themeColor}
                             />
                           </TouchableOpacity>
                         </View>
@@ -1459,7 +1203,7 @@ export default function DaysScreen() {
                 style={[styles.modalCreateButton, { backgroundColor: themeColor }]}
                 onPress={handleSaveExerciseChanges}
               >
-                <Ionicons name="checkmark" size={20} color="#ffffff" />
+                <Ionicons name="checkmark" size={18} color="#000" />
                 <Text style={styles.modalCreateText}>Save Changes</Text>
               </TouchableOpacity>
             </View>
@@ -1469,4 +1213,3 @@ export default function DaysScreen() {
     </SafeAreaView>
   );
 }
-

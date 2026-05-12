@@ -21,7 +21,6 @@ const mockData = {
   hasHeartRateMonitor: true,
   cardioPreferences: ['rowing_machine', 'stationary_bike', 'swimming'],
   flexibilityDetails: 'Tight hip flexors and hamstrings',
-  exerciseNoteDetail: 'detailed' // Test new note detail format
 };
 
 console.log("=== TEST OUTPUT ===");

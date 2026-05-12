@@ -67,7 +67,7 @@ This document outlines the JSON schema for workout programs in the fitness app, 
 - **rest** (number, required): Rest time between sets in seconds
 - **restQuick** (number, optional): Quick rest option in seconds (typically 60% of normal rest)
 - **alternatives** (array, optional): Alternative exercises that can be substituted
-- **notes** (string, optional): Exercise-specific notes or form cues
+- **notes** (string, optional): RIR guidance
 - **previous** (object, optional): Previous performance data for progression tracking
   - **weight** (number): Last weight used
   - **reps** (number): Last reps completed

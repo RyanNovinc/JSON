@@ -18,12 +18,15 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const CALENDAR_INNER_WIDTH = SCREEN_WIDTH - 32 - 12;
 const DAY_CELL_WIDTH = Math.floor(CALENDAR_INNER_WIDTH / 7);
 
+import { useNavigation } from '@react-navigation/native';
+
 interface WorkoutCalendarProps {
-  visible: boolean;
-  onClose: () => void;
+  visible?: boolean;
+  onClose?: () => void;
 }
 
-export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarProps) {
+export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCalendarProps) {
+  const navigation = useNavigation();
   const { themeColor } = useTheme();
   const { convertWeight } = useWeightUnit();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -297,19 +300,12 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
            date.getFullYear() === currentDate.getFullYear();
   }).length;
 
-  return (
-    <Modal
-      visible={visible}
-      transparent={false}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View style={styles.container}>
+  const content = (
+    <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={onClose}
+            onPress={() => onClose ? onClose() : navigation.goBack()}
             style={styles.iconButton}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -524,8 +520,25 @@ export default function WorkoutCalendar({ visible, onClose }: WorkoutCalendarPro
           </View>
         </Modal>
       </View>
-    </Modal>
   );
+
+  // If onClose is provided, we're being used as a modal
+  if (onClose) {
+    return (
+      <Modal
+        visible={visible}
+        transparent={false}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
+      >
+        {content}
+      </Modal>
+    );
+  }
+
+  // Otherwise, we're being used as a navigation screen
+  return content;
 }
 
 // ── Sub-components ────────────────────────────────────────────────

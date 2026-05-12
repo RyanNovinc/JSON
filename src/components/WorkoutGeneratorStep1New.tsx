@@ -78,7 +78,6 @@ export default function WorkoutGeneratorStep1New({ onNext, onBack }: WorkoutGene
           equipmentPrefs.dislikedExercises.split(',').map((ex: string) => ex.trim()).filter((ex: string) => ex.length > 0) 
           : undefined,
         includeDirectCore: equipmentPrefs.includeDirectCore,
-        exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
       };
 
       return consolidatedData;

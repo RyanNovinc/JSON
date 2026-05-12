@@ -33,9 +33,20 @@ const optionalTools: ToolCard[] = [
   },
 ];
 
+// ── Helper ────────────────────────────────────────────────────────
+
+function hexA(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function OptionalToolsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { themeColor, themeColorLight } = useTheme();
+  const { themeColor } = useTheme();
 
   const handleToolPress = (tool: ToolCard) => {
     if (tool.navigationTarget) {
@@ -43,42 +54,33 @@ export default function OptionalToolsScreen() {
     }
   };
 
-  const renderToolCard = (tool: ToolCard, index: number) => {
+  const renderToolCard = (tool: ToolCard) => {
     return (
       <TouchableOpacity
         key={tool.id}
-        style={[styles.card, { 
-          borderColor: themeColor, 
-          shadowColor: themeColor 
-        }]}
-        activeOpacity={0.8}
+        style={styles.setupItem}
         onPress={() => handleToolPress(tool)}
+        activeOpacity={0.8}
       >
-        <View style={styles.cardContent}>
-          <View style={styles.iconContainer}>
-            <Ionicons 
-              name={tool.icon as any} 
-              size={32} 
-              color={themeColor}
-            />
-          </View>
-          
-          <View style={styles.textContainer}>
-            <Text style={[styles.cardTitle, { textShadowColor: themeColorLight }]}>
-              {tool.title}
-            </Text>
-            <Text style={[styles.cardDescription, { color: '#71717a' }]}>
-              {tool.description}
-            </Text>
-          </View>
-          
-          <View style={styles.arrowContainer}>
-            <Ionicons 
-              name="chevron-forward" 
-              size={24} 
-              color="#71717a"
-            />
-          </View>
+        <View
+          style={[
+            styles.iconContainer,
+            {
+              backgroundColor: hexA(themeColor, 0.12),
+              borderColor: hexA(themeColor, 0.3),
+            },
+          ]}
+        >
+          <Ionicons name={tool.icon as any} size={22} color={themeColor} />
+        </View>
+
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemTitle}>{tool.title}</Text>
+          <Text style={styles.itemDescription}>{tool.description}</Text>
+        </View>
+
+        <View style={styles.itemAction}>
+          <Ionicons name="chevron-forward" size={18} color="#55555f" />
         </View>
       </TouchableOpacity>
     );
@@ -86,27 +88,34 @@ export default function OptionalToolsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
       >
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={themeColor} />
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Profile Tools</Text>
-            <Text style={styles.headerSubtitle}>
-              Manage your workout preferences
-            </Text>
-          </View>
-          <View style={styles.placeholder} />
+
+          <Text style={styles.headerLabel}>TOOLS</Text>
+          <View style={styles.backButtonSpacer} />
         </View>
 
-        <View style={styles.cardsContainer}>
-          {optionalTools.map((tool, index) => 
-            renderToolCard(tool, index)
-          )}
+        {/* Title block */}
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>Profile tools</Text>
+          <Text style={styles.subtitle}>MANAGE YOUR WORKOUT PREFERENCES</Text>
+        </View>
+
+        {/* Tool list */}
+        <View style={styles.content}>
+          {optionalTools.map((tool) => renderToolCard(tool))}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -116,82 +125,103 @@ export default function OptionalToolsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0b',
+    backgroundColor: '#000',
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 10,
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingVertical: 10,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1a1a1b',
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#0a0a0f',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  headerContent: {
-    flex: 1,
-    alignItems: 'center',
+  backButtonSpacer: {
+    width: 38,
+    height: 38,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
+  headerLabel: {
+    color: '#9898a4',
+    fontSize: 11,
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Medium',
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#71717a',
-  },
-  cardsContainer: {
+
+  // Title block
+  titleBlock: {
     paddingHorizontal: 16,
-    gap: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
-  card: {
-    backgroundColor: '#1a1a1b',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#22d3ee',
-    padding: 20,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  title: {
+    color: '#f0f0f2',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    fontFamily: 'Outfit-Bold',
+    lineHeight: 30,
   },
-  cardContent: {
+  subtitle: {
+    color: '#55555f',
+    fontSize: 11,
+    letterSpacing: 1.3,
+    marginTop: 6,
+    fontFamily: 'DMMono-Medium',
+  },
+
+  // Content
+  content: {
+    paddingHorizontal: 16,
+  },
+
+  // Tool item rows (same style as RequiredSetupScreen setup items)
+  setupItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: '#0a0a0f',
+    borderColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 10,
   },
   iconContainer: {
-    marginRight: 16,
-  },
-  textContainer: {
-    flex: 1,
-    paddingRight: 16,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    textShadowOpacity: 0.3,
-  },
-  cardDescription: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  arrowContainer: {
-    marginLeft: 'auto',
-  },
-  placeholder: {
     width: 44,
     height: 44,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemDetails: {
+    flex: 1,
+    gap: 4,
+  },
+  itemTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#f0f0f2',
+    letterSpacing: -0.2,
+    fontFamily: 'Outfit-SemiBold',
+  },
+  itemDescription: {
+    fontSize: 12,
+    color: '#9898a4',
+    lineHeight: 16,
+    fontFamily: 'Outfit-Regular',
+  },
+  itemAction: {
+    paddingLeft: 4,
   },
 });

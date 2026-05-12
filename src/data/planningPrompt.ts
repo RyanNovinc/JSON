@@ -255,7 +255,7 @@ export const getRule3 = (hasActivityGoals: boolean): string => {
   }
 };
 
-export const STATIC_RULES_4_5_6_7 = `4. **Treat exercise names as identifiers** — once an exercise name appears in the plan, use that exact string everywhere (across blocks, in superset references, in notes). No variation.
+export const STATIC_RULES_4_5_6_7 = `4. **Treat exercise names as identifiers** — once an exercise name appears in the plan, use that exact string everywhere (across blocks, in superset references). No variation.
 5. **Make definitive choices** — explain reasoning and trade-offs, but commit to a plan. The user will tell you what to change.
 6. **Respect exercise preferences** — if the profile lists liked exercises, incorporate them where they fit the plan. If it lists disliked exercises, avoid them and use alternatives for that movement pattern.
 7. **Only program working sets** — do not include warm-up sets in the plan. The app tracks working sets only.
@@ -498,7 +498,7 @@ Apply the matrix to every exercise based on:
 - Mesocycle week
 - Set count for the exercise
 
-Output RIR guidance as part of each exercise's notes in the program document. Format per the user's experience tier as specified in the file. Keep RIR notes separate from form/technique notes.
+Output RIR guidance as a separate specification for each exercise in the program document. Format per the user's experience tier as specified in the file.
 `;
 
 export const getRepRangeGuidance = (goal: string): string => {

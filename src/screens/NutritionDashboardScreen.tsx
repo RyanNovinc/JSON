@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  Switch,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,8 +25,6 @@ interface GroupCard {
   icon: string;
   type: 'required' | 'optional';
   navigationTarget?: string;
-  completedCount?: number;
-  totalCount?: number;
 }
 
 const groups: GroupCard[] = [
@@ -35,24 +32,35 @@ const groups: GroupCard[] = [
     id: 'requiredSetup',
     title: 'Profile Setup',
     description: 'Required to generate meal plans',
-    icon: 'checkmark-circle-outline',
+    icon: 'restaurant-outline',
     type: 'required',
     navigationTarget: 'NutritionRequiredSetup',
   },
   {
     id: 'optionalTools',
     title: 'Profile Tools',
-    description: 'Optional - Manage your nutrition preferences',
-    icon: 'heart-outline',
+    description: 'Manage your nutrition preferences',
+    icon: 'options-outline',
     type: 'optional',
     navigationTarget: 'NutritionOptionalTools',
   },
 ];
 
+// ── Helper ────────────────────────────────────────────────────────
+
+function hexA(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function NutritionDashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { themeColor, themeColorLight } = useTheme();
-  const { customerInfo, purchasePackage } = useRevenueCat();
+  const { themeColor } = useTheme();
+  const { customerInfo } = useRevenueCat();
   const [completionStatus, setCompletionStatus] = useState<NutritionCompletionStatus>({
     nutritionGoals: false,
     budgetCooking: false,
@@ -60,14 +68,14 @@ export default function NutritionDashboardScreen() {
     fridgePantry: false,
     favoriteMeals: false,
   });
-  
+
   // DEV ONLY: Toggle entitlement view for testing
   const [forceNoEntitlement, setForceNoEntitlement] = useState(false);
+
   useEffect(() => {
     loadCompletionStatus();
   }, []);
 
-  // Reload data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       loadCompletionStatus();
@@ -83,105 +91,28 @@ export default function NutritionDashboardScreen() {
     }
   };
 
-
   const handleGroupPress = (group: GroupCard) => {
     if (group.navigationTarget) {
       navigation.navigate(group.navigationTarget as any);
     }
   };
 
-  const renderGroupCard = (group: GroupCard, index: number) => {
-    let displayDescription = group.description;
-    let statusColor = '#71717a';
-    let isCompleted = false;
-    
-    if (group.type === 'required') {
-      const completedCount = [
-        completionStatus.nutritionGoals,
-        completionStatus.budgetCooking,
-        completionStatus.sleepOptimization
-      ].filter(Boolean).length;
-      const totalCount = 3; // We have 3 required questionnaires
-      isCompleted = completedCount === totalCount;
-      
-      if (isCompleted) {
-        displayDescription = '';
-        statusColor = themeColor;
-      } else {
-        displayDescription = 'Complete your nutrition profile';
-      }
-    } else {
-      displayDescription = 'Optional - Manage your nutrition preferences';
-    }
-    
-    return (
-      <TouchableOpacity
-        key={group.id}
-        style={[
-          styles.card,
-          group.type === 'required' ? {
-            ...styles.requiredCard,
-            borderColor: themeColor
-          } : styles.optionalCard,
-          isCompleted && group.type === 'required' && {
-            ...styles.completedCard,
-            borderColor: themeColor,
-            backgroundColor: themeColor === '#ec4899' ? '#1f1325' : 
-                           themeColor === '#22d3ee' ? '#1e2238' :
-                           themeColor === '#10b981' ? '#0f1611' : '#1f1325'
-          }
-        ]}
-        activeOpacity={0.8}
-        onPress={() => handleGroupPress(group)}
-      >
-        {isCompleted && group.type === 'required' && (
-          <View style={[styles.completeBadge, { backgroundColor: themeColor }]}>
-            <Ionicons name="checkmark" size={16} color="#0a0a0b" />
-            <Text style={styles.completeBadgeText}>COMPLETE</Text>
-          </View>
-        )}
-        
-        {group.type === 'optional' && (
-          <View style={styles.optionalBadge}>
-            <Text style={styles.optionalBadgeText}>OPTIONAL</Text>
-          </View>
-        )}
-        
-        <View style={styles.cardContent}>
-          <View style={styles.cardIcon}>
-            <Ionicons 
-              name={isCompleted && group.type === 'required' ? "checkmark-circle" : group.icon as any}
-              size={48} 
-              color={group.type === 'required' ? themeColor : '#71717a'}
-            />
-          </View>
-          
-          <Text style={styles.cardTitle}>
-            {group.title}
-          </Text>
-          
-          <Text style={[styles.cardDescription, { color: statusColor }]}>
-            {displayDescription}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  // Only count actual questionnaires (exclude favoriteMeals)
+  // Only count actual questionnaires (exclude favoriteMeals, fridgePantry)
   const completedCount = [
     completionStatus.nutritionGoals,
-    completionStatus.budgetCooking, 
-    completionStatus.sleepOptimization
+    completionStatus.budgetCooking,
+    completionStatus.sleepOptimization,
   ].filter(Boolean).length;
 
-  const totalQuestionnaires = 3; // Only 3 actual questionnaires
-  
-  // Check if all questionnaires are completed
+  const totalQuestionnaires = 3;
   const allQuestionnairesCompleted = completedCount === totalQuestionnaires;
-  
+
+  // Entitlement check
+  const userHasNutritionAccess = hasNutritionAccess(customerInfo);
+  const actualHasAccess = __DEV__ && forceNoEntitlement ? false : userHasNutritionAccess;
+  const shouldShowLocked = !actualHasAccess;
+
   const handleGeneratePrompt = () => {
-    // COMPREHENSIVE LOGGING - Send this to Claude
     console.log('🔥 [GENERATE BUTTON CLICKED] Full Debug Report:');
     console.log('==========================================');
     console.log('📱 App State:', {
@@ -198,7 +129,7 @@ export default function NutritionDashboardScreen() {
       allEntitlements: customerInfo?.entitlements?.all || 'MISSING',
     });
     console.log('⚙️ Config Check:', {
-      ENABLE_NUTRITION_PAYWALL: true, // Should be true
+      ENABLE_NUTRITION_PAYWALL: true,
       expectedEntitlement: 'JSON Pro',
       checkingFor: 'nutrition_access entitlement',
     });
@@ -208,115 +139,206 @@ export default function NutritionDashboardScreen() {
       logicUsed: '!userHasNutritionAccess',
     });
     console.log('==========================================');
-    
+
     navigation.navigate('ImportMealPlan', { showStep1New: true });
   };
 
   const handlePurchase = () => {
-    // Navigate to the paywall screen with fade-in animation
-    // Pass a flag to force show the paywall regardless of entitlement status
     navigation.navigate('Payment' as any, { forceShowPaywall: true });
   };
 
-  // Check if user has nutrition access
-  const userHasNutritionAccess = hasNutritionAccess(customerInfo);
-  
-  // Debug logging
-  console.log('[NutritionDashboard] Debug info:', {
-    customerInfo: customerInfo ? 'present' : 'null',
-    hasAccess: userHasNutritionAccess,
-    entitlements: customerInfo?.entitlements?.active ? Object.keys(customerInfo.entitlements.active) : 'none',
-    ENABLE_NUTRITION_PAYWALL: REVENUECAT_CONFIG.debugMode,
-  });
-  
-  // Use actual entitlement check (production ready)
-  const actualHasAccess = __DEV__ && forceNoEntitlement ? false : userHasNutritionAccess;
-  const shouldShowLocked = !actualHasAccess;
+  const renderGroupCard = (group: GroupCard) => {
+    const isRequired = group.type === 'required';
+    const isCompleted = isRequired && allQuestionnairesCompleted;
+
+    const cardBorder = isCompleted
+      ? hexA(themeColor, 0.5)
+      : isRequired
+        ? hexA(themeColor, 0.2)
+        : 'rgba(255,255,255,0.05)';
+
+    const cardBg = isCompleted
+      ? hexA(themeColor, 0.05)
+      : '#0a0a0f';
+
+    return (
+      <TouchableOpacity
+        key={group.id}
+        style={[
+          styles.card,
+          {
+            backgroundColor: cardBg,
+            borderColor: cardBorder,
+          },
+        ]}
+        activeOpacity={0.85}
+        onPress={() => handleGroupPress(group)}
+      >
+        {/* Status pill — top right */}
+        {isCompleted ? (
+          <View style={[styles.statusPill, { backgroundColor: hexA(themeColor, 0.15), borderColor: hexA(themeColor, 0.4) }]}>
+            <Ionicons name="checkmark" size={11} color={themeColor} />
+            <Text style={[styles.statusPillText, { color: themeColor }]}>DONE</Text>
+          </View>
+        ) : isRequired ? (
+          <View style={[styles.statusPill, { backgroundColor: 'rgba(247,178,32,0.1)', borderColor: 'rgba(247,178,32,0.3)' }]}>
+            <Text style={[styles.statusPillText, { color: '#f7b220' }]}>REQUIRED</Text>
+          </View>
+        ) : (
+          <View style={[styles.statusPill, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' }]}>
+            <Text style={[styles.statusPillText, { color: '#9898a4' }]}>OPTIONAL</Text>
+          </View>
+        )}
+
+        {/* Card content (centered) */}
+        <View style={styles.cardContent}>
+          <View
+            style={[
+              styles.iconContainer,
+              {
+                backgroundColor: isRequired
+                  ? hexA(themeColor, 0.12)
+                  : 'rgba(255,255,255,0.04)',
+                borderColor: isRequired
+                  ? hexA(themeColor, 0.3)
+                  : 'rgba(255,255,255,0.08)',
+              },
+            ]}
+          >
+            <Ionicons
+              name={isCompleted ? 'checkmark' : (group.icon as any)}
+              size={32}
+              color={isRequired ? themeColor : '#9898a4'}
+            />
+          </View>
+
+          <Text style={styles.cardTitle}>{group.title}</Text>
+
+          <Text style={styles.cardDescription}>
+            {isCompleted ? 'Your nutrition profile is ready' : group.description}
+          </Text>
+
+          {/* Progress bar (only for incomplete required) */}
+          {isRequired && !isCompleted && (
+            <View style={styles.progressRow}>
+              <View style={styles.progressBarTrack}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width: `${(completedCount / totalQuestionnaires) * 100}%`,
+                      backgroundColor: themeColor,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {completedCount} / {totalQuestionnaires}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Scrollable Content */}
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContainer}
+        contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Nutrition Profile</Text>
-            {completedCount < totalQuestionnaires && (
-              <Text style={styles.headerSubtitle}>
-                Complete your profile to generate meal plans
-              </Text>
-            )}
-          </View>
+
+          <Text style={styles.headerLabel}>NUTRITION</Text>
+          <View style={styles.backButtonSpacer} />
         </View>
 
-        {/* Group Cards */}
+        {/* Title block */}
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>Nutrition profile</Text>
+          <Text style={styles.subtitle}>
+            {allQuestionnairesCompleted
+              ? 'READY TO GENERATE MEAL PLANS'
+              : `${completedCount} OF ${totalQuestionnaires} REQUIRED COMPLETE`}
+          </Text>
+        </View>
+
+        {/* Cards */}
         <View style={styles.cardsContainer}>
-          {groups.map((group, index) => 
-            renderGroupCard(group, index)
-          )}
+          {groups.map((group) => renderGroupCard(group))}
         </View>
 
-        {/* Generate Meal Plan Button - shown when all questionnaires are completed */}
+        {/* Action buttons when all complete */}
         {allQuestionnairesCompleted && (
-          <View style={styles.generatePromptContainer}>
+          <View style={styles.actionsContainer}>
             {!shouldShowLocked ? (
-              // User has access - show normal generate button
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.generatePromptButton, { backgroundColor: themeColor }]}
                 onPress={handleGeneratePrompt}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                <Ionicons name="rocket" size={28} color="#ffffff" />
-                <Text style={styles.generatePromptText}>Generate My Meal Plan</Text>
-                <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+                <Ionicons name="sparkles" size={18} color="#000" />
+                <Text style={styles.generatePromptText}>Generate meal plan</Text>
+                <Ionicons name="arrow-forward" size={18} color="#000" />
               </TouchableOpacity>
             ) : (
-              // User doesn't have access - show locked generate button
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.generatePromptButton, { backgroundColor: themeColor }]}
                 onPress={handlePurchase}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                <Ionicons name="lock-closed" size={28} color="#ffffff" />
-                <Text style={styles.generatePromptText}>Generate My Meal Plan</Text>
-                <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+                <Ionicons name="lock-closed" size={18} color="#000" />
+                <Text style={styles.generatePromptText}>Generate meal plan</Text>
+                <Ionicons name="arrow-forward" size={18} color="#000" />
               </TouchableOpacity>
             )}
-            
-            <TouchableOpacity 
-              style={[styles.myMealPlansButton, { borderColor: themeColor }]}
+
+            <TouchableOpacity
+              style={styles.myMealPlansButton}
               onPress={() => navigation.navigate('MyMealPlans')}
-              activeOpacity={0.8}
+              activeOpacity={0.7}
             >
-              <Ionicons name="heart" size={20} color={themeColor} />
-              <Text style={[styles.myMealPlansText, { color: themeColor }]}>My Meal Plans</Text>
-              <Ionicons name="chevron-down" size={20} color={themeColor} />
+              <Ionicons name="bookmark-outline" size={17} color="#f0f0f2" />
+              <Text style={styles.myMealPlansText}>My meal plans</Text>
+              <Ionicons name="chevron-forward" size={17} color="#9898a4" />
             </TouchableOpacity>
-            
+
             {/* DEV ONLY: Testing button to toggle entitlement view */}
             {__DEV__ && (
-              <TouchableOpacity 
-                style={[styles.testButton, { 
-                  backgroundColor: forceNoEntitlement ? '#ef4444' : '#22d3ee',
-                  borderColor: forceNoEntitlement ? '#ef4444' : '#22d3ee'
-                }]}
+              <TouchableOpacity
+                style={[
+                  styles.testButton,
+                  {
+                    backgroundColor: forceNoEntitlement ? 'rgba(239,68,68,0.1)' : hexA(themeColor, 0.1),
+                    borderColor: forceNoEntitlement ? 'rgba(239,68,68,0.3)' : hexA(themeColor, 0.3),
+                  },
+                ]}
                 onPress={() => setForceNoEntitlement(!forceNoEntitlement)}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <Ionicons 
-                  name={forceNoEntitlement ? "lock-closed" : "lock-open"} 
-                  size={16} 
-                  color="#ffffff" 
+                <Ionicons
+                  name={forceNoEntitlement ? 'lock-closed' : 'lock-open'}
+                  size={13}
+                  color={forceNoEntitlement ? '#ef4444' : themeColor}
                 />
-                <Text style={styles.testButtonText}>
-                  {forceNoEntitlement ? "TESTING: No Entitlement" : "TESTING: Has Entitlement"}
+                <Text
+                  style={[
+                    styles.testButtonText,
+                    { color: forceNoEntitlement ? '#ef4444' : themeColor },
+                  ]}
+                >
+                  {forceNoEntitlement ? 'TESTING: NO ENTITLEMENT' : 'TESTING: HAS ENTITLEMENT'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -330,177 +352,207 @@ export default function NutritionDashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0b',
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  backButton: {
-    position: 'absolute',
-    left: 20,
-    top: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#71717a',
-    textAlign: 'center',
+    backgroundColor: '#000',
   },
   scrollView: {
     flex: 1,
   },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingBottom: 120,
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#0a0a0f',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonSpacer: {
+    width: 38,
+    height: 38,
+  },
+  headerLabel: {
+    color: '#9898a4',
+    fontSize: 11,
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Medium',
+  },
+
+  // Title block
+  titleBlock: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+  title: {
+    color: '#f0f0f2',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    fontFamily: 'Outfit-Bold',
+    lineHeight: 30,
+  },
+  subtitle: {
+    color: '#55555f',
+    fontSize: 11,
+    letterSpacing: 1.3,
+    marginTop: 6,
+    fontFamily: 'DMMono-Medium',
+  },
+
+  // Cards — big tile style
   cardsContainer: {
-    paddingHorizontal: 20,
-    gap: 20,
-    flex: 1,
+    paddingHorizontal: 16,
+    gap: 12,
   },
   card: {
-    backgroundColor: '#18181b',
-    borderRadius: 20,
-    padding: 30,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
     minHeight: 200,
     justifyContent: 'center',
     position: 'relative',
-    borderWidth: 1,
-    borderColor: '#27272a',
   },
-  requiredCard: {
-    borderWidth: 2,
-    backgroundColor: '#18181b',
-  },
-  optionalCard: {
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-    backgroundColor: '#18181b',
-  },
-  completedCard: {
-    backgroundColor: '#1f1325',
-  },
-  completeBadge: {
+  statusPill: {
     position: 'absolute',
-    top: 15,
-    right: 15,
+    top: 14,
+    right: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
     gap: 4,
-  },
-  completeBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#0a0a0b',
-    letterSpacing: 0.5,
-  },
-  optionalBadge: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    backgroundColor: '#3f3f46',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    borderWidth: 1,
   },
-  optionalBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: 0.5,
+  statusPillText: {
+    fontSize: 9,
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Medium',
   },
   cardContent: {
     alignItems: 'center',
+    gap: 12,
   },
-  cardIcon: {
-    marginBottom: 20,
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
   },
   cardTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 10,
+    color: '#f0f0f2',
+    letterSpacing: -0.3,
+    fontFamily: 'Outfit-Bold',
     textAlign: 'center',
   },
   cardDescription: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#9898a4',
+    fontFamily: 'Outfit-Regular',
+    lineHeight: 18,
     textAlign: 'center',
-    lineHeight: 22,
+    paddingHorizontal: 12,
   },
-  generatePromptContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 30,
-    paddingBottom: 20,
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+    width: '70%',
+  },
+  progressBarTrack: {
+    flex: 1,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressText: {
+    fontSize: 10,
+    color: '#55555f',
+    letterSpacing: 0.5,
+    fontFamily: 'DMMono-Medium',
+  },
+
+  // Actions container (when all complete)
+  actionsContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    gap: 10,
   },
   generatePromptButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 14,
   },
   generatePromptText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
     flex: 1,
     textAlign: 'center',
+    letterSpacing: -0.2,
+    fontFamily: 'Outfit-SemiBold',
   },
   myMealPlansButton: {
-    borderWidth: 2,
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#0a0a0f',
+    gap: 10,
   },
   myMealPlansText: {
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: 0.3,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#f0f0f2',
     flex: 1,
     textAlign: 'center',
+    fontFamily: 'Outfit-Medium',
   },
+
+  // Dev testing button
   testButton: {
-    borderWidth: 2,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 6,
   },
   testButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
-    letterSpacing: 0.5,
+    fontSize: 10,
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Medium',
   },
 });

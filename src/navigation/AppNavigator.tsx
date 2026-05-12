@@ -28,6 +28,7 @@ import MealPrepDetailScreen from '../screens/MealPrepDetailScreen';
 import DaysScreen from '../screens/DaysScreen';
 import WorkoutLogScreenAdapter from '../screens/WorkoutLogScreenAdapter';
 import WorkoutReviewScreen from '../screens/WorkoutReviewScreen';
+import OneRMProgressionScreen from '../screens/OneRMProgressionScreen';
 import AppIconScreen from '../screens/AppIconScreen';
 import PaymentScreen from '../screens/PaymentScreen';
 import { FloatingWorkoutIndicator } from '../components/FloatingWorkoutIndicator';
@@ -180,6 +181,9 @@ export type RootStackParamList = {
     blockName: string;
     completionStats: any;
     currentWeek: number;
+  };
+  OneRMProgression: {
+    exerciseName: string;
   };
   // Nutrition screens
   NutritionQuestionnaire: undefined;
@@ -578,6 +582,13 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   headerShown: false,
                 }}
               />
+              <RootStack.Screen 
+                name="OneRMProgression" 
+                component={OneRMProgressionScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
               {/* Nutrition Screens */}
               <RootStack.Screen 
                 name="NutritionQuestionnaire" 
@@ -656,7 +667,7 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                     };
                   },
                 }}
-              />
+/>
               <RootStack.Screen 
                 name="WorkoutCalendar" 
                 component={WorkoutCalendar}
@@ -858,13 +869,19 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={WeightTrackerScreen}
                 options={{
                   headerShown: false,
-                  cardStyleInterpolator: ({ current }) => {
+                  animationTypeForReplace: 'push',
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => {
                     return {
                       cardStyle: {
-                        opacity: current.progress.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, 1],
-                        }),
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
                       },
                     };
                   },

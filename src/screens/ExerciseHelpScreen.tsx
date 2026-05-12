@@ -49,7 +49,7 @@ Instructions:
 1. [Step-by-step movement based on my specifications]
 2. [Continue based on the exercise I described]
 
-Additional Notes: [Any helpful training tips or form cues]
+Additional Notes: [Any helpful training tips]
 
 IMPORTANT: When categorizing muscles, think about which muscles are the PRIMARY MOVERS (doing most of the work) versus which are ASSISTERS/STABILIZERS. For example:
 - Push-ups: Primary = Chest, Triceps | Secondary = Shoulders, Core

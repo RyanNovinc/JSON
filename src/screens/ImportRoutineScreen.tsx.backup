@@ -1715,7 +1715,6 @@ export default function ImportRoutineScreen({ route }: any) {
         sessionStyle: equipmentPrefs.sessionStyle,
         likedExercises: equipmentPrefs.likedExercises,
         dislikedExercises: equipmentPrefs.dislikedExercises,
-        exerciseNoteDetail: equipmentPrefs.exerciseNoteDetail,
       };
 
       // Filter out undefined/null values and ensure data integrity
@@ -1983,8 +1982,6 @@ export default function ImportRoutineScreen({ route }: any) {
     };
     lines.push(`**Rest Style:** ${restStyleMap[data.sessionStyle || 'moderate'] || restStyleMap['moderate']}`);
 
-    // Exercise Note Detail
-    lines.push(`**Exercise Note Detail:** ${noteDetailMap[data.exerciseNoteDetail || 'minimal'] || 'Only non-obvious technique tips or specific setup instructions.'}`);
 
     lines.push(''); // blank line
 
@@ -2085,16 +2082,7 @@ export default function ImportRoutineScreen({ route }: any) {
                         return;
                       }
                       
-                      const notesInstruction = (() => {
-                        const detail = questionnaireData?.exerciseNoteDetail || 'brief';
-                        if (detail === 'detailed') {
-                          return '- Include detailed step-by-step form instructions for EVERY exercise in the notes field';
-                        } else if (detail === 'brief') {
-                          return '- Include brief coaching cues in the notes field for compound lifts only';
-                        } else {
-                          return '- Keep notes minimal — only include non-obvious technique tips or specific setup instructions';
-                        }
-                      })();
+                      const notesInstruction = '- Include exercise notes as appropriate';
                       
                       let planningPrompt;
                       try {

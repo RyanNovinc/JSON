@@ -45,9 +45,20 @@ const optionalTools: ToolCard[] = [
   },
 ];
 
+// ── Helper ────────────────────────────────────────────────────────
+
+function hexA(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function NutritionOptionalToolsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { themeColor, themeColorLight } = useTheme();
+  const { themeColor } = useTheme();
   const [completionStatus, setCompletionStatus] = useState<NutritionCompletionStatus>({
     nutritionGoals: false,
     budgetCooking: false,
@@ -110,7 +121,7 @@ export default function NutritionOptionalToolsScreen() {
   const handleToggleFridgePantry = async (value: boolean) => {
     try {
       setUseFridgePantry(value);
-      
+
       const results = await WorkoutStorage.loadFridgePantryResults();
       if (results) {
         const updatedResults = {
@@ -129,9 +140,8 @@ export default function NutritionOptionalToolsScreen() {
 
   const getFridgePantryDisplayText = () => {
     if (!useFridgePantry) return 'Off';
-    
     if (!fridgePantryPreferences) return 'Set up';
-    
+
     switch (fridgePantryPreferences.primaryApproach) {
       case 'maximize':
         return 'Maximize inventory';
@@ -148,103 +158,180 @@ export default function NutritionOptionalToolsScreen() {
     navigation.navigate(tool.navigationTarget as any);
   };
 
-  const renderToolCard = (tool: ToolCard, index: number) => {
+  const renderToolCard = (tool: ToolCard) => {
     const isCompleted = completionStatus[tool.completionKey];
-    const isFavorites = tool.id === 'favorites';
     const isFridgePantry = tool.id === 'fridgePantry';
-    
+
+    // Fridge & Pantry has special handling: completed but can be toggled off
+    const fridgePantryActive = isFridgePantry && isCompleted && useFridgePantry;
+    const fridgePantryInactive = isFridgePantry && isCompleted && !useFridgePantry;
+
+    // Determine active/cyan state for visual emphasis
+    const showCyan = isFridgePantry ? fridgePantryActive : isCompleted;
+
     return (
       <TouchableOpacity
         key={tool.id}
-        style={[styles.card, { 
-          borderColor: isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor, 
-          shadowColor: isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor 
-        }]}
-        activeOpacity={0.8}
+        style={[
+          styles.setupItem,
+          {
+            backgroundColor: showCyan ? hexA(themeColor, 0.05) : '#0a0a0f',
+            borderColor: showCyan
+              ? hexA(themeColor, 0.3)
+              : 'rgba(255,255,255,0.05)',
+          },
+        ]}
         onPress={() => handleToolPress(tool)}
+        activeOpacity={0.8}
       >
-        {/* Fridge Pantry Item Count */}
-        {isFridgePantry && fridgePantryCount > 0 && (
-          <View style={[styles.itemCountContainer, { backgroundColor: useFridgePantry ? themeColor : '#71717a' }]}>
-            <Text style={[styles.itemCountText, { color: useFridgePantry ? '#0a0a0b' : '#ffffff' }]}>{fridgePantryCount}</Text>
-          </View>
-        )}
+        {/* Top row: icon + title + status + chevron */}
+        <View style={styles.topRow}>
+          <View style={styles.iconWrapper}>
+            <View
+              style={[
+                styles.iconContainer,
+                {
+                  backgroundColor: showCyan
+                    ? hexA(themeColor, 0.15)
+                    : 'rgba(255,255,255,0.04)',
+                  borderColor: showCyan
+                    ? hexA(themeColor, 0.3)
+                    : 'rgba(255,255,255,0.06)',
+                },
+              ]}
+            >
+              <Ionicons
+                name={tool.icon as any}
+                size={22}
+                color={showCyan ? themeColor : '#9898a4'}
+              />
+            </View>
 
-        <View style={styles.cardContent}>
-          <View style={styles.iconContainer}>
-            <Ionicons 
-              name={tool.icon as any} 
-              size={32} 
-              color={isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor}
-            />
-          </View>
-          
-          <View style={styles.textContainer}>
-            <Text style={[styles.cardTitle, { textShadowColor: themeColorLight }]}>
-              {tool.title}
-            </Text>
-            <Text style={[styles.cardDescription, { color: isFavorites ? themeColor : (isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : isCompleted ? themeColor : '#71717a') }]}>
-              {isFavorites ? tool.description : (isFridgePantry && isCompleted ? getFridgePantryDisplayText() : isCompleted ? 'Completed' : tool.description)}
-            </Text>
-            
-            {/* Toggle for Fridge & Pantry */}
-            {isFridgePantry && (
-              <View style={styles.toggleContainer}>
-                <Text style={styles.toggleLabel}>Include in meal planning</Text>
-                <Switch
-                  value={useFridgePantry}
-                  onValueChange={handleToggleFridgePantry}
-                  trackColor={{ false: '#27272a', true: themeColor + '40' }}
-                  thumbColor={useFridgePantry ? themeColor : '#71717a'}
-                  ios_backgroundColor="#27272a"
-                />
+            {/* Item count badge — fridge pantry only */}
+            {isFridgePantry && fridgePantryCount > 0 && (
+              <View
+                style={[
+                  styles.countBadge,
+                  {
+                    backgroundColor: showCyan ? themeColor : '#3a3a44',
+                    borderColor: '#000',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.countBadgeText,
+                    { color: showCyan ? '#000' : '#f0f0f2' },
+                  ]}
+                >
+                  {fridgePantryCount}
+                </Text>
               </View>
             )}
           </View>
-          
-          <View style={styles.arrowContainer}>
-            {isFavorites || !isCompleted || (isFridgePantry && !isCompleted) ? (
-              <Ionicons 
-                name="chevron-forward" 
-                size={24} 
-                color="#71717a"
-              />
-            ) : (
-              <Ionicons 
-                name="checkmark-circle" 
-                size={24} 
-                color={isFridgePantry && isCompleted ? (useFridgePantry ? themeColor : '#71717a') : themeColor}
-              />
-            )}
+
+          <View style={styles.itemDetails}>
+            <View style={styles.itemTitleRow}>
+              <Text style={styles.itemTitle}>{tool.title}</Text>
+
+              {/* Status pill */}
+              {isFridgePantry ? (
+                <View
+                  style={[
+                    styles.statusPill,
+                    {
+                      backgroundColor: showCyan
+                        ? hexA(themeColor, 0.15)
+                        : 'rgba(255,255,255,0.04)',
+                      borderColor: showCyan
+                        ? hexA(themeColor, 0.4)
+                        : 'rgba(255,255,255,0.08)',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      { color: showCyan ? themeColor : '#9898a4' },
+                    ]}
+                  >
+                    {useFridgePantry ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              ) : isCompleted ? (
+                <View
+                  style={[
+                    styles.statusPill,
+                    {
+                      backgroundColor: hexA(themeColor, 0.15),
+                      borderColor: hexA(themeColor, 0.4),
+                    },
+                  ]}
+                >
+                  <Text style={[styles.statusPillText, { color: themeColor }]}>DONE</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Text style={styles.itemDescription}>
+              {isFridgePantry && isCompleted
+                ? getFridgePantryDisplayText()
+                : tool.description}
+            </Text>
+          </View>
+
+          <View style={styles.itemAction}>
+            <Ionicons name="chevron-forward" size={18} color="#55555f" />
           </View>
         </View>
+
+        {/* Toggle row — fridge pantry only */}
+        {isFridgePantry && (
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>Include in meal planning</Text>
+            <Switch
+              value={useFridgePantry}
+              onValueChange={handleToggleFridgePantry}
+              trackColor={{ false: 'rgba(255,255,255,0.08)', true: hexA(themeColor, 0.4) }}
+              thumbColor={useFridgePantry ? themeColor : '#9898a4'}
+              ios_backgroundColor="rgba(255,255,255,0.08)"
+            />
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
       >
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={themeColor} />
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Profile Tools</Text>
-            <Text style={styles.headerSubtitle}>
-              Manage your nutrition preferences
-            </Text>
-          </View>
-          <View style={styles.placeholder} />
+
+          <Text style={styles.headerLabel}>TOOLS</Text>
+          <View style={styles.backButtonSpacer} />
         </View>
 
-        <View style={styles.cardsContainer}>
-          {optionalTools.map((tool, index) => 
-            renderToolCard(tool, index)
-          )}
+        {/* Title block */}
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>Profile tools</Text>
+          <Text style={styles.subtitle}>MANAGE YOUR NUTRITION PREFERENCES</Text>
+        </View>
+
+        {/* Tool list */}
+        <View style={styles.content}>
+          {optionalTools.map((tool) => renderToolCard(tool))}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -254,103 +341,144 @@ export default function NutritionOptionalToolsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0b',
+    backgroundColor: '#000',
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 10,
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingVertical: 10,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1a1a1b',
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#0a0a0f',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  headerContent: {
-    flex: 1,
-    alignItems: 'center',
+  backButtonSpacer: {
+    width: 38,
+    height: 38,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
+  headerLabel: {
+    color: '#9898a4',
+    fontSize: 11,
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Medium',
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#71717a',
-  },
-  cardsContainer: {
+
+  // Title block
+  titleBlock: {
     paddingHorizontal: 16,
-    gap: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
-  card: {
-    backgroundColor: '#1a1a1b',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#22d3ee',
-    padding: 20,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    position: 'relative',
+  title: {
+    color: '#f0f0f2',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    fontFamily: 'Outfit-Bold',
+    lineHeight: 30,
   },
-  cardContent: {
+  subtitle: {
+    color: '#55555f',
+    fontSize: 11,
+    letterSpacing: 1.3,
+    marginTop: 6,
+    fontFamily: 'DMMono-Medium',
+  },
+
+  // Content
+  content: {
+    paddingHorizontal: 16,
+  },
+
+  // Tool item rows
+  setupItem: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  iconWrapper: {
+    position: 'relative',
   },
   iconContainer: {
-    marginRight: 16,
-  },
-  textContainer: {
-    flex: 1,
-    paddingRight: 16,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 4,
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    textShadowOpacity: 0.3,
-  },
-  cardDescription: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  arrowContainer: {
-    marginLeft: 'auto',
-  },
-  placeholder: {
     width: 44,
     height: 44,
-  },
-  itemCountContainer: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
+    borderRadius: 11,
+    borderWidth: 1,
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#0a0a0b',
-    zIndex: 10,
+    justifyContent: 'center',
   },
-  itemCountText: {
-    fontSize: 14,
+  countBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#0a0a0b',
+    fontFamily: 'DMMono-Medium',
+    letterSpacing: 0.2,
   },
+  itemDetails: {
+    flex: 1,
+    gap: 4,
+  },
+  itemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  itemTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#f0f0f2',
+    letterSpacing: -0.2,
+    fontFamily: 'Outfit-SemiBold',
+  },
+  itemDescription: {
+    fontSize: 12,
+    color: '#9898a4',
+    lineHeight: 16,
+    fontFamily: 'Outfit-Regular',
+  },
+  statusPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  statusPillText: {
+    fontSize: 8,
+    letterSpacing: 1.3,
+    fontFamily: 'DMMono-Medium',
+  },
+  itemAction: {
+    paddingLeft: 4,
+  },
+
+  // Toggle row for fridge pantry
   toggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -358,11 +486,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#27272a',
+    borderTopColor: 'rgba(255,255,255,0.05)',
   },
   toggleLabel: {
-    fontSize: 14,
-    color: '#a1a1aa',
+    fontSize: 12,
+    color: '#9898a4',
     flex: 1,
+    fontFamily: 'Outfit-Medium',
   },
 });

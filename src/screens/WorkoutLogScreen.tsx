@@ -24,7 +24,7 @@
  *   - DM Mono for numbers, Outfit for text
  */
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -57,6 +57,7 @@ import RepSchemeModal from '../components/RepSchemeModal';
 import ExerciseNotesModal, { NoteEntry } from '../components/ExerciseNotesModal';
 import WorkoutHeatmapModal from '../components/WorkoutHeatmapModal';
 import DeleteSetModal from '../components/DeleteSetModal';
+import OneRMProgressionModal from '../components/OneRMProgressionModal';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -303,6 +304,23 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // Cross-fade animation when swapping focused exercise
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  // Header buttons staggered animation
+  const buttonAnimations = useRef([
+    new Animated.Value(0), // body button
+    new Animated.Value(0), // barbell button  
+    new Animated.Value(0), // 1RM progression button
+    new Animated.Value(0), // notes button
+    new Animated.Value(0), // history button
+    new Animated.Value(0), // collapse button
+  ]).current;
+
+  // Dropdown arrow rotation animation
+  const arrowRotation = useRef(new Animated.Value(0)).current;
+
+  // Exercise alternatives dropdown animation
+  const dropdownOpacity = useRef(new Animated.Value(0)).current;
+  const dropdownScale = useRef(new Animated.Value(0.95)).current;
+
   // Image cache (in-memory; pair with AsyncStorage in production)
   const [imageCache, setImageCache] = useState<Record<string, string | null>>({});
   const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
@@ -359,6 +377,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [exerciseNotes, setExerciseNotes] = useState<{ [exerciseIndex: number]: NoteEntry[] }>({});
   const [exerciseInSettings, setExerciseInSettings] = useState<number | null>(null);
   
+  // Header buttons expansion state
+  const [headerButtonsExpanded, setHeaderButtonsExpanded] = useState(false);
+  
   // Delete set modal state
   const [showDeleteSetModal, setShowDeleteSetModal] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
   
@@ -369,12 +390,130 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   
   // Exercise selector dropdown state
   const [showExerciseSelector, setShowExerciseSelector] = useState<number | null>(null);
+  const [isMultiLine, setIsMultiLine] = useState<Map<number, boolean>>(new Map());
+  
+  // Header buttons staggered animation effect
+  useEffect(() => {
+    if (headerButtonsExpanded) {
+      // Reset all animations to 0
+      buttonAnimations.forEach(anim => anim.setValue(0));
+      
+      // Create staggered animations - RIGHT TO LEFT (reverse order)
+      // Collapse button (index 5) appears first, body button (index 0) appears last
+      const animations = buttonAnimations.map((anim, index) =>
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 150,
+          delay: (buttonAnimations.length - 1 - index) * 50, // Reverse the delay
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        })
+      );
+      
+      Animated.parallel(animations).start();
+    } else {
+      // When collapsing, animate out LEFT TO RIGHT (opposite direction)
+      // Body button (index 0) disappears first, collapse button (index 5) disappears last
+      const animations = buttonAnimations.map((anim, index) =>
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 120,
+          delay: index * 30, // Left to right, faster timing
+          useNativeDriver: true,
+        })
+      );
+      
+      Animated.parallel(animations).start();
+    }
+  }, [headerButtonsExpanded]);
+  
+  // Dropdown arrow rotation and alternatives animation effect
+  useEffect(() => {
+    if (showExerciseSelector !== null) {
+      // Opening: animate arrow rotation and dropdown appearance
+      Animated.parallel([
+        Animated.timing(arrowRotation, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownOpacity, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownScale, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.back(1.1)),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Closing: animate arrow rotation and dropdown disappearance
+      Animated.parallel([
+        Animated.timing(arrowRotation, {
+          toValue: 0,
+          duration: 150,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownScale, {
+          toValue: 0.95,
+          duration: 150,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showExerciseSelector]);
+  
+  // Mini card images cache (separate from main exercise images) - using state to trigger re-renders when loaded
+  const [miniCardImages, setMiniCardImages] = useState<Map<string, {start: any, end: any} | null>>(new Map());
+  
+  // Pre-load all mini card images when component mounts or theme changes
+  useEffect(() => {
+    if (resolveExerciseImagePair && exercises.length > 0) {
+      const loadAllImages = async () => {
+        const newImagesMap = new Map<string, {start: any, end: any} | null>();
+        
+        const promises = exercises.map(async (exercise) => {
+          const exerciseKey = exercise.exercise || exercise.name || '';
+          try {
+            const images = await resolveExerciseImagePair(exercise);
+            newImagesMap.set(exerciseKey, images);
+          } catch (error) {
+            newImagesMap.set(exerciseKey, null);
+          }
+        });
+        
+        await Promise.all(promises);
+        setMiniCardImages(newImagesMap);
+      };
+      
+      loadAllImages();
+    }
+  }, [exercises, resolveExerciseImagePair, themeColor]);
   
   // Workout History Modal state
   const [showWorkoutHistory, setShowWorkoutHistory] = useState<{
     exerciseName: string;
     exerciseIndex: number;
   } | null>(null);
+
+  // 1RM Progression Modal state
+  const [show1RMProgression, setShow1RMProgression] = useState<{
+    exerciseName: string;
+    exerciseIndex: number;
+  } | null>(null);
+
   
   // Timer context
   const { timer, startTimer, showModal: showTimerModal } = useTimer();
@@ -436,6 +575,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     };
     loadHistoryData();
   }, [showWorkoutHistory]);
+
+
 
 
   // Resolve image for current exercise (lazy, cached)
@@ -792,6 +933,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     globalUnit,
   } : null;
 
+
   return (
     <>
     <GestureDetector gesture={swipeGesture}>
@@ -849,34 +991,145 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             </TouchableOpacity>
 
             <View style={styles.overlayHeaderActions}>
-              <TouchableOpacity
-                onPress={() => setShowWorkoutHeatmap(true)}
-                style={styles.overlayBtn}
-              >
-                <Ionicons name="body-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleNotesPress(currentIndex)}
-                style={styles.overlayBtn}
-              >
-                <Ionicons name="barbell-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleExerciseNotesPress(currentIndex)}
-                style={styles.overlayBtn}
-              >
-                <Ionicons name="document-text-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  // Use the effective exercise name (including alternatives)
-                  const exerciseName = effectiveCurrentExercise.exercise;
-                  setShowWorkoutHistory({ exerciseName, exerciseIndex: currentIndex });
-                }}
-                style={styles.overlayBtn}
-              >
-                <Ionicons name="time-outline" size={20} color="#fff" />
-              </TouchableOpacity>
+              {headerButtonsExpanded ? (
+                <>
+                  <Animated.View
+                    style={{
+                      opacity: buttonAnimations[0],
+                      transform: [
+                        {
+                          translateX: buttonAnimations[0].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-20, 0],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => setShowWorkoutHeatmap(true)}
+                      style={styles.overlayBtn}
+                    >
+                      <Ionicons name="body-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <Animated.View
+                    style={{
+                      opacity: buttonAnimations[1],
+                      transform: [
+                        {
+                          translateX: buttonAnimations[1].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-20, 0],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => handleNotesPress(currentIndex)}
+                      style={styles.overlayBtn}
+                    >
+                      <Ionicons name="barbell-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <Animated.View
+                    style={{
+                      opacity: buttonAnimations[2],
+                      transform: [
+                        {
+                          translateX: buttonAnimations[2].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-20, 0],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Show 1RM progression modal
+                        const exerciseName = effectiveCurrentExercise.exercise;
+                        setShow1RMProgression({ exerciseName, exerciseIndex: currentIndex });
+                      }}
+                      style={styles.overlayBtn}
+                    >
+                      <Ionicons name="trending-up-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <Animated.View
+                    style={{
+                      opacity: buttonAnimations[3],
+                      transform: [
+                        {
+                          translateX: buttonAnimations[3].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-20, 0],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => handleExerciseNotesPress(currentIndex)}
+                      style={styles.overlayBtn}
+                    >
+                      <Ionicons name="document-text-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <Animated.View
+                    style={{
+                      opacity: buttonAnimations[4],
+                      transform: [
+                        {
+                          translateX: buttonAnimations[4].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-20, 0],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Use the effective exercise name (including alternatives)
+                        const exerciseName = effectiveCurrentExercise.exercise;
+                        setShowWorkoutHistory({ exerciseName, exerciseIndex: currentIndex });
+                      }}
+                      style={styles.overlayBtn}
+                    >
+                      <Ionicons name="time-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <Animated.View
+                    style={{
+                      opacity: buttonAnimations[5],
+                      transform: [
+                        {
+                          translateX: buttonAnimations[5].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-20, 0],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => setHeaderButtonsExpanded(false)}
+                      style={styles.overlayBtn}
+                    >
+                      <Ionicons name="chevron-up" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </Animated.View>
+                </>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setHeaderButtonsExpanded(true)}
+                  style={styles.overlayBtn}
+                >
+                  <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -889,17 +1142,70 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         >
           {/* Exercise title and info */}
           <View style={styles.titleRow}>
-            <View style={{ flex: 1, marginRight: 12 }}>
+            <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
               <TouchableOpacity
-                style={styles.titleButton}
+                style={[styles.titleButton, isMultiLine.get(currentIndex) && styles.titleButtonMultiline]}
                 onPress={() => allExercises.length > 1 && setShowExerciseSelector(showExerciseSelector === currentIndex ? null : currentIndex)}
                 activeOpacity={allExercises.length > 1 ? 0.7 : 1}
               >
-                <Text style={styles.title} numberOfLines={2}>
+                <Text 
+                  style={styles.title} 
+                  numberOfLines={2}
+                  onTextLayout={(event) => {
+                    const { lines } = event.nativeEvent;
+                    const isMultiLineText = lines.length > 1;
+                    setIsMultiLine(prev => {
+                      const newMap = new Map(prev);
+                      newMap.set(currentIndex, isMultiLineText);
+                      return newMap;
+                    });
+                  }}
+                >
                   {currentExerciseName}
+                  {allExercises.length > 1 && isMultiLine.get(currentIndex) && (
+                    <Text style={styles.inlineArrow}>
+                      {' '}
+                      <Animated.View
+                        style={{
+                          transform: [
+                            {
+                              rotate: arrowRotation.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: ['0deg', '180deg'],
+                              }),
+                            },
+                          ],
+                        }}
+                      >
+                        <Ionicons 
+                          name="chevron-down"
+                          size={18} 
+                          color={themeColor} 
+                        />
+                      </Animated.View>
+                    </Text>
+                  )}
                 </Text>
-                {allExercises.length > 1 && (
-                  <Ionicons name="chevron-down" size={18} color={themeColor} style={{ marginLeft: 8 }} />
+                {allExercises.length > 1 && !isMultiLine.get(currentIndex) && (
+                  <Animated.View
+                    style={{
+                      marginLeft: 8,
+                      transform: [
+                        {
+                          rotate: arrowRotation.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0deg', '180deg'],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <Ionicons 
+                      name="chevron-down"
+                      size={18} 
+                      color={themeColor} 
+                    />
+                  </Animated.View>
                 )}
               </TouchableOpacity>
               {!!(effectiveCurrentExercise.primaryMuscles?.length ||
@@ -922,7 +1228,22 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
           {/* Exercise selector dropdown */}
           {showExerciseSelector === currentIndex && allExercises.length > 1 && (
-            <View style={styles.exerciseSelector}>
+            <Animated.View 
+              style={[
+                styles.exerciseSelector,
+                {
+                  opacity: dropdownOpacity,
+                  transform: [
+                    {
+                      scaleY: dropdownScale,
+                    },
+                    {
+                      scaleX: dropdownScale,
+                    },
+                  ],
+                },
+              ]}
+            >
               {allExercises.map((exerciseName, index) => {
                 const preferredExercise = exercisePreferences[currentExercise.exercise];
                 const isSelected = index === selectedIndex;
@@ -971,7 +1292,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </Animated.View>
           )}
 
           {/* Prescription banner (week + sets × reps + RIR) */}
@@ -1044,6 +1365,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                   isActive={isActive}
                   onPress={() => swapFocus(idx)}
                   onLongPress={() => handleExerciseLongPress(idx)}
+                  exerciseImages={miniCardImages.get(effectiveExercise.exercise || effectiveExercise.name || '') || null}
                 />
                 
                 {/* Show appropriate UI between exercises */}
@@ -1103,6 +1425,18 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
     {/* Exercise History Modal */}
     {historyModalProps && <ExerciseHistoryModal {...historyModalProps} />}
+
+    {/* 1RM Progression Modal */}
+    {show1RMProgression && (
+      <OneRMProgressionModal
+        visible={true}
+        onClose={() => setShow1RMProgression(null)}
+        exerciseName={show1RMProgression.exerciseName}
+        themeColor={themeColor}
+        globalUnit={globalUnit}
+      />
+    )}
+
 
     {/* Superset Selection Modal */}
     <SupersetSelectionModal
@@ -1449,15 +1783,17 @@ interface ExerciseMiniCardProps {
   isActive?: boolean;
   onPress: () => void;
   onLongPress?: () => void;
+  exerciseImages?: {start: any, end: any} | null;
 }
 
-function ExerciseMiniCard({
+const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
   exercise,
   progress,
   themeColor,
   isActive = false,
   onPress,
   onLongPress,
+  exerciseImages,
 }: ExerciseMiniCardProps) {
   const allDone = progress.total > 0 && progress.completed === progress.total;
   return (
@@ -1473,11 +1809,29 @@ function ExerciseMiniCard({
       activeOpacity={0.75}
     >
       <View style={styles.miniIcon}>
-        <Ionicons
-          name={allDone ? 'checkmark-circle' : isActive ? 'play-circle' : 'barbell-outline'}
-          size={20}
-          color={allDone ? themeColor : isActive ? themeColor : '#9898a4'}
-        />
+        {exerciseImages?.start ? (
+          <Image
+            source={exerciseImages.start}
+            style={styles.miniExerciseImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <Ionicons
+            name={allDone ? 'checkmark-circle' : isActive ? 'play-circle' : 'barbell-outline'}
+            size={20}
+            color={allDone ? themeColor : isActive ? themeColor : '#9898a4'}
+          />
+        )}
+        {/* Status overlay for completed/active states when image is shown */}
+        {exerciseImages?.start && (allDone || isActive) && (
+          <View style={styles.miniIconOverlay}>
+            <Ionicons
+              name={allDone ? 'checkmark-circle' : 'play-circle'}
+              size={16}
+              color={themeColor}
+            />
+          </View>
+        )}
       </View>
 
       <View style={{ flex: 1 }}>
@@ -1517,7 +1871,7 @@ function ExerciseMiniCard({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // ── Superset Connector Component ──────────────────────────────────
 
@@ -1915,6 +2269,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     fontFamily: 'Outfit-Bold',
     lineHeight: 26,
+    flexShrink: 1,
   },
   muscles: {
     color: '#55555f',
@@ -1927,6 +2282,8 @@ const styles = StyleSheet.create({
   // ── 1RM badge ─────────────────────────────────
   oneRMBadge: {
     alignItems: 'flex-end',
+    minWidth: 80,
+    flexShrink: 0,
   },
   oneRMLabel: {
     color: '#55555f',
@@ -2073,6 +2430,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  miniExerciseImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
+  miniIconOverlay: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#000',
+    borderRadius: 8,
+    padding: 1,
   },
   miniTitle: {
     color: '#f0f0f2',
@@ -2358,6 +2730,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  titleButtonMultiline: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  inlineArrow: {
+    color: '#22d3ee',
+  },
   exerciseSelector: {
     marginTop: 8,
     gap: 4,
@@ -2576,5 +2955,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     lineHeight: 18,
   },
+
 
 });

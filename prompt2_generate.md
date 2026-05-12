@@ -28,7 +28,7 @@ The plan is fully self-contained: it lists all exercise pools, block structures,
 
 1. **The plan is authoritative** — use the exercise names, sets, muscle tags, superset pairings, and day structure exactly as specified. Do not add, remove, or rename exercises.
 2. **Treat exercise names as identifiers** — use the exact same string for the same exercise across all blocks, days, notes, and superset references. Never vary naming (e.g., always "Overhead Cable Extension", never "Cable Overhead Extension").
-3. **Design what the plan doesn't specify** — you are responsible for rep progressions, rest periods, alternative exercises, and technique notes. The plan provides structure; you provide programming detail.
+3. **Design what the plan doesn't specify** — you are responsible for rep progressions, rest periods, and alternative exercises. The plan provides structure; you provide programming detail.
 4. **Only program working sets** — do not include warm-up sets. The app tracks working sets only.
 5. **The plan is self-contained** — it contains every exercise pool, block structure, and periodization detail needed to generate any block. Always reference the plan for exercise names and structure — never rely on memory of prior blocks in the conversation. If the plan uses a diff-based format for later blocks (referencing carryovers from earlier blocks), first reconstruct the complete exercise list by applying the stated changes to the referenced base block, then generate JSON from that complete list. Every block's JSON must contain all exercises for all days.
 
@@ -82,11 +82,11 @@ Each exercise must include 2 alternatives (or 1 alternative for bodyweight-only 
 
 ### Notes
 
-Only include non-obvious technique tips or specific setup instructions. Do not add notes for standard exercises performed in standard ways. If the plan includes notes for an exercise, carry them through.
+Include RIR guidance from the plan in the notes field.
 
 ### Supersets
 
-Place superset exercises adjacent in the exercises array. Include "Superset with [exact exercise name]" in both exercises' notes field. The plan marks supersets with SS[n]a/SS[n]b notation — translate these to adjacent array entries.
+Place superset exercises adjacent in the exercises array. The plan marks supersets with SS[n]a/SS[n]b notation — translate these to adjacent array entries.
 
 ### Cardio Rotation
 
