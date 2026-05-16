@@ -12,6 +12,7 @@ import * as ExpoSplashScreen from 'expo-splash-screen';
 import SplashScreen from './src/components/SplashScreen';
 import { WorkoutStorage } from './src/utils/storage';
 import { validateProductionEnvironment } from './src/utils/environmentValidator';
+import { validateAll } from './src/utils/curated_meals_validation';
 
 // Keep the native splash screen visible while loading
 ExpoSplashScreen.preventAutoHideAsync();
@@ -31,6 +32,21 @@ function AppContent() {
   useEffect(() => {
     // Validate production environment configuration
     validateProductionEnvironment();
+    
+    // Validate curated meals data integrity
+    try {
+      validateAll();
+      console.log('✅ [CURATED MEALS] Validation passed');
+    } catch (error) {
+      console.error('[CURATED MEALS VALIDATION FAILED]', error);
+      // In development mode, also surface the error visibly
+      if (__DEV__) {
+        // Re-throw to show in React Native's red screen
+        setTimeout(() => {
+          throw new Error(`[CURATED MEALS VALIDATION FAILED] ${error.message}`);
+        }, 0);
+      }
+    }
     
     // Hide native splash screen immediately to show our custom one
     ExpoSplashScreen.hideAsync();

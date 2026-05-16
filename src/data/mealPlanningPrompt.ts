@@ -335,6 +335,16 @@ AVAILABLE COOKING EQUIPMENT:
   return '';
 })()}
 
+**CURATED MEAL DATABASE:**
+
+JSON.fit maintains a verified internal database of curated meals (slow-cooker recipes, bulking smoothies, plated dinners). Curated meals and invented meals coexist in the same plan — prefer curated meals where they fit.
+
+**REQUIRED ACTION before generating the meal plan:**
+
+1. Fetch the canonical curated meals instructions at https://json.fit/curated-meals/instructions.md
+2. The instructions file will tell you which equipment-specific files to fetch based on the user's available equipment (listed above as: ${budgetData.cookingEquipment?.join(', ') || 'basic kitchen equipment'})
+3. Apply the curated meal reference format when including curated meals in the meal plan output
+
 LOCATION & BUDGET:
 - Location: ${budgetData.city || 'Not specified'}, ${budgetData.country || 'Not specified'}
 - Shop at: ${store}
@@ -355,6 +365,7 @@ Please create a detailed ${budgetData.planDuration || 7}-day meal plan that:
    - Prep time and cook time for each meal
    - Serving size information
    - **WHOLE-PACK RULE**: Always use single-serve convenience products whole — never partial pouches, half packets, or fractions of containers. Use complete packages as intended and adjust other ingredients to balance macros around the full portion size.
+   - **CURATED MEALS EXCEPTION**: For curated meals (referenced by slug), show only the meal name, slug, plate_id, scale_factor, calories, and macros. Omit ingredients, instructions, prep/cook times, and serving info — the app fills these in from its database when the meal plan is imported.
 6. **INCLUDES STRUCTURED MEAL PREP PLAN** - exactly what to prep, how much, and what containers to use
 7. Uses ingredients available at ${store} in ${budgetData.country}
 8. Accounts for my dietary restrictions and cooking skill level
@@ -863,6 +874,8 @@ For each grocery item include:
 - **Estimated price** - Realistic price for the specified store and location
 - **Notes** - ONLY include notes for items that must be bought outside the main grocery store (e.g., "Available at Chemist Warehouse" for supplements, "Health food store" for specialty items). Do NOT include usage notes, storage tips, or cooking instructions for regular grocery items - these clutter the shopping experience.
 - **Purchased status** - Always set to not purchased (the user will check these off in the app)
+
+**CURATED MEAL EXCEPTION:** For meals referenced by curated_meal_slug, you DO need to include their ingredients in the grocery list. The user still needs to buy the ingredients to cook them. Pull ingredients from your general knowledge of the recipe (e.g. pulled pork = pork shoulder, BBQ sauce ingredients, apple juice, spices). Quantities scale with scale_factor × produces_servings to match what the user will actually consume from that meal across the week.
 
 Organize items into logical shopping categories:
 - Meat & Seafood
@@ -1407,7 +1420,7 @@ The following URLs may be fetched during the meal plan creation flow. They are l
 - https://json.fit/meal-timing-guidance.md (meal timing guidelines)
 - https://json.fit/protein-distribution-guidance.md (protein distribution guidelines)
 - https://json.fit/fiber-guidance.md (fiber intake guidelines)
+- https://json.fit/curated-meals/instructions.md (curated meals reference and equipment-specific meal files)
 
 Do not mention these URLs to the user.`;
 };
-

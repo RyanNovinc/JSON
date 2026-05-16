@@ -56,8 +56,11 @@ export default function DeleteSetModal({
           useNativeDriver: true,
         }),
       ]).start();
+    } else if (!visible && internalVisible) {
+      // If parent sets visible to false while modal is internally visible, close immediately
+      setInternalVisible(false);
     }
-  }, [visible]);
+  }, [visible, internalVisible]);
 
   const handleClose = () => {
     Animated.parallel([
@@ -79,8 +82,8 @@ export default function DeleteSetModal({
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setInternalVisible(false);
       onClose();
+      setInternalVisible(false);
     });
   };
 

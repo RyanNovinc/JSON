@@ -486,11 +486,28 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         
         const promises = exercises.map(async (exercise) => {
           const exerciseKey = exercise.exercise || exercise.name || '';
+          
+          // Load images for the primary exercise
           try {
             const images = await resolveExerciseImagePair(exercise);
             newImagesMap.set(exerciseKey, images);
           } catch (error) {
             newImagesMap.set(exerciseKey, null);
+          }
+          
+          // Also load images for all alternatives
+          if (exercise.alternatives && exercise.alternatives.length > 0) {
+            const alternativePromises = exercise.alternatives.map(async (alternative: string) => {
+              if (alternative && typeof alternative === 'string') {
+                try {
+                  const altImages = await resolveExerciseImagePair({ exercise: alternative, name: alternative });
+                  newImagesMap.set(alternative, altImages);
+                } catch (error) {
+                  newImagesMap.set(alternative, null);
+                }
+              }
+            });
+            await Promise.all(alternativePromises);
           }
         });
         

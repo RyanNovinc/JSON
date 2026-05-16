@@ -917,5 +917,255 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     allergens: [],
     typical_pack_size: 140,
     notes: 'Leggo\'s or Mutti. Sold in 140g tubes, jars, or small tins. Concentrated tomato — distinct from tomato sauce or passata.'
+  },
+  beef_chuck: {
+    id: 'beef_chuck',
+    display_name: 'Beef chuck',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    notes: 'Also sold as casserole steak, chuck steak, or gravy beef. A tough cut that becomes meltingly tender with long slow cooking. Cheaper than premium beef cuts. Sold at the Coles or Woolworths butcher counter, typically in 500g-2kg pieces.'
+  },
+  beef_stock_liquid: {
+    id: 'beef_stock_liquid',
+    display_name: 'Beef stock (liquid)',
+    category: 'pantry_grains',
+    canonical_unit: 'ml',
+    dietary_flags: ['dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 1000,
+    notes: 'Pre-made liquid stock. Campbell\'s Real Stock or Massel. Check label for gluten content. Alternative: dissolve a beef stock cube in equivalent water.'
+  },
+  cinnamon_stick: {
+    id: 'cinnamon_stick',
+    display_name: 'Cinnamon stick',
+    category: 'pantry_grains',
+    canonical_unit: 'count',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 6,
+    notes: 'Whole bark stick, used to infuse flavour during long cooking. Remove before serving. Distinct from ground cinnamon. Sold in 6-stick jars in the spice section.'
+  },
+  fish_sauce: {
+    id: 'fish_sauce',
+    display_name: 'Fish sauce',
+    category: 'condiments_supplements',
+    canonical_unit: 'ml',
+    dietary_flags: ['gluten_free', 'dairy_free', 'nut_free'],
+    allergens: ['Fish'],
+    typical_pack_size: 300,
+    notes: 'Squid brand is the standard at Coles/Woolworths Asian aisle. Megachef is premium. Salty and pungent, but adds umami depth — not \'fishy\' flavour in the finished dish.'
+  },
+  massaman_curry_paste: {
+    id: 'massaman_curry_paste',
+    display_name: 'Massaman curry paste',
+    category: 'condiments_supplements',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free'],
+    allergens: ['Fish', 'Shellfish', 'Nuts'],
+    typical_pack_size: 114,
+    notes: 'Maesri (114g cans) or Valcom/Ayam (185g jars), sold at Coles or Woolworths Asian aisle. Most brands contain shrimp paste (declared as Shellfish) and may contain peanuts (declared as Nuts) — always check the specific brand\'s label. Gluten status varies by brand.'
+  },
+  peanuts_roasted_unsalted: {
+    id: 'peanuts_roasted_unsalted',
+    display_name: 'Roasted peanuts (unsalted)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free'],
+    allergens: ['Nuts'],
+    typical_pack_size: 375,
+    notes: 'Coles or Woolworths house-brand, or Mayver\'s dry roasted. Crush or chop for use as a garnish. Salted variety works fine if unsalted unavailable.'
+  },
+  potato_waxy: {
+    id: 'potato_waxy',
+    display_name: 'Waxy potato (Desiree or Dutch Cream)',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    notes: 'Holds shape during slow cooking. Desiree or Dutch Cream are the standard Australian waxy varieties. Do not substitute with Sebago, brushed, or starchy baking potatoes — they disintegrate. Sold loose by the kilo or in 1.5kg bags.'
+  },
+  star_anise: {
+    id: 'star_anise',
+    display_name: 'Star anise',
+    category: 'pantry_grains',
+    canonical_unit: 'count',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 30,
+    typical_pack_unit: 'g',
+    notes: 'Whole star-shaped pods, distinctive aniseed flavour. Used to infuse flavour during long cooking. Remove before serving. Sold in jars in the spice section.'
+  },
+  sugar_brown_palm_substitute: {
+    id: 'sugar_brown_palm_substitute',
+    display_name: 'Brown sugar (palm sugar substitute)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'CSR brown sugar substitutes 1:1 for palm sugar in Thai recipes when authentic palm sugar is unavailable. Palm sugar gives a slightly more caramel-like note but the difference is subtle. 1 tbsp is approximately 15g.'
+  },
+  tamarind_paste: {
+    id: 'tamarind_paste',
+    display_name: 'Tamarind paste',
+    category: 'condiments_supplements',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 200,
+    notes: 'Sour-fruity concentrate. Essential for authentic massaman and pad thai. Sold at Coles or Woolworths Asian aisle in jars, typically 200g.'
+  },
+  black_beans_canned: {
+    id: 'black_beans_canned',
+    display_name: 'Canned black beans',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 420,
+    notes: 'Coles or Old El Paso brand. Drain and rinse before using. Sold in 400g-420g tins; drained weight is approximately 250g per tin.'
+  },
+  capsicum_red: {
+    id: 'capsicum_red',
+    display_name: 'Red capsicum',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    notes: 'One large capsicum is approximately 150g. Green works as a substitute but red is sweeter. Sold loose by the kilo or individually.'
+  },
+  cayenne_pepper: {
+    id: 'cayenne_pepper',
+    display_name: 'Cayenne pepper',
+    category: 'pantry_grains',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 50,
+    typical_pack_unit: 'g',
+    notes: 'Masterfoods or supermarket brand. Hot — start with less and adjust to taste. Distinct from chilli powder.'
+  },
+  corn_chips: {
+    id: 'corn_chips',
+    display_name: 'Corn chips',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 240,
+    notes: 'Old El Paso, Doritos, or supermarket brand. Plain salted varieties are typically gluten-free, dairy-free, and vegan; flavoured varieties may not be — check label. Sold in 240g-500g packs.'
+  },
+  jalapenos_pickled: {
+    id: 'jalapenos_pickled',
+    display_name: 'Pickled jalapeños (sliced)',
+    category: 'condiments_supplements',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 220,
+    notes: 'Old El Paso or supermarket house brand. Sold sliced in jars. Drained weight is approximately 140g per 220g jar.'
+  },
+  kidney_beans_canned: {
+    id: 'kidney_beans_canned',
+    display_name: 'Canned red kidney beans',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 420,
+    notes: 'SPC, Edgell, or Coles brand. Drain and rinse before using. Sold in 400g-420g tins; drained weight is approximately 250g per tin.'
+  },
+  paprika_smoked: {
+    id: 'paprika_smoked',
+    display_name: 'Smoked paprika',
+    category: 'pantry_grains',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 50,
+    typical_pack_unit: 'g',
+    notes: 'Masterfoods or Herbie\'s. Adds smoky depth to chilli con carne, paprikash, and BBQ rubs. Distinct from sweet paprika (which is already in the database) — smoked paprika comes from a different processing method and has a noticeably smoky flavour.'
+  },
+  water: {
+    id: 'water',
+    display_name: 'Water',
+    category: 'pantry_grains',
+    canonical_unit: 'ml',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    notes: 'Tap water. Included as an ingredient because the user needs to know required quantities for cooking, even though water contributes no macros. Always scales with the recipe.'
+  },
+  chicken_stock_liquid: {
+    id: 'chicken_stock_liquid',
+    display_name: 'Chicken stock (liquid, low sodium)',
+    category: 'pantry_grains',
+    canonical_unit: 'ml',
+    dietary_flags: ['dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 1000,
+    notes: 'Pre-made liquid stock. Campbell\'s Real Stock or Massel. Lower sodium versions give more control over final seasoning. Check label for gluten content if relevant. Distinct from chicken stock cubes — this is the ready-to-pour carton variety.'
+  },
+  lamb_shank: {
+    id: 'lamb_shank',
+    display_name: 'Lamb shank (bone-in)',
+    category: 'meat_seafood',
+    canonical_unit: 'count',
+    dietary_flags: ['gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 4,
+    notes: 'Standard shank is approximately 400g raw (60% meat-to-bone ratio, so ~240g edible meat per shank). Ask the butcher for French-trimmed if you want the bone exposed nicely. Some butchers offer larger 450-500g shanks. Sold individually at Coles or Woolworths butcher counter, or in 4-packs.'
+  },
+  parsley_flat_leaf: {
+    id: 'parsley_flat_leaf',
+    display_name: 'Fresh flat-leaf parsley',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    notes: 'Italian/continental parsley, not curly. Sold by the bunch (~30g per bunch) in produce. Used as a fresh herb garnish — substitute curly parsley if needed, but flat-leaf has better flavour.'
+  },
+  thyme_fresh: {
+    id: 'thyme_fresh',
+    display_name: 'Fresh thyme',
+    category: 'produce',
+    canonical_unit: 'count',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    notes: 'Sold by the small bunch in the produce section, or growable in a pot at home. Quantity measured in sprigs. Substitute with 2 tsp dried thyme if unavailable (already in database).'
+  },
+
+  mushroom_brown: {
+    id: 'mushroom_brown',
+    display_name: 'Brown/Swiss mushrooms',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 200,
+    notes: 'Brown or Swiss mushrooms have more depth of flavour than white button mushrooms — they hold up better in long braises. White button works as a substitute if needed. Sold in 200g-500g punnets at Coles or Woolworths produce.'
+  },
+
+  potato_baby_chat: {
+    id: 'potato_baby_chat',
+    display_name: 'Baby chat potatoes',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 1000,
+    notes: 'Small whole waxy potatoes (Coles baby chats or Dutch creams). Keep skins on — they hold shape better in stew and add fibre. Halved for cooking. Distinct from baking potatoes (Sebago/russet, starchy) and from larger waxy potatoes (Desiree, cubed) — baby chats are the small whole-potato format. Sold in 750g-1kg bags.'
+  },
+
+  sourdough_crusty: {
+    id: 'sourdough_crusty',
+    display_name: 'Crusty sourdough or baguette',
+    category: 'bakery',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'nut_free'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 500,
+    notes: 'Coles bakery sourdough or Bakers Delight Vienna/baguette. Most plain crusty breads are vegan and dairy-free; check label for butter-enriched varieties. Sold as full loaves, typically 450g-700g.'
   }
 };

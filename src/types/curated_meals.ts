@@ -15,9 +15,13 @@ export type MealSlug =
   | 'strawbrekkie_beast'
   | 'banana_bulk'
   | 'pulled_pork'
-  | 'bolognese';
+  | 'bolognese'
+  | 'massaman'
+  | 'chilli_con_carne'
+  | 'lamb_shanks'
+  | 'beef_stew';
 
-export type CuisineType = 'australian' | 'mediterranean' | 'asian' | 'indian' | 'mexican' | 'breakfast' | 'italian' | 'smoothie';
+export type CuisineType = 'australian' | 'mediterranean' | 'asian' | 'indian' | 'mexican' | 'breakfast' | 'italian' | 'smoothie' | 'thai';
 
 export type PrimaryProtein = 'chicken' | 'beef' | 'lamb' | 'pork' | 'fish' | 'seafood' | 'eggs' | 'dairy' | 'plant';
 
