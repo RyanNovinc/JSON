@@ -1,0 +1,473 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  Linking,
+  Platform,
+} from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../contexts/ThemeContext';
+import { useWeightUnit } from '../contexts/WeightUnitContext';
+import { WorkoutStorage } from '../utils/storage';
+import { FeedbackModal } from '../components/FeedbackTab';
+import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
+import TermsOfServiceModal from '../components/TermsOfServiceModal';
+
+// App version — read from your package.json or app config if you have it,
+// otherwise hard-code here. The Workouts redesign memory mentioned v1.2 in
+// App Store review, so that's the starting value.
+const APP_VERSION = '1.2.0';
+
+// App Store URLs — same values used in FeedbackModal's 5-star flow.
+const APP_STORE_URL_IOS = 'https://apps.apple.com/au/app/json-09d4ce/id6758357834';
+
+/**
+ * ProfileScreen — the user-level utility hub.
+ *
+ * What lives here:
+ *  - Weight tracker quick access
+ *  - App preferences (theme, weight units)
+ *  - Subscription status (read-only for v1; upgrade/manage come later)
+ *  - About: feedback, privacy, terms, rate the app
+ *  - Developer tools (only shown in __DEV__): debug, reset onboarding, clear data
+ *  - App version footer
+ *
+ * What doesn't live here yet (because there's no user-accounts system):
+ *  - Account / sign-in
+ *  - Personal stats / streaks / total workouts
+ *  - Avatar, name, etc.
+ *
+ * Things this screen REPLACES from elsewhere in the app:
+ *  - Theme toggle that used to float top-right on Nutrition
+ *  - Weight tracker FAB that used to sit bottom-right on Nutrition
+ *  - Profile button that used to sit bottom-left on Nutrition
+ *  - Debug console that was buried inside HomeScreen
+ *  - Feedback flow that used to be a global slide-from-right panel
+ */
+export default function ProfileScreen() {
+  const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
+  const { isPinkTheme, setIsPinkTheme, themeColor } = useTheme();
+  const { globalUnit, setGlobalUnit } = useWeightUnit();
+
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [termsModalVisible, setTermsModalVisible] = useState(false);
+
+  // ===== Handlers =====
+  const openWeightTracker = () => {
+    navigation.navigate('WeightTracker' as never);
+  };
+
+  const openExternalUrl = (url: string) => {
+    Linking.openURL(url).catch(err =>
+      console.error('Failed to open URL:', err)
+    );
+  };
+
+  const handleRateApp = () => {
+    const url = Platform.OS === 'ios'
+      ? `${APP_STORE_URL_IOS}?action=write-review`
+      : 'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_ID';
+    openExternalUrl(url);
+  };
+
+  const handleResetOnboarding = () => {
+    Alert.alert(
+      'Reset Onboarding?',
+      'You\'ll see the onboarding flow again next time you open the app.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await WorkoutStorage.clearAllData();
+              Alert.alert('Done', 'Onboarding reset. Restart the app to see it.');
+            } catch (error) {
+              console.error('Failed to reset onboarding:', error);
+              Alert.alert('Error', 'Failed to reset. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllData = () => {
+    Alert.alert(
+      'Clear All Data?',
+      'This deletes ALL your workouts, meal plans, weight history, and settings. This CANNOT be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear Everything',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await WorkoutStorage.clearAllData();
+              Alert.alert('Cleared', 'All app data has been deleted.');
+            } catch (error) {
+              console.error('Failed to clear data:', error);
+              Alert.alert('Error', 'Failed to clear data. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Title bar */}
+      <View style={[styles.titleBar, { paddingTop: insets.top + 4 }]}>
+        <Text style={styles.title}>Profile</Text>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ============================================================
+            WEIGHT TRACKER — hero link at top.
+            Weight is user-level data (not just nutrition), so this is
+            where it belongs long-term.
+            ============================================================ */}
+        <TouchableOpacity
+          style={[styles.heroLink, { borderColor: themeColor, shadowColor: themeColor }]}
+          onPress={openWeightTracker}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Open weight tracker"
+        >
+          <View style={[styles.heroLinkIcon, { backgroundColor: themeColor }]}>
+            <Ionicons name="scale-outline" size={22} color="#0a0a0b" />
+          </View>
+          <View style={styles.heroLinkText}>
+            <Text style={styles.heroLinkTitle}>Weight tracker</Text>
+            <Text style={styles.heroLinkSub}>Log your weight and see progress over time</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#71717a" />
+        </TouchableOpacity>
+
+        {/* ============================================================
+            PREFERENCES
+            ============================================================ */}
+        <Text style={styles.sectionTitle}>Preferences</Text>
+
+        {/* Theme toggle */}
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => setIsPinkTheme(!isPinkTheme)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Switch theme. Current: ${isPinkTheme ? 'pink' : 'cyan'}`}
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="color-palette-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Theme</Text>
+            <Text style={styles.rowSub}>{isPinkTheme ? 'Pink' : 'Cyan'}</Text>
+          </View>
+          <View style={[styles.themeSwatch, { backgroundColor: themeColor }]} />
+        </TouchableOpacity>
+
+        {/* Weight units toggle — flips globalUnit between kg and lbs */}
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => setGlobalUnit(globalUnit === 'kg' ? 'lbs' : 'kg')}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Switch weight units. Current: ${globalUnit}`}
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="speedometer-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Weight units</Text>
+            <Text style={styles.rowSub}>{globalUnit === 'kg' ? 'Kilograms' : 'Pounds'}</Text>
+          </View>
+          <View style={[styles.unitsBadge, { borderColor: themeColor }]}>
+            <Text style={[styles.unitsBadgeText, { color: themeColor }]}>
+              {globalUnit.toUpperCase()}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+
+        {/* ============================================================
+            ABOUT
+            ============================================================ */}
+        <Text style={styles.sectionTitle}>About</Text>
+
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => setFeedbackModalVisible(true)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Send feedback"
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="chatbubble-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Send feedback</Text>
+            <Text style={styles.rowSub}>Rate, report a bug, or request a feature</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color="#71717a" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.row}
+          onPress={handleRateApp}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Rate JSON.fit on the App Store"
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="star-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Rate JSON.fit</Text>
+            <Text style={styles.rowSub}>Leave a review on the App Store</Text>
+          </View>
+          <Ionicons name="open-outline" size={14} color="#71717a" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => setPrivacyModalVisible(true)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="View privacy policy"
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="shield-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Privacy policy</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color="#71717a" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => setTermsModalVisible(true)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="View terms of service"
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="document-text-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Terms of service</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color="#71717a" />
+        </TouchableOpacity>
+
+        {/* ============================================================
+            DEVELOPER — only visible in __DEV__ builds
+            ============================================================ */}
+        {__DEV__ && (
+          <>
+            <Text style={styles.sectionTitle}>Developer</Text>
+
+            <TouchableOpacity
+              style={styles.row}
+              onPress={handleResetOnboarding}
+              activeOpacity={0.7}
+            >
+              <View style={styles.rowIcon}>
+                <Ionicons name="refresh-outline" size={20} color="#a1a1aa" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle}>Reset onboarding</Text>
+                <Text style={styles.rowSub}>Clears data and shows the slideshow again</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color="#71717a" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.row}
+              onPress={handleClearAllData}
+              activeOpacity={0.7}
+            >
+              <View style={styles.rowIcon}>
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, { color: '#ef4444' }]}>Clear all data</Text>
+                <Text style={styles.rowSub}>Deletes everything. Cannot be undone.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color="#71717a" />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Version footer */}
+        <Text style={styles.versionText}>JSON.fit v{APP_VERSION}</Text>
+      </ScrollView>
+
+      <FeedbackModal
+        visible={feedbackModalVisible}
+        onClose={() => setFeedbackModalVisible(false)}
+      />
+      <PrivacyPolicyModal
+        visible={privacyModalVisible}
+        onClose={() => setPrivacyModalVisible(false)}
+      />
+      <TermsOfServiceModal
+        visible={termsModalVisible}
+        onClose={() => setTermsModalVisible(false)}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0a0a0b',
+  },
+
+  // Title bar
+  titleBar: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: -0.4,
+  },
+
+  // Scroll
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 48,
+  },
+
+  // Hero link (weight tracker)
+  heroLink: {
+    backgroundColor: '#18181b',
+    borderRadius: 18,
+    borderWidth: 2,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 28,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  heroLinkIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroLinkText: { flex: 1 },
+  heroLinkTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  heroLinkSub: {
+    fontSize: 12,
+    color: '#a1a1aa',
+    marginTop: 2,
+  },
+
+  // Section header
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#a1a1aa',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginTop: 16,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
+
+  // Row (settings item)
+  row: {
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  rowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#27272a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowText: { flex: 1 },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#ffffff',
+  },
+  rowSub: {
+    fontSize: 11,
+    color: '#71717a',
+    marginTop: 2,
+  },
+
+  // Theme swatch (right side of theme row)
+  themeSwatch: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#3f3f46',
+  },
+  unitsBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 44,
+    alignItems: 'center',
+  },
+  unitsBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
+
+  // Version footer
+  versionText: {
+    fontSize: 11,
+    color: '#52525b',
+    textAlign: 'center',
+    marginTop: 32,
+    letterSpacing: 0.3,
+  },
+});

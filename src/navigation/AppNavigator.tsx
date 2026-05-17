@@ -3,14 +3,19 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Animated, StyleSheet } from 'react-native';
+import { View, Text, Animated, StyleSheet } from 'react-native';
 import { Linking } from 'react-native';
 import { navigationRef } from '../utils/navigationRef';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
+import NutritionHomeScreen from '../screens/NutritionHomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import ModeTransitionContainer from '../components/ModeTransitionContainer';
+import ProfileScreen from '../screens/ProfileScreen';
+import LibraryScreen from '../screens/LibraryScreen';
+// ModeTransitionContainer is no longer wired in — mode switching is now via
+// the bottom tab bar. Import kept in case it's needed elsewhere.
+// import ModeTransitionContainer from '../components/ModeTransitionContainer';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
 import ImportSharedContent from '../screens/ImportSharedContent';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
@@ -32,7 +37,7 @@ import OneRMProgressionScreen from '../screens/OneRMProgressionScreen';
 import AppIconScreen from '../screens/AppIconScreen';
 import PaymentScreen from '../screens/PaymentScreen';
 import { FloatingWorkoutIndicator } from '../components/FloatingWorkoutIndicator';
-import { FeedbackTab } from '../components/FeedbackTab';
+import { FeedbackModal } from '../components/FeedbackTab';
 import { AppModeProvider } from '../contexts/AppModeContext';
 import { MealPlanningProvider } from '../contexts/MealPlanningContext';
 import { SimplifiedMealPlanningProvider } from '../contexts/SimplifiedMealPlanningContext';
@@ -74,6 +79,9 @@ import MethodologyScreen from '../screens/MethodologyScreen';
 import WeightTrackerScreen from '../screens/WeightTrackerScreen';
 import WeekVolumeScreen from '../screens/WeekVolumeScreen';
 
+// New: custom tab bar
+import { CustomTabBar, CREATE_ROUTE } from './CustomTabBar';
+
 // Clean meal plan navigation types
 interface CleanMealPlanNavigationParams {
   targetDate: string; // Always YYYY-MM-DD format
@@ -86,6 +94,7 @@ interface CleanMealPlanNavigationParams {
 
 export type RootStackParamList = {
   Main: undefined;
+  CreateFlow: undefined;
   ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string };
   ImportSharedContent: { shareId: string };
   ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
@@ -229,41 +238,85 @@ export type RootStackParamList = {
   };
 };
 
-
+// Tab param list — 5 tabs (with the Create slot in the middle).
 export type MainTabParamList = {
-  Home: undefined;
-  Settings: undefined;
+  Workouts: undefined;
+  Nutrition: undefined;
+  [CREATE_ROUTE]: undefined;
+  Library: undefined;
+  Profile: undefined;
 };
 
 const RootStack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+// ============================================================================
+// Stub screens for Browse, Profile, Create.
+// Replaced in follow-up PRs when those tabs get built out properly.
+// ============================================================================
+
+function PlaceholderScreen({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <View style={stubStyles.container}>
+      <Text style={stubStyles.title}>{title}</Text>
+      <Text style={stubStyles.subtitle}>{subtitle ?? 'Coming soon'}</Text>
+    </View>
+  );
+}
+
+function BrowseStub() {
+  return <PlaceholderScreen title="Browse" />;
+}
+
+function ProfileStub() {
+  return <PlaceholderScreen title="Profile" />;
+}
+
+// The Create "tab" slot — never actually renders, because we intercept tab
+// presses in the CustomTabBar and route to the CreateFlow modal instead.
+// But React Navigation requires a component for every Tab.Screen, so this
+// returns an empty View as a placeholder.
+function CreateNeverRenders() {
+  return <View style={{ flex: 1, backgroundColor: '#0a0a0b' }} />;
+}
+
+// The Create modal — opens when the center create button is pressed.
+// For now it's a stub. The real compose screen is built in a follow-up PR.
+function CreateFlowStub() {
+  return (
+    <PlaceholderScreen
+      title="Create"
+      subtitle="What do you want to create? (Compose screen coming soon)"
+    />
+  );
+}
+
+// ============================================================================
+// Main tabs — 5 tabs with the cyan-glow Create button in the middle.
+// ============================================================================
 
 function MainNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: { display: 'none' },
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Settings') {
-            iconName = focused ? 'settings' : 'settings-outline';
-          } else {
-            iconName = 'help';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
-      })}
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <CustomTabBar {...props} />}
     >
-      <Tab.Screen name="Home" component={ModeTransitionContainer} options={{ headerShown: false }} />
-      <Tab.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Workouts" component={HomeScreen} />
+      <Tab.Screen name="Nutrition" component={NutritionHomeScreen} />
+      <Tab.Screen
+        name={CREATE_ROUTE}
+        component={CreateNeverRenders}
+        listeners={({ navigation }) => ({
+          // Belt-and-braces: even if React Navigation tries to focus this tab,
+          // we intercept and route to the CreateFlow modal.
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.getParent()?.navigate('CreateFlow' as never);
+          },
+        })}
+      />
+      <Tab.Screen name="Library" component={LibraryScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -273,14 +326,18 @@ interface AppNavigatorProps {
   appReady: boolean;
 }
 
-// Configure deep linking
+// ============================================================================
+// Configure deep linking — preserved verbatim from the original.
+// Only the screens.Main.screens key changed from `Home` → `Workouts` to match
+// the new tab name.
+// ============================================================================
 const linking = {
   prefixes: ['https://json.fit', 'json-app://'],
   config: {
     screens: {
       Main: {
         screens: {
-          Home: '',
+          Workouts: '',
         },
       },
       ImportSharedContent: {
@@ -296,7 +353,7 @@ const linking = {
     const url = await Linking.getInitialURL();
     console.log('🔗 [DEEP LINK] getInitialURL called, url:', url);
     console.log('🔗 [DEEP LINK] App launch scenario - checking if URL contains share pattern');
-    
+
     if (url) {
       console.log('🔗 [DEEP LINK] URL found:', url);
       console.log('🔗 [DEEP LINK] URL analysis:', {
@@ -305,7 +362,7 @@ const linking = {
         isSharePattern: url.includes('/share/'),
         isPPattern: url.includes('/p/'),
       });
-      
+
       // Handle json-app://share/xyz pattern
       if (url.includes('json-app://share/')) {
         const shareId = url.replace('json-app://share/', '');
@@ -313,7 +370,7 @@ const linking = {
         console.log('🔗 [DEEP LINK] Converting share URL:', url, '→', newUrl, 'shareId:', shareId);
         return newUrl;
       }
-      
+
       // Extract shareId for logging purposes
       let extractedShareId = null;
       if (url.includes('/p/')) {
@@ -323,7 +380,7 @@ const linking = {
     } else {
       console.log('🔗 [DEEP LINK] No initial URL found - app not launched via link');
     }
-    
+
     console.log('🔗 [DEEP LINK] Returning URL:', url);
     return url;
   },
@@ -336,7 +393,7 @@ const linking = {
         isSharePattern: url.includes('/share/'),
         isPPattern: url.includes('/p/'),
       });
-      
+
       // Handle json-app://share/xyz pattern in runtime
       if (url.includes('json-app://share/')) {
         const shareId = url.replace('json-app://share/', '');
@@ -366,6 +423,7 @@ const linking = {
 
 export default function AppNavigator({ isAuthenticated, appReady }: AppNavigatorProps) {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const [feedbackModalVisible, setFeedbackModalVisible] = React.useState(false);
 
   React.useEffect(() => {
     if (appReady) {
@@ -392,8 +450,29 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <>
               <RootStack.Screen name="Main" component={MainNavigator} />
-              <RootStack.Screen 
-                name="ImportRoutine" 
+              {/* CreateFlow — modal presentation for the center button flow */}
+              <RootStack.Screen
+                name="CreateFlow"
+                component={CreateFlowStub}
+                options={{
+                  headerShown: false,
+                  presentation: 'modal',
+                  cardStyleInterpolator: ({ current, layouts }) => ({
+                    cardStyle: {
+                      transform: [
+                        {
+                          translateY: current.progress.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [layouts.screen.height, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  }),
+                }}
+              />
+              <RootStack.Screen
+                name="ImportRoutine"
                 component={ImportRoutineScreen}
                 options={{
                   headerShown: false,
@@ -415,8 +494,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   },
                 }}
               />
-              <RootStack.Screen 
-                name="ImportSharedContent" 
+              <RootStack.Screen
+                name="ImportSharedContent"
                 component={ImportSharedContent}
                 options={{
                   headerShown: false,
@@ -438,8 +517,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   },
                 }}
               />
-              <RootStack.Screen 
-                name="ImportMealPlan" 
+              <RootStack.Screen
+                name="ImportMealPlan"
                 component={ImportMealPlanScreen}
                 options={{
                   headerShown: false,
@@ -461,39 +540,39 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   },
                 }}
               />
-              <RootStack.Screen 
-                name="MyWorkouts" 
+              <RootStack.Screen
+                name="MyWorkouts"
                 component={MyWorkoutsScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
                 }}
               />
-              <RootStack.Screen 
-                name="MyMealPlans" 
+              <RootStack.Screen
+                name="MyMealPlans"
                 component={MyMealPlansScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
                 }}
               />
-              <RootStack.Screen 
-                name="SampleMealPlans" 
+              <RootStack.Screen
+                name="SampleMealPlans"
                 component={SampleMealPlansScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
                 }}
               />
-              <RootStack.Screen 
-                name="AppIcon" 
+              <RootStack.Screen
+                name="AppIcon"
                 component={AppIconScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="Payment" 
+              <RootStack.Screen
+                name="Payment"
                 component={PaymentScreen}
                 options={{
                   headerShown: false,
@@ -505,125 +584,125 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
-              <RootStack.Screen 
-                name="Blocks" 
+              <RootStack.Screen
+                name="Blocks"
                 component={BlocksScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MesocycleBlocks" 
+              <RootStack.Screen
+                name="MesocycleBlocks"
                 component={MesocycleBlocksScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealPlanWeeks" 
+              <RootStack.Screen
+                name="MealPlanWeeks"
                 component={MealPlanWeeksScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealPlanDays" 
+              <RootStack.Screen
+                name="MealPlanDays"
                 component={MealPlanDaysScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealPlanDay" 
+              <RootStack.Screen
+                name="MealPlanDay"
                 component={MealPlanDayScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealPlanMealDetail" 
+              <RootStack.Screen
+                name="MealPlanMealDetail"
                 component={MealPlanMealDetailScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealPrepSession" 
+              <RootStack.Screen
+                name="MealPrepSession"
                 component={MealPrepSessionScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealPrepDetail" 
+              <RootStack.Screen
+                name="MealPrepDetail"
                 component={MealPrepDetailScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="Days" 
+              <RootStack.Screen
+                name="Days"
                 component={DaysScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="WorkoutLog" 
+              <RootStack.Screen
+                name="WorkoutLog"
                 component={WorkoutLogScreenAdapter}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="WorkoutReview" 
+              <RootStack.Screen
+                name="WorkoutReview"
                 component={WorkoutReviewScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="OneRMProgression" 
+              <RootStack.Screen
+                name="OneRMProgression"
                 component={OneRMProgressionScreen}
                 options={{
                   headerShown: false,
                 }}
               />
               {/* Nutrition Screens */}
-              <RootStack.Screen 
-                name="NutritionQuestionnaire" 
+              <RootStack.Screen
+                name="NutritionQuestionnaire"
                 component={NutritionQuestionnaireScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
                 }}
               />
-              <RootStack.Screen 
-                name="BudgetCookingQuestionnaire" 
+              <RootStack.Screen
+                name="BudgetCookingQuestionnaire"
                 component={BudgetCookingQuestionnaireScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
                 }}
               />
-              <RootStack.Screen 
-                name="FridgePantryQuestionnaire" 
+              <RootStack.Screen
+                name="FridgePantryQuestionnaire"
                 component={FridgePantryQuestionnaireScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
                 }}
               />
-              <RootStack.Screen 
-                name="SleepOptimizationScreen" 
+              <RootStack.Screen
+                name="SleepOptimizationScreen"
                 component={SleepOptimizationScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
                 }}
               />
-              <RootStack.Screen 
-                name="NutritionDashboard" 
+              <RootStack.Screen
+                name="NutritionDashboard"
                 component={NutritionDashboardScreen}
                 options={{
                   headerShown: false,
@@ -645,8 +724,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   },
                 }}
               />
-              <RootStack.Screen 
-                name="WorkoutDashboard" 
+              <RootStack.Screen
+                name="WorkoutDashboard"
                 component={WorkoutDashboardScreen}
                 options={{
                   headerShown: false,
@@ -668,8 +747,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   },
                 }}
 />
-              <RootStack.Screen 
-                name="WorkoutCalendar" 
+              <RootStack.Screen
+                name="WorkoutCalendar"
                 component={WorkoutCalendar}
                 options={{
                   headerShown: false,
@@ -691,8 +770,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   },
                 }}
               />
-              <RootStack.Screen 
-                name="RequiredSetup" 
+              <RootStack.Screen
+                name="RequiredSetup"
                 component={RequiredSetupScreen}
                 options={{
                   headerShown: false,
@@ -703,8 +782,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
-              <RootStack.Screen 
-                name="OptionalTools" 
+              <RootStack.Screen
+                name="OptionalTools"
                 component={OptionalToolsScreen}
                 options={{
                   headerShown: false,
@@ -715,8 +794,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
-              <RootStack.Screen 
-                name="NutritionRequiredSetup" 
+              <RootStack.Screen
+                name="NutritionRequiredSetup"
                 component={NutritionRequiredSetupScreen}
                 options={{
                   headerShown: false,
@@ -727,8 +806,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
-              <RootStack.Screen 
-                name="NutritionOptionalTools" 
+              <RootStack.Screen
+                name="NutritionOptionalTools"
                 component={NutritionOptionalToolsScreen}
                 options={{
                   headerShown: false,
@@ -739,133 +818,133 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
-              <RootStack.Screen 
-                name="FitnessGoalsQuestionnaire" 
+              <RootStack.Screen
+                name="FitnessGoalsQuestionnaire"
                 component={FitnessGoalsQuestionnaireScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',
                 }}
               />
-              <RootStack.Screen 
-                name="EquipmentPreferencesQuestionnaire" 
+              <RootStack.Screen
+                name="EquipmentPreferencesQuestionnaire"
                 component={EquipmentPreferencesQuestionnaireScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',
                 }}
               />
-              <RootStack.Screen 
-                name="MealCalendar" 
+              <RootStack.Screen
+                name="MealCalendar"
                 component={MealCalendarScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealDetail" 
+              <RootStack.Screen
+                name="MealDetail"
                 component={MealDetailScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="GroceryList" 
+              <RootStack.Screen
+                name="GroceryList"
                 component={GroceryListScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealRatings" 
+              <RootStack.Screen
+                name="MealRatings"
                 component={MealRatingsScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="FavoriteMeals" 
+              <RootStack.Screen
+                name="FavoriteMeals"
                 component={FavoriteMealsScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="AddMeal" 
+              <RootStack.Screen
+                name="AddMeal"
                 component={AddMealScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="ManualMealEntry" 
+              <RootStack.Screen
+                name="ManualMealEntry"
                 component={ManualMealEntryScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealPlanHelp" 
+              <RootStack.Screen
+                name="MealPlanHelp"
                 component={MealPlanHelpScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="MealPlanTest" 
+              <RootStack.Screen
+                name="MealPlanTest"
                 component={MealPlanTestScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="FavoriteExercises" 
+              <RootStack.Screen
+                name="FavoriteExercises"
                 component={FavoriteExercisesScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="ExerciseDetail" 
+              <RootStack.Screen
+                name="ExerciseDetail"
                 component={ExerciseDetailScreen}
                 options={{
                   headerShown: false,
                 }}
               />
-              <RootStack.Screen 
-                name="AddExercise" 
+              <RootStack.Screen
+                name="AddExercise"
                 component={AddExerciseSelectionScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',
                 }}
               />
-              <RootStack.Screen 
-                name="ManualExerciseEntry" 
+              <RootStack.Screen
+                name="ManualExerciseEntry"
                 component={ManualExerciseEntryScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',
                 }}
               />
-              <RootStack.Screen 
-                name="ExerciseHelp" 
+              <RootStack.Screen
+                name="ExerciseHelp"
                 component={ExerciseHelpScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',
                 }}
               />
-              <RootStack.Screen 
-                name="Methodology" 
+              <RootStack.Screen
+                name="Methodology"
                 component={MethodologyScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',
                 }}
               />
-              <RootStack.Screen 
-                name="WeightTracker" 
+              <RootStack.Screen
+                name="WeightTracker"
                 component={WeightTrackerScreen}
                 options={{
                   headerShown: false,
@@ -887,8 +966,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   },
                 }}
               />
-              <RootStack.Screen 
-                name="WeekVolumeScreen" 
+              <RootStack.Screen
+                name="WeekVolumeScreen"
                 component={WeekVolumeScreen}
                 options={{
                   headerShown: false,
@@ -902,7 +981,10 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
             </>
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />
-          <FeedbackTab />
+          <FeedbackModal 
+            visible={feedbackModalVisible}
+            onClose={() => setFeedbackModalVisible(false)}
+          />
                 </NavigationContainer>
                 </SimplifiedMealPlanningProvider>
                 </MealPlanningProvider>
@@ -919,5 +1001,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+});
+
+// Styles for the placeholder Browse / Profile / Create stub screens.
+const stubStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0a0a0b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: -0.4,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#71717a',
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

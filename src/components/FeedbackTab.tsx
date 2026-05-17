@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,29 +9,21 @@ import {
   Platform,
   Keyboard,
   Alert,
-  Dimensions,
   Linking,
   ScrollView,
-  PanResponder,
   Pressable,
+  Modal,
   Easing,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigationState } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { sendRatingFeedback, sendBugReport, sendFeatureRequest } from '../services/feedbackApi';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const PANEL_WIDTH = SCREEN_WIDTH * 0.9;
-const VELOCITY_THRESHOLD = 500;
-const DISTANCE_THRESHOLD = 50;
-
 type TabType = 'rating' | 'bug' | 'feature';
 
-// ── Helper ────────────────────────────────────────────────────────
-
+// Convert hex to rgba — preserved verbatim from FeedbackTab
 function hexA(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
@@ -41,182 +33,64 @@ function hexA(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-export function FeedbackTab() {
-  const { themeColor, isPinkTheme, setIsPinkTheme, isThemeLoaded } = useTheme();
-  const [isOpen, setIsOpen] = useState(false);
+interface FeedbackModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+/**
+ * FeedbackModal — same form/internals as the original FeedbackTab.
+ *
+ * What changed:
+ *  - Container went from "swipe-from-right panel" to "Modal with slide animation"
+ *  - panResponder, translateX, tabTranslateX animations all REMOVED
+ *  - The "always-visible cyan strip on the right edge of every screen" is gone
+ *
+ * What stayed identical:
+ *  - All 3 tabs (Rate, Bug, Feature)
+ *  - Star rating with friendly labels
+ *  - 5-star → App Store deep link (iOS + Android)
+ *  - <5-star → follow-up text field
+ *  - AsyncStorage of all feedback to 'userFeedback' key
+ *  - sendRatingFeedback / sendBugReport / sendFeatureRequest API calls
+ *  - Inline success state with auto-close after 1.6s
+ *  - Theme toggle in header
+ */
+export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
+  const { themeColor, isPinkTheme, setIsPinkTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('rating');
   const [feedback, setFeedback] = useState('');
   const [rating, setRating] = useState(0);
   const [submittedState, setSubmittedState] = useState<TabType | null>(null);
 
-  // Initialize local state with current theme state immediately
+  // Mirror the theme color locally so the rating stars flip instantly
+  // when the user toggles theme (the context update has a tick of delay).
   const [localThemeState, setLocalThemeState] = useState(isPinkTheme);
-
-  // Sync local state with theme context when context changes
-  React.useEffect(() => {
+  useEffect(() => {
     setLocalThemeState(isPinkTheme);
   }, [isPinkTheme]);
-
-  // Use local state for immediate feedback
   const currentThemeState = localThemeState;
   const currentThemeColor = currentThemeState ? '#ec4899' : '#22d3ee';
 
-  // Inline success fade animation
   const successOpacity = useRef(new Animated.Value(0)).current;
 
-  // Hide feedback tab on payment screen
-  const navigationState = useNavigationState(state => state);
-  const currentRoute = navigationState?.routes?.[navigationState.index];
-  const isPaymentScreen = currentRoute?.name === 'Payment';
-
-  // SINGLE ANIMATION SYSTEM — DO NOT TOUCH
-  const translateX = useRef(new Animated.Value(PANEL_WIDTH)).current;
-  const tabTranslateX = useRef(new Animated.Value(0)).current;
-
-  const openPanel = () => {
-    setIsOpen(true);
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 8,
-      }),
-      Animated.spring(tabTranslateX, {
-        toValue: -PANEL_WIDTH,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 8,
-      }),
-    ]).start();
+  // Reset form state every time the modal closes — was previously done
+  // inside the closePanel animation callback.
+  const resetForm = () => {
+    setFeedback('');
+    setRating(0);
+    setActiveTab('rating');
+    setSubmittedState(null);
+    successOpacity.setValue(0);
   };
 
-  const closePanel = () => {
+  const handleClose = () => {
     Keyboard.dismiss();
-    setIsOpen(false); // Update state immediately, not in callback
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: PANEL_WIDTH,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 8,
-      }),
-      Animated.spring(tabTranslateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 8,
-      }),
-    ]).start(() => {
-      // Force tab to final position to fix iOS production build bug
-      tabTranslateX.setValue(0);
-      // Reset form state after animation completes
-      setFeedback('');
-      setRating(0);
-      setActiveTab('rating');
-      setSubmittedState(null);
-      successOpacity.setValue(0);
-    });
+    onClose();
+    // Reset after a tick so the close animation looks clean (otherwise
+    // the form snaps back to the rating tab while still visible)
+    setTimeout(resetForm, 300);
   };
-
-  // WORKING PANRESPONDER — DO NOT TOUCH
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dx) > 5,
-
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dx < 0 && !isOpen) {
-          // Opening: Panel and tab follow finger continuously
-          const dragDistance = Math.abs(gestureState.dx);
-          const newTranslateX = PANEL_WIDTH - dragDistance;
-          const newTabTranslateX = -dragDistance;
-          translateX.setValue(newTranslateX);
-          tabTranslateX.setValue(newTabTranslateX);
-        } else if (gestureState.dx > 0 && isOpen) {
-          // Closing: Panel and tab follow finger as it closes
-          const dragDistance = gestureState.dx;
-          const newTranslateX = dragDistance;
-          const newTabTranslateX = -PANEL_WIDTH + dragDistance;
-          translateX.setValue(newTranslateX);
-          tabTranslateX.setValue(newTabTranslateX);
-        }
-      },
-
-      onPanResponderRelease: (_, gestureState) => {
-        const { dx, vx } = gestureState;
-        const velocity = Math.abs(vx);
-        const distance = Math.abs(dx);
-
-        // Handle tap (small movement)
-        if (distance < 5) {
-          if (isOpen) {
-            closePanel();
-          } else if (Platform.OS === 'android') {
-            // Android: Allow tap to open
-            openPanel();
-          }
-          // iOS: Don't open on tap - only swipe
-          return;
-        }
-
-        if (!isOpen) {
-          // Opening logic
-          if ((velocity > VELOCITY_THRESHOLD && dx < 0) || (dx < 0 && distance > DISTANCE_THRESHOLD)) {
-            openPanel();
-          } else {
-            // Snap back to closed
-            Animated.parallel([
-              Animated.spring(translateX, {
-                toValue: PANEL_WIDTH,
-                useNativeDriver: true,
-                velocity: vx,
-                tension: 100,
-                friction: 8,
-              }),
-              Animated.spring(tabTranslateX, {
-                toValue: 0,
-                useNativeDriver: true,
-                velocity: vx,
-                tension: 100,
-                friction: 8,
-              }),
-            ]).start(() => {
-              // Force tab to final position to fix iOS production build bug
-              tabTranslateX.setValue(0);
-            });
-          }
-        } else {
-          // Closing logic
-          if ((velocity > VELOCITY_THRESHOLD && dx > 0) || (dx > 0 && distance > DISTANCE_THRESHOLD)) {
-            closePanel();
-          } else {
-            // Snap back to open
-            Animated.parallel([
-              Animated.spring(translateX, {
-                toValue: 0,
-                useNativeDriver: true,
-                velocity: -vx,
-                tension: 100,
-                friction: 8,
-              }),
-              Animated.spring(tabTranslateX, {
-                toValue: -PANEL_WIDTH,
-                useNativeDriver: true,
-                velocity: -vx,
-                tension: 100,
-                friction: 8,
-              }),
-            ]).start(() => {
-              // Force tab to final position to fix iOS production build bug
-              tabTranslateX.setValue(-PANEL_WIDTH);
-            });
-          }
-        }
-      },
-    })
-  ).current;
 
   const showInlineSuccess = (type: TabType) => {
     setSubmittedState(type);
@@ -227,12 +101,12 @@ export function FeedbackTab() {
       useNativeDriver: true,
     }).start();
 
-    // Auto-close after 1.6s
     setTimeout(() => {
-      closePanel();
+      handleClose();
     }, 1600);
   };
 
+  // ===== Submit handlers — identical to original =====
   const handleRatingSubmit = async () => {
     if (rating === 5) {
       const appStoreUrl = Platform.OS === 'ios'
@@ -242,7 +116,7 @@ export function FeedbackTab() {
       Linking.openURL(appStoreUrl).catch(err =>
         console.error('Failed to open app store:', err)
       );
-      closePanel();
+      handleClose();
     } else {
       const feedbackEntry = {
         type: 'rating',
@@ -306,11 +180,6 @@ export function FeedbackTab() {
     }
   };
 
-  // Don't render if on payment screen
-  if (isPaymentScreen) {
-    return null;
-  }
-
   const TABS: { key: TabType; icon: string; label: string }[] = [
     { key: 'rating', icon: 'star-outline', label: 'Rate' },
     { key: 'bug', icon: 'bug-outline', label: 'Bug' },
@@ -318,386 +187,309 @@ export function FeedbackTab() {
   ];
 
   return (
-    <>
-      {/* Tab — always visible, moves with panel — DO NOT TOUCH LOGIC */}
-      <Animated.View
-        style={[
-          styles.floatingTab,
-          { transform: [{ translateX: tabTranslateX }] }
-        ]}
-        {...panResponder.panHandlers}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
-        <View style={styles.tabTouchArea}>
-          <View
-            style={[
-              styles.tabIndicator,
-              {
-                backgroundColor: currentThemeColor,
-                shadowColor: currentThemeColor,
-              },
-            ]}
-          />
-        </View>
-      </Animated.View>
-
-      {/* Background overlay - tap to close */}
-      {isOpen && (
-        <TouchableOpacity
-          style={styles.overlay}
-          onPress={closePanel}
-          activeOpacity={1}
-        />
-      )}
-
-      {/* Panel */}
-      <Animated.View
-        style={[
-          styles.panel,
-          {
-            transform: [{ translateX }],
-          },
-        ]}
-        pointerEvents={isOpen ? 'auto' : 'none'}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Header */}
-            <View style={styles.header}>
-              <View>
-                <Text style={styles.headerLabel}>FEEDBACK</Text>
-                <Text style={styles.title}>How's the app?</Text>
-              </View>
-              <View style={styles.headerActions}>
-                <Pressable
-                  onPress={() => {
-                    const newThemeState = !currentThemeState;
-                    setLocalThemeState(newThemeState);
-                    setIsPinkTheme(newThemeState);
-                  }}
-                  style={({ pressed }) => [
-                    styles.colorToggle,
-                    {
-                      borderColor: hexA(currentThemeColor, 0.5),
-                      backgroundColor: hexA(currentThemeColor, 0.15),
-                    },
-                    pressed && { opacity: 0.7 }
-                  ]}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                >
-                  <View
-                    style={[
-                      styles.colorIndicator,
-                      { backgroundColor: currentThemeColor }
-                    ]}
-                  />
-                </Pressable>
-                <TouchableOpacity
-                  onPress={closePanel}
-                  style={styles.closeButton}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="close" size={18} color="#9898a4" />
-                </TouchableOpacity>
-              </View>
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.headerLabel}>FEEDBACK</Text>
+              <Text style={styles.title}>How's the app?</Text>
             </View>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={() => {
+                  const newThemeState = !currentThemeState;
+                  setLocalThemeState(newThemeState);
+                  setIsPinkTheme(newThemeState);
+                }}
+                style={({ pressed }) => [
+                  styles.colorToggle,
+                  {
+                    borderColor: hexA(currentThemeColor, 0.5),
+                    backgroundColor: hexA(currentThemeColor, 0.15),
+                  },
+                  pressed && { opacity: 0.7 }
+                ]}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <View
+                  style={[
+                    styles.colorIndicator,
+                    { backgroundColor: currentThemeColor }
+                  ]}
+                />
+              </Pressable>
+              <TouchableOpacity
+                onPress={handleClose}
+                style={styles.closeButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={18} color="#9898a4" />
+              </TouchableOpacity>
+            </View>
+          </View>
 
-            {/* Segmented Tabs */}
-            <View style={styles.tabsContainer}>
-              {TABS.map((tab) => {
-                const isActive = activeTab === tab.key;
-                return (
-                  <TouchableOpacity
-                    key={tab.key}
-                    style={styles.tabItem}
-                    onPress={() => {
-                      setActiveTab(tab.key);
-                      setFeedback('');
-                      setRating(0);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.tabItemInner}>
-                      <Ionicons
-                        name={tab.icon as any}
-                        size={14}
-                        color={isActive ? currentThemeColor : '#55555f'}
-                      />
-                      <Text
-                        style={[
-                          styles.tabLabel,
-                          isActive && { color: currentThemeColor },
-                        ]}
-                      >
-                        {tab.label}
-                      </Text>
+          {/* Segmented Tabs */}
+          <View style={styles.tabsContainer}>
+            {TABS.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={styles.tabItem}
+                  onPress={() => {
+                    setActiveTab(tab.key);
+                    setFeedback('');
+                    setRating(0);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.tabItemInner}>
+                    <Ionicons
+                      name={tab.icon as any}
+                      size={14}
+                      color={isActive ? currentThemeColor : '#55555f'}
+                    />
+                    <Text
+                      style={[
+                        styles.tabLabel,
+                        isActive && { color: currentThemeColor },
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </View>
+                  {isActive && (
+                    <View
+                      style={[
+                        styles.tabIndicatorUnderline,
+                        { backgroundColor: currentThemeColor },
+                      ]}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {submittedState && (
+            <Animated.View style={[styles.successCard, { opacity: successOpacity }]}>
+              <View
+                style={[
+                  styles.successIcon,
+                  {
+                    backgroundColor: hexA(currentThemeColor, 0.15),
+                    borderColor: hexA(currentThemeColor, 0.4),
+                  },
+                ]}
+              >
+                <Ionicons name="checkmark" size={28} color={currentThemeColor} />
+              </View>
+              <Text style={styles.successTitle}>
+                {submittedState === 'rating' && 'Thanks for the feedback'}
+                {submittedState === 'bug' && "We'll look into it"}
+                {submittedState === 'feature' && 'Got it'}
+              </Text>
+              <Text style={styles.successSubtitle}>
+                {submittedState === 'rating' && 'Your feedback helps us improve.'}
+                {submittedState === 'bug' && 'Thanks for reporting this bug.'}
+                {submittedState === 'feature' && 'Your suggestion has been noted.'}
+              </Text>
+            </Animated.View>
+          )}
+
+          {!submittedState && (
+            <View style={styles.formContent}>
+              {activeTab === 'rating' && (
+                <>
+                  <Text style={styles.question}>How would you rate the app?</Text>
+
+                  <View style={styles.starsCard}>
+                    <View style={styles.starsRow}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <TouchableOpacity
+                          key={star}
+                          onPress={() => setRating(star)}
+                          style={styles.starButton}
+                          activeOpacity={0.6}
+                          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                        >
+                          <Ionicons
+                            name={star <= rating ? 'star' : 'star-outline'}
+                            size={32}
+                            color={star <= rating ? currentThemeColor : '#3a3a44'}
+                          />
+                        </TouchableOpacity>
+                      ))}
                     </View>
-                    {isActive && (
-                      <View
-                        style={[
-                          styles.tabIndicatorUnderline,
-                          { backgroundColor: currentThemeColor },
-                        ]}
+                    {rating > 0 && (
+                      <Text style={[styles.starsLabel, { color: currentThemeColor }]}>
+                        {rating === 1 && 'Not great'}
+                        {rating === 2 && 'Could be better'}
+                        {rating === 3 && "It's okay"}
+                        {rating === 4 && 'Pretty good'}
+                        {rating === 5 && 'Love it'}
+                      </Text>
+                    )}
+                  </View>
+
+                  {rating > 0 && rating < 5 && (
+                    <View style={styles.followUpSection}>
+                      <Text style={styles.label}>WHAT CAN WE IMPROVE?</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Tell us more..."
+                        placeholderTextColor="#3a3a44"
+                        value={feedback}
+                        onChangeText={setFeedback}
+                        multiline
+                        maxLength={500}
+                      />
+                      <Text style={styles.charCount}>{feedback.length} / 500</Text>
+                    </View>
+                  )}
+
+                  {rating === 5 && (
+                    <View
+                      style={[
+                        styles.appStoreCard,
+                        {
+                          backgroundColor: hexA(currentThemeColor, 0.05),
+                          borderColor: hexA(currentThemeColor, 0.3),
+                        },
+                      ]}
+                    >
+                      <Ionicons name="sparkles" size={18} color={currentThemeColor} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.appStoreTitle, { color: currentThemeColor }]}>
+                          Love JSON.fit?
+                        </Text>
+                        <Text style={styles.appStoreSubtitle}>
+                          Help others discover it with a quick review.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      {
+                        backgroundColor: rating === 0 ? '#0a0a0f' : currentThemeColor,
+                        borderWidth: rating === 0 ? 1 : 0,
+                        borderColor: 'rgba(255,255,255,0.06)',
+                      },
+                    ]}
+                    onPress={handleRatingSubmit}
+                    disabled={rating === 0}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={[
+                        styles.submitButtonText,
+                        { color: rating === 0 ? '#55555f' : '#000' },
+                      ]}
+                    >
+                      {rating === 5 ? 'Rate on App Store' : 'Submit feedback'}
+                    </Text>
+                    {rating > 0 && (
+                      <Ionicons
+                        name={rating === 5 ? 'open-outline' : 'arrow-forward'}
+                        size={16}
+                        color="#000"
                       />
                     )}
                   </TouchableOpacity>
-                );
-              })}
-            </View>
+                </>
+              )}
 
-            {/* Inline success overlay (covers form content when active) */}
-            {submittedState && (
-              <Animated.View style={[styles.successCard, { opacity: successOpacity }]}>
-                <View
-                  style={[
-                    styles.successIcon,
-                    {
-                      backgroundColor: hexA(currentThemeColor, 0.15),
-                      borderColor: hexA(currentThemeColor, 0.4),
-                    },
-                  ]}
-                >
-                  <Ionicons name="checkmark" size={28} color={currentThemeColor} />
-                </View>
-                <Text style={styles.successTitle}>
-                  {submittedState === 'rating' && 'Thanks for the feedback'}
-                  {submittedState === 'bug' && "We'll look into it"}
-                  {submittedState === 'feature' && 'Got it'}
-                </Text>
-                <Text style={styles.successSubtitle}>
-                  {submittedState === 'rating' && 'Your feedback helps us improve.'}
-                  {submittedState === 'bug' && 'Thanks for reporting this bug.'}
-                  {submittedState === 'feature' && 'Your suggestion has been noted.'}
-                </Text>
-              </Animated.View>
-            )}
+              {(activeTab === 'bug' || activeTab === 'feature') && (
+                <>
+                  <Text style={styles.question}>
+                    {activeTab === 'bug'
+                      ? 'What issue are you experiencing?'
+                      : 'What feature would you like to see?'}
+                  </Text>
 
-            {/* Form content */}
-            {!submittedState && (
-              <View style={styles.formContent}>
-                {activeTab === 'rating' && (
-                  <>
-                    <Text style={styles.question}>How would you rate the app?</Text>
+                  <TextInput
+                    style={[styles.input, styles.largeInput]}
+                    placeholder={
+                      activeTab === 'bug'
+                        ? 'Describe the bug — what happened, what you expected, steps to reproduce...'
+                        : 'Describe your feature idea — what should it do, why it would help...'
+                    }
+                    placeholderTextColor="#3a3a44"
+                    value={feedback}
+                    onChangeText={setFeedback}
+                    multiline
+                    maxLength={500}
+                  />
 
-                    <View style={styles.starsCard}>
-                      <View style={styles.starsRow}>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <TouchableOpacity
-                            key={star}
-                            onPress={() => setRating(star)}
-                            style={styles.starButton}
-                            activeOpacity={0.6}
-                            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                          >
-                            <Ionicons
-                              name={star <= rating ? 'star' : 'star-outline'}
-                              size={32}
-                              color={star <= rating ? currentThemeColor : '#3a3a44'}
-                            />
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      {rating > 0 && (
-                        <Text style={[styles.starsLabel, { color: currentThemeColor }]}>
-                          {rating === 1 && 'Not great'}
-                          {rating === 2 && 'Could be better'}
-                          {rating === 3 && 'It\'s okay'}
-                          {rating === 4 && 'Pretty good'}
-                          {rating === 5 && 'Love it'}
-                        </Text>
-                      )}
-                    </View>
+                  <Text style={styles.charCount}>{feedback.length} / 500</Text>
 
-                    {rating > 0 && rating < 5 && (
-                      <View style={styles.followUpSection}>
-                        <Text style={styles.label}>WHAT CAN WE IMPROVE?</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="Tell us more..."
-                          placeholderTextColor="#3a3a44"
-                          value={feedback}
-                          onChangeText={setFeedback}
-                          multiline
-                          maxLength={500}
-                        />
-                        <Text style={styles.charCount}>{feedback.length} / 500</Text>
-                      </View>
-                    )}
-
-                    {rating === 5 && (
-                      <View
-                        style={[
-                          styles.appStoreCard,
-                          {
-                            backgroundColor: hexA(currentThemeColor, 0.05),
-                            borderColor: hexA(currentThemeColor, 0.3),
-                          },
-                        ]}
-                      >
-                        <Ionicons name="sparkles" size={18} color={currentThemeColor} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.appStoreTitle, { color: currentThemeColor }]}>
-                            Love JSON.fit?
-                          </Text>
-                          <Text style={styles.appStoreSubtitle}>
-                            Help others discover it with a quick review.
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-
-                    <TouchableOpacity
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      {
+                        backgroundColor: !feedback.trim() ? '#0a0a0f' : currentThemeColor,
+                        borderWidth: !feedback.trim() ? 1 : 0,
+                        borderColor: 'rgba(255,255,255,0.06)',
+                      },
+                    ]}
+                    onPress={handleFeedbackSubmit}
+                    disabled={!feedback.trim()}
+                    activeOpacity={0.85}
+                  >
+                    <Text
                       style={[
-                        styles.submitButton,
-                        {
-                          backgroundColor: rating === 0 ? '#0a0a0f' : currentThemeColor,
-                          borderWidth: rating === 0 ? 1 : 0,
-                          borderColor: 'rgba(255,255,255,0.06)',
-                        },
+                        styles.submitButtonText,
+                        { color: !feedback.trim() ? '#55555f' : '#000' },
                       ]}
-                      onPress={handleRatingSubmit}
-                      disabled={rating === 0}
-                      activeOpacity={0.85}
                     >
-                      <Text
-                        style={[
-                          styles.submitButtonText,
-                          { color: rating === 0 ? '#55555f' : '#000' },
-                        ]}
-                      >
-                        {rating === 5 ? 'Rate on App Store' : 'Submit feedback'}
-                      </Text>
-                      {rating > 0 && (
-                        <Ionicons
-                          name={rating === 5 ? 'open-outline' : 'arrow-forward'}
-                          size={16}
-                          color="#000"
-                        />
-                      )}
-                    </TouchableOpacity>
-                  </>
-                )}
-
-                {(activeTab === 'bug' || activeTab === 'feature') && (
-                  <>
-                    <Text style={styles.question}>
-                      {activeTab === 'bug'
-                        ? 'What issue are you experiencing?'
-                        : 'What feature would you like to see?'}
+                      Submit {activeTab === 'bug' ? 'bug report' : 'feature request'}
                     </Text>
-
-                    <TextInput
-                      style={[styles.input, styles.largeInput]}
-                      placeholder={
-                        activeTab === 'bug'
-                          ? 'Describe the bug — what happened, what you expected, steps to reproduce...'
-                          : 'Describe your feature idea — what should it do, why it would help...'
-                      }
-                      placeholderTextColor="#3a3a44"
-                      value={feedback}
-                      onChangeText={setFeedback}
-                      multiline
-                      maxLength={500}
-                    />
-
-                    <Text style={styles.charCount}>{feedback.length} / 500</Text>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.submitButton,
-                        {
-                          backgroundColor: !feedback.trim() ? '#0a0a0f' : currentThemeColor,
-                          borderWidth: !feedback.trim() ? 1 : 0,
-                          borderColor: 'rgba(255,255,255,0.06)',
-                        },
-                      ]}
-                      onPress={handleFeedbackSubmit}
-                      disabled={!feedback.trim()}
-                      activeOpacity={0.85}
-                    >
-                      <Text
-                        style={[
-                          styles.submitButtonText,
-                          { color: !feedback.trim() ? '#55555f' : '#000' },
-                        ]}
-                      >
-                        Submit {activeTab === 'bug' ? 'bug report' : 'feature request'}
-                      </Text>
-                      {feedback.trim() && (
-                        <Ionicons name="arrow-forward" size={16} color="#000" />
-                      )}
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            )}
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Animated.View>
-    </>
+                    {feedback.trim() && (
+                      <Ionicons name="arrow-forward" size={16} color="#000" />
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  // ── Pull-tab (visual tweaks only, position/sizing preserved) ─────
-  floatingTab: {
-    position: 'absolute',
-    right: 0,
-    top: '45%',
-    zIndex: 1000,
-  },
-  tabTouchArea: {
-    padding: 5,
-  },
-  tabIndicator: {
-    width: 12,
-    height: 60,
-    borderTopLeftRadius: 6,
-    borderBottomLeftRadius: 6,
-    shadowOffset: { width: -2, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-
-  // ── Panel ────────────────────────────────────────────────────────
-  panel: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: PANEL_WIDTH,
-    backgroundColor: '#000',
-    borderLeftWidth: 1,
-    borderLeftColor: 'rgba(255,255,255,0.05)',
-    zIndex: 2001,
-    shadowColor: '#000',
-    shadowOffset: { width: -3, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 15,
-  },
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
-  scrollView: {
-    flex: 1,
-  },
+  scrollView: { flex: 1 },
   content: {
     flexGrow: 1,
-    paddingTop: 56,
+    paddingTop: 24,
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
 
-  // ── Header ───────────────────────────────────────────────────────
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -748,7 +540,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Segmented tabs ───────────────────────────────────────────────
+  // Tabs
   tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -782,10 +574,8 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // ── Form content ─────────────────────────────────────────────────
-  formContent: {
-    flex: 1,
-  },
+  // Form
+  formContent: { flex: 1 },
   question: {
     fontSize: 15,
     fontWeight: '500',
@@ -796,7 +586,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
 
-  // ── Stars row ────────────────────────────────────────────────────
+  // Stars
   starsCard: {
     backgroundColor: '#0a0a0f',
     borderRadius: 14,
@@ -807,13 +597,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     alignItems: 'center',
   },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  starButton: {
-    padding: 2,
-  },
+  starsRow: { flexDirection: 'row', gap: 12 },
+  starButton: { padding: 2 },
   starsLabel: {
     fontSize: 11,
     letterSpacing: 1.3,
@@ -821,10 +606,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
 
-  // ── Inputs ───────────────────────────────────────────────────────
-  followUpSection: {
-    marginBottom: 16,
-  },
+  // Inputs
+  followUpSection: { marginBottom: 16 },
   label: {
     fontSize: 10,
     color: '#9898a4',
@@ -846,9 +629,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-Regular',
     lineHeight: 20,
   },
-  largeInput: {
-    minHeight: 180,
-  },
+  largeInput: { minHeight: 180 },
   charCount: {
     fontSize: 10,
     color: '#3a3a44',
@@ -858,7 +639,7 @@ const styles = StyleSheet.create({
     fontFamily: 'DMMono-Regular',
   },
 
-  // ── 5-star App Store invitation ──────────────────────────────────
+  // App Store invitation card
   appStoreCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -883,7 +664,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // ── Submit button ────────────────────────────────────────────────
+  // Submit
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -901,7 +682,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-SemiBold',
   },
 
-  // ── Inline success state ─────────────────────────────────────────
+  // Success
   successCard: {
     alignItems: 'center',
     paddingTop: 40,
@@ -932,16 +713,5 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: 'center',
     paddingHorizontal: 16,
-  },
-
-  // ── Overlay ──────────────────────────────────────────────────────
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-    zIndex: 2000,
   },
 });

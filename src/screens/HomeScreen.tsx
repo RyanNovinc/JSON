@@ -14,8 +14,10 @@ import {
   TextInput,
   ScrollView,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+import { TouchableOpacity as RNTouchable } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -23,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
 import QRCode from 'react-native-qrcode-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createShare, ShareError } from '../services/shareService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
@@ -40,48 +43,17 @@ type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-function RoutineCard({ routine, onExport, onPress, onLongPress, isPinkTheme, themeColor }: { 
-  routine: WorkoutRoutine; 
-  onExport: () => void;
-  onPress: () => void;
-  onLongPress: () => void;
-  isPinkTheme?: boolean;
-  themeColor: string;
-}) {
-  return (
-    <TouchableOpacity 
-      style={styles.card} 
-      activeOpacity={0.8} 
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={800}
-    >
-      <View style={styles.cardContent}>
-        <View style={styles.cardTextContainer}>
-          <Text style={styles.cardTitle}>{routine.name}</Text>
-          <Text style={styles.cardSubtitle}>
-            {routine.days} days • {routine.blocks} blocks
-          </Text>
-        </View>
-        <TouchableOpacity onPress={onExport} style={styles.exportButton}>
-          <Ionicons name="share-outline" size={22} color={themeColor} />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 export default function HomeScreen({ route, transitionProgress, panGestureRef }: any) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  
+  const insets = useSafeAreaInsets();
+
   // TEST: DISABLED auto-test to stop the loop
-  const [hasRunTest, setHasRunTest] = useState(true); // Set to true to disable auto-test
-  
-  // NEW: Use WorkoutRoutineContext instead of local state
+  const [hasRunTest, setHasRunTest] = useState(true);
+
   const { routines, isLoading, saveRoutine, deleteRoutine: deleteRoutineFromContext, loadRoutines } = useWorkoutRoutines();
-  
-  const [shareModal, setShareModal] = useState<{ 
-    visible: boolean; 
+
+  const [shareModal, setShareModal] = useState<{
+    visible: boolean;
     routine: WorkoutRoutine | null;
     qrCode?: string;
     shareUrl?: string;
@@ -103,17 +75,16 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     visible: false,
     routine: null,
   });
-  
-  // Debug modal for production debugging
+
   const [debugModal, setDebugModal] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string>('');
   const [debugLogsCopied, setDebugLogsCopied] = useState(false);
-  
-  // Debug logging function that captures logs for production debugging
+
   const debugLog = useCallback((message: string) => {
     console.log(message);
     setDebugLogs(prev => prev + `${new Date().toISOString()}: ${message}\n`);
   }, []);
+
   const [savedWorkoutRoutines, setSavedWorkoutRoutines] = useState<Set<string>>(new Set());
   const [myRoutines, setMyRoutines] = useState<WorkoutRoutine[]>([]);
   const [renameModal, setRenameModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null; newName: string }>({
@@ -122,10 +93,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     newName: '',
   });
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const shareModalOpacity = useRef(new Animated.Value(0)).current;
-  
+
   const { showFeedbackModal, submitFeedback, skipFeedback, triggerFeedbackModal } = useImportFeedback();
   const { isPinkTheme, setIsPinkTheme, themeColor, themeColorLight } = useTheme();
   const { appMode, setAppMode, isTrainingMode, isNutritionMode, isTransitioning, setIsTransitioning } = useAppMode();
@@ -155,7 +127,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
 
   const hideShareModal = () => {
     setShareModal(prev => ({ ...prev, isAnimating: true }));
-    
+
     Animated.timing(shareModalOpacity, {
       toValue: 0,
       duration: 200,
@@ -173,30 +145,22 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     });
   };
 
-  // Load additional data on mount (context handles main routines automatically)
   useEffect(() => {
     const initializeApp = async () => {
-      // Clean up any corrupted completion data on app start
       await WorkoutStorage.cleanupCorruptedCompletionData();
-      
-      // Load my routines (separate from main routines)
       loadMyRoutines();
     };
-    
     initializeApp();
   }, []);
 
-  // Check if onboarding should be shown
   useEffect(() => {
     checkOnboarding();
   }, []);
 
   const checkOnboarding = async () => {
-    // Reset onboarding in development for easy testing
     if (__DEV__) {
       await AsyncStorage.removeItem('onboarding_completed');
     }
-    
     const isCompleted = await WorkoutStorage.isOnboardingCompleted();
     if (!isCompleted) {
       setShowOnboarding(true);
@@ -208,37 +172,30 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     const handleImportedProgram = async () => {
       if (route?.params?.importedProgram) {
         const program = route.params.importedProgram;
-        
-        // Check if this is a new unified export that already created the routine
+
         const metadata = (program as any)._metadata;
         if (metadata && metadata.exportType === 'unified_mesocycle_structure') {
-          // Just refresh routines list - routine was already created in ImportScreen
           await loadRoutines();
           navigation.setParams({ importedProgram: undefined } as any);
           return;
         }
-        
-        // Define sample workout IDs to prevent duplicates
+
         const sampleWorkoutIds = [
           'sample_quick_start_ppl',
-          'sample_muscle_builder_pro_52w', 
+          'sample_muscle_builder_pro_52w',
           'sample_glute_tone_12w'
         ];
-        
-        // Check if this is a sample workout trying to be imported
+
         if (program.id && sampleWorkoutIds.includes(program.id)) {
           Alert.alert(
             'Already Available',
             'This workout has been imported previously. You can access it anytime from your saved workouts.',
             [{ text: 'OK' }]
           );
-          
-          // Clear the params and return early
           navigation.setParams({ importedProgram: undefined } as any);
           return;
         }
-        
-        // Determine mesocycle number if this is part of a mesocycle program
+
         let mesocycleNumber: number | undefined;
         if (program.programId) {
           try {
@@ -256,12 +213,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           days: program.days_per_week,
           blocks: program.blocks.length,
           data: program,
-          programId: program.programId, // Link to mesocycle program if applicable
-          mesocycleNumber, // which mesocycle this routine belongs to
+          programId: program.programId,
+          mesocycleNumber,
         };
         await saveRoutine(newRoutine);
-        
-        // If this routine is part of a mesocycle program, update the program's routine list
+
         if (program.programId) {
           try {
             const { ProgramStorage } = await import('../data/programStorage');
@@ -270,15 +226,13 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             console.error('Failed to link routine to program:', error);
           }
         }
-        
-        // Trigger feedback modal if the program has an import ID
+
         if (program.id) {
           setTimeout(() => {
             triggerFeedbackModal(program.id);
-          }, 100); // Quick delay to ensure UI update, then show feedback modal
+          }, 100);
         }
-        
-        // Clear the params to prevent re-adding
+
         navigation.setParams({ importedProgram: undefined } as any);
       }
     };
@@ -286,60 +240,58 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     handleImportedProgram();
   }, [route?.params?.importedProgram, triggerFeedbackModal]);
 
-  // loadRoutines function removed - now handled by WorkoutRoutineContext
-
   const loadMyRoutines = async () => {
     console.log('📥 Loading my routines...');
     const myRoutinesList = await WorkoutStorage.loadMyRoutines();
-    
-    // Add defensive check for corrupted storage
+
     if (!Array.isArray(myRoutinesList)) {
       console.warn('⚠️ My routines data is corrupted, resetting to empty array');
       setMyRoutines([]);
       setSavedWorkoutRoutines(new Set());
       return;
     }
-    
+
     console.log('📥 Loaded', myRoutinesList.length, 'saved routines');
     setMyRoutines(myRoutinesList);
-    
-    // Update saved routines set
+
     const routineIds = new Set(myRoutinesList.map(routine => routine.fingerprint || routine.id));
     setSavedWorkoutRoutines(routineIds);
     console.log('📥 Saved routine IDs:', Array.from(routineIds));
   };
 
-  // addRoutine function removed - now using saveRoutine from context directly
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadRoutines();
+      await loadMyRoutines();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadRoutines]);
 
   const handleExport = async (routine: WorkoutRoutine) => {
     if (!routine.data) return;
-    
-    // Set initial modal state with loading
+
     showShareModal(routine);
 
     try {
-      // Prepare the same data that would be copied to clipboard
       let exportData = { ...routine.data };
-      
-      // Clean exercisePreferences from sample plans at the source
+
       if (routine.data?._metadata?.isSamplePlan && exportData._metadata?.exercisePreferences) {
         delete exportData._metadata.exercisePreferences;
       }
       let programData = null;
-      
-      // Load program data if available
+
       if (routine.programId) {
         const { ProgramStorage } = await import('../data/programStorage');
         programData = await ProgramStorage.getProgram(routine.programId);
       }
-      
-      // Collect all manual blocks across all mesocycles (same logic as existing handleShare)
+
       const manualBlocks = [];
       const completionStatus = {};
       const workoutHistory = [];
-      
+
       if (programData && programData.totalMesocycles > 1) {
-        // Multi-mesocycle program - collect manual blocks from each mesocycle
         for (let mesocycleNum = 1; mesocycleNum <= programData.totalMesocycles; mesocycleNum++) {
           const manualBlocksKey = `manual_blocks_mesocycle_${mesocycleNum}`;
           try {
@@ -356,7 +308,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           }
         }
       } else {
-        // Single mesocycle or no program data
         try {
           const manualBlocksData = await AsyncStorage.getItem('manual_blocks');
           if (manualBlocksData) {
@@ -368,7 +319,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         }
       }
 
-      // Load completion status and workout history (simplified version)
       try {
         const statusData = await AsyncStorage.getItem('workout_completion_status');
         if (statusData) {
@@ -378,7 +328,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         console.log('Could not load completion status');
       }
 
-      // Build the complete export object
       const completeExport = {
         workoutData: exportData,
         manualBlocks: manualBlocks,
@@ -393,19 +342,18 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         }
       };
 
-      // Create universal link
       const shareResult = await createShare(completeExport);
-      
-      setShareModal(prev => ({ 
-        ...prev, 
+
+      setShareModal(prev => ({
+        ...prev,
         qrCode: shareResult.shareUrl,
         shareUrl: shareResult.shareUrl,
-        isGenerating: false 
+        isGenerating: false
       }));
     } catch (error) {
       console.error('Error generating share link:', error);
       let errorMessage = 'Failed to create share link';
-      
+
       if (error instanceof ShareError) {
         switch (error.code) {
           case 'TOO_LARGE':
@@ -421,9 +369,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             errorMessage = error.message;
         }
       }
-      
-      setShareModal(prev => ({ 
-        ...prev, 
+
+      setShareModal(prev => ({
+        ...prev,
         isGenerating: false,
         error: errorMessage
       }));
@@ -434,13 +382,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     const routine = shareModal.routine;
     if (!routine?.data) return;
 
-    // Handle retry action
     if (action === 'retry') {
       handleExport(routine);
       return;
     }
 
-    // Handle share URL action
     if (action === 'shareUrl' && shareModal.shareUrl) {
       try {
         await Share.share({
@@ -454,30 +400,25 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         return;
       }
     }
-    
+
     try {
-      // Enhanced export with complete state including manual modifications
       let exportData = { ...routine.data };
-      
-      // Clean exercisePreferences from sample plans at the source
+
       if (routine.data?._metadata?.isSamplePlan && exportData._metadata?.exercisePreferences) {
         delete exportData._metadata.exercisePreferences;
       }
       let programData = null;
-      
-      // Load program data if available
+
       if (routine.programId) {
         const { ProgramStorage } = await import('../data/programStorage');
         programData = await ProgramStorage.getProgram(routine.programId);
       }
-      
-      // Collect all manual blocks across all mesocycles
+
       const manualBlocks = [];
       const completionStatus = {};
       const workoutHistory = [];
-      
+
       if (programData && programData.totalMesocycles > 1) {
-        // Multi-mesocycle program - collect manual blocks from each mesocycle
         for (let mesocycleNum = 1; mesocycleNum <= programData.totalMesocycles; mesocycleNum++) {
           const manualBlocksKey = `manual_blocks_mesocycle_${mesocycleNum}`;
           try {
@@ -493,8 +434,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             console.log(`Could not load manual blocks for mesocycle ${mesocycleNum}`);
           }
         }
-        
-        // Load custom mesocycles
+
         try {
           const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
           const customMesocyclesData = await AsyncStorage.getItem(customMesocyclesKey);
@@ -513,15 +453,13 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 }
               }
             }
-            
-            // Include custom mesocycles in export
+
             exportData._customMesocycles = customMesocycles;
           }
         } catch (error) {
           console.log('Could not load custom mesocycles');
         }
       } else {
-        // Single routine or no mesocycles - load manual blocks directly
         const manualBlocksKey = `manual_blocks_${routine.id}`;
         try {
           const manualBlocksData = await AsyncStorage.getItem(manualBlocksKey);
@@ -533,8 +471,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           console.log('Could not load manual blocks');
         }
       }
-      
-      // Load completion status
+
       try {
         const completionKey = `completion_${routine.id}`;
         const completionData = await AsyncStorage.getItem(completionKey);
@@ -544,8 +481,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       } catch (error) {
         console.log('Could not load completion status');
       }
-      
-      // Load workout history
+
       try {
         const historyKey = `workoutHistory_${routine.id}`;
         const historyData = await AsyncStorage.getItem(historyKey);
@@ -555,55 +491,43 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       } catch (error) {
         console.log('Could not load workout history');
       }
-      
-      // Load exercise customizations and dynamic exercises
+
       const exerciseCustomizations = {};
       const dynamicExercisesData = {};
       const setsData = {};
-      
+
       if (routine.data && routine.data.blocks) {
         for (const block of routine.data.blocks) {
           for (const day of block.days) {
-            // Check for various week customizations
-            for (let week = 1; week <= 20; week++) { // Check up to 20 weeks
-              // Load exercise customizations (order changes, rep scheme changes)
+            for (let week = 1; week <= 20; week++) {
               const customizationKey = `day_customization_${block.block_name}_${day.day_name}_week${week}`;
               try {
                 const customizationData = await AsyncStorage.getItem(customizationKey);
                 if (customizationData) {
                   exerciseCustomizations[customizationKey] = JSON.parse(customizationData);
                 }
-              } catch (error) {
-                // Continue to next
-              }
-              
-              // Load dynamic exercises (added during workouts)
+              } catch (error) {}
+
               const dynamicKey = `workout_${block.block_name}_${day.day_name}_week${week}_exercises`;
               try {
                 const dynamicData = await AsyncStorage.getItem(dynamicKey);
                 if (dynamicData) {
                   dynamicExercisesData[dynamicKey] = JSON.parse(dynamicData);
                 }
-              } catch (error) {
-                // Continue to next
-              }
-              
-              // Load sets data (modified sets/reps)
+              } catch (error) {}
+
               const setsKey = `workout_${block.block_name}_${day.day_name}_week${week}_sets`;
               try {
                 const setsInfo = await AsyncStorage.getItem(setsKey);
                 if (setsInfo) {
                   setsData[setsKey] = JSON.parse(setsInfo);
                 }
-              } catch (error) {
-                // Continue to next
-              }
+              } catch (error) {}
             }
           }
         }
       }
-      
-      // Load exercise preferences
+
       let exercisePreferences = {};
       try {
         const preferencesData = await AsyncStorage.getItem('exercise_preferences');
@@ -613,8 +537,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       } catch (error) {
         console.log('Could not load exercise preferences');
       }
-      
-      // Load active block and week progress
+
       let activeBlock = null;
       let weekProgress = null;
       try {
@@ -626,8 +549,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       } catch (error) {
         console.log('Could not load progress data');
       }
-      
-      // Load custom mesocycles for this routine
+
       let customMesocycles = [];
       try {
         const customMesocyclesKey = `custom_mesocycles_${routine.id}`;
@@ -638,11 +560,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       } catch (error) {
         console.log('Could not load custom mesocycles');
       }
-      
-      // NEW UNIFIED APPROACH: Create complete mesocycle structure
+
       const allMesocycles = [];
-      
-      // Add program mesocycles (if any)
+
       if (programData?.mesocycleRoadmap && programData.mesocycleRoadmap.length > 0) {
         for (const phase of programData.mesocycleRoadmap) {
           allMesocycles.push({
@@ -656,8 +576,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           });
         }
       }
-      
-      // Add custom mesocycles 
+
       for (const customMeso of customMesocycles) {
         allMesocycles.push({
           mesocycleNumber: customMeso.mesocycleNumber,
@@ -670,62 +589,41 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           customId: customMeso.customId
         });
       }
-      
-      // Sort by mesocycle number
+
       allMesocycles.sort((a, b) => a.mesocycleNumber - b.mesocycleNumber);
-      
-      // Check if this is a sample plan to exclude exercisePreferences
-      // Primary check: explicit isSamplePlan flag
+
       let isSamplePlan = routine.data?._metadata?.isSamplePlan || false;
-      
-      // Fallback check: detect sample plans by their characteristics (for plans imported before isSamplePlan flag)
+
       if (!isSamplePlan) {
-        
-        // Check by original sample plan IDs first
         const knownSamplePlanIds = ['sample_quick_start_ppl', 'sample_muscle_builder_52w', 'sample_glute_tone_12w'];
         isSamplePlan = knownSamplePlanIds.includes(routine.data?.id);
-        
-        // If not found by ID, check by workout structure fingerprint
+
         if (!isSamplePlan) {
-          // Check for Foundation Builder fingerprint (this specific routine):
-          // - 3 days per week
-          // - 2 blocks 
-          // - Full Body A/B/C structure
-          if (routine.data?.days_per_week === 3 && 
+          if (routine.data?.days_per_week === 3 &&
               routine.data?.blocks?.length === 2 &&
               routine.data?.blocks?.[0]?.days?.[0]?.day_name === "Full Body A" &&
               routine.data?.blocks?.[0]?.days?.[1]?.day_name === "Full Body B" &&
               routine.data?.blocks?.[0]?.days?.[2]?.day_name === "Full Body C") {
             isSamplePlan = true;
           }
-          
-          // Check for original Quick Start sample plan fingerprint:
-          // - 3 days per week, 3 blocks, Push/Pull/Legs
-          else if (routine.data?.days_per_week === 3 && 
+          else if (routine.data?.days_per_week === 3 &&
                    routine.data?.blocks?.length === 3 &&
                    routine.data?.blocks?.[0]?.days?.[0]?.day_name === "Push Day" &&
                    routine.data?.blocks?.[0]?.days?.[1]?.day_name === "Pull Day" &&
                    routine.data?.blocks?.[0]?.days?.[2]?.day_name === "Leg Day") {
             isSamplePlan = true;
           }
-          
-          // Check for Muscle Builder Pro fingerprint:
-          // - 4-6 days per week, many blocks, specific structure
-          else if (routine.data?.blocks?.length >= 10 && 
+          else if (routine.data?.blocks?.length >= 10 &&
                    routine.data?.days_per_week >= 4) {
             isSamplePlan = true;
           }
-          
-          // Check for Glute & Tone fingerprint:
-          // - 4 days per week, Lower/Upper pattern
           else if (routine.data?.days_per_week === 4 &&
                    routine.data?.blocks?.[0]?.days?.[0]?.day_name === "Lower Body - Glute Focus") {
             isSamplePlan = true;
           }
         }
       }
-      
-      // Simplified metadata with unified mesocycle structure
+
       const metadata = {
         exportType: 'unified_mesocycle_structure',
         totalMesocycles: allMesocycles.length,
@@ -736,29 +634,23 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         routineName: routine.name,
         currentDisplayName: routine.name,
         originalDaysPerWeek: routine.days,
-        // Complete state data
         manualBlocks: manualBlocks,
         completionStatus: completionStatus,
         workoutHistory: workoutHistory,
         activeBlock: activeBlock ? parseInt(activeBlock) : null,
         weekProgress: weekProgress,
-        // Exercise-level modifications
         exerciseCustomizations: exerciseCustomizations,
         dynamicExercisesData: dynamicExercisesData,
         setsData: setsData,
-        // Only include exercisePreferences for non-sample plans
         ...(isSamplePlan ? {} : { exercisePreferences: exercisePreferences }),
-        // Preserve isSamplePlan flag if it exists
         ...(isSamplePlan ? { isSamplePlan: true } : {})
       };
-      
+
       exportData._metadata = metadata;
       exportData.routine_name = routine.name;
-      
-      // NEW UNIFIED EXPORT: No complex logic, just export everything cleanly
-      
+
       const jsonString = JSON.stringify(exportData, null, 2);
-      
+
       if (action === 'copy') {
         console.log('📋 Starting clipboard copy...');
         await Clipboard.setStringAsync(jsonString);
@@ -768,7 +660,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         setTimeout(() => {
           console.log('📋 Showing success modal');
           setSuccessModal(true);
-          // Auto-dismiss success modal after 2 seconds
           setTimeout(() => {
             console.log('📋 Auto-dismissing success modal');
             setSuccessModal(false);
@@ -791,31 +682,40 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     setDeleteModal({ visible: true, routine });
   };
 
+  // === NEW: share from action sheet ===
+  // Closes the action sheet, then opens the existing share modal (with QR
+  // code, send link, retry) — same flow that handleExport powers.
+  const handleShareFromActionSheet = (routine: WorkoutRoutine) => {
+    setDeleteModal({ visible: false, routine: null });
+    // small delay so the action sheet finishes dismissing before the share
+    // modal animates in — feels smoother than a hard swap.
+    setTimeout(() => {
+      handleExport(routine);
+    }, 200);
+  };
+
   const handleToggleSaveWorkout = async (routine: WorkoutRoutine) => {
     try {
       const routineId = routine.fingerprint || routine.id;
       const isCurrentlySaved = savedWorkoutRoutines.has(routineId);
-      
+
       console.log('💾 Save workout button pressed:', routine.name, 'Currently saved:', isCurrentlySaved);
-      
+
       if (isCurrentlySaved) {
-        // Remove from collection
         console.log('🗑️ Removing workout from collection');
         await WorkoutStorage.removeMyRoutine(routineId);
       } else {
-        // Add to collection
         const transformedWorkout = {
           ...routine,
           id: `${routine.id}_${Date.now()}`,
-          fingerprint: routineId, // Keep original fingerprint for identification
+          fingerprint: routineId,
           createdAt: Date.now(),
         };
-        
+
         console.log('💾 Saving workout with ID:', transformedWorkout.id);
         await WorkoutStorage.addMyRoutine(transformedWorkout);
       }
-      
-      // Refresh my routines list
+
       await loadMyRoutines();
       console.log('💾 Toggle workout completed successfully');
     } catch (error) {
@@ -826,7 +726,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   const handleDeleteConfirm = () => {
     const routine = deleteModal.routine;
     if (!routine) return;
-    
+
     Alert.alert(
       'Remove Workout Plan',
       'Are you sure? This will delete all progress you have made in this plan and cannot be undone.',
@@ -864,7 +764,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     try {
       const updatedRoutine = { ...routine, name: newName.trim() };
       await WorkoutStorage.updateRoutine(updatedRoutine);
-      // Update handled by WorkoutRoutineContext
       setRenameModal({ visible: false, routine: null, newName: '' });
     } catch (error) {
       console.error('Failed to rename routine:', error);
@@ -882,21 +781,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     setShowOnboarding(true);
   };
 
-  const handleNutritionTransition = () => {
-    if (isTransitioning) return;
-    
-    // Check if we're already in nutrition mode - no need to transition
-    if (appMode === 'nutrition') return;
-    
-    // Set transitioning state to prevent multiple clicks
-    setIsTransitioning(true);
-    
-    // Switch the app mode, the container will handle the animation
-    setAppMode('nutrition');
-  };
-
-
-
   const handleGoToTodayWorkout = async () => {
     try {
       if (routines.length === 0) {
@@ -908,10 +792,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         return;
       }
 
-      // Find the active routine (first one for now, but could be extended to find truly active one)
       const activeRoutine = routines[0];
-      
-      
+
       if (!activeRoutine.data?.blocks || activeRoutine.data.blocks.length === 0) {
         Alert.alert(
           'Invalid Routine',
@@ -921,7 +803,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         return;
       }
 
-      // Get the active block from storage, or find first incomplete block
       let activeBlockIndex = 0;
       try {
         const savedActiveBlock = await WorkoutStorage.getActiveBlock(activeRoutine.id);
@@ -937,8 +818,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       }
 
       const activeBlock = activeRoutine.data.blocks[activeBlockIndex];
-      
-      
+
       if (!activeBlock || !activeBlock.weeks) {
         Alert.alert(
           'Invalid Block',
@@ -947,33 +827,27 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         );
         return;
       }
-      
-      // Calculate current week based on completion
+
       let currentWeek = 1;
-      const totalWeeks = activeBlock.weeks.includes('-') 
-        ? parseInt(activeBlock.weeks.split('-')[1]) - parseInt(activeBlock.weeks.split('-')[0]) + 1 
+      const totalWeeks = activeBlock.weeks.includes('-')
+        ? parseInt(activeBlock.weeks.split('-')[1]) - parseInt(activeBlock.weeks.split('-')[0]) + 1
         : 1;
 
       try {
-        // Check for manually bookmarked week first
         const bookmarkData = await WorkoutStorage.getBookmark(activeBlock.block_name);
-        
+
         if (bookmarkData?.isBookmarked) {
           currentWeek = bookmarkData.week;
         } else {
-          // Find first incomplete week using robust storage
           for (let week = 1; week <= totalWeeks; week++) {
-            // Use the same robust storage logic as DaysScreen.tsx
             const key = `completed_${activeBlock.block_name}_week${week}`;
             console.log(`🎯 [TODAY-BUTTON] Checking week ${week} with key: ${key}`);
-            
-            // Try robust storage first, with fallback to legacy storage
+
             let completed = await RobustStorage.getItem(key, true);
             if (!completed) {
-              // Fallback to legacy AsyncStorage
               completed = await AsyncStorage.getItem(key);
             }
-            
+
             let completedWorkouts: string[] = [];
             if (completed) {
               try {
@@ -987,36 +861,34 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             } else {
               console.log(`🎯 [TODAY-BUTTON] No completion data found for week ${week}`);
             }
-            
+
             if (!completedWorkouts || completedWorkouts.length === 0) {
               console.log(`🎯 [TODAY-BUTTON] Week ${week} has no completed workouts - selecting this week`);
               currentWeek = week;
               break;
             }
-            
-            // Check if all workout days in this week are completed (exclude REST days)
+
             console.log(`🎯 [TODAY-BUTTON] Checking days for week ${week}:`, activeBlock.days.map(d => d.day_name));
-            const workoutDays = activeBlock.days.filter(day => 
+            const workoutDays = activeBlock.days.filter(day =>
               day.day_name && !day.day_name.toLowerCase().includes('rest')
             );
             console.log(`🎯 [TODAY-BUTTON] Workout days (excluding rest):`, workoutDays.map(d => d.day_name));
-            
+
             const allDaysCompleted = workoutDays.every(day => {
               const expectedKey = `${day.day_name}_week${week}`;
               const isCompleted = completedWorkouts.includes(expectedKey);
               console.log(`🎯 [TODAY-BUTTON] Day ${day.day_name} - expected key: ${expectedKey}, completed: ${isCompleted}`);
               return isCompleted;
             });
-            
+
             console.log(`🎯 [TODAY-BUTTON] Week ${week} all days completed: ${allDaysCompleted}`);
-            
+
             if (!allDaysCompleted) {
               console.log(`🎯 [TODAY-BUTTON] Week ${week} has incomplete days - selecting this week`);
               currentWeek = week;
               break;
             }
-            
-            // If we're on the last week and it's complete, stay on last week
+
             if (week === totalWeeks) {
               console.log(`🎯 [TODAY-BUTTON] Reached last week ${week} - staying here`);
               currentWeek = totalWeeks;
@@ -1028,14 +900,13 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         currentWeek = 1;
       }
 
-      // Navigate directly to the Days screen with the active block
       const todayActiveBlock = activeRoutine.data.blocks[activeBlockIndex];
       navigation.navigate('Days' as any, {
         block: todayActiveBlock,
         routineName: activeRoutine.name,
         initialWeek: currentWeek
       });
-      
+
     } catch (error) {
       console.error('Error navigating to today\'s workout:', error);
       Alert.alert(
@@ -1048,9 +919,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
 
   const handleGoToToday = async () => {
     try {
-      // Load all meal plans
       const mealPlans = await WorkoutStorage.loadMealPlans();
-      
+
       if (mealPlans.length === 0) {
         Alert.alert(
           'No Meal Plans',
@@ -1060,14 +930,12 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         return;
       }
 
-      // For now, use the first meal plan. In a real app, you'd find the active meal plan
       const activeMealPlan = mealPlans[0];
       const today = new Date();
-      
-      // Calculate which week contains today
-      const mealPlanStartDate = new Date(); // This should come from meal plan data
+
+      const mealPlanStartDate = new Date();
       const daysDifference = Math.floor((today.getTime() - mealPlanStartDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (daysDifference < 0) {
         Alert.alert(
           'Future Meal Plan',
@@ -1080,12 +948,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       const weeks = activeMealPlan.data?.weeks || [];
       let currentWeek = null;
       let currentWeekNumber = 0;
-      
-      // Find which week contains today
+
       for (let i = 0; i < weeks.length; i++) {
         const weekStartDay = i * 7;
         const weekEndDay = weekStartDay + weeks[i].days.length - 1;
-        
+
         if (daysDifference >= weekStartDay && daysDifference <= weekEndDay) {
           currentWeek = weeks[i];
           currentWeekNumber = i + 1;
@@ -1102,15 +969,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         return;
       }
 
-      // Navigate to the week that contains today
       navigation.navigate('MealPlanWeeks' as any, { mealPlan: activeMealPlan });
-      
-      // Optional: You could navigate directly to the day instead
-      // navigation.navigate('MealPlanDays' as any, { 
-      //   week: currentWeek, 
-      //   mealPlanName: activeMealPlan.name 
-      // });
-      
     } catch (error) {
       console.error('Error navigating to today:', error);
       Alert.alert(
@@ -1121,236 +980,28 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     }
   };
 
-
-  const renderContent = () => {
-    // Show loading if context is still loading (prevents flash of empty state)
-    if (isLoading) {
-      return (
-        <View style={[styles.emptyState, { backgroundColor: '#0a0a0b' }]}>
-          <Ionicons name="barbell-outline" size={64} color="#3f3f46" />
-          <Text style={styles.emptyTitle}>Loading Routines...</Text>
-        </View>
-      );
-    }
-
-    if (routines.length === 0) {
-      return (
-        <View style={[styles.emptyState, { backgroundColor: '#0a0a0b' }]}>
-          <Ionicons name="barbell-outline" size={64} color="#3f3f46" />
-          <Text style={styles.emptyTitle}>No Routines Yet</Text>
-          <Text style={styles.emptyDescription}>
-            Import a custom JSON workout plan or choose one of the sample plans.
-          </Text>
-        </View>
-      );
-    }
-
-    if (routines.length === 1) {
-      // Hero layout for single routine
-      const routine = routines[0];
-      return (
-        <View style={styles.heroContainer}>
-          <TouchableOpacity
-            style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('Blocks' as any, { routine })}
-            onLongPress={() => handleActionRequest(routine)}
-            delayLongPress={800}
-          >
-            <View style={styles.heroContent}>
-              <Text style={[styles.heroTitle, { textShadowColor: themeColorLight }]}>{routine.name}</Text>
-              <Text style={styles.heroSubtitle}>
-                {routine.days} days per week • {routine.blocks} blocks
-              </Text>
-            </View>
-            
-            <View style={styles.heroActions}>
-              <TouchableOpacity
-                style={styles.heroActionButton}
-                onPress={() => handleExport(routine)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="share-outline" size={24} color={themeColor} />
-                <Text style={[styles.heroActionText, { color: themeColor }]}>Share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.heroSecondaryButton}
-                onPress={() => handleGoToTodayWorkout()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="today-outline" size={18} color="#71717a" />
-                <Text style={styles.heroSecondaryText}>Today</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    if (routines.length === 2) {
-      // Two routines - split screen vertically
-      return (
-        <View style={styles.dualVerticalContainer}>
-          {routines.map((routine, index) => (
-            <View key={routine.id} style={styles.dualVerticalHeroContainer}>
-              <TouchableOpacity
-                style={[styles.dualVerticalCard, { borderColor: themeColor, shadowColor: themeColor }]}
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('Blocks' as any, { routine })}
-                onLongPress={() => handleActionRequest(routine)}
-                delayLongPress={800}
-              >
-                <View style={styles.dualVerticalContent}>
-                  <Text style={[styles.dualVerticalTitle, { textShadowColor: themeColorLight }]}>{routine.name}</Text>
-                  <Text style={styles.dualVerticalSubtitle}>
-                    {routine.days} days per week • {routine.blocks} blocks
-                  </Text>
-                  
-                  <View style={styles.dualVerticalActions}>
-                    <TouchableOpacity
-                      style={styles.dualVerticalShareButton}
-                      onPress={() => handleExport(routine)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="share-outline" size={24} color={themeColor} />
-                      <Text style={[styles.dualVerticalShareText, { color: themeColor }]}>Share</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.dualVerticalSecondaryButton}
-                      onPress={() => handleGoToTodayWorkout()}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="today-outline" size={16} color="#71717a" />
-                      <Text style={styles.dualVerticalSecondaryText}>Today</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      );
-    }
-
-    if (routines.length === 3) {
-      // Three routines - compact horizontal cards
-      return (
-        <View style={styles.tripleContainer}>
-          {routines.map((routine, index) => (
-            <View key={routine.id} style={styles.tripleCardContainer}>
-              <TouchableOpacity
-                style={[styles.tripleCard, { borderColor: themeColor, shadowColor: themeColor }]}
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('Blocks' as any, { routine })}
-                onLongPress={() => handleActionRequest(routine)}
-                delayLongPress={800}
-              >
-                <View style={styles.tripleContent}>
-                  <Text style={[styles.tripleTitle, { textShadowColor: themeColorLight }]} numberOfLines={2}>
-                    {routine.name}
-                  </Text>
-                  <Text style={styles.tripleSubtitle}>
-                    {routine.days} days • {routine.blocks} blocks
-                  </Text>
-                  <Text style={[styles.tripleDescription, { color: themeColor }]}>
-                    Tap to start
-                  </Text>
-                </View>
-                
-                <View style={styles.tripleButtonsContainer}>
-                  <TouchableOpacity
-                    style={styles.tripleShareButton}
-                    onPress={() => handleExport(routine)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="share-outline" size={20} color={themeColor} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.tripleShareButton}
-                    onPress={() => handleGoToTodayWorkout()}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="today-outline" size={20} color={themeColor} />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      );
-    }
-
-    if (routines.length === 4) {
-      // Four routines - vertical stack layout
-      return (
-        <View style={styles.quadContainer}>
-          {routines.map((routine, index) => (
-            <View key={routine.id} style={styles.quadCardContainer}>
-              <TouchableOpacity
-                style={[styles.quadCard, { borderColor: themeColor, shadowColor: themeColor }]}
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('Blocks' as any, { routine })}
-                onLongPress={() => handleActionRequest(routine)}
-                delayLongPress={800}
-              >
-                <View style={styles.quadContent}>
-                  <Text style={[styles.quadTitle, { textShadowColor: themeColorLight }]} numberOfLines={2}>
-                    {routine.name}
-                  </Text>
-                  <Text style={styles.quadSubtitle}>
-                    {routine.days} days • {routine.blocks} blocks
-                  </Text>
-                  <Text style={[styles.quadDescription, { color: themeColor }]}>
-                    Tap to start
-                  </Text>
-                </View>
-                
-                <View style={styles.quadButtonsContainer}>
-                  <TouchableOpacity
-                    style={styles.quadShareButton}
-                    onPress={() => handleExport(routine)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="share-outline" size={18} color={themeColor} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.quadShareButton}
-                    onPress={() => handleGoToTodayWorkout()}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="today-outline" size={18} color={themeColor} />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      );
-    }
-
-    // Multiple routines - scrollable list
-    return (
-      <FlatList
-        data={routines}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <RoutineCard
-            routine={item}
-            onExport={() => handleExport(item)}
-            onPress={() => navigation.navigate('Blocks' as any, { routine: item })}
-            onLongPress={() => handleActionRequest(item)}
-            isPinkTheme={isPinkTheme}
-            themeColor={themeColor}
-          />
-        )}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
-    );
+  const openCreateFlow = () => {
+    navigation.getParent()?.navigate('CreateFlow' as never);
   };
+
+  const currentRoutine = routines[0] ?? null;
+  const otherRoutines = routines.slice(1);
 
   return (
     <View style={styles.container}>
+      <View style={[styles.titleBar, { paddingTop: insets.top + 4 }]}>
+        <Text style={styles.title}>Workouts</Text>
+        <TouchableOpacity
+          style={styles.titleAction}
+          onPress={() => setCalendarModal(true)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Open workout calendar"
+        >
+          <Ionicons name="calendar-outline" size={18} color="#a1a1aa" />
+        </TouchableOpacity>
+      </View>
+
       <Animated.View
         style={[
           styles.animatedContainer,
@@ -1360,10 +1011,144 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           },
         ]}
       >
-        {renderContent()}
+        {isLoading ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="barbell-outline" size={56} color="#3f3f46" />
+            <Text style={styles.emptyTitle}>Loading routines...</Text>
+          </View>
+        ) : routines.length === 0 ? (
+          <ScrollView
+            contentContainerStyle={styles.emptyScroll}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
+            }
+          >
+            <View style={styles.emptyHero}>
+              <View style={[styles.emptyHeroIcon, { backgroundColor: themeColor, shadowColor: themeColor }]}>
+                <Ionicons name="sparkles" size={36} color="#0a0a0b" />
+              </View>
+              <Text style={styles.emptyHeroTitle}>Create your first plan</Text>
+              <Text style={styles.emptyHeroBody}>
+                Answer a few questions. We'll send a prompt to your AI. Import the plan it sends back.
+              </Text>
+              <TouchableOpacity
+                style={[styles.emptyHeroButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
+                onPress={openCreateFlow}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.emptyHeroButtonText}>Get started</Text>
+                <Ionicons name="arrow-forward" size={16} color="#0a0a0b" />
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
+            }
+          >
+            {/* ================================================================
+                HERO PLAN CARD — redesigned
+
+                Layout:
+                  CURRENT PLAN  (eyebrow)
+                  5-Day Strength Build  (title)
+                  5 days / week • 1 block  (subtitle)
+
+                  [   ▶  Start today's workout   ]   <- full-width primary
+                       View full plan ›             <- subtle text link
+
+                Share lives in the action sheet (long-press the card).
+                ================================================================ */}
+            <View style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}>
+              {/* ••• menu button — opens the action sheet (Share, Save, Rename, Remove) */}
+              <RNTouchable
+                style={styles.heroMenuBtn}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleActionRequest(currentRoutine!);
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel="More options"
+              >
+                <Ionicons name="ellipsis-horizontal" size={20} color="#a1a1aa" />
+              </RNTouchable>
+
+              <Pressable
+                onPress={() => navigation.navigate('Blocks' as any, { routine: currentRoutine })}
+                onLongPress={() => handleActionRequest(currentRoutine!)}
+                delayLongPress={600}
+              >
+                <Text style={[styles.heroEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
+                <Text style={[styles.heroTitleText, { textShadowColor: themeColorLight }]} numberOfLines={2}>
+                  {currentRoutine!.name}
+                </Text>
+                <Text style={styles.heroSubtitle}>
+                  {currentRoutine!.days} days / week • {currentRoutine!.blocks} {currentRoutine!.blocks === 1 ? 'block' : 'blocks'}
+                </Text>
+              </Pressable>
+
+              {/* Primary: full-width Today button */}
+              <TouchableOpacity
+                style={[styles.heroTodayBtn, { backgroundColor: themeColor, shadowColor: themeColor }]}
+                onPress={handleGoToTodayWorkout}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Start today's workout"
+              >
+                <Ionicons name="play" size={16} color="#0a0a0b" />
+                <Text style={styles.heroTodayText}>Start today's workout</Text>
+              </TouchableOpacity>
+
+              {/* Secondary: subtle text link */}
+              <TouchableOpacity
+                style={styles.heroPlanLink}
+                onPress={() => navigation.navigate('Blocks' as any, { routine: currentRoutine })}
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel="View full plan"
+              >
+                <Text style={[styles.heroPlanLinkText, { color: themeColor }]}>View full plan</Text>
+                <Ionicons name="chevron-forward" size={13} color={themeColor} />
+              </TouchableOpacity>
+            </View>
+
+            {otherRoutines.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Other plans</Text>
+                </View>
+                {otherRoutines.map(routine => (
+                  <TouchableOpacity
+                    key={routine.id}
+                    style={styles.smallPlanCard}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('Blocks' as any, { routine })}
+                    onLongPress={() => handleActionRequest(routine)}
+                    delayLongPress={600}
+                  >
+                    <View style={styles.smallPlanContent}>
+                      <Text style={styles.smallPlanTitle} numberOfLines={1}>{routine.name}</Text>
+                      <Text style={styles.smallPlanSub}>
+                        {routine.days} days • {routine.blocks} blocks
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={14} color="#71717a" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+          </ScrollView>
+        )}
       </Animated.View>
 
-      {/* RED TEST BUTTON - Universal Link Debug */}
+      {/* RED TEST BUTTON - Universal Link Debug (kept from original) */}
       <TouchableOpacity
         style={styles.debugTestButton}
         onPress={() => {
@@ -1375,103 +1160,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         <Text style={styles.debugTestButtonText}>TEST UNIVERSAL LINK</Text>
       </TouchableOpacity>
 
-      {/* Calendar Button - Bottom Left */}
-      <View style={[styles.calendarButton, { backgroundColor: themeColor }]}>
-        <TouchableOpacity
-          style={styles.buttonInner}
-          onPress={() => navigation.navigate('WorkoutCalendar' as any)}
-          activeOpacity={0.9}
-        >
-          <Ionicons name="calendar-outline" size={24} color="#0a0a0b" />
-        </TouchableOpacity>
-      </View>
+      {/* ============================================================ */}
+      {/* MODALS                                                        */}
+      {/* ============================================================ */}
 
-
-      {/* Questionnaire Button - Bottom Center */}
-      <View style={[styles.questionnaireButton, { backgroundColor: themeColor }]}>
-        <TouchableOpacity
-          style={styles.buttonInner}
-          onPress={() => navigation.navigate('WorkoutDashboard' as any)}
-          activeOpacity={0.9}
-        >
-          <Ionicons name="person-outline" size={24} color="#0a0a0b" />
-        </TouchableOpacity>
-      </View>
-
-      {/* App Mode Toggle - Centered at Top */}
-      <View style={styles.centralToggleContainer}>
-        <View style={styles.centralToggleInner}>
-          <Animated.View
-            style={[
-              styles.centralModeToggle,
-              {
-                backgroundColor: transitionProgress ? transitionProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [themeColor, 'transparent']
-                }) : (isTrainingMode ? themeColor : 'transparent'),
-                borderColor: transitionProgress ? transitionProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [themeColor, '#3f3f46']
-                }) : (isTrainingMode ? themeColor : '#3f3f46')
-              }
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.centralModeToggleInner}
-              onPress={() => setAppMode('training')}
-            >
-              <Ionicons 
-                name="barbell" 
-                size={20} 
-                color={isTrainingMode ? "#0a0a0b" : themeColor}
-              />
-              <Text style={[
-                styles.centralToggleText,
-                { color: isTrainingMode ? "#0a0a0b" : themeColor }
-              ]}>
-                Workouts
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-          
-          <Animated.View
-            style={[
-              styles.centralModeToggle,
-              {
-                backgroundColor: transitionProgress ? transitionProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['transparent', themeColor]
-                }) : (isNutritionMode ? themeColor : 'transparent'),
-                borderColor: transitionProgress ? transitionProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['transparent', themeColor]
-                }) : (isNutritionMode ? themeColor : 'transparent')
-              }
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.centralModeToggleInner}
-              onPress={handleNutritionTransition}
-            >
-              <Ionicons 
-                name="restaurant" 
-                size={20} 
-                color={isNutritionMode ? "#0a0a0b" : themeColor}
-              />
-              <Text style={[
-                styles.centralToggleText,
-                { color: isNutritionMode ? "#0a0a0b" : themeColor }
-              ]}>
-                Nutrition
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </View>
-
-
-
-      {/* Custom Share Modal */}
+      {/* Custom Share Modal — QR code + send link, unchanged from original */}
       <Modal
         visible={shareModal.visible}
         transparent={true}
@@ -1479,14 +1172,13 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         onRequestClose={hideShareModal}
       >
         <Animated.View style={[styles.newShareOverlay, { opacity: shareModalOpacity }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.newShareBackdrop}
             activeOpacity={1}
             onPress={hideShareModal}
           />
-          
+
           <View style={[styles.newShareModal, { borderColor: themeColor }]}>
-            {/* Close Button */}
             <View style={styles.newShareHeader}>
               <TouchableOpacity
                 style={styles.newShareClose}
@@ -1496,24 +1188,21 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 <Ionicons name="close" size={24} color="#ffffff" />
               </TouchableOpacity>
             </View>
-            
-            {/* Image */}
-            <Image 
-              source={isPinkTheme ? 
+
+            <Image
+              source={isPinkTheme ?
                 require('./../../Lucid_Origin_Two_athletic_women_in_a_modern_gym_one_spotting_t_0.jpg') :
                 require('./../../sdfdfs.jpg')
               }
               style={styles.newShareImage}
               resizeMode="cover"
             />
-            
-            {/* Content */}
+
             <View style={styles.newShareContent}>
               <Text style={[styles.newShareTitle, { color: themeColor }]}>
                 {shareModal.routine?.name?.toUpperCase()}
               </Text>
-              
-              {/* QR Code Section */}
+
               {shareModal.isGenerating ? (
                 <View style={styles.qrCodeContainer}>
                   <View style={styles.qrCodePlaceholder}>
@@ -1540,8 +1229,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                   </View>
                 </View>
               ) : null}
-              
-              {/* Action Buttons */}
+
               <View style={styles.shareActionButtons}>
                 {shareModal.error ? (
                   <TouchableOpacity
@@ -1567,7 +1255,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                   </TouchableOpacity>
                 ) : null}
               </View>
-              
+
               {shareModal.qrCode && (
                 <Text style={styles.shareFooterText}>Link expires in 7 days</Text>
               )}
@@ -1576,7 +1264,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </Animated.View>
       </Modal>
 
-      {/* Custom Success Modal */}
+      {/* Success Modal */}
       <Modal
         visible={successModal}
         transparent={true}
@@ -1587,7 +1275,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           <View style={styles.successContainer}>
             <Text style={styles.successTitle}>Copied!</Text>
             <Text style={styles.successMessage}>Workout JSON copied to clipboard</Text>
-            
+
             <TouchableOpacity
               style={[styles.successButton, { backgroundColor: themeColor }]}
               onPress={() => setSuccessModal(false)}
@@ -1599,7 +1287,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
-      {/* Action Sheet Modal */}
+      {/* ================================================================
+          ACTION SHEET — now includes Share at the top of the actions.
+          Tapping Share dismisses the sheet and opens the existing share
+          modal via handleShareFromActionSheet → handleExport.
+          ================================================================ */}
       <Modal
         visible={deleteModal.visible}
         transparent={true}
@@ -1607,17 +1299,15 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         onRequestClose={() => setDeleteModal({ visible: false, routine: null })}
       >
         <View style={styles.actionModalOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionModalBackdrop}
             activeOpacity={1}
             onPress={() => setDeleteModal({ visible: false, routine: null })}
           />
-          
+
           <View style={[styles.actionSheet, { borderColor: themeColor }]}>
-            {/* Handle Bar */}
             <View style={styles.handleBar} />
-            
-            {/* Header */}
+
             <View style={styles.actionHeader}>
               <Text style={styles.actionTitle}>Workout Options</Text>
               <TouchableOpacity
@@ -1628,8 +1318,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 <Ionicons name="close" size={24} color="#a1a1aa" />
               </TouchableOpacity>
             </View>
-            
-            {/* Routine Info */}
+
             <View style={styles.actionPlanInfo}>
               <Text style={styles.actionPlanName} numberOfLines={2}>
                 {deleteModal.routine?.name}
@@ -1638,9 +1327,18 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 {deleteModal.routine?.days} days • {deleteModal.routine?.blocks} blocks
               </Text>
             </View>
-            
+
             <View style={styles.modernActionButtons}>
-              {/* Save to Collection Button */}
+              {/* SHARE — opens the QR / send link modal */}
+              <TouchableOpacity
+                style={[styles.shareActionInSheet, { backgroundColor: themeColor, shadowColor: themeColor }]}
+                onPress={() => deleteModal.routine && handleShareFromActionSheet(deleteModal.routine)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="share-outline" size={18} color="#0a0a0b" />
+                <Text style={styles.shareActionInSheetText}>Share</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[
                   styles.saveActionButton,
@@ -1656,16 +1354,16 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons 
+                <Ionicons
                   name={savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? "heart-dislike" : "heart"}
-                  size={18} 
-                  color="#ffffff" 
+                  size={18}
+                  color="#ffffff"
                 />
                 <Text style={styles.saveActionText}>
                   {savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? 'Remove from Collection' : 'Save to Collection'}
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.renameButton}
                 onPress={() => deleteModal.routine && handleRenameRequest(deleteModal.routine)}
@@ -1674,7 +1372,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 <Ionicons name="create-outline" size={18} color="#ffffff" />
                 <Text style={styles.renameText}>Rename</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.deleteConfirmButton}
                 onPress={handleDeleteConfirm}
@@ -1683,7 +1381,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 <Ionicons name="trash" size={18} color="#ffffff" />
                 <Text style={styles.deleteConfirmText}>Remove</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.deleteCancelButton}
                 onPress={() => setDeleteModal({ visible: false, routine: null })}
@@ -1696,14 +1394,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
-
-      {/* Workout Calendar */}
       <WorkoutCalendar
         visible={calendarModal}
         onClose={() => setCalendarModal(false)}
       />
 
-      {/* Import Feedback Modal */}
       <ImportFeedbackModal
         visible={showFeedbackModal}
         onFeedback={submitFeedback}
@@ -1722,9 +1417,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             <View style={styles.renameIconContainer}>
               <Ionicons name="create-outline" size={32} color="#22d3ee" />
             </View>
-            
+
             <Text style={styles.renameTitle}>Rename Routine</Text>
-            
+
             <View style={styles.renameInputContainer}>
               <TextInput
                 style={styles.renameInput}
@@ -1736,7 +1431,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 selectTextOnFocus={true}
               />
             </View>
-            
+
             <View style={styles.renameButtons}>
               <TouchableOpacity
                 style={styles.renameCancelButton}
@@ -1745,7 +1440,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               >
                 <Text style={styles.renameCancelText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.renameConfirmButton, { backgroundColor: themeColor }]}
                 onPress={handleRenameConfirm}
@@ -1759,7 +1454,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
-      {/* Debug Modal for Production Debugging */}
+      {/* Debug Modal */}
       <Modal
         animationType="slide"
         transparent={false}
@@ -1767,18 +1462,16 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         onRequestClose={() => setDebugModal(false)}
       >
         <View style={styles.debugFullscreenContainer}>
-          {/* Header */}
           <View style={styles.debugHeader}>
             <Text style={styles.debugHeaderTitle}>Debug Console</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setDebugModal(false)}
               style={styles.debugCloseButton}
             >
               <Ionicons name="close" size={24} color="#ffffff" />
             </TouchableOpacity>
           </View>
-          
-          {/* Content */}
+
           <View style={styles.debugContent}>
             <View style={styles.debugSection}>
               <Text style={styles.debugSectionTitle}>Production Logs</Text>
@@ -1789,18 +1482,14 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               </ScrollView>
             </View>
           </View>
-          
-          {/* Actions */}
+
           <View style={styles.debugActions}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.debugReloadButton}
               onPress={async () => {
                 debugLog('🔄 [DEBUG] Manually triggering context loadRoutines...');
                 debugLog(`🔄 [DEBUG] Before reload - routines.length: ${routines.length}`);
-                
-                // Trigger context reload
                 await loadRoutines();
-                
                 debugLog(`🔄 [DEBUG] After reload - routines.length: ${routines.length}`);
                 debugLog('🔄 [DEBUG] Context reload completed');
               }}
@@ -1808,8 +1497,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               <Ionicons name="refresh" size={18} color="#ffffff" />
               <Text style={styles.debugButtonLabel}>Reload Data</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[
                 styles.debugCopyButton,
                 { backgroundColor: debugLogsCopied ? '#10b981' : '#3b82f6' }
@@ -1824,10 +1513,10 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 }
               }}
             >
-              <Ionicons 
-                name={debugLogsCopied ? "checkmark" : "copy-outline"} 
-                size={18} 
-                color="#ffffff" 
+              <Ionicons
+                name={debugLogsCopied ? "checkmark" : "copy-outline"}
+                size={18}
+                color="#ffffff"
               />
               <Text style={styles.debugButtonLabel}>
                 {debugLogsCopied ? 'Copied!' : 'Copy Logs'}
@@ -1837,7 +1526,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
-      {/* Onboarding Slideshow */}
       <OnboardingSlideshow
         visible={showOnboarding}
         onComplete={handleOnboardingComplete}
@@ -1854,97 +1542,264 @@ const styles = StyleSheet.create({
   animatedContainer: {
     flex: 1,
   },
-  header: {
-    paddingTop: 50,
+
+  // ===== Title bar =====
+  titleBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 8,
   },
-  appHeader: {
-    marginBottom: 24,
-  },
-  appName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#22d3ee',
-    letterSpacing: 2,
-  },
-  pageTitle: {
-    fontSize: 32,
+  title: {
+    fontSize: 28,
     fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: -0.4,
   },
-  listContent: {
-    paddingTop: 120,
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  emptyListContent: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  card: {
+  titleAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#18181b',
-    borderRadius: 4,
     borderWidth: 1,
     borderColor: '#27272a',
-    padding: 20,
-    marginBottom: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  cardContent: {
+
+  // ===== Scroll =====
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 32,
+  },
+
+  // ===== Section grouping =====
+  section: { marginBottom: 20 },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'baseline',
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
-  cardTextContainer: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 18,
+  sectionTitle: {
+    fontSize: 12,
     fontWeight: '600',
+    color: '#a1a1aa',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+
+  // ===== Hero card — new layout =====
+  heroCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 18,
+    borderWidth: 2,
+    padding: 20,
+    marginBottom: 20,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  heroEyebrow: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  heroTitleText: {
+    fontSize: 26,
+    fontWeight: '700',
     color: '#ffffff',
-    marginBottom: 4,
+    lineHeight: 32,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
-  cardSubtitle: {
-    fontSize: 14,
-    color: '#71717a',
+  heroSubtitle: {
+    fontSize: 13,
+    color: '#a1a1aa',
+    marginTop: 4,
   },
-  exportButton: {
-    padding: 8,
-    marginLeft: 12,
-  },
-  emptyState: {
-    flex: 1,
+  // Full-width primary action
+  heroTodayBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 18,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  emptyTitle: {
+  heroTodayText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0a0a0b',
+    letterSpacing: 0.2,
+  },
+  heroMenuBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  // Subtle text link below
+  heroPlanLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingTop: 12,
+    paddingBottom: 2,
+  },
+  heroPlanLinkText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  // ===== Small plan card (for routines beyond the first) =====
+  smallPlanCard: {
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  smallPlanContent: { flex: 1 },
+  smallPlanTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  smallPlanSub: {
+    fontSize: 11,
+    color: '#71717a',
+    marginTop: 2,
+  },
+
+  // ===== Link row =====
+  linkRow: {
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  linkRowPressable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  linkRowMenuBtn: {
+    padding: 4,
+    borderRadius: 4,
+  },
+  linkRowText: { flex: 1 },
+  linkRowTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#ffffff',
+  },
+  linkRowSub: {
+    fontSize: 11,
+    color: '#71717a',
+    marginTop: 2,
+  },
+
+  // ===== Empty state =====
+  emptyScroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  emptyHero: {
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyHeroIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 22,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 22,
+    elevation: 14,
+  },
+  emptyHeroTitle: {
     fontSize: 22,
     fontWeight: '700',
     color: '#ffffff',
     textAlign: 'center',
-    marginTop: 24,
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  emptyDescription: {
-    fontSize: 16,
-    color: '#71717a',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  emptySubtext: {
+  emptyHeroBody: {
     fontSize: 14,
-    color: '#52525b',
+    color: '#a1a1aa',
     textAlign: 'center',
-    paddingHorizontal: 40,
+    lineHeight: 20,
+    marginBottom: 28,
   },
-  buttonInner: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
+  emptyHeroButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 4,
+    gap: 8,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
   },
+  emptyHeroButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0a0a0b',
+  },
+
+  // ===== Old card styles preserved (rollback safety, unused by new layout) =====
+  header: { paddingTop: 50, paddingHorizontal: 16, paddingBottom: 16 },
+  appHeader: { marginBottom: 24 },
+  appName: { fontSize: 14, fontWeight: '700', color: '#22d3ee', letterSpacing: 2 },
+  pageTitle: { fontSize: 32, fontWeight: '700', color: '#ffffff' },
+  listContent: { paddingTop: 120, paddingHorizontal: 16, paddingBottom: 100 },
+  emptyListContent: { flex: 1, paddingHorizontal: 16 },
+  card: { backgroundColor: '#18181b', borderRadius: 4, borderWidth: 1, borderColor: '#27272a', padding: 20, marginBottom: 12 },
+  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardTextContainer: { flex: 1 },
+  cardTitle: { fontSize: 18, fontWeight: '600', color: '#ffffff', marginBottom: 4 },
+  cardSubtitle: { fontSize: 14, color: '#71717a' },
+  exportButton: { padding: 8, marginLeft: 12 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  emptyTitle: { fontSize: 22, fontWeight: '700', color: '#ffffff', textAlign: 'center', marginTop: 24, marginBottom: 16 },
+  emptyDescription: { fontSize: 16, color: '#71717a', textAlign: 'center', lineHeight: 24 },
+  emptySubtext: { fontSize: 14, color: '#52525b', textAlign: 'center', paddingHorizontal: 40 },
+  buttonInner: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', borderRadius: 4 },
+
+  // ===== Modal shared =====
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -1961,45 +1816,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#71717a',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  modalButtons: {
-    gap: 12,
-  },
-  modalButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#27272a',
-    borderRadius: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  modalButtonCancel: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  modalButtonCancelText: {
-    color: '#71717a',
-  },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#ffffff', textAlign: 'center', marginBottom: 8 },
+  modalSubtitle: { fontSize: 14, color: '#71717a', textAlign: 'center', marginBottom: 24 },
+  modalButtons: { gap: 12 },
+  modalButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#27272a', borderRadius: 8, paddingVertical: 16, paddingHorizontal: 20, gap: 12 },
+  modalButtonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#3f3f46' },
+  modalButtonText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+  modalButtonCancelText: { color: '#71717a' },
+
+  // ===== Success modal =====
   successContainer: {
     backgroundColor: '#18181b',
     borderRadius: 12,
@@ -2010,105 +1835,118 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     alignItems: 'center',
   },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
+  successTitle: { fontSize: 24, fontWeight: '700', color: '#ffffff', marginBottom: 8 },
+  successMessage: { fontSize: 14, color: '#71717a', textAlign: 'center', marginBottom: 24 },
+  successButton: { backgroundColor: '#22d3ee', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 32, minWidth: 80 },
+  successButtonText: { fontSize: 16, fontWeight: '600', color: '#0a0a0b', textAlign: 'center' },
+
+  // ===== Action sheet =====
+  actionModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'flex-end' },
+  actionModalBackdrop: { flex: 1 },
+  actionSheet: {
+    backgroundColor: '#18181b',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+    paddingBottom: 34,
+    paddingHorizontal: 20,
+    maxHeight: '85%',
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderColor: '#22d3ee',
+    marginHorizontal: 4,
   },
-  successMessage: {
-    fontSize: 14,
-    color: '#71717a',
-    textAlign: 'center',
+  handleBar: { width: 40, height: 4, backgroundColor: '#52525b', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  actionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  actionTitle: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
+  actionCloseButton: { padding: 4 },
+  actionPlanInfo: {
+    backgroundColor: '#27272a',
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
   },
-  successButton: {
-    backgroundColor: '#22d3ee',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    minWidth: 80,
+  actionPlanName: { color: '#ffffff', fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 4 },
+  actionPlanDetails: { color: '#a1a1aa', fontSize: 14, textAlign: 'center' },
+  modernActionButtons: { flexDirection: 'column', gap: 14, width: '100%' },
+
+  // NEW: Share button inside action sheet (primary cyan styling)
+  shareActionInSheet: {
+    width: '100%',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  successButtonText: {
+  shareActionInSheetText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0b',
-    textAlign: 'center',
+    letterSpacing: 0.2,
   },
-  deleteContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#27272a',
-    padding: 28,
+
+  saveActionButton: {
     width: '100%',
-    maxWidth: 350,
-    alignItems: 'center',
-    shadowColor: '#ef4444',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  deleteIconContainer: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: 50,
-    padding: 16,
-    marginBottom: 20,
-  },
-  deleteTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  deleteRoutineInfo: {
-    backgroundColor: '#0f0f0f',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 16,
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  deleteRoutineName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  deleteRoutineDetails: {
-    fontSize: 13,
-    color: '#a1a1aa',
-    textAlign: 'center',
-  },
-  deleteMessage: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 28,
-  },
-  deleteButtons: {
+    backgroundColor: '#10b981',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
     flexDirection: 'row',
-    gap: 8,
-    width: '100%',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  deleteButton: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+  removeActionButton: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
+  saveActionText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+  renameButton: {
+    width: '100%',
+    backgroundColor: '#3b82f6',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#22d3ee',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
+  renameText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+  deleteConfirmButton: {
+    width: '100%',
+    backgroundColor: '#ef4444',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  deleteConfirmText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
   deleteCancelButton: {
     flex: 1,
     backgroundColor: '#27272a',
@@ -2121,683 +1959,22 @@ const styles = StyleSheet.create({
     borderColor: '#3f3f46',
     minHeight: 44,
   },
-  renameButton: {
+  deleteCancelText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+  actionCancelButton: {
     width: '100%',
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#27272a',
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 24,
     alignItems: 'center',
-    flexDirection: 'row',
     justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#22d3ee',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  renameText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  deleteConfirmButton: {
-    width: '100%',
-    backgroundColor: '#ef4444',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#ef4444',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  deleteConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  heroContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Dual vertical layout (two routines)
-  dualVerticalContainer: {
-    flex: 1,
-    paddingTop: 80,
-    paddingBottom: 100,
-    paddingHorizontal: 16,
-    gap: 16,
-    justifyContent: 'space-evenly',
-  },
-  dualVerticalHeroContainer: {
-    height: '45%',
-    width: '100%',
-  },
-  dualVerticalCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#22d3ee',
-    padding: 32,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#22d3ee',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  dualVerticalContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    textAlign: 'center',
-  },
-  dualVerticalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 12,
-    textAlign: 'center',
-    textShadowColor: 'rgba(34, 211, 238, 0.5)',
-    textShadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    textShadowRadius: 2,
-  },
-  dualVerticalSubtitle: {
-    fontSize: 16,
-    color: '#a1a1aa',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  dualVerticalDescription: {
-    fontSize: 14,
-    color: '#22d3ee',
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  dualVerticalActions: {
-    alignItems: 'center',
-  },
-  dualVerticalShareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(34, 211, 238, 0.1)',
-  },
-  dualVerticalShareText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  dualVerticalSecondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    padding: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: 'transparent',
-    marginTop: 8,
-  },
-  dualVerticalSecondaryText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#71717a',
-  },
-  // Triple layout (three routines)
-  tripleContainer: {
-    flex: 1,
-    paddingTop: 80,
-    paddingBottom: 100,
-    paddingHorizontal: 16,
-    gap: 12,
-    justifyContent: 'space-evenly',
-  },
-  tripleCardContainer: {
-    height: '30%',
-    width: '100%',
-  },
-  tripleCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#22d3ee',
-    padding: 20,
-    width: '100%',
-    height: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#22d3ee',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  tripleContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  tripleTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 6,
-    textShadowColor: 'rgba(34, 211, 238, 0.5)',
-    textShadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    textShadowRadius: 2,
-  },
-  tripleSubtitle: {
-    fontSize: 13,
-    color: '#a1a1aa',
-    marginBottom: 4,
-  },
-  tripleDescription: {
-    fontSize: 12,
-    color: '#22d3ee',
-    fontWeight: '600',
-  },
-  tripleButtonsContainer: {
-    flexDirection: 'column',
-    gap: 8,
-    marginLeft: 12,
-  },
-  tripleShareButton: {
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(34, 211, 238, 0.1)',
-  },
-  // Quad layout (four routines) - vertical stack
-  quadContainer: {
-    flex: 1,
-    paddingTop: 80,
-    paddingBottom: 100,
-    paddingHorizontal: 16,
-    gap: 10,
-    justifyContent: 'space-evenly',
-  },
-  quadCardContainer: {
-    height: '22%',
-    width: '100%',
-  },
-  quadCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#22d3ee',
-    padding: 16,
-    width: '100%',
-    height: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#22d3ee',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  quadContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  quadTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 4,
-    textShadowColor: 'rgba(34, 211, 238, 0.5)',
-    textShadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    textShadowRadius: 2,
-  },
-  quadSubtitle: {
-    fontSize: 12,
-    color: '#a1a1aa',
-    marginBottom: 2,
-  },
-  quadDescription: {
-    fontSize: 11,
-    color: '#22d3ee',
-    fontWeight: '600',
-  },
-  quadButtonsContainer: {
-    flexDirection: 'column',
-    gap: 6,
-    marginLeft: 12,
-  },
-  quadShareButton: {
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(34, 211, 238, 0.1)',
-  },
-  heroCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#22d3ee',
-    padding: 40,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 340,
-    minHeight: 320,
-    justifyContent: 'center',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
-    // Add a subtle inner glow effect with multiple shadows
-    shadowColor: '#22d3ee',
-  },
-  heroContent: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  heroTitle: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 42,
-    textShadowColor: '#22d3ee40',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-  },
-  heroSubtitle: {
-    fontSize: 18,
-    color: '#71717a',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  heroDescription: {
-    fontSize: 16,
-    color: '#22d3ee',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  heroActions: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  heroActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#27272a',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    gap: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#3f3f46',
-  },
-  heroActionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#22d3ee',
-  },
-  heroSecondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    gap: 8,
-    marginTop: 8,
-  },
-  heroSecondaryText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#71717a',
-  },
-  dualContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 80,
-    paddingBottom: 100,
-    gap: 20,
-  },
-  dualCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 24,
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 120,
-  },
-  dualCardFirst: {
-    borderColor: '#22d3ee40',
-  },
-  dualCardSecond: {
-    borderColor: '#a855f740',
-  },
-  dualContent: {
-    flex: 1,
-  },
-  dualTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 8,
-    lineHeight: 28,
-  },
-  dualSubtitle: {
-    fontSize: 14,
-    color: '#71717a',
-  },
-  dualShareButton: {
-    backgroundColor: '#27272a',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  
-  // Calendar button styles
-  calendarButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 32,
-    width: 56,
-    height: 56,
-    borderRadius: 4,
-    backgroundColor: '#22d3ee',
-  },
-  
-  
-  
-  // Questionnaire button styles
-  questionnaireButton: {
-    position: 'absolute',
-    left: 16,
-    bottom: 32,
-    width: 56,
-    height: 56,
-    borderRadius: 4,
   },
 
-  // Share modal styles
-  shareModalContainer: {
-    backgroundColor: '#0a0a0b',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#22d3ee',
-    padding: 0,
-    width: '90%',
-    maxWidth: 400,
-    overflow: 'hidden',
-    shadowColor: '#22d3ee',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 20,
-    position: 'relative',
-  },
-  shareCloseButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(39, 39, 42, 0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  shareCloseText: {
-    fontSize: 18,
-    color: '#a1a1aa',
-    fontWeight: '400',
-    lineHeight: 18,
-  },
-  shareHeader: {
-    paddingHorizontal: 28,
-    paddingTop: 32,
-    paddingBottom: 24,
-    alignItems: 'center',
-  },
-  shareTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  shareSubtitle: {
-    fontSize: 15,
-    color: '#a1a1aa',
-    textAlign: 'center',
-    fontWeight: '500',
-    lineHeight: 22,
-  },
-  programInfo: {
-    paddingHorizontal: 28,
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  programName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#22d3ee',
-    textAlign: 'center',
-  },
-  shareOptions: {
-    paddingHorizontal: 28,
-    paddingBottom: 28,
-    gap: 12,
-  },
-  shareOption: {
-    backgroundColor: '#22d3ee',
-    borderRadius: 12,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    shadowColor: '#22d3ee',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  shareOptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0a0a0b',
-    letterSpacing: 0.3,
-  },
-
-  // Centered modal design
-  centeredOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  centeredModal: {
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 320,
-    borderWidth: 1,
-    borderColor: '#27272a',
-  },
-  centeredHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 8,
-  },
-  centeredDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22d3ee',
-  },
-  centeredTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  centeredWorkout: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#22d3ee',
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 28,
-  },
-  centeredSubtext: {
-    fontSize: 15,
-    color: '#a1a1aa',
-    textAlign: 'center',
-    marginBottom: 28,
-    lineHeight: 22,
-  },
-  centeredActions: {
-    width: '100%',
-    gap: 12,
-  },
-  centeredCopyButton: {
-    backgroundColor: '#22d3ee',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  centeredCopyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0a0a0b',
-  },
-  centeredShareButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  centeredShareText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#e4e4e7',
-  },
-  
-  
-  // Central mode toggle styles
-  centralToggleContainer: {
-    position: 'absolute',
-    top: 54,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    zIndex: 1000,
-  },
-  centralToggleInner: {
-    flexDirection: 'row',
-    gap: 8,
-    backgroundColor: '#18181b',
-    borderRadius: 16,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  centralModeToggle: {
-    width: 112,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'transparent',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  centralModeToggleInner: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    width: '100%',
-    height: '100%',
-    paddingHorizontal: 12,
-  },
-  centralToggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  
-  // New Share Modal Styles
-  newShareOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  newShareBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
+  // ===== Share modal =====
+  newShareOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  newShareBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   newShareModal: {
     backgroundColor: '#18181b',
     borderRadius: 16,
@@ -2831,31 +2008,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  newShareImage: {
-    width: '100%',
-    height: 180,
-  },
-  newShareContent: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  newShareTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
-    letterSpacing: 1,
-  },
-  newShareSubtitle: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  shareActionButtons: {
-    width: '100%',
-    gap: 16,
-  },
+  newShareImage: { width: '100%', height: 180 },
+  newShareContent: { padding: 24, alignItems: 'center' },
+  newShareTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 8, letterSpacing: 1 },
+  newShareSubtitle: { fontSize: 14, color: '#a1a1aa', textAlign: 'center', marginBottom: 24 },
+  shareActionButtons: { width: '100%', gap: 16 },
   shareActionPrimary: {
     width: '100%',
     borderRadius: 12,
@@ -2876,139 +2033,11 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 24,
   },
-  shareButtonSimple: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  shareButtonTitleSimple: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0a0a0b',
-    letterSpacing: 0.5,
-  },
-  shareButtonSubtitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(10, 10, 11, 0.7)',
-    letterSpacing: 0.2,
-  },
-  // Action Sheet Modal Styles (matching nutrition screen)
-  actionModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end',
-  },
-  actionModalBackdrop: {
-    flex: 1,
-  },
-  actionSheet: {
-    backgroundColor: '#18181b',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingBottom: 34,
-    paddingHorizontal: 20,
-    maxHeight: '80%',
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-    borderRightWidth: 2,
-    borderColor: '#22d3ee', // Default color, overridden by inline style
-    marginHorizontal: 4, // Add small margin to prevent border cutoff
-  },
-  handleBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#52525b',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  actionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  actionTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  actionCloseButton: {
-    padding: 4,
-  },
-  actionPlanInfo: {
-    backgroundColor: '#27272a',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  actionPlanName: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  actionPlanDetails: {
-    color: '#a1a1aa',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  modernActionButtons: {
-    flexDirection: 'column',
-    gap: 16,
-    width: '100%',
-  },
-  saveActionButton: {
-    width: '100%',
-    backgroundColor: '#10b981',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#10b981',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  removeActionButton: {
-    backgroundColor: '#f59e0b',
-    shadowColor: '#f59e0b',
-  },
-  saveActionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  actionCancelButton: {
-    width: '100%',
-    backgroundColor: '#27272a',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#3f3f46',
-  },
-  deleteCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  // Rename Modal Styles (updated for centered design)
+  shareButtonSimple: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  shareButtonTitleSimple: { fontSize: 16, fontWeight: '700', color: '#0a0a0b', letterSpacing: 0.5 },
+  shareButtonSubtitle: { fontSize: 13, fontWeight: '500', color: 'rgba(10, 10, 11, 0.7)', letterSpacing: 0.2 },
+
+  // ===== Rename modal =====
   renameContainer: {
     backgroundColor: '#18181b',
     borderRadius: 20,
@@ -3019,27 +2048,13 @@ const styles = StyleSheet.create({
     maxWidth: 350,
     alignItems: 'center',
     shadowColor: '#22d3ee',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
   },
-  renameIconContainer: {
-    backgroundColor: 'rgba(34, 211, 238, 0.1)',
-    borderRadius: 50,
-    padding: 16,
-    marginBottom: 20,
-  },
-  renameTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
+  renameIconContainer: { backgroundColor: 'rgba(34, 211, 238, 0.1)', borderRadius: 50, padding: 16, marginBottom: 20 },
+  renameTitle: { fontSize: 22, fontWeight: '700', color: '#ffffff', marginBottom: 20, textAlign: 'center' },
   renameInputContainer: {
     backgroundColor: '#0f0f0f',
     borderRadius: 12,
@@ -3049,20 +2064,8 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 28,
   },
-  renameInput: {
-    fontSize: 16,
-    color: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'transparent',
-  },
-  renameButtons: {
-    flexDirection: 'row',
-    gap: 16,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  renameInput: { fontSize: 16, color: '#ffffff', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: 'transparent' },
+  renameButtons: { flexDirection: 'row', gap: 16, width: '100%', justifyContent: 'center', alignItems: 'center' },
   renameCancelButton: {
     flex: 1,
     backgroundColor: '#27272a',
@@ -3085,65 +2088,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     minHeight: 50,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
   },
-  renameCancelText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  renameConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0a0a0b',
-  },
-  nutritionPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  nutritionPlaceholderTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  nutritionPlaceholderText: {
-    fontSize: 16,
-    color: '#71717a',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  
-  // Debug styles
-  debugButton: {
-    position: 'absolute',
-    bottom: 150, // Above the calendar button (which is at bottom: 80)
-    left: 20,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  
-  debugFullscreenContainer: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-  },
-  
+  renameCancelText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+  renameConfirmText: { fontSize: 16, fontWeight: '600', color: '#0a0a0b' },
+
+  // ===== Debug modal =====
+  debugFullscreenContainer: { flex: 1, backgroundColor: '#1a1a1a' },
   debugHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -3155,60 +2109,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#3a3a3a',
   },
-  
-  debugHeaderTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  
-  debugCloseButton: {
-    padding: 8,
-    backgroundColor: '#404040',
-    borderRadius: 8,
-  },
-  
-  debugContent: {
-    flex: 1,
-    padding: 20,
-  },
-  
-  debugSection: {
-    flex: 1,
-  },
-  
-  debugSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#cccccc',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  
-  debugScrollContainer: {
-    flex: 1,
-    backgroundColor: '#0f0f0f',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333333',
-  },
-  
-  debugText: {
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#00ff00',
-    lineHeight: 18,
-  },
-  
-  debugActions: {
-    flexDirection: 'row',
-    padding: 20,
-    paddingTop: 0,
-    gap: 12,
-  },
-  
+  debugHeaderTitle: { fontSize: 20, fontWeight: '700', color: '#ffffff' },
+  debugCloseButton: { padding: 8, backgroundColor: '#404040', borderRadius: 8 },
+  debugContent: { flex: 1, padding: 20 },
+  debugSection: { flex: 1 },
+  debugSectionTitle: { fontSize: 16, fontWeight: '600', color: '#cccccc', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  debugScrollContainer: { flex: 1, backgroundColor: '#0f0f0f', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#333333' },
+  debugText: { fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#00ff00', lineHeight: 18 },
+  debugActions: { flexDirection: 'row', padding: 20, paddingTop: 0, gap: 12 },
   debugReloadButton: {
     flex: 1,
     flexDirection: 'row',
@@ -3219,7 +2127,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
-  
   debugCopyButton: {
     flex: 1,
     flexDirection: 'row',
@@ -3229,28 +2136,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
-  
-  debugButtonLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  
-  // QR Code styles
-  qrCodeContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  qrCodeWrapper: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  debugButtonLabel: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+
+  // ===== QR =====
+  qrCodeContainer: { alignItems: 'center', marginVertical: 20 },
+  qrCodeWrapper: { backgroundColor: 'white', padding: 16, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
   qrCodePlaceholder: {
     width: 272,
     height: 272,
@@ -3261,34 +2151,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#3f3f46',
   },
-  qrCodeLoadingText: {
-    color: '#a1a1aa',
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  qrCodeErrorText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  qrCodeDescription: {
-    color: '#a1a1aa',
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  shareFooterText: {
-    color: '#71717a',
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 16,
-    textAlign: 'center',
-  },
+  qrCodeLoadingText: { color: '#a1a1aa', fontSize: 14, fontWeight: '500', marginTop: 8, textAlign: 'center' },
+  qrCodeErrorText: { color: '#ef4444', fontSize: 14, fontWeight: '500', marginTop: 8, textAlign: 'center' },
+  qrCodeDescription: { color: '#a1a1aa', fontSize: 12, fontWeight: '500', marginTop: 12, textAlign: 'center' },
+  shareFooterText: { color: '#71717a', fontSize: 11, fontWeight: '500', marginTop: 16, textAlign: 'center' },
+
+  // ===== Debug test button =====
   debugTestButton: {
     position: 'absolute',
     top: 80,
@@ -3305,11 +2173,5 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  debugTestButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
+  debugTestButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '700', textAlign: 'center', letterSpacing: 0.5 },
 });
