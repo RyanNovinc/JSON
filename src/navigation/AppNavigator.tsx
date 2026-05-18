@@ -13,6 +13,7 @@ import NutritionHomeScreen from '../screens/NutritionHomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import LibraryScreen from '../screens/LibraryScreen';
+import WorkoutPreviewScreen from '../screens/WorkoutPreviewScreen';
 // ModeTransitionContainer is no longer wired in — mode switching is now via
 // the bottom tab bar. Import kept in case it's needed elsewhere.
 // import ModeTransitionContainer from '../components/ModeTransitionContainer';
@@ -37,7 +38,7 @@ import OneRMProgressionScreen from '../screens/OneRMProgressionScreen';
 import AppIconScreen from '../screens/AppIconScreen';
 import PaymentScreen from '../screens/PaymentScreen';
 import { FloatingWorkoutIndicator } from '../components/FloatingWorkoutIndicator';
-import { FeedbackModal } from '../components/FeedbackTab';
+// import { FeedbackModal } from '../components/FeedbackTab';
 import { AppModeProvider } from '../contexts/AppModeContext';
 import { MealPlanningProvider } from '../contexts/MealPlanningContext';
 import { SimplifiedMealPlanningProvider } from '../contexts/SimplifiedMealPlanningContext';
@@ -115,6 +116,19 @@ export type RootStackParamList = {
     initialBlock?: number;
     initialWeek?: number;
     autoNavigateToToday?: boolean;
+  };
+  WorkoutPreview: {
+    routine: {
+      id: string;
+      name: string;
+      days: number;
+      blocks: number;
+      data?: any;
+      programId?: string;
+      mesocycleNumber?: number;
+      fingerprint?: string;
+      createdAt?: number;
+    };
   };
   MesocycleBlocks: {
     mesocycle: {
@@ -423,7 +437,7 @@ const linking = {
 
 export default function AppNavigator({ isAuthenticated, appReady }: AppNavigatorProps) {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const [feedbackModalVisible, setFeedbackModalVisible] = React.useState(false);
+  // const [feedbackModalVisible, setFeedbackModalVisible] = React.useState(false);
 
   React.useEffect(() => {
     if (appReady) {
@@ -587,6 +601,14 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen
                 name="Blocks"
                 component={BlocksScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              {/* WorkoutPreview — opens when a user taps a saved workout in Library */}
+              <RootStack.Screen
+                name="WorkoutPreview"
+                component={WorkoutPreviewScreen}
                 options={{
                   headerShown: false,
                 }}
@@ -981,10 +1003,10 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
             </>
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />
-          <FeedbackModal 
+          {/* <FeedbackModal 
             visible={feedbackModalVisible}
             onClose={() => setFeedbackModalVisible(false)}
-          />
+          /> */}
                 </NavigationContainer>
                 </SimplifiedMealPlanningProvider>
                 </MealPlanningProvider>

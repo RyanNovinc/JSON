@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,9 @@ import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningCon
 import { WorkoutStorage, NutritionCompletionStatus, MealPlan } from '../utils/storage';
 import { SimplifiedMealPlan } from '../types/nutrition';
 import { createShare, ShareError } from '../services/shareService';
+import { CURATED_MEALS } from '../data/curated_meals';
+import { CuratedMeal } from '../types/curated_meals';
+import { getMealImage } from '../assets/mealImages';
 
 type NutritionNavigationProp = StackNavigationProp<RootStackParamList, 'NutritionHome'>;
 
@@ -205,6 +208,52 @@ const getMacroSplitDisplay = (plan: MealPlan) => {
 };
 
 // ============================================================================
+// NEW HELPERS — for the Meals/Smoothies sections
+// ============================================================================
+
+/**
+ * Picks the "headline" macros and time to show on a meal feed card.
+ * Strategy: use first plate's macros and first method's total_minutes.
+ * The first plate is the canonical representation; users can see all
+ * plate variants when they tap into RecipeDetailScreen.
+ */
+function getCardSummary(meal: CuratedMeal): {
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  totalMinutes: number;
+} {
+  const firstPlate = meal.plates?.[0];
+  const firstMethod = meal.methods?.[0];
+
+  return {
+    kcal: firstPlate?.plate_macros?.kcal ?? 0,
+    protein: firstPlate?.plate_macros?.protein_g ?? 0,
+    carbs: firstPlate?.plate_macros?.carbs_g ?? 0,
+    fat: firstPlate?.plate_macros?.fat_g ?? 0,
+    totalMinutes: firstMethod?.time_total_minutes ?? 0,
+  };
+}
+
+/**
+ * Format minutes as a short human-readable string for the card chip.
+ * 5  → "5m"
+ * 45 → "45m"
+ * 60 → "1h"
+ * 90 → "1h 30m"
+ * 480 → "8h"
+ */
+function formatTime(minutes: number): string {
+  if (!minutes || minutes <= 0) return '—';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (remainder === 0) return `${hours}h`;
+  return `${hours}h ${remainder}m`;
+}
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 export default function NutritionHomeScreen({ route }: any) {
@@ -223,6 +272,17 @@ export default function NutritionHomeScreen({ route }: any) {
     convertedMealPlans[0] ||
     null;
   const otherPlans = convertedMealPlans.filter(p => p.id !== currentPlanLegacy?.id);
+
+  // ===== Curated meals — split by cuisine =====
+  // Memoised because the source is a constant import; no point reconstituting
+  // the arrays on every render.
+  const { mealsList, smoothiesList } = useMemo(() => {
+    const all = Object.values(CURATED_MEALS);
+    return {
+      mealsList: all.filter(m => m.cuisine !== 'smoothie'),
+      smoothiesList: all.filter(m => m.cuisine === 'smoothie'),
+    };
+  }, []);
 
   // ===== State =====
   const [shareModal, setShareModal] = useState<{
@@ -642,8 +702,87 @@ export default function NutritionHomeScreen({ route }: any) {
   };
 
   // ============================================================================
+  // NEW HANDLERS — for meals/smoothies feed
+  // ============================================================================
+
+  // Tap a meal/smoothie card — for now just console.log. RecipeDetailScreen
+  // navigation will be wired up in the next iteration.
+  const handleMealCardPress = (meal: CuratedMeal) => {
+    console.log('🍽️ Tapped meal:', meal.slug, '—', meal.display_name);
+  };
+
+  // "See all" link — same console.log pattern, MealsLibraryScreen comes later.
+  const handleSeeAllPress = (category: 'meals' | 'smoothies') => {
+    console.log('📚 See all:', category);
+  };
+
+  // ============================================================================
   // RENDER
   // ============================================================================
+
+  /**
+   * Renders a single horizontal scroll card for the meals or smoothies feed.
+   * Hero image with title overlay, footer chip row with time and protein.
+   * Width is fixed at 200px to give a clean snap-feel as user scrolls.
+   */
+  const renderFeedCard = (meal: CuratedMeal) => {
+    const { kcal, protein, carbs, fat, totalMinutes } = getCardSummary(meal);
+    const imageSource = getMealImage(meal.image_filename);
+
+    return (
+      <TouchableOpacity
+        key={meal.slug}
+        style={styles.feedCard}
+        activeOpacity={0.85}
+        onPress={() => handleMealCardPress(meal)}
+      >
+        {/* Hero image — no overlay, photo stays clean */}
+        <View style={styles.feedCardImageWrap}>
+          {imageSource ? (
+            <Image
+              source={imageSource}
+              style={styles.feedCardImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.feedCardImage, styles.feedCardImagePlaceholder]}>
+              <Ionicons name="restaurant-outline" size={28} color="#52525b" />
+            </View>
+          )}
+        </View>
+
+        {/* Body — title, then time/kcal, then 3-column macro grid */}
+        <View style={styles.feedCardBody}>
+          <Text style={styles.feedCardTitle} numberOfLines={2}>
+            {meal.display_name}
+          </Text>
+          <Text style={styles.feedCardMeta}>
+            {formatTime(totalMinutes)} · {kcal} kcal
+          </Text>
+
+          <View style={styles.feedCardMacroGrid}>
+            <View style={styles.feedCardMacroCell}>
+              <Text style={[styles.feedCardMacroValue, { color: themeColor }]}>
+                {protein}g
+              </Text>
+              <Text style={styles.feedCardMacroLabel}>PROTEIN</Text>
+            </View>
+            <View style={styles.feedCardMacroDivider} />
+            <View style={styles.feedCardMacroCell}>
+              <Text style={styles.feedCardMacroValueMuted}>{carbs}g</Text>
+              <Text style={styles.feedCardMacroLabel}>CARBS</Text>
+            </View>
+            <View style={styles.feedCardMacroDivider} />
+            <View style={styles.feedCardMacroCell}>
+              <Text style={styles.feedCardMacroValueMuted}>{fat}g</Text>
+              <Text style={styles.feedCardMacroLabel}>FAT</Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Title bar */}
@@ -671,10 +810,15 @@ export default function NutritionHomeScreen({ route }: any) {
       >
         {convertedMealPlans.length === 0 ? (
           // ============================================================
-          // EMPTY STATE
+          // EMPTY STATE — no meal plans yet
+          // Hero is replaced with "Plan your meals" prompt, but Meals
+          // and Smoothies sections still appear below so users can
+          // discover recipes without having a plan.
           // ============================================================
           <ScrollView
-            contentContainerStyle={styles.emptyScroll}
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
@@ -696,10 +840,14 @@ export default function NutritionHomeScreen({ route }: any) {
                 <Ionicons name="arrow-forward" size={16} color="#0a0a0b" />
               </TouchableOpacity>
             </View>
+
+            {/* Meals + Smoothies sections, even without a plan */}
+            {renderMealsSection()}
+            {renderSmoothiesSection()}
           </ScrollView>
         ) : (
           // ============================================================
-          // POPULATED STATE — hero card + other plans + weight tracker link
+          // POPULATED STATE — hero card + meals/smoothies + other plans
           // ============================================================
           <ScrollView
             style={styles.scroll}
@@ -769,6 +917,12 @@ export default function NutritionHomeScreen({ route }: any) {
               </View>
             )}
 
+            {/* ====================================================== */}
+            {/* NEW: Meals + Smoothies horizontal scroll sections      */}
+            {/* ====================================================== */}
+            {renderMealsSection()}
+            {renderSmoothiesSection()}
+
             {otherPlans.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -800,7 +954,7 @@ export default function NutritionHomeScreen({ route }: any) {
       </Animated.View>
 
       {/* ============================================================ */}
-      {/* MODALS                                                        */}
+      {/* MODALS — all preserved verbatim from original                 */}
       {/* ============================================================ */}
 
       {/* Action Sheet — Share at top, then Save, Rename, Remove */}
@@ -1070,6 +1224,64 @@ export default function NutritionHomeScreen({ route }: any) {
       </Modal>
     </View>
   );
+
+  /**
+   * Section: Meals horizontal scroll row.
+   * Defined as inner function so it has access to themeColor, mealsList, and handlers.
+   */
+  function renderMealsSection() {
+    if (mealsList.length === 0) return null;
+    return (
+      <View style={styles.feedSection}>
+        <View style={styles.feedSectionHeader}>
+          <Text style={styles.feedSectionTitle}>Meals</Text>
+          <TouchableOpacity
+            onPress={() => handleSeeAllPress('meals')}
+            activeOpacity={0.6}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
+            <Text style={[styles.feedSectionSeeAll, { color: themeColor }]}>
+              See all {mealsList.length} ›
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.feedScrollContent}
+        >
+          {mealsList.map(renderFeedCard)}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  function renderSmoothiesSection() {
+    if (smoothiesList.length === 0) return null;
+    return (
+      <View style={styles.feedSection}>
+        <View style={styles.feedSectionHeader}>
+          <Text style={styles.feedSectionTitle}>Smoothies</Text>
+          <TouchableOpacity
+            onPress={() => handleSeeAllPress('smoothies')}
+            activeOpacity={0.6}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
+            <Text style={[styles.feedSectionSeeAll, { color: themeColor }]}>
+              See all {smoothiesList.length} ›
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.feedScrollContent}
+        >
+          {smoothiesList.map(renderFeedCard)}
+        </ScrollView>
+      </View>
+    );
+  }
 }
 
 // ============================================================================
@@ -1112,13 +1324,12 @@ const styles = StyleSheet.create({
   // Scroll feed
   scroll: { flex: 1 },
   scrollContent: {
-    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 32,
   },
 
-  // Section grouping
-  section: { marginBottom: 20 },
+  // Section grouping (for "Other plans" — old style)
+  section: { marginBottom: 20, paddingHorizontal: 16 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1140,7 +1351,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 2,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 24,
+    marginHorizontal: 16,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -1233,34 +1445,107 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Link row
-  linkRow: {
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    borderRadius: 12,
-    padding: 14,
+  // ===== NEW: feed section + cards =====
+  feedSection: {
+    marginBottom: 24,
+  },
+  feedSectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 12,
+    paddingHorizontal: 16,
   },
-  linkRowText: { flex: 1 },
-  linkRowTitle: {
-    fontSize: 14,
-    fontWeight: '500',
+  feedSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: -0.3,
   },
-  linkRowSub: {
+  feedSectionSeeAll: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  feedScrollContent: {
+    paddingHorizontal: 16,
+    paddingRight: 24,
+  },
+  feedCard: {
+    width: 280,
+    backgroundColor: '#18181b',
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    marginRight: 12,
+  },
+  feedCardImageWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#0a0a0b',
+  },
+  feedCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  feedCardImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#27272a',
+  },
+  feedCardBody: {
+    padding: 14,
+  },
+  feedCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ffffff',
+    lineHeight: 19,
+    letterSpacing: -0.2,
+    marginBottom: 4,
+    minHeight: 38,
+  },
+  feedCardMeta: {
     fontSize: 11,
     color: '#71717a',
-    marginTop: 2,
+    marginBottom: 12,
+  },
+  feedCardMacroGrid: {
+    flexDirection: 'row',
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#27272a',
+  },
+  feedCardMacroCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  feedCardMacroDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: '#27272a',
+    marginVertical: 2,
+  },
+  feedCardMacroValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 17,
+    letterSpacing: -0.3,
+  },
+  feedCardMacroValueMuted: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#d4d4d8',
+    lineHeight: 17,
+    letterSpacing: -0.3,
+  },
+  feedCardMacroLabel: {
+    fontSize: 9,
+    color: '#71717a',
+    marginTop: 3,
+    letterSpacing: 0.4,
   },
 
   // Empty state
-  emptyScroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
   emptyHero: {
     paddingHorizontal: 24,
     paddingVertical: 40,

@@ -258,7 +258,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
   },
   brekkie_grow: {
     slug: 'brekkie_grow',
-    display_name: 'Brekkie to GROW-Grow Bulking Smoothie',
+    display_name: 'Brekkie to GROW-Grow',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -271,7 +271,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Brekkie to GROW-Grow Bulking Smoothie',
+        display_name: 'Brekkie to GROW-Grow',
         description: 'Banana, oats, peanut butter, and whey blended into a breakfast you drink',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -368,7 +368,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
   },
   mango_mass: {
     slug: 'mango_mass',
-    display_name: 'Mango Mass Bulking Smoothie',
+    display_name: 'Mango Mass',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -381,7 +381,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Mango Mass Bulking Smoothie',
+        display_name: 'Mango Mass',
         description: 'Tropical mango and nectar with macadamia butter — like drinking a liquid mango smoothie bowl',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -471,7 +471,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
   },
   king_kong_chocolate: {
     slug: 'king_kong_chocolate',
-    display_name: 'King Kong Chocolate Bulking Smoothie',
+    display_name: 'King Kong Chocolate',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -484,7 +484,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'King Kong Chocolate Bulking Smoothie',
+        display_name: 'King Kong Chocolate',
         description: 'Chocolate, peanut butter, cream — the pinch of salt makes it taste like a thick shake, not a sad gym drink',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -582,7 +582,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
   },
   strawberry_stack: {
     slug: 'strawberry_stack',
-    display_name: 'Strawberry Stack Bulking Smoothie',
+    display_name: 'Strawberry Stack',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -595,7 +595,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Strawberry Stack Bulking Smoothie',
+        display_name: 'Strawberry Stack',
         description: 'Strawberries and banana with coconut cream — tastes like liquid strawberries and cream',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -686,7 +686,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
 
   choc_muscle_maxx: {
     slug: 'choc_muscle_maxx',
-    display_name: 'Choc Muscle MAXX Bulking Smoothie',
+    display_name: 'Choc Muscle MAXX',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -699,7 +699,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Choc Muscle MAXX Bulking Smoothie',
+        display_name: 'Choc Muscle MAXX',
         description: 'Post-workout powerhouse with chocolate whey, ice cream, and peanut butter — recovery in a glass',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -792,7 +792,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
 
   cookies_gains: {
     slug: 'cookies_gains',
-    display_name: 'Cookies & Gains Bulking Smoothie',
+    display_name: 'Cookies & Gains',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -805,7 +805,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Cookies & Gains Bulking Smoothie',
+        display_name: 'Cookies & Gains',
         description: 'Oreo cookies blended with vanilla and chocolate — like drinking a cookies and cream milkshake',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -896,7 +896,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
 
   raspberry_rip: {
     slug: 'raspberry_rip',
-    display_name: 'Raspberry Rip Bulking Smoothie',
+    display_name: 'Raspberry Rip',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -909,7 +909,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Raspberry Rip Bulking Smoothie',
+        display_name: 'Raspberry Rip',
         description: 'Raspberry, chocolate, and coconut — tastes like a Cherry Ripe bar in liquid form',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -1006,7 +1006,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
 
   energy_lift_heavy: {
     slug: 'energy_lift_heavy',
-    display_name: 'Energy Lift Heavy Pre-Workout Smoothie',
+    display_name: 'Energy Lift Heavy',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -1019,7 +1019,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Energy Lift Heavy Pre-Workout Smoothie',
+        display_name: 'Energy Lift Heavy',
         description: 'Caffeinated pre-workout smoothie with mango and chia — energy and nutrition combined',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -1118,7 +1118,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
 
   mornin_muscle: {
     slug: 'mornin_muscle',
-    display_name: "Mornin' Muscle Coffee Bulking Smoothie",
+    display_name: "Mornin' Muscle",
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -1131,7 +1131,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: "Mornin' Muscle Coffee Bulking Smoothie",
+        display_name: "Mornin' Muscle",
         description: 'Double espresso chocolate smoothie — breakfast and coffee in one massive drink',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -1230,7 +1230,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
 
   dirty_eden: {
     slug: 'dirty_eden',
-    display_name: 'Dirty Eden Green Bulking Smoothie',
+    display_name: 'Dirty Eden',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -1243,7 +1243,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Dirty Eden Green Bulking Smoothie',
+        display_name: 'Dirty Eden',
         description: 'Green smoothie that tastes tropical, not green — the pineapple and banana dominate',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -1363,7 +1363,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
 
   strawbrekkie_beast: {
     slug: 'strawbrekkie_beast',
-    display_name: 'Strawbrekkie BEAST Bulking Smoothie',
+    display_name: 'Strawbrekkie BEAST',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -1376,7 +1376,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Strawbrekkie BEAST Bulking Smoothie',
+        display_name: 'Strawbrekkie BEAST',
         description: 'Mixed berry breakfast smoothie with oats — carb-heavy for post-workout recovery',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -1481,7 +1481,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
 
   banana_bulk: {
     slug: 'banana_bulk',
-    display_name: 'Banana Bulk Smoothie',
+    display_name: 'Banana Bulk',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -1494,7 +1494,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     plates: [
       {
         id: 'standard',
-        display_name: 'Banana Bulk Smoothie',
+        display_name: 'Banana Bulk',
         description: 'Simple banana-date smoothie with cinnamon — the cheapest bulker in the database',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],

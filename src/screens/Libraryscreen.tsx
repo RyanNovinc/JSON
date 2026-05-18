@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,9 @@ import {
   ScrollView,
   Alert,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+import { TouchableOpacity as GHTouchable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,32 +18,28 @@ import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
 type Segment = 'workouts' | 'meals';
 
 /**
- * LibraryScreen — "your saved stuff" home.
+ * LibraryScreen — your saved workouts and meal plans.
  *
- * Two segments:
- *   - Workouts: saved routines from WorkoutStorage.loadMyRoutines()
- *   - Meal plans: saved meal plans from WorkoutStorage.loadMealPlans()
+ * Cards now use the mini stat grid pattern (matches WorkoutPreviewScreen
+ * and the JSON.fit share page):
+ *   - Title at top
+ *   - Hairline divider
+ *   - 3-column grid with cyan numbers + gray labels
  *
- * Items are saved via the heart button in the action sheet on each plan's
- * home card. This screen is the place to find them again.
- *
- * Tap behavior:
- *   - Workout → navigates to Blocks screen (same as Workouts hero card)
- *   - Meal plan → navigates to MealPlanDays/MealPlanWeeks (depends on shape)
- *
- * Long-press a saved item → confirm "Remove from library?"
+ * Tap workout → WorkoutPreviewScreen
+ * Tap meal plan → MealPlanDays / MealPlanWeeks based on shape
+ * Long-press → confirm remove from library
  */
 export default function LibraryScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { themeColor, themeColorLight } = useTheme();
+  const { themeColor } = useTheme();
 
   const [segment, setSegment] = useState<Segment>('workouts');
   const [savedWorkouts, setSavedWorkouts] = useState<WorkoutRoutine[]>([]);
   const [savedMeals, setSavedMeals] = useState<MealPlan[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  // ===== Loaders =====
   const loadSaved = useCallback(async () => {
     try {
       const [workouts, meals] = await Promise.all([
@@ -58,8 +55,6 @@ export default function LibraryScreen() {
     }
   }, []);
 
-  // Reload every time the tab is focused — if user saved something on
-  // Workouts/Nutrition and switches here, we want to see the new item.
   useFocusEffect(
     useCallback(() => {
       loadSaved();
@@ -75,15 +70,13 @@ export default function LibraryScreen() {
     }
   }, [loadSaved]);
 
-  // ===== Navigation =====
+  // Tap a saved workout → preview screen
   const openWorkout = (routine: WorkoutRoutine) => {
-    navigation.navigate('Blocks' as any, { routine });
+    navigation.navigate('WorkoutPreview' as any, { routine });
   };
 
+  // Tap a saved meal plan → appropriate view based on data shape
   const openMealPlan = (plan: MealPlan) => {
-    // Match the meal plan navigation logic used elsewhere — if there's a
-    // single week or short duration, go straight to MealPlanDays. Otherwise
-    // open the weeks view.
     if (plan.data?.days) {
       const week = { week_number: 1, days: plan.data.days };
       navigation.navigate('MealPlanDays' as any, {
@@ -96,7 +89,6 @@ export default function LibraryScreen() {
       navigation.navigate('MealPlanWeeks' as any, { mealPlan: plan });
       return;
     }
-    // Fallback for single-week plans
     if (plan.data?.weeks && plan.data.weeks.length === 1) {
       navigation.navigate('MealPlanDays' as any, {
         week: plan.data.weeks[0],
@@ -104,14 +96,12 @@ export default function LibraryScreen() {
       });
       return;
     }
-    // Last-resort fallback
     navigation.navigate('MealPlanDays' as any, {
       planId: plan.id,
       planName: plan.name,
     });
   };
 
-  // ===== Remove from library =====
   const removeWorkout = (routine: WorkoutRoutine) => {
     Alert.alert(
       'Remove from library?',
@@ -160,103 +150,94 @@ export default function LibraryScreen() {
     );
   };
 
+  // ===== Compute weeks label for a routine (e.g. "4wk" from "1-4") =====
+  const getWeeksLabel = (routine: WorkoutRoutine): string => {
+    const blocks = routine.data?.blocks;
+    if (!Array.isArray(blocks) || blocks.length === 0) return '—';
+    const w = blocks[0].weeks;
+    if (typeof w === 'string') {
+      const match = w.match(/(\d+)-?(\d+)?/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : start;
+        return `${end - start + 1}wk`;
+      }
+    }
+    return '—';
+  };
+
   const items = segment === 'workouts' ? savedWorkouts : savedMeals;
   const hasItems = items.length > 0;
+  const workoutsActive = segment === 'workouts';
+  const mealsActive = segment === 'meals';
 
   return (
     <View style={styles.container}>
-      {/* Title bar */}
       <View style={[styles.titleBar, { paddingTop: insets.top + 4 }]}>
         <Text style={styles.title}>Library</Text>
       </View>
 
-      {/* Segmented control */}
-      <View style={styles.segmentContainer}>
-        <View style={styles.segmentTrack}>
-          <TouchableOpacity
-            style={[
-              styles.segmentItem,
-              segment === 'workouts' && [styles.segmentItemActive, { backgroundColor: themeColor }],
-            ]}
-            onPress={() => setSegment('workouts')}
-            activeOpacity={0.7}
+      {/* ============================================================
+          Underline tabs (kept as-is)
+          ============================================================ */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          onPress={() => setSegment('workouts')}
+          activeOpacity={0.7}
+          style={[
+            styles.tab,
+            { borderBottomColor: workoutsActive ? themeColor : 'transparent' },
+          ]}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: workoutsActive ? '600' : '500',
+              color: workoutsActive ? '#ffffff' : '#71717a',
+              textAlign: 'center',
+            }}
           >
-            <Ionicons
-              name="barbell-outline"
-              size={14}
-              color={segment === 'workouts' ? '#0a0a0b' : '#a1a1aa'}
-            />
+            Workouts
             <Text
-              style={[
-                styles.segmentLabel,
-                segment === 'workouts' && styles.segmentLabelActive,
-              ]}
+              style={{
+                fontSize: 13,
+                fontWeight: '500',
+                color: workoutsActive ? '#a1a1aa' : '#52525b',
+              }}
             >
-              Workouts
+              {'  '}{savedWorkouts.length}
             </Text>
-            {savedWorkouts.length > 0 && (
-              <View
-                style={[
-                  styles.segmentBadge,
-                  segment === 'workouts'
-                    ? { backgroundColor: 'rgba(10,10,11,0.2)' }
-                    : { backgroundColor: '#27272a' },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.segmentBadgeText,
-                    { color: segment === 'workouts' ? '#0a0a0b' : '#a1a1aa' },
-                  ]}
-                >
-                  {savedWorkouts.length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.segmentItem,
-              segment === 'meals' && [styles.segmentItemActive, { backgroundColor: themeColor }],
-            ]}
-            onPress={() => setSegment('meals')}
-            activeOpacity={0.7}
+        <TouchableOpacity
+          onPress={() => setSegment('meals')}
+          activeOpacity={0.7}
+          style={[
+            styles.tab,
+            { borderBottomColor: mealsActive ? themeColor : 'transparent' },
+          ]}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: mealsActive ? '600' : '500',
+              color: mealsActive ? '#ffffff' : '#71717a',
+              textAlign: 'center',
+            }}
           >
-            <Ionicons
-              name="restaurant-outline"
-              size={14}
-              color={segment === 'meals' ? '#0a0a0b' : '#a1a1aa'}
-            />
+            Meal plans
             <Text
-              style={[
-                styles.segmentLabel,
-                segment === 'meals' && styles.segmentLabelActive,
-              ]}
+              style={{
+                fontSize: 13,
+                fontWeight: '500',
+                color: mealsActive ? '#a1a1aa' : '#52525b',
+              }}
             >
-              Meal plans
+              {'  '}{savedMeals.length}
             </Text>
-            {savedMeals.length > 0 && (
-              <View
-                style={[
-                  styles.segmentBadge,
-                  segment === 'meals'
-                    ? { backgroundColor: 'rgba(10,10,11,0.2)' }
-                    : { backgroundColor: '#27272a' },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.segmentBadgeText,
-                    { color: segment === 'meals' ? '#0a0a0b' : '#a1a1aa' },
-                  ]}
-                >
-                  {savedMeals.length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -274,53 +255,91 @@ export default function LibraryScreen() {
       >
         {hasItems ? (
           segment === 'workouts' ? (
-            savedWorkouts.map(routine => (
-              <TouchableOpacity
-                key={routine.id}
-                style={styles.itemCard}
-                activeOpacity={0.8}
-                onPress={() => openWorkout(routine)}
-                onLongPress={() => removeWorkout(routine)}
-                delayLongPress={600}
-              >
-                <View style={[styles.itemIcon, { backgroundColor: 'rgba(34, 211, 238, 0.1)' }]}>
-                  <Ionicons name="barbell" size={18} color={themeColor} />
-                </View>
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle} numberOfLines={1}>{routine.name}</Text>
-                  <Text style={styles.itemSub}>
-                    {routine.days} days/week • {routine.blocks} {routine.blocks === 1 ? 'block' : 'blocks'}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={14} color="#71717a" />
-              </TouchableOpacity>
-            ))
+            savedWorkouts.map(routine => {
+              const weeksLabel = getWeeksLabel(routine);
+              const blocksCount = routine.blocks || routine.data?.blocks?.length || 0;
+              return (
+                <GHTouchable
+                  key={routine.id}
+                  style={styles.statCard}
+                  activeOpacity={0.85}
+                  onPress={() => openWorkout(routine)}
+                  onLongPress={() => removeWorkout(routine)}
+                  delayLongPress={600}
+                >
+                  <Text style={styles.cardTitle} numberOfLines={1}>{routine.name}</Text>
+                  <View style={styles.miniStatGrid}>
+                    <View style={styles.miniStatCell}>
+                      <Text style={[styles.miniStatValue, { color: themeColor }]}>
+                        {routine.days || '—'}
+                      </Text>
+                      <Text style={styles.miniStatLabel}>days/wk</Text>
+                    </View>
+                    <View style={styles.miniStatDivider} />
+                    <View style={styles.miniStatCell}>
+                      <Text style={[styles.miniStatValue, { color: themeColor }]}>
+                        {weeksLabel}
+                      </Text>
+                      <Text style={styles.miniStatLabel}>program</Text>
+                    </View>
+                    <View style={styles.miniStatDivider} />
+                    <View style={styles.miniStatCell}>
+                      <Text style={[styles.miniStatValue, { color: themeColor }]}>
+                        {blocksCount || '—'}
+                      </Text>
+                      <Text style={styles.miniStatLabel}>
+                        {blocksCount === 1 ? 'block' : 'blocks'}
+                      </Text>
+                    </View>
+                  </View>
+                </GHTouchable>
+              );
+            })
           ) : (
-            savedMeals.map(plan => (
-              <TouchableOpacity
-                key={plan.id}
-                style={styles.itemCard}
-                activeOpacity={0.8}
-                onPress={() => openMealPlan(plan)}
-                onLongPress={() => removeMealPlan(plan)}
-                delayLongPress={600}
-              >
-                <View style={[styles.itemIcon, { backgroundColor: 'rgba(34, 211, 238, 0.1)' }]}>
-                  <Ionicons name="restaurant" size={18} color={themeColor} />
-                </View>
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle} numberOfLines={1}>{plan.name}</Text>
-                  <Text style={styles.itemSub}>
-                    {plan.duration} {plan.duration === 1 ? 'day' : 'days'}
-                    {plan.meals ? ` • ${plan.meals} meals` : ''}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={14} color="#71717a" />
-              </TouchableOpacity>
-            ))
+            savedMeals.map(plan => {
+              const duration = plan.duration || 0;
+              const mealsCount = plan.meals || 0;
+              // Try to extract daily kcal target if available
+              const kcalTarget = plan.data?.target_calories || plan.data?.daily_calories || null;
+              return (
+                <GHTouchable
+                  key={plan.id}
+                  style={styles.statCard}
+                  activeOpacity={0.85}
+                  onPress={() => openMealPlan(plan)}
+                  onLongPress={() => removeMealPlan(plan)}
+                  delayLongPress={600}
+                >
+                  <Text style={styles.cardTitle} numberOfLines={1}>{plan.name}</Text>
+                  <View style={styles.miniStatGrid}>
+                    <View style={styles.miniStatCell}>
+                      <Text style={[styles.miniStatValue, { color: themeColor }]}>
+                        {duration || '—'}
+                      </Text>
+                      <Text style={styles.miniStatLabel}>
+                        {duration === 1 ? 'day' : 'days'}
+                      </Text>
+                    </View>
+                    <View style={styles.miniStatDivider} />
+                    <View style={styles.miniStatCell}>
+                      <Text style={[styles.miniStatValue, { color: themeColor }]}>
+                        {mealsCount || '—'}
+                      </Text>
+                      <Text style={styles.miniStatLabel}>meals</Text>
+                    </View>
+                    <View style={styles.miniStatDivider} />
+                    <View style={styles.miniStatCell}>
+                      <Text style={[styles.miniStatValue, { color: themeColor }]}>
+                        {kcalTarget ? Math.round(kcalTarget).toLocaleString() : '—'}
+                      </Text>
+                      <Text style={styles.miniStatLabel}>kcal/day</Text>
+                    </View>
+                  </View>
+                </GHTouchable>
+              );
+            })
           )
         ) : (
-          // EMPTY STATE
           <View style={styles.emptyHero}>
             <View style={[styles.emptyIcon, { borderColor: themeColor }]}>
               <Ionicons
@@ -359,7 +378,7 @@ const styles = StyleSheet.create({
   // Title bar
   titleBar: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 28,
@@ -368,58 +387,27 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
 
-  // Segmented control
-  segmentContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  segmentTrack: {
+  // ===== Underline tab row =====
+  tabRow: {
     flexDirection: 'row',
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#27272a',
+    marginBottom: 8,
   },
-  segmentItem: {
+  tab: {
     flex: 1,
-    flexDirection: 'row',
+    paddingVertical: 14,
+    borderBottomWidth: 2,
+    marginBottom: -StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  segmentItemActive: {
-    // backgroundColor applied inline (themeColor)
-  },
-  segmentLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#a1a1aa',
-  },
-  segmentLabelActive: {
-    color: '#0a0a0b',
-  },
-  segmentBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  segmentBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
   },
 
   // Scroll
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 48,
   },
   emptyScrollContent: {
@@ -427,37 +415,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  // Item card
-  itemCard: {
+  // ===== Stat card (replaces the old itemCard) =====
+  statCard: {
     backgroundColor: '#18181b',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
+    borderRadius: 14,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    marginBottom: 12,
   },
-  itemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemContent: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+  cardTitle: {
     color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 14,
   },
-  itemSub: {
-    fontSize: 11,
+
+  // ===== Mini stat grid (inside each card) =====
+  miniStatGrid: {
+    flexDirection: 'row',
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#27272a',
+  },
+  miniStatCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  miniStatDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: '#27272a',
+    marginVertical: 2,
+  },
+  miniStatValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    lineHeight: 20,
+  },
+  miniStatLabel: {
+    fontSize: 10,
     color: '#71717a',
-    marginTop: 2,
+    marginTop: 4,
+    letterSpacing: 0.2,
   },
 
   // Empty state
