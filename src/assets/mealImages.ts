@@ -16,7 +16,8 @@
 
 const MEAL_IMAGES: Record<string, any> = {
   // ===== Base meal images (19) =====
-  'Butter Chicken with Basmati Rice.png': require('./meals/butter_chicken.png'),
+  'Butter Chicken.png': require('./meals/butter_chicken_curry.png'),
+  'Butter Chicken with Basmati Rice.png': require('./meals/butter_chicken_with_rice.png'),
   'Brekkie to GROW-Grow.png': require('./meals/brekkie_grow.png'),
   'Mango Mass.png': require('./meals/mango_mass.png'),
   'King Kong Chocolate.png': require('./meals/king_kong_chocolate.png'),

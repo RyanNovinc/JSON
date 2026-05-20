@@ -79,15 +79,11 @@ struct LiveActivityWidget: Widget {
           }
         }
       } compactLeading: {
-        // Use system icon with theme-based coloring
-        let progressTint = context.attributes.progressViewTint ?? "#007AFF"
-        let iconColor: Color = progressTint.contains("pink") || progressTint.contains("ec4899") || progressTint.contains("f472b6") ? .pink : .blue
-        
-        Image(systemName: "figure.strengthtraining.traditional")
-          .font(.system(size: 16, weight: .medium))
-          .foregroundColor(iconColor)
-          .frame(maxWidth: 23, maxHeight: 23)
-          .applyWidgetURL(from: context.attributes.deepLinkUrl)
+        if let dynamicIslandImageName = context.state.dynamicIslandImageName {
+          resizableImage(imageName: dynamicIslandImageName)
+            .frame(maxWidth: 23, maxHeight: 23)
+            .applyWidgetURL(from: context.attributes.deepLinkUrl)
+        }
       } compactTrailing: {
         if let date = context.state.timerEndDateInMilliseconds {
           compactTimer(

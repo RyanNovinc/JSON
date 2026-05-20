@@ -37,6 +37,8 @@ import WorkoutReviewScreen from '../screens/WorkoutReviewScreen';
 import OneRMProgressionScreen from '../screens/OneRMProgressionScreen';
 import AppIconScreen from '../screens/AppIconScreen';
 import PaymentScreen from '../screens/PaymentScreen';
+import RecipeDetailScreen from '../screens/RecipeDetailScreen';
+import CookModeScreen from '../screens/CookModeScreen';
 import { FloatingWorkoutIndicator } from '../components/FloatingWorkoutIndicator';
 // import { FeedbackModal } from '../components/FeedbackTab';
 import { AppModeProvider } from '../contexts/AppModeContext';
@@ -46,6 +48,7 @@ import { WeightUnitProvider } from '../contexts/WeightUnitContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { WorkoutRoutineProvider } from '../contexts/WorkoutRoutineContext';
 import { TimerProvider } from '../contexts/TimerContext';
+import { CookTimerProvider } from '../contexts/CookTimerContext';
 import ShareIntentHandler from '../components/ShareIntentHandler';
 
 // Import nutrition screens
@@ -250,6 +253,8 @@ export type RootStackParamList = {
     weekNumber: number;
     themeColor: string;
   };
+  RecipeDetail: { mealSlug: string };
+  CookMode: { mealSlug: string; plateIndex: number; methodIndex: number };
 };
 
 // Tab param list — 5 tabs (with the Create slot in the middle).
@@ -457,7 +462,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
           <WeightUnitProvider>
             <WorkoutRoutineProvider>
                 <TimerProvider>
-                <MealPlanningProvider>
+                  <CookTimerProvider>
+                    <MealPlanningProvider>
                 <SimplifiedMealPlanningProvider>
                 <NavigationContainer ref={navigationRef} linking={linking}>
                 <ShareIntentHandler />
@@ -1000,6 +1006,20 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
+              <RootStack.Screen
+                name="RecipeDetail"
+                component={RecipeDetailScreen}
+                options={{ headerShown: false }}
+              />
+              <RootStack.Screen
+                name="CookMode"
+                component={CookModeScreen}
+                options={{
+                  headerShown: false,
+                  gestureEnabled: false,
+                  cardStyle: { backgroundColor: '#0a0a0b' }
+                }}
+              />
             </>
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />
@@ -1009,7 +1029,8 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
           /> */}
                 </NavigationContainer>
                 </SimplifiedMealPlanningProvider>
-                </MealPlanningProvider>
+                    </MealPlanningProvider>
+                  </CookTimerProvider>
                 </TimerProvider>
             </WorkoutRoutineProvider>
           </WeightUnitProvider>

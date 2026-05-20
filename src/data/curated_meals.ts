@@ -12,12 +12,24 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     max_scale: 1.5,
     flex_ingredient_id: 'basmati_rice_cooked',
     contains_allergens: ['Dairy'],
-    image_filename: 'Butter Chicken with Basmati Rice.png',
+    image_filename: 'Butter Chicken.png',
     plates: [
+      {
+        id: 'butter_chicken',
+        display_name: 'Butter Chicken',
+        description: 'Spiced tomato-cream curry with tender marinated chicken thigh.',
+        image_filename: undefined,
+        plate_macros: { kcal: 490, protein_g: 48, carbs_g: 14, fat_g: 28, fiber_g: 3 },
+        assembly_time_minutes: 0,
+        additional_instructions: [],
+        additional_ingredients: [],
+        base_serving_multiplier: 1.0,
+      },
       {
         id: 'standard',
         display_name: 'Butter Chicken with Basmati Rice',
         description: 'Slow-simmered chicken thigh in spiced tomato-cream sauce, served over basmati rice',
+        image_filename: 'Butter Chicken with Basmati Rice.png',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
         additional_instructions: [],
@@ -141,13 +153,46 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Cut chicken thigh into 3 cm cubes. Combine with yoghurt, half the garam masala, half the cumin, and half the turmeric. Marinate for 20 minutes.',
-          'Heat ghee in a large frying pan over medium-high heat. Add the marinated chicken and sear for 4-5 minutes until golden on all sides. Remove and set aside.',
-          'In the same pan, add the diced onion and cook for 3 minutes until softened. Add garlic and ginger and cook for another 30 seconds.',
-          'Add the remaining garam masala, cumin, coriander, turmeric, and Kashmiri chilli powder. Stir for 30 seconds until fragrant.',
-          'Pour in the tomato passata and add salt. Bring to a simmer and cook for 5 minutes, stirring occasionally.',
-          'Return the chicken to the pan and stir through the thickened cream. Simmer for 5 more minutes until the chicken is cooked through and the sauce has thickened.',
-          'Serve over cooked basmati rice, garnished with fresh coriander leaves.'
+          {
+            summary: 'Cut chicken thigh into 3 cm cubes. Combine with yoghurt, half the garam masala, half the cumin, and half the turmeric. Marinate for 20 minutes.',
+            substeps: [
+              'Cut chicken thigh into 3 cm cubes. Combine with yoghurt, half the garam masala, half the cumin, and half the turmeric. Marinate for 20 minutes.'
+            ]
+          },
+          {
+            summary: 'Heat ghee in a large frying pan over medium-high heat. Add the marinated chicken and sear for 4-5 minutes until golden on all sides. Remove and set aside.',
+            substeps: [
+              'Heat ghee in a large frying pan over medium-high heat. Add the marinated chicken and sear for 4-5 minutes until golden on all sides. Remove and set aside.'
+            ]
+          },
+          {
+            summary: 'In the same pan, add the diced onion and cook for 3 minutes until softened. Add garlic and ginger and cook for another 30 seconds.',
+            substeps: [
+              'In the same pan, add the diced onion and cook for 3 minutes until softened. Add garlic and ginger and cook for another 30 seconds.'
+            ]
+          },
+          {
+            summary: 'Add the remaining garam masala, cumin, coriander, turmeric, and Kashmiri chilli powder. Stir for 30 seconds until fragrant.',
+            substeps: [
+              'Add the remaining garam masala, cumin, coriander, turmeric, and Kashmiri chilli powder. Stir for 30 seconds until fragrant.'
+            ]
+          },
+          {
+            summary: 'Pour in the tomato passata and add salt. Bring to a simmer and cook for 5 minutes, stirring occasionally.',
+            substeps: [
+              'Pour in the tomato passata and add salt. Bring to a simmer and cook for 5 minutes, stirring occasionally.'
+            ]
+          },
+          {
+            summary: 'Return the chicken to the pan and stir through the thickened cream. Simmer for 5 more minutes until the chicken is cooked through and the sauce has thickened.',
+            substeps: [
+              'Return the chicken to the pan and stir through the thickened cream. Simmer for 5 more minutes until the chicken is cooked through and the sauce has thickened.'
+            ]
+          },
+          {
+            summary: 'Serve over cooked basmati rice, garnished with fresh coriander leaves.',
+            substeps: ['Serve over cooked basmati rice, garnished with fresh coriander leaves.']
+          }
         ]
       },
       {
@@ -199,10 +244,26 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Cut chicken thigh into 3 cm cubes.',
-          'Heat olive oil in a frying pan over medium-high heat. Add the chicken and pan-fry for 6-7 minutes until cooked through and lightly golden.',
-          'Pour in the jar sauce and thickened cream. Stir to coat the chicken and simmer for 3-4 minutes until the sauce is heated through.',
-          'Serve over cooked basmati rice, garnished with fresh coriander leaves.'
+          {
+            summary: 'Cut chicken thigh into 3 cm cubes.',
+            substeps: ['Cut chicken thigh into 3 cm cubes.']
+          },
+          {
+            summary: 'Heat olive oil in a frying pan over medium-high heat. Add the chicken and pan-fry for 6-7 minutes until cooked through and lightly golden.',
+            substeps: [
+              'Heat olive oil in a frying pan over medium-high heat. Add the chicken and pan-fry for 6-7 minutes until cooked through and lightly golden.'
+            ]
+          },
+          {
+            summary: 'Pour in the jar sauce and thickened cream. Stir to coat the chicken and simmer for 3-4 minutes until the sauce is heated through.',
+            substeps: [
+              'Pour in the jar sauce and thickened cream. Stir to coat the chicken and simmer for 3-4 minutes until the sauce is heated through.'
+            ]
+          },
+          {
+            summary: 'Serve over cooked basmati rice, garnished with fresh coriander leaves.',
+            substeps: ['Serve over cooked basmati rice, garnished with fresh coriander leaves.']
+          }
         ]
       },
       {
@@ -248,10 +309,22 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Cut chicken thigh into 3 cm cubes. Place in slow cooker with the jar sauce. Stir to coat.',
-          'Cook on high for 4 hours or low for 6-8 hours.',
-          'Stir through the thickened cream during the last 10 minutes of cooking.',
-          'Serve over cooked basmati rice, garnished with fresh coriander leaves.'
+          {
+            summary: 'Cut chicken thigh into 3 cm cubes. Place in slow cooker with the jar sauce. Stir to coat.',
+            substeps: ['Cut chicken thigh into 3 cm cubes. Place in slow cooker with the jar sauce. Stir to coat.']
+          },
+          {
+            summary: 'Cook on high for 4 hours or low for 6-8 hours.',
+            substeps: ['Cook on high for 4 hours or low for 6-8 hours.']
+          },
+          {
+            summary: 'Stir through the thickened cream during the last 10 minutes of cooking.',
+            substeps: ['Stir through the thickened cream during the last 10 minutes of cooking.']
+          },
+          {
+            summary: 'Serve over cooked basmati rice, garnished with fresh coriander leaves.',
+            substeps: ['Serve over cooked basmati rice, garnished with fresh coriander leaves.']
+          }
         ]
       }
     ]
@@ -358,10 +431,24 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add all ingredients to a high-powered blender.',
-          'Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.',
-          'Blend on high for 45-60 seconds until completely smooth and no oat or banana chunks remain.',
-          'Pour into a large glass. If the smoothie is thicker than you prefer, add a splash of extra milk and pulse to combine.'
+          {
+            summary: 'Add all ingredients to a high-powered blender.',
+            substeps: ['Add all ingredients to a high-powered blender.']
+          },
+          {
+            summary: 'Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.',
+            substeps: ['Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.']
+          },
+          {
+            summary: 'Blend on high for 45-60 seconds until completely smooth and no oat or banana chunks remain.',
+            substeps: ['Blend on high for 45-60 seconds until completely smooth and no oat or banana chunks remain.']
+          },
+          {
+            summary: 'Pour into a large glass. If the smoothie is thicker than you prefer, add a splash of extra milk and pulse to combine.',
+            substeps: [
+              'Pour into a large glass. If the smoothie is thicker than you prefer, add a splash of extra milk and pulse to combine.'
+            ]
+          }
         ]
       }
     ]
@@ -461,10 +548,24 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add all ingredients to a high-powered blender.',
-          'Start at low speed for 5 seconds to break up the frozen mango and banana, then increase to high speed.',
-          'Blend on high for 45-60 seconds until completely smooth.',
-          'Pour into a large glass. If too thick, add a splash of extra milk and pulse to combine.'
+          {
+            summary: 'Add all ingredients to a high-powered blender.',
+            substeps: ['Add all ingredients to a high-powered blender.']
+          },
+          {
+            summary: 'Start at low speed for 5 seconds to break up the frozen mango and banana, then increase to high speed.',
+            substeps: [
+              'Start at low speed for 5 seconds to break up the frozen mango and banana, then increase to high speed.'
+            ]
+          },
+          {
+            summary: 'Blend on high for 45-60 seconds until completely smooth.',
+            substeps: ['Blend on high for 45-60 seconds until completely smooth.']
+          },
+          {
+            summary: 'Pour into a large glass. If too thick, add a splash of extra milk and pulse to combine.',
+            substeps: ['Pour into a large glass. If too thick, add a splash of extra milk and pulse to combine.']
+          }
         ]
       }
     ]
@@ -571,11 +672,32 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add the milk, cream, and yoghurt to the blender first to give the dry ingredients something to blend into.',
-          'Add the frozen banana, whey, cocoa powder, peanut butter, honey, and salt.',
-          'Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.',
-          'Blend on high for 60 seconds until completely smooth and silky. The thickened cream should be fully incorporated.',
-          'Pour into a large glass. The salt is essential — it transforms the flavour from "sad gym shake" to "Maccas thick shake."'
+          {
+            summary: 'Add the milk, cream, and yoghurt to the blender first to give the dry ingredients something to blend into.',
+            substeps: [
+              'Add the milk, cream, and yoghurt to the blender first to give the dry ingredients something to blend into.'
+            ]
+          },
+          {
+            summary: 'Add the frozen banana, whey, cocoa powder, peanut butter, honey, and salt.',
+            substeps: ['Add the frozen banana, whey, cocoa powder, peanut butter, honey, and salt.']
+          },
+          {
+            summary: 'Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.',
+            substeps: ['Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.']
+          },
+          {
+            summary: 'Blend on high for 60 seconds until completely smooth and silky. The thickened cream should be fully incorporated.',
+            substeps: [
+              'Blend on high for 60 seconds until completely smooth and silky. The thickened cream should be fully incorporated.'
+            ]
+          },
+          {
+            summary: 'Pour into a large glass. The salt is essential — it transforms the flavour from "sad gym shake" to "Maccas thick shake."',
+            substeps: [
+              'Pour into a large glass. The salt is essential — it transforms the flavour from "sad gym shake" to "Maccas thick shake."'
+            ]
+          }
         ]
       }
     ]
@@ -675,15 +797,30 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add all ingredients to a high-powered blender.',
-          'Start at low speed for 5 seconds to break up the frozen strawberries and banana, then increase to high speed.',
-          'Blend on high for 45-60 seconds until completely smooth.',
-          'Pour into a large glass. If too thick, add a splash of extra milk and pulse to combine. The coconut cream gives this a strawberries-and-cream finish — don\'t skip it.'
+          {
+            summary: 'Add all ingredients to a high-powered blender.',
+            substeps: ['Add all ingredients to a high-powered blender.']
+          },
+          {
+            summary: 'Start at low speed for 5 seconds to break up the frozen strawberries and banana, then increase to high speed.',
+            substeps: [
+              'Start at low speed for 5 seconds to break up the frozen strawberries and banana, then increase to high speed.'
+            ]
+          },
+          {
+            summary: 'Blend on high for 45-60 seconds until completely smooth.',
+            substeps: ['Blend on high for 45-60 seconds until completely smooth.']
+          },
+          {
+            summary: 'Pour into a large glass. If too thick, add a splash of extra milk and pulse to combine. The coconut cream gives this a strawberries-and-cream finish — don\'t skip it.',
+            substeps: [
+              'Pour into a large glass. If too thick, add a splash of extra milk and pulse to combine. The coconut cream gives this a strawberries-and-cream finish — don\'t skip it.'
+            ]
+          }
         ]
       }
     ]
   },
-
   choc_muscle_maxx: {
     slug: 'choc_muscle_maxx',
     display_name: 'Choc Muscle MAXX',
@@ -780,16 +917,32 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add the milk to the blender first so the dry ingredients have something to blend into.',
-          'Add the frozen banana, ice cream, whey, peanut butter, cocoa, honey, and oats.',
-          'Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.',
-          'Blend on high for 45-60 seconds until completely smooth and no oat texture remains.',
-          'Pour into a large glass. Best within 30 minutes of a workout — the carb-to-protein ratio is built for recovery.'
+          {
+            summary: 'Add the milk to the blender first so the dry ingredients have something to blend into.',
+            substeps: ['Add the milk to the blender first so the dry ingredients have something to blend into.']
+          },
+          {
+            summary: 'Add the frozen banana, ice cream, whey, peanut butter, cocoa, honey, and oats.',
+            substeps: ['Add the frozen banana, ice cream, whey, peanut butter, cocoa, honey, and oats.']
+          },
+          {
+            summary: 'Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.',
+            substeps: ['Start at low speed for 5 seconds to break up the frozen banana, then increase to high speed.']
+          },
+          {
+            summary: 'Blend on high for 45-60 seconds until completely smooth and no oat texture remains.',
+            substeps: ['Blend on high for 45-60 seconds until completely smooth and no oat texture remains.']
+          },
+          {
+            summary: 'Pour into a large glass. Best within 30 minutes of a workout — the carb-to-protein ratio is built for recovery.',
+            substeps: [
+              'Pour into a large glass. Best within 30 minutes of a workout — the carb-to-protein ratio is built for recovery.'
+            ]
+          }
         ]
       }
     ]
   },
-
   cookies_gains: {
     slug: 'cookies_gains',
     display_name: 'Cookies & Gains',
@@ -885,15 +1038,28 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add the milk and yoghurt to the blender first.',
-          'Add the banana, whey, 3 of the Oreos, peanut butter, honey, and ice cream.',
-          'Blend on high for 45-60 seconds until smooth. Some small Oreo flecks are fine — they add texture.',
-          'Pour into a tall glass. Crush the reserved Oreo and sprinkle over the top.'
+          {
+            summary: 'Add the milk and yoghurt to the blender first.',
+            substeps: ['Add the milk and yoghurt to the blender first.']
+          },
+          {
+            summary: 'Add the banana, whey, 3 of the Oreos, peanut butter, honey, and ice cream.',
+            substeps: ['Add the banana, whey, 3 of the Oreos, peanut butter, honey, and ice cream.']
+          },
+          {
+            summary: 'Blend on high for 45-60 seconds until smooth. Some small Oreo flecks are fine — they add texture.',
+            substeps: [
+              'Blend on high for 45-60 seconds until smooth. Some small Oreo flecks are fine — they add texture.'
+            ]
+          },
+          {
+            summary: 'Pour into a tall glass. Crush the reserved Oreo and sprinkle over the top.',
+            substeps: ['Pour into a tall glass. Crush the reserved Oreo and sprinkle over the top.']
+          }
         ]
       }
     ]
   },
-
   raspberry_rip: {
     slug: 'raspberry_rip',
     display_name: 'Raspberry Rip',
@@ -996,14 +1162,26 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add all ingredients to a high-powered blender.',
-          'Blend on high for 45-60 seconds until smooth. The raspberry seeds will leave a subtle texture — that\'s fine.',
-          'Pour into a tall glass. The flavour is essentially a Cherry Ripe in liquid form — chocolate, coconut, raspberry.'
+          {
+            summary: 'Add all ingredients to a high-powered blender.',
+            substeps: ['Add all ingredients to a high-powered blender.']
+          },
+          {
+            summary: 'Blend on high for 45-60 seconds until smooth. The raspberry seeds will leave a subtle texture — that\'s fine.',
+            substeps: [
+              'Blend on high for 45-60 seconds until smooth. The raspberry seeds will leave a subtle texture — that\'s fine.'
+            ]
+          },
+          {
+            summary: 'Pour into a tall glass. The flavour is essentially a Cherry Ripe in liquid form — chocolate, coconut, raspberry.',
+            substeps: [
+              'Pour into a tall glass. The flavour is essentially a Cherry Ripe in liquid form — chocolate, coconut, raspberry.'
+            ]
+          }
         ]
       }
     ]
   },
-
   energy_lift_heavy: {
     slug: 'energy_lift_heavy',
     display_name: 'Energy Lift Heavy',
@@ -1107,18 +1285,33 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Brew the espresso first and let it cool while you measure the other ingredients (or use leftover cold espresso).',
-          'Add all ingredients to a high-powered blender.',
-          'Blend on high for 45-60 seconds until smooth. The chia seeds will thicken the smoothie if it sits — drink within 5 minutes.',
-          'Best consumed 30-45 minutes before training.'
+          {
+            summary: 'Brew the espresso first and let it cool while you measure the other ingredients (or use leftover cold espresso).',
+            substeps: [
+              'Brew the espresso first and let it cool while you measure the other ingredients (or use leftover cold espresso).'
+            ]
+          },
+          {
+            summary: 'Add all ingredients to a high-powered blender.',
+            substeps: ['Add all ingredients to a high-powered blender.']
+          },
+          {
+            summary: 'Blend on high for 45-60 seconds until smooth. The chia seeds will thicken the smoothie if it sits — drink within 5 minutes.',
+            substeps: [
+              'Blend on high for 45-60 seconds until smooth. The chia seeds will thicken the smoothie if it sits — drink within 5 minutes.'
+            ]
+          },
+          {
+            summary: 'Best consumed 30-45 minutes before training.',
+            substeps: ['Best consumed 30-45 minutes before training.']
+          }
         ]
       }
     ]
   },
-
   mornin_muscle: {
     slug: 'mornin_muscle',
-    display_name: "Mornin' Muscle",
+    display_name: 'Mornin\' Muscle',
     cuisine: 'smoothie',
     primary_protein: 'dairy',
     produces_servings: 1,
@@ -1127,11 +1320,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     max_scale: 1.3,
     contains_allergens: ['Dairy', 'Nuts'],
     flex_ingredient_id: 'thickened_cream',
-    image_filename: "Mornin' Muscle.png",
+    image_filename: 'Mornin\' Muscle.png',
     plates: [
       {
         id: 'standard',
-        display_name: "Mornin' Muscle",
+        display_name: 'Mornin\' Muscle',
         description: 'Double espresso chocolate smoothie — breakfast and coffee in one massive drink',
         base_serving_multiplier: 1.0,
         additional_ingredients: [],
@@ -1218,16 +1411,32 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Brew the espresso first and let it cool while you measure the other ingredients.',
-          'Add the milk, cream, and yoghurt to the blender first.',
-          'Add the banana, whey, cocoa, cooled espresso, peanut butter, and maple syrup.',
-          'Blend on high for 45-60 seconds until completely smooth.',
-          'Pour into a tall glass. This is breakfast and lunch in one — 1200 kcal with caffeine and 57g protein.'
+          {
+            summary: 'Brew the espresso first and let it cool while you measure the other ingredients.',
+            substeps: ['Brew the espresso first and let it cool while you measure the other ingredients.']
+          },
+          {
+            summary: 'Add the milk, cream, and yoghurt to the blender first.',
+            substeps: ['Add the milk, cream, and yoghurt to the blender first.']
+          },
+          {
+            summary: 'Add the banana, whey, cocoa, cooled espresso, peanut butter, and maple syrup.',
+            substeps: ['Add the banana, whey, cocoa, cooled espresso, peanut butter, and maple syrup.']
+          },
+          {
+            summary: 'Blend on high for 45-60 seconds until completely smooth.',
+            substeps: ['Blend on high for 45-60 seconds until completely smooth.']
+          },
+          {
+            summary: 'Pour into a tall glass. This is breakfast and lunch in one — 1200 kcal with caffeine and 57g protein.',
+            substeps: [
+              'Pour into a tall glass. This is breakfast and lunch in one — 1200 kcal with caffeine and 57g protein.'
+            ]
+          }
         ]
       }
     ]
   },
-
   dirty_eden: {
     slug: 'dirty_eden',
     display_name: 'Dirty Eden',
@@ -1351,16 +1560,36 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add the liquids (coconut water, milk, lemon juice) to the blender first.',
-          'Add the spinach and mint and pulse briefly to break them down before adding the heavier ingredients.',
-          'Add everything else — banana, pineapple, avocado, yoghurt, whey, almond butter, honey.',
-          'Blend on high for 60-90 seconds until completely smooth. Green smoothies need a bit longer to fully break down the leaves.',
-          'Pour into a tall glass. Tastes tropical, not green — the pineapple and banana dominate the flavour.'
+          {
+            summary: 'Add the liquids (coconut water, milk, lemon juice) to the blender first.',
+            substeps: ['Add the liquids (coconut water, milk, lemon juice) to the blender first.']
+          },
+          {
+            summary: 'Add the spinach and mint and pulse briefly to break them down before adding the heavier ingredients.',
+            substeps: [
+              'Add the spinach and mint and pulse briefly to break them down before adding the heavier ingredients.'
+            ]
+          },
+          {
+            summary: 'Add everything else — banana, pineapple, avocado, yoghurt, whey, almond butter, honey.',
+            substeps: ['Add everything else — banana, pineapple, avocado, yoghurt, whey, almond butter, honey.']
+          },
+          {
+            summary: 'Blend on high for 60-90 seconds until completely smooth. Green smoothies need a bit longer to fully break down the leaves.',
+            substeps: [
+              'Blend on high for 60-90 seconds until completely smooth. Green smoothies need a bit longer to fully break down the leaves.'
+            ]
+          },
+          {
+            summary: 'Pour into a tall glass. Tastes tropical, not green — the pineapple and banana dominate the flavour.',
+            substeps: [
+              'Pour into a tall glass. Tastes tropical, not green — the pineapple and banana dominate the flavour.'
+            ]
+          }
         ]
       }
     ]
   },
-
   strawbrekkie_beast: {
     slug: 'strawbrekkie_beast',
     display_name: 'Strawbrekkie BEAST',
@@ -1470,15 +1699,26 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Add the milk and apple juice to the blender first.',
-          'Add the frozen berries, banana, oats, yoghurt, whey, almond butter, and honey.',
-          'Blend on high for 60 seconds until smooth and no oat texture remains.',
-          'Pour into a tall glass. The carb-heavy profile (150g) makes this an ideal post-workout option.'
+          {
+            summary: 'Add the milk and apple juice to the blender first.',
+            substeps: ['Add the milk and apple juice to the blender first.']
+          },
+          {
+            summary: 'Add the frozen berries, banana, oats, yoghurt, whey, almond butter, and honey.',
+            substeps: ['Add the frozen berries, banana, oats, yoghurt, whey, almond butter, and honey.']
+          },
+          {
+            summary: 'Blend on high for 60 seconds until smooth and no oat texture remains.',
+            substeps: ['Blend on high for 60 seconds until smooth and no oat texture remains.']
+          },
+          {
+            summary: 'Pour into a tall glass. The carb-heavy profile (150g) makes this an ideal post-workout option.',
+            substeps: ['Pour into a tall glass. The carb-heavy profile (150g) makes this an ideal post-workout option.']
+          }
         ]
       }
     ]
   },
-
   banana_bulk: {
     slug: 'banana_bulk',
     display_name: 'Banana Bulk',
@@ -1574,16 +1814,34 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Pit the dates if needed and roughly chop them — this helps them blend.',
-          'Add the milk and yoghurt to the blender first.',
-          'Add the frozen bananas, dates, whey, peanut butter, honey, and cinnamon.',
-          'Blend on high for 60 seconds until completely smooth — the dates need extra time to fully break down.',
-          'Pour into a tall glass. The cheapest smoothie in the database — total ingredient cost roughly $3 AUD.'
+          {
+            summary: 'Pit the dates if needed and roughly chop them — this helps them blend.',
+            substeps: ['Pit the dates if needed and roughly chop them — this helps them blend.']
+          },
+          {
+            summary: 'Add the milk and yoghurt to the blender first.',
+            substeps: ['Add the milk and yoghurt to the blender first.']
+          },
+          {
+            summary: 'Add the frozen bananas, dates, whey, peanut butter, honey, and cinnamon.',
+            substeps: ['Add the frozen bananas, dates, whey, peanut butter, honey, and cinnamon.']
+          },
+          {
+            summary: 'Blend on high for 60 seconds until completely smooth — the dates need extra time to fully break down.',
+            substeps: [
+              'Blend on high for 60 seconds until completely smooth — the dates need extra time to fully break down.'
+            ]
+          },
+          {
+            summary: 'Pour into a tall glass. The cheapest smoothie in the database — total ingredient cost roughly $3 AUD.',
+            substeps: [
+              'Pour into a tall glass. The cheapest smoothie in the database — total ingredient cost roughly $3 AUD.'
+            ]
+          }
         ]
       }
     ]
   },
-
   pulled_pork: {
     slug: 'pulled_pork',
     display_name: 'Slow-Cooked BBQ Pulled Pork',
@@ -1597,6 +1855,17 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat', 'Soy', 'Fish'],
     image_filename: 'Slow-Cooked Pulled Pork.png',
     plates: [
+      {
+        id: 'pulled_pork',
+        display_name: 'BBQ Pulled Pork',
+        description: 'Slow-cooked pork shoulder shredded and tossed in tangy BBQ sauce.',
+        image_filename: undefined,
+        plate_macros: { kcal: 610, protein_g: 48, carbs_g: 28, fat_g: 32, fiber_g: 1 },
+        assembly_time_minutes: 0,
+        additional_instructions: [],
+        additional_ingredients: [],
+        base_serving_multiplier: 1.0,
+      },
       {
         id: 'sandwich',
         display_name: 'BBQ Pulled Pork Burger',
@@ -1624,10 +1893,22 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Split and lightly toast the brioche bun (cut side down in a dry pan, 1 minute).',
-          'Pile 1 serving of BBQ pulled pork onto the bottom bun.',
-          'Scatter grated cheese over the hot pork — residual heat melts it.',
-          'Top with coleslaw, lid on, eat immediately.'
+          {
+            summary: 'Split and lightly toast the brioche bun (cut side down in a dry pan, 1 minute).',
+            substeps: ['Split and lightly toast the brioche bun (cut side down in a dry pan, 1 minute).']
+          },
+          {
+            summary: 'Pile 1 serving of BBQ pulled pork onto the bottom bun.',
+            substeps: ['Pile 1 serving of BBQ pulled pork onto the bottom bun.']
+          },
+          {
+            summary: 'Scatter grated cheese over the hot pork — residual heat melts it.',
+            substeps: ['Scatter grated cheese over the hot pork — residual heat melts it.']
+          },
+          {
+            summary: 'Top with coleslaw, lid on, eat immediately.',
+            substeps: ['Top with coleslaw, lid on, eat immediately.']
+          }
         ],
         assembly_time_minutes: 3,
         plate_macros: {
@@ -1672,10 +1953,22 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Cook the basmati rice if not already prepared (10 minutes in a rice cooker or boiling).',
-          'Spread rice across the bottom of a bowl.',
-          'Pile 1 serving of BBQ pulled pork on one side of the rice; coleslaw on the other side.',
-          'Scatter cheese over the pork; drizzle extra BBQ sauce.'
+          {
+            summary: 'Cook the basmati rice if not already prepared (10 minutes in a rice cooker or boiling).',
+            substeps: ['Cook the basmati rice if not already prepared (10 minutes in a rice cooker or boiling).']
+          },
+          {
+            summary: 'Spread rice across the bottom of a bowl.',
+            substeps: ['Spread rice across the bottom of a bowl.']
+          },
+          {
+            summary: 'Pile 1 serving of BBQ pulled pork on one side of the rice; coleslaw on the other side.',
+            substeps: ['Pile 1 serving of BBQ pulled pork on one side of the rice; coleslaw on the other side.']
+          },
+          {
+            summary: 'Scatter cheese over the pork; drizzle extra BBQ sauce.',
+            substeps: ['Scatter cheese over the pork; drizzle extra BBQ sauce.']
+          }
         ],
         assembly_time_minutes: 15,
         plate_macros: {
@@ -1736,10 +2029,26 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Preheat oven to 200°C. Prick the potato all over with a fork. Rub with olive oil and salt.',
-          'Bake directly on the oven rack for 60 minutes, until skin is crisp and inside gives easily when squeezed.',
-          'Split the potato open lengthways. Fluff the flesh with a fork.',
-          'Pile in 1 serving of BBQ pulled pork. Scatter cheese (residual heat melts it), dollop sour cream, scatter spring onion.'
+          {
+            summary: 'Preheat oven to 200°C. Prick the potato all over with a fork. Rub with olive oil and salt.',
+            substeps: ['Preheat oven to 200°C. Prick the potato all over with a fork. Rub with olive oil and salt.']
+          },
+          {
+            summary: 'Bake directly on the oven rack for 60 minutes, until skin is crisp and inside gives easily when squeezed.',
+            substeps: [
+              'Bake directly on the oven rack for 60 minutes, until skin is crisp and inside gives easily when squeezed.'
+            ]
+          },
+          {
+            summary: 'Split the potato open lengthways. Fluff the flesh with a fork.',
+            substeps: ['Split the potato open lengthways. Fluff the flesh with a fork.']
+          },
+          {
+            summary: 'Pile in 1 serving of BBQ pulled pork. Scatter cheese (residual heat melts it), dollop sour cream, scatter spring onion.',
+            substeps: [
+              'Pile in 1 serving of BBQ pulled pork. Scatter cheese (residual heat melts it), dollop sour cream, scatter spring onion.'
+            ]
+          }
         ],
         assembly_time_minutes: 65,
         plate_macros: {
@@ -1799,10 +2108,24 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Warm the reserved plain shredded pork in a pan with a splash of water — about 2 minutes.',
-          'Warm tortillas (30 sec per side in a dry pan, or 15 sec in microwave under a damp cloth).',
-          'Mash avocado roughly with a fork; squeeze in half the lime, pinch of salt.',
-          'Divide pork between the three tortillas (~50g each). Top each with smashed avocado, cheese, coriander, pickled red onion. Squeeze remaining lime over.'
+          {
+            summary: 'Warm the reserved plain shredded pork in a pan with a splash of water — about 2 minutes.',
+            substeps: ['Warm the reserved plain shredded pork in a pan with a splash of water — about 2 minutes.']
+          },
+          {
+            summary: 'Warm tortillas (30 sec per side in a dry pan, or 15 sec in microwave under a damp cloth).',
+            substeps: ['Warm tortillas (30 sec per side in a dry pan, or 15 sec in microwave under a damp cloth).']
+          },
+          {
+            summary: 'Mash avocado roughly with a fork; squeeze in half the lime, pinch of salt.',
+            substeps: ['Mash avocado roughly with a fork; squeeze in half the lime, pinch of salt.']
+          },
+          {
+            summary: 'Divide pork between the three tortillas (~50g each). Top each with smashed avocado, cheese, coriander, pickled red onion. Squeeze remaining lime over.',
+            substeps: [
+              'Divide pork between the three tortillas (~50g each). Top each with smashed avocado, cheese, coriander, pickled red onion. Squeeze remaining lime over.'
+            ]
+          }
         ],
         assembly_time_minutes: 8,
         plate_macros: {
@@ -1866,11 +2189,32 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Cook macaroni in salted boiling water until al dente (about 7 minutes). Reserve ½ cup of pasta water, then drain.',
-          'In the same pot, melt butter over medium heat. Whisk in flour, cook 30 seconds. Gradually whisk in milk until smooth.',
-          'Simmer 2-3 minutes, whisking, until thickened. Stir in grated cheese off the heat until melted. Season.',
-          'Stir drained macaroni through the cheese sauce. Loosen with a splash of pasta water if needed.',
-          'Scoop mac and cheese into a bowl. Top with 1.5 servings\' worth of BBQ pulled pork.'
+          {
+            summary: 'Cook macaroni in salted boiling water until al dente (about 7 minutes). Reserve ½ cup of pasta water, then drain.',
+            substeps: [
+              'Cook macaroni in salted boiling water until al dente (about 7 minutes). Reserve ½ cup of pasta water, then drain.'
+            ]
+          },
+          {
+            summary: 'In the same pot, melt butter over medium heat. Whisk in flour, cook 30 seconds. Gradually whisk in milk until smooth.',
+            substeps: [
+              'In the same pot, melt butter over medium heat. Whisk in flour, cook 30 seconds. Gradually whisk in milk until smooth.'
+            ]
+          },
+          {
+            summary: 'Simmer 2-3 minutes, whisking, until thickened. Stir in grated cheese off the heat until melted. Season.',
+            substeps: [
+              'Simmer 2-3 minutes, whisking, until thickened. Stir in grated cheese off the heat until melted. Season.'
+            ]
+          },
+          {
+            summary: 'Stir drained macaroni through the cheese sauce. Loosen with a splash of pasta water if needed.',
+            substeps: ['Stir drained macaroni through the cheese sauce. Loosen with a splash of pasta water if needed.']
+          },
+          {
+            summary: 'Scoop mac and cheese into a bowl. Top with 1.5 servings\' worth of BBQ pulled pork.',
+            substeps: ['Scoop mac and cheese into a bowl. Top with 1.5 servings\' worth of BBQ pulled pork.']
+          }
         ],
         assembly_time_minutes: 20,
         plate_macros: {
@@ -2019,14 +2363,54 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 2.',
-          'Place pork in the slow cooker, fat cap facing up. Pour the apple juice around the pork — not over the rub.',
-          'Cook on low for 8 hours, or high for 4-5 hours. Pork is done when it shreds easily under light fork pressure.',
-          'Lift the pork carefully into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.',
-          '(Optional crisp step.) Preheat oven to 180°C. Roast the lifted pork for 20 minutes for surface caramelisation. Worth it for texture; skip if rushed.',
-          'Make the BBQ sauce (can be done during the slow cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.',
-          'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.',
-          'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.'
+          {
+            summary: 'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 2.',
+            substeps: [
+              'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 2.'
+            ]
+          },
+          {
+            summary: 'Place pork in the slow cooker, fat cap facing up. Pour the apple juice around the pork — not over the rub.',
+            substeps: [
+              'Place pork in the slow cooker, fat cap facing up. Pour the apple juice around the pork — not over the rub.'
+            ]
+          },
+          {
+            summary: 'Cook on low for 8 hours, or high for 4-5 hours. Pork is done when it shreds easily under light fork pressure.',
+            substeps: [
+              'Cook on low for 8 hours, or high for 4-5 hours. Pork is done when it shreds easily under light fork pressure.'
+            ]
+          },
+          {
+            summary: 'Lift the pork carefully into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.',
+            substeps: [
+              'Lift the pork carefully into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.'
+            ]
+          },
+          {
+            summary: '(Optional crisp step.) Preheat oven to 180°C. Roast the lifted pork for 20 minutes for surface caramelisation. Worth it for texture; skip if rushed.',
+            substeps: [
+              '(Optional crisp step.) Preheat oven to 180°C. Roast the lifted pork for 20 minutes for surface caramelisation. Worth it for texture; skip if rushed.'
+            ]
+          },
+          {
+            summary: 'Make the BBQ sauce (can be done during the slow cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.',
+            substeps: [
+              'Make the BBQ sauce (can be done during the slow cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.'
+            ]
+          },
+          {
+            summary: 'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.',
+            substeps: [
+              'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.'
+            ]
+          },
+          {
+            summary: 'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.',
+            substeps: [
+              'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.'
+            ]
+          }
         ]
       },
       {
@@ -2165,16 +2549,64 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Preheat the oven to 140°C (fan-forced 120°C).',
-          'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 3.',
-          'Place pork in a deep roasting pan or Dutch oven, fat cap facing up. Pour the apple juice around the pork — not over the rub.',
-          'Cover tightly with two layers of foil (or the Dutch oven lid) to trap moisture. The pork needs to braise, not roast.',
-          'Cook for 5 hours. Check at 4 hours: the pork should be starting to give way when pressed; if not, cover and continue.',
-          'Remove from the oven. Carefully lift the pork into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.',
-          'Optional crisp step (recommended): turn the oven up to 200°C. Return the pork uncovered for 20 minutes for surface caramelisation. Worth it for textural contrast.',
-          'Make the BBQ sauce (can be done during the oven cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.',
-          'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.',
-          'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.'
+          {
+            summary: 'Preheat the oven to 140°C (fan-forced 120°C).',
+            substeps: ['Preheat the oven to 140°C (fan-forced 120°C).']
+          },
+          {
+            summary: 'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 3.',
+            substeps: [
+              'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 3.'
+            ]
+          },
+          {
+            summary: 'Place pork in a deep roasting pan or Dutch oven, fat cap facing up. Pour the apple juice around the pork — not over the rub.',
+            substeps: [
+              'Place pork in a deep roasting pan or Dutch oven, fat cap facing up. Pour the apple juice around the pork — not over the rub.'
+            ]
+          },
+          {
+            summary: 'Cover tightly with two layers of foil (or the Dutch oven lid) to trap moisture. The pork needs to braise, not roast.',
+            substeps: [
+              'Cover tightly with two layers of foil (or the Dutch oven lid) to trap moisture. The pork needs to braise, not roast.'
+            ]
+          },
+          {
+            summary: 'Cook for 5 hours. Check at 4 hours: the pork should be starting to give way when pressed; if not, cover and continue.',
+            substeps: [
+              'Cook for 5 hours. Check at 4 hours: the pork should be starting to give way when pressed; if not, cover and continue.'
+            ]
+          },
+          {
+            summary: 'Remove from the oven. Carefully lift the pork into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.',
+            substeps: [
+              'Remove from the oven. Carefully lift the pork into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.'
+            ]
+          },
+          {
+            summary: 'Optional crisp step (recommended): turn the oven up to 200°C. Return the pork uncovered for 20 minutes for surface caramelisation. Worth it for textural contrast.',
+            substeps: [
+              'Optional crisp step (recommended): turn the oven up to 200°C. Return the pork uncovered for 20 minutes for surface caramelisation. Worth it for textural contrast.'
+            ]
+          },
+          {
+            summary: 'Make the BBQ sauce (can be done during the oven cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.',
+            substeps: [
+              'Make the BBQ sauce (can be done during the oven cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.'
+            ]
+          },
+          {
+            summary: 'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.',
+            substeps: [
+              'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.'
+            ]
+          },
+          {
+            summary: 'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.',
+            substeps: [
+              'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.'
+            ]
+          }
         ]
       }
     ]
@@ -2192,6 +2624,17 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Fish', 'Gluten/Wheat'],
     image_filename: 'Bolognese Sauce.png',
     plates: [
+      {
+        id: 'bolognese',
+        display_name: 'Bolognese',
+        description: 'Slow-simmered beef and tomato ragù with red wine and pancetta.',
+        image_filename: undefined,
+        plate_macros: { kcal: 510, protein_g: 32, carbs_g: 18, fat_g: 32, fiber_g: 4 },
+        assembly_time_minutes: 0,
+        additional_instructions: [],
+        additional_ingredients: [],
+        base_serving_multiplier: 1.0,
+      },
       {
         id: 'spaghetti',
         display_name: 'Spaghetti Bolognese',
@@ -2228,10 +2671,28 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Bring a large pot of well-salted water to the boil. Cook the spaghetti for 1 minute less than the packet directions — you want it firm because it\'ll finish in the sauce.',
-          'While the pasta cooks, reheat 1 serving of bolognese in a large pan over medium heat. Reserve ½ cup of pasta cooking water before draining.',
-          'Drain the spaghetti and add it directly to the sauce pan. Add a splash (~50ml) of the pasta water. Toss vigorously over medium heat for 1 minute — the starch in the water emulsifies the sauce and makes it cling to the pasta.',
-          'Plate. Top with grated parmesan and a drizzle of olive oil.'
+          {
+            summary: 'Bring a large pot of well-salted water to the boil. Cook the spaghetti for 1 minute less than the packet directions — you want it firm because it\'ll finish in the sauce.',
+            substeps: [
+              'Bring a large pot of well-salted water to the boil. Cook the spaghetti for 1 minute less than the packet directions — you want it firm because it\'ll finish in the sauce.'
+            ]
+          },
+          {
+            summary: 'While the pasta cooks, reheat 1 serving of bolognese in a large pan over medium heat. Reserve ½ cup of pasta cooking water before draining.',
+            substeps: [
+              'While the pasta cooks, reheat 1 serving of bolognese in a large pan over medium heat. Reserve ½ cup of pasta cooking water before draining.'
+            ]
+          },
+          {
+            summary: 'Drain the spaghetti and add it directly to the sauce pan. Add a splash (~50ml) of the pasta water. Toss vigorously over medium heat for 1 minute — the starch in the water emulsifies the sauce and makes it cling to the pasta.',
+            substeps: [
+              'Drain the spaghetti and add it directly to the sauce pan. Add a splash (~50ml) of the pasta water. Toss vigorously over medium heat for 1 minute — the starch in the water emulsifies the sauce and makes it cling to the pasta.'
+            ]
+          },
+          {
+            summary: 'Plate. Top with grated parmesan and a drizzle of olive oil.',
+            substeps: ['Plate. Top with grated parmesan and a drizzle of olive oil.']
+          }
         ],
         assembly_time_minutes: 12,
         plate_macros: {
@@ -2285,11 +2746,28 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Preheat the oven to 200°C. Prick the potato all over with a fork. Rub with olive oil and salt.',
-          'Bake directly on the oven rack for 60 minutes, until the skin is crisp and the inside gives easily when squeezed.',
-          'Reheat 1 serving of bolognese while the potato finishes.',
-          'Split the potato open lengthways. Fluff the flesh with a fork.',
-          'Pile in the bolognese. Scatter cheese (residual heat melts it), dollop sour cream.'
+          {
+            summary: 'Preheat the oven to 200°C. Prick the potato all over with a fork. Rub with olive oil and salt.',
+            substeps: ['Preheat the oven to 200°C. Prick the potato all over with a fork. Rub with olive oil and salt.']
+          },
+          {
+            summary: 'Bake directly on the oven rack for 60 minutes, until the skin is crisp and the inside gives easily when squeezed.',
+            substeps: [
+              'Bake directly on the oven rack for 60 minutes, until the skin is crisp and the inside gives easily when squeezed.'
+            ]
+          },
+          {
+            summary: 'Reheat 1 serving of bolognese while the potato finishes.',
+            substeps: ['Reheat 1 serving of bolognese while the potato finishes.']
+          },
+          {
+            summary: 'Split the potato open lengthways. Fluff the flesh with a fork.',
+            substeps: ['Split the potato open lengthways. Fluff the flesh with a fork.']
+          },
+          {
+            summary: 'Pile in the bolognese. Scatter cheese (residual heat melts it), dollop sour cream.',
+            substeps: ['Pile in the bolognese. Scatter cheese (residual heat melts it), dollop sour cream.']
+          }
         ],
         assembly_time_minutes: 65,
         plate_macros: {
@@ -2324,10 +2802,22 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Bake the garlic bread per packet instructions, usually 180°C for 12-15 minutes.',
-          'Reheat 1 serving of bolognese in a pan or microwave. Spoon into a wide bowl.',
-          'Top with grated parmesan.',
-          'Serve the garlic bread alongside for dipping.'
+          {
+            summary: 'Bake the garlic bread per packet instructions, usually 180°C for 12-15 minutes.',
+            substeps: ['Bake the garlic bread per packet instructions, usually 180°C for 12-15 minutes.']
+          },
+          {
+            summary: 'Reheat 1 serving of bolognese in a pan or microwave. Spoon into a wide bowl.',
+            substeps: ['Reheat 1 serving of bolognese in a pan or microwave. Spoon into a wide bowl.']
+          },
+          {
+            summary: 'Top with grated parmesan.',
+            substeps: ['Top with grated parmesan.']
+          },
+          {
+            summary: 'Serve the garlic bread alongside for dipping.',
+            substeps: ['Serve the garlic bread alongside for dipping.']
+          }
         ],
         assembly_time_minutes: 18,
         plate_macros: {
@@ -2413,13 +2903,46 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Note: this plate makes a 6-portion bake. You\'ll commit 6 servings of bolognese in one go. Plan to eat across the week or freeze portions.',
-          'Make the béchamel: melt the butter in a small saucepan over medium heat. Whisk in the flour, cook 30 seconds. Gradually whisk in the milk until smooth. Simmer 2-3 minutes, whisking, until thickened. Season with nutmeg, salt, pepper. Set aside.',
-          'Make the ricotta mix: combine ricotta, egg, half the parmesan, salt and pepper in a bowl. Stir until smooth.',
-          'Preheat the oven to 180°C. Lightly grease a deep baking dish (roughly 30 × 20 cm).',
-          'Layer it up: a thin smear of bolognese on the base of the dish; lasagne sheets to cover (break to fit if needed); 1/3 of the remaining bolognese; 1/3 of the ricotta mix dolloped and spread; 1/3 of the béchamel; repeat these layers two more times. Top with mozzarella and the remaining parmesan.',
-          'Cover with foil. Bake 25 minutes. Remove the foil and bake 10 more minutes until the cheese is golden and bubbling.',
-          'Rest 15 minutes before cutting — this is non-negotiable; lasagne falls apart if you cut it hot. Cut into 6 portions.'
+          {
+            summary: 'Note: this plate makes a 6-portion bake. You\'ll commit 6 servings of bolognese in one go. Plan to eat across the week or freeze portions.',
+            substeps: [
+              'Note: this plate makes a 6-portion bake. You\'ll commit 6 servings of bolognese in one go. Plan to eat across the week or freeze portions.'
+            ]
+          },
+          {
+            summary: 'Make the béchamel: melt the butter in a small saucepan over medium heat. Whisk in the flour, cook 30 seconds. Gradually whisk in the milk until smooth. Simmer 2-3 minutes, whisking, until thickened. Season with nutmeg, salt, pepper. Set aside.',
+            substeps: [
+              'Make the béchamel: melt the butter in a small saucepan over medium heat. Whisk in the flour, cook 30 seconds. Gradually whisk in the milk until smooth. Simmer 2-3 minutes, whisking, until thickened. Season with nutmeg, salt, pepper. Set aside.'
+            ]
+          },
+          {
+            summary: 'Make the ricotta mix: combine ricotta, egg, half the parmesan, salt and pepper in a bowl. Stir until smooth.',
+            substeps: [
+              'Make the ricotta mix: combine ricotta, egg, half the parmesan, salt and pepper in a bowl. Stir until smooth.'
+            ]
+          },
+          {
+            summary: 'Preheat the oven to 180°C. Lightly grease a deep baking dish (roughly 30 × 20 cm).',
+            substeps: ['Preheat the oven to 180°C. Lightly grease a deep baking dish (roughly 30 × 20 cm).']
+          },
+          {
+            summary: 'Layer it up: a thin smear of bolognese on the base of the dish; lasagne sheets to cover (break to fit if needed); 1/3 of the remaining bolognese; 1/3 of the ricotta mix dolloped and spread; 1/3 of the béchamel; repeat these layers two more times. Top with mozzarella and the remaining parmesan.',
+            substeps: [
+              'Layer it up: a thin smear of bolognese on the base of the dish; lasagne sheets to cover (break to fit if needed); 1/3 of the remaining bolognese; 1/3 of the ricotta mix dolloped and spread; 1/3 of the béchamel; repeat these layers two more times. Top with mozzarella and the remaining parmesan.'
+            ]
+          },
+          {
+            summary: 'Cover with foil. Bake 25 minutes. Remove the foil and bake 10 more minutes until the cheese is golden and bubbling.',
+            substeps: [
+              'Cover with foil. Bake 25 minutes. Remove the foil and bake 10 more minutes until the cheese is golden and bubbling.'
+            ]
+          },
+          {
+            summary: 'Rest 15 minutes before cutting — this is non-negotiable; lasagne falls apart if you cut it hot. Cut into 6 portions.',
+            substeps: [
+              'Rest 15 minutes before cutting — this is non-negotiable; lasagne falls apart if you cut it hot. Cut into 6 portions.'
+            ]
+          }
         ],
         assembly_time_minutes: 70,
         plate_macros: {
@@ -2563,12 +3086,40 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Heat 15g of the olive oil in a large skillet over medium-high heat. Add the diced onion, carrot, and celery. Cook for 7 minutes until soft and the onion is translucent. Add the garlic and pancetta; cook 2 more minutes. Transfer everything to the slow cooker.',
-          'Add the remaining 15g oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — don\'t overcrowd the pan. Break up the mince with a wooden spoon as it cooks. Transfer to the slow cooker.',
-          'Return the skillet to medium heat. Pour in the red wine and scrape all the browned bits from the bottom of the pan — this fond is where the flavour lives. Simmer for 2 minutes, then pour into the slow cooker.',
-          'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire sauce, sugar, oregano, thyme, bay leaves, salt, and pepper to the slow cooker. Stir well.',
-          'Cook on LOW for 6 hours (or HIGH for 4 hours).',
-          'After cooking, taste and adjust salt. Remove the bay leaves. If the sauce looks too liquid (common in slow cookers — they don\'t reduce much), prop the lid open with a wooden spoon and cook on HIGH for 30 more minutes.'
+          {
+            summary: 'Heat 15g of the olive oil in a large skillet over medium-high heat. Add the diced onion, carrot, and celery. Cook for 7 minutes until soft and the onion is translucent. Add the garlic and pancetta; cook 2 more minutes. Transfer everything to the slow cooker.',
+            substeps: [
+              'Heat 15g of the olive oil in a large skillet over medium-high heat. Add the diced onion, carrot, and celery. Cook for 7 minutes until soft and the onion is translucent. Add the garlic and pancetta; cook 2 more minutes. Transfer everything to the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Add the remaining 15g oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — don\'t overcrowd the pan. Break up the mince with a wooden spoon as it cooks. Transfer to the slow cooker.',
+            substeps: [
+              'Add the remaining 15g oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — don\'t overcrowd the pan. Break up the mince with a wooden spoon as it cooks. Transfer to the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Return the skillet to medium heat. Pour in the red wine and scrape all the browned bits from the bottom of the pan — this fond is where the flavour lives. Simmer for 2 minutes, then pour into the slow cooker.',
+            substeps: [
+              'Return the skillet to medium heat. Pour in the red wine and scrape all the browned bits from the bottom of the pan — this fond is where the flavour lives. Simmer for 2 minutes, then pour into the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire sauce, sugar, oregano, thyme, bay leaves, salt, and pepper to the slow cooker. Stir well.',
+            substeps: [
+              'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire sauce, sugar, oregano, thyme, bay leaves, salt, and pepper to the slow cooker. Stir well.'
+            ]
+          },
+          {
+            summary: 'Cook on LOW for 6 hours (or HIGH for 4 hours).',
+            substeps: ['Cook on LOW for 6 hours (or HIGH for 4 hours).']
+          },
+          {
+            summary: 'After cooking, taste and adjust salt. Remove the bay leaves. If the sauce looks too liquid (common in slow cookers — they don\'t reduce much), prop the lid open with a wooden spoon and cook on HIGH for 30 more minutes.',
+            substeps: [
+              'After cooking, taste and adjust salt. Remove the bay leaves. If the sauce looks too liquid (common in slow cookers — they don\'t reduce much), prop the lid open with a wooden spoon and cook on HIGH for 30 more minutes.'
+            ]
+          }
         ]
       },
       {
@@ -2698,12 +3249,40 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Heat 15g olive oil in a large heavy-based pot or Dutch oven over medium heat. Add the onion, carrot, and celery. Cook for 7 minutes until softened. Add the garlic and pancetta; cook 2 more minutes.',
-          'Turn the heat to high. Push the vegetables to one side of the pot. Add the remaining 15g oil and the beef mince. Brown it well, breaking it up with a wooden spoon — about 5 minutes.',
-          'Pour in the red wine. Simmer rapidly for 2 minutes until reduced by half.',
-          'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire, sugar, herbs, bay leaves, salt, and pepper. Stir well and bring to a simmer.',
-          'Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5-2 hours, stirring every 20 minutes. The sauce should be bubbling lazily, not vigorously.',
-          'After 1.5 hours, taste. Adjust salt and acidity (more sugar if too sharp). Remove the bay leaves. The sauce should be thick and glossy — if too watery, simmer uncovered for the last 20 minutes.'
+          {
+            summary: 'Heat 15g olive oil in a large heavy-based pot or Dutch oven over medium heat. Add the onion, carrot, and celery. Cook for 7 minutes until softened. Add the garlic and pancetta; cook 2 more minutes.',
+            substeps: [
+              'Heat 15g olive oil in a large heavy-based pot or Dutch oven over medium heat. Add the onion, carrot, and celery. Cook for 7 minutes until softened. Add the garlic and pancetta; cook 2 more minutes.'
+            ]
+          },
+          {
+            summary: 'Turn the heat to high. Push the vegetables to one side of the pot. Add the remaining 15g oil and the beef mince. Brown it well, breaking it up with a wooden spoon — about 5 minutes.',
+            substeps: [
+              'Turn the heat to high. Push the vegetables to one side of the pot. Add the remaining 15g oil and the beef mince. Brown it well, breaking it up with a wooden spoon — about 5 minutes.'
+            ]
+          },
+          {
+            summary: 'Pour in the red wine. Simmer rapidly for 2 minutes until reduced by half.',
+            substeps: ['Pour in the red wine. Simmer rapidly for 2 minutes until reduced by half.']
+          },
+          {
+            summary: 'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire, sugar, herbs, bay leaves, salt, and pepper. Stir well and bring to a simmer.',
+            substeps: [
+              'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire, sugar, herbs, bay leaves, salt, and pepper. Stir well and bring to a simmer.'
+            ]
+          },
+          {
+            summary: 'Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5-2 hours, stirring every 20 minutes. The sauce should be bubbling lazily, not vigorously.',
+            substeps: [
+              'Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5-2 hours, stirring every 20 minutes. The sauce should be bubbling lazily, not vigorously.'
+            ]
+          },
+          {
+            summary: 'After 1.5 hours, taste. Adjust salt and acidity (more sugar if too sharp). Remove the bay leaves. The sauce should be thick and glossy — if too watery, simmer uncovered for the last 20 minutes.',
+            substeps: [
+              'After 1.5 hours, taste. Adjust salt and acidity (more sugar if too sharp). Remove the bay leaves. The sauce should be thick and glossy — if too watery, simmer uncovered for the last 20 minutes.'
+            ]
+          }
         ]
       }
     ]
@@ -2721,6 +3300,17 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Fish', 'Shellfish', 'Nuts'],
     image_filename: 'Massaman Beef Curry.png',
     plates: [
+      {
+        id: 'massaman',
+        display_name: 'Massaman Beef Curry',
+        description: 'Slow-cooked beef and potato in fragrant Thai coconut curry.',
+        image_filename: undefined,
+        plate_macros: { kcal: 890, protein_g: 52, carbs_g: 42, fat_g: 58, fiber_g: 5 },
+        assembly_time_minutes: 0,
+        additional_instructions: [],
+        additional_ingredients: [],
+        base_serving_multiplier: 1.0,
+      },
       {
         id: 'rice',
         display_name: 'Massaman Beef Curry with Rice',
@@ -2758,11 +3348,32 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Cook the rice according to packet directions, or use a rice cooker. 100g dry basmati + 200ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.',
-          'Reheat 1 serving of massaman curry in a small saucepan or microwave. Don\'t boil hard — gentle warming preserves the texture of the beef.',
-          'Pile the rice into a bowl on one side, ladle the curry over the other side (or on top of the rice).',
-          'Scatter crushed peanuts over the curry. Top with fresh coriander leaves.',
-          'Squeeze the lime wedge over everything just before eating.'
+          {
+            summary: 'Cook the rice according to packet directions, or use a rice cooker. 100g dry basmati + 200ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.',
+            substeps: [
+              'Cook the rice according to packet directions, or use a rice cooker. 100g dry basmati + 200ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.'
+            ]
+          },
+          {
+            summary: 'Reheat 1 serving of massaman curry in a small saucepan or microwave. Don\'t boil hard — gentle warming preserves the texture of the beef.',
+            substeps: [
+              'Reheat 1 serving of massaman curry in a small saucepan or microwave. Don\'t boil hard — gentle warming preserves the texture of the beef.'
+            ]
+          },
+          {
+            summary: 'Pile the rice into a bowl on one side, ladle the curry over the other side (or on top of the rice).',
+            substeps: [
+              'Pile the rice into a bowl on one side, ladle the curry over the other side (or on top of the rice).'
+            ]
+          },
+          {
+            summary: 'Scatter crushed peanuts over the curry. Top with fresh coriander leaves.',
+            substeps: ['Scatter crushed peanuts over the curry. Top with fresh coriander leaves.']
+          },
+          {
+            summary: 'Squeeze the lime wedge over everything just before eating.',
+            substeps: ['Squeeze the lime wedge over everything just before eating.']
+          }
         ],
         assembly_time_minutes: 15,
         plate_macros: {
@@ -2888,13 +3499,46 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Heat 15ml of the olive oil in a large skillet over medium-high heat. Brown the beef in 2-3 batches, about 2 minutes per side to get a hard sear — don\'t crowd the pan. Transfer to the slow cooker as you go. Browning is optional but adds real depth of flavour.',
-          'In the same skillet (don\'t wipe out), drop the heat to medium. Add the sliced onion and cook 3 minutes until starting to soften. Add the garlic, ginger, and massaman curry paste. Cook 2 minutes, stirring constantly, until the paste is fragrant and the oil starts to split out — this "blooms" the paste and is the most important flavour step.',
-          'Pour in 1 cup of the coconut cream and stir to combine with the paste, scraping all the brown bits off the bottom of the pan. Bring to a simmer for 1 minute, then transfer everything to the slow cooker.',
-          'Add the remaining coconut cream, beef stock, potatoes, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves to the slow cooker. Stir to combine.',
-          'Cook on LOW for 8 hours or HIGH for 5 hours, until the beef is fork-tender and falls apart with light pressure.',
-          'Optional finishing reduction: if the sauce looks too thin (slow cookers vary), transfer to a saucepan and simmer uncovered for 10 minutes to reduce. Or mash 2-3 potato chunks gently into the sauce to thicken naturally.',
-          'Remove the cinnamon stick, star anise, and bay leaves before serving.'
+          {
+            summary: 'Heat 15ml of the olive oil in a large skillet over medium-high heat. Brown the beef in 2-3 batches, about 2 minutes per side to get a hard sear — don\'t crowd the pan. Transfer to the slow cooker as you go. Browning is optional but adds real depth of flavour.',
+            substeps: [
+              'Heat 15ml of the olive oil in a large skillet over medium-high heat. Brown the beef in 2-3 batches, about 2 minutes per side to get a hard sear — don\'t crowd the pan. Transfer to the slow cooker as you go. Browning is optional but adds real depth of flavour.'
+            ]
+          },
+          {
+            summary: 'In the same skillet (don\'t wipe out), drop the heat to medium. Add the sliced onion and cook 3 minutes until starting to soften. Add the garlic, ginger, and massaman curry paste. Cook 2 minutes, stirring constantly, until the paste is fragrant and the oil starts to split out — this "blooms" the paste and is the most important flavour step.',
+            substeps: [
+              'In the same skillet (don\'t wipe out), drop the heat to medium. Add the sliced onion and cook 3 minutes until starting to soften. Add the garlic, ginger, and massaman curry paste. Cook 2 minutes, stirring constantly, until the paste is fragrant and the oil starts to split out — this "blooms" the paste and is the most important flavour step.'
+            ]
+          },
+          {
+            summary: 'Pour in 1 cup of the coconut cream and stir to combine with the paste, scraping all the brown bits off the bottom of the pan. Bring to a simmer for 1 minute, then transfer everything to the slow cooker.',
+            substeps: [
+              'Pour in 1 cup of the coconut cream and stir to combine with the paste, scraping all the brown bits off the bottom of the pan. Bring to a simmer for 1 minute, then transfer everything to the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Add the remaining coconut cream, beef stock, potatoes, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves to the slow cooker. Stir to combine.',
+            substeps: [
+              'Add the remaining coconut cream, beef stock, potatoes, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves to the slow cooker. Stir to combine.'
+            ]
+          },
+          {
+            summary: 'Cook on LOW for 8 hours or HIGH for 5 hours, until the beef is fork-tender and falls apart with light pressure.',
+            substeps: [
+              'Cook on LOW for 8 hours or HIGH for 5 hours, until the beef is fork-tender and falls apart with light pressure.'
+            ]
+          },
+          {
+            summary: 'Optional finishing reduction: if the sauce looks too thin (slow cookers vary), transfer to a saucepan and simmer uncovered for 10 minutes to reduce. Or mash 2-3 potato chunks gently into the sauce to thicken naturally.',
+            substeps: [
+              'Optional finishing reduction: if the sauce looks too thin (slow cookers vary), transfer to a saucepan and simmer uncovered for 10 minutes to reduce. Or mash 2-3 potato chunks gently into the sauce to thicken naturally.'
+            ]
+          },
+          {
+            summary: 'Remove the cinnamon stick, star anise, and bay leaves before serving.',
+            substeps: ['Remove the cinnamon stick, star anise, and bay leaves before serving.']
+          }
         ]
       },
       {
@@ -3006,13 +3650,48 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Heat 15ml olive oil in a large heavy-based pot or Dutch oven over medium-high heat. Brown the beef in batches, about 2 minutes per side. Transfer to a plate.',
-          'Drop the heat to medium. Add the remaining 15ml oil and the sliced onion. Cook 5 minutes until soft. Add the garlic and ginger, cook 1 minute.',
-          'Add the massaman curry paste and cook for 3 minutes, stirring constantly. The paste should darken and the oil should split out — this is the bloom.',
-          'Pour in the coconut cream and stir to combine with the paste. Bring to a simmer, then add the beef back in with any juices, plus the beef stock, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves.',
-          'Bring to a simmer. Cover loosely (lid slightly ajar) and simmer gently for 1 hour 15 minutes, stirring every 20 minutes.',
-          'Add the potato chunks. Continue simmering uncovered for 30-40 minutes, until the potatoes are tender and the beef shreds easily with a fork. The sauce should have reduced and thickened.',
-          'Remove the cinnamon stick, star anise, and bay leaves. Taste and adjust — more fish sauce for salt, more sugar for sweetness, more tamarind for sour.'
+          {
+            summary: 'Heat 15ml olive oil in a large heavy-based pot or Dutch oven over medium-high heat. Brown the beef in batches, about 2 minutes per side. Transfer to a plate.',
+            substeps: [
+              'Heat 15ml olive oil in a large heavy-based pot or Dutch oven over medium-high heat. Brown the beef in batches, about 2 minutes per side. Transfer to a plate.'
+            ]
+          },
+          {
+            summary: 'Drop the heat to medium. Add the remaining 15ml oil and the sliced onion. Cook 5 minutes until soft. Add the garlic and ginger, cook 1 minute.',
+            substeps: [
+              'Drop the heat to medium. Add the remaining 15ml oil and the sliced onion. Cook 5 minutes until soft. Add the garlic and ginger, cook 1 minute.'
+            ]
+          },
+          {
+            summary: 'Add the massaman curry paste and cook for 3 minutes, stirring constantly. The paste should darken and the oil should split out — this is the bloom.',
+            substeps: [
+              'Add the massaman curry paste and cook for 3 minutes, stirring constantly. The paste should darken and the oil should split out — this is the bloom.'
+            ]
+          },
+          {
+            summary: 'Pour in the coconut cream and stir to combine with the paste. Bring to a simmer, then add the beef back in with any juices, plus the beef stock, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves.',
+            substeps: [
+              'Pour in the coconut cream and stir to combine with the paste. Bring to a simmer, then add the beef back in with any juices, plus the beef stock, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves.'
+            ]
+          },
+          {
+            summary: 'Bring to a simmer. Cover loosely (lid slightly ajar) and simmer gently for 1 hour 15 minutes, stirring every 20 minutes.',
+            substeps: [
+              'Bring to a simmer. Cover loosely (lid slightly ajar) and simmer gently for 1 hour 15 minutes, stirring every 20 minutes.'
+            ]
+          },
+          {
+            summary: 'Add the potato chunks. Continue simmering uncovered for 30-40 minutes, until the potatoes are tender and the beef shreds easily with a fork. The sauce should have reduced and thickened.',
+            substeps: [
+              'Add the potato chunks. Continue simmering uncovered for 30-40 minutes, until the potatoes are tender and the beef shreds easily with a fork. The sauce should have reduced and thickened.'
+            ]
+          },
+          {
+            summary: 'Remove the cinnamon stick, star anise, and bay leaves. Taste and adjust — more fish sauce for salt, more sugar for sweetness, more tamarind for sour.',
+            substeps: [
+              'Remove the cinnamon stick, star anise, and bay leaves. Taste and adjust — more fish sauce for salt, more sugar for sweetness, more tamarind for sour.'
+            ]
+          }
         ]
       }
     ]
@@ -3030,6 +3709,17 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'Chilli Con Carne.png',
     plates: [
+      {
+        id: 'chilli_con_carne',
+        display_name: 'Chilli Con Carne',
+        description: 'Slow-simmered beef chilli with kidney and black beans.',
+        image_filename: undefined,
+        plate_macros: { kcal: 620, protein_g: 42, carbs_g: 38, fat_g: 32, fiber_g: 14 },
+        assembly_time_minutes: 0,
+        additional_instructions: [],
+        additional_ingredients: [],
+        base_serving_multiplier: 1.0,
+      },
       {
         id: 'bowl',
         display_name: 'Bulking Chilli Bowl',
@@ -3079,11 +3769,32 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Cook the rice according to packet directions, or use a rice cooker. 85g dry basmati + 170ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.',
-          'Reheat 1 serving of chilli in a saucepan or microwave.',
-          'Pile the rice into a bowl. Ladle the chilli over the rice — generously, you want sauce flooding the rice.',
-          'Top with grated cheese (the heat melts it), a dollop of sour cream, sliced or smashed avocado, and a scatter of fresh coriander leaves.',
-          'Squeeze the lime wedge over everything just before eating.'
+          {
+            summary: 'Cook the rice according to packet directions, or use a rice cooker. 85g dry basmati + 170ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.',
+            substeps: [
+              'Cook the rice according to packet directions, or use a rice cooker. 85g dry basmati + 170ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.'
+            ]
+          },
+          {
+            summary: 'Reheat 1 serving of chilli in a saucepan or microwave.',
+            substeps: ['Reheat 1 serving of chilli in a saucepan or microwave.']
+          },
+          {
+            summary: 'Pile the rice into a bowl. Ladle the chilli over the rice — generously, you want sauce flooding the rice.',
+            substeps: [
+              'Pile the rice into a bowl. Ladle the chilli over the rice — generously, you want sauce flooding the rice.'
+            ]
+          },
+          {
+            summary: 'Top with grated cheese (the heat melts it), a dollop of sour cream, sliced or smashed avocado, and a scatter of fresh coriander leaves.',
+            substeps: [
+              'Top with grated cheese (the heat melts it), a dollop of sour cream, sliced or smashed avocado, and a scatter of fresh coriander leaves.'
+            ]
+          },
+          {
+            summary: 'Squeeze the lime wedge over everything just before eating.',
+            substeps: ['Squeeze the lime wedge over everything just before eating.']
+          }
         ],
         assembly_time_minutes: 15,
         plate_macros: {
@@ -3158,14 +3869,42 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Preheat the oven to 200°C.',
-          'Reheat 1 serving of chilli in a small saucepan or microwave until hot.',
-          'Spread the corn chips across an oven-safe dish or baking tray in a single thick layer.',
-          'Spoon the hot chilli evenly over the chips — go right to the edges, you want chilli on every chip.',
-          'Scatter the grated cheese over the top in an even layer.',
-          'Bake for 8-10 minutes, until the cheese is fully melted and bubbling at the edges.',
-          'Remove from the oven. Top immediately with dollops of sour cream, sliced or smashed avocado, scattered jalapeños, sliced spring onion, and fresh coriander.',
-          'Squeeze the lime wedge over everything. Eat straight from the dish.'
+          {
+            summary: 'Preheat the oven to 200°C.',
+            substeps: ['Preheat the oven to 200°C.']
+          },
+          {
+            summary: 'Reheat 1 serving of chilli in a small saucepan or microwave until hot.',
+            substeps: ['Reheat 1 serving of chilli in a small saucepan or microwave until hot.']
+          },
+          {
+            summary: 'Spread the corn chips across an oven-safe dish or baking tray in a single thick layer.',
+            substeps: ['Spread the corn chips across an oven-safe dish or baking tray in a single thick layer.']
+          },
+          {
+            summary: 'Spoon the hot chilli evenly over the chips — go right to the edges, you want chilli on every chip.',
+            substeps: [
+              'Spoon the hot chilli evenly over the chips — go right to the edges, you want chilli on every chip.'
+            ]
+          },
+          {
+            summary: 'Scatter the grated cheese over the top in an even layer.',
+            substeps: ['Scatter the grated cheese over the top in an even layer.']
+          },
+          {
+            summary: 'Bake for 8-10 minutes, until the cheese is fully melted and bubbling at the edges.',
+            substeps: ['Bake for 8-10 minutes, until the cheese is fully melted and bubbling at the edges.']
+          },
+          {
+            summary: 'Remove from the oven. Top immediately with dollops of sour cream, sliced or smashed avocado, scattered jalapeños, sliced spring onion, and fresh coriander.',
+            substeps: [
+              'Remove from the oven. Top immediately with dollops of sour cream, sliced or smashed avocado, scattered jalapeños, sliced spring onion, and fresh coriander.'
+            ]
+          },
+          {
+            summary: 'Squeeze the lime wedge over everything. Eat straight from the dish.',
+            substeps: ['Squeeze the lime wedge over everything. Eat straight from the dish.']
+          }
         ],
         assembly_time_minutes: 18,
         plate_macros: {
@@ -3316,11 +4055,34 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Heat 15ml of the olive oil in a large skillet over medium-high heat. Add the onion, garlic, and capsicum. Cook 4-5 minutes until softening and slightly caramelised. Transfer to the slow cooker.',
-          'Add the remaining 15ml oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — break it up with a wooden spoon as it cooks. You want proper browning, not stewing. Transfer to the slow cooker.',
-          'Add to the slow cooker: crushed tomatoes, tomato paste, both drained beans, crumbled stock cubes, sugar, paprika, cumin, garlic powder, onion powder, oregano, cayenne, salt, and water. Stir well.',
-          'Cook on LOW for 6 hours or HIGH for 4 hours.',
-          'Taste and adjust — more cayenne for heat, more salt if needed, more sugar if too acidic. If the sauce is too liquid, prop the lid open on HIGH for 20 minutes to reduce.'
+          {
+            summary: 'Heat 15ml of the olive oil in a large skillet over medium-high heat. Add the onion, garlic, and capsicum. Cook 4-5 minutes until softening and slightly caramelised. Transfer to the slow cooker.',
+            substeps: [
+              'Heat 15ml of the olive oil in a large skillet over medium-high heat. Add the onion, garlic, and capsicum. Cook 4-5 minutes until softening and slightly caramelised. Transfer to the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Add the remaining 15ml oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — break it up with a wooden spoon as it cooks. You want proper browning, not stewing. Transfer to the slow cooker.',
+            substeps: [
+              'Add the remaining 15ml oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — break it up with a wooden spoon as it cooks. You want proper browning, not stewing. Transfer to the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Add to the slow cooker: crushed tomatoes, tomato paste, both drained beans, crumbled stock cubes, sugar, paprika, cumin, garlic powder, onion powder, oregano, cayenne, salt, and water. Stir well.',
+            substeps: [
+              'Add to the slow cooker: crushed tomatoes, tomato paste, both drained beans, crumbled stock cubes, sugar, paprika, cumin, garlic powder, onion powder, oregano, cayenne, salt, and water. Stir well.'
+            ]
+          },
+          {
+            summary: 'Cook on LOW for 6 hours or HIGH for 4 hours.',
+            substeps: ['Cook on LOW for 6 hours or HIGH for 4 hours.']
+          },
+          {
+            summary: 'Taste and adjust — more cayenne for heat, more salt if needed, more sugar if too acidic. If the sauce is too liquid, prop the lid open on HIGH for 20 minutes to reduce.',
+            substeps: [
+              'Taste and adjust — more cayenne for heat, more salt if needed, more sugar if too acidic. If the sauce is too liquid, prop the lid open on HIGH for 20 minutes to reduce.'
+            ]
+          }
         ]
       },
       {
@@ -3456,17 +4218,44 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Heat 15ml olive oil in a large heavy-based pot over medium-high heat. Add the onion, garlic, and capsicum. Cook 5 minutes until soft and lightly browned.',
-          'Push the vegetables to one side of the pot. Add the remaining 15ml oil and the beef mince. Brown it well, breaking it up — about 5-6 minutes. Don\'t rush this; the browning is where the flavour lives.',
-          'Add all the spices (paprika, cumin, garlic powder, onion powder, oregano, cayenne) and stir for 30 seconds — toasting them in the fat blooms the flavour.',
-          'Add the crushed tomatoes, tomato paste, beans, stock cubes, sugar, salt, and water. Stir well.',
-          'Bring to a simmer. Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5 hours minimum, up to 2.5 hours for the weekend version. Stir every 20 minutes. The sauce thickens and the flavour deepens with time.',
-          'Taste and adjust. The sauce should be thick, glossy, and rich. If too thin, simmer uncovered for the last 15-20 minutes.'
+          {
+            summary: 'Heat 15ml olive oil in a large heavy-based pot over medium-high heat. Add the onion, garlic, and capsicum. Cook 5 minutes until soft and lightly browned.',
+            substeps: [
+              'Heat 15ml olive oil in a large heavy-based pot over medium-high heat. Add the onion, garlic, and capsicum. Cook 5 minutes until soft and lightly browned.'
+            ]
+          },
+          {
+            summary: 'Push the vegetables to one side of the pot. Add the remaining 15ml oil and the beef mince. Brown it well, breaking it up — about 5-6 minutes. Don\'t rush this; the browning is where the flavour lives.',
+            substeps: [
+              'Push the vegetables to one side of the pot. Add the remaining 15ml oil and the beef mince. Brown it well, breaking it up — about 5-6 minutes. Don\'t rush this; the browning is where the flavour lives.'
+            ]
+          },
+          {
+            summary: 'Add all the spices (paprika, cumin, garlic powder, onion powder, oregano, cayenne) and stir for 30 seconds — toasting them in the fat blooms the flavour.',
+            substeps: [
+              'Add all the spices (paprika, cumin, garlic powder, onion powder, oregano, cayenne) and stir for 30 seconds — toasting them in the fat blooms the flavour.'
+            ]
+          },
+          {
+            summary: 'Add the crushed tomatoes, tomato paste, beans, stock cubes, sugar, salt, and water. Stir well.',
+            substeps: ['Add the crushed tomatoes, tomato paste, beans, stock cubes, sugar, salt, and water. Stir well.']
+          },
+          {
+            summary: 'Bring to a simmer. Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5 hours minimum, up to 2.5 hours for the weekend version. Stir every 20 minutes. The sauce thickens and the flavour deepens with time.',
+            substeps: [
+              'Bring to a simmer. Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5 hours minimum, up to 2.5 hours for the weekend version. Stir every 20 minutes. The sauce thickens and the flavour deepens with time.'
+            ]
+          },
+          {
+            summary: 'Taste and adjust. The sauce should be thick, glossy, and rich. If too thin, simmer uncovered for the last 15-20 minutes.',
+            substeps: [
+              'Taste and adjust. The sauce should be thick, glossy, and rich. If too thin, simmer uncovered for the last 15-20 minutes.'
+            ]
+          }
         ]
       }
     ]
   },
-
   lamb_shanks: {
     slug: 'lamb_shanks',
     display_name: 'Red Wine–Braised Lamb Shanks',
@@ -3480,6 +4269,17 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'Red Wine Braised Lamb Shanks.png',
     plates: [
+      {
+        id: 'lamb_shanks',
+        display_name: 'Red Wine–Braised Lamb Shank',
+        description: 'Whole lamb shank slow-braised in red wine and tomato.',
+        image_filename: undefined,
+        plate_macros: { kcal: 825, protein_g: 54, carbs_g: 14, fat_g: 58, fiber_g: 2 },
+        assembly_time_minutes: 0,
+        additional_instructions: [],
+        additional_ingredients: [],
+        base_serving_multiplier: 1.0,
+      },
       {
         id: 'mash',
         display_name: 'Lamb Shank on Creamy Mash',
@@ -3536,12 +4336,38 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Peel the potato and cut into 3cm chunks. Place in a large saucepan, cover with cold water, and add a generous pinch of salt. Bring to a boil and cook 15-18 minutes until a knife slides in with no resistance.',
-          'Drain the potatoes thoroughly, then return them to the empty hot saucepan. Leave for 30 seconds — this steams off excess moisture and gives you fluffier mash.',
-          'Add the butter, cream, and milk. Mash until smooth (or use a potato ricer if you want it silky). Season generously with salt and pepper. Taste and adjust.',
-          'Pile the hot mash into a wide shallow bowl. Make a slight well in the middle.',
-          'Place the lamb shank on top of the mash. Spoon a generous amount of the reduced red wine sauce over the shank and onto the mash — the sauce should pool around the base.',
-          'Scatter the chopped parsley over the top. Serve immediately.'
+          {
+            summary: 'Peel the potato and cut into 3cm chunks. Place in a large saucepan, cover with cold water, and add a generous pinch of salt. Bring to a boil and cook 15-18 minutes until a knife slides in with no resistance.',
+            substeps: [
+              'Peel the potato and cut into 3cm chunks. Place in a large saucepan, cover with cold water, and add a generous pinch of salt. Bring to a boil and cook 15-18 minutes until a knife slides in with no resistance.'
+            ]
+          },
+          {
+            summary: 'Drain the potatoes thoroughly, then return them to the empty hot saucepan. Leave for 30 seconds — this steams off excess moisture and gives you fluffier mash.',
+            substeps: [
+              'Drain the potatoes thoroughly, then return them to the empty hot saucepan. Leave for 30 seconds — this steams off excess moisture and gives you fluffier mash.'
+            ]
+          },
+          {
+            summary: 'Add the butter, cream, and milk. Mash until smooth (or use a potato ricer if you want it silky). Season generously with salt and pepper. Taste and adjust.',
+            substeps: [
+              'Add the butter, cream, and milk. Mash until smooth (or use a potato ricer if you want it silky). Season generously with salt and pepper. Taste and adjust.'
+            ]
+          },
+          {
+            summary: 'Pile the hot mash into a wide shallow bowl. Make a slight well in the middle.',
+            substeps: ['Pile the hot mash into a wide shallow bowl. Make a slight well in the middle.']
+          },
+          {
+            summary: 'Place the lamb shank on top of the mash. Spoon a generous amount of the reduced red wine sauce over the shank and onto the mash — the sauce should pool around the base.',
+            substeps: [
+              'Place the lamb shank on top of the mash. Spoon a generous amount of the reduced red wine sauce over the shank and onto the mash — the sauce should pool around the base.'
+            ]
+          },
+          {
+            summary: 'Scatter the chopped parsley over the top. Serve immediately.',
+            substeps: ['Scatter the chopped parsley over the top. Serve immediately.']
+          }
         ],
         plate_macros: {
           kcal: 1417,
@@ -3659,16 +4485,58 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Pat the shanks dry with paper towel. Season generously with salt and pepper.',
-          'Heat 30ml of the olive oil in a large heavy skillet over high heat. Sear the shanks in two batches until well-browned all over — about 5 minutes per batch. Don\'t rush this; the colour is where the flavour comes from. Transfer browned shanks to the slow cooker.',
-          'Drain any excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15ml oil.',
-          'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes until the onion is translucent and starting to sweeten.',
-          'Pour in the red wine. Bring to a simmer, scraping all the brown bits off the bottom of the pan into the wine — this is the fond, every bit of it matters. Simmer 2-3 minutes to cook off some of the alcohol.',
-          'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir well and bring to a simmer.',
-          'Pour the entire braising liquid into the slow cooker over the shanks. The shanks should be mostly submerged — squeeze them in to fit if needed.',
-          'Cook on LOW for 8 hours. The meat should be fall-off-the-bone tender.',
-          'Carefully remove the shanks (they\'re delicate when done — use two spoons). Strain the sauce into a saucepan, discarding the solids for a clean sauce or leaving the carrot and celery in for a rustic finish. Simmer on the stovetop for 10-15 minutes to reduce to a thick, glossy gravy.',
-          'Return the shanks to the reduced sauce to warm through before serving.'
+          {
+            summary: 'Pat the shanks dry with paper towel. Season generously with salt and pepper.',
+            substeps: ['Pat the shanks dry with paper towel. Season generously with salt and pepper.']
+          },
+          {
+            summary: 'Heat 30ml of the olive oil in a large heavy skillet over high heat. Sear the shanks in two batches until well-browned all over — about 5 minutes per batch. Don\'t rush this; the colour is where the flavour comes from. Transfer browned shanks to the slow cooker.',
+            substeps: [
+              'Heat 30ml of the olive oil in a large heavy skillet over high heat. Sear the shanks in two batches until well-browned all over — about 5 minutes per batch. Don\'t rush this; the colour is where the flavour comes from. Transfer browned shanks to the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Drain any excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15ml oil.',
+            substeps: ['Drain any excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15ml oil.']
+          },
+          {
+            summary: 'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes until the onion is translucent and starting to sweeten.',
+            substeps: [
+              'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes until the onion is translucent and starting to sweeten.'
+            ]
+          },
+          {
+            summary: 'Pour in the red wine. Bring to a simmer, scraping all the brown bits off the bottom of the pan into the wine — this is the fond, every bit of it matters. Simmer 2-3 minutes to cook off some of the alcohol.',
+            substeps: [
+              'Pour in the red wine. Bring to a simmer, scraping all the brown bits off the bottom of the pan into the wine — this is the fond, every bit of it matters. Simmer 2-3 minutes to cook off some of the alcohol.'
+            ]
+          },
+          {
+            summary: 'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir well and bring to a simmer.',
+            substeps: [
+              'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir well and bring to a simmer.'
+            ]
+          },
+          {
+            summary: 'Pour the entire braising liquid into the slow cooker over the shanks. The shanks should be mostly submerged — squeeze them in to fit if needed.',
+            substeps: [
+              'Pour the entire braising liquid into the slow cooker over the shanks. The shanks should be mostly submerged — squeeze them in to fit if needed.'
+            ]
+          },
+          {
+            summary: 'Cook on LOW for 8 hours. The meat should be fall-off-the-bone tender.',
+            substeps: ['Cook on LOW for 8 hours. The meat should be fall-off-the-bone tender.']
+          },
+          {
+            summary: 'Carefully remove the shanks (they\'re delicate when done — use two spoons). Strain the sauce into a saucepan, discarding the solids for a clean sauce or leaving the carrot and celery in for a rustic finish. Simmer on the stovetop for 10-15 minutes to reduce to a thick, glossy gravy.',
+            substeps: [
+              'Carefully remove the shanks (they\'re delicate when done — use two spoons). Strain the sauce into a saucepan, discarding the solids for a clean sauce or leaving the carrot and celery in for a rustic finish. Simmer on the stovetop for 10-15 minutes to reduce to a thick, glossy gravy.'
+            ]
+          },
+          {
+            summary: 'Return the shanks to the reduced sauce to warm through before serving.',
+            substeps: ['Return the shanks to the reduced sauce to warm through before serving.']
+          }
         ]
       },
       {
@@ -3770,21 +4638,58 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Preheat the oven to 180°C.',
-          'Pat the shanks dry. Season with salt and pepper.',
-          'Heat 30ml olive oil in a large Dutch oven over high heat. Sear the shanks in two batches until browned all over, 5 minutes per batch. Set aside on a plate.',
-          'Drain the fat. Drop the heat to medium-low. Add the remaining 15ml oil.',
-          'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes.',
-          'Pour in the red wine. Bring to a simmer, scraping the fond. Simmer 2-3 minutes.',
-          'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir. Return the shanks to the pot, squeezing them in so they\'re mostly submerged.',
-          'Bring the liquid to a simmer. Cover with the lid. Transfer to the oven for 2 hours covered.',
-          'Remove the lid. Return to the oven for another 30 minutes uncovered. This finishes reducing the sauce and gives the shanks a beautiful crust.',
-          'Remove from the oven. Carefully transfer the shanks to a plate. If the sauce needs more reduction, simmer on the stovetop for 5-10 minutes.'
+          {
+            summary: 'Preheat the oven to 180°C.',
+            substeps: ['Preheat the oven to 180°C.']
+          },
+          {
+            summary: 'Pat the shanks dry. Season with salt and pepper.',
+            substeps: ['Pat the shanks dry. Season with salt and pepper.']
+          },
+          {
+            summary: 'Heat 30ml olive oil in a large Dutch oven over high heat. Sear the shanks in two batches until browned all over, 5 minutes per batch. Set aside on a plate.',
+            substeps: [
+              'Heat 30ml olive oil in a large Dutch oven over high heat. Sear the shanks in two batches until browned all over, 5 minutes per batch. Set aside on a plate.'
+            ]
+          },
+          {
+            summary: 'Drain the fat. Drop the heat to medium-low. Add the remaining 15ml oil.',
+            substeps: ['Drain the fat. Drop the heat to medium-low. Add the remaining 15ml oil.']
+          },
+          {
+            summary: 'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes.',
+            substeps: ['Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes.']
+          },
+          {
+            summary: 'Pour in the red wine. Bring to a simmer, scraping the fond. Simmer 2-3 minutes.',
+            substeps: ['Pour in the red wine. Bring to a simmer, scraping the fond. Simmer 2-3 minutes.']
+          },
+          {
+            summary: 'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir. Return the shanks to the pot, squeezing them in so they\'re mostly submerged.',
+            substeps: [
+              'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir. Return the shanks to the pot, squeezing them in so they\'re mostly submerged.'
+            ]
+          },
+          {
+            summary: 'Bring the liquid to a simmer. Cover with the lid. Transfer to the oven for 2 hours covered.',
+            substeps: ['Bring the liquid to a simmer. Cover with the lid. Transfer to the oven for 2 hours covered.']
+          },
+          {
+            summary: 'Remove the lid. Return to the oven for another 30 minutes uncovered. This finishes reducing the sauce and gives the shanks a beautiful crust.',
+            substeps: [
+              'Remove the lid. Return to the oven for another 30 minutes uncovered. This finishes reducing the sauce and gives the shanks a beautiful crust.'
+            ]
+          },
+          {
+            summary: 'Remove from the oven. Carefully transfer the shanks to a plate. If the sauce needs more reduction, simmer on the stovetop for 5-10 minutes.',
+            substeps: [
+              'Remove from the oven. Carefully transfer the shanks to a plate. If the sauce needs more reduction, simmer on the stovetop for 5-10 minutes.'
+            ]
+          }
         ]
       }
     ]
   },
-
   beef_stew: {
     slug: 'beef_stew',
     display_name: 'Red Wine Beef Stew',
@@ -3798,6 +4703,17 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Gluten/Wheat', 'Fish'],
     image_filename: 'Slow-Cooked Beef Stew.png',
     plates: [
+      {
+        id: 'beef_stew',
+        display_name: 'Red Wine Beef Stew',
+        description: 'Fork-tender beef chuck with carrots, mushrooms and baby potatoes.',
+        image_filename: undefined,
+        plate_macros: { kcal: 700, protein_g: 46, carbs_g: 32, fat_g: 38, fiber_g: 6 },
+        assembly_time_minutes: 0,
+        additional_instructions: [],
+        additional_ingredients: [],
+        base_serving_multiplier: 1.0,
+      },
       {
         id: 'mash',
         display_name: 'Beef Stew on Creamy Mash',
@@ -3854,12 +4770,36 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Peel the potato and cut into 3cm chunks. Place in a saucepan, cover with cold water, and salt generously. Boil 15-18 minutes until knife-tender.',
-          'Drain thoroughly, return to the hot empty saucepan, and leave for 30 seconds to steam off moisture.',
-          'Add the butter, cream, and milk. Mash until smooth. Season with salt and pepper.',
-          'Pile the mash into a wide shallow bowl. Make a small well in the centre.',
-          'Ladle a generous portion of stew over and around the mash — make sure plenty of sauce hits the mash.',
-          'Scatter parsley over the top.'
+          {
+            summary: 'Peel the potato and cut into 3cm chunks. Place in a saucepan, cover with cold water, and salt generously. Boil 15-18 minutes until knife-tender.',
+            substeps: [
+              'Peel the potato and cut into 3cm chunks. Place in a saucepan, cover with cold water, and salt generously. Boil 15-18 minutes until knife-tender.'
+            ]
+          },
+          {
+            summary: 'Drain thoroughly, return to the hot empty saucepan, and leave for 30 seconds to steam off moisture.',
+            substeps: [
+              'Drain thoroughly, return to the hot empty saucepan, and leave for 30 seconds to steam off moisture.'
+            ]
+          },
+          {
+            summary: 'Add the butter, cream, and milk. Mash until smooth. Season with salt and pepper.',
+            substeps: ['Add the butter, cream, and milk. Mash until smooth. Season with salt and pepper.']
+          },
+          {
+            summary: 'Pile the mash into a wide shallow bowl. Make a small well in the centre.',
+            substeps: ['Pile the mash into a wide shallow bowl. Make a small well in the centre.']
+          },
+          {
+            summary: 'Ladle a generous portion of stew over and around the mash — make sure plenty of sauce hits the mash.',
+            substeps: [
+              'Ladle a generous portion of stew over and around the mash — make sure plenty of sauce hits the mash.'
+            ]
+          },
+          {
+            summary: 'Scatter parsley over the top.',
+            substeps: ['Scatter parsley over the top.']
+          }
         ],
         plate_macros: {
           kcal: 1288,
@@ -3900,11 +4840,28 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         additional_instructions: [
-          'Reheat 1 serving of stew in a saucepan or microwave until piping hot.',
-          'Slice the bread into 2 thick slices. Optionally warm in a 180°C oven for 3-4 minutes, or briefly under the grill, until just crisp on the outside.',
-          'Ladle stew into a wide bowl. Scatter parsley over the top.',
-          'Spread butter on the bread. Serve alongside.',
-          'Eat by dipping the bread into the gravy as you go.'
+          {
+            summary: 'Reheat 1 serving of stew in a saucepan or microwave until piping hot.',
+            substeps: ['Reheat 1 serving of stew in a saucepan or microwave until piping hot.']
+          },
+          {
+            summary: 'Slice the bread into 2 thick slices. Optionally warm in a 180°C oven for 3-4 minutes, or briefly under the grill, until just crisp on the outside.',
+            substeps: [
+              'Slice the bread into 2 thick slices. Optionally warm in a 180°C oven for 3-4 minutes, or briefly under the grill, until just crisp on the outside.'
+            ]
+          },
+          {
+            summary: 'Ladle stew into a wide bowl. Scatter parsley over the top.',
+            substeps: ['Ladle stew into a wide bowl. Scatter parsley over the top.']
+          },
+          {
+            summary: 'Spread butter on the bread. Serve alongside.',
+            substeps: ['Spread butter on the bread. Serve alongside.']
+          },
+          {
+            summary: 'Eat by dipping the bread into the gravy as you go.',
+            substeps: ['Eat by dipping the bread into the gravy as you go.']
+          }
         ],
         plate_macros: {
           kcal: 977,
@@ -4044,16 +5001,60 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Pat the beef cubes dry with paper towel. Season with the salt and pepper. Place the beef and flour in a large zip-top bag or bowl and toss to coat evenly. Shake off the excess.',
-          'Heat 30g olive oil in a large heavy skillet over high heat — get it properly hot. Brown the beef aggressively in 2-3 batches, about 1.5 minutes per side. Don\'t crowd the pan; you want crust, not steam. Transfer browned beef to the slow cooker.',
-          'Drain the excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15g oil.',
-          'Add the onion and garlic; cook 3 minutes. Add the carrot and celery; cook 4 minutes until softening at the edges. Transfer to the slow cooker.',
-          'Pour the red wine into the still-hot skillet. Bring to a vigorous simmer, scraping all the brown bits off the bottom of the pan (the fond). Simmer 2 minutes to cook off some alcohol and reduce slightly.',
-          'Pour the wine into the slow cooker. Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.',
-          'Add the mushrooms and baby potatoes on top. Push down so everything is mostly submerged in liquid.',
-          'Cook on LOW for 8 hours or HIGH for 5 hours. Beef should be fork-tender and falling apart.',
-          'Optional finishing reduction: if the sauce is thinner than you want (slow cookers vary), ladle the liquid into a saucepan and simmer 10-15 minutes to reduce. Or remove the lid for the last 30 minutes on HIGH.',
-          'Discard the bay leaves and thyme sprigs before serving.'
+          {
+            summary: 'Pat the beef cubes dry with paper towel. Season with the salt and pepper. Place the beef and flour in a large zip-top bag or bowl and toss to coat evenly. Shake off the excess.',
+            substeps: [
+              'Pat the beef cubes dry with paper towel. Season with the salt and pepper. Place the beef and flour in a large zip-top bag or bowl and toss to coat evenly. Shake off the excess.'
+            ]
+          },
+          {
+            summary: 'Heat 30g olive oil in a large heavy skillet over high heat — get it properly hot. Brown the beef aggressively in 2-3 batches, about 1.5 minutes per side. Don\'t crowd the pan; you want crust, not steam. Transfer browned beef to the slow cooker.',
+            substeps: [
+              'Heat 30g olive oil in a large heavy skillet over high heat — get it properly hot. Brown the beef aggressively in 2-3 batches, about 1.5 minutes per side. Don\'t crowd the pan; you want crust, not steam. Transfer browned beef to the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Drain the excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15g oil.',
+            substeps: ['Drain the excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15g oil.']
+          },
+          {
+            summary: 'Add the onion and garlic; cook 3 minutes. Add the carrot and celery; cook 4 minutes until softening at the edges. Transfer to the slow cooker.',
+            substeps: [
+              'Add the onion and garlic; cook 3 minutes. Add the carrot and celery; cook 4 minutes until softening at the edges. Transfer to the slow cooker.'
+            ]
+          },
+          {
+            summary: 'Pour the red wine into the still-hot skillet. Bring to a vigorous simmer, scraping all the brown bits off the bottom of the pan (the fond). Simmer 2 minutes to cook off some alcohol and reduce slightly.',
+            substeps: [
+              'Pour the red wine into the still-hot skillet. Bring to a vigorous simmer, scraping all the brown bits off the bottom of the pan (the fond). Simmer 2 minutes to cook off some alcohol and reduce slightly.'
+            ]
+          },
+          {
+            summary: 'Pour the wine into the slow cooker. Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.',
+            substeps: [
+              'Pour the wine into the slow cooker. Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.'
+            ]
+          },
+          {
+            summary: 'Add the mushrooms and baby potatoes on top. Push down so everything is mostly submerged in liquid.',
+            substeps: [
+              'Add the mushrooms and baby potatoes on top. Push down so everything is mostly submerged in liquid.'
+            ]
+          },
+          {
+            summary: 'Cook on LOW for 8 hours or HIGH for 5 hours. Beef should be fork-tender and falling apart.',
+            substeps: ['Cook on LOW for 8 hours or HIGH for 5 hours. Beef should be fork-tender and falling apart.']
+          },
+          {
+            summary: 'Optional finishing reduction: if the sauce is thinner than you want (slow cookers vary), ladle the liquid into a saucepan and simmer 10-15 minutes to reduce. Or remove the lid for the last 30 minutes on HIGH.',
+            substeps: [
+              'Optional finishing reduction: if the sauce is thinner than you want (slow cookers vary), ladle the liquid into a saucepan and simmer 10-15 minutes to reduce. Or remove the lid for the last 30 minutes on HIGH.'
+            ]
+          },
+          {
+            summary: 'Discard the bay leaves and thyme sprigs before serving.',
+            substeps: ['Discard the bay leaves and thyme sprigs before serving.']
+          }
         ]
       },
       {
@@ -4176,17 +5177,60 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         instructions: [
-          'Preheat the oven to 160°C.',
-          'Pat the beef cubes dry. Season with salt and pepper. Toss with the flour to coat; shake off the excess.',
-          'Heat 30g olive oil in a large Dutch oven over high heat. Brown the beef in 2-3 batches, 1.5 minutes per side. Transfer to a plate.',
-          'Drain the excess fat. Drop the heat to medium-low. Add the remaining 15g oil. Sauté the onion and garlic for 3 minutes; add the carrot and celery, cook another 4 minutes.',
-          'Pour in the red wine. Simmer 2 minutes, scraping the fond.',
-          'Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.',
-          'Return the beef to the pot with any juices. Add the mushrooms and potatoes. The liquid should cover everything.',
-          'Bring to a simmer on the stovetop. Cover and transfer to the oven for 1.5 hours.',
-          'Uncover and return to the oven for another 30 minutes to reduce and thicken the sauce. Total oven time: 2 hours.',
-          'Check the beef is fork-tender. If not quite there, return covered for another 20 minutes.',
-          'Discard the bay leaves and thyme sprigs before serving.'
+          {
+            summary: 'Preheat the oven to 160°C.',
+            substeps: ['Preheat the oven to 160°C.']
+          },
+          {
+            summary: 'Pat the beef cubes dry. Season with salt and pepper. Toss with the flour to coat; shake off the excess.',
+            substeps: [
+              'Pat the beef cubes dry. Season with salt and pepper. Toss with the flour to coat; shake off the excess.'
+            ]
+          },
+          {
+            summary: 'Heat 30g olive oil in a large Dutch oven over high heat. Brown the beef in 2-3 batches, 1.5 minutes per side. Transfer to a plate.',
+            substeps: [
+              'Heat 30g olive oil in a large Dutch oven over high heat. Brown the beef in 2-3 batches, 1.5 minutes per side. Transfer to a plate.'
+            ]
+          },
+          {
+            summary: 'Drain the excess fat. Drop the heat to medium-low. Add the remaining 15g oil. Sauté the onion and garlic for 3 minutes; add the carrot and celery, cook another 4 minutes.',
+            substeps: [
+              'Drain the excess fat. Drop the heat to medium-low. Add the remaining 15g oil. Sauté the onion and garlic for 3 minutes; add the carrot and celery, cook another 4 minutes.'
+            ]
+          },
+          {
+            summary: 'Pour in the red wine. Simmer 2 minutes, scraping the fond.',
+            substeps: ['Pour in the red wine. Simmer 2 minutes, scraping the fond.']
+          },
+          {
+            summary: 'Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.',
+            substeps: ['Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.']
+          },
+          {
+            summary: 'Return the beef to the pot with any juices. Add the mushrooms and potatoes. The liquid should cover everything.',
+            substeps: [
+              'Return the beef to the pot with any juices. Add the mushrooms and potatoes. The liquid should cover everything.'
+            ]
+          },
+          {
+            summary: 'Bring to a simmer on the stovetop. Cover and transfer to the oven for 1.5 hours.',
+            substeps: ['Bring to a simmer on the stovetop. Cover and transfer to the oven for 1.5 hours.']
+          },
+          {
+            summary: 'Uncover and return to the oven for another 30 minutes to reduce and thicken the sauce. Total oven time: 2 hours.',
+            substeps: [
+              'Uncover and return to the oven for another 30 minutes to reduce and thicken the sauce. Total oven time: 2 hours.'
+            ]
+          },
+          {
+            summary: 'Check the beef is fork-tender. If not quite there, return covered for another 20 minutes.',
+            substeps: ['Check the beef is fork-tender. If not quite there, return covered for another 20 minutes.']
+          },
+          {
+            summary: 'Discard the bay leaves and thyme sprigs before serving.',
+            substeps: ['Discard the bay leaves and thyme sprigs before serving.']
+          }
         ]
       }
     ]

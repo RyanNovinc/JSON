@@ -708,7 +708,7 @@ export default function NutritionHomeScreen({ route }: any) {
   // Tap a meal/smoothie card — for now just console.log. RecipeDetailScreen
   // navigation will be wired up in the next iteration.
   const handleMealCardPress = (meal: CuratedMeal) => {
-    console.log('🍽️ Tapped meal:', meal.slug, '—', meal.display_name);
+    navigation.navigate('RecipeDetail' as any, { mealSlug: meal.slug });
   };
 
   // "See all" link — same console.log pattern, MealsLibraryScreen comes later.
@@ -754,7 +754,7 @@ export default function NutritionHomeScreen({ route }: any) {
         {/* Body — title, then time/kcal, then 3-column macro grid */}
         <View style={styles.feedCardBody}>
           <Text style={styles.feedCardTitle} numberOfLines={2}>
-            {meal.display_name}
+            {meal.plates?.[0]?.display_name || meal.display_name}
           </Text>
           <Text style={styles.feedCardMeta}>
             {formatTime(totalMinutes)} · {kcal} kcal
@@ -788,15 +788,6 @@ export default function NutritionHomeScreen({ route }: any) {
       {/* Title bar */}
       <View style={[styles.titleBar, { paddingTop: insets.top + 4 }]}>
         <Text style={styles.title}>Nutrition</Text>
-        <TouchableOpacity
-          style={styles.titleAction}
-          onPress={() => navigation.navigate('WeightTracker' as any)}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Open weight tracker"
-        >
-          <Ionicons name="scale-outline" size={18} color="#a1a1aa" />
-        </TouchableOpacity>
       </View>
 
       <Animated.View

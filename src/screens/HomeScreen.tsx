@@ -38,16 +38,95 @@ import { ENABLE_NUTRITION_PAYWALL } from '../config/revenueCatConfig';
 import { useAppMode } from '../contexts/AppModeContext';
 import { useHasNutritionAccess } from '../contexts/RevenueCatContext';
 import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
+import { getProgramImage } from '../assets/programImages';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// ============================================================================
+// Bulking programs — placeholder data
+// ============================================================================
+type BulkingProgram = {
+  id: string;
+  title: string;
+  level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  frequency: string;
+  durationLabel: string;
+  gradient: [string, string];
+};
+
+const BULKING_PROGRAMS: BulkingProgram[] = [
+  {
+    id: 'foundations',
+    title: 'Foundations',
+    level: 'BEGINNER',
+    frequency: '3 days · Full body',
+    durationLabel: '4 weeks',
+    gradient: ['#1a1a1a', '#2d1410'],
+  },
+  {
+    id: 'builder',
+    title: 'Builder',
+    level: 'INTERMEDIATE',
+    frequency: '4 days · Upper/Lower',
+    durationLabel: '4 weeks',
+    gradient: ['#1a1a1a', '#3a1f1a'],
+  },
+  {
+    id: 'mass',
+    title: 'Mass',
+    level: 'ADVANCED',
+    frequency: '6 days · Push/Pull/Legs',
+    durationLabel: '4 weeks',
+    gradient: ['#1a1a1a', '#4a2820'],
+  },
+];
+
+// ============================================================================
+// Week strip
+// ============================================================================
+type DayState = 'workedOut' | 'skipped' | 'today' | 'future';
+
+function getWeekDays(workoutDates: Set<string>): Array<{ letter: string; state: DayState; date: Date }> {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - daysFromMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  const todayKey = new Date().toDateString();
+
+  const days: Array<{ letter: string; state: DayState; date: Date }> = [];
+  const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dKey = d.toDateString();
+
+    let state: DayState;
+    if (dKey === todayKey) {
+      state = 'today';
+    } else if (d > today) {
+      state = 'future';
+    } else if (workoutDates.has(dKey)) {
+      state = 'workedOut';
+    } else {
+      state = 'skipped';
+    }
+
+    days.push({ letter: letters[i], state, date: d });
+  }
+
+  return days;
+}
+
 export default function HomeScreen({ route, transitionProgress, panGestureRef }: any) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const insets = useSafeAreaInsets();
 
-  // TEST: DISABLED auto-test to stop the loop
   const [hasRunTest, setHasRunTest] = useState(true);
 
   const { routines, isLoading, saveRoutine, deleteRoutine: deleteRoutineFromContext, loadRoutines } = useWorkoutRoutines();
@@ -87,6 +166,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
 
   const [savedWorkoutRoutines, setSavedWorkoutRoutines] = useState<Set<string>>(new Set());
   const [myRoutines, setMyRoutines] = useState<WorkoutRoutine[]>([]);
+  const [workoutDates, setWorkoutDates] = useState<Set<string>>(new Set());
   const [renameModal, setRenameModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null; newName: string }>({
     visible: false,
     routine: null,
@@ -103,7 +183,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   const { appMode, setAppMode, isTrainingMode, isNutritionMode, isTransitioning, setIsTransitioning } = useAppMode();
   const hasNutritionAccess = useHasNutritionAccess();
 
-  // Clean animation functions for share modal
   const showShareModal = (routine: WorkoutRoutine) => {
     setShareModal({
       visible: true,
@@ -149,6 +228,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     const initializeApp = async () => {
       await WorkoutStorage.cleanupCorruptedCompletionData();
       loadMyRoutines();
+      loadWeekHistory();
     };
     initializeApp();
   }, []);
@@ -167,7 +247,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     }
   };
 
-  // Handle imported program
   useEffect(() => {
     const handleImportedProgram = async () => {
       if (route?.params?.importedProgram) {
@@ -241,22 +320,39 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   }, [route?.params?.importedProgram, triggerFeedbackModal]);
 
   const loadMyRoutines = async () => {
-    console.log('📥 Loading my routines...');
     const myRoutinesList = await WorkoutStorage.loadMyRoutines();
 
     if (!Array.isArray(myRoutinesList)) {
-      console.warn('⚠️ My routines data is corrupted, resetting to empty array');
       setMyRoutines([]);
       setSavedWorkoutRoutines(new Set());
       return;
     }
 
-    console.log('📥 Loaded', myRoutinesList.length, 'saved routines');
     setMyRoutines(myRoutinesList);
 
     const routineIds = new Set(myRoutinesList.map(routine => routine.fingerprint || routine.id));
     setSavedWorkoutRoutines(routineIds);
-    console.log('📥 Saved routine IDs:', Array.from(routineIds));
+  };
+
+  const loadWeekHistory = async () => {
+    try {
+      const history = await WorkoutStorage.loadWorkoutHistory();
+      const dates = new Set<string>();
+      history.forEach((workout: any) => {
+        let dateKey: string | null = null;
+        if (workout.timestamp) {
+          dateKey = new Date(workout.timestamp).toDateString();
+        } else if (workout.date) {
+          const [y, m, d] = workout.date.split('-');
+          dateKey = new Date(parseInt(y), parseInt(m) - 1, parseInt(d)).toDateString();
+        }
+        if (dateKey) dates.add(dateKey);
+      });
+      setWorkoutDates(dates);
+    } catch (e) {
+      console.warn('Could not load workout history for week strip', e);
+      setWorkoutDates(new Set());
+    }
   };
 
   const onRefresh = useCallback(async () => {
@@ -264,6 +360,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     try {
       await loadRoutines();
       await loadMyRoutines();
+      await loadWeekHistory();
     } finally {
       setRefreshing(false);
     }
@@ -652,16 +749,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       const jsonString = JSON.stringify(exportData, null, 2);
 
       if (action === 'copy') {
-        console.log('📋 Starting clipboard copy...');
         await Clipboard.setStringAsync(jsonString);
-        console.log('📋 Clipboard copy completed');
         hideShareModal();
-        console.log('📋 Share modal closed');
         setTimeout(() => {
-          console.log('📋 Showing success modal');
           setSuccessModal(true);
           setTimeout(() => {
-            console.log('📋 Auto-dismissing success modal');
             setSuccessModal(false);
           }, 2000);
         }, 100);
@@ -682,13 +774,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     setDeleteModal({ visible: true, routine });
   };
 
-  // === NEW: share from action sheet ===
-  // Closes the action sheet, then opens the existing share modal (with QR
-  // code, send link, retry) — same flow that handleExport powers.
   const handleShareFromActionSheet = (routine: WorkoutRoutine) => {
     setDeleteModal({ visible: false, routine: null });
-    // small delay so the action sheet finishes dismissing before the share
-    // modal animates in — feels smoother than a hard swap.
     setTimeout(() => {
       handleExport(routine);
     }, 200);
@@ -699,10 +786,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       const routineId = routine.fingerprint || routine.id;
       const isCurrentlySaved = savedWorkoutRoutines.has(routineId);
 
-      console.log('💾 Save workout button pressed:', routine.name, 'Currently saved:', isCurrentlySaved);
-
       if (isCurrentlySaved) {
-        console.log('🗑️ Removing workout from collection');
         await WorkoutStorage.removeMyRoutine(routineId);
       } else {
         const transformedWorkout = {
@@ -711,13 +795,10 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           fingerprint: routineId,
           createdAt: Date.now(),
         };
-
-        console.log('💾 Saving workout with ID:', transformedWorkout.id);
         await WorkoutStorage.addMyRoutine(transformedWorkout);
       }
 
       await loadMyRoutines();
-      console.log('💾 Toggle workout completed successfully');
     } catch (error) {
       console.error('Failed to toggle save workout:', error);
     }
@@ -776,24 +857,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     await WorkoutStorage.setOnboardingCompleted();
   };
 
-  const resetOnboarding = async () => {
-    await WorkoutStorage.clearAllData();
-    setShowOnboarding(true);
-  };
-
-  const handleGoToTodayWorkout = async () => {
+  const handleGoToTodayWorkoutForRoutine = async (activeRoutine: WorkoutRoutine) => {
     try {
-      if (routines.length === 0) {
-        Alert.alert(
-          'No Workout Routines',
-          'You need to import a workout routine first to use "Go to Today".',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const activeRoutine = routines[0];
-
       if (!activeRoutine.data?.blocks || activeRoutine.data.blocks.length === 0) {
         Alert.alert(
           'Invalid Routine',
@@ -809,11 +874,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         if (savedActiveBlock !== null && savedActiveBlock >= 0 && savedActiveBlock < activeRoutine.data.blocks.length) {
           activeBlockIndex = savedActiveBlock;
         } else {
-          console.log('Invalid active block index, using first block');
           activeBlockIndex = 0;
         }
       } catch (error) {
-        console.log('No active block saved, using first block');
         activeBlockIndex = 0;
       }
 
@@ -841,7 +904,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         } else {
           for (let week = 1; week <= totalWeeks; week++) {
             const key = `completed_${activeBlock.block_name}_week${week}`;
-            console.log(`🎯 [TODAY-BUTTON] Checking week ${week} with key: ${key}`);
 
             let completed = await RobustStorage.getItem(key, true);
             if (!completed) {
@@ -853,50 +915,36 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               try {
                 const parsedCompleted = JSON.parse(completed);
                 completedWorkouts = Array.isArray(parsedCompleted) ? parsedCompleted : [];
-                console.log(`🎯 [TODAY-BUTTON] Week ${week} completed workouts:`, completedWorkouts);
               } catch (error) {
-                console.log(`Error parsing completed workouts for week ${week}:`, error);
                 completedWorkouts = [];
               }
-            } else {
-              console.log(`🎯 [TODAY-BUTTON] No completion data found for week ${week}`);
             }
 
             if (!completedWorkouts || completedWorkouts.length === 0) {
-              console.log(`🎯 [TODAY-BUTTON] Week ${week} has no completed workouts - selecting this week`);
               currentWeek = week;
               break;
             }
 
-            console.log(`🎯 [TODAY-BUTTON] Checking days for week ${week}:`, activeBlock.days.map(d => d.day_name));
             const workoutDays = activeBlock.days.filter(day =>
               day.day_name && !day.day_name.toLowerCase().includes('rest')
             );
-            console.log(`🎯 [TODAY-BUTTON] Workout days (excluding rest):`, workoutDays.map(d => d.day_name));
 
             const allDaysCompleted = workoutDays.every(day => {
               const expectedKey = `${day.day_name}_week${week}`;
-              const isCompleted = completedWorkouts.includes(expectedKey);
-              console.log(`🎯 [TODAY-BUTTON] Day ${day.day_name} - expected key: ${expectedKey}, completed: ${isCompleted}`);
-              return isCompleted;
+              return completedWorkouts.includes(expectedKey);
             });
 
-            console.log(`🎯 [TODAY-BUTTON] Week ${week} all days completed: ${allDaysCompleted}`);
-
             if (!allDaysCompleted) {
-              console.log(`🎯 [TODAY-BUTTON] Week ${week} has incomplete days - selecting this week`);
               currentWeek = week;
               break;
             }
 
             if (week === totalWeeks) {
-              console.log(`🎯 [TODAY-BUTTON] Reached last week ${week} - staying here`);
               currentWeek = totalWeeks;
             }
           }
         }
       } catch (error) {
-        console.log('Error calculating current week, using week 1');
         currentWeek = 1;
       }
 
@@ -917,89 +965,127 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     }
   };
 
-  const handleGoToToday = async () => {
-    try {
-      const mealPlans = await WorkoutStorage.loadMealPlans();
-
-      if (mealPlans.length === 0) {
-        Alert.alert(
-          'No Meal Plans',
-          'You need to import a meal plan first to use "Go to Today".',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const activeMealPlan = mealPlans[0];
-      const today = new Date();
-
-      const mealPlanStartDate = new Date();
-      const daysDifference = Math.floor((today.getTime() - mealPlanStartDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (daysDifference < 0) {
-        Alert.alert(
-          'Future Meal Plan',
-          'Today is before the start of your meal plan.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const weeks = activeMealPlan.data?.weeks || [];
-      let currentWeek = null;
-      let currentWeekNumber = 0;
-
-      for (let i = 0; i < weeks.length; i++) {
-        const weekStartDay = i * 7;
-        const weekEndDay = weekStartDay + weeks[i].days.length - 1;
-
-        if (daysDifference >= weekStartDay && daysDifference <= weekEndDay) {
-          currentWeek = weeks[i];
-          currentWeekNumber = i + 1;
-          break;
-        }
-      }
-
-      if (!currentWeek) {
-        Alert.alert(
-          'Meal Plan Completed',
-          'Today is beyond the end of your current meal plan.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      navigation.navigate('MealPlanWeeks' as any, { mealPlan: activeMealPlan });
-    } catch (error) {
-      console.error('Error navigating to today:', error);
-      Alert.alert(
-        'Error',
-        'Could not find today\'s meal plan. Please try again.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
-
   const openCreateFlow = () => {
     navigation.getParent()?.navigate('CreateFlow' as never);
   };
 
-  const currentRoutine = routines[0] ?? null;
-  const otherRoutines = routines.slice(1);
+  const handleBulkingProgramPress = (program: BulkingProgram) => {
+    console.log('Bulking program tapped:', program.id);
+  };
+
+  const weekDays = getWeekDays(workoutDates);
+
+  // ==========================================================================
+  // Render helpers
+  // ==========================================================================
+  const renderBulkingPrograms = (subtitle?: string) => (
+    <>
+      <View style={styles.bulkingHeader}>
+        <Text style={styles.bulkingSectionTitle}>Bulking programs</Text>
+        {subtitle ? <Text style={styles.bulkingSubtitle}>{subtitle}</Text> : null}
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.bulkingScrollContent}
+        style={styles.bulkingScroll}
+      >
+        {BULKING_PROGRAMS.map((program) => {
+          const imageSource = getProgramImage(program.id, isPinkTheme);
+          return (
+            <TouchableOpacity
+              key={program.id}
+              style={styles.bulkingCard}
+              onPress={() => handleBulkingProgramPress(program)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.bulkingCardImage}>
+                {imageSource ? (
+                  <Image
+                    source={imageSource}
+                    style={styles.bulkingCardImageSrc}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.bulkingCardImageSrc,
+                      { backgroundColor: program.gradient[1] },
+                    ]}
+                  />
+                )}
+                <View style={styles.bulkingLevelChip}>
+                  <Text style={[styles.bulkingLevelText, { color: themeColor }]}>
+                    {program.level}
+                  </Text>
+                </View>
+                <View style={styles.bulkingDurationChip}>
+                  <Text style={styles.bulkingDurationText}>{program.durationLabel}</Text>
+                </View>
+              </View>
+              <View style={styles.bulkingCardBody}>
+                <Text style={styles.bulkingCardTitle}>{program.title}</Text>
+                <Text style={styles.bulkingCardMeta}>{program.frequency}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </>
+  );
+
+  const renderWeekStrip = () => (
+    <TouchableOpacity
+      style={styles.weekStrip}
+      onPress={() => setCalendarModal(true)}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel="View workout calendar"
+    >
+      <View style={styles.weekStripHeader}>
+        <Text style={styles.weekStripLabel}>THIS WEEK</Text>
+        <View style={styles.weekStripLinkRow}>
+          <Text style={[styles.weekStripLink, { color: themeColor }]}>View calendar</Text>
+          <Ionicons name="chevron-forward" size={13} color={themeColor} />
+        </View>
+      </View>
+
+      <View style={styles.weekStripDays}>
+        {weekDays.map((d, i) => {
+          const isToday = d.state === 'today';
+          const isWorkedOut = d.state === 'workedOut';
+          const isFuture = d.state === 'future';
+          return (
+            <View key={i} style={styles.weekStripDayCol}>
+              <Text
+                style={[
+                  styles.weekStripDayLetter,
+                  isToday && { color: themeColor, fontWeight: '700' },
+                  isFuture && { color: '#52525b' },
+                ]}
+              >
+                {d.letter}
+              </Text>
+              <View
+                style={[
+                  styles.weekStripDot,
+                  isWorkedOut && { backgroundColor: themeColor, borderWidth: 0 },
+                  isToday && { borderColor: themeColor, borderWidth: 2, backgroundColor: 'transparent' },
+                  isFuture && { borderColor: '#27272a' },
+                ]}
+              />
+            </View>
+          );
+        })}
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
       <View style={[styles.titleBar, { paddingTop: insets.top + 4 }]}>
         <Text style={styles.title}>Workouts</Text>
-        <TouchableOpacity
-          style={styles.titleAction}
-          onPress={() => setCalendarModal(true)}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Open workout calendar"
-        >
-          <Ionicons name="calendar-outline" size={18} color="#a1a1aa" />
-        </TouchableOpacity>
       </View>
 
       <Animated.View
@@ -1018,18 +1104,33 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           </View>
         ) : routines.length === 0 ? (
           <ScrollView
-            contentContainerStyle={styles.emptyScroll}
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
-            <View style={styles.emptyHero}>
-              <View style={[styles.emptyHeroIcon, { backgroundColor: themeColor, shadowColor: themeColor }]}>
-                <Ionicons name="sparkles" size={36} color="#0a0a0b" />
+            <View
+              style={[
+                styles.emptyHeroCard,
+                {
+                  borderColor: themeColor + '59',
+                  backgroundColor: themeColor + '14',
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.emptyHeroIcon,
+                  { backgroundColor: themeColor, shadowColor: themeColor },
+                ]}
+              >
+                <Ionicons name="sparkles" size={26} color="#0a0a0b" />
               </View>
               <Text style={styles.emptyHeroTitle}>Create your first plan</Text>
               <Text style={styles.emptyHeroBody}>
-                Answer a few questions. We'll send a prompt to your AI. Import the plan it sends back.
+                Answer a few questions. Get a custom AI workout in seconds.
               </Text>
               <TouchableOpacity
                 style={[styles.emptyHeroButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
@@ -1037,9 +1138,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 activeOpacity={0.85}
               >
                 <Text style={styles.emptyHeroButtonText}>Get started</Text>
-                <Ionicons name="arrow-forward" size={16} color="#0a0a0b" />
+                <Ionicons name="arrow-forward" size={15} color="#0a0a0b" />
               </TouchableOpacity>
             </View>
+
+            {renderBulkingPrograms('Or start with a pre-built program')}
           </ScrollView>
         ) : (
           <ScrollView
@@ -1050,105 +1153,98 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
-            {/* ================================================================
-                HERO PLAN CARD — redesigned
+            {routines.length > 1 && (
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionLabel}>YOUR PLANS</Text>
+              </View>
+            )}
 
-                Layout:
-                  CURRENT PLAN  (eyebrow)
-                  5-Day Strength Build  (title)
-                  5 days / week • 1 block  (subtitle)
+            {routines.map((routine, idx) => {
+              const isPrimary = idx === 0;
+              return (
+                <View
+                  key={routine.id}
+                  style={[
+                    isPrimary ? styles.planCardPrimary : styles.planCardSecondary,
+                    isPrimary && {
+                      borderColor: themeColor,
+                      shadowColor: themeColor,
+                    },
+                  ]}
+                >
+                  <RNTouchable
+                    style={styles.planMenuBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleActionRequest(routine);
+                    }}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="More options"
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={isPrimary ? 18 : 16} color="#a1a1aa" />
+                  </RNTouchable>
 
-                  [   ▶  Start today's workout   ]   <- full-width primary
-                       View full plan ›             <- subtle text link
+                  {isPrimary && (
+                    <Text style={[styles.planEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
+                  )}
 
-                Share lives in the action sheet (long-press the card).
-                ================================================================ */}
-            <View style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}>
-              {/* ••• menu button — opens the action sheet (Share, Save, Rename, Remove) */}
-              <RNTouchable
-                style={styles.heroMenuBtn}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleActionRequest(currentRoutine!);
-                }}
-                activeOpacity={0.7}
-                hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                accessibilityRole="button"
-                accessibilityLabel="More options"
-              >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#a1a1aa" />
-              </RNTouchable>
-
-              <Pressable
-                onPress={() => navigation.navigate('Blocks' as any, { routine: currentRoutine })}
-                onLongPress={() => handleActionRequest(currentRoutine!)}
-                delayLongPress={600}
-              >
-                <Text style={[styles.heroEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
-                <Text style={[styles.heroTitleText, { textShadowColor: themeColorLight }]} numberOfLines={2}>
-                  {currentRoutine!.name}
-                </Text>
-                <Text style={styles.heroSubtitle}>
-                  {currentRoutine!.days} days / week • {currentRoutine!.blocks} {currentRoutine!.blocks === 1 ? 'block' : 'blocks'}
-                </Text>
-              </Pressable>
-
-              {/* Primary: full-width Today button */}
-              <TouchableOpacity
-                style={[styles.heroTodayBtn, { backgroundColor: themeColor, shadowColor: themeColor }]}
-                onPress={handleGoToTodayWorkout}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-                accessibilityLabel="Start today's workout"
-              >
-                <Ionicons name="play" size={16} color="#0a0a0b" />
-                <Text style={styles.heroTodayText}>Start today's workout</Text>
-              </TouchableOpacity>
-
-              {/* Secondary: subtle text link */}
-              <TouchableOpacity
-                style={styles.heroPlanLink}
-                onPress={() => navigation.navigate('Blocks' as any, { routine: currentRoutine })}
-                activeOpacity={0.6}
-                accessibilityRole="button"
-                accessibilityLabel="View full plan"
-              >
-                <Text style={[styles.heroPlanLinkText, { color: themeColor }]}>View full plan</Text>
-                <Ionicons name="chevron-forward" size={13} color={themeColor} />
-              </TouchableOpacity>
-            </View>
-
-            {otherRoutines.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Other plans</Text>
-                </View>
-                {otherRoutines.map(routine => (
-                  <TouchableOpacity
-                    key={routine.id}
-                    style={styles.smallPlanCard}
-                    activeOpacity={0.8}
+                  <Pressable
                     onPress={() => navigation.navigate('Blocks' as any, { routine })}
                     onLongPress={() => handleActionRequest(routine)}
                     delayLongPress={600}
                   >
-                    <View style={styles.smallPlanContent}>
-                      <Text style={styles.smallPlanTitle} numberOfLines={1}>{routine.name}</Text>
-                      <Text style={styles.smallPlanSub}>
-                        {routine.days} days • {routine.blocks} blocks
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={14} color="#71717a" />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+                    <Text style={isPrimary ? styles.planTitlePrimary : styles.planTitleSecondary} numberOfLines={2}>
+                      {routine.name}
+                    </Text>
+                    <Text style={isPrimary ? styles.planSubtitlePrimary : styles.planSubtitleSecondary}>
+                      {routine.days} days / week · {routine.blocks} {routine.blocks === 1 ? 'block' : 'blocks'}
+                    </Text>
+                  </Pressable>
 
+                  {isPrimary ? (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.planStartBtnPrimary, { backgroundColor: themeColor, shadowColor: themeColor }]}
+                        onPress={() => handleGoToTodayWorkoutForRoutine(routine)}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityLabel="Start today's workout"
+                      >
+                        <Ionicons name="play" size={14} color="#0a0a0b" />
+                        <Text style={styles.planStartBtnPrimaryText}>Start today's workout</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.planViewLink}
+                        onPress={() => navigation.navigate('Blocks' as any, { routine })}
+                        activeOpacity={0.6}
+                      >
+                        <Text style={[styles.planViewLinkText, { color: themeColor }]}>View full plan</Text>
+                        <Ionicons name="chevron-forward" size={13} color={themeColor} />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.planStartBtnSecondary}
+                      onPress={() => handleGoToTodayWorkoutForRoutine(routine)}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="play" size={13} color="#d4d4d8" />
+                      <Text style={styles.planStartBtnSecondaryText}>Start today's workout</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+
+            {renderBulkingPrograms()}
+            {renderWeekStrip()}
           </ScrollView>
         )}
       </Animated.View>
 
-      {/* RED TEST BUTTON - Universal Link Debug (kept from original) */}
       <TouchableOpacity
         style={styles.debugTestButton}
         onPress={() => {
@@ -1160,11 +1256,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         <Text style={styles.debugTestButtonText}>TEST UNIVERSAL LINK</Text>
       </TouchableOpacity>
 
-      {/* ============================================================ */}
-      {/* MODALS                                                        */}
-      {/* ============================================================ */}
-
-      {/* Custom Share Modal — QR code + send link, unchanged from original */}
       <Modal
         visible={shareModal.visible}
         transparent={true}
@@ -1264,7 +1355,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </Animated.View>
       </Modal>
 
-      {/* Success Modal */}
       <Modal
         visible={successModal}
         transparent={true}
@@ -1287,11 +1377,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
-      {/* ================================================================
-          ACTION SHEET — now includes Share at the top of the actions.
-          Tapping Share dismisses the sheet and opens the existing share
-          modal via handleShareFromActionSheet → handleExport.
-          ================================================================ */}
       <Modal
         visible={deleteModal.visible}
         transparent={true}
@@ -1324,12 +1409,11 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                 {deleteModal.routine?.name}
               </Text>
               <Text style={styles.actionPlanDetails}>
-                {deleteModal.routine?.days} days • {deleteModal.routine?.blocks} blocks
+                {deleteModal.routine?.days} days · {deleteModal.routine?.blocks} blocks
               </Text>
             </View>
 
             <View style={styles.modernActionButtons}>
-              {/* SHARE — opens the QR / send link modal */}
               <TouchableOpacity
                 style={[styles.shareActionInSheet, { backgroundColor: themeColor, shadowColor: themeColor }]}
                 onPress={() => deleteModal.routine && handleShareFromActionSheet(deleteModal.routine)}
@@ -1345,11 +1429,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                   savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') && styles.removeActionButton
                 ]}
                 onPress={() => {
-                  console.log('🔥 Save button pressed, modal routine:', deleteModal.routine?.name);
                   if (deleteModal.routine) {
                     handleToggleSaveWorkout(deleteModal.routine);
-                  } else {
-                    console.log('❌ No routine in modal');
                   }
                 }}
                 activeOpacity={0.7}
@@ -1405,7 +1486,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         onSkip={skipFeedback}
       />
 
-      {/* Rename Modal */}
       <Modal
         visible={renameModal.visible}
         transparent={true}
@@ -1415,7 +1495,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         <View style={styles.modalOverlay}>
           <View style={styles.renameContainer}>
             <View style={styles.renameIconContainer}>
-              <Ionicons name="create-outline" size={32} color="#22d3ee" />
+              <Ionicons name="create-outline" size={32} color={themeColor} />
             </View>
 
             <Text style={styles.renameTitle}>Rename Routine</Text>
@@ -1454,7 +1534,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
-      {/* Debug Modal */}
       <Modal
         animationType="slide"
         transparent={false}
@@ -1543,7 +1622,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ===== Title bar =====
   titleBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1557,18 +1635,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     letterSpacing: -0.4,
   },
-  titleAction: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 
-  // ===== Scroll =====
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 16,
@@ -1576,230 +1643,333 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  // ===== Section grouping =====
-  section: { marginBottom: 20 },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 10,
+  sectionHeaderRow: {
     paddingHorizontal: 2,
+    marginBottom: 10,
   },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#a1a1aa',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#71717a',
+    letterSpacing: 1.2,
   },
 
-  // ===== Hero card — new layout =====
-  heroCard: {
-    backgroundColor: '#18181b',
+  planCardPrimary: {
+    backgroundColor: '#000',
     borderRadius: 18,
-    borderWidth: 2,
+    borderWidth: 1.5,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 12,
+    position: 'relative',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 12,
   },
-  heroEyebrow: {
+  planEyebrow: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  heroTitleText: {
-    fontSize: 26,
-    fontWeight: '700',
+  planTitlePrimary: {
     color: '#ffffff',
-    lineHeight: 32,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+    paddingRight: 30,
   },
-  heroSubtitle: {
+  planSubtitlePrimary: {
+    color: '#71717a',
     fontSize: 13,
-    color: '#a1a1aa',
-    marginTop: 4,
+    marginBottom: 16,
   },
-  // Full-width primary action
-  heroTodayBtn: {
+  planStartBtnPrimary: {
+    height: 48,
+    borderRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 18,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
   },
-  heroTodayText: {
-    fontSize: 15,
-    fontWeight: '600',
+  planStartBtnPrimaryText: {
     color: '#0a0a0b',
+    fontSize: 14,
+    fontWeight: '700',
     letterSpacing: 0.2,
   },
-  heroMenuBtn: {
+  planViewLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingTop: 14,
+    paddingBottom: 2,
+  },
+  planViewLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  planCardSecondary: {
+    backgroundColor: '#18181b',
+    borderRadius: 14,
+    borderColor: '#27272a',
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 14,
+    marginBottom: 10,
+    position: 'relative',
+  },
+  planTitleSecondary: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 2,
+    paddingRight: 30,
+  },
+  planSubtitleSecondary: {
+    color: '#71717a',
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  planStartBtnSecondary: {
+    height: 40,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#3f3f46',
+  },
+  planStartBtnSecondaryText: {
+    color: '#d4d4d8',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+
+  planMenuBtn: {
     position: 'absolute',
     top: 12,
     right: 12,
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
   },
-  // Subtle text link below
-  heroPlanLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingTop: 12,
-    paddingBottom: 2,
+
+  bulkingHeader: {
+    marginTop: 24,
+    marginBottom: 12,
+    paddingHorizontal: 2,
   },
-  heroPlanLinkText: {
-    fontSize: 13,
-    fontWeight: '500',
+  bulkingSectionTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  bulkingSubtitle: {
+    color: '#71717a',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  bulkingScroll: {
+    marginHorizontal: -16,
+  },
+  bulkingScrollContent: {
+    paddingHorizontal: 16,
+    paddingRight: 4,
+    gap: 12,
+  },
+  bulkingCard: {
+    width: 260,
+    backgroundColor: '#18181b',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  bulkingCardImage: {
+    height: 130,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bulkingCardImageSrc: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  bulkingLevelChip: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  bulkingLevelText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  bulkingDurationChip: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  bulkingDurationText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  bulkingCardBody: {
+    padding: 12,
+  },
+  bulkingCardTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  bulkingCardMeta: {
+    color: '#71717a',
+    fontSize: 11,
   },
 
-  // ===== Small plan card (for routines beyond the first) =====
-  smallPlanCard: {
-    backgroundColor: '#18181b',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    borderRadius: 12,
-    padding: 14,
+  weekStrip: {
+    marginTop: 24,
+    marginBottom: 8,
+    backgroundColor: '#0a0a0f',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+  },
+  weekStripHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  weekStripLabel: {
+    color: '#a1a1aa',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  weekStripLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  weekStripLink: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  weekStripDays: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  weekStripDayCol: {
+    flexDirection: 'column',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 8,
   },
-  smallPlanContent: { flex: 1 },
-  smallPlanTitle: {
-    fontSize: 14,
+  weekStripDayLetter: {
+    color: '#71717a',
+    fontSize: 12,
     fontWeight: '600',
-    color: '#ffffff',
   },
-  smallPlanSub: {
-    fontSize: 11,
-    color: '#71717a',
-    marginTop: 2,
-  },
-
-  // ===== Link row =====
-  linkRow: {
-    backgroundColor: '#18181b',
+  weekStripDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#27272a',
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  linkRowPressable: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  linkRowMenuBtn: {
-    padding: 4,
-    borderRadius: 4,
-  },
-  linkRowText: { flex: 1 },
-  linkRowTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  linkRowSub: {
-    fontSize: 11,
-    color: '#71717a',
-    marginTop: 2,
+    borderColor: '#3f3f46',
   },
 
-  // ===== Empty state =====
-  emptyScroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  emptyHero: {
-    paddingHorizontal: 24,
-    paddingVertical: 40,
+  emptyHeroCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    paddingHorizontal: 20,
+    paddingTop: 26,
+    paddingBottom: 22,
+    marginBottom: 8,
     alignItems: 'center',
   },
   emptyHeroIcon: {
-    width: 84,
-    height: 84,
-    borderRadius: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: 14,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 22,
     elevation: 14,
   },
   emptyHeroTitle: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '700',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   emptyHeroBody: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#a1a1aa',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 28,
+    lineHeight: 19,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   emptyHeroButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 12,
+    gap: 6,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 24,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 10,
   },
   emptyHeroButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#0a0a0b',
   },
-
-  // ===== Old card styles preserved (rollback safety, unused by new layout) =====
-  header: { paddingTop: 50, paddingHorizontal: 16, paddingBottom: 16 },
-  appHeader: { marginBottom: 24 },
-  appName: { fontSize: 14, fontWeight: '700', color: '#22d3ee', letterSpacing: 2 },
-  pageTitle: { fontSize: 32, fontWeight: '700', color: '#ffffff' },
-  listContent: { paddingTop: 120, paddingHorizontal: 16, paddingBottom: 100 },
-  emptyListContent: { flex: 1, paddingHorizontal: 16 },
-  card: { backgroundColor: '#18181b', borderRadius: 4, borderWidth: 1, borderColor: '#27272a', padding: 20, marginBottom: 12 },
-  cardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTextContainer: { flex: 1 },
-  cardTitle: { fontSize: 18, fontWeight: '600', color: '#ffffff', marginBottom: 4 },
-  cardSubtitle: { fontSize: 14, color: '#71717a' },
-  exportButton: { padding: 8, marginLeft: 12 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   emptyTitle: { fontSize: 22, fontWeight: '700', color: '#ffffff', textAlign: 'center', marginTop: 24, marginBottom: 16 },
-  emptyDescription: { fontSize: 16, color: '#71717a', textAlign: 'center', lineHeight: 24 },
-  emptySubtext: { fontSize: 14, color: '#52525b', textAlign: 'center', paddingHorizontal: 40 },
-  buttonInner: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', borderRadius: 4 },
 
-  // ===== Modal shared =====
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -1807,24 +1977,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
   },
-  modalContainer: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    padding: 24,
-    width: '100%',
-    maxWidth: 320,
-  },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#ffffff', textAlign: 'center', marginBottom: 8 },
-  modalSubtitle: { fontSize: 14, color: '#71717a', textAlign: 'center', marginBottom: 24 },
-  modalButtons: { gap: 12 },
-  modalButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#27272a', borderRadius: 8, paddingVertical: 16, paddingHorizontal: 20, gap: 12 },
-  modalButtonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#3f3f46' },
-  modalButtonText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
-  modalButtonCancelText: { color: '#71717a' },
 
-  // ===== Success modal =====
   successContainer: {
     backgroundColor: '#18181b',
     borderRadius: 12,
@@ -1837,10 +1990,9 @@ const styles = StyleSheet.create({
   },
   successTitle: { fontSize: 24, fontWeight: '700', color: '#ffffff', marginBottom: 8 },
   successMessage: { fontSize: 14, color: '#71717a', textAlign: 'center', marginBottom: 24 },
-  successButton: { backgroundColor: '#22d3ee', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 32, minWidth: 80 },
+  successButton: { borderRadius: 8, paddingVertical: 12, paddingHorizontal: 32, minWidth: 80 },
   successButtonText: { fontSize: 16, fontWeight: '600', color: '#0a0a0b', textAlign: 'center' },
 
-  // ===== Action sheet =====
   actionModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'flex-end' },
   actionModalBackdrop: { flex: 1 },
   actionSheet: {
@@ -1854,7 +2006,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 2,
     borderLeftWidth: 2,
     borderRightWidth: 2,
-    borderColor: '#22d3ee',
     marginHorizontal: 4,
   },
   handleBar: { width: 40, height: 4, backgroundColor: '#52525b', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
@@ -1873,7 +2024,6 @@ const styles = StyleSheet.create({
   actionPlanDetails: { color: '#a1a1aa', fontSize: 14, textAlign: 'center' },
   modernActionButtons: { flexDirection: 'column', gap: 14, width: '100%' },
 
-  // NEW: Share button inside action sheet (primary cyan styling)
   shareActionInSheet: {
     width: '100%',
     borderRadius: 16,
@@ -1923,7 +2073,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 12,
-    shadowColor: '#22d3ee',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -1960,19 +2109,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   deleteCancelText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
-  actionCancelButton: {
-    width: '100%',
-    backgroundColor: '#27272a',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#3f3f46',
-  },
 
-  // ===== Share modal =====
   newShareOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   newShareBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   newShareModal: {
@@ -1982,7 +2119,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     overflow: 'hidden',
-    shadowColor: '#22d3ee',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -2011,33 +2147,20 @@ const styles = StyleSheet.create({
   newShareImage: { width: '100%', height: 180 },
   newShareContent: { padding: 24, alignItems: 'center' },
   newShareTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 8, letterSpacing: 1 },
-  newShareSubtitle: { fontSize: 14, color: '#a1a1aa', textAlign: 'center', marginBottom: 24 },
   shareActionButtons: { width: '100%', gap: 16 },
   shareActionPrimary: {
     width: '100%',
     borderRadius: 12,
     paddingVertical: 20,
     paddingHorizontal: 24,
-    shadowColor: '#22d3ee',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 12,
   },
-  shareActionSecondary: {
-    width: '100%',
-    backgroundColor: '#27272a',
-    borderWidth: 2,
-    borderColor: '#3f3f46',
-    borderRadius: 12,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-  },
   shareButtonSimple: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   shareButtonTitleSimple: { fontSize: 16, fontWeight: '700', color: '#0a0a0b', letterSpacing: 0.5 },
-  shareButtonSubtitle: { fontSize: 13, fontWeight: '500', color: 'rgba(10, 10, 11, 0.7)', letterSpacing: 0.2 },
 
-  // ===== Rename modal =====
   renameContainer: {
     backgroundColor: '#18181b',
     borderRadius: 20,
@@ -2047,13 +2170,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 350,
     alignItems: 'center',
-    shadowColor: '#22d3ee',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
   },
-  renameIconContainer: { backgroundColor: 'rgba(34, 211, 238, 0.1)', borderRadius: 50, padding: 16, marginBottom: 20 },
+  renameIconContainer: { backgroundColor: 'rgba(236, 72, 153, 0.1)', borderRadius: 50, padding: 16, marginBottom: 20 },
   renameTitle: { fontSize: 22, fontWeight: '700', color: '#ffffff', marginBottom: 20, textAlign: 'center' },
   renameInputContainer: {
     backgroundColor: '#0f0f0f',
@@ -2096,7 +2218,6 @@ const styles = StyleSheet.create({
   renameCancelText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
   renameConfirmText: { fontSize: 16, fontWeight: '600', color: '#0a0a0b' },
 
-  // ===== Debug modal =====
   debugFullscreenContainer: { flex: 1, backgroundColor: '#1a1a1a' },
   debugHeader: {
     flexDirection: 'row',
@@ -2138,7 +2259,6 @@ const styles = StyleSheet.create({
   },
   debugButtonLabel: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
 
-  // ===== QR =====
   qrCodeContainer: { alignItems: 'center', marginVertical: 20 },
   qrCodeWrapper: { backgroundColor: 'white', padding: 16, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
   qrCodePlaceholder: {
@@ -2153,10 +2273,8 @@ const styles = StyleSheet.create({
   },
   qrCodeLoadingText: { color: '#a1a1aa', fontSize: 14, fontWeight: '500', marginTop: 8, textAlign: 'center' },
   qrCodeErrorText: { color: '#ef4444', fontSize: 14, fontWeight: '500', marginTop: 8, textAlign: 'center' },
-  qrCodeDescription: { color: '#a1a1aa', fontSize: 12, fontWeight: '500', marginTop: 12, textAlign: 'center' },
   shareFooterText: { color: '#71717a', fontSize: 11, fontWeight: '500', marginTop: 16, textAlign: 'center' },
 
-  // ===== Debug test button =====
   debugTestButton: {
     position: 'absolute',
     top: 80,

@@ -1,5 +1,10 @@
 import { IngredientId, CanonicalUnit } from './ingredients';
 
+export interface RecipeStep {
+  summary: string;
+  substeps: string[];
+}
+
 export type MealSlug = 
   | 'butter_chicken' 
   | 'brekkie_grow' 
@@ -132,7 +137,7 @@ export interface Plate {
    * Step-by-step assembly instructions, separate from the cook session. Kept
    * brief — these run after the base recipe is already cooked.
    */
-  additional_instructions: string[];
+  additional_instructions: RecipeStep[];
 
   /** Active hands-on time required to assemble this specific plate. */
   assembly_time_minutes: number;
@@ -177,7 +182,7 @@ export interface CookingMethod {
    * Step-by-step cooking instructions for the base recipe only. Assembly
    * instructions for serving specific plates are separate (Plate.additional_instructions).
    */
-  instructions: string[];
+  instructions: RecipeStep[];
   /**
    * When present, overrides the meal's base macros for that specific method 
    * (e.g. slow cooker version has slightly different macros than scratch).
