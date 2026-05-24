@@ -153,7 +153,7 @@ class AsyncStorageDebugger {
     try {
       const keys = await AsyncStorage.getAllKeys();
       console.log(`📋 [STORAGE-KEYS] Found ${keys.length} keys:`, keys);
-      return keys;
+      return [...keys]; // Convert readonly array to mutable array
     } catch (error) {
       console.error('🔴 [STORAGE-KEYS] Error getting all keys:', error);
       return [];

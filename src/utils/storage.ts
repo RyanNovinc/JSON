@@ -1,3 +1,16 @@
+// src/utils/storage.ts
+//
+// Full storage layer for JSON.fit. This file replaces the existing
+// src/utils/storage.ts in your project.
+//
+// Changes vs. previous version:
+//   - Added STORAGE_KEYS.AWAITING_IMPORT
+//   - Added WorkoutStorage.setAwaitingImport(value)
+//   - Added WorkoutStorage.isAwaitingImport()
+//   - Added AWAITING_IMPORT to the clearAllData() multiRemove list
+//
+// Everything else is unchanged.
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from './robustStorage';
 
@@ -141,6 +154,10 @@ const STORAGE_KEYS = {
   FITNESS_GOALS: 'fitness_goals_questionnaire_results',
   FAVORITE_EXERCISES: 'favorite_exercises_results',
   WEIGHT_HISTORY: 'weight_tracking_history',
+  // NEW: set when user copies the prompt from PromptReady, cleared after
+  // successful workout import. Used by CreateChooserScreen to show a
+  // "Continue your setup" banner on cold launch.
+  AWAITING_IMPORT: 'awaiting_workout_import',
 };
 
 export class WorkoutStorage {
@@ -148,22 +165,22 @@ export class WorkoutStorage {
   static async saveRoutines(routines: WorkoutRoutine[]): Promise<void> {
     try {
       const routinesJson = JSON.stringify(routines);
-      
+
       // Try robust storage first
       let saveSuccess = await RobustStorage.setItem(STORAGE_KEYS.ROUTINES, routinesJson, true);
-      
+
       if (!saveSuccess) {
         console.warn('RobustStorage failed, retrying with regular AsyncStorage...');
-        
+
         // Retry with regular AsyncStorage
         await AsyncStorage.setItem(STORAGE_KEYS.ROUTINES, routinesJson);
-        
+
         // Verify the save worked by reading it back
         const verification = await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
         if (verification !== routinesJson) {
           throw new Error('Storage verification failed - data may not have been saved correctly');
         }
-        
+
         console.log('✅ Routines saved successfully with AsyncStorage fallback');
       } else {
         console.log('✅ Routines saved successfully with RobustStorage');
@@ -179,27 +196,27 @@ export class WorkoutStorage {
       console.log('🔄 [STORAGE] Attempting to load routines...');
       const robustData = await RobustStorage.getItem(STORAGE_KEYS.ROUTINES, true);
       console.log('🔄 [STORAGE] RobustStorage result:', robustData ? 'Has data' : 'No data');
-      
+
       const fallbackData = await AsyncStorage.getItem(STORAGE_KEYS.ROUTINES);
       console.log('🔄 [STORAGE] AsyncStorage fallback result:', fallbackData ? 'Has data' : 'No data');
-      
+
       const data = robustData || fallbackData;
       console.log('🔄 [STORAGE] Final data to parse:', data ? 'Has data' : 'No data');
-      
+
       if (!data) {
         console.log('🔄 [STORAGE] No routine data found, returning empty array');
         return [];
       }
-      
+
       const result = JSON.parse(data);
-      
+
       // Validate the parsed data structure
       if (!Array.isArray(result)) {
         console.warn('⚠️ [STORAGE] Routine data is not an array, resetting to empty');
         await this.saveRoutines([]); // Reset corrupted data
         return [];
       }
-      
+
       // Validate each routine has required fields
       const validRoutines = result.filter(routine => {
         if (!routine || typeof routine !== 'object') {
@@ -208,12 +225,12 @@ export class WorkoutStorage {
         }
         return true;
       });
-      
+
       if (validRoutines.length !== result.length) {
         console.warn(`⚠️ [STORAGE] Found ${result.length - validRoutines.length} corrupted routines, saving clean data`);
         await this.saveRoutines(validRoutines);
       }
-      
+
       console.log('🔄 [STORAGE] Parsed routines count:', validRoutines.length);
       return validRoutines;
     } catch (error) {
@@ -236,7 +253,7 @@ export class WorkoutStorage {
       console.log(`✅ Successfully added routine: ${routine.name}`);
     } catch (error) {
       console.error(`❌ Failed to add routine with RobustStorage: ${routine.name}`, error);
-      
+
       // FALLBACK: Try simple AsyncStorage directly
       try {
         console.log('🔄 Attempting simple AsyncStorage fallback...');
@@ -249,7 +266,7 @@ export class WorkoutStorage {
       } catch (fallbackError) {
         console.error('❌ Even simple storage failed:', fallbackError);
       }
-      
+
       throw new Error(`Failed to save workout routine. Please check your device storage and try again.`);
     }
   }
@@ -284,20 +301,20 @@ export class WorkoutStorage {
   static async loadMyRoutines(): Promise<WorkoutRoutine[]> {
     try {
       const data = await RobustStorage.getItem(STORAGE_KEYS.MY_ROUTINES, true) || await AsyncStorage.getItem(STORAGE_KEYS.MY_ROUTINES);
-      
+
       if (!data) {
         console.log('🔄 [STORAGE] No my routines data found, returning empty array');
         return [];
       }
-      
+
       const parsed = JSON.parse(data);
-      
+
       if (!Array.isArray(parsed)) {
         console.warn('⚠️ [STORAGE] My routines data is not an array, resetting to empty');
         await this.saveMyRoutines([]);
         return [];
       }
-      
+
       // Validate each routine
       const validRoutines = parsed.filter(routine => {
         if (!routine || typeof routine !== 'object') {
@@ -306,12 +323,12 @@ export class WorkoutStorage {
         }
         return true;
       });
-      
+
       if (validRoutines.length !== parsed.length) {
         console.warn(`⚠️ [STORAGE] Found ${parsed.length - validRoutines.length} corrupted my routines, saving clean data`);
         await this.saveMyRoutines(validRoutines);
       }
-      
+
       console.log('🔄 [STORAGE] Loaded my routines count:', validRoutines.length);
       return validRoutines;
     } catch (error) {
@@ -361,21 +378,21 @@ export class WorkoutStorage {
   static async loadMealPlans(): Promise<MealPlan[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.MEAL_PLANS);
-      
+
       if (!data) {
         console.log('🔄 [STORAGE] No meal plans data found, returning empty array');
         return [];
       }
-      
+
       const result = JSON.parse(data);
-      
+
       // Validate the parsed data structure
       if (!Array.isArray(result)) {
         console.warn('⚠️ [STORAGE] Meal plans data is not an array, resetting to empty');
         await this.saveMealPlans([]);
         return [];
       }
-      
+
       // Validate each meal plan has required fields
       const validMealPlans = result.filter(plan => {
         if (!plan || typeof plan !== 'object' || !plan.id || !plan.name) {
@@ -384,12 +401,12 @@ export class WorkoutStorage {
         }
         return true;
       });
-      
+
       if (validMealPlans.length !== result.length) {
         console.warn(`⚠️ [STORAGE] Found ${result.length - validMealPlans.length} corrupted meal plans, saving clean data`);
         await this.saveMealPlans(validMealPlans);
       }
-      
+
       console.log('🔄 [STORAGE] Parsed meal plans count:', validMealPlans.length);
       return validMealPlans;
     } catch (error) {
@@ -428,21 +445,21 @@ export class WorkoutStorage {
   static async loadWorkoutHistory(): Promise<WorkoutHistory[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.HISTORY);
-      
+
       if (!data) {
         console.log('🔄 [STORAGE] No workout history data found, returning empty array');
         return [];
       }
-      
+
       const result = JSON.parse(data);
-      
+
       // Validate the parsed data structure
       if (!Array.isArray(result)) {
         console.warn('⚠️ [STORAGE] Workout history data is not an array, resetting to empty');
         await this.saveWorkoutHistory([]);
         return [];
       }
-      
+
       // Validate each workout entry has required fields
       const validEntries = result.filter(entry => {
         if (!entry || typeof entry !== 'object' || !entry.exerciseName || !entry.date) {
@@ -451,12 +468,12 @@ export class WorkoutStorage {
         }
         return true;
       });
-      
+
       if (validEntries.length !== result.length) {
         console.warn(`⚠️ [STORAGE] Found ${result.length - validEntries.length} corrupted workout entries, saving clean data`);
         await this.saveWorkoutHistory(validEntries);
       }
-      
+
       console.log('🔄 [STORAGE] Parsed workout history count:', validEntries.length, 'entries');
       return validEntries;
     } catch (error) {
@@ -500,32 +517,32 @@ export class WorkoutStorage {
     try {
       let data: string | null = null;
       let workoutKey: string;
-      
+
       if (dayName && blockName) {
         workoutKey = `${STORAGE_KEYS.CURRENT_WORKOUT}_${dayName}_${blockName}`;
         data = await AsyncStorage.getItem(workoutKey);
       }
-      
+
       // Fallback to old key for backwards compatibility
       if (!data) {
         workoutKey = STORAGE_KEYS.CURRENT_WORKOUT;
         data = await AsyncStorage.getItem(workoutKey);
       }
-      
+
       if (!data) {
         console.log('🔄 [STORAGE] No current workout data found');
         return null;
       }
-      
+
       const result = JSON.parse(data);
-      
+
       // Validate the parsed data structure
       if (!result || typeof result !== 'object') {
         console.warn('⚠️ [STORAGE] Current workout data is invalid, removing');
         await AsyncStorage.removeItem(workoutKey);
         return null;
       }
-      
+
       console.log('🔄 [STORAGE] Current workout loaded successfully');
       return result;
     } catch (error) {
@@ -561,7 +578,7 @@ export class WorkoutStorage {
   static async saveFeedback(feedback: FeedbackEntry): Promise<void> {
     try {
       const existingFeedback = await this.loadFeedback();
-      
+
       // Check if feedback already exists for this program to avoid duplicates
       if (feedback.programId) {
         const existingEntry = existingFeedback.find(f => f.programId === feedback.programId);
@@ -569,7 +586,7 @@ export class WorkoutStorage {
           return; // Don't save duplicate feedback for same program
         }
       }
-      
+
       existingFeedback.push(feedback);
       await AsyncStorage.setItem(STORAGE_KEYS.FEEDBACK, JSON.stringify(existingFeedback));
     } catch (error) {
@@ -591,7 +608,7 @@ export class WorkoutStorage {
   // static async syncFeedbackToServer(): Promise<void> {
   //   const feedback = await this.loadFeedback();
   //   const unsynced = feedback.filter(f => !f.synced);
-  //   
+  //
   //   for (const entry of unsynced) {
   //     try {
   //       await fetch('/api/feedback', {
@@ -604,7 +621,7 @@ export class WorkoutStorage {
   //       console.error('Failed to sync feedback entry:', entry.id);
   //     }
   //   }
-  //   
+  //
   //   await AsyncStorage.setItem(STORAGE_KEYS.FEEDBACK, JSON.stringify(feedback));
   // }
 
@@ -641,7 +658,7 @@ export class WorkoutStorage {
   static async saveExercisePreference(preference: ExercisePreference): Promise<void> {
     try {
       const preferences = await this.loadExercisePreferences();
-      
+
       // Safety check: ensure preferences is an array
       if (!Array.isArray(preferences)) {
         console.warn('Exercise preferences is not an array, resetting to empty array');
@@ -649,14 +666,14 @@ export class WorkoutStorage {
         await AsyncStorage.setItem(STORAGE_KEYS.EXERCISE_PREFERENCES, JSON.stringify(newPreferences));
         return;
       }
-      
+
       // Remove existing preference for same program/block/exercise combo
-      const filtered = preferences.filter(p => 
-        !(p.programId === preference.programId && 
-          p.blockName === preference.blockName && 
+      const filtered = preferences.filter(p =>
+        !(p.programId === preference.programId &&
+          p.blockName === preference.blockName &&
           p.primaryExercise === preference.primaryExercise)
       );
-      
+
       filtered.push(preference);
       await AsyncStorage.setItem(STORAGE_KEYS.EXERCISE_PREFERENCES, JSON.stringify(filtered));
     } catch (error) {
@@ -670,16 +687,16 @@ export class WorkoutStorage {
       if (!data) {
         return [];
       }
-      
+
       const parsed = JSON.parse(data);
-      
+
       // Ensure the parsed data is an array
       if (!Array.isArray(parsed)) {
         console.warn('Exercise preferences data is corrupted, resetting to empty array');
         await AsyncStorage.setItem(STORAGE_KEYS.EXERCISE_PREFERENCES, JSON.stringify([]));
         return [];
       }
-      
+
       return parsed;
     } catch (error) {
       console.error('Failed to load exercise preferences:', error);
@@ -694,8 +711,8 @@ export class WorkoutStorage {
   }
 
   static async getExercisePreference(
-    programId: string, 
-    blockName: string, 
+    programId: string,
+    blockName: string,
     primaryExercise: string
   ): Promise<string | null> {
     try {
@@ -705,9 +722,9 @@ export class WorkoutStorage {
         console.warn('Exercise preferences is not an array, returning null');
         return null;
       }
-      const preference = preferences.find(p => 
-        p.programId === programId && 
-        p.blockName === blockName && 
+      const preference = preferences.find(p =>
+        p.programId === programId &&
+        p.blockName === blockName &&
         p.primaryExercise === primaryExercise
       );
       return preference ? preference.preferredExercise : null;
@@ -753,6 +770,7 @@ export class WorkoutStorage {
         STORAGE_KEYS.NUTRITION_COMPLETION_STATUS,
         STORAGE_KEYS.BUDGET_COOKING_QUESTIONNAIRE,
         STORAGE_KEYS.FRIDGE_PANTRY_QUESTIONNAIRE,
+        STORAGE_KEYS.AWAITING_IMPORT,
       ]);
     } catch (error) {
       console.error('Failed to clear all data:', error);
@@ -763,7 +781,7 @@ export class WorkoutStorage {
   static async saveNutritionResults(results: NutritionQuestionnaireResults): Promise<void> {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.NUTRITION_QUESTIONNAIRE, JSON.stringify(results));
-      
+
       // Also update completion status
       const completionStatus = await this.loadNutritionCompletionStatus();
       completionStatus.nutritionGoals = true;
@@ -776,21 +794,21 @@ export class WorkoutStorage {
   static async loadNutritionResults(): Promise<NutritionQuestionnaireResults | null> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.NUTRITION_QUESTIONNAIRE);
-      
+
       if (!data) {
         console.log('🔄 [STORAGE] No nutrition questionnaire data found');
         return null;
       }
-      
+
       const result = JSON.parse(data);
-      
+
       // Validate the parsed data structure
       if (!result || typeof result !== 'object') {
         console.warn('⚠️ [STORAGE] Nutrition results data is invalid, resetting');
         await AsyncStorage.removeItem(STORAGE_KEYS.NUTRITION_QUESTIONNAIRE);
         return null;
       }
-      
+
       console.log('🔄 [STORAGE] Nutrition results loaded successfully');
       return result;
     } catch (error) {
@@ -816,7 +834,7 @@ export class WorkoutStorage {
   static async loadNutritionCompletionStatus(): Promise<NutritionCompletionStatus> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.NUTRITION_COMPLETION_STATUS);
-      
+
       const defaultStatus: NutritionCompletionStatus = {
         nutritionGoals: false,
         budgetCooking: false,
@@ -824,21 +842,21 @@ export class WorkoutStorage {
         fridgePantry: false,
         favoriteMeals: false,
       };
-      
+
       if (!data) {
         console.log('🔄 [STORAGE] No nutrition completion status found, using defaults');
         return defaultStatus;
       }
-      
+
       const result = JSON.parse(data);
-      
+
       // Validate the parsed data structure
       if (!result || typeof result !== 'object') {
         console.warn('⚠️ [STORAGE] Nutrition completion status is invalid, using defaults');
         await this.saveNutritionCompletionStatus(defaultStatus);
         return defaultStatus;
       }
-      
+
       // Ensure all required fields exist with proper boolean values
       const validatedStatus: NutritionCompletionStatus = {
         nutritionGoals: !!result.nutritionGoals,
@@ -847,7 +865,7 @@ export class WorkoutStorage {
         fridgePantry: !!result.fridgePantry,
         favoriteMeals: !!result.favoriteMeals,
       };
-      
+
       console.log('🔄 [STORAGE] Nutrition completion status loaded successfully');
       return validatedStatus;
     } catch (error) {
@@ -859,14 +877,14 @@ export class WorkoutStorage {
         fridgePantry: false,
         favoriteMeals: false,
       };
-      
+
       // Reset corrupted data
       try {
         await this.saveNutritionCompletionStatus(defaultStatus);
       } catch (resetError) {
         console.error('❌ [STORAGE] Failed to reset corrupted nutrition completion status:', resetError);
       }
-      
+
       return defaultStatus;
     }
   }
@@ -875,7 +893,7 @@ export class WorkoutStorage {
   static async saveBudgetCookingResults(results: BudgetCookingQuestionnaireResults): Promise<void> {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.BUDGET_COOKING_QUESTIONNAIRE, JSON.stringify(results));
-      
+
       // Also update completion status
       const completionStatus = await this.loadNutritionCompletionStatus();
       completionStatus.budgetCooking = true;
@@ -899,7 +917,7 @@ export class WorkoutStorage {
   static async saveSleepOptimizationResults(results: SleepOptimizationResults): Promise<void> {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.SLEEP_OPTIMIZATION, JSON.stringify(results));
-      
+
       // Also update completion status
       const completionStatus = await this.loadNutritionCompletionStatus();
       completionStatus.sleepOptimization = true;
@@ -923,7 +941,7 @@ export class WorkoutStorage {
   static async saveFridgePantryResults(results: any): Promise<void> {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.FRIDGE_PANTRY_QUESTIONNAIRE, JSON.stringify(results));
-      
+
       // Also update completion status
       const completionStatus = await this.loadNutritionCompletionStatus();
       completionStatus.fridgePantry = true;
@@ -978,12 +996,12 @@ export class WorkoutStorage {
   static async cleanupCorruptedCompletionData(): Promise<void> {
     try {
       const allKeys = await AsyncStorage.getAllKeys();
-      
+
       // Find all completion and bookmark keys
-      const completionKeys = allKeys.filter(key => 
-        key.startsWith('completed_') || 
+      const completionKeys = allKeys.filter(key =>
+        key.startsWith('completed_') ||
         key.startsWith('bookmark_') ||
-        key.includes('ads') || 
+        key.includes('ads') ||
         key.includes('asdads') ||
         key.includes('test')
       );
@@ -1022,40 +1040,40 @@ export class WorkoutStorage {
   // Data recovery and cleanup utilities
   static async performDataRecovery(): Promise<void> {
     console.log('🔧 [STORAGE] Performing data recovery and cleanup...');
-    
+
     try {
       // Test and fix routine data
       const routines = await this.loadRoutines();
       console.log('✅ [STORAGE] Routines data recovered:', routines.length, 'routines');
-      
+
       // Test and fix my routines data
       const myRoutines = await this.loadMyRoutines();
       console.log('✅ [STORAGE] My routines data recovered:', myRoutines.length, 'routines');
-      
+
       // Test and fix meal plans data
       const mealPlans = await this.loadMealPlans();
       console.log('✅ [STORAGE] Meal plans data recovered:', mealPlans.length, 'plans');
-      
+
       // Test and fix nutrition completion status
       const nutritionStatus = await this.loadNutritionCompletionStatus();
       console.log('✅ [STORAGE] Nutrition completion status recovered');
-      
+
       // Test and fix nutrition questionnaire results
       const nutritionResults = await this.loadNutritionResults();
       console.log('✅ [STORAGE] Nutrition results recovered:', nutritionResults ? 'has data' : 'no data');
-      
+
       // Test and fix workout history (critical user progress data)
       const workoutHistory = await this.loadWorkoutHistory();
       console.log('✅ [STORAGE] Workout history recovered:', workoutHistory.length, 'entries');
-      
+
       // Test and fix current workout progress
       const currentWorkout = await this.loadCurrentWorkout();
       console.log('✅ [STORAGE] Current workout recovered:', currentWorkout ? 'has active workout' : 'no active workout');
-      
+
       // Test and fix weight history (critical user progress data)
       const weightHistory = await this.loadWeightHistory();
       console.log('✅ [STORAGE] Weight history recovered:', weightHistory ? weightHistory.length : 0, 'entries');
-      
+
       console.log('🎉 [STORAGE] Data recovery completed successfully');
     } catch (error) {
       console.error('❌ [STORAGE] Data recovery failed:', error);
@@ -1118,21 +1136,21 @@ export class WorkoutStorage {
   static async loadWeightHistory(): Promise<any[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.WEIGHT_HISTORY);
-      
+
       if (!data) {
         console.log('🔄 [STORAGE] No weight history data found, returning empty array');
         return [];
       }
-      
+
       const result = JSON.parse(data);
-      
+
       // Validate the parsed data structure
       if (!Array.isArray(result)) {
         console.warn('⚠️ [STORAGE] Weight history data is not an array, resetting to empty');
         await this.saveWeightHistory([]);
         return [];
       }
-      
+
       // Validate each weight entry has required fields
       const validEntries = result.filter(entry => {
         if (!entry || typeof entry !== 'object' || !entry.weight || !entry.date) {
@@ -1141,12 +1159,12 @@ export class WorkoutStorage {
         }
         return true;
       });
-      
+
       if (validEntries.length !== result.length) {
         console.warn(`⚠️ [STORAGE] Found ${result.length - validEntries.length} corrupted weight entries, saving clean data`);
         await this.saveWeightHistory(validEntries);
       }
-      
+
       console.log('🔄 [STORAGE] Parsed weight history count:', validEntries.length, 'entries');
       return validEntries;
     } catch (error) {
@@ -1158,6 +1176,37 @@ export class WorkoutStorage {
         console.error('❌ [STORAGE] Failed to reset corrupted weight history:', resetError);
       }
       return [];
+    }
+  }
+
+  // ===========================================================================
+  // Awaiting import flag
+  //
+  // Set when the user copies the prompt from PromptReady (taps Claude/ChatGPT
+  // or the "Use a different AI" copy button). Cleared after a successful
+  // workout import. Used by CreateChooserScreen to show a "Continue your
+  // setup" banner on cold launch, so users who got killed-out-of-memory
+  // while talking to the AI still have a path back to import.
+  // ===========================================================================
+  static async setAwaitingImport(value: boolean): Promise<void> {
+    try {
+      if (value) {
+        await AsyncStorage.setItem(STORAGE_KEYS.AWAITING_IMPORT, '1');
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEYS.AWAITING_IMPORT);
+      }
+    } catch (error) {
+      console.error('Failed to set awaiting import flag:', error);
+    }
+  }
+
+  static async isAwaitingImport(): Promise<boolean> {
+    try {
+      const value = await AsyncStorage.getItem(STORAGE_KEYS.AWAITING_IMPORT);
+      return value === '1';
+    } catch (error) {
+      console.error('Failed to read awaiting import flag:', error);
+      return false;
     }
   }
 }

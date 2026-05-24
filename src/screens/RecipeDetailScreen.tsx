@@ -453,7 +453,9 @@ export default function RecipeDetailScreen() {
           activeOpacity={0.85}
         >
           <Ionicons name="play" size={16} color="#0a0a0b" />
-          <Text style={styles.ctaText}>Start cooking</Text>
+          <Text style={styles.ctaText}>
+            {meal.cuisine === 'smoothie' ? 'Start blending' : 'Start cooking'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

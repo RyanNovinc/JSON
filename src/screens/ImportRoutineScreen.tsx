@@ -1012,6 +1012,9 @@ export default function ImportRoutineScreen() {
             // Check for mesocycle completion before navigating
             await checkMesocycleCompletion();
             
+            // Clear the cold-launch banner flag — import succeeded
+            await WorkoutStorage.setAwaitingImport(false);
+            
             navigation.navigate('Main', { 
               screen: 'Home',
               params: { 
@@ -1024,6 +1027,9 @@ export default function ImportRoutineScreen() {
       } catch (error) {
         console.error('Error during import:', error);
         Alert.alert('Import Error', 'There was an error associating this import with your program. The import will continue normally.');
+        
+        // Clear the cold-launch banner flag — import still proceeded to Home
+        WorkoutStorage.setAwaitingImport(false).catch(() => {});
         
         // Continue with normal import flow
         navigation.navigate('Main', { 
@@ -1877,11 +1883,14 @@ export default function ImportRoutineScreen() {
             duration: 250,
             useNativeDriver: true,
           }),
-        ]).start(() => {
+        ]).start(async () => {
           setShowConfirmation(false);
           modalScale.setValue(0);
           modalOpacity.setValue(0);
           successScale.setValue(0);
+          
+          // Clear the cold-launch banner flag — append succeeded
+          await WorkoutStorage.setAwaitingImport(false);
           
           // Navigate back to the block list with refresh trigger
           navigation.navigate('Blocks', {
@@ -2009,12 +2018,13 @@ export default function ImportRoutineScreen() {
 
 
   const handleCancel = () => {
-    // Don't show Step1 if we're in append-block mode
-    if (route?.params?.mode === 'append-block') {
+    // append-block mode or new questionnaire flow: just go back
+    if (route?.params?.mode === 'append-block' || (route?.params as any)?.fromNewFlow) {
       navigation.goBack();
-    } else {
-      setShowStep1New(true);
+      return;
     }
+    // Legacy entry point: fall back to old Step1New screen
+    setShowStep1New(true);
   };
 
   // Show WorkoutGeneratorStep1New if requested

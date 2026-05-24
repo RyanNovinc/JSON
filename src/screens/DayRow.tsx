@@ -226,6 +226,9 @@ export default function DayRow({
         delayLongPress={800}
       >
         <View style={styles.nextUpContent}>
+          <View style={styles.dayRowStatus}>
+            <Text style={styles.dayRowStatusNumber}>{dayNumber}</Text>
+          </View>
           <View style={styles.nextUpTextBlock}>
             <Text style={styles.nextUpDayName} numberOfLines={1}>
               {day.day_name || 'Untitled Day'}

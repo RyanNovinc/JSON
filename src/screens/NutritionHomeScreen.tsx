@@ -278,9 +278,32 @@ export default function NutritionHomeScreen({ route }: any) {
   // the arrays on every render.
   const { mealsList, smoothiesList } = useMemo(() => {
     const all = Object.values(CURATED_MEALS);
+    const meals = all.filter(m => m.cuisine !== 'smoothie');
+
+    // Custom order for smoothies based on preference
+    const smoothieOrder = [
+      'cookies_gains',
+      'brekkie_grow',
+      'mango_mass',
+      'strawberry_stack',
+      'king_kong_chocolate',
+      'raspberry_rip',
+      'energy_lift_heavy',
+      'dirty_eden',
+      'mornin_muscle',
+      'choc_muscle_maxx',
+      'strawbrekkie_beast',
+      'banana_bulk'
+    ];
+
+    const allSmoothies = all.filter(m => m.cuisine === 'smoothie');
+    const smoothies = smoothieOrder.map(slug =>
+      allSmoothies.find(s => s.slug === slug)
+    ).filter(Boolean) as CuratedMeal[];
+
     return {
-      mealsList: all.filter(m => m.cuisine !== 'smoothie'),
-      smoothiesList: all.filter(m => m.cuisine === 'smoothie'),
+      mealsList: meals,
+      smoothiesList: smoothies,
     };
   }, []);
 
@@ -705,15 +728,17 @@ export default function NutritionHomeScreen({ route }: any) {
   // NEW HANDLERS — for meals/smoothies feed
   // ============================================================================
 
-  // Tap a meal/smoothie card — for now just console.log. RecipeDetailScreen
-  // navigation will be wired up in the next iteration.
   const handleMealCardPress = (meal: CuratedMeal) => {
     navigation.navigate('RecipeDetail' as any, { mealSlug: meal.slug });
   };
 
-  // "See all" link — same console.log pattern, MealsLibraryScreen comes later.
+  // Navigate to the library screens when "See all" is pressed
   const handleSeeAllPress = (category: 'meals' | 'smoothies') => {
-    console.log('📚 See all:', category);
+    if (category === 'meals') {
+      navigation.navigate('MealsLibrary' as any);
+    } else {
+      navigation.navigate('SmoothiesLibrary' as any);
+    }
   };
 
   // ============================================================================
@@ -723,7 +748,7 @@ export default function NutritionHomeScreen({ route }: any) {
   /**
    * Renders a single horizontal scroll card for the meals or smoothies feed.
    * Hero image with title overlay, footer chip row with time and protein.
-   * Width is fixed at 200px to give a clean snap-feel as user scrolls.
+   * Width is fixed at 280px to give a clean snap-feel as user scrolls.
    */
   const renderFeedCard = (meal: CuratedMeal) => {
     const { kcal, protein, carbs, fat, totalMinutes } = getCardSummary(meal);
@@ -736,7 +761,6 @@ export default function NutritionHomeScreen({ route }: any) {
         activeOpacity={0.85}
         onPress={() => handleMealCardPress(meal)}
       >
-        {/* Hero image — no overlay, photo stays clean */}
         <View style={styles.feedCardImageWrap}>
           {imageSource ? (
             <Image
@@ -751,7 +775,6 @@ export default function NutritionHomeScreen({ route }: any) {
           )}
         </View>
 
-        {/* Body — title, then time/kcal, then 3-column macro grid */}
         <View style={styles.feedCardBody}>
           <Text style={styles.feedCardTitle} numberOfLines={2}>
             {meal.plates?.[0]?.display_name || meal.display_name}
@@ -783,13 +806,99 @@ export default function NutritionHomeScreen({ route }: any) {
     );
   };
 
+  /**
+   * Renders a "See more" card at the end of the horizontal scroll.
+   *
+   * Design: same card dimensions as a real meal card. The image area is
+   * replaced with a 2x2 grid of thumbnails previewing what's in the library
+   * — specifically the meals the user hasn't scrolled past yet (positions 6-9
+   * of the source list). This sells the library: "here's the kind of variety
+   * you'll find in there", rather than showing the same images already on
+   * screen.
+   *
+   * The macro grid slot is replaced with a row containing the title and a
+   * circular arrow button. No fake macro data — the slot is explicitly a CTA.
+   */
+  const renderSeeMoreCard = (
+    category: 'meals' | 'smoothies',
+    previewMeals: CuratedMeal[],
+    totalCount: number
+  ) => {
+    // We expect exactly 4 thumbnails. Pad with whatever's available if the
+    // source has fewer than 4 unseen meals (unlikely with current data, but
+    // defensive — meals could shrink in dev).
+    const thumbs = previewMeals.slice(0, 4);
+
+    return (
+      <TouchableOpacity
+        key="see-more"
+        style={styles.feedCard}
+        activeOpacity={0.85}
+        onPress={() => handleSeeAllPress(category)}
+        accessibilityRole="button"
+        accessibilityLabel={`See all ${totalCount} ${category}`}
+      >
+        {/* Thumbnail preview grid — fills the same 16:9 slot a hero image
+            would occupy. 2x2 cells with a 1px gap between them. */}
+        <View style={styles.seeMoreImageWrap}>
+          <View style={styles.seeMoreGrid}>
+            {thumbs.map((meal, idx) => {
+              const imageSource = getMealImage(meal.image_filename);
+              return (
+                <View
+                  key={meal.slug}
+                  style={[
+                    styles.seeMoreThumb,
+                    // Positional borders so the 2x2 grid has clean 1px gutters
+                    // without using gap (which doesn't render cleanly on iOS for
+                    // absolute-positioned image children).
+                    idx === 1 && styles.seeMoreThumbRight,
+                    idx === 2 && styles.seeMoreThumbBottom,
+                    idx === 3 && styles.seeMoreThumbBottomRight,
+                  ]}
+                >
+                  {imageSource ? (
+                    <Image
+                      source={imageSource}
+                      style={styles.seeMoreThumbImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.seeMoreThumbPlaceholder}>
+                      <Ionicons
+                        name={category === 'meals' ? 'restaurant-outline' : 'cafe-outline'}
+                        size={16}
+                        color="#52525b"
+                      />
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Body — title + chevron, no macro grid. Same height as a real
+            card body so the row keeps its rhythm. */}
+        <View style={styles.feedCardBody}>
+          <View style={styles.seeMoreBodyRow}>
+            <View style={styles.seeMoreBodyText}>
+              <Text style={styles.feedCardTitle} numberOfLines={2}>
+                See all {category}
+              </Text>
+              <Text style={styles.feedCardMeta}>{totalCount} recipes</Text>
+            </View>
+            <View style={[styles.seeMoreArrow, { backgroundColor: themeColor }]}>
+              <Ionicons name="arrow-forward" size={16} color="#0a0a0b" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* Title bar */}
-      <View style={[styles.titleBar, { paddingTop: insets.top + 4 }]}>
-        <Text style={styles.title}>Nutrition</Text>
-      </View>
-
       <Animated.View
         style={[
           styles.animatedContainer,
@@ -808,12 +917,13 @@ export default function NutritionHomeScreen({ route }: any) {
           // ============================================================
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 12 }]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
+            <Text style={styles.title}>Nutrition</Text>
             <View style={styles.emptyHero}>
               <View style={[styles.emptyHeroIcon, { backgroundColor: themeColor, shadowColor: themeColor }]}>
                 <Ionicons name="restaurant" size={36} color="#0a0a0b" />
@@ -842,12 +952,13 @@ export default function NutritionHomeScreen({ route }: any) {
           // ============================================================
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 12 }]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
+            <Text style={styles.title}>Nutrition</Text>
             {currentPlanLegacy && (
               <View style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}>
                 {/* ••• menu — opens action sheet (Share, Save, Rename, Remove) */}
@@ -1218,10 +1329,19 @@ export default function NutritionHomeScreen({ route }: any) {
 
   /**
    * Section: Meals horizontal scroll row.
-   * Defined as inner function so it has access to themeColor, mealsList, and handlers.
+   * Shows first 5 meals + a "See more" card with a thumbnail-grid preview
+   * of meals 6-9 (the ones the user hasn't already scrolled past).
    */
   function renderMealsSection() {
     if (mealsList.length === 0) return null;
+
+    const displayedMeals = mealsList.slice(0, 5);
+    const showSeeMoreCard = mealsList.length > 5;
+    // Preview thumbnails come from positions 5-8 (zero-indexed) — i.e. the
+    // four meals immediately after what's already on screen. Falls back to
+    // earlier meals if the list is shorter than 9.
+    const previewThumbs = mealsList.slice(5, 9);
+
     return (
       <View style={styles.feedSection}>
         <View style={styles.feedSectionHeader}>
@@ -1241,7 +1361,8 @@ export default function NutritionHomeScreen({ route }: any) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.feedScrollContent}
         >
-          {mealsList.map(renderFeedCard)}
+          {displayedMeals.map(renderFeedCard)}
+          {showSeeMoreCard && renderSeeMoreCard('meals', previewThumbs, mealsList.length)}
         </ScrollView>
       </View>
     );
@@ -1249,6 +1370,11 @@ export default function NutritionHomeScreen({ route }: any) {
 
   function renderSmoothiesSection() {
     if (smoothiesList.length === 0) return null;
+
+    const displayedSmoothies = smoothiesList.slice(0, 5);
+    const showSeeMoreCard = smoothiesList.length > 5;
+    const previewThumbs = smoothiesList.slice(5, 9);
+
     return (
       <View style={styles.feedSection}>
         <View style={styles.feedSectionHeader}>
@@ -1268,7 +1394,8 @@ export default function NutritionHomeScreen({ route }: any) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.feedScrollContent}
         >
-          {smoothiesList.map(renderFeedCard)}
+          {displayedSmoothies.map(renderFeedCard)}
+          {showSeeMoreCard && renderSeeMoreCard('smoothies', previewThumbs, smoothiesList.length)}
         </ScrollView>
       </View>
     );
@@ -1300,6 +1427,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
     letterSpacing: -0.4,
+    marginBottom: 16,
   },
   titleAction: {
     width: 32,
@@ -1315,12 +1443,14 @@ const styles = StyleSheet.create({
   // Scroll feed
   scroll: { flex: 1 },
   scrollContent: {
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 32,
   },
 
   // Section grouping (for "Other plans" — old style)
-  section: { marginBottom: 20, paddingHorizontal: 16 },
+  // FIX: removed paddingHorizontal: 16. scrollContent already pads, so this was doubling up.
+  section: { marginBottom: 20 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1337,13 +1467,15 @@ const styles = StyleSheet.create({
   },
 
   // Hero card
+  // FIX: removed marginHorizontal: 16. scrollContent's paddingHorizontal: 16
+  // was already providing the gutter; adding marginHorizontal here doubled it
+  // to 32px, which is what made the card look squished vs HomeScreen.
   heroCard: {
-    backgroundColor: '#18181b',
+    backgroundColor: '#000',
     borderRadius: 18,
-    borderWidth: 2,
+    borderWidth: 1.5,
     padding: 20,
-    marginBottom: 24,
-    marginHorizontal: 16,
+    marginBottom: 12,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -1436,9 +1568,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ===== NEW: feed section + cards =====
+  // ===== feed section + cards =====
+  // FIX: added marginHorizontal: -16 to break out of scrollContent's 16px
+  // padding. Same trick HomeScreen uses for bulkingScroll so horizontal-
+  // scrolling cards can slide off the right edge cleanly.
   feedSection: {
     marginBottom: 24,
+    marginHorizontal: -16,
   },
   feedSectionHeader: {
     flexDirection: 'row',
@@ -1534,6 +1670,74 @@ const styles = StyleSheet.create({
     color: '#71717a',
     marginTop: 3,
     letterSpacing: 0.4,
+  },
+
+  // ===== See more card (Option B — thumbnail grid preview) =====
+  // The wrap reuses the same 16:9 slot a hero image would occupy, but
+  // contains a 2x2 grid of thumbnails of unseen meals. Background colour
+  // matches what shows through the 1px gutters between cells.
+  seeMoreImageWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#27272a',
+  },
+  seeMoreGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  // Each thumbnail cell is exactly 50% wide and 50% tall. The 0.5px borders
+  // on the right cell and bottom row create the gutters between cells without
+  // needing flex gap (which is finicky for image children on older RN).
+  seeMoreThumb: {
+    width: '50%',
+    height: '50%',
+    overflow: 'hidden',
+  },
+  seeMoreThumbRight: {
+    borderLeftWidth: 1,
+    borderLeftColor: '#27272a',
+  },
+  seeMoreThumbBottom: {
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+  },
+  seeMoreThumbBottomRight: {
+    borderTopWidth: 1,
+    borderTopColor: '#27272a',
+    borderLeftWidth: 1,
+    borderLeftColor: '#27272a',
+  },
+  seeMoreThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  seeMoreThumbPlaceholder: {
+    flex: 1,
+    backgroundColor: '#18181b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Card body becomes a single row instead of stacked title + meta + macros.
+  // Title and meta on the left, circular arrow button on the right.
+  seeMoreBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    minHeight: 104, // matches a real card body: title (38) + meta (~25) +
+                    // macro grid (~41). Keeps see-more card the same height
+                    // as neighbouring meal cards in the row.
+  },
+  seeMoreBodyText: {
+    flex: 1,
+  },
+  seeMoreArrow: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Empty state

@@ -39,6 +39,8 @@ import AppIconScreen from '../screens/AppIconScreen';
 import PaymentScreen from '../screens/PaymentScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import CookModeScreen from '../screens/CookModeScreen';
+import MealsLibraryScreen from '../screens/MealsLibraryScreen';
+import SmoothiesLibraryScreen from '../screens/SmoothiesLibraryScreen';
 import { FloatingWorkoutIndicator } from '../components/FloatingWorkoutIndicator';
 // import { FeedbackModal } from '../components/FeedbackTab';
 import { AppModeProvider } from '../contexts/AppModeContext';
@@ -82,6 +84,19 @@ import ExerciseHelpScreen from '../screens/ExerciseHelpScreen';
 import MethodologyScreen from '../screens/MethodologyScreen';
 import WeightTrackerScreen from '../screens/WeightTrackerScreen';
 import WeekVolumeScreen from '../screens/WeekVolumeScreen';
+import CreateChooserScreen from '../screens/CreateChooserScreen';
+
+// Import questionnaire screens
+import Q1PrimaryGoalScreen from '../screens/questionnaire/Q1PrimaryGoalScreen';
+import Q2ExperienceScreen from '../screens/questionnaire/Q2ExperienceScreen';
+import Q3DaysPerWeekScreen from '../screens/questionnaire/Q3DaysPerWeekScreen';
+import Q4ProgramDurationScreen from '../screens/questionnaire/Q4ProgramDurationScreen';
+import Q5EquipmentScreen from '../screens/questionnaire/Q5EquipmentScreen';
+import Q6VolumePreferenceScreen from '../screens/questionnaire/Q6VolumePreferenceScreen';
+import Q7RestStyleScreen from '../screens/questionnaire/Q7RestStyleScreen';
+import RefinementsScreen from '../screens/questionnaire/RefinementsScreen';
+import PromptReadyScreen from '../screens/questionnaire/PromptReadyScreen';
+import QuestionnaireSummaryScreen from '../screens/questionnaire/QuestionnaireSummaryScreen';
 
 // New: custom tab bar
 import { CustomTabBar, CREATE_ROUTE } from './CustomTabBar';
@@ -99,7 +114,7 @@ interface CleanMealPlanNavigationParams {
 export type RootStackParamList = {
   Main: undefined;
   CreateFlow: undefined;
-  ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string };
+  ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean };
   ImportSharedContent: { shareId: string };
   ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
   MyWorkouts: undefined;
@@ -255,6 +270,19 @@ export type RootStackParamList = {
   };
   RecipeDetail: { mealSlug: string };
   CookMode: { mealSlug: string; plateIndex: number; methodIndex: number };
+  MealsLibrary: undefined;
+  SmoothiesLibrary: undefined;
+  // Questionnaire screens
+  Q1PrimaryGoal: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q2Experience: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q3DaysPerWeek: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q4ProgramDuration: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q5Equipment: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q6Volume: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q7RestStyle: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  QuestionnaireRefinements: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  PromptReady: undefined;
+  QuestionnaireSummary: undefined;
 };
 
 // Tab param list — 5 tabs (with the Create slot in the middle).
@@ -473,7 +501,7 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               {/* CreateFlow — modal presentation for the center button flow */}
               <RootStack.Screen
                 name="CreateFlow"
-                component={CreateFlowStub}
+                component={CreateChooserScreen}
                 options={{
                   headerShown: false,
                   presentation: 'modal',
@@ -1012,6 +1040,16 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 options={{ headerShown: false }}
               />
               <RootStack.Screen
+                name="MealsLibrary"
+                component={MealsLibraryScreen}
+                options={{ headerShown: false }}
+              />
+              <RootStack.Screen
+                name="SmoothiesLibrary"
+                component={SmoothiesLibraryScreen}
+                options={{ headerShown: false }}
+              />
+              <RootStack.Screen
                 name="CookMode"
                 component={CookModeScreen}
                 options={{
@@ -1020,6 +1058,17 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   cardStyle: { backgroundColor: '#0a0a0b' }
                 }}
               />
+              {/* Questionnaire screens */}
+              <RootStack.Screen name="Q1PrimaryGoal" component={Q1PrimaryGoalScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="Q2Experience" component={Q2ExperienceScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="Q3DaysPerWeek" component={Q3DaysPerWeekScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="Q4ProgramDuration" component={Q4ProgramDurationScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="Q5Equipment" component={Q5EquipmentScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="Q6Volume" component={Q6VolumePreferenceScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="Q7RestStyle" component={Q7RestStyleScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="QuestionnaireRefinements" component={RefinementsScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="PromptReady" component={PromptReadyScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="QuestionnaireSummary" component={QuestionnaireSummaryScreen} options={{ headerShown: false }} />
             </>
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />

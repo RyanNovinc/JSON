@@ -491,7 +491,9 @@ export default function CookModeScreen() {
             { paddingTop: insets.top + 12 },
           ]}
         >
-          <Text style={styles.completionEyebrow}>DONE COOKING</Text>
+          <Text style={styles.completionEyebrow}>
+            {meal?.cuisine === 'smoothie' ? 'DONE BLENDING' : 'DONE COOKING'}
+          </Text>
           <TouchableOpacity
             style={styles.completionShareBtn}
             onPress={handleShare}
@@ -509,7 +511,9 @@ export default function CookModeScreen() {
             { paddingBottom: insets.bottom + 16 },
           ]}
         >
-          <Text style={styles.completionTitle}>Eat well.</Text>
+          <Text style={styles.completionTitle}>
+            {meal?.cuisine === 'smoothie' ? 'Drink up.' : 'Eat well.'}
+          </Text>
           <Text style={styles.completionPlateName}>{plate.display_name}</Text>
           {plate.description && (
             <Text style={styles.completionDescription} numberOfLines={2}>

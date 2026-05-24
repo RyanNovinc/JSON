@@ -1084,10 +1084,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
 
   return (
     <View style={styles.container}>
-      <View style={[styles.titleBar, { paddingTop: insets.top + 4 }]}>
-        <Text style={styles.title}>Workouts</Text>
-      </View>
-
       <Animated.View
         style={[
           styles.animatedContainer,
@@ -1105,12 +1101,13 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         ) : routines.length === 0 ? (
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 12 }]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
+            <Text style={styles.title}>Workouts</Text>
             <View
               style={[
                 styles.emptyHeroCard,
@@ -1147,12 +1144,13 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         ) : (
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 12 }]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
+            <Text style={styles.title}>Workouts</Text>
             {routines.length > 1 && (
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionLabel}>YOUR PLANS</Text>
@@ -1634,6 +1632,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
     letterSpacing: -0.4,
+    marginBottom: 16,
   },
 
   scroll: { flex: 1 },
