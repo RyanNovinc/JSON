@@ -9,9 +9,10 @@
 //
 //   2. Return state: when the user comes back from an external AI after
 //      being away for at least 30 seconds, the screen transforms — a
-//      cyan "Welcome back" banner becomes the new hero with a prominent
-//      "Import your workout file" button. The AI cards demote to a
-//      retry section ("Didn't work? Try a different AI").
+//      cyan "Welcome back" banner becomes the new hero with TWO import
+//      options: "Paste from clipboard" (primary) and "Import saved
+//      file" (secondary). The AI cards demote to a retry section
+//      ("Didn't work? Try a different AI").
 //
 // On tap of an AI card, an AILaunchSheet slides up confirming the
 // clipboard write and requiring an explicit "Open Claude" / "Open
@@ -22,14 +23,10 @@
 // "Continue your setup" banner on cold launch if iOS killed the app
 // while the user was in the AI.
 //
-// v7 update notes:
-//   - Subtitle simplified to one sentence (no "file" jargon)
-//   - Generous vertical spacing throughout to fix cramped feel
-//   - Removed redundant open-outline icon from AI cards
-//   - YOUR PROGRAM card slightly more prominent (bigger icon, bigger
-//     title, more padding)
-//   - 3-step flow icons slightly larger (38px) with cyan "You send"
-//     label matching the highlighted icon
+// Import is handled INLINE via the useWorkoutImport hook — both the
+// clipboard and saved-file paths run the full import pipeline and show
+// the confirmation modal on this screen, without navigating to the
+// separate ImportRoutine screen.
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -49,6 +46,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ImportConfirmationModal from '../../components/import/ImportConfirmationModal';
 import { useTheme } from '../../contexts/ThemeContext';
 import { WorkoutStorage } from '../../utils/storage';
 import { assemblePlanningPrompt } from '../../data/planningPrompt';
@@ -57,6 +55,7 @@ import {
   AIProvider,
 } from '../../components/questionnaire/AILaunchSheet';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { useWorkoutImport } from '../../hooks/useWorkoutImport';
 
 type NavProp = StackNavigationProp<RootStackParamList, 'PromptReady'>;
 
@@ -109,6 +108,37 @@ export default function PromptReadyScreen() {
   const backgroundedAt = useRef<number | null>(null);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // -------------------------------------------------------------------------
+  // Workout Import Hook
+  // -------------------------------------------------------------------------
+  const {
+    parsedProgram,
+    accumulatedPrograms,
+    showConfirmation,
+    showAddMoreMode,
+    generationTime,
+    modalScale,
+    modalOpacity,
+    importFromClipboard,
+    importFromFile,
+    confirmImport,
+    cancelConfirmation,
+    addMoreFiles,
+    backToConfirmation,
+  } = useWorkoutImport({
+    mode: 'create',
+    onImportComplete: (importedProgram) => {
+      // Navigate exactly as ImportRoutine's original handleConfirmImport did
+      navigation.navigate('Main', {
+        screen: 'Workouts',
+        params: {
+          importedProgram,
+          refreshRoutines: true,
+        },
+      } as any);
+    },
+  });
 
   // -------------------------------------------------------------------------
   // Load questionnaire data and assemble the prompt + preview card content
@@ -221,10 +251,24 @@ export default function PromptReadyScreen() {
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
 
-  // Welcome-back state's "Import your workout file" button: actual nav
-  const handleImport = useCallback(() => {
-    navigation.navigate('ImportRoutine', { fromNewFlow: true });
-  }, [navigation]);
+  // Welcome-back: "Paste from clipboard" — read clipboard, then import.
+  const handlePaste = useCallback(async () => {
+    const text = await Clipboard.getStringAsync();
+    if (!text) {
+      Alert.alert('Clipboard Empty', 'Copy your workout program first', [
+        { text: 'OK' },
+      ]);
+      return;
+    }
+    importFromClipboard();
+  }, [importFromClipboard]);
+
+  // Welcome-back: "Import saved file" — open the document picker. The
+  // hook's importFromFile handles picking, reading and the empty/cancel
+  // cases, then feeds the same import pipeline.
+  const handleImportFile = useCallback(() => {
+    importFromFile();
+  }, [importFromFile]);
 
   const handleClose = useCallback(() => {
     navigation.popToTop();
@@ -275,7 +319,8 @@ export default function PromptReadyScreen() {
       >
         {returnedFromAI ? (
           <ReturnState
-            onImport={handleImport}
+            onPaste={handlePaste}
+            onImportFile={handleImportFile}
             onRetryAI={handleSelectAI}
             themeColor={themeColor}
           />
@@ -290,6 +335,23 @@ export default function PromptReadyScreen() {
           />
         )}
       </ScrollView>
+
+      <ImportConfirmationModal
+        visible={showConfirmation}
+        parsedProgram={parsedProgram}
+        accumulatedPrograms={accumulatedPrograms}
+        showAddMoreMode={showAddMoreMode}
+        generationTime={generationTime}
+        modalScale={modalScale}
+        modalOpacity={modalOpacity}
+        themeColor={themeColor}
+        onConfirm={confirmImport}
+        onAddMore={addMoreFiles}
+        onBackToConfirmation={backToConfirmation}
+        onCancel={cancelConfirmation}
+        onPasteNext={importFromClipboard}
+        onImportNextFile={importFromFile}
+      />
 
       <AILaunchSheet
         visible={sheetVisible}
@@ -433,18 +495,20 @@ const InitialState: React.FC<InitialStateProps> = ({
 // Return state — what the user sees when they come back from the AI
 // ============================================================================
 interface ReturnStateProps {
-  onImport: () => void;
+  onPaste: () => void;
+  onImportFile: () => void;
   onRetryAI: (provider: AIProvider) => void;
   themeColor: string;
 }
 
 const ReturnState: React.FC<ReturnStateProps> = ({
-  onImport,
+  onPaste,
+  onImportFile,
   onRetryAI,
   themeColor,
 }) => (
   <>
-    {/* Welcome back banner — the new hero */}
+    {/* Welcome back banner — the new hero with two import options */}
     <View style={[styles.welcomeBanner, { backgroundColor: themeColor }]}>
       <View style={styles.welcomeHeader}>
         <View style={styles.welcomeIconBox}>
@@ -456,19 +520,26 @@ const ReturnState: React.FC<ReturnStateProps> = ({
         </View>
       </View>
 
+      {/* Primary: paste from clipboard */}
       <TouchableOpacity
         style={styles.welcomeButton}
-        onPress={onImport}
+        onPress={onPaste}
         activeOpacity={0.85}
       >
-        <Ionicons
-          name="cloud-download-outline"
-          size={16}
-          color={themeColor}
-        />
+        <Ionicons name="clipboard-outline" size={16} color={themeColor} />
         <Text style={[styles.welcomeButtonText, { color: themeColor }]}>
-          Import your workout file
+          Paste from clipboard
         </Text>
+      </TouchableOpacity>
+
+      {/* Secondary: import a saved file */}
+      <TouchableOpacity
+        style={styles.welcomeButtonSecondary}
+        onPress={onImportFile}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="document-outline" size={16} color="#0a0a0b" />
+        <Text style={styles.welcomeButtonSecondaryText}>Import saved file</Text>
       </TouchableOpacity>
     </View>
 
@@ -490,9 +561,7 @@ const ReturnState: React.FC<ReturnStateProps> = ({
             { backgroundColor: 'rgba(217, 119, 87, 0.2)' },
           ]}
         >
-          <Text style={[styles.aiLogoLetterSmall, { color: '#d97757' }]}>
-            C
-          </Text>
+          <Text style={[styles.aiLogoLetterSmall, { color: '#d97757' }]}>C</Text>
         </View>
         <Text style={styles.aiNameCompact}>Claude</Text>
         <Ionicons name="arrow-forward" size={14} color="#71717a" />
@@ -509,9 +578,7 @@ const ReturnState: React.FC<ReturnStateProps> = ({
             { backgroundColor: 'rgba(16, 163, 127, 0.15)' },
           ]}
         >
-          <Text style={[styles.aiLogoLetterSmall, { color: '#10a37f' }]}>
-            G
-          </Text>
+          <Text style={[styles.aiLogoLetterSmall, { color: '#10a37f' }]}>G</Text>
         </View>
         <Text style={styles.aiNameCompact}>ChatGPT</Text>
         <Ionicons name="arrow-forward" size={14} color="#71717a" />
@@ -911,6 +978,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 1,
   },
+  // Primary import button (paste) — filled dark on the banner
   welcomeButton: {
     backgroundColor: '#0a0a0b',
     borderRadius: 12,
@@ -919,10 +987,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    marginBottom: 10,
   },
   welcomeButtonText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  // Secondary import button (saved file) — outlined on the banner
+  welcomeButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(10, 10, 11, 0.4)',
+    borderRadius: 12,
+    padding: 12.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  welcomeButtonSecondaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0a0a0b',
   },
 
   // Return state — retry section

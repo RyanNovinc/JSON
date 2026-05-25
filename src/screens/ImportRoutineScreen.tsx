@@ -1016,7 +1016,7 @@ export default function ImportRoutineScreen() {
             await WorkoutStorage.setAwaitingImport(false);
             
             navigation.navigate('Main', { 
-              screen: 'Home',
+              screen: 'Workouts',
               params: { 
                 importedProgram: parsedProgram,
                 refreshRoutines: true // Force refresh to load new mesocycle routines
@@ -1033,7 +1033,7 @@ export default function ImportRoutineScreen() {
         
         // Continue with normal import flow
         navigation.navigate('Main', { 
-          screen: 'Home',
+          screen: 'Workouts',
           params: { 
             importedProgram: parsedProgram,
             refreshRoutines: true // Force refresh to load new mesocycle routines
