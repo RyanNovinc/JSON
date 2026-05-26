@@ -2,21 +2,15 @@
 //
 // The "What do you want to create?" modal users land on when they tap
 // the Create (+) button. Lets them choose between a custom workout plan
-// (which kicks off the questionnaire flow) or a custom meal plan.
+// (which kicks off the questionnaire flow) or a custom meal plan (which
+// now kicks off the nutrition questionnaire flow).
 //
-// Changes vs. previous version:
-//   - Imports useState, useEffect from React
-//   - Imports WorkoutStorage from '../utils/storage'
-//   - Checks WorkoutStorage.isAwaitingImport() on mount and on focus
-//   - Renders a cyan "Continue your setup" banner above the option cards
-//     when a previously-started workout flow is awaiting import. This is
-//     the cold-launch recovery path: if iOS killed the app while the user
-//     was in Claude/ChatGPT, this banner is how they get back to the
-//     import screen without restarting the questionnaire.
-//
-// The banner dismisses the chooser and navigates to ImportRoute with
-// fromNewFlow:true. The flag itself is cleared inside ImportRoutineScreen
-// after a successful import (see PATCH-NOTES.md for that change).
+// The meal-plan card routes into the required nutrition questionnaire:
+// NutritionSummary if the NEW questionnaire draft is complete, otherwise
+// N1Goal fresh. The completeness check reads the nutrition DRAFT store
+// (hasCompleteNutritionAnswers), NOT the finalized result keys — those
+// can hold stale completedAt from the old nutrition questionnaires, which
+// would wrongly route a brand-new user straight to an empty Summary.
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -37,6 +31,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { getCreateImage } from '../assets/createImages';
 import { WorkoutStorage } from '../utils/storage';
 import { hasCompleteQuestionnaire } from '../utils/questionnaireStorage';
+import { hasCompleteNutritionAnswers } from '../utils/nutritionQuestionnaireStorage';
 
 type NavProp = StackNavigationProp<RootStackParamList>;
 
@@ -65,13 +60,16 @@ export default function CreateChooserScreen() {
   const { themeColor } = useTheme();
   const [awaitingImport, setAwaitingImport] = useState(false);
   const [hasSavedPlan, setHasSavedPlan] = useState(false);
+  const [hasNutritionPlan, setHasNutritionPlan] = useState(false);
 
   useEffect(() => {
     const check = async () => {
       const pending = await WorkoutStorage.isAwaitingImport();
       const complete = await hasCompleteQuestionnaire();
+      const nutritionComplete = await hasCompleteNutritionAnswers();
       setAwaitingImport(pending);
       setHasSavedPlan(complete);
+      setHasNutritionPlan(nutritionComplete);
     };
     check();
     const unsub = navigation.addListener('focus', check);
@@ -99,7 +97,11 @@ export default function CreateChooserScreen() {
           navigation.navigate('Q1PrimaryGoal', undefined);
         }
       } else {
-        navigation.navigate('ImportMealPlan', { showStep1New: true });
+        if (hasNutritionPlan) {
+          navigation.navigate('NutritionSummary');
+        } else {
+          navigation.navigate('N1Goal', undefined);
+        }
       }
     }, 50);
   };

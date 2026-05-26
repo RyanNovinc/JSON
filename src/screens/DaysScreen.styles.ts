@@ -53,6 +53,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  weekTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   weekTitle: {
     color: '#f0f0f2',
     fontSize: 26,
@@ -60,6 +65,28 @@ export const styles = StyleSheet.create({
     letterSpacing: -0.5,
     fontFamily: 'Outfit-Bold',
     lineHeight: 30,
+  },
+  deloadBadge: {
+    backgroundColor: 'rgba(236, 72, 153, 0.15)',
+    borderWidth: 1,
+    borderColor: '#ec4899',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  deloadBadgeText: {
+    fontSize: 9,
+    letterSpacing: 1.1,
+    color: '#ec4899',
+    fontFamily: 'DMMono-Medium',
+    fontWeight: '600',
+  },
+  deloadSubtext: {
+    color: '#71717a',
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 4,
+    fontFamily: 'Outfit-Regular',
   },
   bookmarkButton: {
     width: 32,

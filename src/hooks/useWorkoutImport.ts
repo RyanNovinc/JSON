@@ -1109,11 +1109,46 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
         throw new Error('Description must be a string');
       }
 
+      // Helper function for parsing weeks range
+      const parseWeeksRange = (weeks: string): { startWeek: number, endWeek: number, weekCount: number } | null => {
+        if (!weeks || typeof weeks !== 'string') {
+          return null;
+        }
+        
+        let startWeek: number, endWeek: number;
+        
+        if (weeks.includes('-')) {
+          const parts = weeks.split('-');
+          if (parts.length !== 2) return null;
+          startWeek = parseInt(parts[0].trim());
+          endWeek = parseInt(parts[1].trim());
+        } else {
+          const week = parseInt(weeks.trim());
+          startWeek = endWeek = week;
+        }
+        
+        // Validate parsed numbers
+        if (!Number.isFinite(startWeek) || !Number.isFinite(endWeek) || 
+            startWeek <= 0 || endWeek <= 0 || endWeek < startWeek) {
+          return null;
+        }
+        
+        return { startWeek, endWeek, weekCount: endWeek - startWeek + 1 };
+      };
+
       // Validate blocks structure
       parsed.blocks.forEach((block: any, blockIndex: number) => {
         if (!block.block_name || !block.weeks) {
           throw new Error(`Block ${blockIndex + 1} is incomplete`);
         }
+        
+        // Validate weeks format
+        const weekRange = parseWeeksRange(block.weeks);
+        if (!weekRange) {
+          throw new Error(`Block "${block.block_name}" has invalid weeks field "${block.weeks}" - expected a range like "1-5" or a single number`);
+        }
+        const { startWeek, endWeek, weekCount } = weekRange;
+        const expectedWeekKeys = Array.from({ length: weekCount }, (_, i) => (i + 1).toString());
         
         // Validate optional block fields
         if (block.structure && typeof block.structure !== 'string') {
@@ -1127,6 +1162,10 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
           block.deload_weeks.forEach((week: any) => {
             if (typeof week !== 'number' || week <= 0) {
               throw new Error(`Block "${block.block_name}" has invalid deload_weeks - must contain positive numbers`);
+            }
+            // CHECK 1: Range validation
+            if (week < startWeek || week > endWeek) {
+              throw new Error(`Block "${block.block_name}" has deload_weeks ${week} outside its week range ${block.weeks}`);
             }
           });
         }
@@ -1157,6 +1196,16 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
               throw new Error(`Exercise ${exerciseIndex + 1} in "${day.day_name}" missing type field`);
             }
 
+            // CHECK 2: Weekly data completeness (only for exercises with sets_weekly)
+            if (exercise.sets_weekly) {
+              const missingWeeks = expectedWeekKeys.filter(weekKey => 
+                !exercise.sets_weekly.hasOwnProperty(weekKey)
+              );
+              if (missingWeeks.length > 0) {
+                throw new Error(`Block "${block.block_name}" declares ${weekCount} weeks but exercise "${exercise.exercise}" is missing sets_weekly data for week(s) ${missingWeeks.join(', ')}`);
+              }
+            }
+
             // Validate based on exercise type
             switch (exercise.type) {
               case 'strength':
@@ -1184,6 +1233,9 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
       return parsed as WorkoutProgram;
     } catch (validationError) {
       const error = validationError as Error;
+      console.error('🔍 [VALIDATION DEBUG] Raw validation error:', error);
+      console.error('🔍 [VALIDATION DEBUG] Error message:', error.message);
+      console.error('🔍 [VALIDATION DEBUG] Error stack:', error.stack);
       const detailedError = `⚠️ Validation Error:\n\n${error.message}\n\n💡 This means your JSON was parsed successfully, but the workout program structure has issues. Please check that all required fields are present and correctly formatted.`;
       
       setErrorMessage(detailedError);

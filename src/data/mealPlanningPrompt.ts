@@ -305,9 +305,9 @@ COOKING PREFERENCES:
 - ${getVarietySeekingText(budgetData.varietySeeking)}
 - ${getSkillConfidenceText(budgetData.skillConfidence)}${(budgetData.skillConfidence || 3) > 1 ? `\n- ${getCookingEnjoymentText(budgetData.cookingEnjoyment)}` : ''}
 
-AVAILABLE COOKING EQUIPMENT:
-- Available equipment: ${budgetData.cookingEquipment?.join(', ') || 'basic kitchen equipment'}
-- IMPORTANT: Only suggest meals that can be made with the above equipment. Do not suggest oven recipes if no oven available, etc.${(() => {
+EQUIPMENT TO COOK WITH:
+- Preferred equipment: ${budgetData.cookingEquipment?.join(', ') || 'basic kitchen equipment'}
+- IMPORTANT: These are the tools the user actually WANTS to cook with — build recipes around them, not just check they're available. Only suggest meals that use this equipment, and don't require anything outside this list (the user may own other gear but chose not to use it).${(() => {
   const skillConfidence = budgetData.skillConfidence || 3;
   const timeInvestment = budgetData.timeInvestment || 3;
   
@@ -1283,8 +1283,12 @@ const getTimeRequirements = (budgetData: any): string => {
   const timeInvestment = budgetData?.timeInvestment || 3;
   const skillConfidence = budgetData?.skillConfidence || 3;
   
-  let timeText = '\n\n## TIME INVESTMENT REQUIREMENTS\n';
-  
+  let timeText = '\n\n## HANDS-ON TIME REQUIREMENTS\n';
+
+  timeText += `
+**These limits refer to ACTIVE, hands-on time — the minutes the user is actually working. Unattended cooking (slow cooker, oven, marinating, simmering) does NOT count against the limit and is welcome at every level except Speed Cook. A meal with 10 minutes of prep and hours of hands-off cooking fits a LOW hands-on preference perfectly — favour these where they suit the user.**
+`;
+
   if (timeInvestment === 1) {
     timeText += `
 - **Speed Cook approach**: Maximum 5 minutes total per meal including any heating.
@@ -1294,18 +1298,18 @@ const getTimeRequirements = (budgetData: any): string => {
 - **Convenience default**: Pre-cooked and convenience products should be the default choice. Favor ready-made components that just need reheating or simple assembly.`;
   } else if (timeInvestment === 2) {
     timeText += `
-- **Quick Meals approach**: Maximum 10 minutes active prep per meal. Total time under 20 minutes.
-- **One-pan focus**: Simple one-pan or one-tray recipes preferred. Air fryer dump-and-cook is ideal.
+- **Quick Meals approach**: Maximum 10–15 minutes hands-on per meal. Unattended cook time (slow cooker, oven) can run longer — it doesn't count against the hands-on limit.
+- **One-pan / set-and-forget focus**: Simple one-pan or one-tray recipes, air fryer dump-and-cook, and slow-cooker dump meals are all ideal.
 - **Efficient batch prep**: Batch prep session under 1 hour.
 - **Smart convenience**: Mix of convenience products and simple cooking.`;
   } else if (timeInvestment === 3) {
     timeText += `
-- **Moderate Cook approach**: Up to 15 minutes active prep. Total time up to 30 minutes per recipe.
+- **Moderate Cook approach**: Up to 20 minutes hands-on per recipe. Unattended cook time is unrestricted (slow cooker, braises, oven welcome).
 - **Multi-step cooking**: Multi-step recipes are fine. Batch prep up to 1.5 hours.
 - **Standard ingredients**: Standard ingredients — no need for convenience shortcuts unless they're genuinely better.`;
   } else if (timeInvestment === 4) {
     timeText += `
-- **Thorough Cook approach**: Up to 20 minutes active prep. Total time up to 45 minutes.
+- **Thorough Cook approach**: Up to 30 minutes hands-on per recipe. Longer unattended cooking is welcome.
 - **Complex techniques**: Recipes can involve simmering, marinating, and multi-stage cooking.
 - **Extended batch prep**: Batch prep up to 2 hours.`;
   } else if (timeInvestment === 5) {
@@ -1355,7 +1359,7 @@ Adjust portion sizes and recheck if any day or average is outside tolerance.
 
 2. **Protein distribution** — verify protein is spread across meals (no single meal exceeds 50% of daily target).
 
-3. **Cooking time** — verify actual cook times match user's time investment preference.
+3. **Hands-on time** — verify each recipe's ACTIVE prep time matches the user's hands-on preference. Long unattended cook time (slow cooker, oven) is fine and does not count against this.
 
 4. **Meal prep coherence** — if planning style is 1-2, verify batch items are reused across multiple meals.
 

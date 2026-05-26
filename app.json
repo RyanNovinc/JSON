@@ -15,7 +15,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.RyanNovinc.JSON",
       "buildNumber": "94",
-      "associatedDomains": ["applinks:json.fit"],
+      "associatedDomains": [
+        "applinks:json.fit"
+      ],
       "entitlements": {
         "aps-environment": "development"
       },
@@ -48,7 +50,10 @@
               "pathPrefix": "/p/"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -63,7 +68,8 @@
     "owner": "ryan_novinc",
     "plugins": [
       "@react-native-community/datetimepicker",
-      "expo-live-activity"
+      "expo-live-activity",
+      "expo-asset"
     ]
   }
 }

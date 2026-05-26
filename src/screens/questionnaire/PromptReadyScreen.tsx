@@ -1,27 +1,40 @@
 // src/screens/questionnaire/PromptReadyScreen.tsx
 //
-// Final step of the workout questionnaire flow. Shows:
-//   1. Initial state: personalized YOUR PROGRAM card, 3-step flow,
-//      Claude + ChatGPT cards (equal weight, Claude first because its
-//      free tier is more capable for this use case), "Use a different
-//      AI" copy-only option, and an "Already have your file? Import it"
-//      footer link.
+// Final step of the workout questionnaire flow. Design "Direction C":
+// the prompt itself is the hero. The app builds a prompt from the
+// user's questionnaire answers; the user sends it to an AI THEY already
+// use (Claude / ChatGPT), which designs the plan and returns a file
+// the user imports back into the app.
+//
+//   1. Initial state:
+//        - "Your prompt is ready." headline
+//        - A friendly, human-readable preview of what the prompt asks
+//          for (goal / duration / days / equipment) — NOT the raw
+//          machine text. Tap the card to copy: the pill flips "Copy" →
+//          "Copied". The full technical prompt goes to the clipboard
+//          untouched.
+//        - "Paste it into an AI you already use" framing line.
+//        - "Open in Claude" / "Open in ChatGPT" rows. These are
+//          DESTINATIONS, not engines: tapping silently RE-COPIES the
+//          prompt (clipboard-freshness guarantee) then launches the AI,
+//          so the user is never stranded with an empty clipboard whether
+//          or not they tapped the card first.
+//        - "Copy again & use any other AI" escape hatch.
+//        - "Confused?" — opens a self-contained help sheet explaining
+//          the full round trip. Confusion is a one-time event, so the
+//          explanation is available-on-demand rather than always-on.
+//        - "Already have your file? Import it" footer link.
 //
 //   2. Return state: when the user comes back from an external AI after
-//      being away for at least 30 seconds, the screen transforms — a
-//      cyan "Welcome back" banner becomes the new hero with TWO import
-//      options: "Paste from clipboard" (primary) and "Import saved
-//      file" (secondary). The AI cards demote to a retry section
-//      ("Didn't work? Try a different AI").
+//      being away for at least RETURN_THRESHOLD_MS, the screen reworks —
+//      the two import actions ("Paste from clipboard" / "Import saved
+//      file") become the hero, and the AI rows demote to a quiet retry
+//      section ("Didn't work? Try a different AI").
 //
-// On tap of an AI card, an AILaunchSheet slides up confirming the
-// clipboard write and requiring an explicit "Open Claude" / "Open
-// ChatGPT" tap before launching the URL.
-//
-// A persistent flag (WorkoutStorage.setAwaitingImport) is set whenever
-// the user copies the prompt — this lets CreateChooserScreen show a
-// "Continue your setup" banner on cold launch if iOS killed the app
-// while the user was in the AI.
+// A persistent flag (WorkoutStorage.setAwaitingImport) is set as soon as
+// the prompt is copied — this lets CreateChooserScreen show a "Continue
+// your setup" banner on cold launch if iOS killed the app while the user
+// was in the AI.
 //
 // Import is handled INLINE via the useWorkoutImport hook — both the
 // clipboard and saved-file paths run the full import pipeline and show
@@ -40,8 +53,13 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
+  Modal,
+  Animated,
+  Easing,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -50,10 +68,8 @@ import ImportConfirmationModal from '../../components/import/ImportConfirmationM
 import { useTheme } from '../../contexts/ThemeContext';
 import { WorkoutStorage } from '../../utils/storage';
 import { assemblePlanningPrompt } from '../../data/planningPrompt';
-import {
-  AILaunchSheet,
-  AIProvider,
-} from '../../components/questionnaire/AILaunchSheet';
+import { generateProgramSpecs } from '../../data/workoutPrompt';
+import { AIProvider } from '../../components/questionnaire/AILaunchSheet';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useWorkoutImport } from '../../hooks/useWorkoutImport';
 
@@ -88,26 +104,33 @@ async function openAIApp(provider: AIProvider): Promise<void> {
 // app-switch returns through.
 const RETURN_THRESHOLD_MS = 3 * 1000;
 
+// Monospace family for the prompt preview. DM Mono isn't bundled, so we
+// fall back to the platform default monospace (Courier on iOS).
+const MONO_FONT = Platform.select({ ios: 'Courier', default: 'monospace' });
+
 export default function PromptReadyScreen() {
+  console.log('[PROMPTREADY] render');
   const navigation = useNavigation<NavProp>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
 
   const [prompt, setPrompt] = useState<string>('');
-  const [programLabel, setProgramLabel] = useState<string>(
-    'Your custom workout'
-  );
-  const [programMeta, setProgramMeta] = useState<string>('');
+  const [promptPreview, setPromptPreview] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  const [sheetVisible, setSheetVisible] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<AIProvider>('claude');
+  // True once the user has tapped the prompt card to copy. Drives the
+  // pill: "Copy" → "Copied".
+  const [copied, setCopied] = useState(false);
 
   const [hasOpenedAI, setHasOpenedAI] = useState(false);
   const [returnedFromAI, setReturnedFromAI] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
+
   const backgroundedAt = useRef<number | null>(null);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const scrollViewRef = useRef<ScrollView>(null);
+  // Timer that reverts the pill "Copied" → "Copy" after a moment.
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // -------------------------------------------------------------------------
   // Workout Import Hook
@@ -141,7 +164,16 @@ export default function PromptReadyScreen() {
   });
 
   // -------------------------------------------------------------------------
-  // Load questionnaire data and assemble the prompt + preview card content
+  // Load questionnaire data and assemble the prompt. The clipboard gets
+  // the FULL assembled prompt (machine instructions and all). The on-screen
+  // preview shows only the user-facing PROFILE — the same profile block the
+  // prompt embeds — so the user sees their own answers reflected back, not
+  // the "Stop immediately. Respond ONLY…" machine boilerplate.
+  //
+  // We do NOT copy on load — the prompt card itself is the copy button
+  // (tap it → "Copy" flips to "Copied"). The "Open in …" rows still
+  // silently re-copy on tap, so nobody can get stranded with an empty
+  // clipboard whether or not they tapped the card first.
   // -------------------------------------------------------------------------
   useEffect(() => {
     (async () => {
@@ -151,9 +183,9 @@ export default function PromptReadyScreen() {
           await WorkoutStorage.loadEquipmentPreferencesResults();
         const merged = { ...(fitnessGoals || {}), ...(equipment || {}) };
         const assembled = assemblePlanningPrompt(merged);
+
         setPrompt(assembled);
-        setProgramLabel(buildProgramLabel(merged));
-        setProgramMeta(buildProgramMeta(merged));
+        setPromptPreview(buildPromptPreview(merged));
       } catch (e) {
         console.error('Failed to load prompt data', e);
       } finally {
@@ -183,6 +215,7 @@ export default function PromptReadyScreen() {
           : 0;
         if (elapsed >= RETURN_THRESHOLD_MS) {
           setReturnedFromAI(true);
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         }
       }
 
@@ -193,53 +226,64 @@ export default function PromptReadyScreen() {
   }, [hasOpenedAI]);
 
   // -------------------------------------------------------------------------
-  // Handlers
+  // Helper: copy the prompt to the clipboard. Called both when the user
+  // taps the prompt card and right before launching an AI (the launch
+  // path re-copies to guarantee the clipboard is fresh at hand-off).
+  // Flips the pill to "Copied", then reverts to "Copy" after a moment.
   // -------------------------------------------------------------------------
-  const handleSelectAI = useCallback((provider: AIProvider) => {
-    setSelectedProvider(provider);
-    setSheetVisible(true);
-  }, []);
-
-  const handleConfirmLaunch = useCallback(async () => {
-    try {
-      await Clipboard.setStringAsync(prompt);
-      await WorkoutStorage.setAwaitingImport(true);
-      setHasOpenedAI(true);
-      setSheetVisible(false);
-      // Small delay so the sheet animates out before the URL launches
-      setTimeout(() => {
-        openAIApp(selectedProvider);
-      }, 250);
-    } catch (e) {
-      console.error('Launch AI failed', e);
-      setSheetVisible(false);
-    }
-  }, [prompt, selectedProvider]);
-
-  const handleCancelSheet = useCallback(() => {
-    setSheetVisible(false);
-  }, []);
-
-  const handleCopyOnly = useCallback(async () => {
-    try {
-      await Clipboard.setStringAsync(prompt);
-      await WorkoutStorage.setAwaitingImport(true);
-      setHasOpenedAI(true);
+  const ensureCopied = useCallback(async (): Promise<boolean> => {
+    if (!prompt || prompt.length === 0) {
       Alert.alert(
-        'Prompt copied',
-        'Open your AI of choice and paste it. Come back here when you have your workout file.',
-        [{ text: 'Got it', style: 'default' }]
+        'One sec',
+        'Your prompt is still loading — try again in a moment.'
       );
+      return false;
+    }
+    try {
+      await Clipboard.setStringAsync(prompt);
+      await WorkoutStorage.setAwaitingImport(true);
+      setCopied(true);
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+      copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+      return true;
     } catch (e) {
-      console.error('Copy failed', e);
+      Alert.alert('Copy failed', (e as Error).message);
+      return false;
     }
   }, [prompt]);
 
-  // Initial state's "Import it" footer link: don't navigate yet, just
-  // transform the screen into the welcome-back state. This consolidates
-  // both paths ("I came back from AI" and "I already have my file") into
-  // one consistent destination. Also sets the awaitingImport flag so the
-  // cold-launch recovery banner kicks in if they leave to grab their file.
+  // Clear any pending revert timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    };
+  }, []);
+
+  // -------------------------------------------------------------------------
+  // Handlers
+  // -------------------------------------------------------------------------
+
+  // Tap the prompt card to copy. Flips the pill "Copy" → "Copied". Does
+  // NOT set hasOpenedAI — tapping the card isn't leaving for the AI yet.
+  const handleCopyCard = useCallback(async () => {
+    await ensureCopied();
+  }, [ensureCopied]);
+
+  // "Open in Claude" / "Open in ChatGPT": silently re-copy, then launch.
+  const handleOpenAI = useCallback(
+    async (provider: AIProvider) => {
+      const ok = await ensureCopied();
+      if (!ok) return;
+      setHasOpenedAI(true);
+      // Small delay lets any press feedback settle before the OS hands
+      // off to the other app.
+      setTimeout(() => openAIApp(provider), 120);
+    },
+    [ensureCopied]
+  );
+
+  // Footer "Import it": jump straight to the return/import state without
+  // leaving the app — for users who already have a file in hand.
   const handleImportFromInitial = useCallback(async () => {
     try {
       await WorkoutStorage.setAwaitingImport(true);
@@ -247,15 +291,14 @@ export default function PromptReadyScreen() {
       console.error('setAwaitingImport failed', e);
     }
     setReturnedFromAI(true);
-    // Scroll to top so the welcome banner is in view
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
 
-  // Welcome-back: "Paste from clipboard" — read clipboard, then import.
+  // Return-state "Paste from clipboard": read clipboard, then import.
   const handlePaste = useCallback(async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
-      Alert.alert('Clipboard Empty', 'Copy your workout program first', [
+      Alert.alert('Clipboard empty', 'Copy your workout file first', [
         { text: 'OK' },
       ]);
       return;
@@ -263,9 +306,8 @@ export default function PromptReadyScreen() {
     importFromClipboard();
   }, [importFromClipboard]);
 
-  // Welcome-back: "Import saved file" — open the document picker. The
-  // hook's importFromFile handles picking, reading and the empty/cancel
-  // cases, then feeds the same import pipeline.
+  // Return-state "Import saved file": open the document picker. The hook
+  // handles picking, reading and the empty/cancel cases.
   const handleImportFile = useCallback(() => {
     importFromFile();
   }, [importFromFile]);
@@ -275,8 +317,22 @@ export default function PromptReadyScreen() {
   }, [navigation]);
 
   const handleBack = useCallback(() => {
+    // If the user is on the "add your file" (return) state, back should
+    // take them to the "Your prompt is ready" state — not leave the
+    // screen. Only navigate away when already on the prompt-ready state.
+    console.log('[PROMPTREADY] handleBack — returnedFromAI =', returnedFromAI);
+    if (returnedFromAI) {
+      console.log('[PROMPTREADY] handleBack — flipping to prompt-ready state');
+      setReturnedFromAI(false);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
+    console.log('[PROMPTREADY] handleBack — calling navigation.goBack()');
     navigation.goBack();
-  }, [navigation]);
+  }, [navigation, returnedFromAI]);
+
+  const openHelp = useCallback(() => setHelpVisible(true), []);
+  const closeHelp = useCallback(() => setHelpVisible(false), []);
 
   // -------------------------------------------------------------------------
   // Render
@@ -321,17 +377,17 @@ export default function PromptReadyScreen() {
           <ReturnState
             onPaste={handlePaste}
             onImportFile={handleImportFile}
-            onRetryAI={handleSelectAI}
             themeColor={themeColor}
           />
         ) : (
           <InitialState
-            programLabel={programLabel}
-            programMeta={programMeta}
+            promptPreview={promptPreview}
+            copied={copied}
             themeColor={themeColor}
-            onSelectAI={handleSelectAI}
+            onCopy={handleCopyCard}
+            onOpenAI={handleOpenAI}
+            onHelp={openHelp}
             onImport={handleImportFromInitial}
-            onCopyOnly={handleCopyOnly}
           />
         )}
       </ScrollView>
@@ -353,78 +409,111 @@ export default function PromptReadyScreen() {
         onImportNextFile={importFromFile}
       />
 
-      <AILaunchSheet
-        visible={sheetVisible}
-        provider={selectedProvider}
-        onConfirm={handleConfirmLaunch}
-        onCancel={handleCancelSheet}
+      <HelpSheet
+        visible={helpVisible}
+        themeColor={themeColor}
+        onClose={closeHelp}
       />
     </View>
   );
 }
 
 // ============================================================================
-// Initial state — the screen the user sees first
+// Initial state — prompt is the hero
 // ============================================================================
 interface InitialStateProps {
-  programLabel: string;
-  programMeta: string;
+  promptPreview: string;
+  copied: boolean;
   themeColor: string;
-  onSelectAI: (provider: AIProvider) => void;
+  onCopy: () => void;
+  onOpenAI: (provider: AIProvider) => void;
+  onHelp: () => void;
   onImport: () => void;
-  onCopyOnly: () => void;
 }
 
 const InitialState: React.FC<InitialStateProps> = ({
-  programLabel,
-  programMeta,
+  promptPreview,
+  copied,
   themeColor,
-  onSelectAI,
+  onCopy,
+  onOpenAI,
+  onHelp,
   onImport,
-  onCopyOnly,
 }) => (
   <>
     <View style={styles.titleBlock}>
-      <Text style={styles.title}>Almost there.</Text>
-      <Text style={styles.subtitle}>
-        An AI you already use will design your workout from your answers.
+      <Text style={styles.title}>Your prompt is ready.</Text>
+    </View>
+
+    {/* Prompt preview — the hero, and the copy button. Shows the real
+        prompt text (machine preamble stripped) in mono with a fade, so it
+        reads as the actual artifact you're handing off. Tap to copy: the
+        pill flips "Copy" → "Copied". The full prompt (preamble included)
+        goes to the clipboard untouched. */}
+    <TouchableOpacity
+      style={styles.promptCard}
+      onPress={onCopy}
+      activeOpacity={0.8}
+    >
+      <Text
+        style={[styles.promptText, { fontFamily: MONO_FONT }]}
+        numberOfLines={7}
+      >
+        {promptPreview}
+      </Text>
+
+      {/* Gradient fade — text dissolves into the card bg so it reads as
+          "there's more below", not a hard cut. */}
+      <LinearGradient
+        colors={['rgba(19,19,22,0)', 'rgba(19,19,22,0.85)', '#131316']}
+        locations={[0, 0.55, 1]}
+        style={styles.promptFade}
+        pointerEvents="none"
+      />
+
+      <View
+        style={[
+          styles.copyPill,
+          copied
+            ? {
+                backgroundColor: hexToRgba(themeColor, 0.12),
+                borderColor: hexToRgba(themeColor, 0.3),
+              }
+            : {
+                backgroundColor: '#18181b',
+                borderColor: '#27272a',
+              },
+        ]}
+      >
+        <Ionicons
+          name={copied ? 'checkmark' : 'copy-outline'}
+          size={13}
+          color={copied ? themeColor : '#a1a1aa'}
+        />
+        <Text
+          style={[
+            styles.copyPillText,
+            { color: copied ? themeColor : '#a1a1aa' },
+          ]}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+
+    {/* Framing line: "an AI you already use" presupposes ownership —
+        this is the line that kills the "in-app AI" misconception. */}
+    <View style={styles.framingRow}>
+      <Ionicons name="arrow-down" size={14} color="#52525b" />
+      <Text style={styles.framingText}>
+        Paste it into an AI you already use
       </Text>
     </View>
 
-    {/* YOUR PROGRAM personalized card */}
-    <View
-      style={[
-        styles.programCard,
-        {
-          backgroundColor: 'rgba(34, 211, 238, 0.08)',
-          borderColor: 'rgba(34, 211, 238, 0.25)',
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.programIcon,
-          { backgroundColor: 'rgba(34, 211, 238, 0.2)' },
-        ]}
-      >
-        <Ionicons name="barbell-outline" size={18} color={themeColor} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.programLabel}>YOUR PROGRAM</Text>
-        <Text style={styles.programTitle}>{programLabel}</Text>
-        {programMeta ? (
-          <Text style={styles.programMeta}>{programMeta}</Text>
-        ) : null}
-      </View>
-    </View>
-
-    {/* 3-step flow */}
-    <FlowStrip themeColor={themeColor} state="initial" />
-
-    {/* Claude card */}
+    {/* Open in Claude — destination, not engine. ↗ signals "you leave". */}
     <TouchableOpacity
-      style={styles.aiCard}
-      onPress={() => onSelectAI('claude')}
+      style={styles.aiRow}
+      onPress={() => onOpenAI('claude')}
       activeOpacity={0.85}
     >
       <View
@@ -432,318 +521,302 @@ const InitialState: React.FC<InitialStateProps> = ({
       >
         <Text style={[styles.aiLogoLetter, { color: '#d97757' }]}>C</Text>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.aiName}>Claude</Text>
-      </View>
-      <View style={[styles.aiArrow, { backgroundColor: themeColor }]}>
-        <Ionicons name="arrow-forward" size={16} color="#0a0a0b" />
-      </View>
+      <Text style={styles.aiRowText}>Open in Claude</Text>
+      <Ionicons name="open-outline" size={19} color={themeColor} />
     </TouchableOpacity>
 
-    {/* ChatGPT card */}
+    {/* Open in ChatGPT — monochrome tile (matches OpenAI's current mark
+        direction; the old green is stale post-2025 rebrand). */}
     <TouchableOpacity
-      style={styles.aiCard}
-      onPress={() => onSelectAI('chatgpt')}
+      style={styles.aiRow}
+      onPress={() => onOpenAI('chatgpt')}
       activeOpacity={0.85}
     >
       <View
         style={[
           styles.aiLogoBox,
-          { backgroundColor: 'rgba(16, 163, 127, 0.15)' },
+          { backgroundColor: '#232328', borderWidth: 0.5, borderColor: '#313137' },
         ]}
       >
-        <Text style={[styles.aiLogoLetter, { color: '#10a37f' }]}>G</Text>
+        <Text style={[styles.aiLogoLetter, { color: '#fafafa' }]}>G</Text>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.aiName}>ChatGPT</Text>
-      </View>
-      <View style={[styles.aiArrow, { backgroundColor: themeColor }]}>
-        <Ionicons name="arrow-forward" size={16} color="#0a0a0b" />
-      </View>
+      <Text style={styles.aiRowText}>Open in ChatGPT</Text>
+      <Ionicons name="open-outline" size={19} color={themeColor} />
     </TouchableOpacity>
 
-    {/* Use a different AI — copies to clipboard so user can paste anywhere */}
-    <TouchableOpacity
-      style={styles.differentAIButton}
-      onPress={onCopyOnly}
-      activeOpacity={0.7}
-    >
-      <Ionicons name="ellipsis-horizontal" size={14} color="#a1a1aa" />
-      <Text style={styles.differentAIText}>Use a different AI</Text>
-    </TouchableOpacity>
+    {/* Plain hint, not a button — the prompt card above is the copy
+        action now, so this is just a nudge that other AIs work too. */}
+    <Text style={styles.otherAIHint}>…or use any other AI you like</Text>
 
-    {/* Footer: existing file path */}
-    <TouchableOpacity
-      style={styles.footerLink}
-      onPress={onImport}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.footerLinkText}>Already have your file? </Text>
-      <Text
-        style={[
-          styles.footerLinkText,
-          { color: themeColor, fontWeight: '600' },
-        ]}
+    {/* Footer: "Confused?" (one-time help) above the import escape hatch */}
+    <View style={styles.footer}>
+      <TouchableOpacity
+        style={styles.helpPill}
+        onPress={onHelp}
+        activeOpacity={0.7}
+        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
       >
-        Import it
-      </Text>
-    </TouchableOpacity>
+        <Ionicons name="help-circle-outline" size={15} color="#a1a1aa" />
+        <Text style={styles.helpPillText}>See how it works</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.footerLink}
+        onPress={onImport}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.footerLinkText}>Already have your file? </Text>
+        <Text
+          style={[
+            styles.footerLinkText,
+            { color: themeColor, fontWeight: '600' },
+          ]}
+        >
+          Import it
+        </Text>
+      </TouchableOpacity>
+    </View>
   </>
 );
 
 // ============================================================================
-// Return state — what the user sees when they come back from the AI
+// Return state — back from the AI; "add your file" is the whole job
 // ============================================================================
 interface ReturnStateProps {
   onPaste: () => void;
   onImportFile: () => void;
-  onRetryAI: (provider: AIProvider) => void;
   themeColor: string;
 }
 
 const ReturnState: React.FC<ReturnStateProps> = ({
   onPaste,
   onImportFile,
-  onRetryAI,
   themeColor,
 }) => (
-  <>
-    {/* Welcome back banner — the new hero with two import options */}
-    <View style={[styles.welcomeBanner, { backgroundColor: themeColor }]}>
-      <View style={styles.welcomeHeader}>
-        <View style={styles.welcomeIconBox}>
-          <Ionicons name="clipboard-outline" size={20} color="#0a0a0b" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.welcomeTitle}>Welcome back</Text>
-          <Text style={styles.welcomeSubtitle}>Got your workout file?</Text>
-        </View>
-      </View>
+  <View style={styles.returnRoot}>
+    <View style={styles.returnTitleBlock}>
+      <Text style={styles.title}>Almost done.</Text>
+      <Text style={styles.returnSubtitle}>
+        Add the workout file your AI gave you.
+      </Text>
+    </View>
 
-      {/* Primary: paste from clipboard */}
+    {/* Fills the space between the title and the import line. */}
+    <View style={styles.returnBody}>
+      {/* Big tappable paste zone — the hero. Grows to fill. Tapping
+          anywhere pastes from the clipboard. */}
       <TouchableOpacity
-        style={styles.welcomeButton}
+        style={styles.pasteZone}
         onPress={onPaste}
         activeOpacity={0.85}
       >
-        <Ionicons name="clipboard-outline" size={16} color={themeColor} />
-        <Text style={[styles.welcomeButtonText, { color: themeColor }]}>
-          Paste from clipboard
+        <View style={styles.pasteZoneIcon}>
+          <Ionicons name="clipboard-outline" size={28} color={themeColor} />
+        </View>
+        <Text style={styles.pasteZoneTitle}>Paste your file</Text>
+        <Text style={styles.pasteZoneHint}>Tap anywhere here</Text>
+      </TouchableOpacity>
+
+      {/* Secondary: saved-file path, as a natural-language line */}
+      <TouchableOpacity
+        style={styles.importFileLink}
+        onPress={onImportFile}
+        activeOpacity={0.7}
+        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+      >
+        <Text style={styles.importFileLinkText}>
+          Saved it as a file instead?{' '}
+        </Text>
+        <Text
+          style={[
+            styles.importFileLinkText,
+            { color: themeColor, fontWeight: '600' },
+          ]}
+        >
+          Import
         </Text>
       </TouchableOpacity>
-
-      {/* Secondary: import a saved file */}
-      <TouchableOpacity
-        style={styles.welcomeButtonSecondary}
-        onPress={onImportFile}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="document-outline" size={16} color="#0a0a0b" />
-        <Text style={styles.welcomeButtonSecondaryText}>Import saved file</Text>
-      </TouchableOpacity>
     </View>
-
-    {/* 3-step flow, "Import now" lit up */}
-    <FlowStrip themeColor={themeColor} state="returned" />
-
-    {/* Retry section */}
-    <Text style={styles.didntWorkLabel}>DIDN'T WORK? TRY A DIFFERENT AI</Text>
-
-    <View style={{ opacity: 0.75 }}>
-      <TouchableOpacity
-        style={styles.aiCardCompact}
-        onPress={() => onRetryAI('claude')}
-        activeOpacity={0.85}
-      >
-        <View
-          style={[
-            styles.aiLogoBoxSmall,
-            { backgroundColor: 'rgba(217, 119, 87, 0.2)' },
-          ]}
-        >
-          <Text style={[styles.aiLogoLetterSmall, { color: '#d97757' }]}>C</Text>
-        </View>
-        <Text style={styles.aiNameCompact}>Claude</Text>
-        <Ionicons name="arrow-forward" size={14} color="#71717a" />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.aiCardCompact}
-        onPress={() => onRetryAI('chatgpt')}
-        activeOpacity={0.85}
-      >
-        <View
-          style={[
-            styles.aiLogoBoxSmall,
-            { backgroundColor: 'rgba(16, 163, 127, 0.15)' },
-          ]}
-        >
-          <Text style={[styles.aiLogoLetterSmall, { color: '#10a37f' }]}>G</Text>
-        </View>
-        <Text style={styles.aiNameCompact}>ChatGPT</Text>
-        <Ionicons name="arrow-forward" size={14} color="#71717a" />
-      </TouchableOpacity>
-    </View>
-  </>
+  </View>
 );
 
 // ============================================================================
-// FlowStrip — the 3-step "You send / AI designs / You import" visual
+// HelpSheet — "Confused?" walkthrough. The full round trip, on demand.
+// Self-contained slide-up bottom sheet (no shared component dependency).
 // ============================================================================
-interface FlowStripProps {
+interface HelpSheetProps {
+  visible: boolean;
   themeColor: string;
-  state: 'initial' | 'returned';
+  onClose: () => void;
 }
 
-const FlowStrip: React.FC<FlowStripProps> = ({ themeColor, state }) => {
-  const completed = state === 'returned';
+const HELP_STEPS: { title: string; body: string }[] = [
+  {
+    title: 'Open your AI & paste',
+    body: 'Your prompt is on the clipboard. Open Claude or ChatGPT and paste it into the chat.',
+  },
+  {
+    title: 'Follow what it tells you',
+    body: "The AI builds your plan and hands back a file. It'll guide you to download or copy it.",
+  },
+  {
+    title: 'Come back & import',
+    body: 'Return here, paste or import the file, and your plan loads into the app.',
+  },
+];
 
-  return (
-    <View style={styles.flowStrip}>
-      <FlowStep
-        icon="paper-plane-outline"
-        label={completed ? 'You sent' : 'You send'}
-        // In initial state, "You send" is the user's next action — accent it.
-        active={!completed}
-        done={completed}
-        themeColor={themeColor}
-      />
-
-      <Ionicons
-        name="arrow-forward"
-        size={14}
-        color="#3f3f46"
-        style={{ paddingBottom: 18, opacity: completed ? 0.45 : 1 }}
-      />
-
-      <FlowStep
-        icon="sparkles-outline"
-        label={completed ? 'AI designed' : 'AI designs'}
-        active={false}
-        done={completed}
-        themeColor={themeColor}
-      />
-
-      <Ionicons
-        name="arrow-forward"
-        size={14}
-        color={completed ? themeColor : '#3f3f46'}
-        style={{ paddingBottom: 18 }}
-      />
-
-      <FlowStep
-        icon="cloud-download-outline"
-        label={completed ? 'Import now' : 'You import'}
-        active={completed}
-        done={false}
-        themeColor={themeColor}
-      />
-    </View>
-  );
-};
-
-interface FlowStepProps {
-  icon: any;
-  label: string;
-  active: boolean;
-  done: boolean;
-  themeColor: string;
-}
-
-const FlowStep: React.FC<FlowStepProps> = ({
-  icon,
-  label,
-  active,
-  done,
+const HelpSheet: React.FC<HelpSheetProps> = ({
+  visible,
   themeColor,
+  onClose,
 }) => {
-  const showIcon = done ? 'checkmark' : icon;
-  const iconColor = active ? themeColor : '#71717a';
-  const labelColor = active ? themeColor : '#a1a1aa';
-  const bgColor = active ? 'rgba(34, 211, 238, 0.18)' : '#18181b';
-  const borderColor = active ? themeColor : '#27272a';
-  const borderWidth = active ? 1.5 : 0.5;
+  const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(600)).current;
+  const backdrop = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdrop, {
+          toValue: 1,
+          duration: 280,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      translateY.setValue(600);
+      backdrop.setValue(0);
+    }
+  }, [visible, translateY, backdrop]);
 
   return (
-    <View style={[styles.flowStep, { opacity: done ? 0.45 : 1 }]}>
-      <View
-        style={[
-          styles.flowStepIconBox,
-          {
-            backgroundColor: bgColor,
-            borderColor,
-            borderWidth,
-          },
-        ]}
-      >
-        <Ionicons name={showIcon as any} size={16} color={iconColor} />
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Animated.View style={[styles.sheetBackdrop, { opacity: backdrop }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+      </Animated.View>
+
+      <View style={styles.sheetRoot} pointerEvents="box-none">
+        <Animated.View
+          style={[
+            styles.sheetCard,
+            {
+              paddingBottom: insets.bottom + 24,
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+          <View style={styles.sheetGrabber} />
+
+          <Text style={styles.sheetTitle}>How this works</Text>
+          <Text style={styles.sheetIntro}>
+            JSON.fit builds you a prompt from your answers, but an AI you
+            already use designs the actual plan. Here&apos;s the round trip:
+          </Text>
+
+          {HELP_STEPS.map((step, i) => (
+            <View key={step.title} style={styles.sheetStep}>
+              <View
+                style={[
+                  styles.sheetStepNum,
+                  {
+                    backgroundColor: hexToRgba(themeColor, 0.15),
+                    borderColor: hexToRgba(themeColor, 0.35),
+                  },
+                ]}
+              >
+                <Text style={[styles.sheetStepNumText, { color: themeColor }]}>
+                  {i + 1}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetStepTitle}>{step.title}</Text>
+                <Text style={styles.sheetStepBody}>{step.body}</Text>
+              </View>
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={[styles.sheetCta, { backgroundColor: themeColor }]}
+            onPress={onClose}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.sheetCtaText}>Got it</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
-      <Text
-        style={[
-          styles.flowStepLabel,
-          { color: labelColor, fontWeight: active ? '600' : '500' },
-        ]}
-      >
-        {label}
-      </Text>
-    </View>
+    </Modal>
   );
 };
 
 // ============================================================================
-// Helpers — build the YOUR PROGRAM card content from questionnaire data
+// Helpers — build the program-recap content from questionnaire data
 // ============================================================================
-function buildProgramLabel(data: any): string {
-  const duration = formatDuration(data?.programDuration);
-  const goal = formatGoal(data?.primaryGoal);
-  if (duration && goal) return `${duration} ${goal} plan`;
-  if (goal) return `${goal} plan`;
-  if (duration) return `${duration} workout plan`;
-  return 'Your custom workout';
+
+// Display version of the prompt preview: the user-facing PROFILE block
+// (the same one generateProgramSpecs embeds in the full prompt), lightly
+// cleaned of markdown so it reads as plain text in the mono card. This is
+// the part a human cares about — their own answers — not the machine
+// instructions that top the assembled prompt. The full prompt (machine
+// boilerplate included) still goes to the clipboard untouched.
+function buildPromptPreview(data: any): string {
+  let specs = '';
+  try {
+    specs = generateProgramSpecs(data) || '';
+  } catch (e) {
+    console.error('generateProgramSpecs failed for preview', e);
+  }
+  if (!specs) return '';
+
+  return (
+    specs
+      // Strip markdown headers (#, ##) and horizontal rules (---).
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/^\s*-{3,}\s*$/gm, '')
+      // Drop bold/italic emphasis markers but keep the words.
+      .replace(/\*\*/g, '')
+      .replace(/(^|\s)[*_]([^*_]+)[*_]/g, '$1$2')
+      // Collapse 3+ blank lines down to a single blank line.
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
 }
 
-function buildProgramMeta(data: any): string {
-  const days = data?.totalTrainingDays
-    ? `${data.totalTrainingDays} days/week`
-    : '';
-  const equipment = formatEquipment(data?.selectedEquipment);
-  return [days, equipment].filter(Boolean).join(' · ');
-}
-
-function formatDuration(d?: string): string {
-  if (!d) return '';
-  const map: Record<string, string> = {
-    '4_weeks': '4-week',
-    '8_weeks': '8-week',
-    '12_weeks': '12-week',
-    '6_months': '6-month',
-    '1_year': '1-year',
-    custom: '',
-  };
-  return map[d] || '';
-}
-
-function formatGoal(g?: string): string {
-  if (!g) return '';
-  const map: Record<string, string> = {
-    build_muscle: 'build muscle',
-    burn_fat: 'burn fat',
-    gain_strength: 'gain strength',
-    body_recomposition: 'body recomp',
-    general_fitness: 'general fitness',
-  };
-  return map[g] || '';
-}
-
-function formatEquipment(e?: string[]): string {
-  if (!e || e.length === 0) return '';
-  const map: Record<string, string> = {
-    commercial_gym: 'Commercial gym',
-    home_gym: 'Home gym',
-    bodyweight: 'Bodyweight',
-    basic_equipment: 'Basic equipment',
-  };
-  return map[e[0]] || '';
+// Convert a #rrggbb hex to an rgba() string at the given alpha. Lets the
+// theme-aware accent drive translucent fills/borders without hardcoding
+// the cyan/pink rgb triples.
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    // Fallback to the cyan accent if a non-hex value sneaks in.
+    return `rgba(34, 211, 238, ${alpha})`;
+  }
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 // ============================================================================
@@ -784,13 +857,14 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
 
-  // Title block — generous top padding to breathe from header
+  // Title — more room above to push the hero down from the header
   titleBlock: {
-    paddingTop: 32,
+    paddingTop: 44,
     paddingBottom: 6,
   },
   title: {
@@ -798,93 +872,82 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
     lineHeight: 34,
-    marginBottom: 12,
     letterSpacing: -0.3,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    lineHeight: 21,
-  },
 
-  // YOUR PROGRAM card — slightly more prominent than v6
-  programCard: {
-    borderRadius: 14,
+  // Prompt preview card — the hero, and the copy button. Real prompt
+  // text (mono) under a bottom fade, with the Copy/Copied pill overlaid
+  // bottom-right. Tapping the card copies.
+  promptCard: {
+    backgroundColor: '#131316',
     borderWidth: 0.5,
-    padding: 16,
+    borderColor: '#27272a',
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 32,
+    minHeight: 168,
+    overflow: 'hidden',
+  },
+  promptText: {
+    fontSize: 11,
+    color: '#6b7280',
+    lineHeight: 18,
+  },
+  promptFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 96,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+  },
+  copyPill: {
+    position: 'absolute',
+    bottom: 14,
+    right: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 28,
-    marginBottom: 32,
-  },
-  programIcon: {
-    width: 36,
-    height: 36,
+    gap: 6,
+    borderWidth: 0.5,
     borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 13,
   },
-  programLabel: {
-    fontSize: 11,
-    color: '#71717a',
-    letterSpacing: 0.5,
-    fontWeight: '600',
-    marginBottom: 3,
-  },
-  programTitle: {
-    fontSize: 15,
-    color: '#ffffff',
-    fontWeight: '600',
-    lineHeight: 19,
-  },
-  programMeta: {
+  copyPillText: {
     fontSize: 12,
-    color: '#a1a1aa',
-    marginTop: 3,
+    fontWeight: '600',
   },
 
-  // 3-step flow — bigger icons, more space
-  flowStrip: {
+  // Framing line
+  framingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 8,
-    marginBottom: 34,
+    paddingTop: 28,
+    paddingBottom: 8,
   },
-  flowStep: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 8,
-  },
-  flowStepIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  flowStepLabel: {
-    fontSize: 11,
-    textAlign: 'center',
-    lineHeight: 14,
+  framingText: {
+    fontSize: 13,
+    color: '#d4d4d8',
   },
 
-  // AI cards (initial state) — larger and more spaced
-  aiCard: {
+  // AI rows (initial state)
+  aiRow: {
     backgroundColor: '#18181b',
     borderWidth: 0.5,
     borderColor: '#27272a',
     borderRadius: 16,
-    padding: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    marginBottom: 14,
+    marginTop: 14,
   },
   aiLogoBox: {
-    width: 46,
-    height: 46,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -894,158 +957,196 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.5,
   },
-  aiName: {
-    fontSize: 17,
+  aiRowText: {
+    flex: 1,
+    fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
-    lineHeight: 22,
-    flex: 1,
-  },
-  aiArrow: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 
-  // "Use a different AI" — more isolated with generous margin
-  differentAIButton: {
-    backgroundColor: '#0f0f10',
-    borderWidth: 0.5,
-    borderColor: '#27272a',
-    borderRadius: 12,
-    padding: 14,
+  // "…or use any other AI" — plain hint, centered, quiet
+  otherAIHint: {
+    fontSize: 13,
+    color: '#71717a',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+
+  // Footer
+  footer: {
+    alignItems: 'center',
+    gap: 22,
+    paddingTop: 36,
+    marginTop: 36,
+    borderTopWidth: 0.5,
+    borderTopColor: '#18181b',
+  },
+  helpPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    marginTop: 22,
-    marginBottom: 28,
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderWidth: 0.5,
+    borderColor: '#27272a',
+    borderRadius: 20,
   },
-  differentAIText: {
+  helpPillText: {
     fontSize: 13,
     color: '#d4d4d8',
     fontWeight: '500',
   },
-
-  // Footer link
   footerLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 16,
-    paddingBottom: 8,
-    marginTop: 8,
-    borderTopWidth: 0.5,
-    borderTopColor: '#18181b',
+    paddingBottom: 4,
   },
   footerLinkText: {
     fontSize: 13,
     color: '#71717a',
   },
 
-  // Return state — welcome banner
-  welcomeBanner: {
-    borderRadius: 18,
-    padding: 20,
-    marginTop: 20,
-    marginBottom: 22,
+  // Return state (B3) — "add your file"
+  // Return state (B3, paced as B) — fills the screen vertically
+  returnRoot: {
+    flex: 1,
   },
-  welcomeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 14,
+  returnTitleBlock: {
+    paddingTop: 48,
+    paddingBottom: 6,
   },
-  welcomeIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(10, 10, 11, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  returnSubtitle: {
+    fontSize: 14,
+    color: '#a1a1aa',
+    lineHeight: 21,
+    marginTop: 10,
   },
-  welcomeTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0a0a0b',
-    lineHeight: 22,
+  // Grows to fill the space between the title and the bottom padding.
+  returnBody: {
+    flex: 1,
+    paddingTop: 26,
+    paddingBottom: 8,
   },
-  welcomeSubtitle: {
-    fontSize: 13,
-    color: 'rgba(10, 10, 11, 0.7)',
-    lineHeight: 18,
-    marginTop: 1,
-  },
-  // Primary import button (paste) — filled dark on the banner
-  welcomeButton: {
-    backgroundColor: '#0a0a0b',
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  welcomeButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  // Secondary import button (saved file) — outlined on the banner
-  welcomeButtonSecondary: {
-    backgroundColor: 'transparent',
+  // Big tappable paste zone — accent-tinted dashed target, grows to fill.
+  pasteZone: {
+    flex: 1,
+    backgroundColor: 'rgba(34, 211, 238, 0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(10, 10, 11, 0.4)',
-    borderRadius: 12,
-    padding: 12.5,
+    borderColor: 'rgba(34, 211, 238, 0.35)',
+    borderStyle: 'dashed',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pasteZoneIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 17,
+    backgroundColor: 'rgba(34, 211, 238, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pasteZoneTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginTop: 16,
+  },
+  pasteZoneHint: {
+    fontSize: 12,
+    color: '#71717a',
+    marginTop: 6,
+  },
+  // Secondary saved-file link
+  importFileLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    paddingTop: 18,
   },
-  welcomeButtonSecondaryText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0a0a0b',
+  importFileLinkText: {
+    fontSize: 13,
+    color: '#71717a',
   },
 
-  // Return state — retry section
-  didntWorkLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    color: '#71717a',
-    marginBottom: 10,
+  // Help sheet
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
-  aiCardCompact: {
-    backgroundColor: '#18181b',
-    borderWidth: 0.5,
+  sheetRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetCard: {
+    backgroundColor: '#131316',
+    borderTopWidth: 0.5,
     borderColor: '#27272a',
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 8,
   },
-  aiLogoBoxSmall: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  sheetGrabber: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3f3f46',
+    marginTop: 8,
+    marginBottom: 18,
+  },
+  sheetTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 6,
+  },
+  sheetIntro: {
+    fontSize: 13,
+    color: '#a1a1aa',
+    lineHeight: 19,
+    marginBottom: 24,
+  },
+  sheetStep: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 20,
+  },
+  sheetStepNum: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 0.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  aiLogoLetterSmall: {
-    fontSize: 14,
+  sheetStepNumText: {
+    fontSize: 12,
     fontWeight: '600',
-    letterSpacing: -0.3,
   },
-  aiNameCompact: {
-    flex: 1,
+  sheetStepTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
+    marginBottom: 2,
+  },
+  sheetStepBody: {
+    fontSize: 12.5,
+    color: '#a1a1aa',
+    lineHeight: 18,
+  },
+  sheetCta: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  sheetCtaText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0a0a0b',
   },
 });

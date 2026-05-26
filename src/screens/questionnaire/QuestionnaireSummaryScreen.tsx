@@ -7,8 +7,8 @@
 // Top: header (back + close to dismiss the whole flow).
 // Body: hero "Your plan" title + a list of summary rows (one per Q),
 //   each tappable to edit. Refinements appear in a collapsible-style
-//   section below.
-// Footer: "Continue to prompt" primary CTA + "Start over" secondary.
+//   section below. The CTAs ("Continue to prompt" / "Start over")
+//   flow at the end of the scroll content, after refinements.
 //
 // Editing flow:
 //   tap a row → navigate to that Q in editMode → user changes value
@@ -232,12 +232,12 @@ export default function QuestionnaireSummaryScreen() {
 
   const handleStartOver = () => {
     Alert.alert(
-      'Start over?',
+      'Restart questionnaire?',
       'This will clear all your answers and start the questionnaire from the beginning.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Start over',
+          text: 'Restart',
           style: 'destructive',
           onPress: async () => {
             await clearQuestionnaireAnswers();
@@ -304,16 +304,16 @@ export default function QuestionnaireSummaryScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 12) + 24 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero */}
-        <Text style={[styles.eyebrow, { color: themeColor }]}>
-          REVIEW & GENERATE
-        </Text>
         <Text style={styles.title}>Looking good.</Text>
         <Text style={styles.subtitle}>
-          Tap any answer to change it, or continue to send it to your AI.
+          Tap any answer to change it, or continue to the next step.
         </Text>
 
         {/* Main rows */}
@@ -400,34 +400,27 @@ export default function QuestionnaireSummaryScreen() {
           <Ionicons name="chevron-forward" size={16} color="#52525b" />
         </TouchableOpacity>
 
-        <View style={{ height: 12 }} />
+        {/* CTAs — flow at the end of the content, not pinned */}
+        <View style={styles.ctas}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handleContinue}
+            style={[styles.primaryBtn, { backgroundColor: themeColor }]}
+          >
+            <Text style={[styles.primaryBtnText, { color: '#0a0a0b' }]}>
+              Continue
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleStartOver}
+            style={styles.secondaryBtn}
+          >
+            <Text style={styles.secondaryBtnText}>Restart questionnaire</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-
-      {/* Footer: stacked CTAs */}
-      <View
-        style={[
-          styles.footer,
-          { paddingBottom: Math.max(insets.bottom, 12) + 4 },
-        ]}
-      >
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={handleContinue}
-          style={[styles.primaryBtn, { backgroundColor: themeColor }]}
-        >
-          <Text style={[styles.primaryBtnText, { color: '#0a0a0b' }]}>
-            Continue to prompt
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={handleStartOver}
-          style={styles.secondaryBtn}
-        >
-          <Text style={styles.secondaryBtnText}>Start over</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -535,12 +528,6 @@ const styles = StyleSheet.create({
   },
 
   // Hero
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 14,
-  },
   title: {
     fontSize: 32,
     fontWeight: '700',
@@ -618,13 +605,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Footer
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#18181b',
-    backgroundColor: '#0a0a0b',
+  // CTAs — now inline at the end of the scroll content
+  ctas: {
+    marginTop: 32,
     gap: 6,
   },
   primaryBtn: {

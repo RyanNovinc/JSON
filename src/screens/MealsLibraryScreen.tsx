@@ -196,7 +196,13 @@ export default function MealsLibraryScreen() {
         >
           <View style={styles.cardImageWrap}>
             {imageSource ? (
-              <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
+              <Image 
+                source={imageSource} 
+                style={styles.cardImage} 
+                resizeMode="cover"
+                fadeDuration={200}
+                loadingIndicatorSource={{ uri: 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==' }}
+              />
             ) : (
               <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
                 <Ionicons name="restaurant-outline" size={24} color="#52525b" />
@@ -354,12 +360,12 @@ export default function MealsLibraryScreen() {
             { paddingBottom: insets.bottom + 24 },
           ]}
           showsVerticalScrollIndicator={false}
-          // Performance — these matter when the meal database grows.
-          // At 7-20 items they don't do much, but they're free and correct.
+          // Performance — optimized for smooth scrolling
           initialNumToRender={6}
-          maxToRenderPerBatch={6}
-          windowSize={5}
-          removeClippedSubviews
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={4}
+          updateCellsBatchingPeriod={100}
+          windowSize={10}
         />
       )}
     </View>

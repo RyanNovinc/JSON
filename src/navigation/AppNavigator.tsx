@@ -14,6 +14,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import WorkoutPreviewScreen from '../screens/WorkoutPreviewScreen';
+import SamplePlanDetailScreen from '../screens/SamplePlanDetailScreen';
 // ModeTransitionContainer is no longer wired in — mode switching is now via
 // the bottom tab bar. Import kept in case it's needed elsewhere.
 // import ModeTransitionContainer from '../components/ModeTransitionContainer';
@@ -98,6 +99,21 @@ import RefinementsScreen from '../screens/questionnaire/RefinementsScreen';
 import PromptReadyScreen from '../screens/questionnaire/PromptReadyScreen';
 import QuestionnaireSummaryScreen from '../screens/questionnaire/QuestionnaireSummaryScreen';
 
+// Import nutrition questionnaire screens
+import N1GoalScreen from '../screens/nutrition/questionnaire/N1GoalScreen';
+import N2RateScreen from '../screens/nutrition/questionnaire/N2RateScreen';
+import N3AboutYouScreen from '../screens/nutrition/questionnaire/N3AboutYouScreen';
+import N4ActivityScreen from '../screens/nutrition/questionnaire/N4ActivityScreen';
+import N5DietTypeScreen from '../screens/nutrition/questionnaire/N5DietTypeScreen';
+import N6MealsSnackingScreen from '../screens/nutrition/questionnaire/N6MealsSnackingScreen';
+import N7LocationScreen from '../screens/nutrition/questionnaire/N7LocationScreen';
+import N8BudgetScreen from '../screens/nutrition/questionnaire/N8BudgetScreen';
+import N9PlanLengthScreen from '../screens/nutrition/questionnaire/N9PlanLengthScreen';
+import N10CookingScreen from '../screens/nutrition/questionnaire/N10CookingScreen';
+import NutritionRefinementsScreen from '../screens/nutrition/questionnaire/NutritionRefinementsScreen';
+import NutritionSummaryScreen from '../screens/nutrition/questionnaire/NutritionSummaryScreen';
+import NutritionPromptReadyScreen from '../screens/nutrition/questionnaire/NutritionPromptReadyScreen';
+
 // New: custom tab bar
 import { CustomTabBar, CREATE_ROUTE } from './CustomTabBar';
 
@@ -114,6 +130,7 @@ interface CleanMealPlanNavigationParams {
 export type RootStackParamList = {
   Main: undefined;
   CreateFlow: undefined;
+  SamplePlanDetail: { plan: any };
   ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean };
   ImportSharedContent: { shareId: string };
   ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
@@ -283,6 +300,20 @@ export type RootStackParamList = {
   QuestionnaireRefinements: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   PromptReady: undefined;
   QuestionnaireSummary: undefined;
+  // Nutrition questionnaire screens
+  N1Goal: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N2Rate: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N3AboutYou: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N4Activity: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N5DietType: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N6MealsSnacking: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N7Location: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N8Budget: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N9PlanLength: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N10Cooking: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  NutritionRefinements: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  NutritionSummary: undefined;
+  NutritionPromptReady: undefined;
 };
 
 // Tab param list — 5 tabs (with the Create slot in the middle).
@@ -517,6 +548,14 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                       ],
                     },
                   }),
+                }}
+              />
+              {/* SamplePlanDetail — preview + import screen for the Bulking program cards */}
+              <RootStack.Screen
+                name="SamplePlanDetail"
+                component={SamplePlanDetailScreen}
+                options={{
+                  headerShown: false,
                 }}
               />
               <RootStack.Screen
@@ -1069,6 +1108,21 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen name="QuestionnaireRefinements" component={RefinementsScreen} options={{ headerShown: false }} />
               <RootStack.Screen name="PromptReady" component={PromptReadyScreen} options={{ headerShown: false }} />
               <RootStack.Screen name="QuestionnaireSummary" component={QuestionnaireSummaryScreen} options={{ headerShown: false }} />
+
+              {/* Nutrition questionnaire screens */}
+              <RootStack.Screen name="N1Goal" component={N1GoalScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N2Rate" component={N2RateScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N3AboutYou" component={N3AboutYouScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N4Activity" component={N4ActivityScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N5DietType" component={N5DietTypeScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N6MealsSnacking" component={N6MealsSnackingScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N7Location" component={N7LocationScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N8Budget" component={N8BudgetScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N9PlanLength" component={N9PlanLengthScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N10Cooking" component={N10CookingScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="NutritionRefinements" component={NutritionRefinementsScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="NutritionSummary" component={NutritionSummaryScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="NutritionPromptReady" component={NutritionPromptReadyScreen} options={{ headerShown: false }} />
             </>
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />

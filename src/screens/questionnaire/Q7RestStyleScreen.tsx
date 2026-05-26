@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import QuestionnaireHeader from './QuestionnaireHeader';
+import QuestionCard from './QuestionCard';
 import { updateQuestionnaireField } from '../../utils/questionnaireStorage';
 
 /**
@@ -32,7 +33,6 @@ interface RestOption {
   value: SessionStyleValue;
   title: string;
   subtitle: string;
-  restHint: string;
   icon: keyof typeof Ionicons.glyphMap;
 }
 
@@ -40,22 +40,19 @@ const OPTIONS: RestOption[] = [
   {
     value: 'optimal',
     title: 'Optimal',
-    subtitle: 'Full recovery between sets, maximum strength',
-    restHint: '2–4 min between sets',
+    subtitle: 'Full recovery between sets, maximum strength. 2–4 min between sets',
     icon: 'hourglass-outline',
   },
   {
     value: 'moderate',
     title: 'Moderate',
-    subtitle: 'Balanced strength and conditioning',
-    restHint: '60–90 sec between sets',
+    subtitle: 'Balanced strength and conditioning. 60–90 sec between sets',
     icon: 'time-outline',
   },
   {
     value: 'minimal',
     title: 'Minimal',
-    subtitle: 'Short rest, more cardio stress',
-    restHint: '30–60 sec between sets',
+    subtitle: 'Short rest, more cardio stress. 30–60 sec between sets',
     icon: 'flash-outline',
   },
 ];
@@ -68,7 +65,7 @@ export default function Q7RestStyleScreen() {
   const navigation = useNavigation<StackNavigationProp<any>>();
   const route = useRoute<RouteProp<ParamList, 'Q7RestStyle'>>();
   const insets = useSafeAreaInsets();
-  const { themeColor, colors } = useTheme();
+  const { themeColor } = useTheme();
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
@@ -114,43 +111,17 @@ export default function Q7RestStyleScreen() {
           More rest builds strength. Less rest builds conditioning.
         </Text>
 
-        <View style={styles.optionsList}>
-          {OPTIONS.map((opt) => {
-            const isSelected = selected === opt.value;
-            return (
-              <TouchableOpacity
-                key={opt.value}
-                activeOpacity={0.85}
-                onPress={() => setSelected(opt.value)}
-                style={[
-                  styles.card,
-                  isSelected && {
-                    borderColor: themeColor,
-                    backgroundColor: colors.primaryAlpha20,
-                    borderWidth: 1.5,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.iconBox,
-                    isSelected && { backgroundColor: themeColor },
-                  ]}
-                >
-                  <Ionicons
-                    name={opt.icon}
-                    size={20}
-                    color={isSelected ? '#0a0a0b' : '#a1a1aa'}
-                  />
-                </View>
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{opt.title}</Text>
-                  <Text style={styles.cardSubtitle}>{opt.subtitle}</Text>
-                  <Text style={styles.restHint}>{opt.restHint}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+        <View>
+          {OPTIONS.map((opt) => (
+            <QuestionCard
+              key={opt.value}
+              icon={opt.icon}
+              title={opt.title}
+              subtitle={opt.subtitle}
+              selected={selected === opt.value}
+              onPress={() => setSelected(opt.value)}
+            />
+          ))}
         </View>
       </ScrollView>
 
@@ -211,48 +182,6 @@ const styles = StyleSheet.create({
     color: '#a1a1aa',
     lineHeight: 22,
     marginBottom: 28,
-  },
-  optionsList: {
-    gap: 0,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#18181b',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#27272a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  cardText: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: '#a1a1aa',
-    lineHeight: 18,
-  },
-  restHint: {
-    fontSize: 12,
-    color: '#71717a',
-    marginTop: 4,
-    fontVariant: ['tabular-nums'],
   },
   ctaBar: {
     paddingHorizontal: 20,

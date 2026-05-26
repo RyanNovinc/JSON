@@ -221,6 +221,9 @@ export default function DaysScreen() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkedWeek, setBookmarkedWeek] = useState<number | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Deload week detection
+  const isDeloadWeek = localBlock.deload_weeks?.includes(currentWeek) || false;
   const [showAddDayModal, setShowAddDayModal] = useState(false);
   const [newDayName, setNewDayName] = useState('');
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -907,7 +910,14 @@ export default function DaysScreen() {
             {/* Title block */}
             <View style={styles.titleBlock}>
               <View style={styles.titleRow}>
-                <Text style={styles.weekTitle}>Week {currentWeek}</Text>
+                <View style={styles.weekTitleContainer}>
+                  <Text style={styles.weekTitle}>Week {currentWeek}</Text>
+                  {isDeloadWeek && (
+                    <View style={styles.deloadBadge}>
+                      <Text style={styles.deloadBadgeText}>DELOAD WEEK</Text>
+                    </View>
+                  )}
+                </View>
                 <TouchableOpacity
                   style={styles.bookmarkButton}
                   onPress={toggleBookmark}
@@ -921,6 +931,12 @@ export default function DaysScreen() {
                   />
                 </TouchableOpacity>
               </View>
+
+              {isDeloadWeek && (
+                <Text style={styles.deloadSubtext}>
+                  Reduced volume — recover and back off
+                </Text>
+              )}
 
               <View style={styles.weekSubtitleRow}>
                 <Text style={styles.weekSubtitle}>

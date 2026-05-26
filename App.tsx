@@ -13,6 +13,7 @@ import SplashScreen from './src/components/SplashScreen';
 import { WorkoutStorage } from './src/utils/storage';
 import { validateProductionEnvironment } from './src/utils/environmentValidator';
 import { validateAll } from './src/utils/curated_meals_validation';
+import { preloadCriticalImages } from './src/utils/imagePreloader';
 
 // Keep the native splash screen visible while loading
 ExpoSplashScreen.preventAutoHideAsync();
@@ -54,6 +55,11 @@ function AppContent() {
     // Perform data recovery on app startup to fix any corrupted data
     WorkoutStorage.performDataRecovery().catch(error => {
       console.error('❌ [APP] Data recovery failed:', error);
+    });
+    
+    // Preload critical images for better performance
+    preloadCriticalImages().catch(error => {
+      console.warn('⚠️ [APP] Image preloading failed:', error);
     });
   }, []);
 

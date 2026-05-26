@@ -88,7 +88,11 @@ export default function SmoothiesLibraryScreen() {
         >
           <View style={styles.cardImageWrap}>
             {imageSource ? (
-              <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
+              <Image 
+                source={imageSource} 
+                style={styles.cardImage} 
+                resizeMode="cover"
+              />
             ) : (
               <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
                 <Ionicons name="cafe-outline" size={24} color="#52525b" />

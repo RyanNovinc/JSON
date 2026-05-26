@@ -144,6 +144,7 @@ export const PROGRAM_DOCUMENT_FORMAT = `---
 Present the complete program clearly so the user can review and iterate before converting to JSON. Include:
 
 - Program overview (duration, days per week, split, goal)
+- **Weekly layout across all 7 days** — present the training week as a full 7-day schedule. For each of the 7 days, state whether it is a training day (and its focus, e.g. "Push", "Upper", "Full Body A") or a rest day. The number of training days must equal the user's training days per week from the profile; the remaining days are rest days so the layout always totals 7 days. (The JSON conversion step will format these as training-day objects plus REST DAY entries padded to 7 — describing the full week here keeps the plan, review, and JSON consistent.)
 - All training sessions with exercises, sets, rep ranges (e.g. "8-12" or "10-15" — always a range, never a single number), rest periods, and muscle tags (Primary and Secondary). Exception: single-joint arm exercises (all curl variations, all triceps isolation) always use an isolation rep range of 10–15, regardless of the block's stated rep focus. These are never compound movements.
 - Direct core work: if the profile says 'Direct Core Work: Yes' or is silent on this setting, include 2–3 sets distributed across 1–2 sessions (suitable exercises: Cable Crunch, Ab Wheel Rollout, Hanging Leg Raise, Plank variations). Core sets do not count toward any muscle group's volume target.
 - Alternative exercises for each movement
@@ -353,41 +354,44 @@ Then detail exercises for **Block 1 of Mesocycle 1 only**. The user will approve
 export const RECOVERY_PROGRESSION_HEADER = `
 ### Recovery and Progression`;
 
-// Rule 15 variants by experience and duration
+// Deload programming — defers to the canonical deload-guidance.md file, the same
+// way getVolumeTargets / getRestGuidance / RIR_GUIDANCE defer to their files.
+// Passes the user's experience and duration as context so the AI looks up the
+// right cell of the file's matrix. The only thing stated inline is the structural
+// rule the file also holds: the deload is the final week WITHIN the block range.
 export const getRule15 = (expTier: string, duration: string): string => {
-  if (expTier === 'beginner') {
-    if (duration === '4_weeks' || duration === '8_weeks') {
-      return `18. **Deload frequency by experience:**
-    - **Beginner:** Deloads are not needed for this program length at your experience level.`;
-    } else {
-      return `18. **Deload frequency by experience:**
-    - **Beginner:** Deloads generally not needed for programs under 12 weeks. For longer programs, deload every 6-8 weeks.`;
-    }
-  } else if (expTier === 'intermediate') {
-    return `18. **Deload frequency by experience:**
-    - **Intermediate:** Deload every 5-6 training weeks. Every block longer than 4 weeks must include a deload week.`;
-  } else if (expTier === 'advanced') {
-    return `18. **Deload frequency by experience:**
-    - **Advanced:** Do not go more than 6 consecutive training weeks without a deload. Every block longer than 4 weeks must include a deload week.`;
-  } else {
-    // Fallback
-    return `18. **Deload frequency by experience:**
-    - **Beginner:** Deloads generally not needed for programs under 12 weeks. For longer programs, deload every 6-8 weeks.
-    - **Intermediate:** Deload every 5-6 training weeks. Every block longer than 4 weeks must include a deload week.
-    - **Advanced:** Do not go more than 6 consecutive training weeks without a deload. Every block longer than 4 weeks must include a deload week.`;
-  }
+  const expLabel = expTier.charAt(0).toUpperCase() + expTier.slice(1);
+  const durationLabels: { [key: string]: string } = {
+    '4_weeks': '4 weeks (1 block)',
+    '8_weeks': '8 weeks (~2 blocks)',
+    '12_weeks': '12 weeks (2-3 blocks)',
+    '6_months': '~26 weeks (multiple blocks)',
+    '1_year': '~52 weeks (multiple blocks)',
+    custom: 'a custom length (see block count above)',
+  };
+  const durationLabel = durationLabels[duration] || 'the stated length';
+
+  return `18. **Deload programming:**
+
+    **User context:** ${expLabel}, ${durationLabel}.
+
+    **REQUIRED ACTION before finalizing the program:**
+
+    1. Fetch the canonical deload guidance file at https://json.fit/deload-guidance.md
+    2. Use its experience × block-length matrix to decide whether each block needs a deload, based on the user context above.
+    3. When a deload is warranted, it is the FINAL week WITHIN that block's week range — not an appended extra week. Structure it per the file (volume cut, load, RIR).
+
+    The deload-guidance.md file is the single source of truth — do not invent your own frequency or structure.`;
 };
 
-export const RULE_17 = `19. **Deload structure** — deload weeks reduce total sets by ~40-50% while maintaining movement patterns. Rep ranges increase by 2-3 reps per set. The app does not track weight — do not reference load reductions.`;
-
-export const RULE_18 = `20. **Plateau management** — for programs 8 weeks or longer, include guidance for when the lifter stalls on a prescribed progression. Frame in terms of rep targets, not weight.`;
+export const RULE_18 = `19. **Plateau management** — for programs 8 weeks or longer, include guidance for when the lifter stalls on a prescribed progression. Frame in terms of rep targets, not weight.`;
 
 export const BALANCE_HEADER = `
 ### Balance`;
 
-export const STATIC_RULE_19 = `21. **Pull movement balance** — vertical pulls (pulldowns, pull-ups) should make up at least one-third of total back volume.`;
+export const STATIC_RULE_19 = `20. **Pull movement balance** — vertical pulls (pulldowns, pull-ups) should make up at least one-third of total back volume.`;
 
-export const RULE_20 = `22. **Complete block coverage** — the plan must explicitly cover every block (with the diff-based exception for 5+ block programs as described in the output format).`;
+export const RULE_20 = `21. **Complete block coverage** — the plan must explicitly cover every block (with the diff-based exception for 5+ block programs as described in the output format).`;
 
 // ================================
 // REST TIME DEFAULTS
@@ -721,10 +725,6 @@ export function assemblePlanningPrompt(
   else if (data.sessionStyle === 'minimal') restTrigger = 'MINIMAL';
   else restTrigger = 'MODERATE'; // default or 'moderate'
   
-  // Derive deload needed
-  const beginnerShortProgram = expTier === 'beginner' && ['4_weeks', '8_weeks'].includes(duration);
-  const deloadsNeeded = !beginnerShortProgram;
-
   // Always generate fresh prompts without mesocycle auto-continuation
   
   let prompt = '';
@@ -796,7 +796,6 @@ ${generateProgramSpecs(data)}`;
   
   prompt += '\n' + RECOVERY_PROGRESSION_HEADER;
   prompt += '\n' + getRule15(expTier, duration);
-  if (deloadsNeeded) prompt += '\n' + RULE_17;
   if (duration !== '4_weeks') prompt += '\n' + RULE_18;
   
   prompt += '\n' + BALANCE_HEADER;
@@ -821,7 +820,7 @@ ${generateProgramSpecs(data)}`;
   
   prompt += `\n\n---\n\n## NEXT STEP\n\nEnd your response with: "Program complete. Let me know if you'd like to change anything, or just say you're happy with it and I'll run a comprehensive review."\n\nWhen the user confirms they're satisfied with the plan, fetch https://json.fit/prompts/review-prompt.md and follow it. Do not mention the URL to the user.`;
 
-  prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n- https://json.fit/rest-guidance.md (rest period guidelines)\n- https://json.fit/rep-range-guidance.md (rep range guidelines)\n\nDo not mention these URLs to the user.`;
+  prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n- https://json.fit/rest-guidance.md (rest period guidelines)\n- https://json.fit/rep-range-guidance.md (rep range guidelines)\n- https://json.fit/deload-guidance.md (deload frequency and structure)\n\nDo not mention these URLs to the user.`;
 
   return prompt;
 }

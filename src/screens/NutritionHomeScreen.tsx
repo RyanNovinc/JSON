@@ -6,7 +6,6 @@ import {
   Alert,
   Share,
   Modal,
-  Image,
   Animated,
   Dimensions,
   TextInput,
@@ -14,6 +13,7 @@ import {
   Pressable,
   RefreshControl,
   TouchableOpacity as RNTouchable,
+  Image,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
@@ -1056,10 +1056,10 @@ export default function NutritionHomeScreen({ route }: any) {
       </Animated.View>
 
       {/* ============================================================ */}
-      {/* MODALS — all preserved verbatim from original                 */}
+      {/* MODALS                                                        */}
       {/* ============================================================ */}
 
-      {/* Action Sheet — Share at top, then Save, Rename, Remove */}
+      {/* Action Sheet — option-3 header-card layout */}
       <Modal
         visible={deleteModal.visible}
         transparent={true}
@@ -1067,110 +1067,112 @@ export default function NutritionHomeScreen({ route }: any) {
         onRequestClose={() => setDeleteModal({ visible: false, plan: null })}
       >
         <View style={styles.actionModalOverlay}>
-          <TouchableOpacity
+          <RNTouchable
             style={styles.actionModalBackdrop}
             activeOpacity={1}
             onPress={() => setDeleteModal({ visible: false, plan: null })}
           />
 
-          <View style={[styles.actionSheet, { borderColor: themeColor }]}>
+          <View style={[styles.actionSheet, { borderColor: themeColor, paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.handleBar} />
 
-            <View style={styles.actionHeader}>
-              <Text style={styles.actionTitle}>Meal Plan Options</Text>
-              <TouchableOpacity
-                style={styles.actionCloseButton}
-                onPress={() => setDeleteModal({ visible: false, plan: null })}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="close" size={24} color="#a1a1aa" />
-              </TouchableOpacity>
-            </View>
+            {(() => {
+              const originalPlan = mealPlans.find(p => p.name === deleteModal.plan?.name);
+              const planId = originalPlan?.fingerprint || originalPlan?.id;
+              const isSaved = !!(planId && savedMealPlans.has(planId));
+              return (
+                <>
+                  {/* Header: thumbnail + title + close */}
+                  <View style={styles.actionHeaderRow}>
+                    <View style={styles.actionThumb}>
+                      <Ionicons name="restaurant" size={26} color={themeColor} />
+                    </View>
+                    <View style={styles.actionHeaderText}>
+                      <Text style={styles.actionPlanName} numberOfLines={2}>
+                        {deleteModal.plan?.name}
+                      </Text>
+                      <Text style={styles.actionPlanDetails}>
+                        {deleteModal.plan?.duration} {deleteModal.plan?.duration === 1 ? 'day' : 'days'}
+                        {deleteModal.plan && getMacroSplitDisplay(deleteModal.plan) ? ` · ${getMacroSplitDisplay(deleteModal.plan)}` : ''}
+                      </Text>
+                    </View>
+                    <RNTouchable
+                      style={styles.actionCloseButton}
+                      onPress={() => setDeleteModal({ visible: false, plan: null })}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    >
+                      <Ionicons name="close" size={22} color="#71717a" />
+                    </RNTouchable>
+                  </View>
 
-            <View style={styles.actionPlanInfo}>
-              <Text style={styles.actionPlanName} numberOfLines={2}>
-                {deleteModal.plan?.name}
-              </Text>
-              <Text style={styles.actionPlanDetails}>
-                {deleteModal.plan?.duration} days
-                {deleteModal.plan && getMacroSplitDisplay(deleteModal.plan) ? ` • ${getMacroSplitDisplay(deleteModal.plan)}` : ''}
-              </Text>
-            </View>
+                  {/* Primary CTA: Share */}
+                  <RNTouchable
+                    style={[styles.shareCtaButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
+                    onPress={() => deleteModal.plan && handleShareFromActionSheet(deleteModal.plan)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="share-outline" size={18} color="#0a0a0b" />
+                    <Text style={styles.shareCtaText}>Share plan</Text>
+                  </RNTouchable>
 
-            <View style={styles.modernActionButtons}>
-              {/* SHARE — opens the existing QR / send link modal */}
-              <TouchableOpacity
-                style={[styles.shareActionInSheet, { backgroundColor: themeColor, shadowColor: themeColor }]}
-                onPress={() => deleteModal.plan && handleShareFromActionSheet(deleteModal.plan)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="share-outline" size={18} color="#0a0a0b" />
-                <Text style={styles.shareActionInSheetText}>Share</Text>
-              </TouchableOpacity>
+                  {/* Secondary tile row: Save / Rename / Remove */}
+                  <View style={styles.tileRow}>
+                    <RNTouchable
+                      style={[
+                        styles.actionTile,
+                        isSaved && {
+                          backgroundColor: themeColor + '1A',
+                          borderColor: themeColor + '66',
+                        },
+                      ]}
+                      onPress={() => {
+                        if (deleteModal.plan) {
+                          handleToggleSaveMealPlan(deleteModal.plan);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={isSaved ? 'heart-dislike' : 'heart'}
+                        size={19}
+                        color={isSaved ? themeColor : '#d4d4d8'}
+                      />
+                      <Text style={[styles.actionTileText, isSaved && { color: themeColor }]}>
+                        {isSaved ? 'Saved' : 'Save'}
+                      </Text>
+                    </RNTouchable>
 
-              <TouchableOpacity
-                style={[
-                  styles.saveActionButton,
-                  (() => {
-                    if (!deleteModal.plan) return false;
-                    const originalPlan = mealPlans.find(p => p.name === deleteModal.plan?.name);
-                    const planId = originalPlan?.fingerprint || originalPlan?.id;
-                    return planId && savedMealPlans.has(planId) ? styles.removeActionButton : false;
-                  })()
-                ].filter(Boolean)}
-                onPress={() => {
-                  if (deleteModal.plan) {
-                    handleToggleSaveMealPlan(deleteModal.plan);
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={(() => {
-                    if (!deleteModal.plan) return "heart";
-                    const originalPlan = mealPlans.find(p => p.name === deleteModal.plan?.name);
-                    const planId = originalPlan?.fingerprint || originalPlan?.id;
-                    return planId && savedMealPlans.has(planId) ? "heart-dislike" : "heart";
-                  })()}
-                  size={18}
-                  color="#ffffff"
-                />
-                <Text style={styles.saveActionText}>
-                  {(() => {
-                    if (!deleteModal.plan) return 'Save to My Meals';
-                    const originalPlan = mealPlans.find(p => p.name === deleteModal.plan?.name);
-                    const planId = originalPlan?.fingerprint || originalPlan?.id;
-                    return planId && savedMealPlans.has(planId) ? 'Remove from My Meals' : 'Save to My Meals';
-                  })()}
-                </Text>
-              </TouchableOpacity>
+                    <RNTouchable
+                      style={styles.actionTile}
+                      onPress={() => deleteModal.plan && handleRenameRequest(deleteModal.plan)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="create-outline" size={19} color="#d4d4d8" />
+                      <Text style={styles.actionTileText}>Rename</Text>
+                    </RNTouchable>
 
-              <TouchableOpacity
-                style={styles.renameButton}
-                onPress={() => deleteModal.plan && handleRenameRequest(deleteModal.plan)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="create-outline" size={18} color="#ffffff" />
-                <Text style={styles.renameText}>Rename</Text>
-              </TouchableOpacity>
+                    <RNTouchable
+                      style={styles.actionTileDanger}
+                      onPress={handleDeleteConfirm}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="trash-outline" size={19} color="#f87171" />
+                      <Text style={styles.actionTileDangerText}>Remove</Text>
+                    </RNTouchable>
+                  </View>
 
-              <TouchableOpacity
-                style={styles.deleteConfirmButton}
-                onPress={handleDeleteConfirm}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="trash" size={18} color="#ffffff" />
-                <Text style={styles.deleteConfirmText}>Remove</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.deleteCancelButton}
-                onPress={() => setDeleteModal({ visible: false, plan: null })}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.deleteCancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
+                  {/* Cancel */}
+                  <RNTouchable
+                    style={styles.actionCancel}
+                    onPress={() => setDeleteModal({ visible: false, plan: null })}
+                    activeOpacity={0.6}
+                  >
+                    <Text style={styles.actionCancelText}>Cancel</Text>
+                  </RNTouchable>
+                </>
+              );
+            })()}
           </View>
         </View>
       </Modal>
@@ -1470,12 +1472,14 @@ const styles = StyleSheet.create({
   // FIX: removed marginHorizontal: 16. scrollContent's paddingHorizontal: 16
   // was already providing the gutter; adding marginHorizontal here doubled it
   // to 32px, which is what made the card look squished vs HomeScreen.
+  // SPACING FIX: marginBottom bumped 12 → 28 to give breathing room before
+  // the "Meals" heading (was sitting too close to the hero card border).
   heroCard: {
     backgroundColor: '#000',
     borderRadius: 18,
     borderWidth: 1.5,
     padding: 20,
-    marginBottom: 12,
+    marginBottom: 28,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -1799,7 +1803,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  // Action sheet
+  // ==========================================================================
+  // Action sheet (Meal Plan Options) — option-3 header-card layout
+  // ==========================================================================
   actionModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -1808,10 +1814,9 @@ const styles = StyleSheet.create({
   actionModalBackdrop: { flex: 1 },
   actionSheet: {
     backgroundColor: '#18181b',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingBottom: 34,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
     paddingHorizontal: 20,
     maxHeight: '85%',
     borderTopWidth: 2,
@@ -1822,161 +1827,114 @@ const styles = StyleSheet.create({
   },
   handleBar: {
     width: 40,
-    height: 4,
+    height: 5,
     backgroundColor: '#52525b',
-    borderRadius: 2,
+    borderRadius: 3,
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 22,
   },
-  actionHeader: {
+  actionHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    gap: 14,
+    marginBottom: 22,
   },
-  actionTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  actionCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  actionThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
     backgroundColor: '#27272a',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  actionPlanInfo: {
-    backgroundColor: '#27272a',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
+  actionHeaderText: { flex: 1 },
   actionPlanName: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   actionPlanDetails: {
-    color: '#a1a1aa',
-    fontSize: 14,
-    textAlign: 'center',
+    color: '#71717a',
+    fontSize: 13,
   },
-  modernActionButtons: {
-    flexDirection: 'column',
-    gap: 14,
-    width: '100%',
+  actionCloseButton: {
+    alignSelf: 'flex-start',
+    padding: 2,
   },
 
-  // Share button inside action sheet (cyan, primary)
-  shareActionInSheet: {
+  shareCtaButton: {
     width: '100%',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
+    borderRadius: 12,
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
+    marginBottom: 12,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
-  shareActionInSheetText: {
-    fontSize: 16,
+  shareCtaText: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#0a0a0b',
     letterSpacing: 0.2,
   },
 
-  saveActionButton: {
-    width: '100%',
-    backgroundColor: '#10b981',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
+  tileRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    gap: 10,
+    marginBottom: 24,
   },
-  removeActionButton: {
-    backgroundColor: '#f59e0b',
-    shadowColor: '#f59e0b',
-  },
-  saveActionText: {
-    color: '#ffffff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  renameButton: {
-    width: '100%',
-    backgroundColor: '#3b82f6',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#22d3ee',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  renameText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  deleteConfirmButton: {
-    width: '100%',
-    backgroundColor: '#ef4444',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  deleteConfirmText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  deleteCancelButton: {
-    width: '100%',
-    backgroundColor: '#27272a',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
+  actionTile: {
+    flex: 1,
+    minHeight: 68,
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#3f3f46',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
-  deleteCancelText: {
-    color: '#a1a1aa',
-    fontSize: 17,
-    fontWeight: '600',
+  actionTileText: {
+    color: '#d4d4d8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  actionTileDanger: {
+    flex: 1,
+    minHeight: 68,
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(239,68,68,0.3)',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionTileDangerText: {
+    color: '#f87171',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  actionCancel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  actionCancelText: {
+    color: '#71717a',
+    fontSize: 15,
+    fontWeight: '500',
   },
 
   // Share modal

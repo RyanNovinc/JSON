@@ -39,49 +39,21 @@ import { useAppMode } from '../contexts/AppModeContext';
 import { useHasNutritionAccess } from '../contexts/RevenueCatContext';
 import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
 import { getProgramImage } from '../assets/programImages';
+import { SAMPLE_PLANS } from '../data/samplePlans';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============================================================================
-// Bulking programs — placeholder data
+// Bulking programs — gradient fallback colors (used when no image is found).
+// The card data itself now comes from SAMPLE_PLANS (src/data/samplePlans).
 // ============================================================================
-type BulkingProgram = {
-  id: string;
-  title: string;
-  level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
-  frequency: string;
-  durationLabel: string;
-  gradient: [string, string];
+const PROGRAM_GRADIENTS: Record<string, [string, string]> = {
+  foundations: ['#1a1a1a', '#2d1410'],
+  builder: ['#1a1a1a', '#3a1f1a'],
+  mass: ['#1a1a1a', '#4a2820'],
 };
-
-const BULKING_PROGRAMS: BulkingProgram[] = [
-  {
-    id: 'foundations',
-    title: 'Foundations',
-    level: 'BEGINNER',
-    frequency: '3 days · Full body',
-    durationLabel: '4 weeks',
-    gradient: ['#1a1a1a', '#2d1410'],
-  },
-  {
-    id: 'builder',
-    title: 'Builder',
-    level: 'INTERMEDIATE',
-    frequency: '4 days · Upper/Lower',
-    durationLabel: '4 weeks',
-    gradient: ['#1a1a1a', '#3a1f1a'],
-  },
-  {
-    id: 'mass',
-    title: 'Mass',
-    level: 'ADVANCED',
-    frequency: '6 days · Push/Pull/Legs',
-    durationLabel: '4 weeks',
-    gradient: ['#1a1a1a', '#4a2820'],
-  },
-];
 
 // ============================================================================
 // Week strip
@@ -969,8 +941,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     navigation.getParent()?.navigate('CreateFlow' as never);
   };
 
-  const handleBulkingProgramPress = (program: BulkingProgram) => {
-    console.log('Bulking program tapped:', program.id);
+  const handleBulkingProgramPress = (plan: any) => {
+    navigation.navigate('SamplePlanDetail' as any, { plan });
   };
 
   const weekDays = getWeekDays(workoutDates);
@@ -991,13 +963,14 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         contentContainerStyle={styles.bulkingScrollContent}
         style={styles.bulkingScroll}
       >
-        {BULKING_PROGRAMS.map((program) => {
-          const imageSource = getProgramImage(program.id, isPinkTheme);
+        {SAMPLE_PLANS.map((plan) => {
+          const imageSource = getProgramImage(plan.id, isPinkTheme);
+          const gradient = PROGRAM_GRADIENTS[plan.id] || ['#1a1a1a', '#2d1410'];
           return (
             <TouchableOpacity
-              key={program.id}
+              key={plan.id}
               style={styles.bulkingCard}
-              onPress={() => handleBulkingProgramPress(program)}
+              onPress={() => handleBulkingProgramPress(plan)}
               activeOpacity={0.85}
             >
               <View style={styles.bulkingCardImage}>
@@ -1011,22 +984,22 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                   <View
                     style={[
                       styles.bulkingCardImageSrc,
-                      { backgroundColor: program.gradient[1] },
+                      { backgroundColor: gradient[1] },
                     ]}
                   />
                 )}
                 <View style={styles.bulkingLevelChip}>
                   <Text style={[styles.bulkingLevelText, { color: themeColor }]}>
-                    {program.level}
+                    {plan.level}
                   </Text>
                 </View>
                 <View style={styles.bulkingDurationChip}>
-                  <Text style={styles.bulkingDurationText}>{program.durationLabel}</Text>
+                  <Text style={styles.bulkingDurationText}>{plan.summary.weeks} weeks</Text>
                 </View>
               </View>
               <View style={styles.bulkingCardBody}>
-                <Text style={styles.bulkingCardTitle}>{program.title}</Text>
-                <Text style={styles.bulkingCardMeta}>{program.frequency}</Text>
+                <Text style={styles.bulkingCardTitle} numberOfLines={2}>{plan.summary.routine_name}</Text>
+                <Text style={styles.bulkingCardMeta} numberOfLines={1}>{plan.summary.daysPerWeek} days · {plan.summary.split}</Text>
               </View>
             </TouchableOpacity>
           );
@@ -1243,16 +1216,18 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         )}
       </Animated.View>
 
-      <TouchableOpacity
-        style={styles.debugTestButton}
-        onPress={() => {
-          console.log('🔴 [TEST] Simulating universal link import for shareId: BVFdmcwG');
-          navigation.navigate('ImportSharedContent', { shareId: 'BVFdmcwG' });
-        }}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.debugTestButtonText}>TEST UNIVERSAL LINK</Text>
-      </TouchableOpacity>
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.debugTestButton}
+          onPress={() => {
+            console.log('🔴 [TEST] Simulating universal link import for shareId: BVFdmcwG');
+            navigation.navigate('ImportSharedContent', { shareId: 'BVFdmcwG' });
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.debugTestButtonText}>TEST UNIVERSAL LINK</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal
         visible={shareModal.visible}
@@ -1388,87 +1363,110 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             onPress={() => setDeleteModal({ visible: false, routine: null })}
           />
 
-          <View style={[styles.actionSheet, { borderColor: themeColor }]}>
+          <View style={[styles.actionSheet, { borderColor: themeColor, paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.handleBar} />
 
-            <View style={styles.actionHeader}>
-              <Text style={styles.actionTitle}>Workout Options</Text>
-              <TouchableOpacity
-                style={styles.actionCloseButton}
-                onPress={() => setDeleteModal({ visible: false, routine: null })}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="close" size={24} color="#a1a1aa" />
-              </TouchableOpacity>
-            </View>
+            {(() => {
+              const isSaved = savedWorkoutRoutines.has(
+                deleteModal.routine?.fingerprint || deleteModal.routine?.id || ''
+              );
+              return (
+                <>
+                  {/* Header: thumbnail + title + close */}
+                  <View style={styles.actionHeaderRow}>
+                    <View style={styles.actionThumb}>
+                      <Ionicons name="barbell" size={26} color={themeColor} />
+                    </View>
+                    <View style={styles.actionHeaderText}>
+                      <Text style={styles.actionPlanName} numberOfLines={2}>
+                        {deleteModal.routine?.name}
+                      </Text>
+                      <Text style={styles.actionPlanDetails}>
+                        {deleteModal.routine?.days} days · {deleteModal.routine?.blocks} {deleteModal.routine?.blocks === 1 ? 'block' : 'blocks'}
+                      </Text>
+                    </View>
+                    <RNTouchable
+                      style={styles.actionCloseButton}
+                      onPress={() => setDeleteModal({ visible: false, routine: null })}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    >
+                      <Ionicons name="close" size={22} color="#71717a" />
+                    </RNTouchable>
+                  </View>
 
-            <View style={styles.actionPlanInfo}>
-              <Text style={styles.actionPlanName} numberOfLines={2}>
-                {deleteModal.routine?.name}
-              </Text>
-              <Text style={styles.actionPlanDetails}>
-                {deleteModal.routine?.days} days · {deleteModal.routine?.blocks} blocks
-              </Text>
-            </View>
+                  {/* Primary CTA: Share */}
+                  <RNTouchable
+                    style={[styles.shareCtaButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
+                    onPress={() => deleteModal.routine && handleShareFromActionSheet(deleteModal.routine)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="share-outline" size={18} color="#0a0a0b" />
+                    <Text style={styles.shareCtaText}>Share plan</Text>
+                  </RNTouchable>
 
-            <View style={styles.modernActionButtons}>
-              <TouchableOpacity
-                style={[styles.shareActionInSheet, { backgroundColor: themeColor, shadowColor: themeColor }]}
-                onPress={() => deleteModal.routine && handleShareFromActionSheet(deleteModal.routine)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="share-outline" size={18} color="#0a0a0b" />
-                <Text style={styles.shareActionInSheetText}>Share</Text>
-              </TouchableOpacity>
+                  {/* Secondary tile row: Save / Rename / Remove */}
+                  <View style={styles.tileRow}>
+                    <RNTouchable
+                      style={[
+                        styles.actionTile,
+                        isSaved && {
+                          backgroundColor: themeColor + '1A',
+                          borderColor: themeColor + '66',
+                        },
+                      ]}
+                      onPress={() => {
+                        if (deleteModal.routine) {
+                          handleToggleSaveWorkout(deleteModal.routine);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={isSaved ? 'heart-dislike' : 'heart'}
+                        size={19}
+                        color={isSaved ? themeColor : '#d4d4d8'}
+                      />
+                      <Text
+                        style={[
+                          styles.actionTileText,
+                          isSaved && { color: themeColor },
+                        ]}
+                      >
+                        {isSaved ? 'Saved' : 'Save'}
+                      </Text>
+                    </RNTouchable>
 
-              <TouchableOpacity
-                style={[
-                  styles.saveActionButton,
-                  savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') && styles.removeActionButton
-                ]}
-                onPress={() => {
-                  if (deleteModal.routine) {
-                    handleToggleSaveWorkout(deleteModal.routine);
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? "heart-dislike" : "heart"}
-                  size={18}
-                  color="#ffffff"
-                />
-                <Text style={styles.saveActionText}>
-                  {savedWorkoutRoutines.has(deleteModal.routine?.fingerprint || deleteModal.routine?.id || '') ? 'Remove from Collection' : 'Save to Collection'}
-                </Text>
-              </TouchableOpacity>
+                    <RNTouchable
+                      style={styles.actionTile}
+                      onPress={() => deleteModal.routine && handleRenameRequest(deleteModal.routine)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="create-outline" size={19} color="#d4d4d8" />
+                      <Text style={styles.actionTileText}>Rename</Text>
+                    </RNTouchable>
 
-              <TouchableOpacity
-                style={styles.renameButton}
-                onPress={() => deleteModal.routine && handleRenameRequest(deleteModal.routine)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="create-outline" size={18} color="#ffffff" />
-                <Text style={styles.renameText}>Rename</Text>
-              </TouchableOpacity>
+                    <RNTouchable
+                      style={styles.actionTileDanger}
+                      onPress={handleDeleteConfirm}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="trash-outline" size={19} color="#f87171" />
+                      <Text style={styles.actionTileDangerText}>Remove</Text>
+                    </RNTouchable>
+                  </View>
 
-              <TouchableOpacity
-                style={styles.deleteConfirmButton}
-                onPress={handleDeleteConfirm}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="trash" size={18} color="#ffffff" />
-                <Text style={styles.deleteConfirmText}>Remove</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.deleteCancelButton}
-                onPress={() => setDeleteModal({ visible: false, routine: null })}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.deleteCancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
+                  {/* Cancel */}
+                  <RNTouchable
+                    style={styles.actionCancel}
+                    onPress={() => setDeleteModal({ visible: false, routine: null })}
+                    activeOpacity={0.6}
+                  >
+                    <Text style={styles.actionCancelText}>Cancel</Text>
+                  </RNTouchable>
+                </>
+              );
+            })()}
           </View>
         </View>
       </Modal>
@@ -1793,6 +1791,7 @@ const styles = StyleSheet.create({
   },
   bulkingCard: {
     width: 260,
+    height: 208,
     backgroundColor: '#18181b',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
@@ -1843,13 +1842,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bulkingCardBody: {
-    padding: 12,
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: 'flex-start',
   },
   bulkingCardTitle: {
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
-    marginBottom: 2,
+    lineHeight: 19,
+    marginBottom: 4,
   },
   bulkingCardMeta: {
     color: '#71717a',
@@ -1992,14 +1995,16 @@ const styles = StyleSheet.create({
   successButton: { borderRadius: 8, paddingVertical: 12, paddingHorizontal: 32, minWidth: 80 },
   successButtonText: { fontSize: 16, fontWeight: '600', color: '#0a0a0b', textAlign: 'center' },
 
+  // ==========================================================================
+  // Action sheet (Workout Options) — option-3 header card layout
+  // ==========================================================================
   actionModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'flex-end' },
   actionModalBackdrop: { flex: 1 },
   actionSheet: {
     backgroundColor: '#18181b',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingBottom: 34,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
     paddingHorizontal: 20,
     maxHeight: '85%',
     borderTopWidth: 2,
@@ -2007,107 +2012,105 @@ const styles = StyleSheet.create({
     borderRightWidth: 2,
     marginHorizontal: 4,
   },
-  handleBar: { width: 40, height: 4, backgroundColor: '#52525b', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  actionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  actionTitle: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
-  actionCloseButton: { padding: 4 },
-  actionPlanInfo: {
-    backgroundColor: '#27272a',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-  },
-  actionPlanName: { color: '#ffffff', fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 4 },
-  actionPlanDetails: { color: '#a1a1aa', fontSize: 14, textAlign: 'center' },
-  modernActionButtons: { flexDirection: 'column', gap: 14, width: '100%' },
+  handleBar: { width: 40, height: 5, backgroundColor: '#52525b', borderRadius: 3, alignSelf: 'center', marginBottom: 22 },
 
-  shareActionInSheet: {
+  actionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 22,
+  },
+  actionThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: '#27272a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionHeaderText: {
+    flex: 1,
+  },
+  actionPlanName: { color: '#ffffff', fontSize: 16, fontWeight: '600', marginBottom: 3 },
+  actionPlanDetails: { color: '#71717a', fontSize: 13 },
+  actionCloseButton: {
+    alignSelf: 'flex-start',
+    padding: 2,
+  },
+
+  shareCtaButton: {
     width: '100%',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
+    borderRadius: 12,
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
+    marginBottom: 12,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
-  shareActionInSheetText: {
-    fontSize: 16,
+  shareCtaText: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#0a0a0b',
     letterSpacing: 0.2,
   },
 
-  saveActionButton: {
-    width: '100%',
-    backgroundColor: '#10b981',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
+  tileRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    gap: 10,
+    marginBottom: 24,
   },
-  removeActionButton: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
-  saveActionText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
-  renameButton: {
-    width: '100%',
-    backgroundColor: '#3b82f6',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  renameText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
-  deleteConfirmButton: {
-    width: '100%',
-    backgroundColor: '#ef4444',
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  deleteConfirmText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
-  deleteCancelButton: {
+  actionTile: {
     flex: 1,
-    backgroundColor: '#27272a',
+    minHeight: 68,
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#3f3f46',
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#3f3f46',
-    minHeight: 44,
+    gap: 6,
   },
-  deleteCancelText: { fontSize: 16, fontWeight: '600', color: '#ffffff' },
+  actionTileText: {
+    color: '#d4d4d8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  actionTileDanger: {
+    flex: 1,
+    minHeight: 68,
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(239,68,68,0.3)',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionTileDangerText: {
+    color: '#f87171',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  actionCancel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  actionCancelText: {
+    color: '#71717a',
+    fontSize: 15,
+    fontWeight: '500',
+  },
 
   newShareOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   newShareBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
