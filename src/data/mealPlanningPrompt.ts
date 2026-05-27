@@ -17,6 +17,30 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
     // Load favorite meals data for detailed meal information
     const favoriteMealsData = await AsyncStorage.getItem('@nutrition_favorites');
     const favoriteMeals = favoriteMealsData ? JSON.parse(favoriteMealsData) : [];
+
+    // Load curated favourites — the "Foods you like" taste profile. New object
+    // shape { slugs, cuisines, avoid, likedDishes }; older saves were a bare
+    // slug array, handled here for back-compat. Optional; all empty if skipped.
+    const curatedFavoritesData = await AsyncStorage.getItem('@nutrition_curated_favorites');
+    const curatedFav = (() => {
+      const empty = { slugs: [] as string[], cuisines: [] as string[], avoid: [] as string[], likedDishes: [] as string[] };
+      try {
+        const parsed = curatedFavoritesData ? JSON.parse(curatedFavoritesData) : null;
+        if (!parsed) return empty;
+        const clean = (v: any): string[] =>
+          Array.isArray(v) ? v.filter((s) => typeof s === 'string' && s.trim().length > 0) : [];
+        if (Array.isArray(parsed)) return { ...empty, slugs: clean(parsed) }; // legacy slug-only
+        return {
+          slugs: clean(parsed.slugs),
+          cuisines: clean(parsed.cuisines),
+          avoid: clean(parsed.avoid),
+          likedDishes: clean(parsed.likedDishes),
+        };
+      } catch {
+        return empty;
+      }
+    })();
+    const curatedFavoriteSlugs: string[] = curatedFav.slugs;
     
     if (!nutritionResults || !budgetCookingResults) {
       throw new Error('Please complete the Nutrition Goals and Budget & Cooking questionnaires first.');
@@ -132,7 +156,7 @@ Sometimes the user's preferences will conflict — for example, a very low budge
 - Daily fiber target: ${fiberTarget}g (aim for ${fiberTarget - 5}–${fiberTarget + 5}g range)
 - **MEAL STRUCTURE**: ${budgetData.mealsPerDay || 3} substantial main meals per day + snacks as completely separate items
 - **SNACK ALLOCATION**: ${getSnackAllocationGuidance(budgetData)} (snacks are NEVER counted as main meals)
-- **CRITICAL**: If user requests 4 meals + snacks, provide exactly 4 substantial main meals (each 700-900+ kcal) PLUS the requested number of snacks (each 10-15% of daily calories). Do not make snacks "optional" - include exactly what was requested.
+- **CRITICAL**: If user requests 4 meals + snacks, provide exactly 4 substantial main meals PLUS the requested number of snacks (each 10-15% of daily calories). Size all meals so the DAILY total hits the calorie target — the calorie target always wins over making any single meal "substantial". Do not make snacks "optional" - include exactly what was requested.
 - Plan duration: ${budgetData.planDuration || 7} days
 - Snacking style: ${budgetData.snackingStyle || 'Occasional snacker'}
 - Goal: ${nutritionData.goal || 'maintain'} at ${displayRate} rate
@@ -162,7 +186,7 @@ The calculated fiber target provides a baseline, but the file contains important
 
 ${getVarietyRequirements(budgetData, budgetData.skillConfidence, budgetData.timeInvestment)}${getSkillRequirements(budgetData)}${getTimeRequirements(budgetData)}
 
-${getMealStructure(budgetData.mealsPerDay || 3, macroResults.protein || 150)}
+${getMealStructure(budgetData.mealsPerDay || 3, macroResults.protein || 150, macroResults.calories || 2000)}
 
 **PROTEIN DISTRIBUTION GUIDELINES:**
 
@@ -298,6 +322,25 @@ ${budgetData.mealPreferences === 'include_favorites' ?
   `- User wants to include their favorite meals in the plan${formatSelectedFavoriteMeals(budgetData.selectedFavorites, favoriteMeals)}${budgetData.customMealRequests ? `\n- Custom requests: ${budgetData.customMealRequests}` : ''}` :
   '- User wants AI to suggest all meals based on their profile and preferences'
 }
+${curatedFavoriteSlugs.length ? `
+**USER-SELECTED CURATED MEALS (high priority — include these):**
+The user picked these from the JSON.fit catalogue because they like them. Treat them as preferred and work them into the plan where they fit the macro, calorie, and dietary constraints. Resolve every one against the curated meals instructions file (https://json.fit/curated-meals/instructions.md) and output it using the curated meal reference format (slug, plate_id, scale_factor, calories, macros), NOT as an invented recipe.
+
+Each entry below is either a bare slug (use the meal; you choose the most suitable plate) or "slug:plate_id" (the user specifically wants THAT plate of that meal — use that exact plate_id). When a meal has multiple plates and several are listed, the user is happy eating it those different ways across the week — a single batch cook served as different plates is ideal and on-theme for meal prep.
+
+Selected:
+${curatedFavoriteSlugs.map((s) => `- ${s}`).join('\n')}
+
+Spread these across the plan rather than clustering them on one day. If a selected meal can't fit the constraints (e.g. its calories blow the daily target even scaled down), note which one you left out and why in the plan notes — don't silently drop it.` : ''}${curatedFav.cuisines.length ? `
+
+**CUISINES THE USER LOVES:** ${curatedFav.cuisines.join(', ')}
+Lean towards these cuisines when inventing meals — the user enjoys them. This is a preference, not a hard requirement; don't force a cuisine into a meal where it doesn't fit the macros or budget. The user may love a cuisine we have no curated meal for yet — generate those meals from your own knowledge.` : ''}${curatedFav.likedDishes.length ? `
+
+**SPECIFIC DISHES THE USER LIKES:** ${curatedFav.likedDishes.join(', ')}
+These are dishes the user named themselves. Include some of them in the plan where they fit the macro, calorie, and dietary constraints, building each from your own knowledge of the dish. Spread them out; if one can't fit, skip it and note why rather than distorting the day's targets.` : ''}${curatedFav.avoid.length ? `
+
+**FOODS THE USER WANTS TO AVOID (taste preference — exclude):** ${curatedFav.avoid.join(', ')}
+Do not use these ingredients in any meal. This is a strong preference. Treat it the same as the dietary "avoid foods" list above — scan every meal and keep these out.` : ''}
 
 COOKING PREFERENCES:
 - ${getMealPrepStyleText(budgetData.planningStyle, budgetData.skillConfidence, budgetData.timeInvestment)}
@@ -520,7 +563,7 @@ Verify snack requirements are met exactly as requested:
 - **If user specified exact snack count** (1, 2, or 3): Plan must include exactly that many snacks. FAIL if snacks are missing, labeled as "optional", or if snack count doesn't match.
 - **If user selected "No Snacks"**: Plan must include zero snacks. FAIL if any snacks are present.
 - **If user selected "Let AI Decide"**: Plan should include 1-3 snacks as appropriate for meal timing. PASS as long as snacks are reasonable for gaps.
-- **Snack sizing**: Each snack should be 10-15% of daily calories (300-500 kcal range). FAIL if snacks are meal-sized (>600 kcal) or too small (<200 kcal).
+- **Snack sizing**: Each snack should be 10-15% of daily calories. FAIL if a snack is meal-sized (>25% of daily calories) or negligible (<5% of daily calories).
 - **Snack vs meal distinction**: Verify snacks use specific snack types (morning_snack, afternoon_snack, etc.) not generic "snack" or main meal types.
 
 ### 10. Nutritional Quality & Balance
@@ -580,20 +623,31 @@ const getCurrencySymbol = (countryCode: string): string => {
   return currencyMap[countryCode] || '$';
 };
 
-const getMealStructure = (mealsPerDay: number, proteinTarget: number): string => {
+const getMealStructure = (mealsPerDay: number, proteinTarget: number, calories: number = 2000): string => {
+  // Per-main-meal calorie target, derived from the actual daily total rather
+  // than a hardcoded floor. This prevents the old contradiction where a low
+  // calorie target (e.g. a cut at 1400 kcal) collided with a fixed
+  // "700-900 kcal per meal" rule that only made sense at bulk calories.
+  const perMeal = (n: number) => Math.round(calories / n / 10) * 10;
+  // Rough band around the per-meal figure (±15%) so the AI has tolerance.
+  const band = (n: number) => {
+    const c = perMeal(n);
+    return `${Math.round((c * 0.85) / 10) * 10}-${Math.round((c * 1.15) / 10) * 10}`;
+  };
+
   switch (mealsPerDay) {
     case 2:
       return `MEAL STRUCTURE (2 main meals):
-- Meal 1: breakfast (substantial meal)
-- Meal 2: dinner (substantial meal)
+- Meal 1: breakfast (substantial meal, ~${perMeal(2)} kcal)
+- Meal 2: dinner (substantial meal, ~${perMeal(2)} kcal)
 - Distribute daily calories roughly evenly across both meals (flexibility is fine)
 - Distribute ${proteinTarget}g protein appropriately across both meals`;
     
     case 3:
       return `MEAL STRUCTURE (3 main meals):
-- Meal 1: breakfast (substantial meal)
-- Meal 2: lunch (substantial meal)  
-- Meal 3: dinner (substantial meal)
+- Meal 1: breakfast (substantial meal, ~${perMeal(3)} kcal)
+- Meal 2: lunch (substantial meal, ~${perMeal(3)} kcal)  
+- Meal 3: dinner (substantial meal, ~${perMeal(3)} kcal)
 - Distribute daily calories roughly evenly across meals (flexibility is fine - aim for balanced portions)
 - Distribute ${proteinTarget}g protein appropriately across all meals`;
     
@@ -601,18 +655,20 @@ const getMealStructure = (mealsPerDay: number, proteinTarget: number): string =>
       return `MEAL STRUCTURE (4 main meals + snacks):
 
 **EXACTLY 4 SUBSTANTIAL MAIN MEALS (NEVER MAKE THESE OPTIONAL):**
-- Meal 1: breakfast (700-900+ kcal, substantial meal)
-- Meal 2: brunch or second_lunch (700-900+ kcal, substantial meal) 
-- Meal 3: lunch (700-900+ kcal, substantial meal)
-- Meal 4: dinner (700-900+ kcal, substantial meal)
+- Meal 1: breakfast (~${band(4)} kcal, substantial meal)
+- Meal 2: brunch or second_lunch (~${band(4)} kcal, substantial meal) 
+- Meal 3: lunch (~${band(4)} kcal, substantial meal)
+- Meal 4: dinner (~${band(4)} kcal, substantial meal)
+
+**MEAL SIZING**: Each main meal is roughly ${perMeal(4)} kcal (daily target ÷ 4). The band above is guidance, not a floor — if snacks are included, reduce main meals proportionally so the DAILY total still hits the calorie target. The calorie target always wins over any per-meal figure.
 
 **SNACKS (completely separate from the 4 main meals above):**
 - Include the exact number of snacks the user requested (check their snacking preferences)
-- Each snack should be 10-15% of daily calories (300-500 kcal range)
+- Each snack should be 10-15% of daily calories
 - NEVER label snacks as "optional" - if user chose snacks, include them definitively
 - Place snacks between main meals to optimize timing
 
-**CRITICAL RULE**: Do not substitute a snack for one of the 4 main meals. User wants 4 large meals PLUS snacks.
+**CRITICAL RULE**: Do not substitute a snack for one of the 4 main meals. User wants 4 main meals PLUS any requested snacks. But if 4 meals + snacks would exceed the daily calorie target, shrink every item proportionally — never pad the day above target just to make meals "substantial".
 
 Distribute ${proteinTarget}g protein primarily across the 4 main meals
 Distribute calories across all 4 meals (aim for roughly equal portions)`;
@@ -620,24 +676,24 @@ Distribute calories across all 4 meals (aim for roughly equal portions)`;
     case 5:
       return `MEAL STRUCTURE (5 eating occasions):
 
-If user doesn't snack: 5 substantial meals — breakfast, brunch (type "lunch"), lunch, dinner, supper (type "dinner")
+If user doesn't snack: 5 substantial meals — breakfast, brunch (type "lunch"), lunch, dinner, supper (type "dinner"), ~${perMeal(5)} kcal each
 If user snacks: 3 main meals (breakfast, lunch, dinner) + 2 snacks between them (type "snack")
 Distribute ${proteinTarget}g protein across all meals, main meals carrying most
-Distribute calories appropriately (flexibility is fine)`;
+Distribute calories appropriately so the daily total hits the target (flexibility per-meal is fine)`;
     
     case 6:
       return `MEAL STRUCTURE (6 eating occasions):
 
-If user doesn't snack: 6 substantial meals — breakfast, brunch, lunch, afternoon meal, dinner, supper (use types "breakfast"/"lunch"/"dinner" as appropriate)
+If user doesn't snack: 6 substantial meals — breakfast, brunch, lunch, afternoon meal, dinner, supper (use types "breakfast"/"lunch"/"dinner" as appropriate), ~${perMeal(6)} kcal each
 If user snacks: 3 main meals + 3 snacks between them (type "snack", respect bedtime timing for evening snack)
 Distribute ${proteinTarget}g protein across all meals, main meals carrying most
-Distribute calories appropriately (flexibility is fine)`;
+Distribute calories appropriately so the daily total hits the target (flexibility per-meal is fine)`;
     
     default: // fallback to 3
       return `MEAL STRUCTURE (3 main meals):
-- Meal 1: breakfast (substantial meal)
-- Meal 2: lunch (substantial meal)
-- Meal 3: dinner (substantial meal)
+- Meal 1: breakfast (substantial meal, ~${perMeal(3)} kcal)
+- Meal 2: lunch (substantial meal, ~${perMeal(3)} kcal)
+- Meal 3: dinner (substantial meal, ~${perMeal(3)} kcal)
 - Distribute daily calories roughly evenly across meals (flexibility is fine - aim for balanced portions)
 - Distribute ${proteinTarget}g protein appropriately across all meals`;
   }
@@ -650,9 +706,13 @@ const getSnackingGuidance = (snackingStyle: string, snackFrequency?: string): st
     return `MINIMAL SNACKING: User prefers not to snack. For 4+ eating occasions, treat extra slots as substantial meals. Only add light snacks if gaps exceed 5-6 hours.`;
   }
   
-  // If user specified exact number of snacks, use that
-  if (snackFrequency && snackFrequency !== '0') {
-    const numSnacks = parseInt(snackFrequency);
+  // If user specified an exact NUMBER of snacks, use that. Guard with
+  // Number.isNaN so a stale/non-numeric snackFrequency (e.g. an old build's
+  // 'occasional') can never fall in here and emit "exactly NaN snacks" — it
+  // falls through to the style-based handlers and the default below instead.
+  const parsedSnacks = snackFrequency ? parseInt(snackFrequency, 10) : NaN;
+  if (!Number.isNaN(parsedSnacks) && parsedSnacks > 0) {
+    const numSnacks = parsedSnacks;
     const snackTypeGuidance = style.includes('sweet tooth') ? 'healthier sweet options' :
                             style.includes('savory') ? 'savory options' :
                             style.includes('need healthy snacks') ? 'whole food options' :
