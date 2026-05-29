@@ -18,7 +18,7 @@ interface WeightUnitProviderProps {
   children: ReactNode;
 }
 
-export const WeightUnitProvider: React.FC<WeightUnitProviderProps> = ({ children }) => {
+export const WeightUnitProvider = ({ children }: WeightUnitProviderProps) => {
   const [globalUnit, setGlobalUnit] = useState<WeightUnit>('kg');
   const [exerciseUnits, setExerciseUnits] = useState<{ [exerciseIndex: number]: WeightUnit }>({});
 

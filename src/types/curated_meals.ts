@@ -37,7 +37,7 @@ export type AllergenType = 'Nuts' | 'Shellfish' | 'Dairy' | 'Eggs' | 'Gluten/Whe
 /**
  * Equipment types matching the exact equipment IDs from the budget cooking questionnaire
  */
-export type EquipmentType = 'stovetop' | 'oven' | 'microwave' | 'air_fryer' | 'slow_cooker' | 'rice_cooker' | 'pressure_cooker' | 'grill' | 'blender' | 'food_processor';
+export type EquipmentType = 'stovetop' | 'oven' | 'microwave' | 'air_fryer' | 'slow_cooker' | 'rice_cooker' | 'pressure_cooker' | 'grill' | 'blender' | 'food_processor' | 'no_cook';
 
 /**
  * How an ingredient scales when the meal portion is adjusted
@@ -147,6 +147,11 @@ export interface Plate {
    * This is what the user is actually consuming. Not a delta — the full picture.
    */
   plate_macros: BaseMacros;
+
+  /** Cooked, plated weight in grams. Used to compute calorie density
+   *  (kcal per gram) for the density sort in the Foods-you-like picker.
+   *  Optional during authoring — meals without it sort last under density. */
+  plate_finished_weight_g?: number;
 
   /**
    * Filename of the image asset for this specific plate, e.g. 'pulled_pork_sandwich.png'. The image file should 

@@ -271,7 +271,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
           // Load existing data with fallbacks for new fields
           setFormData({
             ...existingResults.formData,
-            planDuration: existingResults.formData.planDuration || 7, // Default to 7 days for existing data
+            planDuration: existingResults.formData.planDuration === 14 ? 7 : (existingResults.formData.planDuration || 7), // Migrate 14-day to 7-day
             mealPreferences: existingResults.formData.mealPreferences || '',
             selectedFavorites: existingResults.formData.selectedFavorites || [],
             customMealRequests: existingResults.formData.customMealRequests || '',
@@ -1505,8 +1505,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                     { value: '0', label: 'No Snacks' },
                     { value: '1', label: '1 Snack' },
                     { value: '2', label: '2 Snacks' },
-                    { value: '3', label: '3 Snacks' },
-                    { value: 'ai_decide', label: 'Let AI Decide' },
+                    { value: '3+', label: '3+ Snacks' },
                   ].map((option) => (
                     <TouchableOpacity
                       key={option.value}
@@ -2068,7 +2067,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
                   <Text style={styles.tronDataLabel}>Snacks Per Day</Text>
                   <Text style={[styles.tronDataValue, { color: colors.primary }]}>
                     {formData.snackFrequency === '0' ? 'None' : 
-                     formData.snackFrequency === 'ai_decide' ? 'AI Decides' : 
+                     formData.snackFrequency === '3+' ? '3+ Snacks' : 
                      formData.snackFrequency}
                   </Text>
                 </Animatable.View>
@@ -2332,44 +2331,6 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
               </TouchableOpacity>
             </Animatable.View>
 
-            {/* 14 Days Option */}
-            <Animatable.View
-              animation="fadeInUp"
-              delay={400}
-              style={styles.durationOptionWrapper}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.modernDurationCard,
-                  formData.planDuration === 14 && [
-                    styles.selectedModernCard,
-                    { borderColor: colors.primary, backgroundColor: colors.primaryAlpha10, shadowColor: colors.primary }
-                  ]
-                ]}
-                onPress={() => setFormData({ ...formData, planDuration: 14 })}
-                activeOpacity={0.9}
-              >
-                <View style={styles.modernCardContent}>
-                  <View style={styles.modernCardLeft}>
-                    <Text style={[styles.modernTitle, { color: '#ffffff' }]}>
-                      2 Weeks (14 days)
-                    </Text>
-                    <Text style={styles.modernSubtitle}>Less frequent planning</Text>
-                  </View>
-                  
-                  <View style={styles.modernCardRight}>
-                    <View style={[
-                      styles.modernRadio,
-                      formData.planDuration === 14 && { backgroundColor: colors.primary }
-                    ]}>
-                      {formData.planDuration === 14 && (
-                        <Ionicons name="checkmark" size={16} color="#000000" />
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </Animatable.View>
           </View>
         </Animatable.View>
       </ScrollView>

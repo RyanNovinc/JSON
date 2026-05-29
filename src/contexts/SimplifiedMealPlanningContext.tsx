@@ -44,7 +44,7 @@ interface SimplifiedMealPlanningProviderProps {
   children: ReactNode;
 }
 
-export const SimplifiedMealPlanningProvider: React.FC<SimplifiedMealPlanningProviderProps> = ({ children }) => {
+export const SimplifiedMealPlanningProvider = ({ children }: SimplifiedMealPlanningProviderProps) => {
   const [state, setState] = useState({
     mealPlans: [] as SimplifiedMealPlan[],
     currentPlan: null as SimplifiedMealPlan | null,

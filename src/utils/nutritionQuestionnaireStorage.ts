@@ -56,7 +56,15 @@ export interface NutritionAnswers {
 export async function loadNutritionAnswers(): Promise<NutritionAnswers> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) : {};
+    const answers = raw ? JSON.parse(raw) : {};
+    
+    // Migration: Convert 14-day plans to 7-day plans
+    if (answers.planDuration === 14) {
+      answers.planDuration = 7;
+      await saveNutritionAnswers(answers);
+    }
+    
+    return answers;
   } catch (e) {
     console.error('loadNutritionAnswers failed', e);
     return {};

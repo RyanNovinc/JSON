@@ -42,11 +42,11 @@ interface RevenueCatProviderProps {
   autoInitialize?: boolean;
 }
 
-export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ 
+export const RevenueCatProvider = ({ 
   children, 
   userId,
   autoInitialize = true 
-}) => {
+}: RevenueCatProviderProps) => {
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOffering[]>([]);
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);

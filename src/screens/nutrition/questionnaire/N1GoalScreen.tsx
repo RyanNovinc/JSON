@@ -92,12 +92,17 @@ export default function N1GoalScreen() {
 
   const handleClose = () => navigation.popToTop();
 
+  const handleBack = () => {
+    navigation.navigate('CreateFlow' as never);
+  };
+
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={1}
-        totalSteps={10}
-        showBack={false}
+        totalSteps={11}
+        showBack={true}
+        onBack={handleBack}
         onClose={handleClose}
       />
 

@@ -140,7 +140,7 @@ export default function N5DietTypeScreen() {
       return;
     }
     navigation.navigate(
-      'N6MealsSnacking' as never,
+      'N5bAllergies' as never,
       {
         answersSoFar: {
           ...answersSoFar,
@@ -158,7 +158,7 @@ export default function N5DietTypeScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={5}
-        totalSteps={10}
+        totalSteps={11}
         onBack={handleBack}
         onClose={handleClose}
       />

@@ -1,24 +1,24 @@
 {
-  "routine_name": "4-Week Beginner Full Body",
-  "description": "Conservative-volume full-body program for a complete beginner. Three full-body sessions per week (A/B/C) run Monday/Wednesday/Friday. Goal: muscle building (hypertrophy). Every muscle sits at MEV; no deload (4-week beginner block).",
-  "days_per_week": 3,
+  "routine_name": "Beginner Full Body 3-Day Hypertrophy",
+  "description": "4-week beginner hypertrophy block. Full Body A/B/C, 3 sessions/week, conservative volume, moderate rest. Basic compounds and machine alternatives. No deload — short beginner block.",
+  "days_per_week": 7,
   "blocks": [
     {
-      "block_name": "Full Body Foundation",
+      "block_name": "Block 1 — Foundation",
       "weeks": "1-4",
       "structure": "Full Body A / Full Body B / Full Body C",
       "weekly_schedule": [
-        { "day_number": 1, "type": "training", "day_name": "Full Body A" },
+        { "day_number": 1, "type": "training", "day_name": "Full Body A — Squat Focus" },
         { "day_number": 2, "type": "rest", "day_name": "REST DAY" },
-        { "day_number": 3, "type": "training", "day_name": "Full Body B" },
+        { "day_number": 3, "type": "training", "day_name": "Full Body B — Posterior Focus" },
         { "day_number": 4, "type": "rest", "day_name": "REST DAY" },
-        { "day_number": 5, "type": "training", "day_name": "Full Body C" },
+        { "day_number": 5, "type": "training", "day_name": "Full Body C — Push Focus" },
         { "day_number": 6, "type": "rest", "day_name": "REST DAY" },
         { "day_number": 7, "type": "rest", "day_name": "REST DAY" }
       ],
       "days": [
         {
-          "day_name": "Full Body A",
+          "day_name": "Full Body A — Squat Focus",
           "estimated_duration": 65,
           "exercises": [
             {
@@ -26,14 +26,14 @@
               "exercise": "Barbell Back Squat",
               "sets": 3,
               "reps": "6-10",
-              "rest": 240,
-              "restQuick": 156,
+              "rest": 165,
+              "restQuick": 105,
               "primaryMuscles": ["Quads"],
               "secondaryMuscles": ["Glutes"],
-              "reps_weekly": { "1": "10, 10, 10", "2": "10, 9, 8", "3": "8, 8, 8", "4": "8, 7, 6" },
-              "rir_weekly": { "1": "4, 3, 2", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
+              "reps_weekly": { "1": "10, 10, 8", "2": "10, 8, 8", "3": "8, 8, 6", "4": "8, 6, 6" },
+              "rir_weekly": { "1": "4, 3, 2", "2": "3, 2, 1", "3": "2, 1, 0", "4": "1-2, 0-1, 0" },
               "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when bar speed slows noticeably. Last set: push hard, last 1-2 reps should grind. Stay technical — never sacrifice form for the rep target. Don't burn out on the first exercise; save energy for later movements.",
+              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Stay technical — never sacrifice form for RIR target. Brace hard, knees track over toes, hit depth.",
               "alternatives": [
                 { "exercise": "Smith Machine Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"] },
                 { "exercise": "Hack Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"] }
@@ -41,38 +41,20 @@
             },
             {
               "type": "strength",
-              "exercise": "Barbell Bench Press",
-              "sets": 3,
-              "reps": "6-10",
-              "rest": 240,
-              "restQuick": 156,
+              "exercise": "Machine Chest Press",
+              "sets": 4,
+              "reps": "6-15",
+              "rest": 120,
+              "restQuick": 78,
               "primaryMuscles": ["Chest"],
               "secondaryMuscles": ["Triceps", "Front Delts"],
-              "reps_weekly": { "1": "10, 10, 10", "2": "10, 9, 8", "3": "8, 8, 8", "4": "8, 7, 6" },
-              "rir_weekly": { "1": "4, 3, 2", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
-              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Keep form clean rather than chasing a rep. Use a spotter or safeties.",
+              "reps_weekly": { "1": "15, 14, 12, 10", "2": "14, 12, 10, 10", "3": "12, 10, 10, 8", "4": "10, 10, 8, 8" },
+              "rir_weekly": { "1": "3, 2, 2, 1", "2": "3, 2, 1, 1", "3": "2, 1, 1, 0", "4": "1-2, 1, 0-1, 0" },
+              "sets_weekly": { "1": 4, "2": 4, "3": 4, "4": 4 },
+              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Control the stretch, drive through chest not shoulders.",
               "alternatives": [
                 { "exercise": "Dumbbell Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"] },
-                { "exercise": "Machine Chest Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"] }
-              ]
-            },
-            {
-              "type": "strength",
-              "exercise": "Seated Cable Row",
-              "sets": 3,
-              "reps": "6-15",
-              "rest": 165,
-              "restQuick": 107,
-              "primaryMuscles": ["Upper Back"],
-              "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"],
-              "reps_weekly": { "1": "15, 15, 15", "2": "13, 12, 12", "3": "12, 10, 10", "4": "10, 9, 8" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
-              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Pull with the elbows, squeeze the shoulder blades.",
-              "alternatives": [
-                { "exercise": "Chest-Supported Dumbbell Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"] },
-                { "exercise": "Chest-Supported T-Bar Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"] }
+                { "exercise": "Smith Machine Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"] }
               ]
             },
             {
@@ -80,32 +62,50 @@
               "exercise": "Lat Pulldown",
               "sets": 2,
               "reps": "6-15",
-              "rest": 165,
-              "restQuick": 107,
+              "rest": 120,
+              "restQuick": 78,
               "primaryMuscles": ["Lats"],
               "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"],
-              "reps_weekly": { "1": "15, 15", "2": "13, 12", "3": "12, 10", "4": "10, 8" },
-              "rir_weekly": { "1": "3, 1", "2": "3, 1", "3": "2, 0", "4": "2, 0" },
+              "reps_weekly": { "1": "15, 12", "2": "12, 10", "3": "10, 10", "4": "10, 8" },
+              "rir_weekly": { "1": "3, 2", "2": "2, 1", "3": "1, 0", "4": "0-1, 0" },
               "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
-              "notes": "First set: stop when reps slow down. Last set: push hard, last 1-2 reps should grind.",
+              "notes": "Both sets: last 1-2 reps should grind. Pull to upper chest, drive elbows down and back.",
               "alternatives": [
-                { "exercise": "Assisted Pull-up", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"] },
-                { "exercise": "Close-Grip Lat Pulldown", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Rear Delts"] }
+                { "exercise": "Neutral-Grip Lat Pulldown", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"] },
+                { "exercise": "Assisted Pull-up", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"] }
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Seated Leg Curl",
+              "sets": 3,
+              "reps": "8-20",
+              "rest": 80,
+              "restQuick": 52,
+              "primaryMuscles": ["Hamstrings"],
+              "secondaryMuscles": [],
+              "reps_weekly": { "1": "20, 18, 15", "2": "18, 15, 12", "3": "15, 12, 10", "4": "12, 10, 8" },
+              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "0-1, 0, 0" },
+              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
+              "notes": "Last set: push hard, last 1-2 reps should grind. Pause briefly in the contracted position.",
+              "alternatives": [
+                { "exercise": "Lying Leg Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": [] },
+                { "exercise": "Single-Leg Hamstring Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": [] }
               ]
             },
             {
               "type": "strength",
               "exercise": "Dumbbell Lateral Raise",
-              "sets": 3,
-              "reps": "8-20",
-              "rest": 75,
-              "restQuick": 49,
+              "sets": 4,
+              "reps": "10-20",
+              "rest": 60,
+              "restQuick": 39,
               "primaryMuscles": ["Side Delts"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "20, 20, 20", "2": "18, 16, 15", "3": "15, 13, 12", "4": "12, 10, 10" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "1, 0, 0" },
-              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard to a strong burn. Lead with the elbows, control the lowering.",
+              "reps_weekly": { "1": "20, 18, 15, 12", "2": "18, 15, 12, 12", "3": "15, 12, 12, 10", "4": "12, 12, 10, 10" },
+              "rir_weekly": { "1": "3, 2, 1, 1", "2": "2, 1, 1, 0", "3": "1, 0-1, 0, 0", "4": "1, 0, 0, 0" },
+              "sets_weekly": { "1": 4, "2": 4, "3": 4, "4": 4 },
+              "notes": "Last set: take to failure. Lead with elbows, slight forward lean, don't shrug.",
               "alternatives": [
                 { "exercise": "Cable Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": [] },
                 { "exercise": "Machine Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": [] }
@@ -113,20 +113,38 @@
             },
             {
               "type": "strength",
-              "exercise": "Dumbbell Curl",
+              "exercise": "Standing Calf Raise",
+              "sets": 3,
+              "reps": "8-15",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Calves"],
+              "secondaryMuscles": [],
+              "reps_weekly": { "1": "15, 12, 10", "2": "12, 12, 10", "3": "12, 10, 8", "4": "10, 8, 8" },
+              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "1, 0, 0" },
+              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
+              "notes": "Last set: close to failure. Full stretch at the bottom, full contraction at the top.",
+              "alternatives": [
+                { "exercise": "Seated Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": [] },
+                { "exercise": "Leg Press Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": [] }
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Cable Curl",
               "sets": 2,
               "reps": "10-15",
-              "rest": 120,
-              "restQuick": 78,
+              "rest": 60,
+              "restQuick": 39,
               "primaryMuscles": ["Biceps"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "15, 15", "2": "13, 12", "3": "12, 11", "4": "11, 10" },
-              "rir_weekly": { "1": "3, 1", "2": "2, 0", "3": "1, 0", "4": "1, 0" },
+              "reps_weekly": { "1": "15, 12", "2": "12, 12", "3": "12, 10", "4": "10, 10" },
+              "rir_weekly": { "1": "2, 1", "2": "1, 0", "3": "0-1, 0", "4": "0, 0" },
               "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
-              "notes": "First set: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. No swinging.",
+              "notes": "Last set: close to failure. Keep elbows pinned, no swinging.",
               "alternatives": [
                 { "exercise": "EZ-Bar Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": [] },
-                { "exercise": "Cable Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": [] }
+                { "exercise": "Dumbbell Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": [] }
               ]
             },
             {
@@ -134,17 +152,17 @@
               "exercise": "Cable Crunch",
               "sets": 2,
               "reps": "10-15",
-              "rest": 75,
-              "restQuick": 49,
+              "rest": 60,
+              "restQuick": 39,
               "primaryMuscles": ["Core"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "15, 15", "2": "14, 13", "3": "13, 12", "4": "12, 10" },
-              "rir_weekly": { "1": "3, 1", "2": "2, 0", "3": "1, 0", "4": "1, 0" },
+              "reps_weekly": { "1": "15, 12", "2": "12, 12", "3": "12, 10", "4": "10, 10" },
+              "rir_weekly": { "1": "2, 1", "2": "1, 0", "3": "0-1, 0", "4": "0, 0" },
               "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
-              "notes": "Crunch with the abs, not the hips. Control the return.",
+              "notes": "Last set: close to failure. Crunch by flexing the spine — don't hip hinge.",
               "alternatives": [
                 { "exercise": "Hanging Leg Raise", "primaryMuscles": ["Core"], "secondaryMuscles": [] },
-                { "exercise": "Ab Wheel Rollout", "primaryMuscles": ["Core"], "secondaryMuscles": [] }
+                { "exercise": "Decline Crunch", "primaryMuscles": ["Core"], "secondaryMuscles": [] }
               ]
             }
           ]
@@ -155,114 +173,114 @@
           "exercises": []
         },
         {
-          "day_name": "Full Body B",
-          "estimated_duration": 56,
+          "day_name": "Full Body B — Posterior Focus",
+          "estimated_duration": 55,
           "exercises": [
             {
               "type": "strength",
               "exercise": "Romanian Deadlift",
               "sets": 3,
-              "reps": "8-15",
+              "reps": "6-10",
               "rest": 165,
-              "restQuick": 107,
+              "restQuick": 105,
               "primaryMuscles": ["Hamstrings"],
               "secondaryMuscles": ["Glutes", "Lower Back"],
-              "reps_weekly": { "1": "15, 15, 15", "2": "13, 12, 12", "3": "12, 10, 10", "4": "10, 9, 8" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
+              "reps_weekly": { "1": "10, 10, 8", "2": "10, 8, 8", "3": "8, 8, 6", "4": "8, 6, 6" },
+              "rir_weekly": { "1": "4, 3, 2", "2": "3, 2, 1", "3": "2, 1, 0", "4": "1-2, 0-1, 0" },
               "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard but keep the spine neutral — stop the set if your lower back rounds. Don't burn out on the first exercise.",
+              "notes": "First sets: stop when reps slow down. Last set: push hard but keep your back set. Stay technical — never sacrifice form for RIR target. Bar close to legs, push hips back, slight knee bend.",
               "alternatives": [
                 { "exercise": "Dumbbell Romanian Deadlift", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": ["Glutes", "Lower Back"] },
-                { "exercise": "Seated Leg Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": [] }
+                { "exercise": "Stiff-Leg Deadlift", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": ["Glutes", "Lower Back"] }
               ]
             },
             {
               "type": "strength",
-              "exercise": "Machine Chest Press",
+              "exercise": "Neutral-Grip Lat Pulldown",
               "sets": 3,
               "reps": "6-15",
-              "rest": 165,
-              "restQuick": 107,
-              "primaryMuscles": ["Chest"],
-              "secondaryMuscles": ["Triceps", "Front Delts"],
-              "reps_weekly": { "1": "15, 15, 15", "2": "13, 12, 12", "3": "12, 10, 10", "4": "10, 9, 8" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Lats"],
+              "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"],
+              "reps_weekly": { "1": "15, 12, 10", "2": "12, 12, 10", "3": "12, 10, 8", "4": "10, 8, 8" },
+              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "0-1, 0, 0" },
               "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind.",
+              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Drive elbows down and back, slight backward lean.",
               "alternatives": [
-                { "exercise": "Smith Machine Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"] },
-                { "exercise": "Dumbbell Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"] }
+                { "exercise": "Lat Pulldown", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"] },
+                { "exercise": "Assisted Pull-up", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"] }
               ]
             },
             {
               "type": "strength",
-              "exercise": "Barbell Row",
+              "exercise": "Seated Dumbbell Shoulder Press",
               "sets": 3,
               "reps": "6-15",
-              "rest": 165,
-              "restQuick": 107,
-              "primaryMuscles": ["Upper Back"],
-              "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"],
-              "reps_weekly": { "1": "15, 15, 15", "2": "13, 12, 12", "3": "12, 10, 10", "4": "10, 9, 8" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
-              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Keep the torso angle consistent; don't heave with the lower back.",
-              "alternatives": [
-                { "exercise": "Pendlay Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"] },
-                { "exercise": "T-Bar Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"] }
-              ]
-            },
-            {
-              "type": "strength",
-              "exercise": "Machine Shoulder Press",
-              "sets": 2,
-              "reps": "6-15",
-              "rest": 165,
-              "restQuick": 107,
+              "rest": 120,
+              "restQuick": 78,
               "primaryMuscles": ["Front Delts"],
               "secondaryMuscles": ["Triceps", "Side Delts"],
-              "reps_weekly": { "1": "15, 15", "2": "13, 12", "3": "12, 10", "4": "10, 8" },
-              "rir_weekly": { "1": "3, 1", "2": "3, 1", "3": "2, 0", "4": "2, 0" },
-              "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
-              "notes": "First set: stop when reps slow down. Last set: push hard, last 1-2 reps should grind.",
+              "reps_weekly": { "1": "15, 12, 10", "2": "12, 12, 10", "3": "12, 10, 8", "4": "10, 8, 8" },
+              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "0-1, 0, 0" },
+              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
+              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Press straight up, don't flare elbows wide.",
               "alternatives": [
-                { "exercise": "Seated Dumbbell Shoulder Press", "primaryMuscles": ["Front Delts"], "secondaryMuscles": ["Triceps", "Side Delts"] },
-                { "exercise": "Arnold Press", "primaryMuscles": ["Front Delts"], "secondaryMuscles": ["Side Delts", "Triceps"] }
+                { "exercise": "Machine Shoulder Press", "primaryMuscles": ["Front Delts"], "secondaryMuscles": ["Triceps", "Side Delts"] },
+                { "exercise": "Seated Barbell Overhead Press", "primaryMuscles": ["Front Delts"], "secondaryMuscles": ["Triceps", "Side Delts"] }
               ]
             },
             {
               "type": "strength",
-              "exercise": "Cable Lateral Raise",
-              "sets": 3,
-              "reps": "8-20",
-              "rest": 75,
-              "restQuick": 49,
-              "primaryMuscles": ["Side Delts"],
-              "secondaryMuscles": [],
-              "reps_weekly": { "1": "20, 20, 20", "2": "18, 16, 15", "3": "15, 13, 12", "4": "12, 10, 10" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "1, 0, 0" },
-              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard to a strong burn. Smooth, controlled tempo.",
+              "exercise": "Leg Press",
+              "sets": 2,
+              "reps": "6-15",
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Quads"],
+              "secondaryMuscles": ["Glutes"],
+              "reps_weekly": { "1": "15, 12", "2": "12, 12", "3": "12, 10", "4": "10, 8" },
+              "rir_weekly": { "1": "2, 1", "2": "1, 0", "3": "0-1, 0", "4": "0, 0" },
+              "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
+              "notes": "Last set: last 1-2 reps should grind. Full depth without lifting hips off pad.",
               "alternatives": [
-                { "exercise": "Dumbbell Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": [] },
-                { "exercise": "Machine Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": [] }
+                { "exercise": "Hack Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"] },
+                { "exercise": "Smith Machine Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"] }
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Dumbbell Curl",
+              "sets": 3,
+              "reps": "10-15",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Biceps"],
+              "secondaryMuscles": [],
+              "reps_weekly": { "1": "15, 12, 10", "2": "12, 12, 10", "3": "12, 10, 8", "4": "10, 10, 8" },
+              "rir_weekly": { "1": "2, 1, 0", "2": "1, 0, 0", "3": "0-1, 0, 0", "4": "0, 0, 0" },
+              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
+              "notes": "Last set: close to failure. Keep elbows pinned, no body swing.",
+              "alternatives": [
+                { "exercise": "Barbell Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": [] },
+                { "exercise": "Hammer Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": ["Forearms"] }
               ]
             },
             {
               "type": "strength",
               "exercise": "Standing Calf Raise",
               "sets": 4,
-              "reps": "8-20",
-              "rest": 75,
-              "restQuick": 49,
+              "reps": "8-15",
+              "rest": 60,
+              "restQuick": 39,
               "primaryMuscles": ["Calves"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "20, 20, 20, 20", "2": "18, 17, 16, 15", "3": "15, 14, 13, 12", "4": "13, 12, 11, 10" },
-              "rir_weekly": { "1": "3, 2, 2, 1", "2": "2, 1, 1, 0", "3": "1, 0, 0, 0", "4": "1, 0, 0, 0" },
+              "reps_weekly": { "1": "15, 12, 12, 10", "2": "12, 12, 10, 10", "3": "12, 10, 10, 8", "4": "10, 10, 8, 8" },
+              "rir_weekly": { "1": "3, 2, 1, 1", "2": "2, 1, 1, 0", "3": "1, 0-1, 0, 0", "4": "1, 0, 0, 0" },
               "sets_weekly": { "1": 4, "2": 4, "3": 4, "4": 4 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard to a strong burn. Full stretch at the bottom, pause at the top.",
+              "notes": "Last set: close to failure. Full stretch at the bottom, full contraction at the top.",
               "alternatives": [
-                { "exercise": "Leg Press Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": [] },
+                { "exercise": "Seated Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": [] },
                 { "exercise": "Smith Machine Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": [] }
               ]
             }
@@ -274,25 +292,43 @@
           "exercises": []
         },
         {
-          "day_name": "Full Body C",
-          "estimated_duration": 69,
+          "day_name": "Full Body C — Push Focus",
+          "estimated_duration": 60,
           "exercises": [
             {
               "type": "strength",
-              "exercise": "Leg Press",
+              "exercise": "Barbell Bench Press",
               "sets": 3,
-              "reps": "6-15",
+              "reps": "6-10",
               "rest": 165,
-              "restQuick": 107,
-              "primaryMuscles": ["Quads"],
-              "secondaryMuscles": ["Glutes"],
-              "reps_weekly": { "1": "15, 15, 15", "2": "13, 12, 12", "3": "12, 10, 10", "4": "10, 9, 8" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
+              "restQuick": 105,
+              "primaryMuscles": ["Chest"],
+              "secondaryMuscles": ["Triceps", "Front Delts"],
+              "reps_weekly": { "1": "10, 10, 8", "2": "10, 8, 8", "3": "8, 8, 6", "4": "8, 6, 6" },
+              "rir_weekly": { "1": "4, 3, 2", "2": "3, 2, 1", "3": "2, 1, 0", "4": "1-2, 0-1, 0" },
               "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Don't burn out on the first exercise. Don't let the lower back round at the bottom.",
+              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Stay technical — never sacrifice form for RIR target. Tuck elbows ~45°, touch chest, drive feet.",
               "alternatives": [
-                { "exercise": "Hack Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"] },
-                { "exercise": "Smith Machine Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"] }
+                { "exercise": "Dumbbell Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"] },
+                { "exercise": "Machine Chest Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"] }
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Chest-Supported T-Bar Row",
+              "sets": 2,
+              "reps": "6-15",
+              "rest": 120,
+              "restQuick": 78,
+              "primaryMuscles": ["Upper Back"],
+              "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"],
+              "reps_weekly": { "1": "15, 12", "2": "12, 10", "3": "10, 10", "4": "10, 8" },
+              "rir_weekly": { "1": "3, 2", "2": "2, 1", "3": "1, 0", "4": "0-1, 0" },
+              "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
+              "notes": "Both sets: last 1-2 reps should grind. Squeeze shoulder blades together at the top.",
+              "alternatives": [
+                { "exercise": "Seated Cable Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"] },
+                { "exercise": "T-Bar Row", "primaryMuscles": ["Upper Back"], "secondaryMuscles": ["Lats", "Biceps", "Rear Delts"] }
               ]
             },
             {
@@ -300,146 +336,115 @@
               "exercise": "Leg Extension",
               "sets": 3,
               "reps": "8-20",
-              "rest": 120,
-              "restQuick": 78,
+              "rest": 80,
+              "restQuick": 52,
               "primaryMuscles": ["Quads"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "20, 20, 20", "2": "18, 16, 15", "3": "15, 13, 12", "4": "12, 11, 10" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "1, 0, 0" },
+              "reps_weekly": { "1": "20, 15, 12", "2": "15, 12, 10", "3": "15, 12, 10", "4": "12, 10, 8" },
+              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "0-1, 0, 0" },
               "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard to a strong burn. Pause briefly at the top.",
+              "notes": "Last set: push hard, last 1-2 reps should grind. Pause briefly in the contracted position.",
               "alternatives": [
-                { "exercise": "Sissy Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": [] },
-                { "exercise": "Hack Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"] }
+                { "exercise": "Hack Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": ["Glutes"] },
+                { "exercise": "Sissy Squat", "primaryMuscles": ["Quads"], "secondaryMuscles": [] }
               ]
             },
             {
               "type": "strength",
-              "exercise": "Lying Leg Curl",
+              "exercise": "Cable Lateral Raise",
               "sets": 3,
-              "reps": "8-20",
-              "rest": 120,
-              "restQuick": 78,
-              "primaryMuscles": ["Hamstrings"],
-              "secondaryMuscles": [],
-              "reps_weekly": { "1": "20, 20, 20", "2": "18, 16, 15", "3": "15, 13, 12", "4": "12, 11, 10" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "2, 1, 0", "3": "1, 0, 0", "4": "1, 0, 0" },
-              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard to a strong burn. Control the lowering, don't let the weight slam.",
-              "alternatives": [
-                { "exercise": "Seated Leg Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": [] },
-                { "exercise": "Single-Leg Hamstring Curl", "primaryMuscles": ["Hamstrings"], "secondaryMuscles": [] }
-              ]
-            },
-            {
-              "type": "strength",
-              "exercise": "Incline Dumbbell Bench Press",
-              "sets": 3,
-              "reps": "6-15",
-              "rest": 165,
-              "restQuick": 107,
-              "primaryMuscles": ["Chest"],
-              "secondaryMuscles": ["Front Delts", "Triceps"],
-              "reps_weekly": { "1": "15, 15, 15", "2": "13, 12, 12", "3": "12, 10, 10", "4": "10, 9, 8" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
-              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind.",
-              "alternatives": [
-                { "exercise": "Incline Barbell Bench Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Front Delts", "Triceps"] },
-                { "exercise": "Machine Chest Press", "primaryMuscles": ["Chest"], "secondaryMuscles": ["Triceps", "Front Delts"] }
-              ]
-            },
-            {
-              "type": "strength",
-              "exercise": "Neutral-Grip Lat Pulldown",
-              "sets": 3,
-              "reps": "6-15",
-              "rest": 165,
-              "restQuick": 107,
-              "primaryMuscles": ["Lats"],
-              "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"],
-              "reps_weekly": { "1": "15, 15, 15", "2": "13, 12, 12", "3": "12, 10, 10", "4": "10, 9, 8" },
-              "rir_weekly": { "1": "3, 2, 1", "2": "3, 2, 1", "3": "2, 1, 0", "4": "2, 1, 0" },
-              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard, last 1-2 reps should grind. Drive the elbows down and back.",
-              "alternatives": [
-                { "exercise": "Close-Grip Lat Pulldown", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Rear Delts"] },
-                { "exercise": "Assisted Pull-up", "primaryMuscles": ["Lats"], "secondaryMuscles": ["Biceps", "Upper Back", "Rear Delts"] }
-              ]
-            },
-            {
-              "type": "strength",
-              "exercise": "Machine Lateral Raise",
-              "sets": 2,
-              "reps": "8-20",
-              "rest": 75,
-              "restQuick": 49,
+              "reps": "10-20",
+              "rest": 60,
+              "restQuick": 39,
               "primaryMuscles": ["Side Delts"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "20, 20", "2": "18, 16", "3": "15, 13", "4": "12, 10" },
-              "rir_weekly": { "1": "3, 1", "2": "2, 0", "3": "1, 0", "4": "1, 0" },
-              "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
-              "notes": "First set: stop when reps slow down. Last set: push hard to a strong burn.",
+              "reps_weekly": { "1": "20, 15, 12", "2": "18, 15, 12", "3": "15, 12, 10", "4": "12, 10, 10" },
+              "rir_weekly": { "1": "2, 1, 0", "2": "1, 0, 0", "3": "0-1, 0, 0", "4": "0, 0, 0" },
+              "sets_weekly": { "1": 3, "2": 3, "3": 3, "4": 3 },
+              "notes": "Last set: take to failure. Cable behind back, lead with elbow.",
               "alternatives": [
                 { "exercise": "Dumbbell Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": [] },
-                { "exercise": "Cable Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": [] }
+                { "exercise": "Machine Lateral Raise", "primaryMuscles": ["Side Delts"], "secondaryMuscles": [] }
               ]
             },
             {
               "type": "strength",
-              "exercise": "Cable Curl",
-              "sets": 1,
+              "exercise": "Pec Deck Fly",
+              "sets": 2,
               "reps": "10-15",
-              "rest": 120,
-              "restQuick": 78,
-              "primaryMuscles": ["Biceps"],
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Chest"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "15", "2": "13", "3": "12", "4": "10" },
-              "rir_weekly": { "1": "0", "2": "0", "3": "0", "4": "0" },
-              "sets_weekly": { "1": 1, "2": 1, "3": 1, "4": 1 },
-              "notes": "Single set = single chance. Take it to true failure. No swinging.",
+              "reps_weekly": { "1": "15, 12", "2": "12, 12", "3": "12, 10", "4": "10, 10" },
+              "rir_weekly": { "1": "2, 1", "2": "1, 0", "3": "0-1, 0", "4": "0, 0" },
+              "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
+              "notes": "Both sets: last 1-2 reps should grind. Squeeze chest together in the contracted position.",
               "alternatives": [
-                { "exercise": "Dumbbell Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": [] },
-                { "exercise": "EZ-Bar Curl", "primaryMuscles": ["Biceps"], "secondaryMuscles": [] }
+                { "exercise": "Cable Crossover", "primaryMuscles": ["Chest"], "secondaryMuscles": [] },
+                { "exercise": "Dumbbell Fly", "primaryMuscles": ["Chest"], "secondaryMuscles": [] }
               ]
             },
             {
               "type": "strength",
-              "exercise": "Overhead Cable Triceps Extension",
-              "sets": 1,
+              "exercise": "Triceps Pushdown",
+              "sets": 2,
               "reps": "10-15",
-              "rest": 120,
-              "restQuick": 78,
+              "rest": 60,
+              "restQuick": 39,
               "primaryMuscles": ["Triceps"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "15", "2": "13", "3": "12", "4": "10" },
-              "rir_weekly": { "1": "0", "2": "0", "3": "0", "4": "0" },
-              "sets_weekly": { "1": 1, "2": 1, "3": 1, "4": 1 },
-              "notes": "Single set = single chance. Take it to true failure. Keep the elbows tucked.",
+              "reps_weekly": { "1": "15, 12", "2": "12, 12", "3": "12, 10", "4": "10, 10" },
+              "rir_weekly": { "1": "2, 1", "2": "1, 0", "3": "0-1, 0", "4": "0, 0" },
+              "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
+              "notes": "Last set: close to failure. Elbows pinned at sides, full lockout at the bottom.",
               "alternatives": [
                 { "exercise": "Rope Triceps Pushdown", "primaryMuscles": ["Triceps"], "secondaryMuscles": [] },
-                { "exercise": "Triceps Pushdown", "primaryMuscles": ["Triceps"], "secondaryMuscles": [] }
+                { "exercise": "Overhead Cable Triceps Extension", "primaryMuscles": ["Triceps"], "secondaryMuscles": [] }
               ]
             },
             {
               "type": "strength",
-              "exercise": "Seated Calf Raise",
-              "sets": 4,
-              "reps": "8-20",
-              "rest": 75,
-              "restQuick": 49,
+              "exercise": "Standing Calf Raise",
+              "sets": 2,
+              "reps": "8-15",
+              "rest": 60,
+              "restQuick": 39,
               "primaryMuscles": ["Calves"],
               "secondaryMuscles": [],
-              "reps_weekly": { "1": "20, 20, 20, 20", "2": "18, 17, 16, 15", "3": "15, 14, 13, 12", "4": "13, 12, 11, 10" },
-              "rir_weekly": { "1": "3, 2, 2, 1", "2": "2, 1, 1, 0", "3": "1, 0, 0, 0", "4": "1, 0, 0, 0" },
-              "sets_weekly": { "1": 4, "2": 4, "3": 4, "4": 4 },
-              "notes": "First sets: stop when reps slow down. Last set: push hard to a strong burn. Full stretch at the bottom, pause at the top.",
+              "reps_weekly": { "1": "15, 12", "2": "12, 12", "3": "12, 10", "4": "10, 8" },
+              "rir_weekly": { "1": "2, 1", "2": "1, 0", "3": "0-1, 0", "4": "1, 0" },
+              "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
+              "notes": "Last set: close to failure. Full stretch at the bottom, full contraction at the top.",
               "alternatives": [
-                { "exercise": "Standing Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": [] },
+                { "exercise": "Seated Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": [] },
                 { "exercise": "Leg Press Calf Raise", "primaryMuscles": ["Calves"], "secondaryMuscles": [] }
+              ]
+            },
+            {
+              "type": "strength",
+              "exercise": "Plank",
+              "sets": 2,
+              "reps": "30-60s hold",
+              "rest": 60,
+              "restQuick": 39,
+              "primaryMuscles": ["Core"],
+              "secondaryMuscles": [],
+              "reps_weekly": { "1": "45s, 30s", "2": "45s, 45s", "3": "60s, 45s", "4": "60s, 60s" },
+              "rir_weekly": { "1": "2, 1", "2": "1, 0", "3": "0-1, 0", "4": "0, 0" },
+              "sets_weekly": { "1": 2, "2": 2, "3": 2, "4": 2 },
+              "notes": "Hold steady, brace hard. Squeeze glutes, neutral spine, don't let hips sag.",
+              "alternatives": [
+                { "exercise": "Side Plank", "primaryMuscles": ["Obliques"], "secondaryMuscles": ["Core"] },
+                { "exercise": "Ab Wheel Rollout", "primaryMuscles": ["Core"], "secondaryMuscles": [] }
               ]
             }
           ]
+        },
+        {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
         },
         {
           "day_name": "REST DAY",
@@ -453,8 +458,5 @@
         }
       ]
     }
-  ],
-  "_metadata": {
-    "isSamplePlan": true
-  }
+  ]
 }

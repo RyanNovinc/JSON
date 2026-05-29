@@ -42,6 +42,7 @@ import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import CookModeScreen from '../screens/CookModeScreen';
 import MealsLibraryScreen from '../screens/MealsLibraryScreen';
 import SmoothiesLibraryScreen from '../screens/SmoothiesLibraryScreen';
+import MealDetailScreen from '../screens/nutrition/MealDetailScreen';
 import { FloatingWorkoutIndicator } from '../components/FloatingWorkoutIndicator';
 // import { FeedbackModal } from '../components/FeedbackTab';
 import { AppModeProvider } from '../contexts/AppModeContext';
@@ -69,7 +70,6 @@ import FitnessGoalsQuestionnaireScreen from '../screens/FitnessGoalsQuestionnair
 import EquipmentPreferencesQuestionnaireScreen from '../screens/EquipmentPreferencesQuestionnaireScreen';
 import MealCalendarScreen from '../screens/MealCalendarScreen';
 import WorkoutCalendar from '../components/WorkoutCalendar';
-import MealDetailScreen from '../screens/MealDetailScreen';
 import GroceryListScreen from '../screens/GroceryListScreen';
 import MealRatingsScreen from '../screens/MealRatingsScreen';
 import FavoriteMealsScreen from '../screens/FavoriteMealsScreen';
@@ -105,14 +105,17 @@ import N2RateScreen from '../screens/nutrition/questionnaire/N2RateScreen';
 import N3AboutYouScreen from '../screens/nutrition/questionnaire/N3AboutYouScreen';
 import N4ActivityScreen from '../screens/nutrition/questionnaire/N4ActivityScreen';
 import N5DietTypeScreen from '../screens/nutrition/questionnaire/N5DietTypeScreen';
+import N5bAllergiesScreen from '../screens/nutrition/questionnaire/N5bAllergiesScreen';
+import N5cSleepScreen from '../screens/nutrition/questionnaire/N5cSleepScreen';
 import N6MealsSnackingScreen from '../screens/nutrition/questionnaire/N6MealsSnackingScreen';
 import N7LocationScreen from '../screens/nutrition/questionnaire/N7LocationScreen';
 import N8BudgetScreen from '../screens/nutrition/questionnaire/N8BudgetScreen';
 import N9PlanLengthScreen from '../screens/nutrition/questionnaire/N9PlanLengthScreen';
-import N10CookingScreen from '../screens/nutrition/questionnaire/N10CookingScreen';
 import NutritionRefinementsScreen from '../screens/nutrition/questionnaire/NutritionRefinementsScreen';
 import NutritionSummaryScreen from '../screens/nutrition/questionnaire/NutritionSummaryScreen';
 import NutritionPromptReadyScreen from '../screens/nutrition/questionnaire/NutritionPromptReadyScreen';
+import CuratedFavoritesScreen from '../screens/nutrition/CuratedFavoritesScreen';
+import FridgePantryScreen from '../screens/nutrition/FridgePantryScreen';
 
 // New: custom tab bar
 import { CustomTabBar, CREATE_ROUTE } from './CustomTabBar';
@@ -306,14 +309,17 @@ export type RootStackParamList = {
   N3AboutYou: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N4Activity: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N5DietType: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N5bAllergies: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N5cSleep: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N6MealsSnacking: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N7Location: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N8Budget: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N9PlanLength: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
-  N10Cooking: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   NutritionRefinements: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   NutritionSummary: undefined;
   NutritionPromptReady: undefined;
+  CuratedFavorites: undefined;
+  FridgePantry: { editMode?: boolean } | undefined;
 };
 
 // Tab param list — 5 tabs (with the Create slot in the middle).
@@ -937,13 +943,6 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 }}
               />
               <RootStack.Screen
-                name="MealDetail"
-                component={MealDetailScreen}
-                options={{
-                  headerShown: false,
-                }}
-              />
-              <RootStack.Screen
                 name="GroceryList"
                 component={GroceryListScreen}
                 options={{
@@ -1098,31 +1097,210 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 }}
               />
               {/* Questionnaire screens */}
-              <RootStack.Screen name="Q1PrimaryGoal" component={Q1PrimaryGoalScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="Q2Experience" component={Q2ExperienceScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="Q3DaysPerWeek" component={Q3DaysPerWeekScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="Q4ProgramDuration" component={Q4ProgramDurationScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="Q5Equipment" component={Q5EquipmentScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="Q6Volume" component={Q6VolumePreferenceScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="Q7RestStyle" component={Q7RestStyleScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="QuestionnaireRefinements" component={RefinementsScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="PromptReady" component={PromptReadyScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="QuestionnaireSummary" component={QuestionnaireSummaryScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="Q1PrimaryGoal" component={Q1PrimaryGoalScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="Q2Experience" component={Q2ExperienceScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="Q3DaysPerWeek" component={Q3DaysPerWeekScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="Q4ProgramDuration" component={Q4ProgramDurationScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="Q5Equipment" component={Q5EquipmentScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="Q6Volume" component={Q6VolumePreferenceScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="Q7RestStyle" component={Q7RestStyleScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="QuestionnaireRefinements" component={RefinementsScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="PromptReady" component={PromptReadyScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="QuestionnaireSummary" component={QuestionnaireSummaryScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
 
               {/* Nutrition questionnaire screens */}
-              <RootStack.Screen name="N1Goal" component={N1GoalScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N2Rate" component={N2RateScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N3AboutYou" component={N3AboutYouScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N4Activity" component={N4ActivityScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N5DietType" component={N5DietTypeScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N6MealsSnacking" component={N6MealsSnackingScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N7Location" component={N7LocationScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N8Budget" component={N8BudgetScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N9PlanLength" component={N9PlanLengthScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="N10Cooking" component={N10CookingScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="NutritionRefinements" component={NutritionRefinementsScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="NutritionSummary" component={NutritionSummaryScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="NutritionPromptReady" component={NutritionPromptReadyScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="N1Goal" component={N1GoalScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N2Rate" component={N2RateScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N3AboutYou" component={N3AboutYouScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N4Activity" component={N4ActivityScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N5DietType" component={N5DietTypeScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N5bAllergies" component={N5bAllergiesScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N5cSleep" component={N5cSleepScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N6MealsSnacking" component={N6MealsSnackingScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N7Location" component={N7LocationScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N8Budget" component={N8BudgetScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="N9PlanLength" component={N9PlanLengthScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="NutritionRefinements" component={NutritionRefinementsScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="NutritionSummary" component={NutritionSummaryScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="NutritionPromptReady" component={NutritionPromptReadyScreen} options={{ 
+                headerShown: false,
+                cardStyleInterpolator: ({ current }) => ({
+                  cardStyle: {
+                    opacity: current.progress,
+                  },
+                }),
+              }} />
+              <RootStack.Screen name="CuratedFavorites" component={CuratedFavoritesScreen} options={{ headerShown: false }} />
+              <RootStack.Screen name="FridgePantry" component={FridgePantryScreen} options={{ headerShown: false, presentation: 'modal' }} />
+              <RootStack.Screen
+                name="MealDetail"
+                component={MealDetailScreen}
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                }}
+              />
             </>
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />

@@ -24,7 +24,7 @@ interface ThemeProviderProps {
   children: ReactNode;
 }
 
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   const [isPinkTheme, setIsPinkTheme] = useState(false);
   const [isThemeLoaded, setIsThemeLoaded] = useState(false);
 

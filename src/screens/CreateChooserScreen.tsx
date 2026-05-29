@@ -81,29 +81,21 @@ export default function CreateChooserScreen() {
   };
 
   const handleSelect = (option: CreateOption) => {
-    // Dismiss the chooser modal, then immediately push the relevant
-    // questionnaire. This keeps the chooser out of the back stack so
-    // back-arrow from the questionnaire returns to the tab bar instead
-    // of looping back through the chooser.
-    navigation.goBack();
-
-    // Slight delay to let the dismiss animation start before the
-    // next push — feels more natural than stacking the navigations.
-    setTimeout(() => {
-      if (option.id === 'workout') {
-        if (hasSavedPlan) {
-          navigation.navigate('QuestionnaireSummary');
-        } else {
-          navigation.navigate('Q1PrimaryGoal', undefined);
-        }
+    // Navigate directly to questionnaire without dismissing the modal first.
+    // This creates a smooth fade transition from modal to questionnaire.
+    if (option.id === 'workout') {
+      if (hasSavedPlan) {
+        navigation.navigate('QuestionnaireSummary');
       } else {
-        if (hasNutritionPlan) {
-          navigation.navigate('NutritionSummary');
-        } else {
-          navigation.navigate('N1Goal', undefined);
-        }
+        navigation.navigate('Q1PrimaryGoal', undefined);
       }
-    }, 50);
+    } else {
+      if (hasNutritionPlan) {
+        navigation.navigate('NutritionSummary');
+      } else {
+        navigation.navigate('N1Goal', undefined);
+      }
+    }
   };
 
 

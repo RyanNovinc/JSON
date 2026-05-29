@@ -77,7 +77,7 @@ const TimerContext = createContext<TimerContextType | undefined>(undefined);
 const STORAGE_KEY = '@timer_state';
 const SETTINGS_KEY = '@timer_settings';
 
-export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const [timer, setTimer] = useState<TimerState | null>(null);
   const [isMinimized, setIsMinimized] = useState(true);
   const [timerSettings, setTimerSettingsState] = useState<TimerSettings>({

@@ -58,7 +58,7 @@ interface WorkoutRoutineProviderProps {
   children: ReactNode;
 }
 
-export const WorkoutRoutineProvider: React.FC<WorkoutRoutineProviderProps> = ({ children }) => {
+export const WorkoutRoutineProvider = ({ children }: WorkoutRoutineProviderProps) => {
   const [state, setState] = useState({
     routines: [] as WorkoutRoutine[],
     isLoading: true,

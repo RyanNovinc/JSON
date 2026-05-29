@@ -150,6 +150,9 @@ Sometimes the user's preferences will conflict — for example, a very low budge
 2. **ACKNOWLEDGE** the trade-off in the plan notes — tell the user which constraint you relaxed and why. For example: "Your moderate budget target is difficult to hit at 3000 kcal/day with convenience products. This plan uses some from-scratch cooking (rice cooker instead of microwave pouches) to bring costs closer to your budget. If you prefer fully no-cook meals, expect the weekly cost to be higher."
 3. **NEVER** silently ignore a constraint. If you can't meet it, say so.
 
+**RESOLVE EVERYTHING YOURSELF — NO INTERACTIVE QUESTIONS:**
+You have all the information you need in this prompt to build the plan end to end. Never pause to ask the user to choose between options, and never present interactive choices or "how would you like me to handle X?" questions — including when a macro target is hard to hit, a trade-off arises, or a constraint conflicts. Resolve it yourself using the priority order above, apply the fix, and note the decision in one line in the plan notes. The only question you may end on is the single confirmation line specified at the end of this prompt.
+
 **NUTRITION TARGETS:**
 - Daily calories: ${macroResults.calories || 2000}
 - Protein: ${macroResults.protein || 150}g | Carbs: ${macroResults.carbs || 200}g | Fat: ${macroResults.fat || 67}g
@@ -422,6 +425,7 @@ Please create a detailed ${budgetData.planDuration || 7}-day meal plan that:
     // Add static sections
     prompt += getGroceryListRequirements(store, budgetData.planDuration || 7);
     prompt += getMealPrepSessionRequirements(budgetData.planDuration || 7, budgetData.skillConfidence, budgetData.timeInvestment, budgetData.planningStyle);
+    prompt += getDailyTotalsVerification();
     prompt += getVerificationSteps(budgetData.planDuration || 7);
     prompt += getFormatRequirements();
     prompt += getFeedbackWorkflow();
@@ -725,8 +729,8 @@ const getSnackingGuidance = (snackingStyle: string, snackFrequency?: string): st
     return `NO SNACKS: User wants no snacks between meals. Do not include any snacks. Focus all calories on the main meals.`;
   }
   
-  if (snackFrequency === 'ai_decide') {
-    return `AI DECIDES SNACKS: User wants AI to determine optimal snack count and timing. Include 1-3 snacks as needed based on meal gaps and sleep optimization. Each snack should be 10-15% of daily calories (300-500 kcal range).`;
+  if (snackFrequency === '3+') {
+    return `FREQUENT SNACKING: User wants 3 or more snacks per day. Include 3-4 snacks distributed throughout the day between main meals. Each snack should be 8-12% of daily calories (250-400 kcal range). Focus on protein-rich options to support muscle building and satiety.`;
   }
   
   if (style.includes('love snacking') || style.includes('frequent')) {
@@ -1394,6 +1398,29 @@ const getTimeRequirements = (budgetData: any): string => {
 };
 
 
+const getDailyTotalsVerification = (): string => {
+  return `
+
+---
+
+## DAILY TOTALS — SHOW THE ARITHMETIC
+
+Language models are unreliable at mental arithmetic, and the most common failure here is stating a daily total that the meals don't actually add up to. Before the verification steps below, output a short totals block for EVERY day. Write the addition expression before each result, and compute it with a code/Python tool if one is available — never estimate a total in your head.
+
+Format per day:
+
+\`\`\`
+DAY 1 — [date]
+  [meal]  [kcal] / [protein]P
+  [meal]  [kcal] / [protein]P
+  ... (one line per meal/snack that day)
+  kcal:    [list] = [total]   vs target [X] → [+/-%]
+  protein: [list] = [total]   vs target [X] → [+/-%]
+\`\`\`
+
+If a day's calories are outside ±5% or protein outside ±10% of target, adjust that day's portions and redo its block before presenting the plan. The calorie and protein targets are non-negotiable — fix the numbers, don't explain them away.`;
+};
+
 const getVerificationSteps = (planDuration: number = 7): string => {
   const periodLabel = planDuration <= 7 ? 'plan-period' : 'weekly';
   const periodNote = planDuration < 7 
@@ -1409,7 +1436,7 @@ const getVerificationSteps = (planDuration: number = 7): string => {
 
 Before presenting the meal plan, complete these checks:
 
-1. **Macro tolerance check** — verify these thresholds:
+1. **Macro tolerance check** — verify these thresholds using the re-derived totals from the Daily Totals block above (never totals estimated mentally):
 
 Protein: within ±10% of target DAILY
 Calories: within ±5% of target as ${periodLabel} average ${periodNote}
@@ -1458,8 +1485,8 @@ const getFormatRequirements = (): string => {
 FORMAT:
 
 Present the plan directly in chat with clear formatting (headers, bullets, tables as needed)
-Include grocery list (by category with quantities/prices) and meal prep session (step-by-step with storage guidelines)
-Present ONLY the final plan — no working, drafts, or iteration commentary
+Include the Daily Totals block, grocery list (by category with quantities/prices), and meal prep session (step-by-step with storage guidelines)
+Present ONLY the final plan — no working, drafts, or iteration commentary (the Daily Totals block is final output, not draft working)
 Focus on practical meals matching my planning preferences.`;
 };
 

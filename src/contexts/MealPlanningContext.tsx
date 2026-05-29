@@ -73,7 +73,7 @@ interface MealPlanningProviderProps {
   children: ReactNode;
 }
 
-export const MealPlanningProvider: React.FC<MealPlanningProviderProps> = ({ children }) => {
+export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) => {
   const [state, setState] = useState<NutritionState>({
     userProfile: null,
     currentMealPlan: null,

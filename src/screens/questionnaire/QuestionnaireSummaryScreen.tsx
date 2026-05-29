@@ -207,7 +207,7 @@ export default function QuestionnaireSummaryScreen() {
     }, []),
   );
 
-  const handleBack = () => navigation.goBack();
+  const handleBack = () => navigation.navigate('CreateFlow' as never);
   const handleClose = () => navigation.popToTop();
 
   const handleEditRow = (route: string) => {

@@ -3,14 +3,24 @@
 // Hub the user lands on after completing the nutrition questionnaire (or
 // when re-entering with saved answers). Mirrors the workout
 // QuestionnaireSummaryScreen: hero + tappable rows to edit each answer,
-// a refinements block, and CTAs at the end.
+// and CTAs at the end.
 //
 // Differences from workout: a macro recap card up top (calories + P/C/F
 // computed from the answers), and Continue re-runs finalizeNutrition()
 // so any edits made here are written to the storage keys before the
 // PromptReady screen reads them.
+//
+// CHANGES (curated-meals model):
+//  - "Foods you like" promoted from optional add-on to a primary section
+//    ("Build your plan around") above "Your answers", since in the curated
+//    model the user's selected meals are the core input the AI schedules from.
+//  - Fridge & pantry removed entirely (dead in the curated model).
+//  - Refinements (eating challenges) folded into the "Your answers" table as
+//    a normal row instead of its own section.
+//  - Soft gate on Continue: if no meals are picked, confirm before proceeding
+//    (the AI would otherwise invent the whole plan). Not a hard block.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +29,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -31,8 +43,17 @@ import {
   NutritionAnswers,
 } from '../../../utils/nutritionQuestionnaireStorage';
 import { computeMacros, finalizeNutrition } from '../../../utils/nutritionMacros';
+import { loadCuratedFavorites, favoritesCount } from '../../../utils/curatedFavoritesStorage';
+import { WorkoutStorage } from '../../../utils/storage';
 
 type NavProp = StackNavigationProp<any>;
+
+// Macro bar colours — protein cyan (theme), carbs amber, fat pink.
+const MACRO_COLORS = {
+  protein: '#22d3ee',
+  carbs: '#fbbf24',
+  fat: '#f472b6',
+};
 
 const GOAL_LABELS: Record<string, string> = {
   lose_weight: 'Lose weight',
@@ -123,8 +144,8 @@ const ROWS: RowConfig[] = [
       const snack =
         a.snackFrequency === '0'
           ? 'no snacks'
-          : a.snackFrequency === 'ai_decide'
-          ? 'snacks: AI decides'
+          : a.snackFrequency === '3+'
+          ? '3+ snacks'
           : a.snackFrequency
           ? `${a.snackFrequency} snack${a.snackFrequency === '1' ? '' : 's'}`
           : '';
@@ -160,15 +181,6 @@ const ROWS: RowConfig[] = [
       return `${a.planDuration} days${start ? ` · ${start}` : ''}`;
     },
   },
-  {
-    label: 'Cooking',
-    route: 'N10Cooking',
-    format: (a) => {
-      if (a.skillConfidence == null) return '—';
-      const n = a.cookingEquipment?.length ?? 0;
-      return `Skill ${a.skillConfidence}/5 · Time ${a.timeInvestment}/5 · ${n} item${n === 1 ? '' : 's'}`;
-    },
-  },
 ];
 
 export default function NutritionSummaryScreen() {
@@ -179,16 +191,51 @@ export default function NutritionSummaryScreen() {
   const [answers, setAnswers] = useState<NutritionAnswers | null>(null);
   const [loading, setLoading] = useState(true);
   const [continuing, setContinuing] = useState(false);
+  // Bumped on every focus so the macro bars replay their fill animation
+  // (macros may have changed after editing a row).
+  const [animTick, setAnimTick] = useState(0);
+  const [favCount, setFavCount] = useState(0);
+  // Sleep lives in its own WorkoutStorage key (not the NutritionAnswers
+  // draft), so we load it separately to show a row + deep-link to N5cSleep.
+  const [sleepSummary, setSleepSummary] = useState<string | null>(null);
+
+  // ScrollView ref for scroll position management
+  const scrollViewRef = useRef<ScrollView>(null);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+
+      // Reset scroll position to top whenever screen gains focus
+      // This fixes the issue where summary retains scroll offset across remounts
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+
       (async () => {
         const data = await loadNutritionAnswers();
+        const favs = await loadCuratedFavorites();
+        let sleepText: string | null = null;
+        try {
+          const sleep = await WorkoutStorage.loadSleepOptimizationResults();
+          const f = sleep?.formData;
+          if (f?.bedtime && f?.wakeTime) {
+            const level =
+              f.optimizationLevel === 'minimal'
+                ? 'Relaxed'
+                : f.optimizationLevel === 'maximum'
+                ? 'Strict'
+                : 'Balanced';
+            sleepText = `${f.bedtime} – ${f.wakeTime} · ${level}`;
+          }
+        } catch {
+          // no sleep data saved — leave the row showing the optional prompt
+        }
         if (!cancelled) {
           setAnswers(data);
+          setFavCount(favoritesCount(favs));
+          setSleepSummary(sleepText);
           setLoading(false);
           setContinuing(false);
+          setAnimTick((t) => t + 1);
         }
       })();
       return () => {
@@ -197,8 +244,18 @@ export default function NutritionSummaryScreen() {
     }, [])
   );
 
-  const handleBack = () => navigation.goBack();
-  const handleClose = () => navigation.popToTop();
+  const handleBack = () => {
+    navigation.navigate('CreateFlow' as never);
+  };
+
+  const handleClose = () => {
+    // Navigate to the main tab navigator's Nutrition tab
+    navigation.navigate('Main', { screen: 'Nutrition' });
+  };
+
+  const handleOpenFavorites = () => {
+    navigation.push('CuratedFavorites' as never);
+  };
 
   const handleEditRow = (route: string) => {
     if (!answers) return;
@@ -216,8 +273,24 @@ export default function NutritionSummaryScreen() {
     } as never);
   };
 
-  const handleContinue = async () => {
-    if (!answers || continuing) return;
+  // Allergies/avoid are owned by N5b now, so edit there (not Refinements).
+  const handleEditAllergies = () => {
+    if (!answers) return;
+    navigation.push('N5bAllergies' as never, {
+      editMode: true,
+      answersSoFar: answers,
+    } as never);
+  };
+
+  // Sleep saves to its own store; N5c reads it itself, so no answersSoFar.
+  const handleEditSleep = () => {
+    navigation.push('N5cSleep' as never, { editMode: true } as never);
+  };
+
+  // Proceeds to the prompt step after re-finalizing. Pulled out so both the
+  // direct path and the "Continue anyway" soft-gate path can call it.
+  const proceedToPrompt = async () => {
+    if (!answers) return;
     setContinuing(true);
     try {
       // Re-finalize so any edits made here are written before the prompt
@@ -237,6 +310,37 @@ export default function NutritionSummaryScreen() {
       Alert.alert('Something went wrong', 'Could not save. Try again.');
       setContinuing(false);
     }
+  };
+
+  const handleContinue = async () => {
+    if (!answers || continuing) return;
+
+    // Soft gate: in the curated model, an empty "Foods you like" selection
+    // means the AI invents the entire plan from scratch. Don't hard-block —
+    // just make the consequence clear so there's no confusion downstream.
+    if (favCount === 0) {
+      Alert.alert(
+        'No meals picked yet',
+        "Without any picks, the AI builds your whole plan from scratch. Pick a few foods you like for a plan built around them — or continue anyway.",
+        [
+          {
+            text: 'Pick foods',
+            onPress: () => navigation.push('CuratedFavorites' as never),
+          },
+          {
+            text: 'Continue anyway',
+            style: 'destructive',
+            onPress: () => {
+              void proceedToPrompt();
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
+    await proceedToPrompt();
   };
 
   const handleStartOver = () => {
@@ -277,10 +381,15 @@ export default function NutritionSummaryScreen() {
 
   const macros = computeMacros(answers);
 
-  const hasRefinements =
-    (answers.allergies?.length ?? 0) > 0 ||
-    (answers.avoidFoods?.length ?? 0) > 0 ||
-    (answers.eatingChallenges?.length ?? 0) > 0;
+  // Eating challenges now live as a row in the main "Your answers" table.
+  const challengesValue =
+    (answers.eatingChallenges?.length ?? 0) > 0
+      ? answers.eatingChallenges!.join(', ')
+      : 'None';
+
+  const allergyCount = answers.allergies?.length ?? 0;
+  const exclusionsSummary =
+    allergyCount > 0 ? answers.allergies!.join(', ') : null;
 
   const visibleRows = ROWS.filter((r) => !r.show || r.show(answers));
 
@@ -307,6 +416,7 @@ export default function NutritionSummaryScreen() {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(insets.bottom, 12) + 24 },
@@ -315,7 +425,7 @@ export default function NutritionSummaryScreen() {
       >
         <Text style={styles.title}>Looking good.</Text>
         <Text style={styles.subtitle}>
-          Tap any answer to change it, or continue to your prompt.
+          Tap any answer to change it, then add the meals your plan is built from.
         </Text>
 
         {/* Macro recap */}
@@ -327,32 +437,105 @@ export default function NutritionSummaryScreen() {
               </Text>
               <Text style={styles.macroCalsUnit}>kcal / day</Text>
             </View>
-            <View style={styles.macroRow}>
-              {[
-                { label: 'Protein', value: `${macros.protein}g` },
-                { label: 'Carbs', value: `${macros.carbs}g` },
-                { label: 'Fat', value: `${macros.fat}g` },
-              ].map((m) => (
-                <View key={m.label} style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{m.value}</Text>
-                  <Text style={styles.macroLabel}>{m.label}</Text>
-                </View>
-              ))}
+            <View style={styles.macroBars}>
+              {(() => {
+                const pCal = (macros.protein ?? 0) * 4;
+                const cCal = (macros.carbs ?? 0) * 4;
+                const fCal = (macros.fat ?? 0) * 9;
+                const total = pCal + cCal + fCal;
+                const pct = (v: number) =>
+                  total > 0 ? Math.round((v / total) * 100) : 0;
+                return [
+                  {
+                    label: 'Protein',
+                    grams: macros.protein ?? 0,
+                    pct: pct(pCal),
+                    color: MACRO_COLORS.protein,
+                  },
+                  {
+                    label: 'Carbs',
+                    grams: macros.carbs ?? 0,
+                    pct: pct(cCal),
+                    color: MACRO_COLORS.carbs,
+                  },
+                  {
+                    label: 'Fat',
+                    grams: macros.fat ?? 0,
+                    pct: pct(fCal),
+                    color: MACRO_COLORS.fat,
+                  },
+                ].map((m, i) => (
+                  <MacroBar
+                    key={m.label}
+                    label={m.label}
+                    grams={m.grams}
+                    pct={m.pct}
+                    color={m.color}
+                    delay={i * 120}
+                    replayKey={animTick}
+                  />
+                ));
+              })()}
             </View>
           </View>
         )}
 
-        {/* Rows */}
+        {/* Build your plan around — Foods you like, promoted to primary.
+            In the curated model this is the core input, not an optional extra. */}
+        <Text style={styles.sectionHeader}>Build your plan around</Text>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={handleOpenFavorites}
+          style={[
+            styles.primaryAddon,
+            { borderColor: favCount > 0 ? themeColor : '#27272a' },
+          ]}
+        >
+          <View style={styles.primaryAddonRow}>
+            <View
+              style={[
+                styles.primaryAddonIcon,
+                {
+                  backgroundColor:
+                    favCount > 0 ? 'rgba(34,211,238,0.12)' : '#141416',
+                },
+              ]}
+            >
+              <Ionicons
+                name={favCount > 0 ? 'heart' : 'heart-outline'}
+                size={19}
+                color={favCount > 0 ? themeColor : '#71717a'}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.primaryAddonTitle}>Foods you like</Text>
+              <Text style={styles.primaryAddonSub}>
+                {favCount > 0
+                  ? `${favCount} meal${favCount === 1 ? '' : 's'} picked`
+                  : 'The meals your plan is built from'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#52525b" />
+          </View>
+          {favCount === 0 && (
+            <View style={styles.primaryAddonNotice}>
+              <Ionicons name="alert-circle-outline" size={14} color="#d97706" />
+              <Text style={styles.primaryAddonNoticeText}>
+                Nothing picked yet — pick meals for a plan built around your tastes
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Your answers — everything completed in the flow, uniform rows */}
+        <Text style={styles.sectionHeader}>Your answers</Text>
         <View style={styles.section}>
-          {visibleRows.map((row, idx) => (
+          {visibleRows.map((row) => (
             <TouchableOpacity
               key={row.route + row.label}
               activeOpacity={0.7}
               onPress={() => handleEditRow(row.route)}
-              style={[
-                styles.row,
-                idx === visibleRows.length - 1 && { borderBottomWidth: 0 },
-              ]}
+              style={styles.row}
             >
               <View style={styles.rowText}>
                 <Text style={styles.rowLabel}>{row.label}</Text>
@@ -361,41 +544,51 @@ export default function NutritionSummaryScreen() {
               <Ionicons name="chevron-forward" size={16} color="#52525b" />
             </TouchableOpacity>
           ))}
-        </View>
 
-        {/* Refinements */}
-        <Text style={styles.sectionHeader}>Refinements</Text>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={handleEditRefinements}
-          style={[styles.section, styles.refBlock]}
-        >
-          {hasRefinements ? (
-            <View style={{ flex: 1 }}>
-              {(answers.allergies?.length ?? 0) > 0 && (
-                <RefRow label="Allergies" value={answers.allergies!.join(', ')} />
-              )}
-              {(answers.avoidFoods?.length ?? 0) > 0 && (
-                <RefRow label="Avoid" value={answers.avoidFoods!.join(', ')} />
-              )}
-              {(answers.eatingChallenges?.length ?? 0) > 0 && (
-                <RefRow
-                  label="Challenges"
-                  value={answers.eatingChallenges!.join(', ')}
-                  last
-                />
-              )}
-            </View>
-          ) : (
-            <View style={styles.refEmpty}>
-              <Ionicons name="add-circle-outline" size={18} color={themeColor} />
-              <Text style={[styles.refEmptyText, { color: themeColor }]}>
-                Add refinements
+          {/* Allergies & avoid — owned by N5b, lives in NutritionAnswers */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleEditAllergies}
+            style={styles.row}
+          >
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>Allergies</Text>
+              <Text style={styles.rowValue} numberOfLines={2}>
+                {exclusionsSummary ?? 'None'}
               </Text>
             </View>
-          )}
-          <Ionicons name="chevron-forward" size={16} color="#52525b" />
-        </TouchableOpacity>
+            <Ionicons name="chevron-forward" size={16} color="#52525b" />
+          </TouchableOpacity>
+
+          {/* Sleep & meal timing — owned by N5c, separate store */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleEditSleep}
+            style={styles.row}
+          >
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>Sleep & meal timing</Text>
+              <Text style={styles.rowValue}>{sleepSummary ?? 'Not set'}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#52525b" />
+          </TouchableOpacity>
+
+          {/* Eating challenges — folded in from the old standalone Refinements
+              section. Allergies/avoid live in their own row above. */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleEditRefinements}
+            style={[styles.row, { borderBottomWidth: 0 }]}
+          >
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>Eating challenges</Text>
+              <Text style={styles.rowValue} numberOfLines={2}>
+                {challengesValue}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#52525b" />
+          </TouchableOpacity>
+        </View>
 
         {/* CTAs */}
         <View style={styles.ctas}>
@@ -409,7 +602,7 @@ export default function NutritionSummaryScreen() {
               <ActivityIndicator size="small" color="#0a0a0b" />
             ) : (
               <Text style={[styles.primaryBtnText, { color: '#0a0a0b' }]}>
-                Continue to prompt
+                Continue
               </Text>
             )}
           </TouchableOpacity>
@@ -427,41 +620,63 @@ export default function NutritionSummaryScreen() {
   );
 }
 
-function RefRow({
+function MacroBar({
   label,
-  value,
-  last,
+  grams,
+  pct,
+  color,
+  delay,
+  replayKey,
 }: {
   label: string;
-  value: string;
-  last?: boolean;
+  grams: number;
+  pct: number;
+  color: string;
+  delay: number;
+  replayKey: number;
 }) {
+  // Animate width 0% -> target%. Width can't use the native driver, but for
+  // three short one-shot tweens that's fine, and it fills left-to-right
+  // naturally with no scale-origin hack.
+  const progress = useRef(new Animated.Value(0)).current;
+  const targetPct = Math.max(pct, 2);
+
+  useEffect(() => {
+    progress.setValue(0);
+    const anim = Animated.timing(progress, {
+      toValue: 1,
+      duration: 650,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [replayKey, targetPct, delay, progress]);
+
+  const widthInterpolated = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', `${targetPct}%`],
+  });
+
   return (
-    <View style={[refStyles.row, last && { borderBottomWidth: 0, paddingBottom: 0 }]}>
-      <Text style={refStyles.label}>{label}</Text>
-      <Text style={refStyles.value} numberOfLines={2}>
-        {value}
-      </Text>
+    <View style={styles.barRow}>
+      <View style={styles.barHead}>
+        <Text style={styles.barLabel}>{label}</Text>
+        <Text style={styles.barGrams}>{grams}g</Text>
+        <Text style={styles.barPct}>{pct}%</Text>
+      </View>
+      <View style={styles.barTrack}>
+        <Animated.View
+          style={[
+            styles.barFill,
+            { width: widthInterpolated, backgroundColor: color },
+          ]}
+        />
+      </View>
     </View>
   );
 }
-
-const refStyles = StyleSheet.create({
-  row: {
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#27272a',
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    color: '#71717a',
-    textTransform: 'uppercase',
-    marginBottom: 3,
-  },
-  value: { fontSize: 14, color: '#e4e4e7', lineHeight: 19 },
-});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0b' },
@@ -516,19 +731,59 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 24,
   },
+  // Foods you like — primary add-on (solid border, not dashed/optional).
+  primaryAddon: {
+    backgroundColor: '#131316',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+  },
+  primaryAddonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  primaryAddonIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryAddonTitle: { fontSize: 15, fontWeight: '500', color: '#ffffff' },
+  primaryAddonSub: { fontSize: 12, color: '#a1a1aa', marginTop: 2, lineHeight: 16 },
+  primaryAddonNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 13,
+    paddingTop: 13,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#27272a',
+  },
+  primaryAddonNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#d97706',
+    lineHeight: 16,
+  },
   macroTop: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 16 },
   macroCals: { fontSize: 40, fontWeight: '700', letterSpacing: -1 },
   macroCalsUnit: { fontSize: 13, color: '#71717a', marginLeft: 8 },
-  macroRow: { flexDirection: 'row' },
-  macroItem: { flex: 1 },
-  macroValue: { fontSize: 18, fontWeight: '600', color: '#ffffff', marginBottom: 2 },
-  macroLabel: {
-    fontSize: 11,
-    color: '#71717a',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontWeight: '600',
+  macroBars: { gap: 13 },
+  barRow: {},
+  barHead: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 },
+  barLabel: { flex: 1, fontSize: 12, color: '#a1a1aa' },
+  barGrams: { fontSize: 13, fontWeight: '600', color: '#ffffff' },
+  barPct: { fontSize: 11, color: '#71717a', marginLeft: 8, width: 34, textAlign: 'right' },
+  barTrack: {
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#1c1c1f',
+    overflow: 'hidden',
   },
+  barFill: { height: '100%', borderRadius: 4 },
   section: {
     backgroundColor: '#131316',
     borderWidth: StyleSheet.hairlineWidth,
@@ -564,14 +819,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 4,
   },
-  refBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    gap: 12,
-  },
-  refEmpty: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  refEmptyText: { fontSize: 14, fontWeight: '500' },
   ctas: { marginTop: 32, gap: 6 },
   primaryBtn: {
     height: 54,

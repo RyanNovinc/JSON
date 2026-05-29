@@ -20,17 +20,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import QuestionnaireHeader from '../../questionnaire/QuestionnaireHeader';
+import WeightEntrySheet from '../../../components/nutrition/WeightEntrySheet';
 import { WorkoutStorage } from '../../../utils/storage';
 import { updateNutritionField } from '../../../utils/nutritionQuestionnaireStorage';
 
 /**
  * N3 — About you (age / gender / height / weight)
- * Step 3. The one screen that isn't a QuestionCard select — it needs
- * inputs. Restyled to the workout aesthetic (#131316 fields, #27272a
- * borders, themeColor on focus) but keeps the OLD NutritionStep3
- * behaviour that matters: weight is NOT typed, it's sourced from
- * WeightTracker (loadWeightHistory → latest entry), with a Change /
- * Add button that navigates to WeightTracker and reloads on focus.
+ *
+ * Step 3 of the nutrition questionnaire. Layout matches every other N
+ * screen — QuestionnaireHeader on top, QuestionCard-style selectors in
+ * the body, CTA bar at the bottom.
+ *
+ * v2 — Weight UX redesign.
+ * The previous flow navigated to WeightTracker (a full Profile-level
+ * screen) just to update one number. That meant the user lost their
+ * questionnaire context, saw a hero number + history list + testimonial
+ * button + "AI info banner", and had to come back. Now we open the
+ * shared WeightEntrySheet inline — same component the Profile tracker
+ * uses, but kept light. KeyboardAvoidingView in the sheet handles the
+ * keyboard hiding the input. The sheet refreshes the local weight
+ * value via onSaved, which then propagates into answersSoFar on Next.
+ *
+ * Theme tints (the rgba background for selected cards) are now derived
+ * from themeColor with low alpha rather than the hardcoded cyan rgba
+ * that broke the pink theme.
  */
 
 type GenderValue = 'male' | 'female' | 'prefer_not_to_say';
@@ -44,6 +57,16 @@ const GENDER_OPTIONS: { value: GenderValue; label: string }[] = [
 type ParamList = {
   N3AboutYou: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
 };
+
+// hex (#rrggbb) → rgba(r, g, b, a). Used so the selection tint follows
+// the user's theme color instead of being a hardcoded cyan rgba.
+function hexToRgba(hex: string, alpha: number): string {
+  const stripped = hex.replace('#', '');
+  const r = parseInt(stripped.substring(0, 2), 16);
+  const g = parseInt(stripped.substring(2, 4), 16);
+  const b = parseInt(stripped.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 export default function N3AboutYouScreen() {
   const navigation = useNavigation<StackNavigationProp<any>>();
@@ -68,8 +91,14 @@ export default function N3AboutYouScreen() {
   );
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
   const [focused, setFocused] = useState<string | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
-  // Pull the latest weight from WeightTracker — same as old NutritionStep3.
+  const selectionTint = hexToRgba(themeColor, 0.08);
+
+  // Pull the latest weight from WeightTracker. Used on mount and
+  // whenever we focus back to this screen (covers the case where the
+  // user navigated to the Profile WeightTracker somehow and updated
+  // their weight from there).
   const loadCurrentWeight = useCallback(async () => {
     try {
       const history = await WorkoutStorage.loadWeightHistory();
@@ -78,21 +107,20 @@ export default function N3AboutYouScreen() {
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         )[0];
         setWeight(latest.weight);
-        setWeightUnit(latest.unit);
+        if (latest.unit === 'kg' || latest.unit === 'lbs') {
+          setWeightUnit(latest.unit);
+        }
       }
     } catch (e) {
       console.error('N3 loadCurrentWeight failed', e);
     }
   }, []);
 
-  // Reload weight whenever we come back from WeightTracker.
   useFocusEffect(
     useCallback(() => {
       loadCurrentWeight();
     }, [loadCurrentWeight])
   );
-
-  const goToWeightTracker = () => navigation.navigate('WeightTracker' as never);
 
   const ageNum = parseInt(age, 10);
   const heightNum = parseInt(height, 10);
@@ -136,7 +164,7 @@ export default function N3AboutYouScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={3}
-        totalSteps={10}
+        totalSteps={11}
         onBack={handleBack}
         onClose={handleClose}
       />
@@ -169,7 +197,7 @@ export default function N3AboutYouScreen() {
                     styles.genderCard,
                     isSel && {
                       borderColor: themeColor,
-                      backgroundColor: 'rgba(34, 211, 238, 0.07)',
+                      backgroundColor: selectionTint,
                       borderWidth: 1.5,
                     },
                   ]}
@@ -231,7 +259,8 @@ export default function N3AboutYouScreen() {
             <Text style={styles.inputUnit}>cm</Text>
           </View>
 
-          {/* Weight — sourced from WeightTracker */}
+          {/* Weight — opens the inline WeightEntrySheet instead of
+              navigating to the full WeightTracker screen. */}
           <Text style={styles.fieldLabel}>Current weight</Text>
           {weight != null ? (
             <View style={styles.weightRow}>
@@ -241,7 +270,7 @@ export default function N3AboutYouScreen() {
               </View>
               <TouchableOpacity
                 style={[styles.weightBtn, { borderColor: themeColor }]}
-                onPress={goToWeightTracker}
+                onPress={() => setSheetVisible(true)}
                 activeOpacity={0.8}
               >
                 <Ionicons name="create-outline" size={15} color={themeColor} />
@@ -253,7 +282,7 @@ export default function N3AboutYouScreen() {
           ) : (
             <TouchableOpacity
               style={[styles.addWeight, { borderColor: themeColor }]}
-              onPress={goToWeightTracker}
+              onPress={() => setSheetVisible(true)}
               activeOpacity={0.8}
             >
               <Ionicons name="add-circle-outline" size={18} color={themeColor} />
@@ -263,7 +292,7 @@ export default function N3AboutYouScreen() {
             </TouchableOpacity>
           )}
           <Text style={styles.weightHint}>
-            Pulled from your Weight Tracker so it stays in sync.
+            Stays in sync with your Weight Tracker.
           </Text>
         </ScrollView>
 
@@ -290,6 +319,20 @@ export default function N3AboutYouScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <WeightEntrySheet
+        visible={sheetVisible}
+        title={weight != null ? 'Update weight' : 'Add weight'}
+        onClose={() => setSheetVisible(false)}
+        onSaved={(entry) => {
+          // Immediately reflect the new weight locally — the sheet has
+          // already persisted to WorkoutStorage and run macro recalc.
+          setWeight(entry.weight);
+          if (entry.unit === 'kg' || entry.unit === 'lbs') {
+            setWeightUnit(entry.unit);
+          }
+        }}
+      />
     </View>
   );
 }

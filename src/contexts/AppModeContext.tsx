@@ -17,7 +17,7 @@ interface AppModeProviderProps {
   children: ReactNode;
 }
 
-export const AppModeProvider: React.FC<AppModeProviderProps> = ({ children }) => {
+export const AppModeProvider = ({ children }: AppModeProviderProps) => {
   const [appMode, setAppMode] = useState<AppMode>('training'); // Default to training
   const [isTransitioning, setIsTransitioning] = useState(false);
 

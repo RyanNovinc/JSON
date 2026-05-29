@@ -536,24 +536,38 @@ export default function NutritionHomeScreen({ route }: any) {
   // Jump to today's day-of-week within the meal plan.
   // Uses the existing cleanMealPlanNavigation utility — same logic that was
   // already in the file, just now wired up to the new primary CTA.
+  //
+  // CHANGED: now takes the plan it should operate on and switches to it first,
+  // so that the secondary plan cards' "Start today's meals" button jumps to
+  // *that* plan's today, not whatever the current hero plan is.
   const handleJumpToToday = (plan: MealPlan) => {
     try {
+      // Make sure the tapped plan becomes the active plan before we resolve
+      // "today" against it — otherwise findBestTodayDate reads currentPlan,
+      // which may still be the hero plan.
+      handleMealPlanSwitch(plan);
+
       const {
         findBestTodayDate,
         navigateToMealDay,
         navigateToMealPlanDays
       } = require('../utils/cleanMealPlanNavigation');
 
-      const bestTodayDate = findBestTodayDate(currentPlan);
+      // Prefer the original SimplifiedMealPlan that matches this card, so the
+      // navigation utility resolves against the correct plan's days.
+      const originalPlan = mealPlans.find(p => p.name === plan.name);
+      const resolvePlan = originalPlan || currentPlan;
+
+      const bestTodayDate = findBestTodayDate(resolvePlan);
 
       if (bestTodayDate) {
         navigateToMealDay(navigation, bestTodayDate, {
-          id: currentPlan?.id || plan.id || 'unknown',
+          id: originalPlan?.id || currentPlan?.id || plan.id || 'unknown',
           name: plan.name
         });
       } else {
         navigateToMealPlanDays(navigation, {
-          id: currentPlan?.id || plan.id || 'unknown',
+          id: originalPlan?.id || currentPlan?.id || plan.id || 'unknown',
           name: plan.name
         });
       }
@@ -637,14 +651,19 @@ export default function NutritionHomeScreen({ route }: any) {
     });
 
     try {
-      if (!currentPlan) {
-        console.error('❌ No current plan to export');
+      // CHANGED: was hard-coded to currentPlan. Now resolves the original
+      // SimplifiedMealPlan matching the tapped card so that sharing a
+      // secondary plan exports that plan, not the hero plan.
+      const originalPlan = mealPlans.find(p => p.name === plan.name) || currentPlan;
+
+      if (!originalPlan) {
+        console.error('❌ No plan to export');
         setShareModal(prev => ({ ...prev, isGenerating: false }));
         return;
       }
 
       const mealPlanToShare = {
-        ...currentPlan,
+        ...originalPlan,
         exported_with_customizations: true,
         export_timestamp: new Date().toISOString(),
         export_note: "This export includes all customizations: manually added meals and permanently deleted meals"
@@ -683,13 +702,17 @@ export default function NutritionHomeScreen({ route }: any) {
 
       console.log('📤 Exporting SimplifiedMealPlan with all customizations');
 
-      if (!currentPlan) {
-        console.error('❌ No current plan to export');
+      // CHANGED: resolve the original plan that matches the share modal's plan
+      // rather than always exporting currentPlan.
+      const originalPlan = mealPlans.find(p => p.name === shareModal.plan?.name) || currentPlan;
+
+      if (!originalPlan) {
+        console.error('❌ No plan to export');
         return;
       }
 
       const mealPlanToExport = {
-        ...currentPlan,
+        ...originalPlan,
         exported_with_customizations: true,
         export_timestamp: new Date().toISOString(),
         export_note: "This export includes all customizations: manually added meals and permanently deleted meals"
@@ -959,6 +982,15 @@ export default function NutritionHomeScreen({ route }: any) {
             }
           >
             <Text style={styles.title}>Nutrition</Text>
+
+            {/* Section label only shown when there's more than one plan —
+                mirrors HomeScreen's "YOUR PLANS" header behaviour. */}
+            {convertedMealPlans.length > 1 && (
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionLabel}>YOUR PLANS</Text>
+              </View>
+            )}
+
             {currentPlanLegacy && (
               <View style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}>
                 {/* ••• menu — opens action sheet (Share, Save, Rename, Remove) */}
@@ -1020,36 +1052,65 @@ export default function NutritionHomeScreen({ route }: any) {
             )}
 
             {/* ====================================================== */}
-            {/* NEW: Meals + Smoothies horizontal scroll sections      */}
+            {/* OTHER PLANS — now rendered as greyed-out secondary      */}
+            {/* plan cards, mirroring HomeScreen.tsx's planCardSecondary */}
+            {/* treatment instead of the old thin smallPlanCard rows.   */}
+            {/* Each card has: ••• menu, tappable title/subtitle, and a  */}
+            {/* "Start today's meals" button.                           */}
             {/* ====================================================== */}
-            {renderMealsSection()}
-            {renderSmoothiesSection()}
+            {otherPlans.map((plan) => {
+              const originalPlan = mealPlans.find(p => p.name === plan.name);
+              const planId = originalPlan?.fingerprint || originalPlan?.id || plan.id;
+              const macroSplit = getMacroSplitDisplay(plan);
+              return (
+                <View key={plan.id} style={styles.planCardSecondary}>
+                  <RNTouchable
+                    style={styles.planMenuBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleActionRequest(plan);
+                    }}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="More options"
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#a1a1aa" />
+                  </RNTouchable>
 
-            {otherPlans.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Other plans</Text>
-                </View>
-                {otherPlans.map(plan => (
-                  <TouchableOpacity
-                    key={plan.id}
-                    style={styles.smallPlanCard}
-                    activeOpacity={0.8}
+                  <Pressable
                     onPress={() => handleMealPlanNavigation(plan)}
                     onLongPress={() => handleActionRequest(plan)}
                     delayLongPress={600}
                   >
-                    <View style={styles.smallPlanContent}>
-                      <Text style={styles.smallPlanTitle} numberOfLines={1}>{plan.name}</Text>
-                      <Text style={styles.smallPlanSub}>
-                        {plan.duration} days{getMacroSplitDisplay(plan) ? ` • ${getMacroSplitDisplay(plan)}` : ''}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={14} color="#71717a" />
+                    <Text style={styles.planTitleSecondary} numberOfLines={2}>
+                      {plan.name}
+                    </Text>
+                    <Text style={styles.planSubtitleSecondary}>
+                      {plan.duration} {plan.duration === 1 ? 'day' : 'days'}
+                      {macroSplit ? ` · ${macroSplit}` : ''}
+                    </Text>
+                  </Pressable>
+
+                  <TouchableOpacity
+                    style={styles.planStartBtnSecondary}
+                    onPress={() => handleJumpToToday(plan)}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Start today's meals"
+                  >
+                    <Ionicons name="restaurant" size={13} color="#d4d4d8" />
+                    <Text style={styles.planStartBtnSecondaryText}>Start today's meals</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-            )}
+                </View>
+              );
+            })}
+
+            {/* ====================================================== */}
+            {/* NEW: Meals + Smoothies horizontal scroll sections      */}
+            {/* ====================================================== */}
+            {renderMealsSection()}
+            {renderSmoothiesSection()}
 
           </ScrollView>
         )}
@@ -1450,6 +1511,18 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
+  // ===== "YOUR PLANS" section label — mirrors HomeScreen.tsx =====
+  sectionHeaderRow: {
+    paddingHorizontal: 2,
+    marginBottom: 10,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#71717a',
+    letterSpacing: 1.2,
+  },
+
   // Section grouping (for "Other plans" — old style)
   // FIX: removed paddingHorizontal: 16. scrollContent already pads, so this was doubling up.
   section: { marginBottom: 20 },
@@ -1479,7 +1552,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1.5,
     padding: 20,
-    marginBottom: 28,
+    marginBottom: 12,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -1503,10 +1576,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   heroTitleText: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '700',
     color: '#ffffff',
-    lineHeight: 32,
+    lineHeight: 34,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
     paddingRight: 40,
@@ -1548,7 +1621,63 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Small plan card (other plans)
+  // ===== Secondary plan card — mirrors HomeScreen.tsx planCardSecondary =====
+  // Greyed-out card for additional (non-current) meal plans. Same visual
+  // treatment as the exercise screen so multiple plans read as a stack:
+  // bold hero card on top, muted secondary cards beneath.
+  planCardSecondary: {
+    backgroundColor: '#18181b',
+    borderRadius: 14,
+    borderColor: '#27272a',
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 14,
+    marginBottom: 10,
+    position: 'relative',
+  },
+  planTitleSecondary: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 2,
+    paddingRight: 30,
+  },
+  planSubtitleSecondary: {
+    color: '#71717a',
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  planStartBtnSecondary: {
+    height: 40,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    backgroundColor: 'transparent',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#3f3f46',
+  },
+  planStartBtnSecondaryText: {
+    color: '#d4d4d8',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  planMenuBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+
+  // Small plan card (other plans) — DEPRECATED, kept for reference only.
+  // Replaced by planCardSecondary above to match HomeScreen.tsx.
   smallPlanCard: {
     backgroundColor: '#18181b',
     borderWidth: 1,
@@ -1579,6 +1708,7 @@ const styles = StyleSheet.create({
   feedSection: {
     marginBottom: 24,
     marginHorizontal: -16,
+    marginTop: 12,
   },
   feedSectionHeader: {
     flexDirection: 'row',

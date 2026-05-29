@@ -25,41 +25,22 @@ import {
 import { finalizeNutrition } from '../../../utils/nutritionMacros';
 
 /**
- * NutritionRefinements — optional final step, mirrors the workout
- * RefinementsScreen. Three skippable chip groups (allergies, foods to
- * avoid, eating challenges).
+ * NutritionRefinements — optional final step before the Summary.
  *
- * On Continue (non-edit) it consolidates the full answer set into the
- * draft store, then runs finalizeNutrition() — which computes the macros
- * and writes BOTH storage keys the prompt builder reads. This is the step
- * that makes assembleMealPlanningPrompt() fire. Then it goes to the
- * Summary hub.
+ * SCOPE NOTE: allergies and foods-to-avoid USED to live here too, but they
+ * are now collected in the main flow at N5b (a hard-constraint step). To keep
+ * a single source of truth, this screen no longer touches allergies/avoidFoods
+ * — it only collects EATING CHALLENGES (soft shaping signal). Leaving the old
+ * groups here would let this screen silently overwrite the N5b answers.
  *
- * editMode (entered from Summary) just updates the three fields in the
- * draft and pops back; Summary re-finalizes on its own Continue.
+ * On Continue (non-edit) it consolidates the full answer set into the draft
+ * store, then runs finalizeNutrition() — which computes macros and writes BOTH
+ * storage keys the prompt builder reads. That's the step that makes
+ * assembleMealPlanningPrompt() fire. Then it goes to the Summary hub.
+ *
+ * editMode (entered from Summary) just updates eatingChallenges in the draft
+ * and pops back; Summary re-finalizes on its own Continue.
  */
-
-const ALLERGIES = [
-  'Dairy',
-  'Eggs',
-  'Peanuts',
-  'Tree nuts',
-  'Soy',
-  'Gluten',
-  'Fish',
-  'Shellfish',
-  'Sesame',
-];
-
-const AVOID_FOODS = [
-  'Red meat',
-  'Pork',
-  'Seafood',
-  'Mushrooms',
-  'Spicy food',
-  'Coriander',
-  'Offal',
-];
 
 const EATING_CHALLENGES = [
   'Low appetite',
@@ -85,12 +66,6 @@ export default function NutritionRefinementsScreen() {
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
 
-  const [allergies, setAllergies] = useState<string[]>(
-    (answersSoFar.allergies as string[]) ?? []
-  );
-  const [avoidFoods, setAvoidFoods] = useState<string[]>(
-    (answersSoFar.avoidFoods as string[]) ?? []
-  );
   const [challenges, setChallenges] = useState<string[]>(
     (answersSoFar.eatingChallenges as string[]) ?? []
   );
@@ -118,8 +93,7 @@ export default function NutritionRefinementsScreen() {
     setSaving(true);
     try {
       if (editMode) {
-        await updateNutritionField('allergies', allergies);
-        await updateNutritionField('avoidFoods', avoidFoods);
+        // Only eatingChallenges — allergies/avoid are owned by N5b now.
         await updateNutritionField('eatingChallenges', challenges);
         navigation.goBack();
         return;
@@ -127,8 +101,6 @@ export default function NutritionRefinementsScreen() {
 
       const merged = {
         ...answersSoFar,
-        allergies,
-        avoidFoods,
         eatingChallenges: challenges,
       };
       await saveNutritionAnswers(merged);
@@ -227,23 +199,9 @@ export default function NutritionRefinementsScreen() {
         <Text style={[styles.eyebrow, { color: themeColor }]}>OPTIONAL</Text>
         <Text style={styles.question}>Anything we should know?</Text>
         <Text style={styles.subtitle}>
-          All optional. Skip anything that doesn't apply.
+          Optional context that helps shape your plan. Skip if none apply.
         </Text>
 
-        {renderGroup(
-          'Allergies',
-          'These are excluded from every meal.',
-          ALLERGIES,
-          allergies,
-          setAllergies
-        )}
-        {renderGroup(
-          'Foods to avoid',
-          "Not allergies — just things you'd rather not eat.",
-          AVOID_FOODS,
-          avoidFoods,
-          setAvoidFoods
-        )}
         {renderGroup(
           'Eating challenges',
           'Helps shape portions, timing, and meal style.',

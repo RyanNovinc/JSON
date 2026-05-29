@@ -1030,7 +1030,7 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
         
         if (position !== null) {
           detailedError += `Error at position ${position}`;
-          if (line) detailedError += ` (line ${line})`;
+          if (line !== null) detailedError += ` (line ${line})`;
           detailedError += '\n\n';
           
           // Show snippet around error position

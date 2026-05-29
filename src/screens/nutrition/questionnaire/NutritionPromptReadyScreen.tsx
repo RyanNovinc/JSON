@@ -1,18 +1,18 @@
 // src/screens/nutrition/questionnaire/NutritionPromptReadyScreen.tsx
 //
-// Nutrition handoff — a clone of the workout PromptReadyScreen with three
-// swaps:
-//   1. The prompt is `await assembleMealPlanningPrompt()` (async, reads
-//      storage itself) instead of assemblePlanningPrompt(merged).
-//   2. The preview card shows a macro/profile recap built from the saved
-//      results, not generateProgramSpecs (the meal prompt's machine
-//      preamble is not something to surface).
-//   3. Import is a navigation to ImportMealPlan (the meal importer has no
-//      inline hook like useWorkoutImport), not an in-screen pipeline.
+// Nutrition handoff — now at TRUE parity with the workout PromptReadyScreen.
+// The return-state import is INLINE: the dashed paste-zone runs the import
+// pipeline (useMealPlanImport) and shows MealPlanConfirmationModal right here,
+// exactly like the workout screen does with useWorkoutImport +
+// ImportConfirmationModal. No more navigating off to the old ImportMealPlan
+// screen (which can now be retired).
 //
-// Everything else — copy pill, Open in Claude/ChatGPT rows, "See how it
-// works" sheet, return-state rework after coming back from the AI — is
-// the same as the workout screen.
+// The only nutrition-specific differences from the workout screen:
+//   1. The prompt is `await assembleMealPlanningPrompt()` (async, reads
+//      storage itself).
+//   2. The preview card shows a macro/profile recap, not generateProgramSpecs.
+//   3. saveMealPlan comes from useSimplifiedMealPlanning() and is handed to
+//      the hook (the hook stays context-agnostic).
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -41,6 +41,9 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { WorkoutStorage } from '../../../utils/storage';
 import { assembleMealPlanningPrompt } from '../../../data/mealPlanningPrompt';
 import { AIProvider } from '../../../components/questionnaire/AILaunchSheet';
+import { useSimplifiedMealPlanning } from '../../../contexts/SimplifiedMealPlanningContext';
+import { useMealPlanImport } from '../../../hooks/useMealPlanImport';
+import MealPlanConfirmationModal from '../../../components/import/MealPlanConfirmationModal';
 
 type NavProp = StackNavigationProp<any>;
 
@@ -103,6 +106,7 @@ export default function NutritionPromptReadyScreen() {
   const navigation = useNavigation<NavProp>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const { saveMealPlan } = useSimplifiedMealPlanning();
 
   const [prompt, setPrompt] = useState<string>('');
   const [promptPreview, setPromptPreview] = useState<string>('');
@@ -117,6 +121,33 @@ export default function NutritionPromptReadyScreen() {
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const scrollViewRef = useRef<ScrollView>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // -------------------------------------------------------------------------
+  // Inline meal-plan import — parity with the workout screen's useWorkoutImport.
+  // saveMealPlan is handed in from the context so the hook stays decoupled.
+  // -------------------------------------------------------------------------
+  const {
+    parsedMealPlan,
+    showConfirmation,
+    isLoading: importLoading,
+    errorMessage,
+    generationTime,
+    modalScale,
+    modalOpacity,
+    importFromClipboard,
+    importFromFile,
+    confirmImport,
+    cancelConfirmation,
+    clearError,
+  } = useMealPlanImport({
+    saveMealPlan,
+    onImportComplete: () => {
+      // Exit the questionnaire flow. popToTop is the known-good target this
+      // screen already uses for Close; swap for navigation.navigate('Main',
+      // { screen: 'Nutrition' }) if you'd rather land on a specific tab.
+      navigation.popToTop();
+    },
+  });
 
   // Assemble the prompt + build the preview from the saved results.
   useEffect(() => {
@@ -204,10 +235,29 @@ export default function NutritionPromptReadyScreen() {
     [ensureCopied]
   );
 
-  // Import → the meal-plan importer (no inline hook for nutrition).
-  const goToImport = useCallback(() => {
-    navigation.navigate('ImportMealPlan' as never, {} as never);
-  }, [navigation]);
+  // Footer "Import it" (initial state): jump straight to the return/import
+  // state without leaving the app — for users who already have a file.
+  const handleImportFromInitial = useCallback(() => {
+    setReturnedFromAI(true);
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
+  // Return-state "Paste your file": read clipboard, then import inline.
+  const handlePaste = useCallback(async () => {
+    const text = await Clipboard.getStringAsync();
+    if (!text) {
+      Alert.alert('Clipboard empty', 'Copy your meal-plan file first', [
+        { text: 'OK' },
+      ]);
+      return;
+    }
+    importFromClipboard();
+  }, [importFromClipboard]);
+
+  // Return-state "Import saved file": open the document picker.
+  const handleImportFile = useCallback(() => {
+    importFromFile();
+  }, [importFromFile]);
 
   const handleClose = useCallback(() => navigation.popToTop(), [navigation]);
 
@@ -223,10 +273,60 @@ export default function NutritionPromptReadyScreen() {
   const openHelp = useCallback(() => setHelpVisible(true), []);
   const closeHelp = useCallback(() => setHelpVisible(false), []);
 
+  // -------------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------------
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator color={themeColor} />
+      </View>
+    );
+  }
+
+  // While the import pipeline runs (the 800ms validate/parse pass), show a
+  // lightweight spinner — mirrors the old importer's "Processing meal plan…".
+  if (importLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={themeColor} />
+        <Text style={styles.processingText}>Processing meal plan…</Text>
+      </View>
+    );
+  }
+
+  // Parse/validation error — surfaced inline (nutrition JSON paste errors are
+  // the most common failure, so unlike the workout screen we show them).
+  if (errorMessage) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorCloseWrapper}>
+          <TouchableOpacity
+            onPress={clearError}
+            style={styles.errorCloseButton}
+            hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+          >
+            <Ionicons name="close" size={26} color="#71717a" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.errorContent}>
+          <Ionicons name="alert-circle" size={56} color="#ef4444" />
+          <Text style={styles.errorTitle}>Format error</Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+
+          <TouchableOpacity
+            style={[styles.copyErrorButton, { backgroundColor: themeColor }]}
+            onPress={async () => {
+              const debugMessage = `I got this error when trying to import my meal plan: "${errorMessage}". Please fix the JSON and make sure it follows the exact format.`;
+              await Clipboard.setStringAsync(debugMessage);
+              clearError();
+            }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="copy-outline" size={18} color="#0a0a0b" />
+            <Text style={styles.copyErrorText}>Copy error for AI</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -259,7 +359,11 @@ export default function NutritionPromptReadyScreen() {
         showsVerticalScrollIndicator={false}
       >
         {returnedFromAI ? (
-          <ReturnState onImport={goToImport} themeColor={themeColor} />
+          <ReturnState
+            onPaste={handlePaste}
+            onImportFile={handleImportFile}
+            themeColor={themeColor}
+          />
         ) : (
           <InitialState
             promptPreview={promptPreview}
@@ -268,10 +372,21 @@ export default function NutritionPromptReadyScreen() {
             onCopy={handleCopyCard}
             onOpenAI={handleOpenAI}
             onHelp={openHelp}
-            onImport={goToImport}
+            onImport={handleImportFromInitial}
           />
         )}
       </ScrollView>
+
+      <MealPlanConfirmationModal
+        visible={showConfirmation}
+        parsedMealPlan={parsedMealPlan}
+        generationTime={generationTime}
+        modalScale={modalScale}
+        modalOpacity={modalOpacity}
+        themeColor={themeColor}
+        onConfirm={confirmImport}
+        onCancel={cancelConfirmation}
+      />
 
       <HelpSheet visible={helpVisible} themeColor={themeColor} onClose={closeHelp} />
     </View>
@@ -397,29 +512,50 @@ const InitialState: React.FC<InitialStateProps> = ({
 );
 
 // ============================================================================
-// Return state — back from the AI
+// Return state — back from the AI; "add your file" is the whole job.
+// Two actions, matching the workout screen: tap-zone pastes inline, the
+// secondary line picks a saved file.
 // ============================================================================
 interface ReturnStateProps {
-  onImport: () => void;
+  onPaste: () => void;
+  onImportFile: () => void;
   themeColor: string;
 }
 
-const ReturnState: React.FC<ReturnStateProps> = ({ onImport, themeColor }) => (
+const ReturnState: React.FC<ReturnStateProps> = ({
+  onPaste,
+  onImportFile,
+  themeColor,
+}) => (
   <View style={styles.returnRoot}>
     <View style={styles.returnTitleBlock}>
       <Text style={styles.title}>Almost done.</Text>
       <Text style={styles.returnSubtitle}>
-        Bring back the meal-plan file your AI gave you.
+        Add the meal-plan file your AI gave you.
       </Text>
     </View>
 
     <View style={styles.returnBody}>
-      <TouchableOpacity style={styles.pasteZone} onPress={onImport} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.pasteZone} onPress={onPaste} activeOpacity={0.85}>
         <View style={styles.pasteZoneIcon}>
-          <Ionicons name="download-outline" size={28} color={themeColor} />
+          <Ionicons name="clipboard-outline" size={28} color={themeColor} />
         </View>
-        <Text style={styles.pasteZoneTitle}>Import your file</Text>
-        <Text style={styles.pasteZoneHint}>Paste it or pick the saved file</Text>
+        <Text style={styles.pasteZoneTitle}>Paste your file</Text>
+        <Text style={styles.pasteZoneHint}>Tap anywhere here</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.importFileLink}
+        onPress={onImportFile}
+        activeOpacity={0.7}
+        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+      >
+        <Text style={styles.importFileLinkText}>Saved it as a file instead? </Text>
+        <Text
+          style={[styles.importFileLinkText, { color: themeColor, fontWeight: '600' }]}
+        >
+          Import
+        </Text>
       </TouchableOpacity>
     </View>
   </View>
@@ -558,6 +694,7 @@ function hexToRgba(hex: string, alpha: number): string {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0b' },
   loadingContainer: { justifyContent: 'center', alignItems: 'center' },
+  processingText: { marginTop: 16, fontSize: 16, color: '#71717a' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -719,6 +856,56 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   pasteZoneHint: { fontSize: 12, color: '#71717a', marginTop: 6 },
+  importFileLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 18,
+  },
+  importFileLinkText: { fontSize: 13, color: '#71717a' },
+  errorCloseWrapper: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    width: 40,
+    height: 40,
+    zIndex: 1,
+  },
+  errorCloseButton: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginTop: 20,
+    marginBottom: 14,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#71717a',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 28,
+  },
+  copyErrorButton: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    gap: 10,
+  },
+  copyErrorText: { fontSize: 15, fontWeight: '600', color: '#0a0a0b' },
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',

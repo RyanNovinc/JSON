@@ -46,7 +46,7 @@ const SNACK_OPTIONS: SnackOption[] = [
   { freq: '0', style: "I don't snack", label: 'None' },
   { freq: '1', style: 'Occasional snacker', label: '1 snack' },
   { freq: '2', style: 'Occasional snacker', label: '2 snacks' },
-  { freq: 'ai_decide', style: 'Occasional snacker', label: 'Let AI decide' },
+  { freq: '3+', style: 'Frequent snacker', label: '3+ snacks' },
 ];
 
 type ParamList = {
@@ -102,8 +102,8 @@ export default function N6MealsSnackingScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={6}
-        totalSteps={10}
+        currentStep={8}
+        totalSteps={11}
         onBack={handleBack}
         onClose={handleClose}
       />

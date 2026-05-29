@@ -5,17 +5,21 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   useNavigation,
   useRoute,
   RouteProp,
+  CommonActions,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import QuestionnaireHeader from '../../questionnaire/QuestionnaireHeader';
-import { updateNutritionField } from '../../../utils/nutritionQuestionnaireStorage';
+import { updateNutritionField, saveNutritionAnswers } from '../../../utils/nutritionQuestionnaireStorage';
+import { finalizeNutrition } from '../../../utils/nutritionMacros';
 
 /**
  * N9 — Plan length & start
@@ -25,7 +29,6 @@ import { updateNutritionField } from '../../../utils/nutritionQuestionnaireStora
 
 const DURATIONS = [
   { days: 7, label: '1 week' },
-  { days: 14, label: '2 weeks' },
 ];
 
 const START_OPTIONS = [
@@ -47,30 +50,59 @@ export default function N9PlanLengthScreen() {
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
 
-  // Default to 1 week. If a draft carried a now-removed value (21/28), clamp to 7.
-  const [duration, setDuration] = useState<number | null>(
-    answersSoFar.planDuration === 14 ? 14 : 7
-  );
+  // Default to 1 week. Migrate any existing 14-day value to 7.
+  const [duration, setDuration] = useState<number | null>(7);
   const [start, setStart] = useState<string | null>(
     (answersSoFar.startDate as string) ?? null
   );
+  const [saving, setSaving] = useState(false);
 
   const valid = duration != null && start != null;
 
   const handleNext = async () => {
-    if (!valid) return;
+    if (!valid || saving) return;
+
     if (editMode) {
       await updateNutritionField('planDuration', duration);
       await updateNutritionField('startDate', start);
       navigation.goBack();
       return;
     }
-    navigation.navigate(
-      'N10Cooking' as never,
-      {
-        answersSoFar: { ...answersSoFar, planDuration: duration, startDate: start },
-      } as never
-    );
+
+    setSaving(true);
+    try {
+      const finalAnswers = {
+        ...answersSoFar,
+        planDuration: duration,
+        startDate: start,
+        eatingChallenges: [], // default empty; user can set later in Refinements
+      };
+
+      await saveNutritionAnswers(finalAnswers);
+      const macros = await finalizeNutrition(finalAnswers);
+
+      if (!macros) {
+        console.error('Failed to finalize nutrition data from N9');
+        Alert.alert(
+          'Missing details',
+          'Some required answers are missing — go back and complete the earlier steps.'
+        );
+        setSaving(false);
+        return;
+      }
+
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'NutritionSummary' }],
+        })
+      );
+      setSaving(false);
+    } catch (error) {
+      console.error('N9 finalize failed', error);
+      Alert.alert('Something went wrong', 'Could not save your answers. Try again.');
+      setSaving(false);
+    }
   };
 
   const handleBack = () => navigation.goBack();
@@ -79,8 +111,8 @@ export default function N9PlanLengthScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={9}
-        totalSteps={10}
+        currentStep={11}
+        totalSteps={11}
         onBack={handleBack}
         onClose={handleClose}
       />
@@ -106,18 +138,16 @@ export default function N9PlanLengthScreen() {
                 style={[
                   styles.durationCard,
                   {
-                    borderColor: isSel ? themeColor : '#27272a',
-                    backgroundColor: isSel
-                      ? 'rgba(34, 211, 238, 0.08)'
-                      : '#131316',
-                    borderWidth: isSel ? 1.5 : StyleSheet.hairlineWidth,
+                    borderColor: themeColor, // Always selected since only one option
+                    backgroundColor: 'rgba(34, 211, 238, 0.08)',
+                    borderWidth: 1.5,
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.durationLabel,
-                    { color: isSel ? '#ffffff' : '#d4d4d8', fontWeight: isSel ? '700' : '500' },
+                    { color: '#ffffff', fontWeight: '700' }, // Always selected styling
                   ]}
                 >
                   {d.label}
@@ -168,18 +198,22 @@ export default function N9PlanLengthScreen() {
       >
         <TouchableOpacity
           activeOpacity={0.85}
-          disabled={!valid}
+          disabled={!valid || saving}
           onPress={handleNext}
           style={[
             styles.ctaButton,
-            { backgroundColor: valid ? themeColor : '#1c1c1f' },
+            { backgroundColor: (valid && !saving) ? themeColor : '#1c1c1f' },
           ]}
         >
-          <Text
-            style={[styles.ctaText, { color: valid ? '#0a0a0b' : '#3f3f46' }]}
-          >
-            {editMode ? 'Save' : 'Continue'}
-          </Text>
+          {saving ? (
+            <ActivityIndicator size="small" color="#0a0a0b" />
+          ) : (
+            <Text
+              style={[styles.ctaText, { color: (valid && !saving) ? '#0a0a0b' : '#3f3f46' }]}
+            >
+              {editMode ? 'Save' : 'Continue'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

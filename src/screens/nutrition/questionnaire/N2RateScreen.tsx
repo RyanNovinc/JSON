@@ -92,7 +92,7 @@ export default function N2RateScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={2}
-        totalSteps={10}
+        totalSteps={11}
         onBack={handleBack}
         onClose={handleClose}
       />
