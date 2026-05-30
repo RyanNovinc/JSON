@@ -108,6 +108,7 @@ import N5DietTypeScreen from '../screens/nutrition/questionnaire/N5DietTypeScree
 import N5bAllergiesScreen from '../screens/nutrition/questionnaire/N5bAllergiesScreen';
 import N5cSleepScreen from '../screens/nutrition/questionnaire/N5cSleepScreen';
 import N6MealsSnackingScreen from '../screens/nutrition/questionnaire/N6MealsSnackingScreen';
+import N6aDessertScreen from '../screens/nutrition/questionnaire/N6aDessertScreen';
 import N7LocationScreen from '../screens/nutrition/questionnaire/N7LocationScreen';
 import N8BudgetScreen from '../screens/nutrition/questionnaire/N8BudgetScreen';
 import N9PlanLengthScreen from '../screens/nutrition/questionnaire/N9PlanLengthScreen';
@@ -312,6 +313,7 @@ export type RootStackParamList = {
   N5bAllergies: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N5cSleep: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N6MealsSnacking: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N6aDessert: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N7Location: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N8Budget: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N9PlanLength: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
@@ -1243,6 +1245,10 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   },
                 }),
               }} />
+              <RootStack.Screen
+                name="N6aDessert"
+                component={N6aDessertScreen}
+              />
               <RootStack.Screen name="N7Location" component={N7LocationScreen} options={{ 
                 headerShown: false,
                 cardStyleInterpolator: ({ current }) => ({

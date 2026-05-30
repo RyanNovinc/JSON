@@ -209,6 +209,8 @@ Use these guidelines to ensure optimal protein distribution across all meals and
 
 **Snacking requirements:** ${getSnackingGuidance(budgetData.snackingStyle, budgetData.snackFrequency)}
 
+**Dessert requirements:** ${getDessertGuidance(budgetData.dessertFrequency)}
+
 **KEY RULE FOR JSON OUTPUT:** Use these meal types: breakfast, brunch, lunch, second_lunch, early_dinner, dinner, snack, morning_snack, afternoon_snack, evening_snack, pre_workout, post_workout. Use specific snack types for different snacks rather than generic "snack".
 
 PERSONAL INFO:
@@ -753,6 +755,29 @@ const getSnackingGuidance = (snackingStyle: string, snackFrequency?: string): st
   return `MODERATE SNACKING: Include 1-2 moderate snacks if gaps exceed 4-5 hours. Keep snacks balanced and proportionate to daily needs.`;
 };
 
+const getDessertGuidance = (dessertFrequency?: string): string => {
+  if (!dessertFrequency || dessertFrequency === '0') {
+    return `NO DESSERTS: User does not want desserts in their plan. Do not include any dessert items.`;
+  }
+
+  if (dessertFrequency === 'every_night') {
+    return `DAILY DESSERTS: User wants a dessert every night. Include one dessert per day, placed after dinner. Each dessert should be 200-500 kcal with at least 15g protein when possible — bulk-friendly treats like protein ice cream, mug cakes, or yoghurt parfaits, not pure sugar.`;
+  }
+
+  if (dessertFrequency === 'most_nights') {
+    return `FREQUENT DESSERTS: User wants dessert most nights (4-5 nights per week). Include desserts on the majority of days but leave 2-3 days without dessert. Distribute naturally across the week. Each dessert 200-500 kcal, protein-forward where possible.`;
+  }
+
+  if (dessertFrequency === 'few_per_week') {
+    return `OCCASIONAL DESSERTS: User wants desserts a few nights per week (2-3 nights). Distribute across non-consecutive days for variety. Use desserts as a planned treat, not a daily expectation. Each dessert 200-500 kcal, protein-forward where possible.`;
+  }
+
+  if (dessertFrequency === 'ai_decide') {
+    return `FLEXIBLE DESSERTS: User is open to AI-determined dessert frequency. Include 3-4 desserts across the week, placed where they make nutritional sense (e.g., post-workout days, high-calorie days, or weekend treats). Each dessert 200-500 kcal, protein-forward where possible.`;
+  }
+
+  return '';
+};
 
 const getMealPrepStyleText = (style: number, skillConfidence?: number, timeInvestment?: number): string => {
   // Override if skill/time make traditional meal prep impossible

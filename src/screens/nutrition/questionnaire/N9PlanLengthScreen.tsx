@@ -111,8 +111,8 @@ export default function N9PlanLengthScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={11}
-        totalSteps={11}
+        currentStep={12}
+        totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
       />

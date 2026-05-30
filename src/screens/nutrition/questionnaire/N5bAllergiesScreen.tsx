@@ -146,7 +146,7 @@ export default function N5bAllergiesScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={6}
-        totalSteps={11}
+        totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
       />

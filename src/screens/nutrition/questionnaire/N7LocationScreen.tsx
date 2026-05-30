@@ -127,8 +127,8 @@ export default function N7LocationScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={9}
-        totalSteps={11}
+        currentStep={10}
+        totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
       />

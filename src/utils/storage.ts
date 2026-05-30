@@ -119,6 +119,13 @@ export interface BudgetCookingQuestionnaireResults {
     skillConfidence: number;
     mealsPerDay: number;
     snackingStyle: string;
+    snackFrequency?: string;
+    dessertFrequency?: '0' | 'few_per_week' | 'most_nights' | 'every_night' | 'ai_decide';
+    budgetMin?: number;
+    budgetMax?: number;
+    planDuration?: number;
+    startDate?: string;
+    cookingEquipment?: string[];
     eatingChallenges: string[];
     allergies: string[];
     avoidFoods: string[];

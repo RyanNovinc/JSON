@@ -153,6 +153,18 @@ const ROWS: RowConfig[] = [
     },
   },
   {
+    label: 'Desserts',
+    route: 'N6aDessert',
+    format: (a) => {
+      if (!a.dessertFrequency || a.dessertFrequency === '0') return 'None';
+      if (a.dessertFrequency === 'every_night') return 'Every night';
+      if (a.dessertFrequency === 'most_nights') return 'Most nights';
+      if (a.dessertFrequency === 'few_per_week') return 'A few nights a week';
+      if (a.dessertFrequency === 'ai_decide') return 'Let AI decide';
+      return '—';
+    },
+  },
+  {
     label: 'Where you shop',
     route: 'N7Location',
     format: (a) => {

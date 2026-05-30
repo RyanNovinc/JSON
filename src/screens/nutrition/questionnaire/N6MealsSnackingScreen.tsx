@@ -84,7 +84,7 @@ export default function N6MealsSnackingScreen() {
       return;
     }
     navigation.navigate(
-      'N7Location' as never,
+      'N6aDessert' as never,
       {
         answersSoFar: {
           ...answersSoFar,
@@ -103,7 +103,7 @@ export default function N6MealsSnackingScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={8}
-        totalSteps={11}
+        totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
       />

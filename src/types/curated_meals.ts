@@ -30,7 +30,7 @@ export type CuisineType = 'australian' | 'mediterranean' | 'asian' | 'indian' | 
 
 export type PrimaryProtein = 'chicken' | 'beef' | 'lamb' | 'pork' | 'fish' | 'seafood' | 'eggs' | 'dairy' | 'plant';
 
-export type MealSlot = 'breakfast' | 'brunch' | 'lunch' | 'second_lunch' | 'early_dinner' | 'dinner' | 'snack' | 'morning_snack' | 'afternoon_snack' | 'evening_snack' | 'pre_workout' | 'post_workout';
+export type MealSlot = 'breakfast' | 'brunch' | 'lunch' | 'second_lunch' | 'early_dinner' | 'dinner' | 'snack' | 'morning_snack' | 'afternoon_snack' | 'evening_snack' | 'pre_workout' | 'post_workout' | 'dessert';
 
 export type AllergenType = 'Nuts' | 'Shellfish' | 'Dairy' | 'Eggs' | 'Gluten/Wheat' | 'Soy' | 'Fish' | 'Sesame';
 

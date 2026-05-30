@@ -158,7 +158,7 @@ export default function N5DietTypeScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={5}
-        totalSteps={11}
+        totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
       />

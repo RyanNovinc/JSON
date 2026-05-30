@@ -128,8 +128,8 @@ export default function N8BudgetScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={10}
-        totalSteps={11}
+        currentStep={11}
+        totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
       />

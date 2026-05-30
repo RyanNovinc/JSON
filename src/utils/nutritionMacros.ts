@@ -130,6 +130,7 @@ export async function finalizeNutrition(
       mealsPerDay: a.mealsPerDay,
       snackingStyle: a.snackingStyle,
       snackFrequency: a.snackFrequency,
+      dessertFrequency: a.dessertFrequency,
       country: a.country,
       city: a.city,
       countryCode: a.countryCode,

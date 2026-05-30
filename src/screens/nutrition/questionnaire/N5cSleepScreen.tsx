@@ -221,7 +221,7 @@ export default function N5cSleepScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={7}
-        totalSteps={11}
+        totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
       />

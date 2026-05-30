@@ -103,7 +103,7 @@ export default function N4ActivityScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={4}
-        totalSteps={11}
+        totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
       />

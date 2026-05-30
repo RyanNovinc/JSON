@@ -20,67 +20,91 @@ import QuestionCard from '../../questionnaire/QuestionCard';
 import { updateNutritionField } from '../../../utils/nutritionQuestionnaireStorage';
 
 /**
- * N2 — Target rate
- * Step 2. Skipped entirely for "maintain" (N1 routes straight to N3).
+ * N6a — Desserts (sits between N6 Meals & Snacking and N7 Location)
  *
- * The old NutritionStep2 used a continuous slider with goal-specific
- * ranges. To match the workout style (no sliders anywhere) this presents
- * the same range as discrete QuestionCards, storing `targetRatePercentage`
- * (% bodyweight / week). The kg/week `targetRate` is derived later, once
- * weight is known on N3 / at macro computation.
+ * Sets `dessertFrequency`, used by the meal-plan prompt builder's
+ * getDessertGuidance and by the Foods You Like screen's tab construction.
+ *
+ * Cadence is per-week (unlike snacks which are per-day) because that's how
+ * people actually think about dessert — "I want it every night" vs "a few
+ * times a week", not "two desserts a day".
  */
 
-interface RateOption {
-  value: number;
+type DessertValue = '0' | 'few_per_week' | 'most_nights' | 'every_night' | 'ai_decide';
+
+interface DessertOption {
+  value: DessertValue;
   title: string;
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
 }
 
-const LOSS_OPTIONS: RateOption[] = [
-  { value: 0.25, title: 'Gentle · 0.25% / week', subtitle: 'Slowest. Best muscle retention.', icon: 'leaf' },
-  { value: 0.5, title: 'Standard · 0.5% / week', subtitle: 'The sweet spot. Sustainable fat loss.', icon: 'walk' },
-  { value: 0.75, title: 'Faster · 0.75% / week', subtitle: 'Quicker, with a bit more muscle-loss risk.', icon: 'flame' },
-  { value: 1.0, title: 'Aggressive · 1% / week', subtitle: 'Fastest. Hardest to sustain.', icon: 'flash' },
-];
-
-const GAIN_OPTIONS: RateOption[] = [
-  { value: 0.16, title: 'Lean · 0.16% / week', subtitle: 'Minimal fat gain, mostly muscle.', icon: 'leaf' },
-  { value: 0.25, title: 'Standard · 0.25% / week', subtitle: 'Balanced muscle and size.', icon: 'walk' },
-  { value: 0.5, title: 'Aggressive · 0.5% / week', subtitle: 'Fastest gains, more fat to cut later.', icon: 'flash' },
+const OPTIONS: DessertOption[] = [
+  {
+    value: '0',
+    title: 'No desserts',
+    subtitle: 'Skip desserts entirely. Clean bulk territory.',
+    icon: 'close-circle',
+  },
+  {
+    value: 'few_per_week',
+    title: 'A few nights a week',
+    subtitle: '2–3 nights. A treat, not an expectation.',
+    icon: 'moon',
+  },
+  {
+    value: 'most_nights',
+    title: 'Most nights',
+    subtitle: '4–5 nights a week.',
+    icon: 'star',
+  },
+  {
+    value: 'every_night',
+    title: 'Every night',
+    subtitle: 'A nightly treat after dinner.',
+    icon: 'ice-cream',
+  },
+  {
+    value: 'ai_decide',
+    title: 'Let AI decide',
+    subtitle: "We'll fit them in where they make sense.",
+    icon: 'bulb',
+  },
 ];
 
 type ParamList = {
-  N2Rate: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N6aDessert:
+    | { answersSoFar?: Record<string, any>; editMode?: boolean }
+    | undefined;
 };
 
-export default function N2RateScreen() {
+export default function N6aDessertScreen() {
   const navigation = useNavigation<StackNavigationProp<any>>();
-  const route = useRoute<RouteProp<ParamList, 'N2Rate'>>();
+  const route = useRoute<RouteProp<ParamList, 'N6aDessert'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
 
-  const isLoss = answersSoFar.goal === 'lose_weight';
-  const OPTIONS = isLoss ? LOSS_OPTIONS : GAIN_OPTIONS;
-
-  const [selected, setSelected] = useState<number | null>(
-    (answersSoFar.targetRatePercentage as number) ?? null
+  const [selected, setSelected] = useState<DessertValue | null>(
+    (answersSoFar.dessertFrequency as DessertValue) ?? null
   );
 
   const handleNext = async () => {
-    if (selected == null) return;
+    if (!selected) return;
     if (editMode) {
-      await updateNutritionField('targetRatePercentage', selected);
+      await updateNutritionField('dessertFrequency', selected);
       navigation.goBack();
       return;
     }
     navigation.navigate(
-      'N3AboutYou' as never,
+      'N7Location' as never,
       {
-        answersSoFar: { ...answersSoFar, targetRatePercentage: selected },
+        answersSoFar: {
+          ...answersSoFar,
+          dessertFrequency: selected,
+        },
       } as never
     );
   };
@@ -91,7 +115,7 @@ export default function N2RateScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={2}
+        currentStep={9}
         totalSteps={12}
         onBack={handleBack}
         onClose={handleClose}
@@ -101,13 +125,10 @@ export default function N2RateScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.question}>
-          How {isLoss ? 'fast' : 'quickly'} do you want to{' '}
-          {isLoss ? 'lose' : 'gain'}?
-        </Text>
+        <Text style={styles.question}>Want dessert in your plan?</Text>
         <Text style={styles.subtitle}>
-          Sets your weekly calorie {isLoss ? 'deficit' : 'surplus'}. Slower
-          is easier to sustain.
+          A small treat on top of your meals — protein ice cream, mug cakes,
+          things like that. Pick how often.
         </Text>
 
         <View>
@@ -132,18 +153,15 @@ export default function N2RateScreen() {
       >
         <TouchableOpacity
           activeOpacity={0.85}
-          disabled={selected == null}
+          disabled={!selected}
           onPress={handleNext}
           style={[
             styles.ctaButton,
-            { backgroundColor: selected != null ? themeColor : '#1c1c1f' },
+            { backgroundColor: selected ? themeColor : '#1c1c1f' },
           ]}
         >
           <Text
-            style={[
-              styles.ctaText,
-              { color: selected != null ? '#0a0a0b' : '#3f3f46' },
-            ]}
+            style={[styles.ctaText, { color: selected ? '#0a0a0b' : '#3f3f46' }]}
           >
             {editMode ? 'Save' : 'Continue'}
           </Text>
@@ -154,10 +172,7 @@ export default function N2RateScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0a0a0b',
-  },
+  container: { flex: 1, backgroundColor: '#0a0a0b' },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 28,
@@ -190,8 +205,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
+  ctaText: { fontSize: 15, fontWeight: '500' },
 });

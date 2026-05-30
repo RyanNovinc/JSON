@@ -28,7 +28,7 @@ export const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   grill: 'Grill', food_processor: 'Food processor',
 };
 
-export type CoreShelf = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+export type CoreShelf = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'dessert';
 export type TimeBucket = 'quick' | 'medium' | 'involved';
 export type ShelfStatus = 'empty' | 'lean' | 'ready';
 export type SortMode = 'default' | 'density';
@@ -37,7 +37,7 @@ export type BadgeKind = 'set_and_forget' | 'fast' | 'none';
 
 // ---- Tunable constants ----
 export const LEAN_THRESHOLDS: Record<CoreShelf, number> = {
-  breakfast: 3, lunch: 3, dinner: 3, snacks: 2,
+  breakfast: 3, lunch: 3, dinner: 3, snacks: 2, dessert: 1,
 };
 export const SET_AND_FORGET_MIN = 120;
 export const FAST_ACTIVE_MAX = 15;
@@ -49,6 +49,7 @@ export const SHELF_SLOTS: Record<CoreShelf, MealSlot[]> = {
   lunch:     ['lunch', 'second_lunch'],
   dinner:    ['dinner', 'early_dinner'],
   snacks:    ['snack', 'morning_snack', 'afternoon_snack', 'evening_snack'],
+  dessert:   ['dessert'],
 };
 
 // pre_workout / post_workout are NOT snacks — they're exotic opt-in shelves.

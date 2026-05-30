@@ -100,7 +100,7 @@ export default function N1GoalScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={1}
-        totalSteps={11}
+        totalSteps={12}
         showBack={true}
         onBack={handleBack}
         onClose={handleClose}

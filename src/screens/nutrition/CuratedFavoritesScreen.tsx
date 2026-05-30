@@ -106,6 +106,7 @@ type ParamList = {
         answersSoFar?: {
           mealsPerDay?: number;
           snackFrequency?: string;
+          dessertFrequency?: string;
           [k: string]: any;
         };
       }
@@ -143,6 +144,7 @@ const SHELF_LABEL: Record<CoreShelf, string> = {
   lunch: 'Lunch',
   dinner: 'Dinner',
   snacks: 'Snacks',
+  dessert: 'Dessert',
 };
 const SLOT_LABEL: Partial<Record<MealSlot, string>> = {
   brunch: 'Brunch',
@@ -191,6 +193,7 @@ function tabId(t: TabKey): string {
 function buildTabs(
   mealsPerDay: number | undefined,
   snackFrequency: string | undefined,
+  dessertFrequency: string | undefined,
   allMeals: CuratedMeal[]
 ): TabKey[] {
   // Fallback: behave like the old four-shelf board.
@@ -236,6 +239,13 @@ function buildTabs(
     tabs.push({ kind: 'core', shelf: 'snacks' });
   }
 
+  // Dessert tab — appears whenever the user wants any dessert frequency.
+  // Cadence (every_night / most_nights / few_per_week / ai_decide) doesn't
+  // affect whether the tab shows, only how the prompt builder uses the value.
+  if (dessertFrequency && dessertFrequency !== '0') {
+    tabs.push({ kind: 'core', shelf: 'dessert' });
+  }
+
   return tabs;
 }
 
@@ -272,6 +282,7 @@ function singularWhen(tab: TabKey): string {
       case 'lunch':     return 'every lunchtime';
       case 'dinner':    return 'every evening';
       case 'snacks':    return 'as a snack';
+      case 'dessert':   return 'as your dessert';
     }
     return 'every day'; // unreachable, satisfies the type-checker
   }
@@ -290,6 +301,11 @@ function singularWhen(tab: TabKey): string {
 
 /** Plural noun + tail used when a slot has 2+ picks. */
 function pluralPhrase(tab: TabKey, n: number): string {
+  // Desserts get "to mix in" treatment — they're optional and rotational,
+  // not a slot the user expects to fill every day.
+  if (tab.kind === 'core' && tab.shelf === 'dessert') {
+    return `${n} desserts to mix in`;
+  }
   // Snacks are not strictly daily — "to mix in" is gentler than "on rotation".
   if (tab.kind === 'core' && tab.shelf === 'snacks') {
     return `${n} snacks to mix in`;
@@ -306,7 +322,8 @@ function pluralPhrase(tab: TabKey, n: number): string {
     const noun =
       tab.shelf === 'breakfast' ? 'breakfasts'
       : tab.shelf === 'lunch'   ? 'lunches'
-      : 'dinners';
+      : tab.shelf === 'dinner'  ? 'dinners'
+      : 'meals'; // unreachable: snacks + dessert handled above
     return `${n} ${noun} on rotation`;
   }
   // Exotic non-snack slots get a slot-named rotation.
@@ -751,10 +768,11 @@ export default function CuratedFavoritesScreen() {
   // screen is opened outside the questionnaire flow.
   const mealsPerDay = route.params?.answersSoFar?.mealsPerDay;
   const snackFrequency = route.params?.answersSoFar?.snackFrequency;
+  const dessertFrequency = route.params?.answersSoFar?.dessertFrequency;
 
   const tabs = useMemo(
-    () => buildTabs(mealsPerDay, snackFrequency, allMeals),
-    [mealsPerDay, snackFrequency, allMeals]
+    () => buildTabs(mealsPerDay, snackFrequency, dessertFrequency, allMeals),
+    [mealsPerDay, snackFrequency, dessertFrequency, allMeals]
   );
 
   // ---- persisted state ----
