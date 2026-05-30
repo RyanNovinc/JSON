@@ -2097,34 +2097,8 @@ PODS:
     - SocketRocket
   - react-native-safe-area-context (5.6.2):
     - React-Core
-  - react-native-slider (5.0.1):
-    - boost
-    - DoubleConversion
-    - fast_float
-    - fmt
-    - glog
-    - hermes-engine
-    - RCT-Folly
-    - RCT-Folly/Fabric
-    - RCTRequired
-    - RCTTypeSafety
+  - react-native-slider (4.2.1):
     - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - SocketRocket
-    - Yoga
   - React-NativeModulesApple (0.81.5):
     - boost
     - DoubleConversion
@@ -3189,7 +3163,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: 94f4264de2cb156960cd82b338a403f4653f2fd9
   React-microtasksnativemodule: 6c4ee39a36958c39c97b074d28f360246a335e84
   react-native-safe-area-context: 6c8805194166a9d6b3e53ba69ca76756c9bfb052
-  react-native-slider: b47f3631bd3ff2948a61ed22f2217ff277f873a4
+  react-native-slider: 242520059ee3ec9f654374844eb6191a744658b3
   React-NativeModulesApple: ebf2ce72b35870036900d6498b33724386540a71
   React-oscompat: eb0626e8ba1a2c61673c991bf9dc21834898475d
   React-perflogger: 509e1f9a3ee28df71b0a66de806ac515ce951246
