@@ -91,6 +91,16 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     allergens: [],
     notes: 'Minced or grated. Sold by the knob in produce.'
   },
+  granola: {
+    id: 'granola',
+    display_name: 'Granola',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian'],
+    allergens: ['Nuts'],
+    typical_pack_size: 400,
+    notes: 'Toasted oat-and-nut clusters. Carman\'s, Coles, or Woolworths brand. Approximately 450 kcal per 100g; ~30g per 1/3 cup. Most contain nuts and are not certified gluten-free (oat cross-contamination) — check the label for nut-free or GF varieties if relevant.'
+  },
   ghee: {
     id: 'ghee',
     display_name: 'Ghee',
@@ -137,6 +147,28 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     canonical_unit: 'tsp',
     dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
     allergens: []
+  },
+  sirloin_steak: {
+    id: 'sirloin_steak',
+    display_name: 'Sirloin steak',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 300,
+    typical_pack_unit: 'g',
+    notes: 'Lean sirloin (rump or topside also work). ~140 kcal and ~21g protein per 100g raw. Substitute ribeye for richer, flank for leaner.'
+  },
+  smoked_salmon: {
+    id: 'smoked_salmon',
+    display_name: 'Smoked salmon',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['gluten_free', 'dairy_free', 'nut_free'],
+    allergens: ['Fish'],
+    typical_pack_size: 100,
+    typical_pack_unit: 'g',
+    notes: 'Cold-smoked salmon slices. ~117 kcal and ~18g protein per 100g.'
   },
   basmati_rice_cooked: {
     id: 'basmati_rice_cooked',
@@ -404,6 +436,27 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     allergens: [],
     notes: 'One shot is approximately 30ml. Substitute: 1 tsp instant coffee dissolved in 30ml hot water.'
   },
+  everything_bagel_seasoning: {
+    id: 'everything_bagel_seasoning',
+    display_name: 'Everything bagel seasoning',
+    category: 'pantry_grains',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: ['Sesame'],
+    typical_pack_size: 100,
+    notes: 'Sesame, poppy seeds, dried garlic, dried onion, salt. Coles/Woolworths spice aisle. Contains sesame.'
+  },
+  feta: {
+    id: 'feta',
+    display_name: 'Feta cheese',
+    category: 'dairy_refrigerated',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'gluten_free', 'nut_free'],
+    allergens: ['Dairy'],
+    typical_pack_size: 200,
+    typical_pack_unit: 'g',
+    notes: 'Crumbled. ~265 kcal and ~14g protein per 100g.'
+  },
   coconut_water: {
     id: 'coconut_water',
     display_name: 'Coconut water',
@@ -443,6 +496,39 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     allergens: [],
     notes: 'Flesh only, weight excludes pit and skin. One medium avocado yields approximately 200g of flesh.'
   },
+  bacon: {
+    id: 'bacon',
+    display_name: 'Bacon (rashers)',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 250,
+    typical_pack_unit: 'g',
+    notes: 'Streaky or middle bacon rashers. ~330 kcal and ~25g protein per 100g cooked. Turkey bacon is leaner.'
+  },
+  bagel: {
+    id: 'bagel',
+    display_name: 'Bagel',
+    category: 'bakery',
+    canonical_unit: 'count',
+    dietary_flags: ['vegetarian'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 5,
+    typical_pack_unit: 'count',
+    notes: 'Plain or everything bagel, ~245 kcal each. Wholemeal/seeded adds fibre; protein bagels (e.g. Warburtons) boost protein.'
+  },
+  baked_beans: {
+    id: 'baked_beans',
+    display_name: 'Baked beans',
+    category: 'condiments_supplements',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 400,
+    typical_pack_unit: 'g',
+    notes: 'Canned baked beans in tomato sauce. ~78 kcal, ~5g protein, ~13g carbs per 100g. Some brands contain gluten — check label.'
+  },
   greek_yoghurt_plain_full_fat: {
     id: 'greek_yoghurt_plain_full_fat',
     display_name: 'Plain Greek yoghurt (full-fat)',
@@ -470,6 +556,16 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
     allergens: [],
     notes: 'Sold by the bunch in produce. Whole leaves only — do not include stems for smoothies.'
+  },
+  mixed_berries: {
+    id: 'mixed_berries',
+    display_name: 'Mixed berries (fresh or frozen)',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'Strawberries, blueberries, and raspberries — fresh or frozen. Frozen mixed berries (Coles/Woolworths) are cheaper and work fine; thaw or stir in frozen. Approximately 50 kcal per 100g.'
   },
   blueberries_frozen: {
     id: 'blueberries_frozen',
@@ -520,6 +616,17 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     allergens: [],
     notes: 'Large baking-grade potato. Sebago is the standard Australian baking potato. One large potato is approximately 350g raw.'
   },
+  baking_powder: {
+    id: 'baking_powder',
+    display_name: 'Baking powder',
+    category: 'pantry_grains',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 125,
+    typical_pack_unit: 'g',
+    notes: 'Raising agent for fluffy pancakes. Negligible macros.'
+  },
   black_pepper_ground: {
     id: 'black_pepper_ground',
     display_name: 'Ground black pepper',
@@ -530,6 +637,17 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     typical_pack_size: 50,
     typical_pack_unit: 'g'
   },
+  breakfast_sausage: {
+    id: 'breakfast_sausage',
+    display_name: 'Breakfast sausage mince',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    typical_pack_unit: 'g',
+    notes: 'Pork or turkey breakfast sausage, casings removed (or sausage mince). ~290 kcal and ~15g protein per 100g raw for pork; turkey is leaner. Brown and crumble.'
+  },
   brioche_bun: {
     id: 'brioche_bun',
     display_name: 'Brioche burger bun',
@@ -539,6 +657,16 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     allergens: ['Dairy', 'Eggs', 'Gluten/Wheat', 'Soy'],
     typical_pack_size: 4,
     notes: 'Approximately 80g per bun. Sold in 4-packs at Coles, Woolworths, or Bakers Delight.'
+  },
+  brioche_loaf: {
+    id: 'brioche_loaf',
+    display_name: 'Brioche loaf (sliced)',
+    category: 'bakery',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'nut_free'],
+    allergens: ['Dairy', 'Eggs', 'Gluten/Wheat', 'Soy'],
+    typical_pack_size: 500,
+    notes: 'Sliced brioche loaf — richer and eggier than sandwich bread, ideal for French toast. Coles/Woolworths bakery section. Approximately 40g per slice. Substitute thick-cut sourdough or Texas toast if unavailable.'
   },
   brown_sugar: {
     id: 'brown_sugar',
@@ -579,6 +707,16 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     allergens: ['Dairy'],
     typical_pack_size: 500,
     notes: 'Standard Australian tasty cheddar. Bega, Coles, or Woolworths brand. Pre-grated bags or grate a block. Sold in 250g-500g bags.'
+  },
+  cherry_tomatoes: {
+    id: 'cherry_tomatoes',
+    display_name: 'Cherry tomatoes',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 250,
+    notes: 'Halved. ~18 kcal per 100g. Grape tomatoes work too.'
   },
   flour_plain: {
     id: 'flour_plain',
@@ -777,6 +915,16 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     typical_pack_size: 800,
     notes: 'Mutti is the premium brand; Ardmona or supermarket house-brand also fine. Sold in 400g or 800g tins.'
   },
+  cucumber: {
+    id: 'cucumber',
+    display_name: 'Cucumber',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 400,
+    notes: 'Diced or sliced. ~15 kcal per 100g.'
+  },
   egg_whole: {
     id: 'egg_whole',
     display_name: 'Egg (whole)',
@@ -918,6 +1066,17 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     typical_pack_size: 140,
     notes: 'Leggo\'s or Mutti. Sold in 140g tubes, jars, or small tins. Concentrated tomato — distinct from tomato sauce or passata.'
   },
+  tortilla_large: {
+    id: 'tortilla_large',
+    display_name: 'Large flour tortilla (burrito size)',
+    category: 'bakery',
+    canonical_unit: 'count',
+    dietary_flags: ['vegetarian'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 8,
+    typical_pack_unit: 'count',
+    notes: 'Burrito-size flour wraps, ~200 kcal each. Wholemeal adds fibre.'
+  },
   beef_chuck: {
     id: 'beef_chuck',
     display_name: 'Beef chuck',
@@ -1057,6 +1216,27 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     typical_pack_size: 240,
     notes: 'Old El Paso, Doritos, or supermarket brand. Plain salted varieties are typically gluten-free, dairy-free, and vegan; flavoured varieties may not be — check label. Sold in 240g-500g packs.'
   },
+  cottage_cheese: {
+    id: 'cottage_cheese',
+    display_name: 'Cottage cheese (full-fat)',
+    category: 'dairy_refrigerated',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'gluten_free', 'nut_free'],
+    allergens: ['Dairy'],
+    typical_pack_size: 500,
+    notes: 'Full-fat (4%) cottage cheese for richer texture and calories. ~98 kcal and ~11g protein per 100g. Blend until smooth if you dislike the curd texture.'
+  },
+  cream_cheese: {
+    id: 'cream_cheese',
+    display_name: 'Cream cheese',
+    category: 'dairy_refrigerated',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'gluten_free', 'nut_free'],
+    allergens: ['Dairy'],
+    typical_pack_size: 250,
+    typical_pack_unit: 'g',
+    notes: 'Full-fat (Philadelphia-style). ~342 kcal per 100g. Soften before spreading.'
+  },
   jalapenos_pickled: {
     id: 'jalapenos_pickled',
     display_name: 'Pickled jalapeños (sliced)',
@@ -1167,5 +1347,158 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     allergens: ['Gluten/Wheat'],
     typical_pack_size: 500,
     notes: 'Coles bakery sourdough or Bakers Delight Vienna/baguette. Most plain crusty breads are vegan and dairy-free; check label for butter-enriched varieties. Sold as full loaves, typically 450g-700g.'
+  },
+
+  instant_pudding_mix: {
+    id: 'instant_pudding_mix',
+    display_name: 'Instant pudding mix',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 100,
+    notes: 'Instant vanilla pudding mix. The thickener that stops protein ice cream turning icy without a machine. About 1 tablespoon = 12g.'
+  },
+
+  vanilla_extract: {
+    id: 'vanilla_extract',
+    display_name: 'Vanilla extract',
+    category: 'condiments_supplements',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegetarian', 'vegan', 'gluten_free', 'nut_free', 'dairy_free'],
+    allergens: [],
+    typical_pack_size: 100,
+    notes: 'Pure vanilla extract for baking and desserts.'
+  },
+
+  chocolate_chips: {
+    id: 'chocolate_chips',
+    display_name: 'Chocolate chips',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'gluten_free', 'nut_free'],
+    allergens: ['Dairy'],
+    typical_pack_size: 250,
+    typical_pack_unit: 'g',
+    notes: 'Dark or milk chocolate chips. ~5 kcal per gram. Dark chips are dairy-free; milk chips contain dairy.'
+  },
+
+  oat_flour: {
+    id: 'oat_flour',
+    display_name: 'Oat flour',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    typical_pack_unit: 'g',
+    notes: 'Finely ground oats — make your own by blending rolled oats. ~380 kcal per 100g. Gluten-free if certified.'
+  },
+
+  beef_jerky: {
+    id: 'beef_jerky',
+    display_name: 'Beef jerky',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 50,
+    typical_pack_unit: 'g',
+    notes: 'Dried beef jerky. ~280-410 kcal and ~33g protein per 100g depending on brand. Choose lower-sodium where possible. Marinades often contain soy/gluten — check the label.'
+  },
+
+  edamame: {
+    id: 'edamame',
+    display_name: 'Edamame (in pods)',
+    category: 'frozen',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: ['Soy'],
+    typical_pack_size: 500,
+    typical_pack_unit: 'g',
+    notes: 'Frozen young soybeans in the pod. ~120 kcal and ~11g protein per 100g of pods (edible beans only). Steam or microwave from frozen.'
+  },
+
+  protein_bar: {
+    id: 'protein_bar',
+    display_name: 'Protein bar (store-bought)',
+    category: 'condiments_supplements',
+    canonical_unit: 'count',
+    dietary_flags: ['vegetarian'],
+    allergens: ['Dairy'],
+    typical_pack_size: 1,
+    notes: 'A store-bought protein bar. Roughly 200-250 kcal and 15-20g protein each; varies a lot by brand. Most contain dairy and may contain nuts/soy — check the label.'
+  },
+
+  cheese_block: {
+    id: 'cheese_block',
+    display_name: 'Cheese (cheddar / tasty)',
+    category: 'dairy_refrigerated',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'gluten_free', 'nut_free'],
+    allergens: ['Dairy'],
+    typical_pack_size: 250,
+    typical_pack_unit: 'g',
+    notes: 'Block cheddar/tasty, string cheese, or individual portions like Babybel. ~400 kcal and ~25g protein per 100g.'
+  },
+
+  tuna: {
+    id: 'tuna',
+    display_name: 'Tuna (canned / pouch)',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free', 'gluten_free', 'nut_free'],
+    allergens: ['Fish'],
+    typical_pack_size: 95,
+    typical_pack_unit: 'g',
+    notes: 'Canned or pouch tuna in springwater. ~110 kcal and ~25g protein per 95g drained pouch. Flavoured pouches (e.g. lemon pepper) are ready to eat straight away.'
+  },
+
+  chickpeas: {
+    id: 'chickpeas',
+    display_name: 'Chickpeas (canned)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 400,
+    typical_pack_unit: 'g',
+    notes: 'Canned chickpeas, drained. ~140 kcal and ~8g protein per 100g drained. Dry well before roasting for crunch.'
+  },
+
+  mixed_nuts: {
+    id: 'mixed_nuts',
+    display_name: 'Mixed nuts',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free'],
+    allergens: ['Nuts'],
+    typical_pack_size: 400,
+    typical_pack_unit: 'g',
+    notes: 'A mix of almonds, cashews, walnuts and similar (roasted, unsalted or lightly salted). ~600 kcal and ~20g protein per 100g. Calorie-dense — a small handful is a serving.'
+  },
+
+  dried_fruit: {
+    id: 'dried_fruit',
+    display_name: 'Dried fruit mix',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 250,
+    typical_pack_unit: 'g',
+    notes: 'Mixed dried fruit like raisins, cranberries, apricots. ~300 kcal per 100g. Naturally sweet and chewy for trail mix or snacking.'
+  },
+
+  dark_chocolate: {
+    id: 'dark_chocolate',
+    display_name: 'Dark chocolate (70%+)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'gluten_free', 'nut_free'],
+    allergens: ['Dairy'],
+    typical_pack_size: 100,
+    typical_pack_unit: 'g',
+    notes: '70%+ dark chocolate. ~550 kcal per 100g. A couple of squares (~30g) is a serving. May contain traces of milk/soy — check the label; very dark varieties can be dairy-free.'
   }
 };

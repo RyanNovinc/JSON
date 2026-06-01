@@ -1154,4 +1154,762 @@ export const MEAL_SUBSTEPS: Record<
       ],
     },
   },
+  muscle_oats: {
+    stovetop: {
+      0: [
+        'Add 80g rolled oats and 250ml full-cream milk to a small saucepan over medium heat',
+        { text: 'Simmer for 4-5 minutes, stirring often, until thick and creamy', timer_seconds: 300, timer_label: 'Simmer' },
+      ],
+      1: [
+        'Take the saucepan off the heat',
+        { text: 'Let it sit for 1 minute to cool slightly', timer_seconds: 60, timer_label: 'Cool' },
+        'Stir 30g vanilla whey protein through until smooth — off the heat keeps it from going grainy',
+      ],
+      2: [
+        'Stir in 21g honey and 1 tsp ground cinnamon',
+        'Tip into a bowl',
+      ],
+      3: [
+        'Slice 120g banana over the top',
+        'Add 32g natural peanut butter (warm it 15 seconds to drizzle, if you like)',
+      ],
+    },
+    microwave: {
+      0: [
+        'Add 80g rolled oats and 250ml full-cream milk to a large microwave-safe bowl (bigger than you think — it bubbles up)',
+      ],
+      1: [
+        { text: 'Microwave on high for 1 minute, then stir', timer_seconds: 60, timer_label: 'Microwave' },
+        { text: 'Microwave on high for another 1-1.5 minutes until thick', timer_seconds: 90, timer_label: 'Microwave' },
+      ],
+      2: [
+        { text: 'Let it sit for 1 minute to cool slightly', timer_seconds: 60, timer_label: 'Cool' },
+        'Stir 30g vanilla whey protein, 21g honey, and 1 tsp ground cinnamon through until smooth',
+      ],
+      3: [
+        'Slice 120g banana over the top',
+        'Add 32g natural peanut butter',
+      ],
+    },
+  },
+  maple_muscle_toast: {
+    stovetop: {
+      0: [
+        'Crack 2 eggs into a wide shallow bowl',
+        'Add 100ml full-cream milk and 1/2 tsp ground cinnamon',
+        'Whisk in 30g vanilla whey protein last, beating well until completely smooth and no lumps remain',
+      ],
+      1: [
+        { text: 'Soak each slice of the 120g brioche (3 slices) in the custard for 20-30 seconds per side', timer_seconds: 60, timer_label: 'Soak' },
+        'Soak enough to soak through but not so long the bread falls apart',
+      ],
+      2: [
+        'Melt 10g salted butter in a non-stick pan over medium heat',
+        { text: 'Cook the soaked slices for 2-3 minutes per side until golden and set', timer_seconds: 300, timer_label: 'Cook' },
+      ],
+      3: [
+        'Stack the French toast on a plate',
+        'Dollop 100g vanilla Greek yoghurt over the top',
+        'Fan 120g sliced banana on top',
+        'Drizzle with 20ml maple syrup',
+      ],
+    },
+  },
+  scramble_stack: {
+    stovetop: {
+      0: [
+        'Crack 4 eggs into a bowl',
+        'Season with 1/4 tsp salt and 1/4 tsp ground black pepper',
+        'Whisk until just combined',
+      ],
+      1: [
+        'Toast 100g sourdough (2 thick slices)',
+        'Spread 6g of the salted butter over the toast',
+        'Smash 80g avocado on top and season with a pinch of salt and pepper',
+      ],
+      2: [
+        'Melt the remaining 6g salted butter in a non-stick pan over medium-low heat',
+        'Add the eggs and stir gently, pulling them in from the edges',
+        { text: 'Cook for 2-3 minutes until softly set', timer_seconds: 150, timer_label: 'Scramble' },
+        'Stir 40g grated tasty cheese through in the last 30 seconds so it just melts',
+      ],
+      3: [
+        'Pile the cheesy scramble onto the avocado toast',
+        'Crack over more black pepper',
+        'Eat immediately',
+      ],
+    },
+  },
+  overnight_oats: {
+    no_cook: {
+      0: [
+        'Add 50g rolled oats, 10g chia seeds, and 30g vanilla whey protein to a jar or container',
+        'Pour in 200ml full-cream milk, 120g vanilla Greek yoghurt, and 21g honey',
+        'Stir well until no dry pockets or whey clumps remain (pre-mix the whey with a splash of the milk first if it clumps)',
+      ],
+      1: [
+        { text: 'Seal and refrigerate for at least 4 hours, ideally overnight', timer_seconds: 14400, timer_label: 'Chill' },
+      ],
+      2: [
+        'In the morning, give it a stir',
+        'Loosen with a splash of milk if it has thickened too much',
+      ],
+    },
+    standard: {
+      0: [
+        'Slice 120g banana over the top',
+      ],
+    },
+    loaded: {
+      0: [
+        'Slice 120g banana over the top',
+        'Drizzle over 32g natural peanut butter (warm it 15 seconds to make it runny)',
+        'Scatter 40g granola over for crunch',
+      ],
+    },
+  },
+  greek_yoghurt_bowl: {
+    no_cook: {
+      0: [
+        'Spoon 280g vanilla Greek yoghurt into a bowl',
+        'Add 30g vanilla whey protein and 21g honey',
+        'Stir until smooth and creamy (loosen with a splash of milk if it gets too thick)',
+      ],
+    },
+    standard: {
+      0: [
+        'Top with 100g mixed berries',
+        'Sprinkle over 10g chia seeds',
+        'Scatter 40g granola for crunch',
+      ],
+    },
+    loaded: {
+      0: [
+        'Top with 100g mixed berries and 120g sliced banana',
+        'Sprinkle over 10g chia seeds',
+        'Scatter 50g granola',
+        'Drizzle over 32g natural peanut butter (warm it 15 seconds to make it runny)',
+      ],
+    },
+  },
+
+  cottage_cheese_bowl: {
+    no_cook: {
+      0: [
+        'Wash and halve the cherry tomatoes',
+        'Wash, peel if desired, and dice the cucumber into small cubes',
+      ],
+      1: [
+        'Spoon the cottage cheese into a serving bowl',
+        'Top with halved cherry tomatoes and diced cucumber',
+        'Drizzle with olive oil',
+        'Season with salt, pepper, and everything bagel seasoning',
+        'Mix gently if desired, or serve with distinct layers for visual appeal',
+      ],
+    },
+  },
+
+  pb_banana_toast: {
+    no_cook: {
+      0: [
+        'Toast 120g sourdough (2-3 slices)',
+      ],
+      1: [
+        'Mash 120g banana in a bowl with a fork',
+        'Sprinkle in 25g vanilla whey protein and mash again until smooth and combined',
+      ],
+      2: [
+        'Spread 40g natural peanut butter over the toast',
+        'Spread the banana-whey mash on top',
+      ],
+      3: [
+        'Drizzle over 14g honey',
+        'Sprinkle with 8g chia seeds',
+      ],
+    },
+  },
+
+  protein_pancakes: {
+    stovetop: {
+      0: [
+        'Add 60g rolled oats, 30g vanilla whey, 2 eggs, 80g vanilla Greek yoghurt, 60ml full-cream milk, and 1 tsp baking powder to a blender',
+        'Blend until smooth',
+        { text: 'Let the batter rest for 5 minutes to thicken', timer_seconds: 300, timer_label: 'Rest' },
+      ],
+      1: [
+        'Melt 8g salted butter in a non-stick pan over medium heat',
+        'Pour in about 1/4 cup of batter per pancake',
+        { text: 'Cook for ~2 minutes until bubbles form on the surface', timer_seconds: 120, timer_label: 'Cook' },
+      ],
+      2: [
+        { text: 'Flip and cook another 1-2 minutes until golden and set', timer_seconds: 90, timer_label: 'Cook' },
+        'Repeat with the remaining batter',
+      ],
+    },
+    standard: {
+      0: [
+        'Stack the pancakes on a plate',
+        'Scatter over 80g mixed berries',
+        'Drizzle with 20ml maple syrup',
+      ],
+    },
+    loaded: {
+      0: [
+        'Stack the pancakes on a plate',
+        'Top with 120g sliced banana and drizzle over 32g natural peanut butter',
+        'Finish with 20ml maple syrup',
+      ],
+    },
+  },
+
+  steak_and_eggs: {
+    stovetop: {
+      0: [
+        'Pat 200g sirloin steak dry and season both sides with salt and pepper',
+        'Leave it to come up to room temperature while you start the potatoes',
+      ],
+      1: [
+        'Dice 200g waxy potato into small cubes',
+        'Heat 8ml olive oil in a pan over medium-high heat and add the potatoes',
+        { text: 'Fry for 12-15 minutes, turning, until golden and tender', timer_seconds: 840, timer_label: 'Potatoes' },
+        'Season with a pinch of salt and pepper, then set aside',
+      ],
+      2: [
+        'Melt 12g salted butter in a hot pan over high heat with 2 crushed garlic cloves',
+        { text: 'Sear the steak 2-3 minutes per side for medium', timer_seconds: 300, timer_label: 'Sear' },
+        { text: 'Rest the steak for 5 minutes so it stays juicy', timer_seconds: 300, timer_label: 'Rest' },
+      ],
+      3: [
+        'Crack 3 eggs into the same pan and fry to your liking',
+        'Slice the rested steak',
+        'Plate the steak, eggs, and potatoes together',
+      ],
+    },
+  },
+
+  shakshuka: {
+    stovetop: {
+      0: [
+        'Dice 80g brown onion and 100g red capsicum; crush 2 garlic cloves',
+        'Heat 10ml olive oil in a pan over medium heat',
+        { text: 'Saute the onion, capsicum, and garlic for 5-7 minutes until soft', timer_seconds: 360, timer_label: 'Soften' },
+      ],
+      1: [
+        'Add 250g crushed tomatoes, 1 tsp ground cumin, 1 tsp sweet paprika, and a pinch of salt and pepper',
+        { text: 'Simmer for 8-10 minutes until thickened', timer_seconds: 540, timer_label: 'Simmer' },
+      ],
+      2: [
+        'Make 4 wells in the sauce and crack 1 egg into each',
+        'Cover the pan',
+        { text: 'Cook 5-7 minutes until the whites are set but the yolks are still runny', timer_seconds: 360, timer_label: 'Poach eggs' },
+      ],
+      3: [
+        'Crumble 40g feta over the top',
+        'Serve straight from the pan with 100g sourdough for scooping',
+      ],
+    },
+  },
+
+  freezer_breakfast_burrito: {
+    stovetop: {
+      0: [
+        'Dice 250g waxy potato',
+        'Heat 12ml olive oil in a large pan over medium-high heat and add the potato',
+        { text: 'Fry 10-12 minutes until tender', timer_seconds: 660, timer_label: 'Potato' },
+        'Add 120g diced brown onion and 120g diced red capsicum and cook 4-5 minutes until soft, then set aside',
+      ],
+      1: [
+        'Add 350g breakfast sausage to the pan, breaking it up with a spoon',
+        { text: 'Brown for 6-8 minutes until cooked through', timer_seconds: 420, timer_label: 'Sausage' },
+      ],
+      2: [
+        'Whisk 10 eggs with a pinch of salt and pepper',
+        'Scramble softly in the pan for 2-3 minutes',
+      ],
+      3: [
+        'Lay out 5 large tortillas',
+        'Divide the sausage, eggs, potato-veg mix, and 150g grated cheese between them',
+        'Fold in the sides and roll up tightly',
+      ],
+      4: [
+        'Eat one now; wrap the rest individually in foil and freeze',
+        { text: 'To reheat from frozen: microwave 1-2 minutes, then crisp in a dry pan', timer_seconds: 90, timer_label: 'Reheat' },
+      ],
+    },
+  },
+
+  baked_oats: {
+    oven: {
+      0: [
+        'Preheat the oven to 180C (350F)',
+        'Mash 60g banana in a bowl',
+      ],
+      1: [
+        'Add 80g rolled oats, 30g vanilla whey, 1 egg, 120ml full-cream milk, 21g honey, 1 tsp baking powder, and 1/2 tsp ground cinnamon',
+        'Mix to a smooth batter',
+      ],
+      2: [
+        'Pour into a greased oven dish or large ramekin',
+        { text: 'Bake 20-22 minutes until set and golden on top', timer_seconds: 1320, timer_label: 'Bake' },
+      ],
+    },
+    standard: {
+      0: [
+        'Top the warm baked oats with 80g vanilla Greek yoghurt',
+        'Scatter over 60g mixed berries',
+      ],
+    },
+    loaded: {
+      0: [
+        'Top the warm baked oats with 80g vanilla Greek yoghurt',
+        'Slice 60g banana over the top',
+        'Drizzle over 32g natural peanut butter (warm it 15 seconds to make it runny)',
+      ],
+    },
+  },
+
+  smoked_salmon_bagel: {
+    stovetop: {
+      0: [
+        'Slice and toast 1 bagel',
+        'Fry 2 eggs in 5ml olive oil to your liking, keeping the yolks soft',
+      ],
+      1: [
+        'Spread 40g cream cheese over both toasted bagel halves',
+        'Season with salt and pepper (a squeeze of lemon and some dill is great if you have them)',
+      ],
+      2: [
+        'Layer 40g sliced cucumber, 100g smoked salmon, 20g sliced red onion, and 60g sliced avocado on the base',
+        'Add the fried eggs',
+      ],
+      3: [
+        'Top with the other bagel half',
+        'Press gently and slice',
+      ],
+    },
+  },
+
+  big_breakfast_plate: {
+    stovetop: {
+      0: [
+        'Heat a large pan over medium heat',
+        { text: 'Fry 60g bacon and 120g breakfast sausage for 6-8 minutes until cooked', timer_seconds: 420, timer_label: 'Bacon & sausage' },
+        'Set aside and keep warm',
+      ],
+      1: [
+        'In the same pan, add 80g sliced brown mushrooms and 100g halved cherry tomatoes',
+        { text: 'Fry 4-5 minutes until soft and browned', timer_seconds: 270, timer_label: 'Veg' },
+      ],
+      2: [
+        'Warm 130g baked beans in a small pot or the microwave',
+        'Toast 100g sourdough and butter it',
+      ],
+      3: [
+        'Fry 3 eggs in the pan to your liking',
+        'Plate the eggs, bacon, sausage, mushrooms, tomatoes, beans, and toast together',
+      ],
+    },
+  },
+
+  egg_muffins: {
+    oven: {
+      0: [
+        'Preheat the oven to 180C (350F) and grease a 12-cup muffin tin',
+        'If your sausage is raw, brown 200g breakfast sausage and crumble it',
+        'Chop 60g spinach and 60g onion',
+      ],
+      1: [
+        'Blend 8 eggs, 250g cottage cheese, and a pinch of salt and pepper until smooth',
+      ],
+      2: [
+        'Divide the sausage, spinach, onion, and half of 80g grated cheese between the 12 cups',
+        'Pour the egg mixture over to fill each cup 3/4 full',
+        'Top with the remaining cheese',
+      ],
+      3: [
+        { text: 'Bake 18-22 minutes until set and puffy', timer_seconds: 1200, timer_label: 'Bake' },
+        'Cool 5 minutes, then loosen the edges and remove',
+      ],
+    },
+    standard: {
+      0: [
+        'Toast 100g sourdough (2 slices) and smash 80g avocado on top',
+        'Serve with 3 egg muffins',
+        'Refrigerate the rest up to 5 days, or freeze',
+      ],
+    },
+  },
+
+  protein_ice_cream: {
+    freezer: {
+      0: [
+        'Add 360ml milk, 35g protein powder, 12g instant pudding mix, and 1 tsp vanilla to a blender',
+        { text: 'Blend until completely smooth, about 30-45 seconds', timer_seconds: 45, timer_label: 'Blend' },
+      ],
+      1: [
+        'Pour into a shallow freezer-safe container and smooth the top',
+        'Freeze for at least 4-6 hours until firm',
+      ],
+      2: [
+        { text: 'Let sit at room temperature for 5-10 minutes to soften', timer_seconds: 300, timer_label: 'Soften' },
+        'Scoop and serve — fold in mix-ins like chocolate chips or peanut butter if you want a bigger hit',
+        'Optional upgrade: if you own a Ninja Creami, freeze in a Creami pint for 24h and spin instead, for a softer texture',
+      ],
+    },
+  },
+
+  cottage_cheese_ice_cream: {
+    freezer: {
+      0: [
+        'Add 300g cottage cheese, 120g mixed berries, 25g honey, 1 tsp vanilla, and a pinch of salt to a blender',
+        { text: 'Blend until completely smooth and creamy, about 60 seconds', timer_seconds: 60, timer_label: 'Blend' },
+        'Taste and adjust sweetness with more honey if needed',
+      ],
+      1: [
+        'Pour into a shallow freezer-safe container and smooth the top',
+        'Cover tightly and freeze for at least 5 hours until firm but scoopable',
+      ],
+      2: [
+        { text: 'Let sit at room temperature for 5 minutes to soften slightly', timer_seconds: 300, timer_label: 'Soften' },
+        'Scoop and serve immediately — the cottage cheese texture creates a naturally creamy consistency',
+        'Pro tip: freeze in individual portions for easy single servings',
+      ],
+    },
+  },
+
+  chocolate_protein_mug_cake: {
+    microwave: {
+      0: [
+        'In a microwave-safe mug, whisk together 30g protein powder, 1 tbsp cocoa, 1/2 tsp baking powder, and a pinch of salt',
+      ],
+      1: [
+        'Add 1 egg, 60ml milk, and 1 tsp maple syrup',
+        'Stir to a smooth batter with no dry pockets of powder',
+        'Stir in half the chocolate chips and scatter the rest on top',
+      ],
+      2: [
+        { text: 'Microwave on high for 60-90 seconds until risen and just set in the middle', timer_seconds: 75, timer_label: 'Microwave' },
+        'Check at 60s — stop as soon as the top springs back; overcooking makes it rubbery',
+        { text: 'Let cool for 1 minute before eating', timer_seconds: 60, timer_label: 'Cool' },
+      ],
+    },
+  },
+
+  fudgy_protein_brownies: {
+    oven: {
+      0: [
+        'Preheat oven to 175°C (350°F)',
+        'Line an 8x8 inch (20cm) baking pan with baking paper',
+      ],
+      1: [
+        'In a large bowl, mix 128g peanut butter, 2 eggs, 80ml maple syrup, 30ml milk, and 1 tsp vanilla until smooth',
+      ],
+      2: [
+        'Stir in 60g protein powder, 30g cocoa, 1/2 tsp baking powder, and 1/4 tsp salt until no clumps remain',
+        'Fold in most of the chocolate chips, saving some for the top',
+      ],
+      3: [
+        'Spread the batter into the pan and scatter the remaining chocolate chips on top',
+        { text: 'Bake 20-25 minutes until the edges are set and a skewer comes out with a few moist crumbs', timer_seconds: 1350, timer_label: 'Bake' },
+      ],
+      4: [
+        'Cool completely in the pan — they firm up as they cool',
+        'Cut into 8 brownies',
+      ],
+    },
+  },
+
+  protein_chocolate_chip_cookies: {
+    oven: {
+      0: [
+        'Preheat oven to 175°C (350°F)',
+        'Line a baking tray with baking paper',
+      ],
+      1: [
+        'In a bowl, mix 200g peanut butter, 2 eggs, 60g honey, and 1 tsp vanilla into a smooth paste',
+      ],
+      2: [
+        'Stir in 50g protein powder, 1/2 tsp baking powder, and 1/4 tsp salt to form a soft dough',
+        'Fold in most of the chocolate chips',
+      ],
+      3: [
+        'Scoop 10 mounds onto the tray and flatten each slightly',
+        'Press the remaining chocolate chips into the tops',
+      ],
+      4: [
+        { text: 'Bake 8-10 minutes until the edges are golden — the centres will still look soft', timer_seconds: 540, timer_label: 'Bake' },
+        'Let cool on the tray; they firm up as they cool',
+      ],
+    },
+  },
+
+  protein_banana_bread: {
+    oven: {
+      0: [
+        'Preheat oven to 175°C (350°F)',
+        'Line a loaf tin with baking paper',
+      ],
+      1: [
+        'Mash 3 ripe bananas in a large bowl',
+        'Whisk in 150g Greek yoghurt, 2 eggs, 60ml maple syrup, and 1 tsp vanilla',
+      ],
+      2: [
+        'Stir in 60g protein powder, 150g oat flour, 1.5 tsp baking powder, 1 tsp cinnamon, and 1/2 tsp salt until just combined',
+        'Fold in most of the chocolate chips',
+      ],
+      3: [
+        'Pour into the tin and scatter the remaining chocolate chips on top',
+        { text: 'Bake 40-50 minutes until a skewer comes out clean; tent with foil if the top browns too fast', timer_seconds: 2700, timer_label: 'Bake' },
+      ],
+      4: [
+        'Cool in the tin before slicing — it sets as it cools',
+        'Slice into 10',
+      ],
+    },
+  },
+
+  edible_protein_cookie_dough: {
+    no_cook: {
+      0: [
+        'In a bowl, stir 60g peanut butter, 30ml maple syrup, 40ml milk, and 1 tsp vanilla until smooth',
+      ],
+      1: [
+        'Add 40g protein powder, 60g oat flour, and a pinch of salt',
+        'Mix to a soft, scoopable dough — add a splash more milk if it feels dry',
+      ],
+      2: [
+        'Fold in 30g chocolate chips',
+        'Eat straight away, or chill 15-30 minutes for a firmer dough',
+      ],
+    },
+  },
+
+  no_bake_protein_cheesecake: {
+    no_cook: {
+      0: [
+        'Mix 80g oat flour, 40g peanut butter, and 20ml honey into a crumbly dough',
+        'Press firmly into the base of a small dish or 4 ramekins and chill while you make the filling',
+      ],
+      1: [
+        'Blend 200g cream cheese, 150g cottage cheese, 100g Greek yoghurt, 30g protein powder, 40ml maple syrup, and 1 tsp vanilla until completely smooth and thick',
+      ],
+      2: [
+        'Spread the filling over the base and smooth the top',
+        { text: 'Chill at least 4 hours (or freeze 1 hour) until set', timer_seconds: 14400, timer_label: 'Chill' },
+      ],
+      3: [
+        'Top with 100g mixed berries',
+        'Slice or serve from the ramekins',
+      ],
+    },
+  },
+
+  chocolate_protein_mousse: {
+    no_cook: {
+      0: [
+        'Add 200g cottage cheese, 15g chocolate protein powder, 2 tbsp cocoa, 1 tbsp maple syrup, 20ml milk, 1 tsp vanilla, and a pinch of salt to a blender',
+        { text: 'Blend 60 seconds until completely smooth and mousse-like, scraping down once', timer_seconds: 60, timer_label: 'Blend' },
+      ],
+      1: [
+        'Spoon into a serving dish',
+        { text: 'Chill 30 minutes to thicken', timer_seconds: 1800, timer_label: 'Chill' },
+      ],
+      2: [
+        'Top with 10g chocolate chips and serve',
+      ],
+    },
+  },
+
+  frozen_date_snickers_bark: {
+    freezer: {
+      0: [
+        'Line a baking tray with baking paper',
+        'Remove pits from 250g Medjool dates if needed',
+        'Press the dates into one solid overlapping layer on the lined tray',
+      ],
+      1: [
+        'Warm 80g natural peanut butter slightly to make it spreadable',
+        'Stir 20g vanilla protein powder into the warmed peanut butter until smooth',
+        'Spread the peanut butter mixture evenly over the date layer',
+        'Roughly chop 40g roasted peanuts and press them into the peanut butter layer',
+      ],
+      2: [
+        'Melt 80g chocolate chips in microwave or double boiler',
+        'Spread the melted chocolate evenly over the top',
+        'Sprinkle with a pinch of flaky salt',
+      ],
+      3: [
+        { text: 'Freeze for 25 minutes until completely set', timer_seconds: 1500, timer_label: 'Freeze' },
+        'Remove from freezer and break into about 10 pieces',
+        'Store in freezer between servings',
+      ],
+    },
+  },
+
+  greek_yogurt_snack: {
+    no_cook: {
+      0: [
+        'Spoon 200g Greek yogurt into a bowl or eat straight from the pot',
+        'Optional: add a drizzle of honey or a handful of berries',
+      ],
+    },
+  },
+
+  beef_jerky: {
+    no_cook: {
+      0: [
+        'Grab a ~40g serving of beef jerky and eat',
+        'Choose a lower-sodium variety if you can',
+      ],
+    },
+  },
+
+  edamame: {
+    microwave: {
+      0: [
+        'Put 150g frozen edamame pods in a bowl with a splash of water',
+        { text: 'Microwave 2-3 minutes until hot', timer_seconds: 150, timer_label: 'Heat' },
+        'Drain',
+      ],
+      1: [
+        'Sprinkle with flaky salt',
+        'Squeeze the beans out of the pods to eat — discard the pods',
+      ],
+    },
+  },
+
+  protein_shake: {
+    no_cook: {
+      0: [
+        'Add 35g protein powder and 350ml milk to a shaker bottle',
+        { text: 'Shake 20-30 seconds until smooth with no clumps', timer_seconds: 30, timer_label: 'Shake' },
+        'Drink — use water instead of milk for a leaner version',
+      ],
+    },
+  },
+
+  protein_bar: {
+    no_cook: {
+      0: [
+        'Grab a protein bar from your bag, desk, or pantry',
+        'Aim for one with at least 15g protein and a reasonable sugar level',
+      ],
+    },
+  },
+
+  cheese_snack: {
+    no_cook: {
+      0: [
+        'Grab a ~30g portion of cheese — a slice of block cheddar, a string cheese, or an individual round',
+        'Eat as-is',
+      ],
+    },
+  },
+
+  hard_boiled_eggs: {
+    stovetop: {
+      0: [
+        'Bring a small pot of water to the boil',
+        'Lower in 2 eggs with a spoon',
+        { text: 'Boil 9-10 minutes for fully set yolks', timer_seconds: 570, timer_label: 'Boil' },
+        'Transfer to cold water to cool, then peel',
+      ],
+      1: [
+        'Season with a pinch of salt and eat',
+        'Tip: boil 6-12 at once and keep them in the fridge for the week',
+      ],
+    },
+  },
+
+  tuna_pouch: {
+    no_cook: {
+      0: [
+        'Tear open a ~95g tuna pouch',
+        'Eat straight from the pouch with a fork — flavoured varieties (lemon pepper, sweet chilli) need nothing added',
+      ],
+    },
+  },
+
+  roasted_chickpeas: {
+    oven: {
+      0: [
+        { text: 'Preheat oven to 200°C', timer_seconds: 600, timer_label: 'Preheat' },
+        'Drain and rinse 400g canned chickpeas',
+        'Pat them completely dry with paper towels — moisture is the enemy of crispiness',
+      ],
+      1: [
+        'Toss the dried chickpeas with 15g olive oil and 0.5 tsp salt in a bowl',
+        'Spread in a single layer on a baking tray',
+        { text: 'Roast 25-30 minutes, shaking the tray halfway through', timer_seconds: 1650, timer_label: 'Roast' },
+      ],
+      2: [
+        'Let cool for 2 minutes — they crisp up as they cool',
+        'Store leftovers in an airtight container for up to 3 days',
+        'Tip: buy ready-roasted chickpeas from the health food section if you want instant gratification',
+      ],
+    },
+  },
+
+  no_bake_protein_balls: {
+    no_cook: {
+      0: [
+        'In a bowl, mix 130g peanut butter, 60g honey, and 1 tsp vanilla until smooth',
+      ],
+      1: [
+        'Stir in 120g rolled oats, 60g protein powder, and 40g chocolate chips',
+        'Mix to a stiff but rollable dough — add a splash of milk if too dry, more oats if too wet',
+      ],
+      2: [
+        'Roll into about 12 balls',
+        { text: 'Chill 30 minutes to firm up', timer_seconds: 1800, timer_label: 'Chill' },
+        'Store in the fridge up to a week',
+      ],
+    },
+  },
+
+  mixed_nuts: {
+    no_cook: {
+      0: [
+        'Grab a ~40g handful of mixed nuts',
+        'Unsalted or lightly salted; calorie-dense, so a small handful goes a long way for surplus',
+      ],
+    },
+  },
+
+  trail_mix: {
+    no_cook: {
+      0: [
+        'Grab a ~60g handful of trail mix',
+        'Or mix your own: 30g mixed nuts + 20g dried fruit + 10g dark chocolate chips',
+        'Calorie-dense — a small scoop is a serving',
+      ],
+    },
+  },
+
+  banana_snack: {
+    no_cook: {
+      0: [
+        'Peel and eat a banana',
+        'Ideal pre- or post-workout for quick carbs and potassium',
+      ],
+    },
+  },
+
+  dried_fruit: {
+    no_cook: {
+      0: [
+        'Grab a ~40g handful of dried fruit (raisins, apricots, dates, cranberries)',
+        'Concentrated fast carbs — a small handful is a serving',
+      ],
+    },
+  },
+
+  dark_chocolate: {
+    no_cook: {
+      0: [
+        'Break off ~30g (2-3 squares) of 70%+ dark chocolate',
+        'Enjoy slowly — calorie-dense, so a couple of squares is a serving',
+      ],
+    },
+  },
 };

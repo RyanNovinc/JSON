@@ -36,6 +36,11 @@ type NutritionNavigationProp = StackNavigationProp<RootStackParamList, 'Nutritio
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Base label for the "mains" shelf (the savoury main dishes — australian,
+// indian, mexican, italian, thai). Change this in one place if you'd rather
+// call it "Dinner" or "Slow cooker".
+const MAINS_TITLE = 'Mains';
+
 // ============================================================================
 // HELPERS — preserved verbatim from the original file. These are pure
 // functions and have been tested in production.
@@ -208,7 +213,7 @@ const getMacroSplitDisplay = (plan: MealPlan) => {
 };
 
 // ============================================================================
-// NEW HELPERS — for the Meals/Smoothies sections
+// HELPERS — for the category feed cards
 // ============================================================================
 
 /**
@@ -254,6 +259,32 @@ function formatTime(minutes: number): string {
 }
 
 // ============================================================================
+// DAYPART FLOAT — decides which single category shelf floats to the top of
+// the feed and what contextual eyebrow + title it gets, based on the device's
+// LOCAL time (works for users in any timezone). Everything else stays in a
+// fixed order below it so muscle memory is preserved.
+// ============================================================================
+type DaypartFloat = { key: string; eyebrow: string; title: string };
+
+function getDaypart(): DaypartFloat {
+  const h = new Date().getHours();
+  if (h < 5)  return { key: 'desserts',  eyebrow: 'WINDING DOWN', title: 'Something sweet' };
+  if (h < 11) return { key: 'breakfast', eyebrow: 'GOOD MORNING', title: 'Start your day' };
+  if (h < 15) return { key: 'mains',     eyebrow: 'MIDDAY',       title: 'Lunch ideas' };
+  if (h < 17) return { key: 'snacks',    eyebrow: 'AFTERNOON',    title: 'Afternoon fuel' };
+  if (h < 21) return { key: 'mains',     eyebrow: 'GOOD EVENING', title: 'Dinner tonight' };
+  return            { key: 'desserts',  eyebrow: 'WINDING DOWN', title: 'Something sweet' };
+}
+
+// A single home-screen category shelf.
+type HomeCategorySection = {
+  key: string;
+  title: string;
+  cuisine: string; // route param for CategoryLibrary ('mains' is a sentinel)
+  meals: CuratedMeal[];
+};
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 export default function NutritionHomeScreen({ route }: any) {
@@ -273,14 +304,20 @@ export default function NutritionHomeScreen({ route }: any) {
     null;
   const otherPlans = convertedMealPlans.filter(p => p.id !== currentPlanLegacy?.id);
 
-  // ===== Curated meals — split by cuisine =====
+  // ===== Curated meals — split into category groups =====
   // Memoised because the source is a constant import; no point reconstituting
-  // the arrays on every render.
-  const { mealsList, smoothiesList } = useMemo(() => {
+  // the arrays on every render. Categories are derived from the `cuisine`
+  // field. "mains" is everything that isn't one of the four leaf categories
+  // (breakfast / snack / dessert / smoothie) — i.e. the savoury main dishes
+  // scattered across australian, indian, mexican, italian, thai.
+  const { mains, breakfast, snacks, desserts, smoothies } = useMemo(() => {
     const all = Object.values(CURATED_MEALS);
-    const meals = all.filter(m => m.cuisine !== 'smoothie');
 
-    // Custom order for smoothies based on preference
+    const breakfast = all.filter(m => m.cuisine === 'breakfast');
+    const snacks = all.filter(m => m.cuisine === 'snack');
+    const desserts = all.filter(m => m.cuisine === 'dessert');
+
+    // Custom order for smoothies based on preference (preserved from original).
     const smoothieOrder = [
       'cookies_gains',
       'brekkie_grow',
@@ -297,15 +334,44 @@ export default function NutritionHomeScreen({ route }: any) {
     ];
 
     const allSmoothies = all.filter(m => m.cuisine === 'smoothie');
-    const smoothies = smoothieOrder.map(slug =>
-      allSmoothies.find(s => s.slug === slug)
-    ).filter(Boolean) as CuratedMeal[];
+    const orderedSmoothies = smoothieOrder
+      .map(slug => allSmoothies.find(s => s.slug === slug))
+      .filter(Boolean) as CuratedMeal[];
+    // Defensive: append any smoothie not named in the order list so new
+    // smoothies never silently vanish from the shelf. (No effect on current
+    // data — all 12 are listed above.)
+    const orderedSlugs = new Set(orderedSmoothies.map(s => s.slug));
+    const smoothies = [
+      ...orderedSmoothies,
+      ...allSmoothies.filter(s => !orderedSlugs.has(s.slug)),
+    ];
 
-    return {
-      mealsList: meals,
-      smoothiesList: smoothies,
-    };
+    // Mains = anything not in the four leaf categories.
+    const LEAF = new Set(['breakfast', 'snack', 'dessert', 'smoothie']);
+    const mains = all.filter(m => !LEAF.has(m.cuisine));
+
+    return { mains, breakfast, snacks, desserts, smoothies };
   }, []);
+
+  // Decide the daypart float for this render (cheap; reads local time).
+  const daypart = getDaypart();
+
+  // Fixed shelf order. The daypart-floated shelf is hoisted to the front;
+  // everything else keeps this relative order so the screen never reshuffles
+  // beyond that single top slot.
+  const categorySections: HomeCategorySection[] = [
+    { key: 'mains',      title: MAINS_TITLE,  cuisine: 'mains',     meals: mains },
+    { key: 'breakfast',  title: 'Breakfast',  cuisine: 'breakfast', meals: breakfast },
+    { key: 'snacks',     title: 'Snacks',     cuisine: 'snack',     meals: snacks },
+    { key: 'desserts',   title: 'Desserts',   cuisine: 'dessert',   meals: desserts },
+    { key: 'smoothies',  title: 'Smoothies',  cuisine: 'smoothie',  meals: smoothies },
+  ];
+
+  const orderedSections: HomeCategorySection[] = (() => {
+    const floated = categorySections.find(s => s.key === daypart.key);
+    if (!floated) return categorySections;
+    return [floated, ...categorySections.filter(s => s.key !== daypart.key)];
+  })();
 
   // ===== State =====
   const [shareModal, setShareModal] = useState<{
@@ -748,20 +814,23 @@ export default function NutritionHomeScreen({ route }: any) {
   };
 
   // ============================================================================
-  // NEW HANDLERS — for meals/smoothies feed
+  // HANDLERS — for the category feed
   // ============================================================================
 
   const handleMealCardPress = (meal: CuratedMeal) => {
     navigation.navigate('RecipeDetail' as any, { mealSlug: meal.slug });
   };
 
-  // Navigate to the library screens when "See all" is pressed
-  const handleSeeAllPress = (category: 'meals' | 'smoothies') => {
-    if (category === 'meals') {
-      navigation.navigate('MealsLibrary' as any);
-    } else {
-      navigation.navigate('SmoothiesLibrary' as any);
-    }
+  // CHANGED: now param-driven. Every category's "See all" routes into a single
+  // generic CategoryLibrary screen, pre-filtered by cuisine. 'mains' is a
+  // sentinel meaning "all savoury mains" (any cuisine except breakfast / snack
+  // / dessert / smoothie) — the CategoryLibrary screen interprets it.
+  //
+  // NOTE: 'CategoryLibrary' must be registered in AppNavigator and accept
+  // { cuisine, title } params. The legacy MealsLibrary / SmoothiesLibrary
+  // screens are left intact in the navigator but are no longer routed to here.
+  const handleSeeAllPress = (cuisine: string, title: string) => {
+    navigation.navigate('CategoryLibrary' as any, { cuisine, title });
   };
 
   // ============================================================================
@@ -769,8 +838,8 @@ export default function NutritionHomeScreen({ route }: any) {
   // ============================================================================
 
   /**
-   * Renders a single horizontal scroll card for the meals or smoothies feed.
-   * Hero image with title overlay, footer chip row with time and protein.
+   * Renders a single horizontal scroll card for any category feed.
+   * Hero image with title overlay, footer chip row with time and macros.
    * Width is fixed at 280px to give a clean snap-feel as user scrolls.
    */
   const renderFeedCard = (meal: CuratedMeal) => {
@@ -841,9 +910,12 @@ export default function NutritionHomeScreen({ route }: any) {
    *
    * The macro grid slot is replaced with a row containing the title and a
    * circular arrow button. No fake macro data — the slot is explicitly a CTA.
+   *
+   * CHANGED: now takes the section it belongs to (so it can route the correct
+   * cuisine + title) instead of a hard-coded 'meals' | 'smoothies' literal.
    */
   const renderSeeMoreCard = (
-    category: 'meals' | 'smoothies',
+    section: HomeCategorySection,
     previewMeals: CuratedMeal[],
     totalCount: number
   ) => {
@@ -851,15 +923,16 @@ export default function NutritionHomeScreen({ route }: any) {
     // source has fewer than 4 unseen meals (unlikely with current data, but
     // defensive — meals could shrink in dev).
     const thumbs = previewMeals.slice(0, 4);
+    const isSmoothie = section.cuisine === 'smoothie';
 
     return (
       <TouchableOpacity
         key="see-more"
         style={styles.feedCard}
         activeOpacity={0.85}
-        onPress={() => handleSeeAllPress(category)}
+        onPress={() => handleSeeAllPress(section.cuisine, section.title)}
         accessibilityRole="button"
-        accessibilityLabel={`See all ${totalCount} ${category}`}
+        accessibilityLabel={`See all ${totalCount} ${section.title}`}
       >
         {/* Thumbnail preview grid — fills the same 16:9 slot a hero image
             would occupy. 2x2 cells with a 1px gap between them. */}
@@ -889,7 +962,7 @@ export default function NutritionHomeScreen({ route }: any) {
                   ) : (
                     <View style={styles.seeMoreThumbPlaceholder}>
                       <Ionicons
-                        name={category === 'meals' ? 'restaurant-outline' : 'cafe-outline'}
+                        name={isSmoothie ? 'cafe-outline' : 'restaurant-outline'}
                         size={16}
                         color="#52525b"
                       />
@@ -907,7 +980,7 @@ export default function NutritionHomeScreen({ route }: any) {
           <View style={styles.seeMoreBodyRow}>
             <View style={styles.seeMoreBodyText}>
               <Text style={styles.feedCardTitle} numberOfLines={2}>
-                See all {category}
+                See all {section.title}
               </Text>
               <Text style={styles.feedCardMeta}>{totalCount} recipes</Text>
             </View>
@@ -934,9 +1007,9 @@ export default function NutritionHomeScreen({ route }: any) {
         {convertedMealPlans.length === 0 ? (
           // ============================================================
           // EMPTY STATE — no meal plans yet
-          // Hero is replaced with "Plan your meals" prompt, but Meals
-          // and Smoothies sections still appear below so users can
-          // discover recipes without having a plan.
+          // Hero is replaced with "Plan your meals" prompt, but the
+          // category sections still appear below so users can discover
+          // recipes without having a plan.
           // ============================================================
           <ScrollView
             style={styles.scroll}
@@ -965,13 +1038,12 @@ export default function NutritionHomeScreen({ route }: any) {
               </TouchableOpacity>
             </View>
 
-            {/* Meals + Smoothies sections, even without a plan */}
-            {renderMealsSection()}
-            {renderSmoothiesSection()}
+            {/* Category sections, even without a plan */}
+            {renderAllSections()}
           </ScrollView>
         ) : (
           // ============================================================
-          // POPULATED STATE — hero card + meals/smoothies + other plans
+          // POPULATED STATE — hero card + category feed + other plans
           // ============================================================
           <ScrollView
             style={styles.scroll}
@@ -1052,9 +1124,8 @@ export default function NutritionHomeScreen({ route }: any) {
             )}
 
             {/* ====================================================== */}
-            {/* OTHER PLANS — now rendered as greyed-out secondary      */}
-            {/* plan cards, mirroring HomeScreen.tsx's planCardSecondary */}
-            {/* treatment instead of the old thin smallPlanCard rows.   */}
+            {/* OTHER PLANS — greyed-out secondary plan cards,          */}
+            {/* mirroring HomeScreen.tsx's planCardSecondary treatment. */}
             {/* Each card has: ••• menu, tappable title/subtitle, and a  */}
             {/* "Start today's meals" button.                           */}
             {/* ====================================================== */}
@@ -1107,10 +1178,9 @@ export default function NutritionHomeScreen({ route }: any) {
             })}
 
             {/* ====================================================== */}
-            {/* NEW: Meals + Smoothies horizontal scroll sections      */}
+            {/* Category horizontal scroll sections (daypart-floated)  */}
             {/* ====================================================== */}
-            {renderMealsSection()}
-            {renderSmoothiesSection()}
+            {renderAllSections()}
 
           </ScrollView>
         )}
@@ -1391,31 +1461,38 @@ export default function NutritionHomeScreen({ route }: any) {
   );
 
   /**
-   * Section: Meals horizontal scroll row.
-   * Shows first 5 meals + a "See more" card with a thumbnail-grid preview
-   * of meals 6-9 (the ones the user hasn't already scrolled past).
+   * Renders one category shelf. Skips categories with fewer than 3 meals so a
+   * sparse shelf never looks broken. The first shelf in `orderedSections` is
+   * the daypart-floated one and gets a contextual eyebrow + title; every other
+   * shelf shows its plain category title.
    */
-  function renderMealsSection() {
-    if (mealsList.length === 0) return null;
+  function renderCategorySection(section: HomeCategorySection, isFloated: boolean) {
+    if (!section.meals || section.meals.length < 3) return null;
 
-    const displayedMeals = mealsList.slice(0, 5);
-    const showSeeMoreCard = mealsList.length > 5;
+    const displayed = section.meals.slice(0, 5);
+    const showSeeMoreCard = section.meals.length > 5;
     // Preview thumbnails come from positions 5-8 (zero-indexed) — i.e. the
     // four meals immediately after what's already on screen. Falls back to
     // earlier meals if the list is shorter than 9.
-    const previewThumbs = mealsList.slice(5, 9);
+    const previewThumbs = section.meals.slice(5, 9);
+    const headerTitle = isFloated ? daypart.title : section.title;
 
     return (
-      <View style={styles.feedSection}>
+      <View key={section.key} style={styles.feedSection}>
+        {isFloated && (
+          <Text style={[styles.feedSectionEyebrow, { color: themeColor }]}>
+            {daypart.eyebrow}
+          </Text>
+        )}
         <View style={styles.feedSectionHeader}>
-          <Text style={styles.feedSectionTitle}>Meals</Text>
+          <Text style={styles.feedSectionTitle}>{headerTitle}</Text>
           <TouchableOpacity
-            onPress={() => handleSeeAllPress('meals')}
+            onPress={() => handleSeeAllPress(section.cuisine, section.title)}
             activeOpacity={0.6}
             hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
           >
             <Text style={[styles.feedSectionSeeAll, { color: themeColor }]}>
-              See all {mealsList.length} ›
+              See all {section.meals.length} ›
             </Text>
           </TouchableOpacity>
         </View>
@@ -1424,43 +1501,20 @@ export default function NutritionHomeScreen({ route }: any) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.feedScrollContent}
         >
-          {displayedMeals.map(renderFeedCard)}
-          {showSeeMoreCard && renderSeeMoreCard('meals', previewThumbs, mealsList.length)}
+          {displayed.map(renderFeedCard)}
+          {showSeeMoreCard && renderSeeMoreCard(section, previewThumbs, section.meals.length)}
         </ScrollView>
       </View>
     );
   }
 
-  function renderSmoothiesSection() {
-    if (smoothiesList.length === 0) return null;
-
-    const displayedSmoothies = smoothiesList.slice(0, 5);
-    const showSeeMoreCard = smoothiesList.length > 5;
-    const previewThumbs = smoothiesList.slice(5, 9);
-
-    return (
-      <View style={styles.feedSection}>
-        <View style={styles.feedSectionHeader}>
-          <Text style={styles.feedSectionTitle}>Smoothies</Text>
-          <TouchableOpacity
-            onPress={() => handleSeeAllPress('smoothies')}
-            activeOpacity={0.6}
-            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-          >
-            <Text style={[styles.feedSectionSeeAll, { color: themeColor }]}>
-              See all {smoothiesList.length} ›
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.feedScrollContent}
-        >
-          {displayedSmoothies.map(renderFeedCard)}
-          {showSeeMoreCard && renderSeeMoreCard('smoothies', previewThumbs, smoothiesList.length)}
-        </ScrollView>
-      </View>
+  /**
+   * Renders every category shelf in daypart order. The floated category sits
+   * at index 0 (see `orderedSections`), so the eyebrow is shown only there.
+   */
+  function renderAllSections() {
+    return orderedSections.map((section, idx) =>
+      renderCategorySection(section, idx === 0 && section.key === daypart.key)
     );
   }
 }
@@ -1709,6 +1763,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginHorizontal: -16,
     marginTop: 12,
+  },
+  // Contextual daypart eyebrow above the floated shelf's title. Padded to line
+  // up with the header row (which re-adds the 16px that feedSection removes).
+  feedSectionEyebrow: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    paddingHorizontal: 16,
+    marginBottom: 3,
   },
   feedSectionHeader: {
     flexDirection: 'row',

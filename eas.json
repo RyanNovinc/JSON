@@ -26,6 +26,9 @@
       "android": {
         "buildType": "app-bundle"
       },
+      "ios": {
+        "resourceClass": "m-medium"
+      },
       "env": {
         "NODE_OPTIONS": "--max_old_space_size=4096"
       }

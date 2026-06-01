@@ -24,9 +24,49 @@ export type MealSlug =
   | 'massaman'
   | 'chilli_con_carne'
   | 'lamb_shanks'
-  | 'beef_stew';
+  | 'beef_stew'
+  | 'maple_muscle_toast'
+  | 'muscle_oats'
+  | 'scramble_stack'
+  | 'overnight_oats'
+  | 'pb_banana_toast'
+  | 'protein_pancakes'
+  | 'baked_oats'
+  | 'big_breakfast_plate'
+  | 'shakshuka'
+  | 'smoked_salmon_bagel'
+  | 'steak_and_eggs'
+  | 'freezer_breakfast_burrito'
+  | 'greek_yoghurt_bowl'
+  | 'cottage_cheese_bowl'
+  | 'egg_muffins'
+  | 'protein_ice_cream'
+  | 'cottage_cheese_ice_cream'
+  | 'chocolate_protein_mug_cake'
+  | 'fudgy_protein_brownies'
+  | 'protein_chocolate_chip_cookies'
+  | 'protein_banana_bread'
+  | 'edible_protein_cookie_dough'
+  | 'no_bake_protein_cheesecake'
+  | 'chocolate_protein_mousse'
+  | 'frozen_date_snickers_bark'
+  | 'greek_yogurt_snack'
+  | 'beef_jerky'
+  | 'edamame'
+  | 'protein_shake'
+  | 'protein_bar'
+  | 'cheese_snack'
+  | 'hard_boiled_eggs'
+  | 'tuna_pouch'
+  | 'roasted_chickpeas'
+  | 'no_bake_protein_balls'
+  | 'mixed_nuts'
+  | 'trail_mix'
+  | 'banana_snack'
+  | 'dried_fruit'
+  | 'dark_chocolate';
 
-export type CuisineType = 'australian' | 'mediterranean' | 'asian' | 'indian' | 'mexican' | 'breakfast' | 'italian' | 'smoothie' | 'thai';
+export type CuisineType = 'australian' | 'mediterranean' | 'asian' | 'indian' | 'mexican' | 'breakfast' | 'italian' | 'smoothie' | 'thai' | 'dessert' | 'snack';
 
 export type PrimaryProtein = 'chicken' | 'beef' | 'lamb' | 'pork' | 'fish' | 'seafood' | 'eggs' | 'dairy' | 'plant';
 
@@ -37,7 +77,7 @@ export type AllergenType = 'Nuts' | 'Shellfish' | 'Dairy' | 'Eggs' | 'Gluten/Whe
 /**
  * Equipment types matching the exact equipment IDs from the budget cooking questionnaire
  */
-export type EquipmentType = 'stovetop' | 'oven' | 'microwave' | 'air_fryer' | 'slow_cooker' | 'rice_cooker' | 'pressure_cooker' | 'grill' | 'blender' | 'food_processor' | 'no_cook';
+export type EquipmentType = 'stovetop' | 'oven' | 'microwave' | 'air_fryer' | 'slow_cooker' | 'rice_cooker' | 'pressure_cooker' | 'grill' | 'blender' | 'food_processor' | 'no_cook' | 'freezer';
 
 /**
  * How an ingredient scales when the meal portion is adjusted

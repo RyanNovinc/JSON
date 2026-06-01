@@ -93,7 +93,34 @@ The 65-80% quality range was chosen because:
 2. Run: `pngquant --quality=65-80 --force --ext .png *.png` in the target directory
 3. Document results and update this file
 
+## Breakfast Meal Images (June 1, 2026)
+- **Before**: 31MB total (15 images)
+- **After**: 7.9MB total
+- **Reduction**: 74%
+- **Range**: 61-74% reduction per image
+
+### Breakfast Meal Optimization Results
+
+| Image | Before | After | Reduction |
+|-------|--------|-------|-----------|
+| muscle_oats.png | 1.3M | 367K | 72% |
+| maple_muscle_toast.png | 1.5M | 514K | 66% |
+| scramble_stack.png | 1.7M | 522K | 69% |
+| overnight_oats.png | 935K | 240K | 74% |
+| greek_yoghurt_bowl.png | 1.3M | 428K | 67% |
+| cottage_cheese_bowl.png | 1.6M | 545K | 66% |
+| pb_banana_toast.png | 1.6M | 506K | 68% |
+| protein_pancakes.png | 1.5M | 454K | 70% |
+| steak_and_eggs.png | 1.8M | 609K | 66% |
+| shakshuka.png | 2.6M | 899K | 65% |
+| freezer_breakfast_burrito.png | 1.6M | 478K | 70% |
+| baked_oats.png | 1.5M | 457K | 70% |
+| egg_muffins.png | 1.9M | 738K | 61% |
+| smoked_salmon_bagel.png | 1.9M | 646K | 66% |
+| big_breakfast_plate.png | 1.9M | 666K | 65% |
+
 **Total app size impact:**
 - Exercise images: -127MB
 - Meal images: -19MB  
-- **Combined savings: 146MB** (massive improvement for mobile app downloads)
+- Breakfast meal images: -23MB
+- **Combined savings: 169MB** (massive improvement for mobile app downloads)

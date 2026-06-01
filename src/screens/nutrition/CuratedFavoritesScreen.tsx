@@ -82,6 +82,7 @@ import {
   loadCuratedFavorites,
   saveCuratedFavorites,
 } from '../../utils/curatedFavoritesStorage';
+import { loadNutritionAnswers } from '../../utils/nutritionQuestionnaireStorage';
 import {
   CoreShelf,
   MealSlot,
@@ -764,11 +765,48 @@ export default function CuratedFavoritesScreen() {
     []
   );
 
-  // Pull questionnaire structure off the route. These can be undefined when the
-  // screen is opened outside the questionnaire flow.
-  const mealsPerDay = route.params?.answersSoFar?.mealsPerDay;
-  const snackFrequency = route.params?.answersSoFar?.snackFrequency;
-  const dessertFrequency = route.params?.answersSoFar?.dessertFrequency;
+  // Answers can arrive two ways:
+  //   1. As route params during the questionnaire flow (synchronous, no async needed)
+  //   2. From saved storage when entered standalone (e.g. from summary/edit screens)
+  // If route params are absent, fall back to loading from storage so the screen
+  // always knows which tabs to show.
+  const paramAnswers = route.params?.answersSoFar;
+  const [loadedAnswers, setLoadedAnswers] = useState<{
+    mealsPerDay?: number;
+    snackFrequency?: string;
+    dessertFrequency?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    // Only load from storage if we don't already have params
+    if (paramAnswers) {
+      setLoadedAnswers(null); // ensure paramAnswers wins
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const saved = await loadNutritionAnswers();
+        if (!cancelled && saved) {
+          setLoadedAnswers({
+            mealsPerDay: saved.mealsPerDay,
+            snackFrequency: saved.snackFrequency,
+            dessertFrequency: saved.dessertFrequency,
+          });
+        }
+      } catch (err) {
+        console.warn('[CuratedFavorites] Failed to load saved answers:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [paramAnswers]);
+
+  const effectiveAnswers = paramAnswers ?? loadedAnswers ?? {};
+  const mealsPerDay = effectiveAnswers.mealsPerDay;
+  const snackFrequency = effectiveAnswers.snackFrequency;
+  const dessertFrequency = effectiveAnswers.dessertFrequency;
 
   const tabs = useMemo(
     () => buildTabs(mealsPerDay, snackFrequency, dessertFrequency, allMeals),
