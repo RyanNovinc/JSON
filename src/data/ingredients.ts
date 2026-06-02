@@ -387,6 +387,16 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     typical_pack_size: 1000,
     notes: 'Standard vanilla ice cream (~200 kcal per 100g). Premium brands like Connoisseur are higher (~270 kcal), budget brands like Coles house-brand are lower (~180 kcal). ½ cup is approximately 60g. Most commercial ice creams contain egg as an emulsifier — check label if eggs are an allergen concern.'
   },
+  jam: {
+    id: 'jam',
+    display_name: 'Jam (mixed berry or apricot)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'Standard fruit jam (~260 kcal per 100g). Mixed berry, strawberry, or apricot work well. Coles, Woolworths, or IXL brand. 1 tbsp is approximately 20g.'
+  },
   oreo_cookies: {
     id: 'oreo_cookies',
     display_name: 'Oreo cookies',
@@ -1500,5 +1510,509 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     typical_pack_size: 100,
     typical_pack_unit: 'g',
     notes: '70%+ dark chocolate. ~550 kcal per 100g. A couple of squares (~30g) is a serving. May contain traces of milk/soy — check the label; very dark varieties can be dairy-free.'
+  },
+
+  chicken_breast: {
+    id: 'chicken_breast',
+    display_name: 'Chicken breast',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'Skinless chicken breast. ~165 kcal and ~31g protein per 100g cooked.'
+  },
+
+  jasmine_rice: {
+    id: 'jasmine_rice',
+    display_name: 'Jasmine rice (uncooked)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 1000,
+    notes: 'Long-grain jasmine rice. ~360 kcal per 100g uncooked. 2 cups uncooked ≈ 370g.'
+  },
+
+  soy_sauce: {
+    id: 'soy_sauce',
+    display_name: 'Soy sauce',
+    category: 'condiments_supplements',
+    canonical_unit: 'ml',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'nut_free'],
+    allergens: ['Soy', 'Gluten/Wheat'],
+    typical_pack_size: 500,
+    notes: 'Light/all-purpose soy sauce. Contains soy and (usually) wheat — use tamari for gluten-free.'
+  },
+
+  rice_vinegar: {
+    id: 'rice_vinegar',
+    display_name: 'Rice vinegar',
+    category: 'condiments_supplements',
+    canonical_unit: 'ml',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 250,
+    notes: 'Mild rice wine vinegar.'
+  },
+
+  cornstarch: {
+    id: 'cornstarch',
+    display_name: 'Cornstarch',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 300,
+    notes: 'Cornflour/cornstarch, for thickening the glaze. 1 tbsp ≈ 8g.'
+  },
+
+  sesame_oil: {
+    id: 'sesame_oil',
+    display_name: 'Sesame oil (toasted)',
+    category: 'condiments_supplements',
+    canonical_unit: 'ml',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free'],
+    allergens: ['Sesame'],
+    typical_pack_size: 250,
+    notes: 'Toasted sesame oil, used as a finishing/flavour oil.'
+  },
+
+  broccoli: {
+    id: 'broccoli',
+    display_name: 'Broccoli florets',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: '~34 kcal per 100g. Fresh or frozen florets.'
+  },
+
+  sesame_seeds: {
+    id: 'sesame_seeds',
+    display_name: 'Sesame seeds',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free'],
+    allergens: ['Sesame'],
+    typical_pack_size: 100,
+    notes: 'White sesame seeds, for garnish. 1 tbsp ≈ 9g.'
+  },
+
+  oyster_sauce: {
+    id: 'oyster_sauce',
+    display_name: 'Oyster sauce',
+    category: 'condiments_supplements',
+    canonical_unit: 'ml',
+    dietary_flags: [],
+    allergens: ['Shellfish', 'Soy', 'Gluten/Wheat'],
+    typical_pack_size: 250,
+    notes: 'Thick savoury Chinese sauce. Contains shellfish, soy, and usually wheat.'
+  },
+
+  chinese_cooking_wine: {
+    id: 'chinese_cooking_wine',
+    display_name: 'Chinese cooking wine (Shaoxing)',
+    category: 'condiments_supplements',
+    canonical_unit: 'ml',
+    dietary_flags: ['dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 640,
+    notes: 'Shaoxing rice wine. Dry sherry or mirin work as substitutes.'
+  },
+
+  chicken_mince: {
+    id: 'chicken_mince',
+    display_name: 'Chicken mince (ground chicken)',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'Ground chicken. ~143 kcal and ~17g protein per 100g raw. Finely chopped chicken thigh or breast works too.'
+  },
+
+  basil_fresh: {
+    id: 'basil_fresh',
+    display_name: 'Fresh basil',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 30,
+    notes: 'Plain fresh basil. Holy basil (bai krapow) or Thai sweet basil is authentic but not reliably available to Western shoppers — regular basil works well. 1 cup loosely packed leaves ≈ 25g.'
+  },
+
+  red_chilli: {
+    id: 'red_chilli',
+    display_name: 'Red chilli (fresh)',
+    category: 'produce',
+    canonical_unit: 'count',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 50,
+    notes: 'Bird\'s eye chilli if available (hot); red jalapeno or a pinch of dried chilli flakes otherwise. Amount adjustable for heat.'
+  },
+
+  pear: {
+    id: 'pear',
+    display_name: 'Pear (or apple)',
+    category: 'produce',
+    canonical_unit: 'count',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 1,
+    notes: 'Optional marinade tenderiser, grated. Korean/Asian pear is traditional but not reliably available to Western shoppers — a regular pear or apple works, or omit entirely for thinly sliced beef.'
+  },
+
+  spaghetti: {
+    id: 'spaghetti',
+    display_name: 'Spaghetti',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'nut_free'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 500,
+    notes: 'Dry spaghetti. ~360 kcal per 100g uncooked. ~125g per person for a generous bulking portion.'
+  },
+
+  parmesan: {
+    id: 'parmesan',
+    display_name: 'Parmesan cheese (grated)',
+    category: 'dairy_refrigerated',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'gluten_free', 'nut_free'],
+    allergens: ['Dairy'],
+    typical_pack_size: 200,
+    notes: 'Grated parmesan/parmigiano. Pecorino Romano is the authentic choice (note as upgrade). ~430 kcal and ~38g protein per 100g.'
+  },
+
+  salmon_fillet: {
+    id: 'salmon_fillet',
+    display_name: 'Salmon fillet',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free', 'gluten_free', 'nut_free'],
+    allergens: ['Fish'],
+    typical_pack_size: 500,
+    notes: 'Skin-on or skinless salmon fillet. ~200 kcal and ~20g protein per 100g raw; naturally fatty (calorie-dense). NOTE: smoked_salmon already exists for breakfast — this is fresh raw fillet, a distinct ingredient.'
+  },
+
+  lemon: {
+    id: 'lemon',
+    display_name: 'Lemon',
+    category: 'produce',
+    canonical_unit: 'count',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 1,
+    notes: 'Juice for the butter sauce + wedges to finish. 1 lemon ≈ 3 tbsp juice.'
+  },
+
+  parsley: {
+    id: 'parsley',
+    display_name: 'Parsley (fresh)',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 30,
+    notes: 'Fresh flat-leaf parsley, chopped; dried works (use ~1/3 the amount). Dill is a common alternative.'
+  },
+
+  black_beans: {
+    id: 'black_beans',
+    display_name: 'Black beans (canned)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 400,
+    notes: 'Canned black beans, drained. ~130 kcal and ~8g protein per 100g drained.'
+  },
+
+  chilli_powder: {
+    id: 'chilli_powder',
+    display_name: 'Chilli powder',
+    category: 'condiments_supplements',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 50,
+    notes: 'Mild chili powder blend (or pure chilli to taste). Part of the fajita spice mix. Use your existing dry-spice category.'
+  },
+
+  coriander_fresh: {
+    id: 'coriander_fresh',
+    display_name: 'Coriander / cilantro (fresh)',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 30,
+    notes: 'Fresh coriander/cilantro, chopped; for the lime rice and sauce.'
+  },
+
+  chipotle_in_adobo: {
+    id: 'chipotle_in_adobo',
+    display_name: 'Chipotle in adobo (optional upgrade)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 200,
+    notes: 'The AUTHENTIC smoky-heat source, chopped into both the marinade and the yoghurt sauce. NOT reliably available in all AU/UK supermarkets, so it is the OPTIONAL UPGRADE — the accessible default heat comes from smoked paprika + chilli powder + cayenne. Include as an ingredient line with scaling that allows 0.'
+  },
+
+  chicken_thigh: {
+    id: 'chicken_thigh',
+    display_name: 'Chicken thigh (skinless)',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'Skinless boneless chicken thigh. ~177 kcal and ~18.6g protein per 100g raw; juicier and more authentic for shawarma than breast. Breast is the leaner swap (~120 kcal, 22.5g protein, 2.6g fat /100g).'
+  },
+
+  coconut_milk: {
+    id: 'coconut_milk',
+    display_name: 'Coconut milk (canned, full-fat)',
+    category: 'pantry_grains',
+    canonical_unit: 'ml',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 400,
+    notes: 'Full-fat canned coconut milk. ~197 kcal and ~21g fat per 100ml — fat-dense, count carefully.'
+  },
+
+  curry_powder: {
+    id: 'curry_powder',
+    display_name: 'Curry powder',
+    category: 'condiments_supplements',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 50,
+    notes: 'KEY ingredient — this is what makes it taste like Aussie-Chinese-restaurant satay rather than Thai-skewer satay. Do not omit.'
+  },
+
+  macaroni: {
+    id: 'macaroni',
+    display_name: 'Macaroni / short pasta (dry)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'nut_free'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 500,
+    notes: 'Elbow macaroni or any short pasta. ~371 kcal per 100g dry. High-protein pasta is an optional swap.'
+  },
+
+  turkey_mince: {
+    id: 'turkey_mince',
+    display_name: 'Turkey mince',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'Lean ground turkey, typically 93/7 lean. Higher protein, lower fat than beef mince. Can substitute chicken mince if unavailable.'
+  },
+
+  breadcrumbs: {
+    id: 'breadcrumbs',
+    display_name: 'Breadcrumbs (panko or fine)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'dairy_free', 'nut_free'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 150,
+    notes: 'Used for binding meatballs and coating. Panko (Japanese) creates lighter texture than fine breadcrumbs.'
+  },
+
+  dried_oregano: {
+    id: 'dried_oregano',
+    display_name: 'Oregano, dried',
+    category: 'condiments_supplements',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 15,
+    notes: 'Essential for Italian flavoring. Mediterranean oregano preferred over Mexican oregano for this application.'
+  },
+
+  dried_basil: {
+    id: 'dried_basil',
+    display_name: 'Basil, dried',
+    category: 'condiments_supplements',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 15,
+    notes: 'Complements oregano in Italian cooking. Fresh basil can substitute at 3:1 ratio but add at the end to preserve flavor.'
+  },
+
+  peas: {
+    id: 'peas',
+    display_name: 'Peas (frozen)',
+    category: 'frozen',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'Frozen peas. ~81 kcal per 100g.'
+  },
+
+  sweetcorn: {
+    id: 'sweetcorn',
+    display_name: 'Sweetcorn (canned or frozen)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 400,
+    notes: 'Canned (drained) or frozen sweetcorn. ~86 kcal per 100g.'
+  },
+
+  lamb_mince: {
+    id: 'lamb_mince',
+    display_name: 'Lamb mince (lean; or regular)',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 500,
+    notes: 'DEFAULT lean lamb mince (~85/15) ~200 kcal, 19.5g protein, 13.5g fat /100g raw. Regular lamb mince (~80/20, ~282 kcal, 23g fat /100g) is juicier but much fattier. A bit of fat keeps koftas juicy; beef or a lamb-beef mix is a milder/cheaper swap.'
+  },
+
+  sausage: {
+    id: 'sausage',
+    display_name: 'Sausages (chicken/turkey default; or pork)',
+    category: 'meat_seafood',
+    canonical_unit: 'g',
+    dietary_flags: ['dairy_free', 'nut_free'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 500,
+    notes: 'DEFAULT leaner chicken/turkey sausage (~172 kcal, 17g protein, 10g fat /100g cooked) for a better protein-per-cal bulking tray. Pork sausage (~300 kcal, 13g protein, 26g fat /100g) is the richer/fattier option — pushes fat much higher. Most sausages contain wheat rusk (gluten) — check the label; gluten-free sausages exist.'
+  },
+
+  noodles: {
+    id: 'noodles',
+    display_name: 'Noodles (egg / soba / udon / rice)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'nut_free'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 400,
+    notes: 'Generic dried noodles — egg, soba, udon, or rice noodles all work (~350 kcal per 100g dry). Rice noodles are the gluten-free option (drop the Gluten/Wheat allergen if rice noodles are used). 70g dry per serve.'
+  },
+
+  orange_juice: {
+    id: 'orange_juice',
+    display_name: 'Orange juice',
+    category: 'produce',
+    canonical_unit: 'ml',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 1000,
+    notes: 'Part of the citrus marinade base (with lime). ~45 kcal per 100ml.'
+  },
+
+  bread_roll: {
+    id: 'bread_roll',
+    display_name: 'Bread roll / bun',
+    category: 'bakery',
+    canonical_unit: 'count',
+    dietary_flags: ['vegetarian', 'dairy_free', 'nut_free'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 6,
+    notes: 'Soft bread roll/bun for the schnitzel roll. ~270 kcal per 100g; a roll ~70g.'
+  },
+
+  sweet_chilli_sauce: {
+    id: 'sweet_chilli_sauce',
+    display_name: 'Sweet chilli sauce',
+    category: 'condiments_supplements',
+    canonical_unit: 'ml',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 300,
+    notes: 'For the schnitzel roll. ~230 kcal per 100g (sugar-forward).'
+  },
+
+  lettuce: {
+    id: 'lettuce',
+    display_name: 'Lettuce',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'vegan', 'dairy_free', 'gluten_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 1,
+    notes: 'Fresh lettuce leaves. ~15 kcal per 100g.'
+  },
+
+  gnocchi: {
+    id: 'gnocchi',
+    display_name: 'Gnocchi (store-bought)',
+    category: 'pantry_grains',
+    canonical_unit: 'g',
+    dietary_flags: ['vegetarian', 'nut_free'],
+    allergens: ['Gluten/Wheat'],
+    typical_pack_size: 500,
+    notes: 'Store-bought vacuum-packed potato gnocchi; cook to packet (boil till they float, ~2-3 min). ~160 kcal per 100g. Homemade works if you have time.'
+  },
+  
+  thai_basil_fresh: {
+    id: 'thai_basil_fresh',
+    display_name: 'Thai basil (fresh)',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 30,
+    notes: 'Holy/Thai basil — the signature note. Regular basil is a fallback.'
+  },
+  
+  red_chilli_fresh: {
+    id: 'red_chilli_fresh',
+    display_name: 'Red chilli (fresh)',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 50
+  },
+  
+  green_beans: {
+    id: 'green_beans',
+    display_name: 'Green beans',
+    category: 'produce',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 250,
+    notes: 'Fresh green beans for stir-fries. ~35 kcal per 100g.'
+  },
+  bicarb_soda: {
+    id: 'bicarb_soda',
+    display_name: 'Bicarb soda (baking soda)',
+    category: 'pantry_grains',
+    canonical_unit: 'tsp',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 100,
+    typical_pack_unit: 'g',
+    notes: 'IMPORTANT for cevapi: gives the signature springy-tender texture. Small amount; do not skip for authentic texture.'
+  },
+  ajvar: {
+    id: 'ajvar',
+    display_name: 'Ajvar (red pepper relish)',
+    category: 'condiments_supplements',
+    canonical_unit: 'g',
+    dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],
+    allergens: [],
+    typical_pack_size: 300,
+    notes: 'Shop-bought ajvar, or substitute a roasted-red-pepper relish/paste. ~90 kcal/100g.'
   }
 };
