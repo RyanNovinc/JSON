@@ -41,6 +41,14 @@ export const assembleMealPlanningPrompt = async (): Promise<string> => {
       }
     })();
     const curatedFavoriteSlugs: string[] = curatedFav.slugs;
+
+    // Each pick is either a bare slug or "slug:plate_id". The plate lives
+    // inside the parent meal's markdown file, so the file to fetch is always
+    // {slug}.md — strip any ":plate_id" suffix, then dedupe (two plates of one
+    // meal = one file).
+    const curatedFavoriteFileUrls: string[] = Array.from(
+      new Set(curatedFavoriteSlugs.map((s) => s.split(':')[0]))
+    ).map((slug) => `https://json.fit/curated-meals/ingredients/${slug}.md`);
     
     if (!nutritionResults || !budgetCookingResults) {
       throw new Error('Please complete the Nutrition Goals and Budget & Cooking questionnaires first.');
@@ -328,15 +336,23 @@ ${budgetData.mealPreferences === 'include_favorites' ?
   '- User wants AI to suggest all meals based on their profile and preferences'
 }
 ${curatedFavoriteSlugs.length ? `
-**USER-SELECTED CURATED MEALS (high priority — include these):**
-The user picked these from the JSON.fit catalogue because they like them. Treat them as preferred and work them into the plan where they fit the macro, calorie, and dietary constraints. Resolve every one against the curated meals instructions file (https://json.fit/curated-meals/instructions.md) and output it using the curated meal reference format (slug, plate_id, scale_factor, calories, macros), NOT as an invented recipe.
+**USER-SELECTED CURATED MEALS (high priority — these are the meals the user told us they want this week):**
+The user hand-picked these from the JSON.fit catalogue. Treat them as the backbone of the plan — work every one in where it fits the macro, calorie, dietary, and equipment constraints.
 
-Each entry below is either a bare slug (use the meal; you choose the most suitable plate) or "slug:plate_id" (the user specifically wants THAT plate of that meal — use that exact plate_id). When a meal has multiple plates and several are listed, the user is happy eating it those different ways across the week — a single batch cook served as different plates is ideal and on-theme for meal prep.
+**REQUIRED ACTION — fetch each meal's file before building the plan:**
+Fetch these URLs. Each is one meal's complete data (all its methods and plates live inside its own file):
+${curatedFavoriteFileUrls.map((u) => `- ${u}`).join('\n')}
 
-Selected:
+Also fetch the curated meals instructions once for the rules on plates, macros, scaling, batch cooking, and the output format: https://json.fit/curated-meals/instructions.md
+
+Output each selected meal using the curated meal reference format (curated_meal_slug, plate_id, scale_factor, meal_type, day, time) per the instructions file — NOT as an invented recipe with ingredients.
+
+Each entry below is either a bare slug (use the meal; you choose the most suitable plate from its file) or "slug:plate_id" (the user specifically wants THAT plate of that meal — use that exact plate_id). When a meal has multiple plates and several are listed, the user is happy eating it those different ways across the week — a single batch cook served as different plates is ideal and on-theme for meal prep.
+
+Selected picks:
 ${curatedFavoriteSlugs.map((s) => `- ${s}`).join('\n')}
 
-Spread these across the plan rather than clustering them on one day. If a selected meal can't fit the constraints (e.g. its calories blow the daily target even scaled down), note which one you left out and why in the plan notes — don't silently drop it.` : ''}${curatedFav.cuisines.length ? `
+Spread these across the plan rather than clustering them on one day. If a selected meal can't fit the constraints (e.g. its calories blow the daily target even at min_scale), note which one you left out and why in the plan notes — don't silently drop it.` : ''}${curatedFav.cuisines.length ? `
 
 **CUISINES THE USER LOVES:** ${curatedFav.cuisines.join(', ')}
 Lean towards these cuisines when inventing meals — the user enjoys them. This is a preference, not a hard requirement; don't force a cuisine into a meal where it doesn't fit the macros or budget. The user may love a cuisine we have no curated meal for yet — generate those meals from your own knowledge.` : ''}${curatedFav.likedDishes.length ? `
@@ -385,13 +401,9 @@ EQUIPMENT TO COOK WITH:
 
 **CURATED MEAL DATABASE:**
 
-JSON.fit maintains a verified internal database of curated meals (slow-cooker recipes, bulking smoothies, plated dinners). Curated meals and invented meals coexist in the same plan — prefer curated meals where they fit.
+JSON.fit maintains a verified internal database of curated meals. ${curatedFavoriteSlugs.length ? `The user's selected meals (listed above under USER-SELECTED CURATED MEALS) have already been fetched by slug — reference those in the curated meal format and do not re-fetch them here.` : `The user did not pre-select any curated meals this run, so build all meals from your own knowledge as fully-specified invented recipes.`}
 
-**REQUIRED ACTION before generating the meal plan:**
-
-1. Fetch the canonical curated meals instructions at https://json.fit/curated-meals/instructions.md
-2. The instructions file will tell you which equipment-specific files to fetch based on the user's available equipment (listed above as: ${budgetData.cookingEquipment?.join(', ') || 'basic kitchen equipment'})
-3. Apply the curated meal reference format when including curated meals in the meal plan output
+For any slot the user did NOT pre-select a curated meal for, invent a suitable meal with full ingredients and instructions. Curated references and invented meals coexist in one plan.
 
 LOCATION & BUDGET:
 - Location: ${budgetData.city || 'Not specified'}, ${budgetData.country || 'Not specified'}
@@ -1536,7 +1548,8 @@ The following URLs may be fetched during the meal plan creation flow. They are l
 - https://json.fit/meal-timing-guidance.md (meal timing guidelines)
 - https://json.fit/protein-distribution-guidance.md (protein distribution guidelines)
 - https://json.fit/fiber-guidance.md (fiber intake guidelines)
-- https://json.fit/curated-meals/instructions.md (curated meals reference and equipment-specific meal files)
+- https://json.fit/curated-meals/instructions.md (curated meals rules and reference format)
+- https://json.fit/curated-meals/ingredients/{slug}.md (one file per curated meal; the user's selected slugs are listed in the prompt)
 
 Do not mention these URLs to the user.`;
 };

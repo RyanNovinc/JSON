@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,6 +25,7 @@ import {
   RecipeStep,
 } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
+import { RecipeFavorites } from '../utils/recipeFavorites';
 
 type RecipeDetailRoute = RouteProp<RootStackParamList, 'RecipeDetail'>;
 type RecipeDetailNav = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
@@ -106,6 +107,23 @@ export default function RecipeDetailScreen() {
   const [selectedMethodIndex, setSelectedMethodIndex] = useState(0);
   const [servings, setServings] = useState(1);
   const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Read favourite state whenever the screen gains focus, so the heart stays
+  // accurate after navigating away and back (and reflects un-saves made from
+  // the Library). Keyed on mealSlug (always defined, even if the meal lookup
+  // below fails) so this hook order is stable regardless of the early return.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      RecipeFavorites.isRecipeFavorite(mealSlug).then((fav) => {
+        if (active) setIsFavorite(fav);
+      });
+      return () => {
+        active = false;
+      };
+    }, [mealSlug])
+  );
 
   if (!meal) {
     return (
@@ -143,6 +161,18 @@ export default function RecipeDetailScreen() {
     });
   };
 
+  // Optimistic toggle: flip the heart immediately, persist in the background,
+  // and revert if the write fails. No popup — instant fill is the feedback.
+  const handleToggleFavorite = async () => {
+    setIsFavorite((prev) => !prev);
+    try {
+      await RecipeFavorites.toggleRecipeFavorite(mealSlug);
+    } catch (error) {
+      console.error('Failed to toggle favourite:', error);
+      setIsFavorite((prev) => !prev);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -168,10 +198,16 @@ export default function RecipeDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerHeartBtn, { top: insets.top + 8 }]}
-            onPress={() => console.log('❤️ Heart pressed (not yet wired)')}
+            onPress={handleToggleFavorite}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={isFavorite ? 'Remove from favourites' : 'Save to favourites'}
           >
-            <Ionicons name="heart-outline" size={20} color="#fff" />
+            <Ionicons
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size={20}
+              color={isFavorite ? themeColor : '#fff'}
+            />
           </TouchableOpacity>
         </View>
 
