@@ -64,11 +64,33 @@ export type MealSlug =
   | 'trail_mix'
   | 'banana_snack'
   | 'dried_fruit'
-  | 'dark_chocolate';
+  | 'dark_chocolate'
+  | 'teriyaki_chicken_rice_bowl'
+  | 'beef_broccoli_stir_fry'
+  | 'thai_basil_chicken'
+  | 'beef_bulgogi_bowl'
+  | 'spaghetti_carbonara'
+  | 'sheet_pan_salmon_potatoes'
+  | 'chicken_fajita_bowl'
+  | 'spicy_chipotle_chicken_burrito'
+  | 'chicken_shawarma'
+  | 'satay_chicken'
+  | 'honey_chicken'
+  | 'chicken_mac_and_cheese'
+  | 'turkey_meatballs_spaghetti'
+  | 'tuna_pasta_bake'
+  | 'lamb_kofta'
+  | 'sheet_pan_sausage_veg'
+  | 'honey_soy_salmon_noodles'
+  | 'carne_asada_bowl'
+  | 'chicken_schnitzel'
+  | 'beef_ragu_gnocchi'
+  | 'cevapi'
+  | 'palacinke';
 
 export type CuisineType = 'australian' | 'mediterranean' | 'asian' | 'indian' | 'mexican' | 'breakfast' | 'italian' | 'smoothie' | 'thai' | 'dessert' | 'snack';
 
-export type PrimaryProtein = 'chicken' | 'beef' | 'lamb' | 'pork' | 'fish' | 'seafood' | 'eggs' | 'dairy' | 'plant';
+export type PrimaryProtein = 'chicken' | 'beef' | 'lamb' | 'pork' | 'turkey' | 'fish' | 'seafood' | 'eggs' | 'dairy' | 'plant';
 
 export type MealSlot = 'breakfast' | 'brunch' | 'lunch' | 'second_lunch' | 'early_dinner' | 'dinner' | 'snack' | 'morning_snack' | 'afternoon_snack' | 'evening_snack' | 'pre_workout' | 'post_workout' | 'dessert';
 

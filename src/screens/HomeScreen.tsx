@@ -1100,7 +1100,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               </View>
               <Text style={styles.emptyHeroTitle}>Create your first plan</Text>
               <Text style={styles.emptyHeroBody}>
-                Answer a few questions. Get a custom AI workout in seconds.
+                A custom workout built around your goals — completely free.
               </Text>
               <TouchableOpacity
                 style={[styles.emptyHeroButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
@@ -1113,6 +1113,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             </View>
 
             {renderBulkingPrograms('Or start with a pre-built program')}
+            {renderWeekStrip()}
           </ScrollView>
         ) : (
           <ScrollView

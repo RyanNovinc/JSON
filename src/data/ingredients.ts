@@ -1976,7 +1976,7 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
   
   red_chilli_fresh: {
     id: 'red_chilli_fresh',
-    display_name: 'Red chilli (fresh)',
+    display_name: 'Red chilli (sliced)',
     category: 'produce',
     canonical_unit: 'g',
     dietary_flags: ['vegan', 'vegetarian', 'gluten_free', 'dairy_free', 'nut_free'],

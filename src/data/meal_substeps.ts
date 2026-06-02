@@ -1912,4 +1912,641 @@ export const MEAL_SUBSTEPS: Record<
       ],
     },
   },
+
+  teriyaki_chicken_rice_bowl: {
+    stovetop: {
+      0: [
+        'Rinse 370g (2 cups) jasmine rice until the water runs clear',
+        { text: 'Cook per packet directions, then keep warm', timer_seconds: 900, timer_label: 'Cook rice' },
+      ],
+      1: [
+        'In a bowl, whisk 120ml soy sauce, 6 tbsp honey, 3 tbsp rice vinegar, 1 tbsp grated ginger, 4 minced garlic cloves, 1.5 tbsp cornstarch, 2 tbsp water, and 1 tsp sesame oil',
+        'Whisk until completely smooth with no cornstarch lumps',
+      ],
+      2: [
+        'Add a splash of water to a lidded pan over high heat and add 500g broccoli florets',
+        { text: 'Cover and steam until crisp-tender', timer_seconds: 180, timer_label: 'Steam broccoli' },
+        'Drain and set aside',
+      ],
+      3: [
+        'Wipe the pan dry, add 2 tbsp olive oil, and heat over medium-high',
+        'Add 800g bite-size chicken in a single layer',
+        { text: 'Cook until golden and cooked through, turning once', timer_seconds: 420, timer_label: 'Brown chicken' },
+      ],
+      4: [
+        'Pour the glaze over the chicken and stir to coat',
+        { text: 'Simmer, stirring, until glossy and clinging to the chicken', timer_seconds: 180, timer_label: 'Glaze' },
+      ],
+      5: [
+        'Divide the rice across 4 containers',
+        'Top each with glazed chicken and broccoli',
+        'Finish with sliced spring onions and a sprinkle of sesame seeds',
+      ],
+    },
+  },
+
+  beef_broccoli_stir_fry: {
+    stovetop: {
+      0: [
+        'Slice 800g sirloin steak thin against the grain',
+        'Toss with 1 tbsp soy sauce and 2 tsp cornstarch to coat',
+        { text: 'Rest while you prep everything else', timer_seconds: 900, timer_label: 'Velvet beef' },
+      ],
+      1: [
+        'Rinse 370g (2 cups) jasmine rice until the water runs clear',
+        { text: 'Cook per packet directions, then keep warm', timer_seconds: 900, timer_label: 'Cook rice' },
+      ],
+      2: [
+        'In a bowl, whisk 60ml soy sauce, 3 tbsp oyster sauce, 2 tbsp Shaoxing wine, 1 tbsp brown sugar, 1.5 tbsp cornstarch, 125ml water, and 1 tsp sesame oil',
+        'Whisk until completely smooth with no cornstarch lumps',
+      ],
+      3: [
+        'Add a splash of water to a lidded pan over high heat and add 500g broccoli florets',
+        { text: 'Cover and steam until crisp-tender', timer_seconds: 180, timer_label: 'Steam broccoli' },
+        'Drain and set aside',
+      ],
+      4: [
+        'Heat 2 tbsp olive oil in the pan over high heat',
+        'Sear the beef in a single layer in two batches so it browns rather than stews',
+        { text: 'Cook until browned, then remove', timer_seconds: 300, timer_label: 'Sear beef' },
+      ],
+      5: [
+        'Add the minced garlic and grated ginger to the pan and stir-fry 30 seconds until fragrant',
+        'Return the beef and broccoli, pour in the sauce',
+        { text: 'Toss until the sauce thickens and turns glossy', timer_seconds: 120, timer_label: 'Glaze' },
+        'Divide the rice across 4 containers and top with the beef and broccoli',
+      ],
+    },
+  },
+
+  thai_basil_chicken: {
+    stovetop: {
+      0: [ { text: 'Cook 360g jasmine rice', timer_seconds: 720, timer_label: 'Cook rice' } ],
+      1: [ 'Stir together 60ml oyster sauce, 40ml soy sauce, 20ml fish sauce, 12g sugar' ],
+      2: [
+        'Heat 30ml oil in a wok over high heat',
+        'Fry 6 minced garlic cloves and 20g chopped chilli a few seconds',
+        { text: 'Add 800g chicken mince; stir-fry until browned, adding 200g green beans for the last 2-3 min', timer_seconds: 420, timer_label: 'Stir-fry' },
+      ],
+      3: [
+        'Pour in the sauce and toss 1 minute to coat',
+        'Off the heat, fold through 40g Thai basil until just wilted',
+        'Serve over the rice',
+      ],
+    },
+  },
+
+  beef_bulgogi_bowl: {
+    stovetop: {
+      0: [
+        'Freeze 800g sirloin steak for about 1 hour to firm it up (makes slicing easier)',
+        'Slice thinly against the grain',
+      ],
+      1: [
+        'In a bowl, mix 60ml soy sauce, 2 tbsp brown sugar, 1 tbsp sesame oil, 4 minced garlic cloves, 1/2 grated brown onion, 1/2 tsp black pepper, and 1/2 tbsp sesame seeds',
+        'Optional: grate in 1/2 a pear (or apple) and 1 tsp ginger to tenderise',
+      ],
+      2: [
+        'Toss the sliced beef through the marinade to coat',
+        { text: 'Rest in the fridge 30 minutes to overnight', timer_seconds: 1800, timer_label: 'Marinate' },
+      ],
+      3: [
+        'Rinse 370g (2 cups) jasmine rice until the water runs clear',
+        { text: 'Cook per packet directions, then keep warm', timer_seconds: 900, timer_label: 'Cook rice' },
+      ],
+      4: [
+        'Heat 1 tbsp olive oil in a pan over high heat',
+        'Sear the beef in batches in a single layer so it caramelises rather than stews',
+        { text: 'Cook each batch 2-3 minutes until browned and caramelised', timer_seconds: 180, timer_label: 'Sear beef' },
+      ],
+      5: [
+        'Divide the rice across 4 containers and top with the bulgogi beef',
+        'Garnish with sliced spring onion and the remaining 1/2 tbsp sesame seeds',
+      ],
+    },
+  },
+
+  spaghetti_carbonara: {
+    stovetop: {
+      0: [
+        'Bring a pot of well-salted water to the boil',
+        'Add 125g spaghetti',
+        { text: 'Cook until al dente per packet timing', timer_seconds: 540, timer_label: 'Cook pasta' },
+        'IMPORTANT: scoop out a cup of the starchy pasta water before draining',
+      ],
+      1: [
+        'Cut 80g bacon into batons and add to a cold pan',
+        'Bring up to medium-high heat',
+        { text: 'Render until crisp, keeping the fat in the pan', timer_seconds: 300, timer_label: 'Crisp pork' },
+      ],
+      2: [
+        'In a bowl, beat 1 whole egg + 1 extra yolk with 40g finely grated parmesan and a generous 3/4 tsp black pepper',
+        'Beat to a thick paste',
+      ],
+      3: [
+        'TAKE THE PAN OFF THE HEAT (this is the critical step — direct heat scrambles the egg)',
+        'Toss the hot drained pasta with the pork and its fat',
+        'Stir through the egg-cheese paste, adding splashes of reserved pasta water until the sauce is glossy and creamy and coats every strand',
+      ],
+      4: [
+        'Serve immediately, topped with extra parmesan and black pepper',
+        'Note: carbonara does not keep — the emulsion breaks and goes grainy if stored or reheated, so eat it fresh',
+      ],
+    },
+  },
+
+  sheet_pan_salmon_potatoes: {
+    oven: {
+      0: [
+        'Heat the oven to 200°C (400°F)',
+      ],
+      1: [
+        'Halve 800g baby chat potatoes and toss with 2 tbsp olive oil, 1 tsp salt, 1/2 tsp pepper, and 1 minced garlic clove',
+        'Spread on a sheet pan in a single layer',
+        { text: 'Roast 15-20 minutes for a head start (potatoes take longer than the salmon)', timer_seconds: 1050, timer_label: 'Roast potatoes' },
+      ],
+      2: [
+        'Melt 40g butter with the remaining 3 minced garlic cloves, the juice of 1 lemon, and 10g chopped parsley',
+      ],
+      3: [
+        'Push the potatoes to one side of the tray',
+        'Add 800g salmon (skin-side down if skin-on) and 400g broccoli florets',
+        'Spoon the lemon-garlic butter over the salmon and broccoli, and season',
+      ],
+      4: [
+        { text: 'Return to the oven 12-15 minutes until the salmon flakes easily and the potatoes are golden', timer_seconds: 810, timer_label: 'Bake salmon' },
+      ],
+      5: [
+        'Finish with a squeeze of fresh lemon and serve, or portion into containers (keeps ~3 days; reheat gently or in an air fryer)',
+      ],
+    },
+  },
+  chicken_fajita_bowl: {
+    stovetop: {
+      0: [
+        'Rinse 320g jasmine rice until water runs clear',
+        'Bring 480ml water to a boil, add rice, reduce heat to low',
+        { text: 'Cover and simmer for 18 minutes', timer_seconds: 1080, timer_label: 'Cook rice' },
+        'Remove from heat, let stand 5 minutes, then fluff with a fork',
+      ],
+      1: [
+        'In a small bowl, combine 2 tsp ground cumin, 2 tsp chilli powder, 1 tsp sweet paprika, 1 tsp garlic powder, 1 tsp salt, and 1/2 tsp black pepper',
+        'Mix well to create fajita seasoning blend',
+      ],
+      2: [
+        'Cut 800g chicken breast into strips about 1cm wide',
+        'Season chicken strips with half of the fajita spice mix',
+        'Toss to coat evenly',
+      ],
+      3: [
+        'Heat 2 tablespoons olive oil in a large pan over medium-high heat',
+        'Add seasoned chicken strips in a single layer',
+        { text: 'Cook 6-8 minutes, turning once halfway through, until golden and cooked through (internal temp 75°C)', timer_seconds: 420, timer_label: 'Cook chicken' },
+        'Remove chicken to a plate and set aside',
+      ],
+      4: [
+        'Add remaining 1 tablespoon olive oil to the same pan',
+        'Add 2 sliced brown onions and 2 sliced red capsicums',
+        'Sprinkle with remaining fajita spice mix',
+        { text: 'Sauté 5-6 minutes until vegetables are softened but still have some bite', timer_seconds: 330, timer_label: 'Cook vegetables' },
+      ],
+      5: [
+        'Add 4 minced garlic cloves to the pan',
+        { text: 'Cook 1 minute until fragrant', timer_seconds: 60, timer_label: 'Cook garlic' },
+      ],
+      6: [
+        'Return cooked chicken to the pan',
+        'Add 400g drained and rinsed black beans',
+        { text: 'Warm through for 2-3 minutes, stirring gently', timer_seconds: 150, timer_label: 'Warm through' },
+      ],
+      7: [
+        'Divide cooked rice among 4 bowls (or meal prep containers)',
+        'Top each portion with the chicken and vegetable mixture',
+        'Squeeze fresh lime juice over each bowl and garnish with lime wedges',
+        'Serve immediately or store in refrigerator for up to 4 days',
+      ],
+    },
+  },
+  spicy_chipotle_chicken_burrito: {
+    stovetop: {
+      0: [
+        { text: 'Cook 260g jasmine rice', timer_seconds: 720, timer_label: 'Cook rice' },
+        'Stir through lime juice and chopped coriander',
+      ],
+      1: [
+        'Toss 800g diced chicken thigh with 2 tsp cumin, 2 tsp smoked paprika, 2 tsp chilli powder, 1 tsp cayenne, 1 tsp salt',
+        { text: 'Cook in 1 tbsp oil over high heat until browned and cooked through', timer_seconds: 480, timer_label: 'Cook chicken' },
+      ],
+      2: [
+        'Warm a drained 400g can of black beans',
+        'Chop tomato + red onion with a squeeze of lime for salsa',
+      ],
+      3: [
+        'Assemble: burrito, extra hot (add chipotle), or bowl (no tortilla) — see plate steps',
+      ],
+    },
+  },
+  chicken_shawarma: {
+    stovetop: {
+      0: [
+        'Mix marinade: 200g Greek yoghurt, 5 minced garlic cloves, 1 lemon juice, 2 tsp cumin, 2 tsp coriander, 2 tsp paprika, 1 tsp turmeric, 30ml olive oil, 1 tsp salt, 1/2 tsp pepper',
+        'Coat 800g chicken thigh skinless',
+        { text: 'Marinate for at least 30 minutes', timer_seconds: 1800, timer_label: 'Marinate chicken' },
+      ],
+      1: [
+        'Heat pan over high heat',
+        { text: 'Cook marinated chicken until done and slightly charred', timer_seconds: 480, timer_label: 'Cook chicken' },
+        'Rest and slice thin',
+      ],
+      2: [
+        'Dice 200g tomatoes and 200g cucumber',
+        'Slice 1 brown onion thinly',
+      ],
+      3: [
+        'RICE BOWL: Cook 400g jasmine rice',
+        'WRAP: Warm tortillas',
+      ],
+      4: [
+        'WRAP: Fill tortillas with chicken, vegetables, remaining yogurt sauce and roll',
+        'RICE BOWL: Serve chicken and vegetables over rice with yogurt sauce',
+      ],
+    },
+  },
+  satay_chicken: {
+    stovetop: {
+      0: [
+        'Rinse 300g jasmine rice until the water runs clear',
+        { text: 'Cook per packet, then keep warm', timer_seconds: 900, timer_label: 'Cook rice' },
+      ],
+      1: [
+        'Slice 800g chicken thigh',
+        'Toss with ~1 tbsp soy sauce and 2 tsp cornstarch',
+        { text: 'Rest while you prep the rest', timer_seconds: 600, timer_label: 'Velvet chicken' },
+      ],
+      2: [
+        'Mix the sauce: 80g peanut butter, 150ml coconut milk, ~2 tbsp soy sauce, 1.5 tbsp brown sugar, 1 tbsp curry powder, and a splash of water until smooth',
+      ],
+      3: [
+        'Heat 1 tbsp oil in a hot pan or wok',
+        { text: 'Sear the chicken until browned, then remove', timer_seconds: 360, timer_label: 'Sear chicken' },
+      ],
+      4: [
+        'Add the sliced onion and 3 minced garlic cloves to the pan',
+        { text: 'Char until soft with golden edges', timer_seconds: 240, timer_label: 'Char onion' },
+      ],
+      5: [
+        'Return the chicken and pour in the satay sauce',
+        { text: 'Simmer until glossy and clinging', timer_seconds: 180, timer_label: 'Simmer sauce' },
+        'Finish with a squeeze of lime',
+      ],
+      6: [
+        'Serve over jasmine rice',
+        'Garnish with crushed peanuts and fresh coriander (optional sliced chilli)',
+      ],
+    },
+  },
+  honey_chicken: {
+    stovetop: {
+      0: [
+        'Rinse 370g (2 cups) jasmine rice until the water runs clear',
+        { text: 'Cook per packet, then keep warm', timer_seconds: 900, timer_label: 'Cook rice' },
+      ],
+      1: [
+        'Cut 800g chicken into bite-size pieces',
+        'Toss in ~30g cornstarch with a pinch of salt to coat (reserve a little cornstarch for the glaze slurry)',
+      ],
+      2: [
+        'Heat 2 tbsp oil in a pan over medium-high',
+        { text: 'Pan-crisp the chicken until golden and cooked through, then drain', timer_seconds: 480, timer_label: 'Crisp chicken' },
+      ],
+      3: [
+        'In the pan, simmer 90g honey, 45ml soy sauce, 2 tbsp rice vinegar, 2 tsp sesame oil, and 3 minced garlic cloves',
+        'Stir in a cornstarch slurry',
+        { text: 'Simmer until glossy and thickened', timer_seconds: 120, timer_label: 'Thicken glaze' },
+      ],
+      4: [
+        'Toss the crispy chicken through the glaze just before serving (keeps it crisper)',
+      ],
+      5: [
+        'Serve over jasmine rice',
+        'Garnish with sesame seeds and sliced spring onion',
+        'Authentic indulgent variant: batter the chicken in egg + flour/cornstarch and deep-fry (double-fry for extra crisp) — adds ~10-15g fat/serve',
+      ],
+    },
+  },
+  chicken_mac_and_cheese: {
+    oven: {
+      0: [
+        'Bring a pot of salted water to the boil',
+        { text: 'Cook 340g macaroni to just under al dente, then drain', timer_seconds: 480, timer_label: 'Cook pasta' },
+      ],
+      1: [
+        'Dice 800g chicken and sear until cooked (or use pre-cooked shredded rotisserie)',
+        'Season with a little salt and pepper',
+      ],
+      2: [
+        'Blend 300g cottage cheese with 300ml milk until smooth, then warm in a pan',
+        'Melt in ~150g grated cheese (reserve ~50g for the top) with 1 tsp garlic powder, 1 tsp onion powder, 1 tsp smoked paprika, 1 tsp salt, 1/2 tsp pepper',
+        '(Alternative: make a roux — melt 20g butter, stir in 20g flour, whisk in the milk, then add cheese)',
+      ],
+      3: [
+        'Fold the drained pasta and cooked chicken through the cheese sauce',
+      ],
+      4: [
+        'Preheat oven to 180-200°C (350-400°F)',
+        'Transfer to a baking dish and scatter the reserved cheese on top (add breadcrumbs for crunch if you like)',
+      ],
+      5: [
+        { text: 'Bake ~20 minutes until golden and bubbling', timer_seconds: 1200, timer_label: 'Bake' },
+        'Cool a few minutes, then portion (reheats well 4-5 days in the microwave)',
+      ],
+    },
+  },
+
+  turkey_meatballs_spaghetti: {
+    oven_stovetop: {
+      1: [
+        'In a bowl, soak 50g breadcrumbs in 60ml milk for 5 minutes',
+        'Add 600g turkey mince, 1 egg, 20g grated parmesan, 1/2 tsp salt, 1/4 tsp pepper',
+        'Mix gently until just combined (don\'t overwork)',
+      ],
+      2: [
+        'Preheat oven to 200°C (400°F)',
+        'Roll mixture into 20-24 meatballs (~30g each)',
+        'Arrange on an oiled baking sheet',
+      ],
+      3: [
+        { text: 'Bake meatballs 15-18 minutes until browned and cooked through (75°C internal)', timer_seconds: 1080, timer_label: 'Bake meatballs' },
+      ],
+      4: [
+        'Meanwhile, heat 30ml olive oil in a large pan over medium heat',
+        'Add 150g diced onion, cook 5-6 minutes until softened',
+        { text: 'Add 4 minced garlic cloves, cook 1 minute until fragrant', timer_seconds: 60, timer_label: 'Garlic' },
+      ],
+      5: [
+        { text: 'Stir in 30g tomato paste, cook 2 minutes', timer_seconds: 120, timer_label: 'Tomato paste' },
+        'Add 800g crushed tomatoes, 2 tsp dried oregano, 2 tsp dried basil, 1 tsp salt, 1/4 tsp pepper',
+        { text: 'Simmer 10-15 minutes until thickened', timer_seconds: 900, timer_label: 'Sauce simmer' },
+      ],
+      6: [
+        'Add baked meatballs to the sauce, gently stir to coat',
+        { text: 'Simmer 5 minutes to meld flavors', timer_seconds: 300, timer_label: 'Final simmer' },
+        'Meanwhile, cook 320g spaghetti according to package directions',
+        'Serve meatballs and sauce over pasta with remaining 20g parmesan',
+      ],
+    },
+  },
+
+  tuna_pasta_bake: {
+    oven: {
+      0: [
+        'Bring a pot of salted water to the boil',
+        { text: 'Cook 320g short pasta to just under al dente, then drain', timer_seconds: 480, timer_label: 'Cook pasta' },
+      ],
+      1: [
+        'Optional: soften 1 diced onion and 2 minced garlic cloves in 1 tbsp oil',
+        'Blend 300g cottage cheese with 250ml milk until smooth, warm through',
+        'Melt in ~90g grated cheese (reserve ~40g for the top) with 1 tsp oregano, 1 tsp salt, 1/2 tsp pepper',
+      ],
+      2: [
+        'Fold through 370g drained tuna, 150g peas, 150g sweetcorn, and the drained pasta',
+      ],
+      3: [
+        'Preheat oven to 200°C (400°F)',
+        'Tip into a baking dish and scatter the reserved cheese on top (add 40g breadcrumbs for crunch if you like)',
+      ],
+      4: [
+        { text: 'Bake ~20 minutes until golden and bubbling', timer_seconds: 1200, timer_label: 'Bake' },
+        'Cool a few minutes, then portion (reheats well 4 days; add a splash of milk/water to loosen)',
+      ],
+    },
+  },
+
+  lamb_kofta: {
+    stovetop: {
+      0: [
+        'Mix 800g lamb mince with 1 grated onion, 3 minced garlic cloves, 20g chopped parsley/mint, 2 tsp cumin, 2 tsp coriander, 2 tsp paprika, 1/2 tsp cinnamon, 1 tsp salt, 1/2 tsp pepper',
+        'Add 40g soaked breadcrumbs if using; mix just until combined — do not overmix',
+      ],
+      1: [
+        'Form into ovals/patties',
+        { text: 'Chill 10 minutes to hold shape', timer_seconds: 600, timer_label: 'Chill' },
+      ],
+      2: [
+        'Heat 1 tbsp oil over medium-high',
+        { text: 'Sear 3-4 minutes per side until browned and cooked through', timer_seconds: 420, timer_label: 'Grill kofta' },
+        'Rest',
+      ],
+      3: [
+        'Mix the sauce: 200g yoghurt, 2 minced garlic cloves, juice of 1 lemon, pinch of salt',
+        'Chop 200g tomato, 200g cucumber, red onion for the salad',
+      ],
+      4: [
+        'Assemble: rice bowl or wrap (see plate steps)',
+      ],
+    },
+  },
+
+  palacinke: {
+    stovetop: {
+      0: [
+        'In a bowl, whisk together 150g plain flour, 2 eggs, 400ml full cream milk, 20g sugar, and 1/4 tsp salt',
+        'Melt 30g butter and add half to the batter — reserve the other half for the pan',
+        { text: 'Whisk until smooth and thin, then rest for 10 minutes', timer_seconds: 600, timer_label: 'Rest batter' },
+      ],
+      1: [
+        { text: 'Heat a non-stick pan over medium heat', timer_seconds: 60, timer_label: 'Heat pan' },
+        'Brush the pan with a little of the reserved melted butter',
+      ],
+      2: [
+        'Pour 2-3 tbsp batter into the pan — immediately swirl to coat the bottom in a thin layer',
+        { text: 'Cook for 1-2 minutes until the edges are golden and the center is just set', timer_seconds: 90, timer_label: 'Cook first side' },
+      ],
+      3: [
+        'Carefully flip with a spatula (they\'re delicate!)',
+        { text: 'Cook for another 30 seconds until lightly golden', timer_seconds: 30, timer_label: 'Cook second side' },
+        'Spread 1-2 tbsp jam on half the crêpe, fold in quarters, and serve warm',
+        'Repeat with remaining batter — re-butter the pan as needed between crêpes',
+      ],
+    },
+  },
+
+  sheet_pan_sausage_veg: {
+    oven: {
+      0: [
+        'Heat the oven to 200°C (400°F)',
+      ],
+      1: [
+        'Halve 1200g baby potatoes, chunk 2 onions and 2 bell peppers',
+        'Toss with 35ml olive oil, 2 tsp dried herbs, 1 tsp paprika, 1 tsp garlic powder, 1 tsp salt, 1/2 tsp pepper',
+        'Spread on a tray in a single layer — do not crowd (crowding steams instead of browns)',
+      ],
+      2: [
+        'Add 800g sausages (whole or sliced) to the tray',
+      ],
+      3: [
+        { text: 'Roast about 20 minutes', timer_seconds: 1200, timer_label: 'Roast (first)' },
+        'Turn everything and add 400g broccoli florets',
+        { text: 'Roast another 15-20 minutes until potatoes are tender and sausage is browned', timer_seconds: 1050, timer_label: 'Roast (second)' },
+      ],
+      4: [
+        'Finish with chopped parsley (or grated parmesan / a fried egg if using)',
+        'Portion into containers — keeps/reheats well 4 days',
+      ],
+    },
+  },
+
+  honey_soy_salmon_noodles: {
+    oven: {
+      0: [
+        'Mix the glaze: 80g honey, 60ml soy sauce, 3 minced garlic cloves, 1 tbsp grated ginger, 2 tsp sesame oil, 2 tbsp rice vinegar',
+      ],
+      1: [
+        'Preheat oven to 200°C (400°F)',
+        'Toss 800g salmon in some glaze, spread on a sheet pan with 400g broccoli (tossed in 1 tbsp olive oil)',
+        { text: 'Roast 12-14 minutes, basting the salmon with more glaze partway, until it flakes', timer_seconds: 810, timer_label: 'Roast salmon' },
+      ],
+      2: [
+        'Cook 280g noodles per packet, drain',
+        'Toss with a little sesame oil and the remaining glaze',
+      ],
+      3: [
+        'Build each bowl: noodles, salmon, broccoli',
+        'Garnish with sesame seeds and sliced spring onion (optional chilli / sriracha for heat)',
+      ],
+    },
+  },
+
+  carne_asada_bowl: {
+    stovetop: {
+      0: [
+        'Mix the marinade: juice of 1 lime + 80ml orange juice, 3 minced garlic cloves, 2 tsp cumin, 2 tsp chilli powder, 1 tbsp oil, 1 tsp salt, optional 1 tsp sugar',
+        'Coat 800g steak',
+        { text: 'Marinate 2-4 hours (NOT more than 8 — citrus turns the steak mushy)', timer_seconds: 7200, timer_label: 'Marinate' },
+      ],
+      1: [
+        'Cook 300g rice',
+        'Stir through the juice of 1 lime, chopped coriander, and a pinch of salt',
+      ],
+      2: [
+        'Warm a drained 240g can of black beans',
+        'Make a quick pico: chopped tomato, red onion, coriander, squeeze of lime',
+      ],
+      3: [
+        'Grill or sear the steak hot until charred',
+        { text: 'About 4-7 minutes per side to your doneness', timer_seconds: 480, timer_label: 'Sear steak' },
+        { text: 'REST 5-10 minutes, then slice thin AGAINST the grain (key tenderness step)', timer_seconds: 420, timer_label: 'Rest' },
+      ],
+      4: [
+        'Build each bowl: cilantro-lime rice, sliced steak, black beans, corn, pico, grated cheese',
+        'Optional (not in base macros): avocado/guac, jalapenos, sour cream/Greek yoghurt, salsa',
+      ],
+    },
+  },
+
+  chicken_schnitzel: {
+    stovetop: {
+      0: [
+        'Slice 800g chicken breast thin, or pound to ~1/2 cm',
+      ],
+      1: [
+        'Set up 3 bowls: seasoned flour (with 1 tsp garlic powder, 1 tsp paprika, salt, pepper), beaten egg, breadcrumbs',
+        'Coat each cutlet flour -> egg -> crumbs, pressing the crumbs on',
+        { text: 'Rest 15-20 minutes so the coating sets', timer_seconds: 1020, timer_label: 'Rest crumb' },
+      ],
+      2: [
+        'Heat oil in a pan over medium-high',
+        { text: 'Shallow-fry 3-4 minutes per side until golden and 73°C/165°F inside', timer_seconds: 420, timer_label: 'Fry schnitzel' },
+        'Drain on a rack (leaner option: oven-bake at 200°C with oil spray, ~20 min, turning once)',
+      ],
+      3: [
+        'Assemble your plate: plain plate, roll, or parma (see plate steps)',
+      ],
+    },
+    plate: {
+      0: [
+        'Serve the schnitzel with roast potatoes or a fresh salad and a wedge of lemon',
+      ],
+    },
+    roll: {
+      0: [
+        'Butter 4 buns',
+        'Add a schnitzel, cheese, lettuce, and a drizzle of sweet chilli sauce to each',
+      ],
+    },
+    parma: {
+      0: [
+        'Top each schnitzel with tomato paste/pasta sauce, grated cheese, and jalapenos',
+        { text: 'Grill or bake until the cheese melts and bubbles', timer_seconds: 360, timer_label: 'Melt cheese' },
+        'Serve with potato or salad',
+      ],
+    },
+  },
+
+  beef_ragu_gnocchi: {
+    slow_braise: {
+      0: [
+        'Pat 800g beef chuck dry and season',
+        { text: 'Sear hard on all sides until deeply browned, then remove', timer_seconds: 480, timer_label: 'Sear beef' },
+      ],
+      1: [
+        'Soften 1 diced onion, 120g carrot, 100g celery, 4 minced garlic cloves in 20ml oil',
+        { text: 'Stir in 50g tomato paste and brown 1-2 min', timer_seconds: 90, timer_label: 'Brown paste' },
+      ],
+      2: [
+        'Deglaze with 125ml red wine if using',
+        'Add 700g crushed tomatoes, ~250ml stock (1 cube), 1 tsp oregano, 1 tsp thyme, 2 bay leaves; return the beef',
+      ],
+      3: [
+        { text: 'Cover and braise low until shreddable — oven 160°C ~2.5 hrs (or stovetop low / slow-cooker 8 hrs low)', timer_seconds: 9000, timer_label: 'Braise' },
+      ],
+      4: [
+        'Shred the beef with two forks; return to the sauce',
+        'Skim surface fat if you like',
+        { text: 'Simmer uncovered 15-20 min to thicken', timer_seconds: 1050, timer_label: 'Reduce' },
+      ],
+      5: [
+        { text: 'Boil 800g gnocchi until they float (~2-3 min)', timer_seconds: 180, timer_label: 'Cook gnocchi' },
+        'Toss through the ragù with a splash of pasta water',
+        'Finish with parmesan and basil',
+      ],
+    },
+    quick_mince: {
+      0: [
+        { text: 'Brown 800g beef mince in a little oil, breaking it up', timer_seconds: 420, timer_label: 'Brown mince' },
+      ],
+      1: [
+        'Soften 1 diced onion, 120g carrot, 100g celery, 4 minced garlic cloves',
+        { text: 'Stir in 50g tomato paste and brown 1-2 min', timer_seconds: 90, timer_label: 'Brown paste' },
+      ],
+      2: [
+        'Add 700g crushed tomatoes, ~150ml stock, 1 tsp oregano',
+        { text: 'Simmer ~30 min until rich', timer_seconds: 1800, timer_label: 'Simmer' },
+      ],
+      3: [
+        { text: 'Boil 800g gnocchi until they float (~2-3 min)', timer_seconds: 180, timer_label: 'Cook gnocchi' },
+        'Toss through; finish with parmesan and basil',
+      ],
+    },
+  },
+
+  cevapi: {
+    stovetop: {
+      0: [
+        'Combine 500g beef mince + 300g lamb mince with 1 grated onion, 6 crushed garlic cloves, 4 tsp paprika, 1.5 tsp salt, 1/2 tsp pepper, 1/2 tsp bicarb soda',
+        'Add a splash of sparkling water; mix well',
+        { text: 'Rest in the fridge 1 hr to overnight for best texture', timer_seconds: 3600, timer_label: 'Rest mix' },
+      ],
+      1: [
+        'With damp hands, roll into small fingers ~8 cm long',
+      ],
+      2: [
+        'Heat a grill or griddle to medium-high',
+        { text: 'Cook 3-4 min per side, turning once, until browned with a crust but juicy — do not press', timer_seconds: 420, timer_label: 'Grill cevapi' },
+      ],
+      3: [
+        'Serve: flatbread or rice plate, with raw onion + ajvar (see plate steps)',
+      ],
+    },
+  },
 };

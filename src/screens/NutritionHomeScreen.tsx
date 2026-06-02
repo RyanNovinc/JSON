@@ -1020,13 +1020,26 @@ export default function NutritionHomeScreen({ route }: any) {
             }
           >
             <Text style={styles.title}>Nutrition</Text>
-            <View style={styles.emptyHero}>
-              <View style={[styles.emptyHeroIcon, { backgroundColor: themeColor, shadowColor: themeColor }]}>
-                <Ionicons name="restaurant" size={36} color="#0a0a0b" />
+            <View
+              style={[
+                styles.emptyHeroCard,
+                {
+                  borderColor: themeColor + '59',
+                  backgroundColor: themeColor + '14',
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.emptyHeroIcon,
+                  { backgroundColor: themeColor, shadowColor: themeColor },
+                ]}
+              >
+                <Ionicons name="restaurant" size={26} color="#0a0a0b" />
               </View>
               <Text style={styles.emptyHeroTitle}>Plan your meals</Text>
               <Text style={styles.emptyHeroBody}>
-                Answer a few questions. We'll send a prompt to your AI. Import the meal plan it sends back.
+                A custom meal plan built around your goals — completely free.
               </Text>
               <TouchableOpacity
                 style={[styles.emptyHeroButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
@@ -1034,7 +1047,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 activeOpacity={0.85}
               >
                 <Text style={styles.emptyHeroButtonText}>Get started</Text>
-                <Ionicons name="arrow-forward" size={16} color="#0a0a0b" />
+                <Ionicons name="arrow-forward" size={15} color="#0a0a0b" />
               </TouchableOpacity>
             </View>
 
@@ -1938,52 +1951,62 @@ const styles = StyleSheet.create({
   },
 
   // Empty state
-  emptyHero: {
-    paddingHorizontal: 24,
-    paddingVertical: 40,
+  // CHANGED: replaced the old free-floating `emptyHero` block with a dashed,
+  // tinted hero card to match HomeScreen.tsx's `emptyHeroCard` treatment.
+  // borderColor / backgroundColor are applied inline at the call site using
+  // themeColor (themeColor + '59' border, themeColor + '14' background).
+  emptyHeroCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    paddingHorizontal: 20,
+    paddingTop: 26,
+    paddingBottom: 22,
+    marginBottom: 8,
     alignItems: 'center',
   },
   emptyHeroIcon: {
-    width: 84,
-    height: 84,
-    borderRadius: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: 14,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 22,
     elevation: 14,
   },
   emptyHeroTitle: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '700',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   emptyHeroBody: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#a1a1aa',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 28,
+    lineHeight: 19,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   emptyHeroButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 12,
+    gap: 6,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 24,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 10,
   },
   emptyHeroButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#0a0a0b',
   },
 
