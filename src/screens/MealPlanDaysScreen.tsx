@@ -404,7 +404,13 @@ export default function MealPlanDaysScreen() {
         })()}
 
         {/* DAY CARD — menu style. Whole day boxed in one outlined card. */}
-        <TouchableOpacity activeOpacity={1} onLongPress={() => handleDayLongPress(viewIndex)} delayLongPress={600} style={styles.dayCard}>
+        <TouchableOpacity 
+          activeOpacity={0.85} 
+          onPress={() => openDay(viewIndex)}
+          onLongPress={() => handleDayLongPress(viewIndex)} 
+          delayLongPress={600} 
+          style={styles.dayCard}
+        >
           <View style={styles.dayCardHead}>
             <Text style={[styles.dayOverline, { color: isTodayView ? themeColor : MUTED }]}>{isTodayView ? 'Today · ' : ''}Day {viewIndex + 1}</Text>
             <Text style={styles.dayHeadline}>{viewDate.toLocaleDateString('en-US', { weekday: 'long' })}</Text>
