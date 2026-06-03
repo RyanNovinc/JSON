@@ -830,7 +830,7 @@ export default function NutritionHomeScreen({ route }: any) {
   // { cuisine, title } params. The legacy MealsLibrary / SmoothiesLibrary
   // screens are left intact in the navigator but are no longer routed to here.
   const handleSeeAllPress = (cuisine: string, title: string) => {
-    navigation.navigate('CategoryLibrary' as any, { cuisine, title });
+    navigation.navigate('CuratedFavorites' as any, { cuisine, title });
   };
 
   // ============================================================================

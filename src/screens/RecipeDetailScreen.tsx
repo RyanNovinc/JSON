@@ -103,26 +103,39 @@ export default function RecipeDetailScreen() {
   const { mealSlug } = route.params;
   const meal: CuratedMeal | undefined = (CURATED_MEALS as any)[mealSlug];
 
-  const [selectedPlateIndex, setSelectedPlateIndex] = useState(0);
+  // Optional plate to pre-select — e.g. when opened from a logged "Burger"
+  // plating, land on that plate rather than the recipe's default.
+  const initialPlateIndex = (() => {
+    const pid = (route.params as any)?.plateId;
+    if (pid && meal?.plates) {
+      const idx = meal.plates.findIndex((p) => p.id === pid);
+      if (idx >= 0) return idx;
+    }
+    return 0;
+  })();
+
+  const [selectedPlateIndex, setSelectedPlateIndex] = useState(initialPlateIndex);
   const [selectedMethodIndex, setSelectedMethodIndex] = useState(0);
   const [servings, setServings] = useState(1);
   const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // Read favourite state whenever the screen gains focus, so the heart stays
-  // accurate after navigating away and back (and reflects un-saves made from
-  // the Library). Keyed on mealSlug (always defined, even if the meal lookup
-  // below fails) so this hook order is stable regardless of the early return.
+  // Read favourite state whenever the screen gains focus OR the selected plate
+  // changes, so the heart reflects the *currently selected plating* (each plate
+  // is favourited independently). Keyed on mealSlug + selectedPlateIndex; both
+  // are defined even if the meal lookup below fails, so hook order stays stable
+  // regardless of the early return.
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      RecipeFavorites.isRecipeFavorite(mealSlug).then((fav) => {
+      const plateId = meal?.plates?.[selectedPlateIndex]?.id;
+      RecipeFavorites.isPlateFavorite(mealSlug, plateId).then((fav) => {
         if (active) setIsFavorite(fav);
       });
       return () => {
         active = false;
       };
-    }, [mealSlug])
+    }, [mealSlug, selectedPlateIndex])
   );
 
   if (!meal) {
@@ -161,12 +174,13 @@ export default function RecipeDetailScreen() {
     });
   };
 
-  // Optimistic toggle: flip the heart immediately, persist in the background,
-  // and revert if the write fails. No popup — instant fill is the feedback.
+  // Optimistic toggle: flip the heart immediately, persist the *selected plate*
+  // in the background, and revert if the write fails. No popup — instant fill
+  // is the feedback.
   const handleToggleFavorite = async () => {
     setIsFavorite((prev) => !prev);
     try {
-      await RecipeFavorites.toggleRecipeFavorite(mealSlug);
+      await RecipeFavorites.togglePlateFavorite(mealSlug, plate.id);
     } catch (error) {
       console.error('Failed to toggle favourite:', error);
       setIsFavorite((prev) => !prev);

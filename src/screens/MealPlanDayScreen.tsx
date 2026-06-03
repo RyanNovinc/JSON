@@ -4,12 +4,15 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  Image,
   Modal,
   TextInput,
   Alert,
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
+  Pressable,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import {Picker} from '@react-native-picker/picker';
@@ -24,12 +27,23 @@ import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningCon
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMeal, SimplifiedMealPlanDay } from '../types/nutrition';
+import RecipeFavorites from '../utils/recipeFavorites';
+import { CURATED_MEALS } from '../data/curated_meals';
+import { getMealImage } from '../assets/mealImages';
 
 type MealPlanDayScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MealPlanDay'>;
 type MealPlanDayScreenRouteProp = RouteProp<RootStackParamList, 'MealPlanDay'>;
 
 // Use SimplifiedMeal from types instead of custom Meal interface
 type Meal = SimplifiedMeal;
+
+const SERIF = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
+const MUTED = '#8a8a90';
+const FAINT = '#6a6a70';
+
+// Resolve a meal photo from whatever field the curated record uses.
+const getMealImageUri = (meal: any): string | null =>
+  meal?.photo_url || meal?.image || meal?.imageUrl || meal?.image_url || meal?.photo || meal?.imageURL || meal?.img || meal?.thumbnail || null;
 
 interface MealCardProps {
   meal: SimplifiedMeal;
@@ -43,70 +57,50 @@ interface MealCardProps {
 }
 
 function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, mealIcon, mealColor, isCompleted }: MealCardProps) {
-  // SimplifiedMeal doesn't have prep/cook time, so we'll skip that calculation
-  
+  const localImg = (meal as any)?.image_filename ? getMealImage((meal as any).image_filename) : null;
+  const uri = getMealImageUri(meal);
+  const cal = (meal.calories && typeof meal.calories === 'number') ? meal.calories : 0;
+  const p = Math.round((meal.macros?.protein || meal.nutritionInfo?.protein || 0));
+  const c = Math.round((meal.macros?.carbs || meal.nutritionInfo?.carbs || meal.nutritionInfo?.carbohydrates || 0));
+  const f = Math.round((meal.macros?.fat || meal.nutritionInfo?.fat || 0));
+  const typeLabel = (meal.type || 'snack').toUpperCase();
+  const metaText = meal.time ? `${meal.time} · ${typeLabel}` : typeLabel;
+
   return (
-    <TouchableOpacity 
-      style={[
-        styles.mealCard, 
-        { borderLeftColor: mealColor },
-        isCompleted && styles.mealCardCompleted
-      ]}
-      activeOpacity={0.8}
-      onPress={onPress}
-      onLongPress={onLongPress}
-    >
-      <View style={styles.mealHeader}>
-        <View style={styles.mealTitleRow}>
-          <View style={[styles.mealIconContainer, { backgroundColor: mealColor + '20' }]}>
-            <Ionicons name={mealIcon as any} size={20} color={mealColor} />
+    <View style={styles.mcard}>
+      <Pressable style={styles.photoWrap} onPress={onPress} onLongPress={onLongPress}>
+        {localImg ? (
+          <Image source={localImg} style={styles.photo} resizeMode="cover" />
+        ) : uri ? (
+          <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
+        ) : (
+          <View style={styles.photoFallback}>
+            <Ionicons name={mealIcon as any} size={36} color="#3a3a42" />
           </View>
-          <View style={styles.mealTitleContainer}>
-            <Text style={styles.mealName}>{meal.name || 'Unknown Meal'}</Text>
-            <View style={styles.mealSubInfo}>
-              <Text style={[styles.mealType, { color: mealColor }]}>
-                {(meal.type || 'snack').charAt(0).toUpperCase() + (meal.type || 'snack').slice(1)}
-              </Text>
-              {meal.time && (
-                <Text style={styles.mealTime}> • {meal.time}</Text>
-              )}
-            </View>
-          </View>
+        )}
+        {isCompleted && <View style={styles.photoScrim} pointerEvents="none" />}
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>{metaText}</Text>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={[
-              styles.completionCheckbox, 
-              isCompleted && { backgroundColor: '#22c55e' },
-              !isCompleted && { borderColor: '#71717a', borderWidth: 2 }
-            ]}
-            onPress={onToggleComplete}
-            activeOpacity={0.7}
-          >
-            {isCompleted && (
-              <Ionicons name="checkmark" size={16} color="#ffffff" />
-            )}
-          </TouchableOpacity>
-          <Ionicons name="chevron-forward" size={20} color={themeColor} />
+        <View style={styles.viewHint}>
+          <Ionicons name="chevron-forward" size={16} color="#e8e8ea" />
         </View>
-      </View>
+      </Pressable>
 
-      {/* Calories and Macros in one clean row */}
-      <View style={styles.nutritionRow}>
-        {/* Always show calories, even if 0 */}
-        <Text style={[styles.caloriesText, { color: mealColor }]}>
-          {(meal.calories && typeof meal.calories === 'number' ? meal.calories : 0)} cal
-        </Text>
-        
-        {/* Always show macros, even if 0 */}
-        <View style={styles.macrosInline}>
-          <Text style={styles.macroInlineText}>P: {Math.round((meal.macros?.protein || meal.nutritionInfo?.protein || 0))}g</Text>
-          <Text style={styles.macroInlineText}>C: {Math.round((meal.macros?.carbs || meal.nutritionInfo?.carbs || meal.nutritionInfo?.carbohydrates || 0))}g</Text>
-          <Text style={styles.macroInlineText}>F: {Math.round((meal.macros?.fat || meal.nutritionInfo?.fat || 0))}g</Text>
+      <Pressable style={styles.mbody} onPress={onToggleComplete} onLongPress={onLongPress}>
+        <Ionicons
+          name={isCompleted ? 'checkmark-circle' : 'ellipse-outline'}
+          size={26}
+          color={isCompleted ? themeColor : '#5a5a60'}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.mname, isCompleted && styles.mnameDone]} numberOfLines={2}>
+            {meal.name || 'Unknown Meal'}
+          </Text>
+          <Text style={[styles.mmacro, isCompleted && styles.mmacroDone]}>{cal} kcal · P{p} C{c} F{f}</Text>
         </View>
-      </View>
-
-    </TouchableOpacity>
+      </Pressable>
+    </View>
   );
 }
 
@@ -308,9 +302,8 @@ export default function MealPlanDayScreen() {
   const [addMealType, setAddMealType] = useState<'manual' | 'favorite' | null>(null);
   const [selectedFavoriteMeal, setSelectedFavoriteMeal] = useState<any>(null);
   const [newMealName, setNewMealName] = useState('');
-  const [newMealType, setNewMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | 'custom'>('snack');
+  const [newMealType, setNewMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack' | 'dessert' | 'custom'>('snack');
   const [customMealType, setCustomMealType] = useState('');
-  const [newMealTime, setNewMealTime] = useState('');
   const [selectedHour, setSelectedHour] = useState(12);
   const [selectedMinute, setSelectedMinute] = useState(0);
   const [selectedPeriod, setSelectedPeriod] = useState('PM');
@@ -327,6 +320,31 @@ export default function MealPlanDayScreen() {
   
   // Meal completion tracking
   const [completedMeals, setCompletedMeals] = useState<Record<string, boolean>>({});
+
+  // Favourited recipes (from the Library's recipe-favourites store), loaded
+  // when the quick-add sheet opens. Slugs are resolved to curated meals.
+  const [favRecipes, setFavRecipes] = useState<any[]>([]);
+  const [selectedRecipe, setSelectedRecipe] = useState<any>(null);
+
+  useEffect(() => {
+    if (!showAddMealModal) return;
+    (async () => {
+      try {
+        const favs = await RecipeFavorites.loadFavorites();
+        const entries = (favs || [])
+          .map(({ slug, plateId }) => {
+            const meal = (CURATED_MEALS as any)[slug];
+            if (!meal || !Array.isArray(meal.plates) || meal.plates.length === 0) return null;
+            const plate = (plateId && meal.plates.find((p: any) => p.id === plateId)) || meal.plates[0];
+            return { meal, plate, slug, plateId: plate?.id, key: `${slug}::${plate?.id}` };
+          })
+          .filter(Boolean);
+        setFavRecipes(entries as any[]);
+      } catch {
+        setFavRecipes([]);
+      }
+    })();
+  }, [showAddMealModal]);
   
   // Load and save meal completion state
   const loadMealCompletions = async (date: string) => {
@@ -788,6 +806,98 @@ export default function MealPlanDayScreen() {
     }
   };
 
+  const closeAddMeal = () => {
+    setShowAddMealModal(false);
+    setSelectedRecipe(null);
+    setNewMealName('');
+    setNewMealType('snack');
+    setNewMealCalories('');
+    setNewMealProtein('');
+    setNewMealCarbs('');
+    setNewMealFat('');
+  };
+
+  // A favourite entry is { meal, plate, slug, plateId, key }; we read macros /
+  // name / photo from the specific favourited plate. Falls back gracefully if
+  // handed a raw meal (defensive).
+  const recipeFields = (r: any) => {
+    const meal = r?.meal || r;
+    const plate = r?.plate || meal?.plates?.[0];
+    const m = plate?.plate_macros || {};
+    return {
+      slug: meal?.slug,
+      plateId: plate?.id,
+      key: r?.key || `${meal?.slug}::${plate?.id}`,
+      name: plate?.display_name || meal?.display_name || 'Recipe',
+      photo: meal?.photo_url || null,
+      localName: plate?.image_filename || meal?.image_filename || null,
+      kcal: Math.round(m.kcal || 0),
+      protein: Math.round(m.protein_g || 0),
+      carbs: Math.round(m.carbs_g || 0),
+      fat: Math.round(m.fat_g || 0),
+    };
+  };
+
+  const prefillFromRecipe = (r: any) => {
+    const f = recipeFields(r);
+    setSelectedRecipe(r);
+    setNewMealName(f.name);
+    setNewMealCalories(f.kcal ? String(f.kcal) : '');
+    setNewMealProtein(f.protein ? String(f.protein) : '');
+    setNewMealCarbs(f.carbs ? String(f.carbs) : '');
+    setNewMealFat(f.fat ? String(f.fat) : '');
+  };
+
+  const logQuickMeal = async () => {
+    const cal = parseInt(newMealCalories) || 0;
+    const p = parseInt(newMealProtein) || 0;
+    const c = parseInt(newMealCarbs) || 0;
+    const f = parseInt(newMealFat) || 0;
+    if (!cal && !p && !c && !f) return;
+
+    const rf = selectedRecipe ? recipeFields(selectedRecipe) : null;
+
+    // Typed loosely: photo_url/slug aren't on SimplifiedMeal yet, but we attach
+    // them so logged-from-recipe meals can show their photo on the day screen.
+    const meal: any = {
+      name: newMealName.trim() || 'Logged meal',
+      type: newMealType === 'custom' ? 'snack' : newMealType,
+      time: '',
+      calories: cal,
+      macros: { protein: p, carbs: c, fat: f },
+      ingredients: [],
+      instructions: [],
+      tags: ['off-plan'],
+      isOriginal: false,
+      addedAt: new Date().toISOString(),
+    };
+    if (rf?.photo) meal.photo_url = rf.photo;
+    if (rf?.localName) meal.image_filename = rf.localName;
+    if (rf?.slug) meal.slug = rf.slug;
+    if (rf?.plateId) meal.plate_id = rf.plateId;
+
+    let targetDate = viewingDate;
+    if (!targetDate && currentPlan && typeof legacyDayIndex === 'number') {
+      const dates = Object.keys(currentPlan.dailyMeals).sort();
+      if (legacyDayIndex >= 0 && legacyDayIndex < dates.length) targetDate = dates[legacyDayIndex];
+    }
+
+    if (!targetDate) {
+      Alert.alert('Error', 'Could not determine the day to log this meal.');
+      return;
+    }
+
+    const success = await addMealToDate(targetDate, meal);
+    if (success) {
+      closeAddMeal();
+      await loadCurrentDayMeals();
+    } else {
+      Alert.alert('Error', 'Failed to log meal. Please try again.');
+    }
+  };
+
+  const canLog = !!(newMealCalories.trim() || newMealProtein.trim() || newMealCarbs.trim() || newMealFat.trim());
+
   // Calculate daily totals
   const dailyTotals = allMeals.reduce((totals, meal) => {
     return {
@@ -880,6 +990,16 @@ export default function MealPlanDayScreen() {
   };
 
   const handleMealPress = (meal: Meal) => {
+    // If this meal maps to a curated recipe, open the rich RecipeDetail screen.
+    const slug = (meal as any).slug;
+    if (slug && (CURATED_MEALS as any)[slug]) {
+      const plateId = (meal as any).plate_id;
+      navigation.navigate('RecipeDetail', { mealSlug: slug, ...(plateId ? { plateId } : {}) } as any);
+      return;
+    }
+
+    // Otherwise (manually-logged meals with no curated source) fall back to the
+    // simple meal detail.
     // Calculate the current viewing date using the same logic as loadCurrentDayMeals
     let currentViewingDate = legacyCalculatedDateString || legacyDay?.date || parseDayNameToDate(legacyDay?.day_name);
     
@@ -930,7 +1050,7 @@ export default function MealPlanDayScreen() {
   };
 
   // Sort meals chronologically by recommended_time, fallback to meal type order
-  const mealTypeOrder = { 'breakfast': 0, 'snack': 1, 'lunch': 2, 'dinner': 3 };
+  const mealTypeOrder = { 'breakfast': 0, 'snack': 1, 'lunch': 2, 'dinner': 3, 'dessert': 4 };
   const sortedMeals = allMeals.sort((a, b) => {
     const timeA = a.time ? timeToMinutes(a.time) : (mealTypeOrder[a.type] || 0) * 360; // 6-hour gaps as fallback
     const timeB = b.time ? timeToMinutes(b.time) : (mealTypeOrder[b.type] || 0) * 360;
@@ -942,597 +1062,247 @@ export default function MealPlanDayScreen() {
     return timeA - timeB;
   });
 
+  // Keep each meal's original index (for completion keys), then split planned
+  // meals from off-plan logged extras so they render in separate sections.
+  const rows = sortedMeals.map((meal, index) => ({ meal, index }));
+  const plannedRows = rows.filter((x) => (x.meal as any).isOriginal !== false);
+  const offPlanRows = rows.filter((x) => (x.meal as any).isOriginal === false);
+  const plannedDone = plannedRows.filter(({ meal, index }) => completedMeals[`${index}_${(meal as any).id || meal.name}`]).length;
+  const plannedPct = plannedRows.length > 0 ? (plannedDone / plannedRows.length) * 100 : 0;
+
+  // Fixed delete-button width: card is min(screenW-56, 340) wide, 26 padding each
+  // side, two buttons with a 12 gap. (flex:1 on gesture-handler touchables
+  // collapses, hiding the labels.)
+  const delBtnW = (Math.min(Dimensions.get('window').width - 56, 340) - 52 - 12) / 2;
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Compact Header */}
-        <View style={styles.compactHeader}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            style={styles.backButton}
-          >
-            <Ionicons name="chevron-back" size={24} color="#ffffff" />
+      <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollPad} showsVerticalScrollIndicator={false}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="chevron-back" size={26} color="#ffffff" />
           </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Text style={styles.dayTitle}>{displayInfo.dayName}</Text>
-            <Text style={styles.dateSubtitle}>{displayInfo.displayDate}</Text>
-          </View>
-          <TouchableOpacity 
-            onPress={() => setShowAddMealModal(true)} 
-            style={styles.addButton}
-          >
-            <Ionicons name="add" size={24} color="#ffffff" />
+          <TouchableOpacity onPress={() => setShowAddMealModal(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="add" size={26} color={themeColor} />
           </TouchableOpacity>
-        </View>
-        {/* Compact Progress Card */}
-        <View style={styles.section}>
-          <View style={[styles.modernProgressCard, { borderColor: `${themeColor}20` }]}>
-            {/* Progress Header */}
-            <View style={styles.progressHeader}>
-              <View>
-                <Text style={styles.modernProgressTitle}>Today's Progress</Text>
-                <Text style={styles.modernProgressSubtitle}>
-                  {completedMealsCount} of {allMeals.length} meals completed
-                </Text>
-              </View>
-              <View style={[styles.percentageCircle, { borderColor: themeColor }]}>
-                <Text style={[styles.percentageText, { color: themeColor }]}>
-                  {Math.round(progressPercentage)}%
-                </Text>
-              </View>
-            </View>
-            
-            {/* Modern Progress Bar */}
-            <View style={styles.modernProgressBarContainer}>
-              <View style={[
-                styles.modernProgressBar, 
-                { 
-                  width: `${progressPercentage}%`, 
-                  backgroundColor: themeColor,
-                  shadowColor: themeColor
-                }
-              ]} />
-            </View>
-            
-            {/* Remaining Nutrition Grid */}
-            <View style={styles.nutritionGrid}>
-              <View style={styles.nutritionItem}>
-                <Text style={[styles.nutritionValue, { color: '#ef4444' }]}>
-                  {Math.max(0, Math.round(dailyTotals.protein - completedNutrition.protein))}g
-                </Text>
-                <Text style={styles.nutritionLabel}>Protein</Text>
-              </View>
-              <View style={styles.nutritionItem}>
-                <Text style={[styles.nutritionValue, { color: '#3b82f6' }]}>
-                  {Math.max(0, Math.round(dailyTotals.carbs - completedNutrition.carbs))}g
-                </Text>
-                <Text style={styles.nutritionLabel}>Carbs</Text>
-              </View>
-              <View style={styles.nutritionItem}>
-                <Text style={[styles.nutritionValue, { color: '#f59e0b' }]}>
-                  {Math.max(0, Math.round(dailyTotals.fat - completedNutrition.fat))}g
-                </Text>
-                <Text style={styles.nutritionLabel}>Fat</Text>
-              </View>
-              <View style={styles.nutritionItem}>
-                <Text style={[styles.nutritionValue, { color: '#22c55e' }]}>
-                  {Math.max(0, Math.round(dailyTotals.calories - completedNutrition.calories))}
-                </Text>
-                <Text style={styles.nutritionLabel}>Calories</Text>
-              </View>
-            </View>
-          </View>
         </View>
 
-        {/* Sequential Meals Timeline */}
-        <View style={styles.mealSection}>
-          <View style={styles.mealSectionHeader}>
-            <Ionicons name="time" size={20} color={themeColor} />
-            <Text style={[styles.mealSectionTitle, { color: themeColor }]}>Your Daily Timeline</Text>
-            <Text style={styles.mealCount}>{allMeals.length} meal{allMeals.length > 1 ? 's' : ''}</Text>
-          </View>
-          
-          {sortedMeals.map((meal, index) => {
-            const mealId = generateMealId(meal, index);
-            const mealKey = `${index}_${meal.id || meal.name}`;
-            const isCompleted = completedMeals[mealKey] || false;
-            
-            return (
-              <MealCard
-                key={index}
-                meal={meal}
-                onPress={() => handleMealPress(meal)}
-                onLongPress={() => handleMealLongPress(meal, index)}
-                onToggleComplete={() => quickToggleMealCompletion(meal, index)}
-                themeColor={themeColor}
-                mealIcon={getMealIcon(meal.type)}
-                mealColor={getMealColor(meal.type)}
-                isCompleted={isCompleted}
-              />
-            );
-          })}
+        {/* Menu-style header (no outline) */}
+        <View style={styles.menuHeader}>
+          <Text style={styles.menuOverline}>{displayInfo.displayDate}</Text>
+          <Text style={styles.menuDay}>{displayInfo.dayName}</Text>
+          <Text style={styles.menuSub}>
+            <Text style={styles.menuSubAccent}>{Math.round(completedNutrition.protein)}</Text> / {Math.round(dailyTotals.protein)}g protein · <Text style={styles.menuSubAccent}>{Math.round(completedNutrition.calories).toLocaleString()}</Text> / {Math.round(dailyTotals.calories).toLocaleString()} kcal
+          </Text>
+          {allMeals.length > 0 && (
+            <>
+              <View style={styles.hairline} />
+              <View style={styles.dayProgressTrack}>
+                <View style={[styles.dayProgressFill, { width: `${progressPercentage}%`, backgroundColor: themeColor }]} />
+              </View>
+              <Text style={styles.loggedText}>{completedMealsCount} of {allMeals.length} eaten</Text>
+            </>
+          )}
         </View>
+
+        {/* Photo meal timeline (planned) */}
+        {plannedRows.length > 0 && (
+          <View style={styles.timelineWrap}>
+            <Text style={styles.timelineLabel}>Timeline</Text>
+            {plannedRows.map(({ meal, index }) => {
+              const mealKey = `${index}_${(meal as any).id || meal.name}`;
+              const isCompleted = completedMeals[mealKey] || false;
+              return (
+                <MealCard
+                  key={index}
+                  meal={meal}
+                  onPress={() => handleMealPress(meal)}
+                  onLongPress={() => handleMealLongPress(meal, index)}
+                  onToggleComplete={() => quickToggleMealCompletion(meal, index)}
+                  themeColor={themeColor}
+                  mealIcon={getMealIcon(meal.type)}
+                  mealColor={getMealColor(meal.type)}
+                  isCompleted={isCompleted}
+                />
+              );
+            })}
+          </View>
+        )}
+
+        {/* Off-plan / logged extras */}
+        {offPlanRows.length > 0 && (
+          <View style={styles.timelineWrap}>
+            <Text style={styles.timelineLabel}>Off-plan</Text>
+            {offPlanRows.map(({ meal, index }) => {
+              const mealKey = `${index}_${(meal as any).id || meal.name}`;
+              const isCompleted = completedMeals[mealKey] || false;
+              return (
+                <MealCard
+                  key={index}
+                  meal={meal}
+                  onPress={() => handleMealPress(meal)}
+                  onLongPress={() => handleMealLongPress(meal, index)}
+                  onToggleComplete={() => quickToggleMealCompletion(meal, index)}
+                  themeColor={themeColor}
+                  mealIcon={getMealIcon(meal.type)}
+                  mealColor={getMealColor(meal.type)}
+                  isCompleted={isCompleted}
+                />
+              );
+            })}
+          </View>
+        )}
 
         {allMeals.length === 0 && (
           <View style={styles.emptyState}>
-            <Ionicons name="restaurant-outline" size={64} color="#3f3f46" />
-            <Text style={styles.emptyTitle}>No Meals Planned</Text>
+            <Ionicons name="restaurant-outline" size={56} color="#3f3f46" />
+            <Text style={styles.emptyTitle}>No meals planned</Text>
             <Text style={styles.emptyDescription}>
-              This day doesn't have any meals configured.
+              This day doesn't have any meals yet. Tap + to add one.
             </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Add Meal Modal */}
+      {/* Quick add / log a meal */}
       <Modal
         visible={showAddMealModal}
         transparent={false}
         animationType="slide"
         presentationStyle="fullScreen"
-        onRequestClose={() => setShowAddMealModal(false)}
+        onRequestClose={closeAddMeal}
       >
         <View style={styles.modalScreen}>
-          {/* Navigation Header */}
-          <View style={styles.navHeader}>
-            <TouchableOpacity 
-              onPress={() => {
-                setShowAddMealModal(false);
-                setAddMealType(null);
-                setSelectedFavoriteMeal(null);
-                setNewMealName('');
-                setNewMealTime('');
-                setSelectedHour(12);
-                setSelectedMinute(0);
-                setSelectedPeriod('PM');
-                setShowTimePicker(false);
-                setNewMealCalories('');
-                setNewMealProtein('');
-                setNewMealCarbs('');
-                setNewMealFat('');
-              }}
-              style={styles.navBackButton}
-            >
-              <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          <View style={styles.qaHeader}>
+            <TouchableOpacity onPress={closeAddMeal} style={styles.qaBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="chevron-back" size={26} color="#ffffff" />
             </TouchableOpacity>
-            <Text style={styles.navTitle}>Add Meal</Text>
-            <View style={styles.navSpacer} />
+            <Text style={styles.qaTitle}>Log a meal</Text>
+            <View style={{ width: 26 }} />
           </View>
 
-          <KeyboardAvoidingView 
+          <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           >
-            <ScrollView 
-              style={styles.scrollContent}
-              contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {!addMealType ? (
-              /* Meal Type Selection */
-              <View style={styles.mealTypeSelection}>
-                <Text style={styles.selectionTitle}>What would you like to add?</Text>
-                
-                <TouchableOpacity
-                  style={styles.mealTypeOption}
-                  onPress={() => setAddMealType('manual')}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionIconContainer}>
-                    <Ionicons name="create-outline" size={32} color={themeColor} />
-                  </View>
-                  <Text style={styles.optionTitle}>Manual Meal</Text>
-                  <Text style={styles.optionDescription}>
-                    Create a custom meal with your own details
-                  </Text>
-                </TouchableOpacity>
+            <ScrollView
+              style={styles.modalScrollContent}
+              contentContainerStyle={styles.qaContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.qaLabel}>What did you eat? <Text style={styles.qaOptional}>(optional)</Text></Text>
+              <TextInput
+                style={styles.qaField}
+                placeholder="e.g. Cafe burrito"
+                placeholderTextColor="#5a5a60"
+                value={newMealName}
+                onChangeText={setNewMealName}
+                autoCapitalize="words"
+              />
 
-                <TouchableOpacity
-                  style={styles.mealTypeOption}
-                  onPress={() => {
-                    if (favoriteMeals.length === 0) {
-                      Alert.alert('No Favorites', 'You haven\'t favorited any meals yet. Favorite meals from your meal plans to use them here!');
-                    } else {
-                      setAddMealType('favorite');
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionIconContainer}>
-                    <Ionicons name="heart-outline" size={32} color="#ef4444" />
-                  </View>
-                  <Text style={styles.optionTitle}>From Favorites</Text>
-                  <Text style={styles.optionDescription}>
-                    Add a meal from your saved favorites
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : addMealType === 'favorite' ? (
-              /* Favorites Selection */
-              <View style={styles.favoritesSelection}>
-                <Text style={styles.formTitle}>Choose from Favorites</Text>
-                
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  {favoriteMeals.map((favorite, index) => {
-                    console.log('🍽️ Favorite meal data:', JSON.stringify(favorite, null, 2));
+              <Text style={[styles.qaLabel, { marginTop: 18 }]}>Meal</Text>
+              {([['breakfast', 'lunch', 'dinner'], ['snack', 'dessert']] as const).map((row, ri) => (
+                <View key={ri} style={[styles.qaSegment, ri > 0 && { marginTop: 8 }]}>
+                  {row.map((t) => {
+                    const active = newMealType === t;
+                    const segW = (Dimensions.get('window').width - 46) / row.length;
                     return (
-                    <TouchableOpacity
-                      key={favorite.mealId}
-                      style={[
-                        styles.favoriteMealCard,
-                        selectedFavoriteMeal?.mealId === favorite.mealId && styles.selectedMealCard
-                      ]}
-                      onPress={() => {
-                        console.log('🎯 Meal card tapped:', favorite.meal?.name);
-                        setSelectedFavoriteMeal(favorite);
-                        console.log('✅ Selected favorite meal set');
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.mealCardHeader}>
-                        <Text style={styles.favoriteMealName}>
-                          {favorite.meal?.name || 'Unknown Meal'}
-                        </Text>
-                        <View style={styles.mealMetrics}>
-                          <Text style={styles.calorieText}>
-                            {favorite.meal?.calories || favorite.meal?.nutritionInfo?.calories || 0} cal
-                          </Text>
-                          {selectedFavoriteMeal?.mealId === favorite.mealId && (
-                            <Ionicons name="checkmark-circle" size={20} color={themeColor} />
-                          )}
-                        </View>
-                      </View>
-                      
-                      {(favorite.meal?.macros || favorite.meal?.nutritionInfo) && (
-                        <View style={styles.macroRow}>
-                          <Text style={styles.macroItem}>
-                            P: {favorite.meal?.macros?.protein || favorite.meal?.nutritionInfo?.protein || 0}g
-                          </Text>
-                          <Text style={styles.macroItem}>
-                            C: {favorite.meal?.macros?.carbs || favorite.meal?.nutritionInfo?.carbs || 0}g
-                          </Text>
-                          <Text style={styles.macroItem}>
-                            F: {favorite.meal?.macros?.fat || favorite.meal?.nutritionInfo?.fat || 0}g
-                          </Text>
-                        </View>
-                      )}
-                      
-                      <View style={styles.mealStats}>
-                        <Text style={styles.statText}>Added {new Date(favorite.addedAt).toLocaleDateString()}</Text>
-                      </View>
-                    </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-                
-                {selectedFavoriteMeal && (
-                  <View style={styles.timeSelectionSection}>
-                    <Text style={styles.fieldLabel}>When will you eat this? *</Text>
-                    <TouchableOpacity
-                      style={styles.timePickerButton}
-                      onPress={() => setShowTimePicker(true)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="time-outline" size={20} color={themeColor} />
-                      <Text style={styles.timePickerButtonText}>{newMealTime || 'Select Time'}</Text>
-                      <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                <TouchableOpacity 
-                  key={`favorite-button-${selectedFavoriteMeal?.mealId || 'none'}-${newMealTime || 'none'}`}
-                  style={[
-                    styles.addMealButton,
-                    { 
-                      backgroundColor: themeColor,
-                      opacity: (!selectedFavoriteMeal || !newMealTime.trim()) ? 0.5 : 1.0
-                    }
-                  ]}
-                  onPressIn={() => {
-                    console.log('🔍 Button state - Selected meal:', selectedFavoriteMeal?.meal?.name || 'NONE');
-                    console.log('🔍 Button state - Time:', newMealTime || 'NONE');
-                    console.log('🔍 Button opacity should be:', (!selectedFavoriteMeal || !newMealTime.trim()) ? 0.5 : 1.0);
-                  }}
-                  onPress={async () => {
-                    if (selectedFavoriteMeal && newMealTime.trim()) {
-                      console.log('🔍 About to add favorite meal:', {
-                        mealName: selectedFavoriteMeal.meal.name,
-                        mealStructure: selectedFavoriteMeal.meal,
-                        hasCalories: !!selectedFavoriteMeal.meal.calories,
-                        hasMacros: !!selectedFavoriteMeal.meal.macros,
-                        hasNutritionInfo: !!selectedFavoriteMeal.meal.nutritionInfo,
-                        time: newMealTime
-                      });
-                      
-                      const success = await addMealToToday(selectedFavoriteMeal.meal, newMealTime);
-                      if (success) {
-                        Alert.alert('Success', `Added "${selectedFavoriteMeal.meal.name}" to your timeline!`);
-                        setShowAddMealModal(false);
-                        setAddMealType(null);
-                        setSelectedFavoriteMeal(null);
-                        setNewMealTime('');
-                        setSelectedHour(12);
-                        setSelectedMinute(0);
-                        setSelectedPeriod('PM');
-                        setShowTimePicker(false);
-                      }
-                    }
-                  }}
-                  disabled={!selectedFavoriteMeal || !newMealTime.trim()}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="heart" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                  <Text style={styles.addMealButtonText}>Add Favorite</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              /* Manual Meal Form */
-              <View style={styles.mealForm}>
-                <Text style={styles.formTitle}>Add Manual Meal</Text>
-                
-                {/* Meal Name */}
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>Meal Name *</Text>
-                  <TextInput
-                    style={styles.inputField}
-                    placeholder="e.g., Protein Shake, Chicken Salad"
-                    placeholderTextColor="#6b7280"
-                    value={newMealName}
-                    onChangeText={setNewMealName}
-                    autoCapitalize="words"
-                  />
-                </View>
-
-                {/* Meal Type Selection */}
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>Type</Text>
-                  <View style={styles.mealTypeSelection}>
-                    {(['breakfast', 'lunch', 'dinner', 'snack', 'custom'] as const).map((type) => (
                       <TouchableOpacity
-                        key={type}
-                        style={[
-                          styles.mealTypeButton,
-                          newMealType === type && { backgroundColor: themeColor }
-                        ]}
-                        onPress={() => setNewMealType(type)}
+                        key={t}
+                        style={[styles.qaSegItem, { width: segW }, active && { backgroundColor: themeColor }]}
+                        activeOpacity={0.8}
+                        onPress={() => setNewMealType(t)}
                       >
-                        <Text style={[
-                          styles.mealTypeButtonText,
-                          newMealType === type && { color: '#ffffff' }
-                        ]}>
-                          {type === 'custom' ? 'Custom' : type}
+                        <Text style={[styles.qaSegText, active && styles.qaSegTextActive]} numberOfLines={1}>
+                          {t.charAt(0).toUpperCase() + t.slice(1)}
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
-                  
-                  {/* Custom Type Input */}
-                  {newMealType === 'custom' && (
-                    <TextInput
-                      style={[styles.inputField, { marginTop: 8 }]}
-                      placeholder="e.g., Lunch x2, Post-workout, Late dinner"
-                      placeholderTextColor="#6b7280"
-                      value={customMealType}
-                      onChangeText={setCustomMealType}
-                      autoCapitalize="words"
-                    />
-                  )}
+                    );
+                  })}
                 </View>
+              ))}
 
-                {/* Time Picker */}
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>Time</Text>
-                  <TouchableOpacity
-                    style={styles.timePickerButton}
-                    onPress={() => setShowTimePicker(true)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="time-outline" size={20} color={themeColor} />
-                    <Text style={styles.timePickerButtonText}>{newMealTime || 'Select Time'}</Text>
-                    <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
-                  </TouchableOpacity>
+              <Text style={[styles.qaLabel, { marginTop: 18 }]}>Macros</Text>
+              <View style={styles.qaMacroRow}>
+                <View style={styles.qaMacroCol}>
+                  <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealCalories} onChangeText={setNewMealCalories} keyboardType="numeric" textAlign="center" />
+                  <Text style={styles.qaMacroLbl}>Kcal</Text>
                 </View>
-
-                {/* Calories */}
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>Calories</Text>
-                  <TextInput
-                    style={styles.inputField}
-                    placeholder="e.g., 300"
-                    placeholderTextColor="#6b7280"
-                    value={newMealCalories}
-                    onChangeText={setNewMealCalories}
-                    keyboardType="numeric"
-                  />
+                <View style={styles.qaMacroCol}>
+                  <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealProtein} onChangeText={setNewMealProtein} keyboardType="numeric" textAlign="center" />
+                  <Text style={styles.qaMacroLbl}>Protein</Text>
                 </View>
-
-                {/* Macros Row */}
-                <View style={styles.macrosRow}>
-                  <View style={styles.macroField}>
-                    <Text style={styles.fieldLabel}>Protein (g)</Text>
-                    <TextInput
-                      style={styles.inputField}
-                      placeholder="25"
-                      placeholderTextColor="#6b7280"
-                      value={newMealProtein}
-                      onChangeText={setNewMealProtein}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                  <View style={styles.macroField}>
-                    <Text style={styles.fieldLabel}>Carbs (g)</Text>
-                    <TextInput
-                      style={styles.inputField}
-                      placeholder="30"
-                      placeholderTextColor="#6b7280"
-                      value={newMealCarbs}
-                      onChangeText={setNewMealCarbs}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                  <View style={styles.macroField}>
-                    <Text style={styles.fieldLabel}>Fat (g)</Text>
-                    <TextInput
-                      style={styles.inputField}
-                      placeholder="10"
-                      placeholderTextColor="#6b7280"
-                      value={newMealFat}
-                      onChangeText={setNewMealFat}
-                      keyboardType="numeric"
-                    />
-                  </View>
+                <View style={styles.qaMacroCol}>
+                  <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealCarbs} onChangeText={setNewMealCarbs} keyboardType="numeric" textAlign="center" />
+                  <Text style={styles.qaMacroLbl}>Carbs</Text>
                 </View>
-
-                {/* Add Button */}
-                <TouchableOpacity 
-                  style={[
-                    styles.addMealButton,
-                    { backgroundColor: themeColor }
-                  ]}
-                  onPress={async () => {
-                    if (newMealName.trim()) {
-                      // Create the meal object
-                      const newMeal = {
-                        name: newMealName.trim(),
-                        type: newMealType === 'custom' ? customMealType.trim() || 'custom' : newMealType,
-                        time: newMealTime || '', // Optional - can be empty
-                        calories: parseInt(newMealCalories) || 0,
-                        macros: {
-                          protein: parseInt(newMealProtein) || 0,
-                          carbs: parseInt(newMealCarbs) || 0,
-                          fat: parseInt(newMealFat) || 0,
-                        },
-                        ingredients: [],
-                        instructions: [],
-                        tags: [],
-                        isOriginal: false,
-                        addedAt: new Date().toISOString(),
-                      };
-                      
-                      // Simple approach: Extract the same date the screen is currently viewing
-                      // This is the date that loadCurrentDayMeals successfully found meals for
-                      let targetDate = legacyCalculatedDateString || legacyDay?.date;
-                      
-                      // Map dayIndex to plan dates if we have currentPlan
-                      if (currentPlan && typeof dayIndex === 'number') {
-                        const availableDates = Object.keys(currentPlan.dailyMeals).sort();
-                        if (dayIndex >= 0 && dayIndex < availableDates.length) {
-                          targetDate = availableDates[dayIndex];
-                        }
-                      }
-                      
-                      console.log(`📅 Adding manual meal to: ${targetDate}`);
-                      const success = await addMealToDate(targetDate, newMeal);
-                      
-                      if (success) {
-                        Alert.alert('Success', 'Manual meal added successfully!');
-                        // Clear the form and close modal
-                        setShowAddMealModal(false);
-                        setAddMealType(null);
-                        setNewMealName('');
-                        setNewMealType('snack');
-                        setCustomMealType('');
-                        setNewMealTime('');
-                        setSelectedHour(12);
-                        setSelectedMinute(0);
-                        setSelectedPeriod('PM');
-                        setShowTimePicker(false);
-                        setNewMealCalories('');
-                        setNewMealProtein('');
-                        setNewMealCarbs('');
-                        setNewMealFat('');
-                        
-                        // Reload the meals to show the new addition
-                        await loadCurrentDayMeals();
-                      } else {
-                        Alert.alert('Error', 'Failed to add meal. Please try again.');
-                      }
-                    }
-                  }}
-                  disabled={!newMealName.trim()}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="add" size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                  <Text style={styles.addMealButtonText}>Add Meal</Text>
-                </TouchableOpacity>
+                <View style={styles.qaMacroCol}>
+                  <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealFat} onChangeText={setNewMealFat} keyboardType="numeric" textAlign="center" />
+                  <Text style={styles.qaMacroLbl}>Fat</Text>
+                </View>
               </View>
-            )}
-          </ScrollView>
+
+              {favRecipes.length > 0 && (
+                <>
+                  <View style={styles.qaDivider}>
+                    <View style={styles.qaDivLine} />
+                    <Text style={styles.qaDivText}>OR PICK A FAVOURITE</Text>
+                    <View style={styles.qaDivLine} />
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.qaFavRow}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {favRecipes.map((r) => {
+                      const f = recipeFields(r);
+                      const selected = selectedRecipe?.key === f.key;
+                      const localSrc = f.localName ? getMealImage(f.localName) : null;
+                      return (
+                        <TouchableOpacity
+                          key={f.key}
+                          style={[styles.qaFav, selected && { borderColor: themeColor }]}
+                          activeOpacity={0.8}
+                          onPress={() => prefillFromRecipe(r)}
+                        >
+                          {localSrc ? (
+                            <Image source={localSrc} style={styles.qaFavPhoto} resizeMode="cover" />
+                          ) : f.photo ? (
+                            <Image source={{ uri: f.photo }} style={styles.qaFavPhoto} resizeMode="cover" />
+                          ) : (
+                            <View style={styles.qaFavPhotoFallback}>
+                              <Ionicons name="restaurant-outline" size={20} color="#52525b" />
+                            </View>
+                          )}
+                          <Text style={[styles.qaFavName, selected && { color: themeColor }]} numberOfLines={1}>{f.name}</Text>
+                          <Text style={styles.qaFavKcal}>{f.kcal} kcal · {f.protein}g P</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.qaAction}>
+              <TouchableOpacity
+                style={[styles.qaBtn, canLog ? { backgroundColor: themeColor } : styles.qaBtnDisabled]}
+                onPress={logQuickMeal}
+                disabled={!canLog}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.qaBtnText, !canLog && styles.qaBtnTextDisabled]}>Log it</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={closeAddMeal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.7}>
+                <Text style={styles.qaCancel}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </KeyboardAvoidingView>
         </View>
-
-        {/* Custom Time Picker Modal */}
-        <Modal
-          visible={showTimePicker}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowTimePicker(false)}
-        >
-          <View style={styles.timePickerOverlay}>
-            <View style={styles.timePickerModal}>
-              <View style={styles.timePickerHeader}>
-                <TouchableOpacity
-                  onPress={() => setShowTimePicker(false)}
-                  style={styles.timePickerCancel}
-                >
-                  <Text style={styles.timePickerCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={styles.timePickerTitle}>Select Time</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    const time = `${selectedHour}:${selectedMinute.toString().padStart(2, '0')} ${selectedPeriod}`;
-                    console.log('⏰ Time picker - Setting time to:', time);
-                    setNewMealTime(time);
-                    console.log('⏰ newMealTime should now be:', time);
-                    setShowTimePicker(false);
-                  }}
-                  style={styles.timePickerDone}
-                >
-                  <Text style={styles.timePickerDoneText}>Done</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.timePickerContent}>
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={selectedHour}
-                    onValueChange={(value) => setSelectedHour(value)}
-                    style={styles.timePicker}
-                    itemStyle={styles.timePickerItem}
-                  >
-                    {[...Array(12)].map((_, i) => (
-                      <Picker.Item key={i + 1} label={String(i + 1)} value={i + 1} color="#ffffff" />
-                    ))}
-                  </Picker>
-                  
-                  <Picker
-                    selectedValue={selectedMinute}
-                    onValueChange={(value) => setSelectedMinute(value)}
-                    style={styles.timePicker}
-                    itemStyle={styles.timePickerItem}
-                  >
-                    {[...Array(60)].map((_, i) => (
-                      <Picker.Item key={i} label={String(i).padStart(2, '0')} value={i} color="#ffffff" />
-                    ))}
-                  </Picker>
-                  
-                  <Picker
-                    selectedValue={selectedPeriod}
-                    onValueChange={(value) => setSelectedPeriod(value)}
-                    style={styles.timePicker}
-                    itemStyle={styles.timePickerItem}
-                  >
-                    <Picker.Item label="AM" value="AM" color="#ffffff" />
-                    <Picker.Item label="PM" value="PM" color="#ffffff" />
-                  </Picker>
-                </View>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </Modal>
 
       {/* Custom Action Sheet */}
@@ -1542,66 +1312,29 @@ export default function MealPlanDayScreen() {
         animationType="fade"
         onRequestClose={() => handleActionSheetAction('cancel')}
       >
-        <View style={styles.actionSheetOverlay}>
-          <TouchableOpacity 
-            style={styles.actionSheetBackdrop}
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity
+            style={styles.sheetBackdrop}
             activeOpacity={1}
             onPress={() => handleActionSheetAction('cancel')}
           />
-          <View style={styles.actionSheetContainer}>
-            {/* Header */}
-            <View style={styles.actionSheetHeader}>
-              <Text style={styles.actionSheetTitle}>
-                {selectedMeal?.meal.name}
-              </Text>
-              <Text style={styles.actionSheetSubtitle}>
-                Choose an action:
-              </Text>
-            </View>
-            
-            {/* Actions */}
-            <TouchableOpacity 
-              style={styles.actionSheetButton}
-              onPress={() => handleActionSheetAction('complete')}
-            >
-              <Ionicons 
-                name={selectedMeal?.isCompleted ? "checkmark-circle" : "checkmark-circle-outline"} 
-                size={24} 
-                color="#10b981" 
-              />
-              <Text style={styles.actionSheetButtonText}>
-                {selectedMeal?.isCompleted ? 'Mark as Incomplete' : 'Mark as Complete'}
-              </Text>
+          <View style={styles.sheetCard}>
+            <View style={styles.sheetGrabber} />
+            <Text style={styles.sheetTitle} numberOfLines={1}>{selectedMeal?.meal.name}</Text>
+            <View style={styles.sheetDivider} />
+
+            <TouchableOpacity style={styles.sheetRow} onPress={() => handleActionSheetAction('complete')} activeOpacity={0.7}>
+              <Ionicons name={selectedMeal?.isCompleted ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={themeColor} />
+              <Text style={styles.sheetRowText}>{selectedMeal?.isCompleted ? 'Mark as not eaten' : 'Mark as eaten'}</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionSheetButton}
-              onPress={() => handleActionSheetAction('edit')}
-            >
-              <Ionicons name="pencil-outline" size={24} color="#3b82f6" />
-              <Text style={[styles.actionSheetButtonText, { color: '#3b82f6' }]}>
-                Edit Meal
-              </Text>
+
+            <TouchableOpacity style={[styles.sheetRow, styles.sheetRowLast]} onPress={() => handleActionSheetAction('delete')} activeOpacity={0.7}>
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              <Text style={[styles.sheetRowText, { color: '#ef4444' }]}>Delete meal</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionSheetButton}
-              onPress={() => handleActionSheetAction('delete')}
-            >
-              <Ionicons name="trash-outline" size={24} color="#ef4444" />
-              <Text style={[styles.actionSheetButtonText, { color: '#ef4444' }]}>
-                Delete Meal
-              </Text>
-            </TouchableOpacity>
-            
-            {/* Cancel Button */}
-            <TouchableOpacity 
-              style={styles.actionSheetCancelButton}
-              onPress={() => handleActionSheetAction('cancel')}
-            >
-              <Text style={styles.actionSheetCancelText}>
-                Cancel
-              </Text>
+
+            <TouchableOpacity style={styles.sheetCancel} onPress={() => handleActionSheetAction('cancel')} activeOpacity={0.7}>
+              <Text style={styles.sheetCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1614,42 +1347,20 @@ export default function MealPlanDayScreen() {
         animationType="fade"
         onRequestClose={handleCancelDelete}
       >
-        <View style={styles.deleteModalOverlay}>
-          <View style={styles.deleteModalContainer}>
-            {/* Icon */}
-            <View style={styles.deleteIconContainer}>
-              <Ionicons name="trash-outline" size={32} color="#ef4444" />
+        <View style={styles.delOverlay}>
+          <View style={styles.delCard}>
+            <View style={styles.delIconWrap}>
+              <Ionicons name="trash-outline" size={26} color="#ef4444" />
             </View>
-            
-            {/* Title */}
-            <Text style={styles.deleteModalTitle}>
-              Delete Meal
-            </Text>
-            
-            {/* Meal Name */}
-            <Text style={styles.deleteModalMealName}>
-              {selectedMeal?.meal.name}
-            </Text>
-            
-            {/* Description */}
-            <Text style={styles.deleteModalDescription}>
-              Are you sure you want to delete this meal? This action cannot be undone.
-            </Text>
-            
-            {/* Buttons */}
-            <View style={styles.deleteModalButtons}>
-              <TouchableOpacity 
-                style={[styles.deleteModalButton, styles.deleteModalCancelButton]}
-                onPress={handleCancelDelete}
-              >
-                <Text style={styles.deleteModalCancelText}>Cancel</Text>
+            <Text style={styles.delTitle}>Delete meal</Text>
+            <Text style={styles.delName} numberOfLines={2}>{selectedMeal?.meal.name}</Text>
+            <Text style={styles.delBody}>This removes it from your day. You can't undo this.</Text>
+            <View style={styles.delButtons}>
+              <TouchableOpacity style={[styles.delCancel, { width: delBtnW }]} onPress={handleCancelDelete} activeOpacity={0.8}>
+                <Text style={styles.delCancelText}>Cancel</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.deleteModalButton, styles.deleteModalConfirmButton]}
-                onPress={handleConfirmDelete}
-              >
-                <Text style={styles.deleteModalConfirmText}>Delete</Text>
+              <TouchableOpacity style={[styles.delConfirm, { width: delBtnW }]} onPress={handleConfirmDelete} activeOpacity={0.85}>
+                <Text style={styles.delConfirmText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1667,462 +1378,252 @@ const styles = StyleSheet.create({
   scrollContent: {
     flex: 1,
   },
-  
-  // Compact Header
-  compactHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e1e1f',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#18181b',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#18181b',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  dateSubtitle: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    textAlign: 'center',
-    fontWeight: '500',
+  scrollPad: {
+    paddingBottom: 48,
   },
 
-  // Section Styling
-  section: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  
-  // Compact Progress Card
-  compactProgressCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    padding: 16,
-  },
-  progressRow: {
+  // ---- New: top bar ----
+  topBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  backBtn: { padding: 4 },
+
+  // ---- New: menu-style header (no outline) ----
+  menuHeader: {
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 28,
+    paddingTop: 10,
+    paddingBottom: 22,
   },
-  progressInfo: {
-    flex: 1,
-  },
-  progressTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  progressSubtitle: {
-    fontSize: 13,
-    color: '#a1a1aa',
-  },
-  progressPercentage: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  progressBarContainer: {
-    height: 6,
-    backgroundColor: '#27272a',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  compactMacrosRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  compactMacro: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  compactMacroDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  compactMacroText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#d4d4d8',
-  },
-  caloriesSection: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  caloriesMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  caloriesValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  caloriesLabel: {
-    fontSize: 14,
-    color: '#71717a',
-    marginLeft: 4,
-  },
-  macrosRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 12,
-    paddingHorizontal: 8,
-  },
-  macroItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  macroItemDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  macroLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#a1a1aa',
-  },
-  bottomStats: {
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
-  },
-  bottomStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  bottomStatText: {
-    fontSize: 12,
-    color: '#71717a',
-  },
-  mealSection: {
-    marginBottom: 20,
-  },
-  mealSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  mealSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  mealCount: {
-    fontSize: 12,
-    color: '#71717a',
-    marginLeft: 'auto',
-  },
-  mealCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    padding: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  mealCardCompleted: {
-    opacity: 0.7,
-    backgroundColor: 'rgba(34, 197, 94, 0.05)',
-    borderColor: '#22c55e',
-    borderWidth: 1,
-  },
-  mealHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  mealTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  mealIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  mealTitleContainer: {
-    flex: 1,
-  },
-  mealName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  mealSubInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  mealType: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  mealTime: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#71717a',
-  },
-  timingReason: {
+  menuOverline: {
     fontSize: 11,
-    color: '#a1a1aa',
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  completedBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  completionCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    marginRight: 8,
-  },
-  mealStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  statChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(39, 39, 42, 0.6)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  statText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#d4d4d8',
-  },
-  macrosBar: {
-    marginBottom: 8,
-  },
-  macrosRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  macroChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  macroChipDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  macroText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#a1a1aa',
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    alignItems: 'center',
-  },
-  tag: {
-    backgroundColor: 'rgba(113, 113, 122, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  tagText: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#a1a1aa',
-  },
-  moreTagsText: {
-    fontSize: 10,
-    color: '#71717a',
-    fontStyle: 'italic',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    fontSize: 14,
-    color: '#71717a',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-
-  // New simplified nutrition styles
-  nutritionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  caloriesText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#f59e0b',
-  },
-  macrosInline: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  macroInlineText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#a1a1aa',
-  },
-
-  // Modern Progress Card Styles
-  modernProgressCard: {
-    backgroundColor: 'rgba(24, 24, 27, 0.8)',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  modernProgressTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  modernProgressSubtitle: {
-    fontSize: 15,
-    color: '#a1a1aa',
-    fontWeight: '500',
-  },
-  percentageCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  percentageText: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  modernProgressBarContainer: {
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 24,
-  },
-  modernProgressBar: {
-    height: '100%',
-    borderRadius: 4,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  nutritionGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  nutritionItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  nutritionValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  nutritionLabel: {
-    fontSize: 12,
-    color: '#71717a',
+    letterSpacing: 2.5,
+    color: FAINT,
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  menuDay: {
+    fontFamily: SERIF,
+    fontSize: 34,
+    fontStyle: 'italic',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  menuSub: {
+    fontSize: 15,
+    color: MUTED,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  menuSubAccent: {
+    fontFamily: SERIF,
+    fontSize: 16,
+    color: '#dcdce0',
+  },
+  hairline: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#2a2a30',
+    alignSelf: 'stretch',
+    marginTop: 18,
+    marginBottom: 14,
+  },
+  dayProgressTrack: {
+    height: 4,
+    backgroundColor: '#1c1c22',
+    borderRadius: 2,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
+  dayProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  loggedText: {
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: FAINT,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginTop: 9,
   },
 
-  // Add Meal Modal Styles
+  // ---- New: photo meal timeline ----
+  timelineWrap: {
+    paddingHorizontal: 18,
+  },
+  timelineLabel: {
+    fontSize: 10,
+    letterSpacing: 2,
+    color: FAINT,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 14,
+  },
+  mcard: {
+    borderRadius: 18,
+    marginBottom: 18,
+  },
+  mcardDone: {
+    opacity: 0.5,
+  },
+  photoWrap: {
+    height: 150,
+    borderRadius: 18,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#121216',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+  },
+  photoFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#141416',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(8,8,10,0.62)',
+  },
+  chip: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  viewHint: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipText: {
+    fontSize: 9.5,
+    letterSpacing: 1.5,
+    color: '#e8e8ea',
+    fontWeight: '600',
+  },
+  check: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkMark: {
+    color: '#06262b',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  mbody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 11,
+    paddingHorizontal: 2,
+  },
+  checkBtn: {
+    width: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mname: {
+    fontFamily: SERIF,
+    fontSize: 18,
+    color: '#ffffff',
+  },
+  mnameDone: {
+    textDecorationLine: 'line-through',
+    color: '#8a8a90',
+  },
+  mmacroDone: {
+    color: '#5a5a60',
+  },
+  mmacro: {
+    fontSize: 12,
+    color: MUTED,
+    marginTop: 5,
+  },
+
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 40,
+  },
+  emptyTitle: {
+    fontFamily: SERIF,
+    fontSize: 22,
+    color: '#ffffff',
+    marginTop: 18,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    fontSize: 15,
+    color: MUTED,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+
+  // ---- Quick add / log a meal ----
+  qaHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingBottom: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#18181c' },
+  qaBack: { padding: 4 },
+  qaTitle: { fontFamily: SERIF, fontSize: 20, color: '#ffffff' },
+  qaContent: { padding: 20, paddingBottom: 40 },
+  qaLabel: { fontSize: 10, letterSpacing: 2, color: FAINT, fontWeight: '600', textTransform: 'uppercase', marginBottom: 9 },
+  qaOptional: { letterSpacing: 0, textTransform: 'none', color: '#4a4a50' },
+  qaFavRow: { paddingRight: 8 },
+  qaFav: { width: 140, borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 14, overflow: 'hidden', marginRight: 9 },
+  qaFavPhoto: { width: '100%', height: 76 },
+  qaFavPhotoFallback: { width: '100%', height: 76, backgroundColor: '#141416', alignItems: 'center', justifyContent: 'center' },
+  qaFavName: { fontFamily: SERIF, fontSize: 14, color: '#e8e8ea', paddingHorizontal: 10, paddingTop: 8 },
+  qaFavKcal: { fontSize: 11, color: MUTED, paddingHorizontal: 10, paddingBottom: 10, paddingTop: 3 },
+  qaDivider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20, marginBottom: 18 },
+  qaDivLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#222' },
+  qaDivText: { fontSize: 10, letterSpacing: 1.5, color: '#5a5a60', fontWeight: '600' },
+  qaField: { backgroundColor: '#0e0e12', borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: '#f4f4f6', minHeight: 48 },
+  qaMacroRow: { flexDirection: 'row', gap: 9 },
+  qaSegment: { flexDirection: 'row', backgroundColor: '#0e0e12', borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 13, padding: 3 },
+  qaSegItem: { paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  qaSegText: { fontSize: 13, color: '#9a9aa0' },
+  qaSegTextActive: { color: '#06262b', fontWeight: '600' },
+  qaMacroCol: { flex: 1 },
+  qaMacroInput: { backgroundColor: '#0e0e12', borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 12, paddingVertical: 13, fontSize: 15, color: '#f4f4f6', minHeight: 48 },
+  qaMacroLbl: { textAlign: 'center', fontSize: 9, letterSpacing: 1, color: FAINT, fontWeight: '600', textTransform: 'uppercase', marginTop: 6 },
+  qaAction: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 30, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#18181c' },
+  qaBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  qaBtnDisabled: { backgroundColor: '#1a1a1e' },
+  qaBtnText: { fontSize: 16, fontWeight: '700', color: '#ffffff' },
+  qaBtnTextDisabled: { color: '#5a5a60' },
+  qaCancel: { fontSize: 14, color: MUTED, textAlign: 'center', marginTop: 14 },
+
+  // ===== Existing modal / picker / sheet styles (unchanged) =====
   modalScreen: {
     flex: 1,
     backgroundColor: '#0a0a0b',
@@ -2154,17 +1655,12 @@ const styles = StyleSheet.create({
   navSpacer: {
     width: 44,
   },
-  scrollContent: {
+  modalScrollContent: {
     flex: 1,
   },
   contentContainer: {
     padding: 20,
     paddingBottom: 40,
-  },
-  
-  // Meal Type Selection
-  mealTypeSelection: {
-    paddingTop: 20,
   },
   selectionTitle: {
     fontSize: 24,
@@ -2203,8 +1699,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  
-  // Manual Meal Form
   mealForm: {
     paddingTop: 20,
   },
@@ -2256,16 +1750,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  addMealButtonDisabled: {
-    opacity: 0.5,
-  },
   addMealButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
   },
-  
-  // Favorites Selection Styles
   favoritesSelection: {
     paddingTop: 20,
   },
@@ -2324,74 +1813,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 24,
   },
-  
-  // Time Picker Styles
-  timePickerContainer: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  timePickerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 8,
-  },
-  pickerColumn: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  pickerLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9ca3af',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  pickerButtonContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  pickerButton: {
-    backgroundColor: '#374151',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    minWidth: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  selectedPicker: {
-    backgroundColor: '#1a1a1f',
-    borderWidth: 1,
-  },
-  pickerButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#d1d5db',
-  },
-  periodButton: {
-    minWidth: 48,
-    paddingHorizontal: 16,
-  },
-  selectedTimeDisplay: {
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#374151',
-  },
-  selectedTimeText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
   mealTypeSelection: {
     flexDirection: 'row',
     gap: 8,
@@ -2411,8 +1832,6 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textTransform: 'capitalize',
   },
-  
-  // Time Picker Button Styles
   timePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2429,8 +1848,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#ffffff',
   },
-  
-  // Custom Time Picker Modal Styles
   timePickerOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -2494,7 +1911,32 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
 
-  // Action Sheet Styles
+  // ---- Revamped action sheet ----
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  sheetBackdrop: { flex: 1 },
+  sheetCard: { backgroundColor: '#141416', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 10, paddingHorizontal: 20, paddingBottom: 36, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#26262c' },
+  sheetGrabber: { alignSelf: 'center', width: 38, height: 4, borderRadius: 2, backgroundColor: '#2a2a30', marginBottom: 16 },
+  sheetTitle: { fontFamily: SERIF, fontSize: 20, color: '#ffffff', textAlign: 'center' },
+  sheetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#222', marginTop: 14, marginBottom: 2 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1c1c20' },
+  sheetRowLast: { borderBottomWidth: 0 },
+  sheetRowText: { fontSize: 16, color: '#f4f4f6', fontWeight: '500' },
+  sheetCancel: { marginTop: 16, paddingVertical: 15, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#2a2a30', alignItems: 'center' },
+  sheetCancelText: { fontSize: 15, color: MUTED, fontWeight: '600' },
+
+  // ---- Revamped delete confirm ----
+  delOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28 },
+  delCard: { width: '100%', maxWidth: 340, backgroundColor: '#141416', borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', padding: 26, alignItems: 'center' },
+  delIconWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(239,68,68,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  delTitle: { fontFamily: SERIF, fontSize: 21, color: '#ffffff', marginBottom: 6 },
+  delName: { fontSize: 15, color: '#ef4444', fontWeight: '600', textAlign: 'center', marginBottom: 12 },
+  delBody: { fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: 22 },
+  delButtons: { flexDirection: 'row', gap: 12, width: '100%', justifyContent: 'center' },
+  delCancel: { paddingVertical: 14, borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, borderColor: '#2a2a30', alignItems: 'center' },
+  delCancelText: { fontSize: 15, color: '#cfcfd4', fontWeight: '600' },
+  delConfirm: { paddingVertical: 14, borderRadius: 13, backgroundColor: '#ef4444', alignItems: 'center' },
+  delConfirmText: { fontSize: 15, color: '#ffffff', fontWeight: '700' },
+
   actionSheetOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -2559,8 +2001,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-
-  // Delete Modal Styles
   deleteModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
