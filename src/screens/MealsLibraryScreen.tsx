@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -20,6 +20,7 @@ import { CuratedMeal, CuisineType } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
 
 type MealsLibraryNavigationProp = StackNavigationProp<RootStackParamList, 'MealsLibrary'>;
+type MealsLibraryRouteProp = RouteProp<RootStackParamList, 'MealsLibrary'>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -96,14 +97,37 @@ const SORT_ORDER: SortMode[] = ['name', 'calories', 'protein', 'active_time'];
 
 export default function MealsLibraryScreen() {
   const navigation = useNavigation<MealsLibraryNavigationProp>();
+  const route = useRoute<MealsLibraryRouteProp>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  
+  // Get filtering parameters from route
+  const { cuisine: routeCuisine, title: routeTitle } = route.params || {};
+  
+  // Check if we're showing a specific category view (no filters needed for single-category views)
+  // Hide filters when showing any specific category (dessert, breakfast, snack, smoothie, mains, etc.)
+  // Only keep filters for the default "all meals" view (no routeCuisine or 'all')
+  const isSpecificCategory = routeCuisine && routeCuisine !== 'all';
+  const shouldHideFilters = isSpecificCategory;
 
-  // All non-smoothie meals
-  const allMeals = useMemo(
-    () => Object.values(CURATED_MEALS).filter(m => m.cuisine !== 'smoothie'),
-    []
-  );
+  // Filter meals based on route params, or default to all non-smoothie meals
+  const allMeals = useMemo(() => {
+    let meals = Object.values(CURATED_MEALS);
+    
+    // Handle special case of 'mains' - savoury main dishes (excluding leaf categories)
+    if (routeCuisine === 'mains') {
+      const LEAF = new Set(['breakfast', 'snack', 'dessert', 'smoothie']);
+      meals = meals.filter(m => !LEAF.has(m.cuisine));
+    } else if (routeCuisine && routeCuisine !== 'all') {
+      // Filter by specific cuisine
+      meals = meals.filter(m => m.cuisine === routeCuisine);
+    } else {
+      // Default: all non-smoothie meals
+      meals = meals.filter(m => m.cuisine !== 'smoothie');
+    }
+    
+    return meals;
+  }, [routeCuisine]);
 
   // Derive cuisine chips from actual data. Stable order: alpha sort.
   // This way the chip row stays in sync as meals are added.
@@ -112,16 +136,21 @@ export default function MealsLibraryScreen() {
     return Array.from(cuisines).sort() as CuisineType[];
   }, [allMeals]);
 
-  // State
-  const [activeCuisine, setActiveCuisine] = useState<CuisineType | 'all'>('all');
+  // State - set initial cuisine based on route params
+  const [activeCuisine, setActiveCuisine] = useState<CuisineType | 'all'>(
+    routeCuisine && routeCuisine !== 'all' ? routeCuisine as CuisineType : 'all'
+  );
   const [sortMode, setSortMode] = useState<SortMode>('name');
 
   // Apply filter then sort
   const displayedMeals = useMemo(() => {
-    const filtered =
-      activeCuisine === 'all'
-        ? allMeals
-        : allMeals.filter(m => m.cuisine === activeCuisine);
+    // If showing a specific category (e.g. mains, dessert), allMeals is already filtered
+    // Only apply additional filtering for the default "all meals" view
+    const filtered = isSpecificCategory 
+      ? allMeals
+      : (activeCuisine === 'all'
+          ? allMeals
+          : allMeals.filter(m => m.cuisine === activeCuisine));
 
     const sorted = [...filtered];
     switch (sortMode) {
@@ -157,7 +186,7 @@ export default function MealsLibraryScreen() {
         break;
     }
     return sorted;
-  }, [allMeals, activeCuisine, sortMode]);
+  }, [allMeals, activeCuisine, sortMode, isSpecificCategory]);
 
   // ===== Handlers =====
 
@@ -266,31 +295,37 @@ export default function MealsLibraryScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Meals</Text>
+          <Text style={styles.headerTitle}>{routeTitle || 'Meals'}</Text>
           <Text style={styles.headerSubtitle}>{displayedMeals.length} recipes</Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.headerSide, styles.headerSortBtn]}
-          activeOpacity={0.7}
-          onPress={handleSortPress}
-          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={`Sort by ${SORT_LABELS[sortMode]}. Tap to change.`}
-        >
-          <Ionicons name="swap-vertical" size={20} color="#d4d4d8" />
-          <Text style={styles.headerSortLabel} numberOfLines={1}>
-            {SORT_LABELS[sortMode]}
-          </Text>
-        </TouchableOpacity>
+        {!shouldHideFilters ? (
+          <TouchableOpacity
+            style={[styles.headerSide, styles.headerSortBtn]}
+            activeOpacity={0.7}
+            onPress={handleSortPress}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort by ${SORT_LABELS[sortMode]}. Tap to change.`}
+          >
+            <Ionicons name="swap-vertical" size={20} color="#d4d4d8" />
+            <Text style={styles.headerSortLabel} numberOfLines={1}>
+              {SORT_LABELS[sortMode]}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSide} />
+        )}
       </View>
 
       {/* ====================================================================
           FILTER CHIPS — cuisine chips derived from the data. "All" is always
           the first chip and is active by default. Chips are horizontally
           scrollable so adding more cuisines doesn't break the layout.
+          Hidden for category views (mains, desserts, breakfast, snacks, smoothies) since filters aren't needed.
       ==================================================================== */}
-      <View style={styles.chipRowWrap}>
+      {!shouldHideFilters && (
+        <View style={styles.chipRowWrap}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -336,6 +371,7 @@ export default function MealsLibraryScreen() {
           })}
         </ScrollView>
       </View>
+      )}
 
       {/* ====================================================================
           GRID — 2 columns, FlatList for windowing.

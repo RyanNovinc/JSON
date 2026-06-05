@@ -97,8 +97,11 @@ export default function Q1PrimaryGoalScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateQuestionnaireField('primaryGoal', selected);
+    
     if (editMode) {
-      await updateQuestionnaireField('primaryGoal', selected);
       navigation.goBack();
       return;
     }

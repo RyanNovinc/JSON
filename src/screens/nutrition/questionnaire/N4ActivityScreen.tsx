@@ -85,8 +85,11 @@ export default function N4ActivityScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateNutritionField('activityLevel', selected);
+    
     if (editMode) {
-      await updateNutritionField('activityLevel', selected);
       navigation.goBack();
       return;
     }

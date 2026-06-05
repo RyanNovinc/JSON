@@ -107,11 +107,13 @@ export default function N7LocationScreen() {
       groceryStore: store.trim(),
       ...(countryCode ? { countryCode } : {}),
     };
+    // Always save the answers to storage, whether in edit mode or not
+    await updateNutritionField('country', payload.country);
+    await updateNutritionField('city', payload.city);
+    await updateNutritionField('groceryStore', payload.groceryStore);
+    if (countryCode) await updateNutritionField('countryCode', countryCode);
+    
     if (editMode) {
-      await updateNutritionField('country', payload.country);
-      await updateNutritionField('city', payload.city);
-      await updateNutritionField('groceryStore', payload.groceryStore);
-      if (countryCode) await updateNutritionField('countryCode', countryCode);
       navigation.goBack();
       return;
     }

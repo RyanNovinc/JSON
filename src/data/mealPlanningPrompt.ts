@@ -401,7 +401,7 @@ EQUIPMENT TO COOK WITH:
 
 **CURATED MEAL DATABASE:**
 
-JSON.fit maintains a verified internal database of curated meals. ${curatedFavoriteSlugs.length ? `The user's selected meals (listed above under USER-SELECTED CURATED MEALS) have already been fetched by slug — reference those in the curated meal format and do not re-fetch them here.` : `The user did not pre-select any curated meals this run, so build all meals from your own knowledge as fully-specified invented recipes.`}
+JSON.fit maintains a verified internal database of curated meals. ${curatedFavoriteSlugs.length ? `The user's selected meals (listed above under USER-SELECTED CURATED MEALS) have already been fetched by slug — reference those in the curated meal format and do not re-fetch them here. Every selected curated meal MUST appear in the plan as a curated reference (curated_meal_slug + plate_id + scale_factor), never rewritten as an invented recipe — the app links the slug to its recipe, photo, and prep-ahead classification, and loses all three if the meal is emitted as a plain recipe.` : `The user did not pre-select any curated meals this run, so build all meals from your own knowledge as fully-specified invented recipes.`}
 
 For any slot the user did NOT pre-select a curated meal for, invent a suitable meal with full ingredients and instructions. Curated references and invented meals coexist in one plan.
 
@@ -426,19 +426,17 @@ Please create a detailed ${budgetData.planDuration || 7}-day meal plan that:
    - Serving size information
    - **WHOLE-PACK RULE**: Always use single-serve convenience products whole — never partial pouches, half packets, or fractions of containers. Use complete packages as intended and adjust other ingredients to balance macros around the full portion size.
    - **CURATED MEALS EXCEPTION**: For curated meals (referenced by slug), show only the meal name, slug, plate_id, scale_factor, calories, and macros. Omit ingredients, instructions, prep/cook times, and serving info — the app fills these in from its database when the meal plan is imported.
-6. **INCLUDES STRUCTURED MEAL PREP PLAN** - exactly what to prep, how much, and what containers to use
-7. Uses ingredients available at ${store} in ${budgetData.country}
-8. Accounts for my dietary restrictions and cooking skill level
-9. Hits macro targets using the tolerance rules below (protein daily, others weekly average)`;
+6. Uses ingredients available at ${store} in ${budgetData.country}
+7. Accounts for my dietary restrictions and cooking skill level
+8. Hits macro targets using the tolerance rules below (protein daily, others weekly average)`;
 
     if (sleepData) {
       prompt += `
-10. **PROVIDES MEAL TIMING RATIONALE** - Explain why each meal time optimizes sleep and circadian health`;
+9. **PROVIDES MEAL TIMING RATIONALE** - Explain why each meal time optimizes sleep and circadian health`;
     }
     
     // Add static sections
     prompt += getGroceryListRequirements(store, budgetData.planDuration || 7);
-    prompt += getMealPrepSessionRequirements(budgetData.planDuration || 7, budgetData.skillConfidence, budgetData.timeInvestment, budgetData.planningStyle);
     prompt += getDailyTotalsVerification();
     prompt += getVerificationSteps(budgetData.planDuration || 7);
     prompt += getFormatRequirements();
@@ -590,18 +588,12 @@ Evaluate nutritional completeness.
 ### 11. Grocery List Completeness & Accuracy
 Verify the grocery list is complete and correct.
 
-### 12. Meal Prep Session Completeness & Skill Alignment
-
-- **Structure & Steps**: Verify prep session matches skill tier, includes all meal plan items, follows prep style (grab-and-go vs moderate), and includes mid-week restock if needed for perishables.
-- **Storage & Safety**: Check all storage durations meet food safety guidelines.${planDuration > 7 ? `
-- **Multi-week plans**: Verify each prep session covers its days and shopping aligns with prep timing.` : ''}
-
-### 13. Overall Coherence
+### 12. Overall Coherence
 Final assessment of plan quality.
 
 ## Output Format
 
-**If all 13 checks PASS on first review:**
+**If all 12 checks PASS on first review:**
 - State "All checks passed — plan is ready."
 - Present the plan as-is (clean, no changes needed).
 - End with: "When you're happy with this plan, send me the JSON conversion prompt and I'll convert it for import into JSON.fit."
@@ -1012,156 +1004,6 @@ Focus on alternatives for:
 **CRITICAL:** Include specific store location notes ONLY for items that cannot be found at ${store}. For regular grocery items (chicken, vegetables, rice, etc.), do NOT include any notes as they clutter the shopping experience.${additionalGuidance ? '\n\n' + additionalGuidance : ''}`;
 };
 
-const getMealPrepSessionRequirements = (planDuration: number = 7, skillConfidence?: number, timeInvestment?: number, planningStyle?: number): string => {
-  const prepGuidance = getMealPrepSessionGuidance(planDuration);
-  
-  // Tier 1: Assembly Only (skill ≤1, or skill ≤2 + time ≤1)
-  if (skillConfidence !== undefined && skillConfidence <= 1) {
-    return `
----
-
-## MEAL PREP SESSION REQUIREMENTS
-
-**IMPORTANT:** Your meal plan should include a structured weekly assembly guide. This will be displayed in the app as a step-by-step prep walkthrough.
-
-${prepGuidance}
-
-**Assembly and portioning only — see Skill Requirements above for full constraints.**
-
-Include:
-- **Session name** — Use "Weekly Assembly & Portioning" (not "Meal Prep" or "Batch Cook")
-- **Total time** — Must be under 20 minutes for the entire week. No separate "cook time" — there is no cooking.
-- **Coverage** — What days/meals the assembly covers
-- **Recommended timing** — When to do it (e.g., "Same day as grocery shop — unpack and portion immediately")
-- **Equipment needed** — ONLY list: containers with lids, zip-lock bags, a bowl, a spoon. No cooking equipment.
-- **Step-by-step instructions** — Clear, ordered steps. Every step must be one of: unpack, portion, combine, stir, store, etc. No step should involve cooking, heating, chopping, or any kitchen skill. Include a time estimate per step (e.g., "Portion chicken — 3 min").
-  Suggested step structure:
-  1. Unpack & sort (fridge vs pantry)
-  2. Portion proteins (e.g., shred rotisserie chicken into containers)
-  3. Portion snacks (e.g., divide nuts into daily bags)
-  4. Assemble make-ahead items (combining dry ingredients for grab-and-go convenience)
-  5. Organize fridge by meal type
-  etc.
-- **Make-ahead assembly rule** — For items requiring moisture/liquid, combine DRY components during the weekly prep session. Add liquid/wet ingredients the night before consumption to prevent texture degradation. This ensures optimal texture and freshness.
-- **Opened tinned items rule** — If a recipe uses half a tin (e.g., half a tin of baked beans), the prep instructions should tell the user to transfer the remaining half to a sealed container, label it, and refrigerate immediately. Use the remainder the next day — do not store opened tinned items for more than 2 days.
-- **Mid-week restock session** — If perishable items won't last 7 days, describe a SEPARATE meal prep session for the mid-week restock. This should have its own name (e.g., "Mid-Week Restock & Assembly"), its own timing, equipment list, and step-by-step instructions. Don't bundle the restock as a final step inside the first prep session — it happens on a different day and should be treated as a distinct session.
-- **Storage guide** — Simple list: item name, container type, fridge or pantry, use-by day. Follow standard food safety storage durations for all stored items. Flag any item stored beyond safe limits.
-
-**ASSEMBLY PREP APPROACH**: All prep is assembly and portioning only. Assemble complete meals into individual grab-and-go containers where possible. At meal time, the only steps should be: grab container, microwave if needed, eat. For items that degrade when pre-assembled (e.g., items that go soggy), note them as exceptions that get assembled fresh at meal time in under 2 minutes.`;
-  }
-
-  // Tier 2: Speed-focused minimal prep (time ≤1, any skill)
-  if (timeInvestment !== undefined && timeInvestment <= 1) {
-    return `
----
-
-## MEAL PREP SESSION REQUIREMENTS
-
-**IMPORTANT:** Your meal plan should include a structured meal prep session guide. This will be displayed in the app as a step-by-step prep walkthrough.
-
-${prepGuidance}
-
-**Speed constraints — see Time Requirements above for full constraints.**
-
-Include:
-- **Session name** — e.g., "Quick Weekly Prep"
-- **Active time** — Hands-on time only (must be under 20 minutes)
-- **Passive time** — Any unattended time (e.g., rice cooker running). Separate from active time.
-- **Total time** — Combined, but the user only needs to be present for active time
-- **Coverage** — What days/meals the prep covers
-- **Recommended timing** — When to do it
-- **Equipment needed** — List only what's actually used. Prefer microwave and rice cooker over stovetop/oven for speed.
-- **Step-by-step instructions** — Ordered for efficiency. Start passive items first (rice cooker), do active tasks while waiting. Include time estimate per step.
-- **Storage guidelines** — How long each prepped item lasts in fridge vs freezer${(() => {
-    const prepApproach = (planningStyle !== undefined && planningStyle <= 2)
-      ? `\n\n**GRAB-AND-GO PREP**: This user selected "Dedicated Meal Prepper" — they want to open the fridge, grab a container, microwave it, and eat. The prep session must assemble COMPLETE meals into individual containers, not just portion ingredients. At meal time, the only steps should be: grab container, microwave 2 minutes, eat. If a meal doesn't reheat well (e.g., wraps go soggy), note it as an exception that gets assembled fresh at meal time in under 2 minutes.`
-      : (planningStyle !== undefined && planningStyle >= 4)
-      ? `\n\n**MINIMAL PREP**: This user prefers deciding at meal time. The prep session should only portion long-life ingredients (nuts, dry oats). All meal assembly happens fresh at meal time using convenience products.`
-      : `\n\n**MODERATE PREP**: Portion and assemble some meals fully into containers, leave others for quick assembly at meal time. Prioritise assembling lunches fully into grab-and-go containers and leave dinners for fresh assembly using convenience items.`;
-    return prepApproach;
-  })()}`;
-  }
-
-  // Tier 3: Simplified prep (skill ≤2 + time ≤2)
-  if (skillConfidence !== undefined && skillConfidence <= 2 && timeInvestment !== undefined && timeInvestment <= 2) {
-    return `
----
-
-## MEAL PREP SESSION REQUIREMENTS
-
-**IMPORTANT:** Your meal plan should include a structured meal prep session guide. This will be displayed in the app as a step-by-step prep walkthrough.
-
-${prepGuidance}
-
-**SIMPLIFIED PREP: Keep it simple and basic. Maximum 1 hour total. No complex techniques.**
-
-Include:
-- **Session name** — e.g., "Weekly Prep Session"
-- **Prep time** — Active hands-on time
-- **Cook time** — Passive cooking time (rice cooker, microwave only — no stovetop timing)
-- **Total time** — Combined (must be under 1 hour)
-- **Coverage** — What days/meals the prep covers
-- **Recommended timing** — When to do it
-- **Equipment needed** — Only rice cooker, microwave, and containers. No stovetop or oven.
-- **Step-by-step instructions** — One task at a time. Never require timing multiple components simultaneously. Include time estimate per step.
-- **Storage guidelines** — How long each prepped item lasts in fridge vs freezer. Include safe storage durations.${(() => {
-    const prepApproach = (planningStyle !== undefined && planningStyle <= 2)
-      ? `\n\n**GRAB-AND-GO PREP**: This user selected "Dedicated Meal Prepper" — they want to open the fridge, grab a container, microwave it, and eat. The prep session must assemble COMPLETE meals into individual containers, not just portion ingredients. At meal time, the only steps should be: grab container, microwave 2 minutes, eat. If a meal doesn't reheat well (e.g., wraps go soggy), note it as an exception that gets assembled fresh at meal time in under 2 minutes.`
-      : (planningStyle !== undefined && planningStyle >= 4)
-      ? `\n\n**MINIMAL PREP**: This user prefers deciding at meal time. The prep session should only portion long-life ingredients (nuts, dry oats). All meal assembly happens fresh at meal time using convenience products.`
-      : `\n\n**MODERATE PREP**: Portion and assemble some meals fully into containers, leave others for quick assembly at meal time. Prioritise assembling lunches fully into grab-and-go containers and leave dinners for fresh assembly using convenience items.`;
-    return prepApproach;
-  })()}`;
-  }
-
-  // Tier 4: Standard/Advanced prep (skill 3+ or time 3+)
-  return `
----
-
-## MEAL PREP SESSION REQUIREMENTS
-
-**IMPORTANT:** Your meal plan should include a structured meal prep session guide. This will be displayed in the app as a step-by-step prep walkthrough.
-
-${prepGuidance}
-
-Include:
-- **Session name** — e.g., "Sunday Meal Prep" or "Weekly Batch Cook"
-- **Prep time and cook time** — Separate active prep vs passive cooking time
-- **Total time** — Combined duration
-- **Coverage** — What days/meals the prep covers (e.g., "${planDuration} days of lunches and dinners")
-- **Recommended timing** — When to do the prep (e.g., "Sunday afternoon")
-- **Equipment needed** — List of equipment required for the prep session
-- **Step-by-step instructions** — Clear, ordered instructions for the full prep session. Order for efficiency: start slow items first (oven, rice cooker), do active prep while those run.
-- **Storage guidelines** — How long each prepped item lasts in fridge vs freezer${(() => {
-    const prepApproach = (planningStyle !== undefined && planningStyle <= 2)
-      ? `\n\n**GRAB-AND-GO PREP**: This user selected "Dedicated Meal Prepper" — they want to open the fridge, grab a container, microwave it, and eat. The prep session must assemble COMPLETE meals into individual containers, not just portion ingredients. At meal time, the only steps should be: grab container, microwave 2 minutes, eat. If a meal doesn't reheat well (e.g., wraps go soggy), note it as an exception that gets assembled fresh at meal time in under 2 minutes.`
-      : (planningStyle !== undefined && planningStyle >= 4)
-      ? `\n\n**MINIMAL PREP**: This user prefers deciding at meal time. The prep session should only portion long-life ingredients (nuts, dry oats). All meal assembly happens fresh at meal time using convenience products.`
-      : `\n\n**MODERATE PREP**: Portion and assemble some meals fully into containers, leave others for quick assembly at meal time. Prioritise assembling lunches fully into grab-and-go containers and leave dinners for fresh assembly using convenience items.`;
-    return prepApproach;
-  })()}`;
-};
-
-const getMealPrepSessionGuidance = (planDuration: number): string => {
-  if (planDuration <= 5) {
-    return `Include a single meal prep session covering the full ${planDuration}-day plan.`;
-  } else if (planDuration <= 7) {
-    return `Include a single meal prep session (e.g., "Sunday Meal Prep") covering the full week.`;
-  } else if (planDuration <= 14) {
-    return `Include TWO meal prep sessions:
-  - Session 1: Covers days 1-7 (do this before the plan starts)
-  - Session 2: Covers days 8-${planDuration} (do this on day 6 or 7)
-  Each session should have its own instructions, equipment list, and storage guidelines.`;
-  } else {
-    return `Include meal prep sessions for every 7-day block:
-  - Session 1: Days 1-7
-  - Session 2: Days 8-14
-  ${planDuration > 14 ? `- Session 3: Days 15-${Math.min(21, planDuration)}` : ''}
-  ${planDuration > 21 ? `- Session 4: Days 22-${planDuration}` : ''}
-  Plan grocery shopping to align with each prep session — don't buy 4 weeks of perishables at once.`;
-  }
-};
-
 const getGroceryListGuidance = (planDuration: number): string => {
   const baseGuidance = `**CRITICAL PRICING RULE**: Price every grocery item at the ACTUAL PACK SIZE the user must buy at the store, not the portion used in recipes. If a recipe uses 90g cheese but the smallest pack is 250g, price the 250g pack. If a recipe uses 200ml cream but the carton is 300ml, price the 300ml carton. The grocery total should reflect what the user will actually spend at the register.
 - Use conservative price estimates — round UP, not down. It's better to overestimate by 10% than underestimate by 20%.
@@ -1509,9 +1351,7 @@ Adjust portion sizes and recheck if any day or average is outside tolerance.
 
 15. **Fiber distribution** — fiber spread across the day, not concentrated in one meal.
 
-16. **Meal prep completeness** — prep guide covers all batch-cooked items from recipes.
-
-17. **Food safety frequency** — no single food exceeds safe weekly consumption guidelines.
+16. **Food safety frequency** — no single food exceeds safe weekly consumption guidelines.
 
 If any check fails, fix the plan before presenting. Do not present a plan with known issues — revise and recheck.`;
 };
@@ -1522,7 +1362,7 @@ const getFormatRequirements = (): string => {
 FORMAT:
 
 Present the plan directly in chat with clear formatting (headers, bullets, tables as needed)
-Include the Daily Totals block, grocery list (by category with quantities/prices), and meal prep session (step-by-step with storage guidelines)
+Include the Daily Totals block and grocery list (by category with quantities/prices)
 Present ONLY the final plan — no working, drafts, or iteration commentary (the Daily Totals block is final output, not draft working)
 Focus on practical meals matching my planning preferences.`;
 };

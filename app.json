@@ -19,7 +19,8 @@
         "applinks:json.fit"
       ],
       "entitlements": {
-        "aps-environment": "development"
+        "aps-environment": "development",
+        "com.apple.developer.associated-domains": ["applinks:json.fit"]
       },
       "infoPlist": {
         "CFBundleDisplayName": "JSON.fit",

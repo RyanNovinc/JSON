@@ -77,8 +77,11 @@ export default function N1GoalScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateNutritionField('goal', selected);
+    
     if (editMode) {
-      await updateNutritionField('goal', selected);
       navigation.goBack();
       return;
     }

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type WeightUnit = 'kg' | 'lbs';
 
@@ -21,6 +22,32 @@ interface WeightUnitProviderProps {
 export const WeightUnitProvider = ({ children }: WeightUnitProviderProps) => {
   const [globalUnit, setGlobalUnit] = useState<WeightUnit>('kg');
   const [exerciseUnits, setExerciseUnits] = useState<{ [exerciseIndex: number]: WeightUnit }>({});
+
+  // Load saved weight unit preference on mount
+  useEffect(() => {
+    const loadWeightUnitPreference = async () => {
+      try {
+        const savedUnit = await AsyncStorage.getItem('globalWeightUnit');
+        if (savedUnit && (savedUnit === 'kg' || savedUnit === 'lbs')) {
+          setGlobalUnit(savedUnit as WeightUnit);
+        }
+      } catch (error) {
+        console.error('Failed to load weight unit preference:', error);
+      }
+    };
+    
+    loadWeightUnitPreference();
+  }, []);
+
+  // Save weight unit preference when it changes
+  const setGlobalUnitAndSave = async (unit: WeightUnit) => {
+    try {
+      setGlobalUnit(unit);
+      await AsyncStorage.setItem('globalWeightUnit', unit);
+    } catch (error) {
+      console.error('Failed to save weight unit preference:', error);
+    }
+  };
 
   const setExerciseUnit = (exerciseIndex: number, unit: WeightUnit) => {
     setExerciseUnits(prev => ({
@@ -54,7 +81,7 @@ export const WeightUnitProvider = ({ children }: WeightUnitProviderProps) => {
       value={{ 
         globalUnit,
         exerciseUnits,
-        setGlobalUnit,
+        setGlobalUnit: setGlobalUnitAndSave,
         setExerciseUnit,
         getExerciseUnit,
         convertWeight,

@@ -26,6 +26,7 @@ import {
 } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
 import { RecipeFavorites } from '../utils/recipeFavorites';
+import { clampCookPortions } from '../utils/cookPortions';
 
 type RecipeDetailRoute = RouteProp<RootStackParamList, 'RecipeDetail'>;
 type RecipeDetailNav = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
@@ -116,8 +117,18 @@ export default function RecipeDetailScreen() {
 
   const [selectedPlateIndex, setSelectedPlateIndex] = useState(initialPlateIndex);
   const [selectedMethodIndex, setSelectedMethodIndex] = useState(0);
-  const [servings, setServings] = useState(1);
+  // Optional servings to pre-set — e.g. deep-linked from a Meal-Prep Session
+  // "Cook N servings" card. Clamped to the cook-flow portion range; absent → 1.
+  const [servings, setServings] = useState(() =>
+    clampCookPortions((route.params as any).servings)
+  );
   const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
+  // Instructions collapsed by default. This screen is decide + shop; the
+  // CookMode flow ("Start cooking") owns the step-by-step execution, so the
+  // full method here was just a second copy. The "N steps · ~time" meta stays
+  // visible as the effort cue, and one tap reveals the steps for anyone who
+  // wants to pre-read.
+  const [instructionsExpanded, setInstructionsExpanded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Read favourite state whenever the screen gains focus OR the selected plate
@@ -326,7 +337,7 @@ export default function RecipeDetailScreen() {
               <Text style={styles.servingsLabel}>Portions</Text>
               <TouchableOpacity
                 style={styles.servingsBtn}
-                onPress={() => setServings(Math.max(1, servings - 1))}
+                onPress={() => setServings(clampCookPortions(servings - 1))}
                 activeOpacity={0.6}
               >
                 <Ionicons name="remove" size={12} color="#a1a1aa" />
@@ -334,7 +345,7 @@ export default function RecipeDetailScreen() {
               <Text style={styles.servingsValue}>{servings}</Text>
               <TouchableOpacity
                 style={styles.servingsBtn}
-                onPress={() => setServings(Math.min(10, servings + 1))}
+                onPress={() => setServings(clampCookPortions(servings + 1))}
                 activeOpacity={0.6}
               >
                 <Ionicons name="add" size={12} color="#a1a1aa" />
@@ -449,14 +460,28 @@ export default function RecipeDetailScreen() {
           )}
         </View>
 
-        {/* INSTRUCTIONS — renders step.summary from new RecipeStep structure */}
+        {/* INSTRUCTIONS — collapsed by default; CookMode owns the step-by-step.
+            Tappable header mirrors the INGREDIENTS accordion. The reserve note
+            stays OUTSIDE the collapse: it's a before-you-start warning. */}
         <View style={styles.sectionPad}>
-          <View style={styles.sectionHeader}>
+          <TouchableOpacity
+            style={styles.sectionHeader}
+            onPress={() => setInstructionsExpanded(!instructionsExpanded)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
             <Text style={[styles.eyebrow, { color: themeColor }]}>INSTRUCTIONS</Text>
-            <Text style={styles.sectionMeta}>
-              {totalSteps} steps · ~{formatTime(method.time_total_minutes + (plate.assembly_time_minutes ?? 0))}
-            </Text>
-          </View>
+            <View style={styles.sectionMetaRow}>
+              <Text style={styles.sectionMeta}>
+                {totalSteps} steps · ~{formatTime(method.time_total_minutes + (plate.assembly_time_minutes ?? 0))}
+              </Text>
+              <Ionicons
+                name={instructionsExpanded ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#71717a"
+              />
+            </View>
+          </TouchableOpacity>
 
           {plate.reserve_before_finishing_note && (
             <View style={styles.reserveNote}>
@@ -467,29 +492,33 @@ export default function RecipeDetailScreen() {
             </View>
           )}
 
-          {plate.additional_instructions.length > 0 && (
-            <Text style={styles.subEyebrow}>COOK THE BASE</Text>
-          )}
-          {method.instructions.map((step, i) => (
-            <View key={`base-step-${i}`} style={styles.stepRow}>
-              <View style={[styles.stepNumber, { borderColor: themeColor + '4D', backgroundColor: themeColor + '1A' }]}>
-                <Text style={[styles.stepNumberText, { color: themeColor }]}>{i + 1}</Text>
-              </View>
-              <Text style={styles.stepText}>{getStepSummary(step)}</Text>
-            </View>
-          ))}
-
-          {plate.additional_instructions.length > 0 && (
+          {instructionsExpanded && (
             <>
-              <Text style={[styles.subEyebrow, { marginTop: 16 }]}>PLATE IT UP</Text>
-              {plate.additional_instructions.map((step, i) => (
-                <View key={`plate-step-${i}`} style={styles.stepRow}>
+              {plate.additional_instructions.length > 0 && (
+                <Text style={styles.subEyebrow}>COOK THE BASE</Text>
+              )}
+              {method.instructions.map((step, i) => (
+                <View key={`base-step-${i}`} style={styles.stepRow}>
                   <View style={[styles.stepNumber, { borderColor: themeColor + '4D', backgroundColor: themeColor + '1A' }]}>
-                    <Text style={[styles.stepNumberText, { color: themeColor }]}>{baseSteps + i + 1}</Text>
+                    <Text style={[styles.stepNumberText, { color: themeColor }]}>{i + 1}</Text>
                   </View>
                   <Text style={styles.stepText}>{getStepSummary(step)}</Text>
                 </View>
               ))}
+
+              {plate.additional_instructions.length > 0 && (
+                <>
+                  <Text style={[styles.subEyebrow, { marginTop: 16 }]}>PLATE IT UP</Text>
+                  {plate.additional_instructions.map((step, i) => (
+                    <View key={`plate-step-${i}`} style={styles.stepRow}>
+                      <View style={[styles.stepNumber, { borderColor: themeColor + '4D', backgroundColor: themeColor + '1A' }]}>
+                        <Text style={[styles.stepNumberText, { color: themeColor }]}>{baseSteps + i + 1}</Text>
+                      </View>
+                      <Text style={styles.stepText}>{getStepSummary(step)}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
             </>
           )}
         </View>
@@ -603,6 +632,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionMeta: { color: '#71717a', fontSize: 11 },
+  sectionMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   pillRow: { gap: 8, paddingBottom: 4 },
   pill: {

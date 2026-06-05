@@ -35,11 +35,11 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -232,7 +232,9 @@ export default function MealDetailScreen() {
             <Image
               source={heroSrc}
               style={styles.hero}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={200}
+              priority="high"
             />
           ) : (
             <View style={[styles.hero, styles.heroPlaceholder]}>

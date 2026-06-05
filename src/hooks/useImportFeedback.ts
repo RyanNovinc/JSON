@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { WorkoutStorage, FeedbackEntry } from '../utils/storage';
 import { sendImportFeedback } from '../services/feedbackApi';
+import { recordImport, shouldPromptReview, markReviewPrompted } from '../utils/reviewGate';
 // import * as Crypto from 'expo-crypto';
 
 export interface UseImportFeedbackReturn {
@@ -28,6 +29,9 @@ export function useImportFeedback(): UseImportFeedbackReturn {
     // Save feedback locally
     await WorkoutStorage.saveFeedback(feedbackEntry);
     
+    // Mark that review was prompted to avoid showing again during cooldown period
+    await markReviewPrompted();
+    
     // Send feedback to AWS (only negative feedback)
     // This runs async but we don't await it to avoid blocking the UI
     sendImportFeedback(feedback, details, currentProgramId).catch(error => {
@@ -48,18 +52,29 @@ export function useImportFeedback(): UseImportFeedbackReturn {
     setCurrentProgramId(null);
   }, [currentProgramId]);
 
-  const skipFeedback = useCallback(() => {
+  const skipFeedback = useCallback(async () => {
+    // Mark that review was prompted to avoid showing again during cooldown period
+    await markReviewPrompted();
+    
     setShowFeedbackModal(false);
     setCurrentProgramId(null);
   }, []);
 
   const triggerFeedbackModal = useCallback(async (programId: string) => {
+    // Always record the import regardless of whether we show the modal
+    await recordImport();
+    
     // Check if feedback already exists to avoid nagging
     const hasFeedback = await WorkoutStorage.hasFeedbackForProgram(programId);
     
     if (!hasFeedback) {
-      setCurrentProgramId(programId);
-      setShowFeedbackModal(true);
+      // Only show modal if frequency gating allows it
+      const shouldShow = await shouldPromptReview();
+      
+      if (shouldShow) {
+        setCurrentProgramId(programId);
+        setShowFeedbackModal(true);
+      }
     }
   }, []);
 

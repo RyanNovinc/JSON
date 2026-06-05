@@ -6,10 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Image,
   Animated,
   Easing,
+  Share,
+  Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -431,9 +433,19 @@ export default function CookModeScreen() {
     navigation.goBack();
   };
 
-  const handleShare = () => {
-    // TODO: wire up share sheet — design TBD
-    console.log('share pressed for', plate.display_name);
+  const handleShare = async () => {
+    try {
+      const url = `https://json.fit/r/?meal=${meal.slug}&plate=${plate.id}`;
+      const m = plate.plate_macros;
+      const caption = `${plate.display_name} — ${m.kcal} cal, ${m.protein_g}g protein`;
+      await Share.share(
+        Platform.OS === 'ios'
+          ? { message: caption, url }
+          : { message: `${caption}\n\n${url}` }
+      );
+    } catch (err) {
+      console.warn('Share failed:', err);
+    }
   };
 
   const sortedTimers = useMemo(() => {
@@ -462,7 +474,9 @@ export default function CookModeScreen() {
           <Image
             source={imageSource}
             style={styles.completionBgImage}
-            resizeMode="cover"
+            contentFit="cover"
+            transition={200}
+            priority="high"
           />
         ) : (
           <View
@@ -494,14 +508,16 @@ export default function CookModeScreen() {
           <Text style={styles.completionEyebrow}>
             {meal?.cuisine === 'smoothie' ? 'DONE BLENDING' : 'DONE COOKING'}
           </Text>
-          <TouchableOpacity
-            style={styles.completionShareBtn}
-            onPress={handleShare}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="share-outline" size={18} color="#fff" />
-          </TouchableOpacity>
+          {meal?.cuisine !== 'snack' && (
+            <TouchableOpacity
+              style={styles.completionShareBtn}
+              onPress={handleShare}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="share-outline" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Bottom content */}

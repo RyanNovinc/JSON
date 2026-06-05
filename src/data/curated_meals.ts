@@ -13,6 +13,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'basmati_rice_cooked',
     contains_allergens: ['Dairy'],
     image_filename: 'butter_chicken_with_rice.png',
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the curry ahead; it reheats well and improves overnight. Rice is grab-and-go / done day-of. Note: this recipe is written as a single serve (produces_servings: 1) rather than a batch — scale it up to prep multiple portions.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'butter_chicken',
@@ -341,6 +346,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'rolled_oats_raw',
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'brekkie_grow.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -465,6 +474,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'mango_nectar',
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'mango_mass.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -582,6 +595,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'peanut_butter_natural',
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'king_kong_chocolate.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -714,6 +731,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'coconut_cream',
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'strawberry_stack.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -833,6 +854,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts', 'Eggs'],
     flex_ingredient_id: 'rolled_oats_raw',
     image_filename: 'choc_muscle_maxx.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -955,6 +980,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts', 'Gluten/Wheat', 'Soy', 'Eggs'],
     flex_ingredient_id: 'oreo_cookies',
     image_filename: 'cookies_gains.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -1072,6 +1101,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     flex_ingredient_id: 'coconut_cream',
     image_filename: 'raspberry_rip.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -1194,6 +1227,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     flex_ingredient_id: 'mango_frozen',
     image_filename: 'energy_lift_heavy.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -1321,6 +1358,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     flex_ingredient_id: 'thickened_cream',
     image_filename: 'mornin_muscle.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -1449,6 +1490,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     flex_ingredient_id: 'avocado',
     image_filename: 'dirty_eden.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -1602,6 +1647,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     flex_ingredient_id: 'rolled_oats_raw',
     image_filename: 'strawbrekkie_beast.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -1731,6 +1780,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     flex_ingredient_id: 'peanut_butter_natural',
     image_filename: 'banana_bulk.png',
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Blend and drink fresh — made ahead it separates, oxidises, and the frozen-fruit/whey texture collapses.',
+    },
     plates: [
       {
         id: 'standard',
@@ -1854,6 +1907,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'pork_shoulder_boneless',
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat', 'Soy', 'Fish'],
     image_filename: 'pulled_pork.png',
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Slow-cook the whole shoulder, make the sauce and shred ahead; the sauced pork reheats whole. Bun, rice, baked potato, tacos and mac are all assembled per plate day-of.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'pulled_pork',
@@ -2623,6 +2681,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'beef_mince_regular',
     contains_allergens: ['Dairy', 'Eggs', 'Fish', 'Gluten/Wheat'],
     image_filename: 'bolognese.png',
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Simmer the ragu ahead; it reheats whole and improves overnight. Pasta, garlic bread, baked potato and the lasagne bake are all done per plate day-of.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'bolognese',
@@ -3299,6 +3362,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'beef_chuck',
     contains_allergens: ['Fish', 'Shellfish', 'Nuts'],
     image_filename: 'massaman.png',
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the curry ahead; it reheats whole and deepens overnight. Rice is grab-and-go / done day-of.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'massaman',
@@ -3708,6 +3776,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'beef_mince_regular',
     contains_allergens: ['Dairy'],
     image_filename: 'chilli_con_carne.png',
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the chilli ahead; it reheats whole. Rice and corn chips are done per plate day-of.',
+      storage: { fridge_days: 5, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'chilli_con_carne',
@@ -4268,6 +4341,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'lamb_shank',
     contains_allergens: ['Dairy'],
     image_filename: 'lamb_shanks.png',
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Braise the shanks and reduce the sauce ahead; reheat the shanks in the sauce. The creamy mash is made per plate day-of.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'lamb_shanks',
@@ -4702,6 +4780,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'beef_chuck',
     contains_allergens: ['Dairy', 'Gluten/Wheat', 'Fish'],
     image_filename: 'beef_stew.png',
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the stew ahead; it reheats whole and improves overnight. Mash and crusty bread are done per plate day-of.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'beef_stew',
@@ -5248,6 +5331,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat', 'Soy'],
     image_filename: 'maple_muscle_toast.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Custard-soaked French toast — goes soggy and the texture dies if made ahead. Cook fresh.',
+    },
     plates: [
       {
         id: 'standard',
@@ -5302,6 +5389,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'muscle_oats.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Stovetop porridge is best fresh; the whey is stirred in off the heat and turns grainy when reheated.',
+    },
     plates: [
       {
         id: 'standard',
@@ -5378,6 +5469,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat'],
     image_filename: 'scramble_stack.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Soft scrambled eggs on toast — eggs overcook on reheat and the toast sogs. Make fresh.',
+    },
     plates: [
       {
         id: 'standard',
@@ -5430,6 +5525,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'overnight_oats.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Made-ahead by design — stir oats, chia, whey, milk, yoghurt and honey in the jar and refrigerate. Add banana and any loaded toppings fresh when serving.',
+      storage: { fridge_days: 4 },
+    },
     plates: [
       {
         id: 'standard',
@@ -5500,6 +5600,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'greek_yoghurt_bowl.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'No-cook 5-minute assembly; the granola goes soft on contact, so build it fresh.',
+    },
     plates: [
       {
         id: 'standard',
@@ -5570,6 +5674,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'cottage_cheese',
     image_filename: 'cottage_cheese_bowl.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'No-cook assembly with fresh tomato and cucumber — best eaten straight away.',
+    },
     plates: [
       {
         id: 'standard',
@@ -5627,6 +5735,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Gluten/Wheat', 'Nuts'],
     image_filename: 'pb_banana_toast.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Toast goes soft and the mashed banana browns — assemble fresh.',
+    },
     plates: [
       {
         id: 'standard',
@@ -5679,6 +5791,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Nuts'],
     image_filename: 'protein_pancakes.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the whole stack ahead and reheat. Toppings (berries, banana, peanut butter, maple) go on fresh when serving.',
+      storage: { fridge_days: 3, freeze_months: 1 },
+    },
     plates: [
       {
         id: 'standard',
@@ -5752,6 +5869,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs'],
     image_filename: 'steak_and_eggs.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Seared steak, fried eggs and crispy pan potatoes are all texture-critical — make fresh.',
+    },
     plates: [
       {
         id: 'standard',
@@ -5806,6 +5927,13 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat'],
     image_filename: 'shakshuka.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'partial',
+      prep_note: 'Make the spiced tomato-capsicum sauce ahead; poach the eggs and crumble the feta fresh.',
+      prep_ahead_summary: 'Spiced tomato-capsicum sauce',
+      day_of_summary: 'Poach eggs, crumble feta',
+      storage: { fridge_days: 5, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -5864,6 +5992,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat'],
     image_filename: 'freezer_breakfast_burrito.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Batch-and-freeze by design — make all 5, eat one now, wrap the rest individually in foil.',
+      storage: { freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -5921,6 +6054,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Nuts'],
     image_filename: 'baked_oats.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Bake ahead and reheat. Add the yoghurt, berries and any loaded toppings fresh when serving.',
+      storage: { fridge_days: 4 },
+    },
     plates: [
       {
         id: 'standard',
@@ -5995,6 +6133,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Fish', 'Gluten/Wheat'],
     image_filename: 'smoked_salmon_bagel.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'A toasted-bagel assembly with avocado and fried eggs — build fresh.',
+    },
     plates: [
       {
         id: 'standard',
@@ -6051,6 +6193,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat'],
     image_filename: 'big_breakfast_plate.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'A cooked fry-up — eggs, bacon, sausage, mushrooms, beans, toast — every component is served fresh.',
+    },
     plates: [
       {
         id: 'standard',
@@ -6107,6 +6253,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat'],
     image_filename: 'egg_muffins.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Bake the full batch of 12 ahead and grab 3 per serve through the week. Toast the sourdough and smash the avocado fresh when serving.',
+      storage: { fridge_days: 4, freeze_months: 1 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6167,6 +6318,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'protein_ice_cream.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Freezer-set ahead by design — blend and freeze.',
+      storage: { freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6216,6 +6372,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'cottage_cheese_ice_cream.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Freezer-set ahead by design — blend and freeze.',
+      storage: { freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6266,6 +6427,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs'],
     image_filename: 'chocolate_protein_mug_cake.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'Microwaved fresh in ~75 seconds — made ahead it dries out and goes rubbery.',
+    },
     plates: [
       {
         id: 'standard',
@@ -6319,6 +6484,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Nuts'],
     image_filename: 'fudgy_protein_brownies.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Bake the batch of 8 ahead.',
+      storage: { fridge_days: 5, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6376,6 +6546,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Nuts'],
     image_filename: 'protein_chocolate_chip_cookies.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Bake the batch of 10 ahead.',
+      storage: { fridge_days: 5, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6431,6 +6606,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs'],
     image_filename: 'protein_banana_bread.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Bake the 10-slice loaf ahead.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6489,6 +6669,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'edible_protein_cookie_dough.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Make ahead and keep chilled — it is eaten cold.',
+      storage: { fridge_days: 5 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6541,6 +6726,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'no_bake_protein_cheesecake.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Fridge-set ahead by design — press the base, blend the filling, chill to set. Add berries when serving.',
+      storage: { fridge_days: 4 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6596,6 +6786,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'chocolate_protein_mousse.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Blend and chill ahead. Add the chocolate-chip topping when serving.',
+      storage: { fridge_days: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6649,6 +6844,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'frozen_date_snickers_bark.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Freezer-set ahead by design — assemble, freeze, then break into pieces.',
+      storage: { freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6701,6 +6901,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Gluten/Wheat', 'Dairy', 'Eggs'],
     image_filename: 'palacinke.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the batch of crepes ahead and reheat; fill with jam when serving. Stack with baking paper between them so they do not stick.',
+      storage: { fridge_days: 3, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -6755,6 +6960,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'greek_yogurt_snack.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'A grab-and-go pot — no prep needed.' },
     plates: [
       {
         id: 'standard',
@@ -6798,6 +7004,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: [],
     image_filename: 'beef_jerky.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'Packaged, shelf-stable grab-and-go.' },
     plates: [
       {
         id: 'standard',
@@ -6841,6 +7048,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Soy'],
     image_filename: 'edamame.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'Steamed in ~3 minutes and eaten hot — quick enough that there is nothing to prep ahead.' },
     plates: [
       {
         id: 'standard',
@@ -6887,6 +7095,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'protein_shake.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'Shake fresh so it does not separate or go gritty.' },
     plates: [
       {
         id: 'standard',
@@ -6931,6 +7140,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'protein_bar.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'Packaged grab-and-go.' },
     plates: [
       {
         id: 'standard',
@@ -6974,6 +7184,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'cheese_snack.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'A grab-and-go portion — no prep needed.' },
     plates: [
       {
         id: 'standard',
@@ -7017,6 +7228,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Eggs'],
     image_filename: 'hard_boiled_eggs.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Boil a batch ahead and grab through the week. Season with salt when eating.',
+      storage: { fridge_days: 7 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7063,6 +7279,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Fish'],
     image_filename: 'tuna_pouch.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'Ready-to-eat packaged pouch — no prep needed.' },
     plates: [
       {
         id: 'standard',
@@ -7106,6 +7323,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: [],
     image_filename: 'roasted_chickpeas.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Roast a batch ahead (or buy ready-roasted); they crisp further as they cool.',
+      storage: { fridge_days: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7154,6 +7376,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Nuts'],
     image_filename: 'no_bake_protein_balls.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Roll the batch of 12 ahead and chill; grab all week.',
+      storage: { fridge_days: 7, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7204,6 +7431,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Nuts'],
     image_filename: 'mixed_nuts.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'A grab-and-go handful — no prep needed.' },
     plates: [
       {
         id: 'standard',
@@ -7247,6 +7475,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Nuts', 'Dairy'],
     image_filename: 'trail_mix.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'A grab-and-go handful — no prep needed.' },
     plates: [
       {
         id: 'standard',
@@ -7292,6 +7521,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: [],
     image_filename: 'banana_snack.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'Whole fruit — grab and go.' },
     plates: [
       {
         id: 'standard',
@@ -7335,6 +7565,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: [],
     image_filename: 'dried_fruit.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'A grab-and-go handful — no prep needed.' },
     plates: [
       {
         id: 'standard',
@@ -7378,6 +7609,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'dark_chocolate.png',
     photo_url: undefined,
+    meal_prep: { strategy: 'none', reason: 'A grab-and-go couple of squares — no prep needed.' },
     plates: [
       {
         id: 'standard',
@@ -7421,6 +7653,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Soy', 'Gluten/Wheat', 'Sesame'],
     image_filename: 'teriyaki_chicken_rice_bowl.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Designed to divide across 4 containers and reheat — chicken, glaze, rice and broccoli all keep. Spring onion and sesame on top.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7483,6 +7720,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Soy', 'Gluten/Wheat', 'Sesame', 'Shellfish'],
     image_filename: 'beef_broccoli_stir_fry.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Divide across 4 containers and reheat — beef, sauce, broccoli and rice all keep.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7544,6 +7786,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'chicken_mince',
     image_filename: 'thai_basil_chicken.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the basil chicken and rice ahead; both reheat whole. (The fried-egg plate just adds an egg fried fresh on top.)',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7623,6 +7870,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Soy', 'Gluten/Wheat', 'Sesame'],
     image_filename: 'beef_bulgogi_bowl.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Marinate and sear the beef and cook the rice ahead; both reheat. Spring onion and sesame on top.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7684,6 +7936,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Gluten/Wheat', 'Eggs', 'Dairy'],
     image_filename: 'spaghetti_carbonara.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'none',
+      reason: 'The egg-and-cheese emulsion splits and scrambles on reheat and the pasta turns claggy — carbonara only works cooked fresh and eaten immediately (the recipe explicitly states the sauce does not store or reheat).',
+    },
     plates: [
       {
         id: 'standard',
@@ -7737,6 +7993,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Fish', 'Dairy'],
     image_filename: 'sheet_pan_salmon_potatoes.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Roast the whole tray ahead and divide into containers.',
+      storage: { fridge_days: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7794,6 +8055,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: [],
     image_filename: 'chicken_fajita_bowl.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Built for meal prep — chicken, peppers, beans and rice all reheat. Fresh lime when serving.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7858,6 +8124,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'chicken_thigh_skinless',
     image_filename: 'Spicy Chipotle Chicken Burrito.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'The filling (chicken, rice, beans) is batch-and-reheat; the burrito_bowl plate is fully reheatable. The only day-of step is wrapping a fresh tortilla and the quick salsa — trivial assembly, so the meal stays full.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -7958,6 +8229,13 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Gluten/Wheat'],
     image_filename: 'chicken_shawarma.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'partial',
+      prep_note: 'Cook the marinated chicken ahead; make the salad and garlic-yoghurt sauce and warm the rice or wrap day-of.',
+      prep_ahead_summary: 'Marinated cooked chicken',
+      day_of_summary: 'Salad, yoghurt sauce, warm rice/wrap',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'wrap',
@@ -8034,6 +8312,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Nuts', 'Soy', 'Gluten/Wheat'],
     image_filename: 'satay_chicken.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the chicken in the satay sauce and the rice ahead; reheats whole. Crushed peanuts and coriander on top.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8094,6 +8377,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Soy', 'Gluten/Wheat', 'Sesame'],
     image_filename: 'honey_chicken.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the chicken, glaze and rice ahead; reheats whole. Chicken softens slightly on reheat.',
+      storage: { fridge_days: 4 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8152,6 +8440,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Gluten/Wheat'],
     image_filename: 'chicken_mac_and_cheese.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Bake ahead; reheats whole.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8212,6 +8505,13 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat'],
     image_filename: 'turkey_meatballs_spaghetti.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'partial',
+      prep_note: 'Bake the meatballs and simmer the sauce ahead; store together and reheat with fresh pasta.',
+      prep_ahead_summary: 'Turkey meatballs + tomato sauce',
+      day_of_summary: 'Boil fresh spaghetti',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8275,6 +8575,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Fish', 'Dairy', 'Gluten/Wheat'],
     image_filename: 'tuna_pasta_bake.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Bake ahead; reheats whole.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8336,6 +8641,13 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'lamb_mince',
     image_filename: 'lamb_kofta.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'partial',
+      prep_note: 'Grill the koftas ahead; make the salad and garlic-yoghurt sauce and warm the rice or wrap day-of.',
+      prep_ahead_summary: 'Grilled koftas',
+      day_of_summary: 'Salad, yoghurt sauce, warm rice/wrap',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'rice_bowl',
@@ -8423,6 +8735,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Gluten/Wheat'],
     image_filename: 'sheet_pan_sausage_veg.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Roast the whole tray ahead and divide into containers; reheats whole.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8481,6 +8798,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Fish', 'Soy', 'Gluten/Wheat', 'Sesame'],
     image_filename: 'honey_soy_salmon_noodles.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the salmon, noodles and broccoli ahead and divide into containers. Sesame and spring onion on top.',
+      storage: { fridge_days: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8539,6 +8861,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy'],
     image_filename: 'carne_asada_bowl.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Grill and slice the steak and cook the cilantro-lime rice ahead; with beans and corn it divides into containers and reheats. Carb check: the rice is cooked in the method (cook-ahead) and there is no plate-level day-of step. The pico is a quick fresh garnish you can make day-of or pack.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8604,6 +8931,13 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat'],
     image_filename: 'Chicken Schnitzel.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'partial',
+      prep_note: 'Crumb and fry the schnitzels ahead; reheat crisp in a hot oven and finish each plate day-of.',
+      prep_ahead_summary: 'Crumbed schnitzels',
+      day_of_summary: 'Reheat crisp, finish your plate',
+      storage: { fridge_days: 4, freeze_months: 2 },
+    },
     plates: [
       {
         id: 'plate',
@@ -8621,6 +8955,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         assembly_time_minutes: 2,
         plate_macros: { kcal: 621, protein_g: 54, carbs_g: 53, fat_g: 20, fiber_g: 5 },
         image_filename: 'Schnitzel Plate (plate).png',
+        meal_prep: { day_of_summary: 'Roast potatoes, lemon' },
       },
       {
         id: 'roll',
@@ -8640,6 +8975,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         assembly_time_minutes: 3,
         plate_macros: { kcal: 881, protein_g: 63, carbs_g: 70, fat_g: 38, fiber_g: 4 },
         image_filename: 'Schnitzel Roll (roll).png',
+        meal_prep: { day_of_summary: 'Build the roll' },
       },
       {
         id: 'parma',
@@ -8659,6 +8995,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         assembly_time_minutes: 8,
         plate_macros: { kcal: 747, protein_g: 62, carbs_g: 54, fat_g: 30, fiber_g: 6 },
         image_filename: 'Chicken Parma (parma).png',
+        meal_prep: { day_of_summary: 'Sauce, cheese, grill to melt' },
       },
     ],
     methods: [
@@ -8704,6 +9041,13 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'beef_chuck',
     image_filename: 'beef_ragu_gnocchi.png',
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'partial',
+      prep_note: 'Slow-braise and shred the ragù ahead; boil fresh gnocchi and toss through day-of.',
+      prep_ahead_summary: 'Slow-braised beef ragù',
+      day_of_summary: 'Boil fresh gnocchi',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'standard',
@@ -8801,6 +9145,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     flex_ingredient_id: 'beef_mince_regular',
     image_filename: undefined,
     photo_url: undefined,
+    meal_prep: {
+      strategy: 'partial',
+      prep_note: 'Grill the cevapi ahead; warm the flatbread or rice and add raw onion, ajvar and salad day-of. Carb check: the flatbread (flatbread) and rice (rice_plate) are plate ingredients done fresh per serve; the salad comes from the method, also day-of.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
     plates: [
       {
         id: 'flatbread',

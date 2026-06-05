@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NutritionFormData } from '../../screens/NutritionQuestionnaireScreen';
+import { useWeightUnit } from '../../contexts/WeightUnitContext';
 import RobustStorage from '../../utils/robustStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutStorage } from '../../utils/storage';
@@ -45,9 +46,9 @@ export const NutritionStep3: React.FC<Props> = ({
   scrollViewRef,
 }) => {
   const navigation = useNavigation();
+  const { globalUnit } = useWeightUnit();
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
 
   useEffect(() => {
     loadCurrentWeight();
@@ -73,7 +74,6 @@ export const NutritionStep3: React.FC<Props> = ({
         console.log('🏃‍♂️ [NUTRITION STEP3] Found latest weight from WorkoutStorage:', latestEntry.weight, latestEntry.unit);
         
         setCurrentWeight(latestEntry.weight);
-        setWeightUnit(latestEntry.unit);
         
         // Always sync the latest weight from tracker to form data
         updateFormData({ weight: latestEntry.weight });
@@ -97,7 +97,6 @@ export const NutritionStep3: React.FC<Props> = ({
           console.log('🏃‍♂️ [NUTRITION STEP3] Found latest weight from legacy storage:', latestEntry.weight, latestEntry.unit);
           
           setCurrentWeight(latestEntry.weight);
-          setWeightUnit(latestEntry.unit);
           
           // Always sync the latest weight from tracker to form data
           updateFormData({ weight: latestEntry.weight });
@@ -273,7 +272,7 @@ export const NutritionStep3: React.FC<Props> = ({
               <View style={styles.weightDisplayContainer}>
                 <View style={styles.weightDisplay}>
                   <Text style={styles.weightValue}>{currentWeight}</Text>
-                  <Text style={styles.weightUnitDisplay}>{weightUnit}</Text>
+                  <Text style={styles.weightUnitDisplay}>{globalUnit}</Text>
                 </View>
                 <TouchableOpacity
                   style={[styles.changeWeightButton, { borderColor: colors.primary }]}

@@ -99,8 +99,11 @@ export default function Q4ProgramDurationScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateQuestionnaireField('programDuration', selected);
+    
     if (editMode) {
-      await updateQuestionnaireField('programDuration', selected);
       navigation.goBack();
       return;
     }

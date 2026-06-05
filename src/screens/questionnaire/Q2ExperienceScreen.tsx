@@ -84,8 +84,11 @@ export default function Q2ExperienceScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateQuestionnaireField('trainingExperience', selected);
+    
     if (editMode) {
-      await updateQuestionnaireField('trainingExperience', selected);
       navigation.goBack();
       return;
     }

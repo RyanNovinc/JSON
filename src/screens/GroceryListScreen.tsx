@@ -321,7 +321,7 @@ export default function GroceryListScreen() {
   const money = (n: number) => `${currencySymbol}${currencySymbol.length > 1 ? ' ' : ''}${Math.round(n || 0)}`;
 
   const estimateDisplay = hasRange
-    ? `${money(estimatedLow)}–${money(estimatedHigh)}`
+    ? `${money(estimatedLow)}–${Math.round(estimatedHigh)}`
     : legacyEstimate != null
       ? money(legacyEstimate)
       : null;
@@ -802,7 +802,14 @@ export default function GroceryListScreen() {
           <View style={styles.totalCard}>
             <View style={styles.totalTopRow}>
               <Text style={styles.miniLabel}>Estimated total</Text>
-              <Text style={styles.totalFigure}>{estimateDisplay || money(totalCost)}</Text>
+              <Text
+                style={styles.totalFigure}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+              >
+                {estimateDisplay || money(totalCost)}
+              </Text>
             </View>
             <View style={styles.trackBar}>
               <View style={[styles.fillBar, { width: `${pct}%`, backgroundColor: themeColor }]} />
@@ -964,9 +971,9 @@ const styles = StyleSheet.create({
 
   // Total card
   totalCard: { marginHorizontal: 18, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 15 },
-  totalTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  miniLabel: { fontSize: 10, letterSpacing: 2, color: FAINT, fontWeight: '600', textTransform: 'uppercase' },
-  totalFigure: { fontFamily: SERIF, fontSize: 24, color: '#ffffff' },
+  totalTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  miniLabel: { fontSize: 10, letterSpacing: 2, color: FAINT, fontWeight: '600', textTransform: 'uppercase', flexShrink: 0 },
+  totalFigure: { fontFamily: SERIF, fontSize: 24, color: '#ffffff', flexShrink: 1, textAlign: 'right' },
   trackBar: { height: 5, backgroundColor: '#1c1c22', borderRadius: 3, marginTop: 12, overflow: 'hidden' },
   fillBar: { height: '100%', borderRadius: 3 },
   totalBotRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },

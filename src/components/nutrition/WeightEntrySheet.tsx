@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useWeightUnit } from '../../contexts/WeightUnitContext';
 import { WorkoutStorage } from '../../utils/storage';
 import {
   loadNutritionAnswers,
@@ -81,9 +82,10 @@ export default function WeightEntrySheet({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const { globalUnit } = useWeightUnit();
 
   const [weight, setWeight] = useState('');
-  const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
+  const unit = globalUnit; // Use global unit preference instead of local state
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -105,9 +107,6 @@ export default function WeightEntrySheet({
         );
         const latest = sorted[0];
         setLatestEntry(latest);
-        if (latest.unit === 'kg' || latest.unit === 'lbs') {
-          setUnit(latest.unit);
-        }
       } catch (e) {
         console.error('WeightEntrySheet prefill failed', e);
       }
@@ -254,41 +253,13 @@ export default function WeightEntrySheet({
                   />
                 </View>
 
-                <View style={styles.unitToggle}>
-                  <TouchableOpacity
-                    style={[
-                      styles.unitBtn,
-                      unit === 'kg' && { backgroundColor: themeColor },
-                    ]}
-                    onPress={() => setUnit('kg')}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.unitText,
-                        { color: unit === 'kg' ? '#0a0a0b' : '#a1a1aa' },
-                      ]}
-                    >
-                      kg
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.unitBtn,
-                      unit === 'lbs' && { backgroundColor: themeColor },
-                    ]}
-                    onPress={() => setUnit('lbs')}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.unitText,
-                        { color: unit === 'lbs' ? '#0a0a0b' : '#a1a1aa' },
-                      ]}
-                    >
-                      lbs
-                    </Text>
-                  </TouchableOpacity>
+                <View style={styles.unitDisplay}>
+                  <Text style={styles.unitText}>
+                    {unit}
+                  </Text>
+                  <Text style={styles.unitSubtext}>
+                    Change in Profile settings
+                  </Text>
                 </View>
               </View>
 
@@ -422,23 +393,26 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     letterSpacing: -0.5,
   },
-  unitToggle: {
-    flexDirection: 'row',
+  unitDisplay: {
     backgroundColor: '#0a0a0b',
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
-    overflow: 'hidden',
-  },
-  unitBtn: {
     paddingHorizontal: 16,
-    minWidth: 52,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   unitText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
+    color: '#ffffff',
+    textTransform: 'uppercase',
+  },
+  unitSubtext: {
+    fontSize: 11,
+    color: '#71717a',
+    marginTop: 2,
   },
   notesToggle: {
     flexDirection: 'row',

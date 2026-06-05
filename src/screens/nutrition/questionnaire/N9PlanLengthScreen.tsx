@@ -18,7 +18,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import QuestionnaireHeader from '../../questionnaire/QuestionnaireHeader';
-import { updateNutritionField, saveNutritionAnswers } from '../../../utils/nutritionQuestionnaireStorage';
+import { updateNutritionField, loadNutritionAnswers } from '../../../utils/nutritionQuestionnaireStorage';
 import { finalizeNutrition } from '../../../utils/nutritionMacros';
 
 /**
@@ -71,14 +71,14 @@ export default function N9PlanLengthScreen() {
 
     setSaving(true);
     try {
-      const finalAnswers = {
-        ...answersSoFar,
-        planDuration: duration,
-        startDate: start,
-        eatingChallenges: [], // default empty; user can set later in Refinements
-      };
+      // Save only the fields collected by this screen.
+      // N1-N8 answers are already persisted by their individual screens.
+      await updateNutritionField('planDuration', duration);
+      await updateNutritionField('startDate', start);
+      await updateNutritionField('eatingChallenges', []); // default empty; user can set later in Refinements
 
-      await saveNutritionAnswers(finalAnswers);
+      // Load the complete answers for macro calculation
+      const finalAnswers = await loadNutritionAnswers();
       const macros = await finalizeNutrition(finalAnswers);
 
       if (!macros) {

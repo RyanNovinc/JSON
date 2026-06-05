@@ -215,10 +215,10 @@ export type RootStackParamList = {
     mealPlanName: string;
   };
   MealPrepSession: {
-    mealPrepSession: any;
+    mealPrepSession?: any;
     sessionIndex?: number; // Which session to display (0, 1, 2...)
     allSessions?: any[]; // All meal prep sessions for navigation
-  };
+  } | undefined;
   MealPrepDetail: {
     meal: any;
     sessionName: string;
@@ -289,9 +289,9 @@ export type RootStackParamList = {
     weekNumber: number;
     themeColor: string;
   };
-  RecipeDetail: { mealSlug: string };
+  RecipeDetail: { mealSlug: string; plateId?: string; servings?: number };
   CookMode: { mealSlug: string; plateIndex: number; methodIndex: number };
-  MealsLibrary: undefined;
+  MealsLibrary: { cuisine?: string; title?: string } | undefined;
   SmoothiesLibrary: undefined;
   // Questionnaire screens
   Q1PrimaryGoal: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
@@ -418,7 +418,7 @@ interface AppNavigatorProps {
 // the new tab name.
 // ============================================================================
 const linking = {
-  prefixes: ['https://json.fit', 'json-app://'],
+  prefixes: [Linking.createURL('/'), 'https://json.fit'],
   config: {
     screens: {
       Main: {
@@ -430,6 +430,13 @@ const linking = {
         path: 'p/:shareId',
         parse: {
           shareId: (shareId: string) => shareId,
+        },
+      },
+      RecipeDetail: {
+        path: 'r',
+        parse: {
+          mealSlug: (params: any) => params.meal,
+          plateId: (params: any) => params.plate,
         },
       },
     },

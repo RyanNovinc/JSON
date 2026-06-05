@@ -98,8 +98,11 @@ export default function Q5EquipmentScreen() {
 
   const handleNext = async () => {
     if (selected.length === 0) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateQuestionnaireField('selectedEquipment', selected);
+    
     if (editMode) {
-      await updateQuestionnaireField('selectedEquipment', selected);
       navigation.goBack();
       return;
     }

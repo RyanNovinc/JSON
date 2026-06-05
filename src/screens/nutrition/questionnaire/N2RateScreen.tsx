@@ -72,8 +72,11 @@ export default function N2RateScreen() {
 
   const handleNext = async () => {
     if (selected == null) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateNutritionField('targetRatePercentage', selected);
+    
     if (editMode) {
-      await updateNutritionField('targetRatePercentage', selected);
       navigation.goBack();
       return;
     }

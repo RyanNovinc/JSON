@@ -75,8 +75,11 @@ export default function Q7RestStyleScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateQuestionnaireField('sessionStyle', selected);
+    
     if (editMode) {
-      await updateQuestionnaireField('sessionStyle', selected);
       navigation.goBack();
       return;
     }

@@ -103,16 +103,17 @@ export default function N8BudgetScreen() {
     if (showRange && Number.isFinite(minNum)) payload.budgetMin = minNum;
     if (showRange && Number.isFinite(maxNum)) payload.budgetMax = maxNum;
 
+    // Always save the answers to storage, whether in edit mode or not
+    await updateNutritionField('weeklyBudget', attitude!);
+    await updateNutritionField('budgetMin', payload.budgetMin ?? null);
+    await updateNutritionField('budgetMax', payload.budgetMax ?? null);
+    
+    // Set default values for missing required fields until proper screens are added
+    await updateNutritionField('skillConfidence', 3); // Default medium confidence
+    await updateNutritionField('timeInvestment', 30); // Default 30 min
+    await updateNutritionField('cookingEquipment', ['stovetop', 'oven']); // Default basic equipment
+    
     if (editMode) {
-      await updateNutritionField('weeklyBudget', attitude!);
-      await updateNutritionField(
-        'budgetMin',
-        payload.budgetMin ?? null
-      );
-      await updateNutritionField(
-        'budgetMax',
-        payload.budgetMax ?? null
-      );
       navigation.goBack();
       return;
     }

@@ -30,8 +30,8 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { getCreateImage } from '../assets/createImages';
 import { WorkoutStorage } from '../utils/storage';
-import { hasCompleteQuestionnaire } from '../utils/questionnaireStorage';
-import { hasCompleteNutritionAnswers } from '../utils/nutritionQuestionnaireStorage';
+import { hasCompleteQuestionnaire, loadQuestionnaireAnswers } from '../utils/questionnaireStorage';
+import { hasCompleteNutritionAnswers, loadNutritionAnswers } from '../utils/nutritionQuestionnaireStorage';
 
 type NavProp = StackNavigationProp<RootStackParamList>;
 
@@ -80,20 +80,22 @@ export default function CreateChooserScreen() {
     navigation.goBack();
   };
 
-  const handleSelect = (option: CreateOption) => {
+  const handleSelect = async (option: CreateOption) => {
     // Navigate directly to questionnaire without dismissing the modal first.
     // This creates a smooth fade transition from modal to questionnaire.
     if (option.id === 'workout') {
       if (hasSavedPlan) {
         navigation.navigate('QuestionnaireSummary');
       } else {
-        navigation.navigate('Q1PrimaryGoal', undefined);
+        const saved = await loadQuestionnaireAnswers();
+        navigation.navigate('Q1PrimaryGoal', { answersSoFar: saved || {} });
       }
     } else {
       if (hasNutritionPlan) {
         navigation.navigate('NutritionSummary');
       } else {
-        navigation.navigate('N1Goal', undefined);
+        const saved = await loadNutritionAnswers();
+        navigation.navigate('N1Goal', { answersSoFar: saved || {} });
       }
     }
   };

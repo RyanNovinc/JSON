@@ -437,7 +437,7 @@ export default function NutritionSummaryScreen() {
       >
         <Text style={styles.title}>Looking good.</Text>
         <Text style={styles.subtitle}>
-          Tap any answer to change it, then add the meals your plan is built from.
+          Review your plan details and add your favorite meals below.
         </Text>
 
         {/* Macro recap */}

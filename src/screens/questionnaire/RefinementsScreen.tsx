@@ -19,7 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
-import { WorkoutStorage } from '../../utils/storage';
+import { updateQuestionnaireField } from '../../utils/questionnaireStorage';
 
 /**
  * Refinements — optional final step before prompt generation.
@@ -187,19 +187,13 @@ export default function RefinementsScreen() {
     setSaving(true);
 
     try {
-      const questionnaireData = {
-        ...answersSoFar,
-        priorityMuscleGroups: priorityMuscles,
-        auxiliaryMuscles,
-        movementLimitations,
-        gender: gender ?? 'prefer_not_to_say',
-        includeDirectCore,
-      };
-
-      // Save into both storage keys so WorkoutGeneratorStep1New finds
-      // the data regardless of which split it expects.
-      await WorkoutStorage.saveFitnessGoalsResults(questionnaireData);
-      await WorkoutStorage.saveEquipmentPreferencesResults(questionnaireData);
+      // Save only the refinement fields collected by this screen.
+      // Q1-Q7 answers are already persisted by their individual screens.
+      await updateQuestionnaireField('priorityMuscleGroups', priorityMuscles);
+      await updateQuestionnaireField('auxiliaryMuscles', auxiliaryMuscles);
+      await updateQuestionnaireField('movementLimitations', movementLimitations);
+      await updateQuestionnaireField('gender', gender ?? 'prefer_not_to_say');
+      await updateQuestionnaireField('includeDirectCore', includeDirectCore);
 
       if (editMode) {
         navigation.goBack();

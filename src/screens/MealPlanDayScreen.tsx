@@ -57,8 +57,24 @@ interface MealCardProps {
 }
 
 function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, mealIcon, mealColor, isCompleted }: MealCardProps) {
-  const localImg = (meal as any)?.image_filename ? getMealImage((meal as any).image_filename) : null;
-  const uri = getMealImageUri(meal);
+  // Resolve the meal photo. Manually-logged meals carry image_filename / photo_url
+  // directly. Curated meals (incl. AI-imported plans) carry only curated_meal_slug
+  // + plate_id, so hydrate the image from the curated DB: per-plate image_filename
+  // first, then the meal-level photo_url. Falls back to the type icon if neither.
+  let imageFilename: string | null = (meal as any)?.image_filename || null;
+  let uri = getMealImageUri(meal);
+  if (!imageFilename && !uri) {
+    const slug = (meal as any)?.curated_meal_slug || (meal as any)?.slug || null;
+    const cm = slug ? (CURATED_MEALS as any)[slug] : null;
+    if (cm) {
+      const plates = Array.isArray(cm.plates) ? cm.plates : [];
+      const plateId = (meal as any)?.plate_id || null;
+      const plate = (plateId && plates.find((p: any) => p?.id === plateId)) || plates[0] || null;
+      imageFilename = plate?.image_filename || cm.image_filename || null;
+      uri = cm.photo_url || uri;
+    }
+  }
+  const localImg = imageFilename ? getMealImage(imageFilename) : null;
   const cal = (meal.calories && typeof meal.calories === 'number') ? meal.calories : 0;
   const p = Math.round((meal.macros?.protein || meal.nutritionInfo?.protein || 0));
   const c = Math.round((meal.macros?.carbs || meal.nutritionInfo?.carbs || meal.nutritionInfo?.carbohydrates || 0));

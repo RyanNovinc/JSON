@@ -13,8 +13,8 @@ import {
   Pressable,
   RefreshControl,
   TouchableOpacity as RNTouchable,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
@@ -830,7 +830,7 @@ export default function NutritionHomeScreen({ route }: any) {
   // { cuisine, title } params. The legacy MealsLibrary / SmoothiesLibrary
   // screens are left intact in the navigator but are no longer routed to here.
   const handleSeeAllPress = (cuisine: string, title: string) => {
-    navigation.navigate('CuratedFavorites' as any, { cuisine, title });
+    navigation.navigate('MealsLibrary' as any, { cuisine, title });
   };
 
   // ============================================================================
@@ -858,7 +858,8 @@ export default function NutritionHomeScreen({ route }: any) {
             <Image
               source={imageSource}
               style={styles.feedCardImage}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={150}
             />
           ) : (
             <View style={[styles.feedCardImage, styles.feedCardImagePlaceholder]}>
@@ -957,7 +958,8 @@ export default function NutritionHomeScreen({ route }: any) {
                     <Image
                       source={imageSource}
                       style={styles.seeMoreThumbImage}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      transition={100}
                     />
                   ) : (
                     <View style={styles.seeMoreThumbPlaceholder}>
@@ -1090,7 +1092,7 @@ export default function NutritionHomeScreen({ route }: any) {
                   accessibilityRole="button"
                   accessibilityLabel="More options"
                 >
-                  <Ionicons name="ellipsis-horizontal" size={20} color="#a1a1aa" />
+                  <Ionicons name="ellipsis-horizontal" size={18} color="#a1a1aa" />
                 </RNTouchable>
 
                 <Pressable
@@ -1099,7 +1101,7 @@ export default function NutritionHomeScreen({ route }: any) {
                   delayLongPress={600}
                 >
                   <Text style={[styles.heroEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
-                  <Text style={[styles.heroTitleText, { textShadowColor: themeColorLight }]} numberOfLines={2}>
+                  <Text style={styles.heroTitleText} numberOfLines={2}>
                     {currentPlanLegacy.name}
                   </Text>
                   <Text style={styles.heroSubtitle}>
@@ -1118,7 +1120,7 @@ export default function NutritionHomeScreen({ route }: any) {
                   accessibilityRole="button"
                   accessibilityLabel="Start today's meals"
                 >
-                  <Ionicons name="restaurant" size={16} color="#0a0a0b" />
+                  <Ionicons name="restaurant" size={14} color="#0a0a0b" />
                   <Text style={styles.heroTodayText}>Start today's meals</Text>
                 </TouchableOpacity>
 
@@ -1352,7 +1354,7 @@ export default function NutritionHomeScreen({ route }: any) {
                 require('./../../lucid-origin_Two_athletic_men_enjoying_a_healthy_meal_together_in_a_modern_kitchen_one_passin-0.jpg')
               }
               style={styles.newShareImage}
-              resizeMode="cover"
+              contentFit="cover"
             />
 
             <View style={styles.newShareContent}>
@@ -1608,18 +1610,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  // Hero card
-  // FIX: removed marginHorizontal: 16. scrollContent's paddingHorizontal: 16
-  // was already providing the gutter; adding marginHorizontal here doubled it
-  // to 32px, which is what made the card look squished vs HomeScreen.
-  // SPACING FIX: marginBottom bumped 12 → 28 to give breathing room before
-  // the "Meals" heading (was sitting too close to the hero card border).
+  // ==========================================================================
+  // Hero / current plan card — now matches HomeScreen.tsx planCardPrimary
+  // exactly (same radius, padding, title size, pill button, link styling).
+  // The only intentional differences are the icon glyph (restaurant vs play)
+  // and the button label.
+  // ==========================================================================
   heroCard: {
     backgroundColor: '#000',
     borderRadius: 18,
     borderWidth: 1.5,
     padding: 20,
     marginBottom: 12,
+    position: 'relative',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -1629,8 +1632,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1640,39 +1643,37 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   heroTitleText: {
-    fontSize: 28,
-    fontWeight: '700',
     color: '#ffffff',
-    lineHeight: 34,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-    paddingRight: 40,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+    paddingRight: 30,
   },
   heroSubtitle: {
+    color: '#71717a',
     fontSize: 13,
-    color: '#a1a1aa',
-    marginTop: 4,
+    marginBottom: 16,
   },
   heroTodayBtn: {
+    height: 48,
+    borderRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 18,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
   },
   heroTodayText: {
-    fontSize: 15,
-    fontWeight: '600',
     color: '#0a0a0b',
+    fontSize: 14,
+    fontWeight: '700',
     letterSpacing: 0.2,
   },
   heroPlanLink: {
@@ -1680,12 +1681,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    paddingTop: 12,
+    paddingTop: 14,
     paddingBottom: 2,
   },
   heroPlanLinkText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 
   // ===== Secondary plan card — mirrors HomeScreen.tsx planCardSecondary =====

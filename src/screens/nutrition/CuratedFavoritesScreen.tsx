@@ -52,7 +52,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   Dimensions,
   ActivityIndicator,
@@ -69,6 +68,7 @@ import {
   // touchables can coexist in the same tree.
   TouchableOpacity as RNTouchableOpacity,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -495,8 +495,8 @@ const MealCard = React.memo(function MealCard({
             <Image
               source={imageSource}
               style={styles.cardImage}
-              resizeMode="cover"
-              fadeDuration={200}
+              contentFit="cover"
+              transition={200}
             />
           ) : (
             <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
@@ -621,7 +621,7 @@ function PlatePanel({
 
       <View style={styles.heroWrap}>
         {baseImg ? (
-          <Image source={baseImg} style={styles.cardImage} resizeMode="cover" />
+          <Image source={baseImg} style={styles.cardImage} contentFit="cover" transition={150} />
         ) : (
           <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
             <Ionicons name="restaurant-outline" size={32} color="#52525b" />
@@ -696,7 +696,8 @@ function PlatePanel({
                       <Image
                         source={plateImg}
                         style={styles.cardImage}
-                        resizeMode="cover"
+                        contentFit="cover"
+                        transition={150}
                       />
                     ) : (
                       <View

@@ -76,10 +76,12 @@ export default function N6MealsSnackingScreen() {
   const handleNext = async () => {
     if (!valid) return;
     const snack = SNACK_OPTIONS.find((s) => s.freq === snackFreq)!;
+    // Always save the answers to storage, whether in edit mode or not
+    await updateNutritionField('mealsPerDay', meals);
+    await updateNutritionField('snackFrequency', snackFreq);
+    await updateNutritionField('snackingStyle', snack.style);
+    
     if (editMode) {
-      await updateNutritionField('mealsPerDay', meals);
-      await updateNutritionField('snackFrequency', snackFreq);
-      await updateNutritionField('snackingStyle', snack.style);
       navigation.goBack();
       return;
     }

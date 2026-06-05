@@ -6,7 +6,7 @@
  */
 
 import { Asset } from 'expo-asset';
-import { Image } from 'react-native';
+import { Image } from 'expo-image';
 
 // Critical images that should be preloaded on app startup
 const CRITICAL_IMAGES = [
@@ -29,7 +29,7 @@ const CRITICAL_IMAGES = [
 
 /**
  * Preload critical images using Asset.loadAsync for initial bundling
- * and Image.prefetch for expo-image caching
+ * and expo-image caching for optimal performance
  */
 export async function preloadCriticalImages(): Promise<void> {
   try {
@@ -38,12 +38,11 @@ export async function preloadCriticalImages(): Promise<void> {
     // Preload using Asset (bundles images for offline use)
     await Asset.loadAsync(CRITICAL_IMAGES);
     
-    // Also prefetch using React Native Image for better caching
+    // Prefetch using expo-image for better caching and performance
     const prefetchPromises = CRITICAL_IMAGES.map(async (imageSource) => {
       try {
-        // React Native Image.prefetch expects a URI string
-        const uri = Image.resolveAssetSource(imageSource).uri;
-        await Image.prefetch(uri);
+        // expo-image accepts both URIs and require() sources
+        await Image.prefetch(imageSource);
       } catch (error) {
         console.warn('Failed to prefetch image:', imageSource, error);
       }
@@ -65,8 +64,8 @@ export async function preloadScreenImages(imageList: any[]): Promise<void> {
   try {
     const prefetchPromises = imageList.map(async (imageSource) => {
       try {
-        const uri = Image.resolveAssetSource(imageSource).uri;
-        await Image.prefetch(uri);
+        // expo-image handles both URIs and require() sources natively
+        await Image.prefetch(imageSource);
       } catch (error) {
         console.warn('Failed to prefetch screen image:', imageSource, error);
       }
@@ -83,9 +82,10 @@ export async function preloadScreenImages(imageList: any[]): Promise<void> {
  */
 export async function clearImageCache(): Promise<void> {
   try {
-    // React Native Image doesn't have built-in cache clearing
-    // This would require a third-party library or native implementation
-    console.log('🧹 Image cache clear requested (manual implementation needed)');
+    // expo-image provides built-in cache clearing
+    await Image.clearDiskCache();
+    await Image.clearMemoryCache();
+    console.log('🧹 Image cache cleared successfully');
   } catch (error) {
     console.warn('Cache clearing failed:', error);
   }

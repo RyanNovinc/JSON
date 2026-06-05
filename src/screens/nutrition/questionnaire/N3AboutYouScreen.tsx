@@ -135,11 +135,14 @@ export default function N3AboutYouScreen() {
 
   const handleNext = async () => {
     if (!valid) return;
+    
+    // Always save the answers to storage, whether in edit mode or not
+    await updateNutritionField('gender', gender!);
+    await updateNutritionField('age', ageNum);
+    await updateNutritionField('height', heightNum);
+    await updateNutritionField('weight', weight!);
+    
     if (editMode) {
-      await updateNutritionField('gender', gender!);
-      await updateNutritionField('age', ageNum);
-      await updateNutritionField('height', heightNum);
-      await updateNutritionField('weight', weight!);
       navigation.goBack();
       return;
     }

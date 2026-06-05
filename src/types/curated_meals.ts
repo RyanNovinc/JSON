@@ -139,6 +139,68 @@ export interface MealIngredient {
 }
 
 /**
+ * Prep-ahead classification consumed by the Meal-Prep Session feature.
+ * `buildPrepSession` reads this to project a weekly plan into a prep session.
+ *
+ * - 'full'    — cook all servings ahead, store, reheat. Stews, curries, braises,
+ *               roasts, mince dishes, soups, casseroles, cooked grain+protein
+ *               bowls — anything that reheats well. Surfaces as a "Cook N
+ *               servings" card that deep-links into the cook flow.
+ * - 'partial' — cook the cooked components ahead, finish/assemble fresh.
+ *               Default boundary (NO extra authoring required): the chosen
+ *               method's base `instructions` are the prep-ahead steps; the
+ *               plate's `additional_instructions` are the day-of steps. This
+ *               reuses the recipe's existing "Cook the base" vs "Plate it up"
+ *               structure. Only set the *_step_ids overrides below if that
+ *               default split is wrong for a given meal.
+ * - 'none'    — make fresh, nothing to prep. Dairy/raw/assembly-only/
+ *               texture-sensitive-cold (yoghurt + fruit, smoothies, undressed
+ *               salads that degrade). Surfaces in the quiet "Make fresh" list so
+ *               the user can see it was skipped on purpose.
+ */
+export type MealPrepStrategy = 'full' | 'partial' | 'none';
+
+export interface MealPrep {
+  strategy: MealPrepStrategy;
+
+  /** One-line summary shown on the prep card (e.g. "Cook the curry, store, reheat"). */
+  prep_note?: string;
+
+  /** For 'partial' meals: what to prepare ahead (e.g. "Turkey meatballs + tomato sauce"). */
+  prep_ahead_summary?: string;
+
+  /** For 'partial' meals: what to do day-of (e.g. "Boil fresh spaghetti"). */
+  day_of_summary?: string;
+
+  /** For 'none' only: why it's intentionally made fresh. Shown in the Make Fresh list. */
+  reason?: string;
+
+  /** Storage guidance shown on cook-ahead / prep-ahead cards ("fridge 4 days · freeze 3 mo"). */
+  storage?: {
+    fridge_days?: number;
+    freeze_months?: number;
+  };
+
+  /**
+   * 'partial' OVERRIDES ONLY. By default a 'partial' meal treats the method's
+   * base `instructions` as prep-ahead and the plate's `additional_instructions`
+   * as day-of — so these are unnecessary unless that split is wrong for a meal.
+   *
+   * NOTE — architectural gap: RecipeStep has no `id` field yet, so these are
+   * NOT yet consumed by the app (the default base/plate boundary is the only
+   * wired path). They are typed here so authoring stays forward-compatible;
+   * wire them up only once RecipeStep gains a stable `id`.
+   */
+  prep_ahead_step_ids?: string[];
+  day_of_step_ids?: string[];
+}
+
+/** 
+ * Plate-level meal prep overrides. All fields optional since they merge with meal-level config.
+ */
+export type MealPrepOverride = Partial<MealPrep>;
+
+/**
  * A "plate" represents one way to serve a meal. Most meals have a single plate
  * (e.g. butter chicken with rice and naan). Multi-variant meals like pulled pork
  * have several plates (sandwich, bowl, tacos), each with its own accompaniments,
@@ -226,6 +288,14 @@ export interface Plate {
    * URL of a hosted hero photo for this specific plate. Optional. When absent, UI falls back to the meal's photo_url.
    */
   photo_url?: string;
+
+  /**
+   * Optional prep-ahead override for THIS plate. When present it overrides the
+   * meal-level `meal_prep` for this plate only — e.g. the base curry is 'full',
+   * but a "with garlic bread" plate of it is 'partial' (reheat the stew, bake
+   * the bread fresh). When absent, the plate inherits the meal's `meal_prep`.
+   */
+  meal_prep?: MealPrepOverride;
 }
 
 /**
@@ -292,6 +362,15 @@ export interface CuratedMeal {
    * The UI layer chooses whether to use image_filename (bundled) or photo_url (hosted) based on context.
    */
   photo_url?: string;
+  /**
+   * Default prep-ahead classification for the meal, read by `buildPrepSession`
+   * to project a weekly plan into a Meal-Prep Session. A plate may override this
+   * via its own `meal_prep`. Optional during authoring — a meal without it is
+   * treated as 'none' (shown under "Make fresh") so nothing breaks while the
+   * catalogue is being classified. See the GitHub authoring rubric for how to
+   * classify each meal.
+   */
+  meal_prep?: MealPrep;
 }
 
 /**

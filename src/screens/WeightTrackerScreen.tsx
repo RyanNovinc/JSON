@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { WorkoutStorage } from '../utils/storage';
 import WeightEntrySheet from '../components/nutrition/WeightEntrySheet';
 
@@ -284,6 +285,7 @@ export default function WeightTrackerScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const { globalUnit } = useWeightUnit();
 
   const [history, setHistory] = useState<WeightEntry[]>([]);
   const [loading, setLoading] = useState(true);

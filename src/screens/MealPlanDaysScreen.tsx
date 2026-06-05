@@ -17,6 +17,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
+import { buildPrepSession } from '../utils/buildPrepSession';
 
 type Nav = StackNavigationProp<RootStackParamList, 'MealPlanDays'>;
 type Rt = RouteProp<RootStackParamList, 'MealPlanDays'>;
@@ -52,7 +53,7 @@ export default function MealPlanDaysScreen() {
   const mealPlanning = useMealPlanning();
   const { currentPlan, saveMealPlan } = useSimplifiedMealPlanning();
 
-  const { week = { week_number: 1, days: [] }, mealPlanName, allMealPrepSessions, groceryList } = route.params;
+  const { week = { week_number: 1, days: [] }, mealPlanName, groceryList } = route.params;
 
   // ---- Grocery resolution -------------------------------------------------
   const currentGroceryList = currentPlan?.grocery_list || mealPlanning.currentMealPlan?.data?.grocery_list || groceryList;
@@ -99,68 +100,14 @@ export default function MealPlanDaysScreen() {
     };
   };
 
-  // ---- Meal prep resolution ----------------------------------------------
-  const generateMealPrepFromCurrentPlan = () => {
-    if (!currentPlan) return null;
-    const uniqueMeals = new Map<string, any>();
-    Object.values(currentPlan.dailyMeals).forEach((day: any) => {
-      day.meals?.forEach((meal: any) => { if (!uniqueMeals.has(meal.name)) uniqueMeals.set(meal.name, meal); });
-    });
-    const arr = Array.from(uniqueMeals.values());
-    if (arr.length === 0) return null;
-    const est = (meal: any) => {
-      const ins = meal.instructions || [];
-      const tags = meal.tags || [];
-      if (tags.includes('no-cook') || tags.includes('quick')) return { p: 5, c: 0 };
-      if (tags.includes('air-fryer')) return { p: 10, c: 20 };
-      if (tags.includes('sheet-pan')) return { p: 15, c: 25 };
-      if (ins.length > 8) return { p: 20, c: 30 };
-      if (ins.length > 5) return { p: 15, c: 20 };
-      return { p: 10, c: 15 };
-    };
-    const totalPrepTime = arr.reduce((t, meal) => { const e = est(meal); return t + (meal.prep_time || meal.prepTime || e.p) + (meal.cook_time || meal.cookTime || e.c); }, 0);
-    const today = new Date();
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() + (((0 - today.getDay() + 7) % 7) || 7));
-    return [{
-      id: 'weekly_meal_prep',
-      session_name: 'Weekly Meal Prep',
-      session_number: 1,
-      name: 'Weekly Meal Prep',
-      prep_time: Math.round(totalPrepTime * 0.4),
-      cook_time: Math.round(totalPrepTime * 0.6),
-      total_time: totalPrepTime,
-      covers: `${arr.length} recipes for the week`,
-      recommended_timing: 'Sunday morning or evening for best results',
-      recommended_date: sunday.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
-      equipment_needed: [],
-      instructions: [],
-      storage_guidelines: {},
-      prep_meals: arr.map((meal) => {
-        const e = est(meal);
-        const p = meal.prep_time || meal.prepTime || e.p;
-        const c = meal.cook_time || meal.cookTime || e.c;
-        return {
-          meal_name: meal.name,
-          meal_type: meal.type || meal.meal_type || 'meal',
-          prep_time: p, cook_time: c, total_time: p + c, servings: 1,
-          calories: meal.calories || 0,
-          macros: meal.macros || { protein: 0, carbs: 0, fat: 0, fiber: 0 },
-          ingredients: meal.ingredients || [],
-          instructions: meal.instructions || [],
-          meal_prep_notes: `This ${meal.type || 'meal'} can be prepped ahead for convenience`,
-          tags: meal.tags || [],
-        };
-      }),
-    }];
-  };
-
   const effectiveGroceryList = currentGroceryList || generateGroceryListFromCurrentPlan();
 
-  let effectiveMealPrepSessions = allMealPrepSessions;
-  if (currentPlan?.meal_prep_sessions && currentPlan.meal_prep_sessions.length > 0) effectiveMealPrepSessions = currentPlan.meal_prep_sessions;
-  else if (currentPlan?.meal_prep_session) effectiveMealPrepSessions = [currentPlan.meal_prep_session];
-  else if (!effectiveMealPrepSessions || effectiveMealPrepSessions.length === 0) effectiveMealPrepSessions = generateMealPrepFromCurrentPlan();
+  // Prep session is derived deterministically from the plan (the same projection
+  // the Meal Prep screen renders), not from stale AI-emitted meal_prep_sessions
+  // or the route param. Badge figures come straight off its totals.
+  const prepSession = useMemo(() => (currentPlan ? buildPrepSession(currentPlan) : null), [currentPlan]);
+  const prepMealCount = prepSession?.totals.mealCount ?? 0;
+  const prepActiveMinutes = prepSession?.totals.activeMinutes ?? 0;
 
   const actualGroceryTotal = useMemo(() => {
     if (!effectiveGroceryList?.categories) return 0;
@@ -174,25 +121,10 @@ export default function MealPlanDaysScreen() {
     return effectiveGroceryList.categories.reduce((s: number, c: any) => s + (c.items?.length || 0), 0);
   }, [effectiveGroceryList]);
 
-  const prepRecipeCount = useMemo(() => {
-    if (effectiveMealPrepSessions && effectiveMealPrepSessions.length) {
-      const counted = effectiveMealPrepSessions.reduce((s: number, x: any) => s + (x.prep_meals?.length || 0), 0);
-      if (counted > 0) return counted;
-    }
-    if (currentPlan) {
-      const names = new Set<string>();
-      Object.values(currentPlan.dailyMeals).forEach((d: any) => d.meals?.forEach((m: any) => names.add(m.name)));
-      return names.size;
-    }
-    return 0;
-  }, [effectiveMealPrepSessions, currentPlan]);
-
-  const prepTotalTime = effectiveMealPrepSessions && effectiveMealPrepSessions.length
-    ? effectiveMealPrepSessions.reduce((s: number, x: any) => s + (x.total_time || 0), 0)
-    : 0;
-
   const hasGrocery = !!effectiveGroceryList;
-  const hasPrep = !!(effectiveMealPrepSessions && effectiveMealPrepSessions.length > 0);
+  // Button shows whenever there's a plan — the Meal Prep screen handles the
+  // all-fresh and legacy (no curated meals) cases itself.
+  const hasPrep = !!currentPlan;
   const currency = (effectiveGroceryList as any)?.currency || '$';
 
   const setupTasks = (currentPlan as any)?.setupTasks as { shopping?: boolean; prep?: boolean } | undefined;
@@ -318,7 +250,7 @@ export default function MealPlanDaysScreen() {
     else Alert.alert('Shopping list', 'No shopping list available for this plan yet.');
   };
   const openPrep = () => {
-    if (hasPrep) navigation.navigate('MealPrepSession', { mealPrepSession: effectiveMealPrepSessions[0], sessionIndex: 0, allSessions: effectiveMealPrepSessions });
+    if (hasPrep) navigation.navigate('MealPrepSession');
     else Alert.alert('Meal prep', 'No meal prep available for this plan yet.');
   };
 
@@ -470,10 +402,10 @@ export default function MealPlanDaysScreen() {
                   <View style={styles.billRow}>
                     <Text style={[styles.billName, prepDone && styles.billNameDone]}>Meal prep</Text>
                     <View style={styles.leader} />
-                    <Text style={styles.billFigure}>{prepTotalTime ? `${prepTotalTime} min` : `${prepRecipeCount}`}</Text>
+                    <Text style={styles.billFigure}>{prepActiveMinutes > 0 ? `${prepActiveMinutes} min` : (prepMealCount > 0 ? `${prepMealCount}` : '')}</Text>
                     <Text style={styles.billChev}>›</Text>
                   </View>
-                  <Text style={styles.billMeta}>{prepDone ? 'Done · ' : ''}{prepRecipeCount} {prepRecipeCount === 1 ? 'recipe' : 'recipes'}</Text>
+                  <Text style={styles.billMeta}>{prepMealCount > 0 ? `${prepDone ? 'Done · ' : ''}${prepMealCount} ${prepMealCount === 1 ? 'meal' : 'meals'}` : 'Tap to view'}</Text>
                 </TouchableOpacity>
               )}
             </View>

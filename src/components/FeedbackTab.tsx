@@ -210,29 +210,6 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
               <Text style={styles.title}>How's the app?</Text>
             </View>
             <View style={styles.headerActions}>
-              <Pressable
-                onPress={() => {
-                  const newThemeState = !currentThemeState;
-                  setLocalThemeState(newThemeState);
-                  setIsPinkTheme(newThemeState);
-                }}
-                style={({ pressed }) => [
-                  styles.colorToggle,
-                  {
-                    borderColor: hexA(currentThemeColor, 0.5),
-                    backgroundColor: hexA(currentThemeColor, 0.15),
-                  },
-                  pressed && { opacity: 0.7 }
-                ]}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              >
-                <View
-                  style={[
-                    styles.colorIndicator,
-                    { backgroundColor: currentThemeColor }
-                  ]}
-                />
-              </Pressable>
               <TouchableOpacity
                 onPress={handleClose}
                 style={styles.closeButton}
@@ -515,19 +492,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  colorToggle: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  colorIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
   },
   closeButton: {
     width: 32,

@@ -133,9 +133,11 @@ export default function N5DietTypeScreen() {
     const customMacros =
       selected === 'custom' ? { protein: p, carbs: c, fat: f } : undefined;
 
+    // Always save the answers to storage, whether in edit mode or not
+    await updateNutritionField('dietType', selected!);
+    if (customMacros) await updateNutritionField('customMacros', customMacros);
+    
     if (editMode) {
-      await updateNutritionField('dietType', selected!);
-      if (customMacros) await updateNutritionField('customMacros', customMacros);
       navigation.goBack();
       return;
     }

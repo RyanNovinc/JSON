@@ -77,8 +77,11 @@ export default function Q6VolumePreferenceScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateQuestionnaireField('volumePreference', selected);
+    
     if (editMode) {
-      await updateQuestionnaireField('volumePreference', selected);
       navigation.goBack();
       return;
     }

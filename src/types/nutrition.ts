@@ -274,6 +274,15 @@ export interface SimplifiedMeal {
   tags: MealTag[];
   isOriginal: boolean; // true if from generated plan, false if manually added
   addedAt?: string; // timestamp when added (for manual meals)
+  // Curated-meal reference fields. Present when this meal maps to a curated
+  // catalogue entry; absent for invented or manually-logged meals. slug +
+  // plate_id resolve the recipe / prep classification from CURATED_MEALS,
+  // scale_factor scales its macros, and the photo fields carry the meal image.
+  curated_meal_slug?: string;
+  plate_id?: string;
+  scale_factor?: number;
+  photo_url?: string;
+  image_filename?: string;
 }
 
 export interface MealPlanDay {
