@@ -30,7 +30,7 @@ import { updateNutritionField } from '../../../utils/nutritionQuestionnaireStora
  * times a week", not "two desserts a day".
  */
 
-type DessertValue = '0' | 'few_per_week' | 'most_nights' | 'every_night' | 'ai_decide';
+type DessertValue = '0' | 'once_per_week' | 'few_per_week' | 'most_nights' | 'every_night' | 'ai_decide';
 
 interface DessertOption {
   value: DessertValue;
@@ -45,6 +45,12 @@ const OPTIONS: DessertOption[] = [
     title: 'No desserts',
     subtitle: 'Skip desserts entirely. Clean bulk territory.',
     icon: 'close-circle',
+  },
+  {
+    value: 'once_per_week',
+    title: 'Once a week',
+    subtitle: 'One night per week. An occasional treat.',
+    icon: 'calendar',
   },
   {
     value: 'few_per_week',
@@ -93,8 +99,11 @@ export default function N6aDessertScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
+    
+    // Always save the answer to storage, whether in edit mode or not
+    await updateNutritionField('dessertFrequency', selected);
+    
     if (editMode) {
-      await updateNutritionField('dessertFrequency', selected);
       navigation.goBack();
       return;
     }

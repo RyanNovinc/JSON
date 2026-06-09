@@ -162,7 +162,7 @@ export default function N6MealsSnackingScreen() {
           </View>
         )}
 
-        <Text style={[styles.fieldLabel, { marginTop: 28 }]}>Snacks</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 28 }]}>Snacks per day</Text>
         <View style={styles.snackRow}>
           {SNACK_OPTIONS.map((opt) => {
             const isSel = snackFreq === opt.freq;

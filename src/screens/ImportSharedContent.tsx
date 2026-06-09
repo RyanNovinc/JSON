@@ -58,9 +58,59 @@ export default function ImportSharedContent() {
   const fetchAndNavigate = async () => {
     try {
       console.log('📱 [IMPORT SHARED] fetchAndNavigate started for shareId:', shareId);
+      
+      // Check if this is a curated program import (pattern: program/slug)
+      if (shareId.startsWith('program/')) {
+        console.log('📱 [IMPORT SHARED] Detected curated program import');
+        const programSlug = shareId.replace('program/', '');
+        console.log('📱 [IMPORT SHARED] Program slug:', programSlug);
+        
+        // Validate slug format
+        if (!/^[a-z0-9-]+$/.test(programSlug)) {
+          throw new Error('Invalid program identifier');
+        }
+        
+        // Fetch curated program data from static file
+        const programUrl = `https://json.fit/programs/${programSlug}.json`;
+        console.log('📱 [IMPORT SHARED] Fetching curated program from:', programUrl);
+        
+        const response = await fetch(programUrl, { 
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('This curated program is not available');
+          }
+          throw new Error(`Failed to load curated program: ${response.status}`);
+        }
+        
+        const programData = await response.json();
+        console.log('📱 [IMPORT SHARED] Curated program data loaded, keys:', Object.keys(programData || {}));
+        
+        // Validate the program data structure
+        if (!programData || typeof programData !== 'object' || !programData.routine_name) {
+          throw new Error('Invalid curated program data');
+        }
+        
+        // Convert to JSON string and navigate to ImportRoutine
+        const prefilledJson = JSON.stringify(programData);
+        console.log('📱 [IMPORT SHARED] Navigating to ImportRoutine with curated program');
+        navigation.replace('ImportRoutine', { 
+          prefilledJson,
+          isCurated: true,
+          curatedSlug: programSlug
+        });
+        return;
+      }
+      
       console.log('📱 [IMPORT SHARED] About to call fetchShare service');
       
-      // Fetch the shared content data
+      // Fetch the shared content data (existing flow)
       const startTime = Date.now();
       const sharedData = await fetchShare(shareId);
       const fetchTime = Date.now() - startTime;
@@ -132,9 +182,9 @@ export default function ImportSharedContent() {
     } catch (error) {
       console.error('📱 [IMPORT SHARED] ERROR occurred:', error);
       console.error('📱 [IMPORT SHARED] Error type:', typeof error);
-      console.error('📱 [IMPORT SHARED] Error name:', error?.name);
-      console.error('📱 [IMPORT SHARED] Error message:', error?.message);
-      console.error('📱 [IMPORT SHARED] Error stack:', error?.stack);
+      console.error('📱 [IMPORT SHARED] Error name:', (error as any)?.name);
+      console.error('📱 [IMPORT SHARED] Error message:', (error as any)?.message);
+      console.error('📱 [IMPORT SHARED] Error stack:', (error as any)?.stack);
       console.error('📱 [IMPORT SHARED] Error instanceof ShareError:', error instanceof ShareError);
       
       if (error instanceof ShareError) {
@@ -164,7 +214,7 @@ export default function ImportSharedContent() {
         }
       } else {
         console.log('📱 [IMPORT SHARED] Processing generic error');
-        errorMessage = error?.message || 'Unknown error occurred';
+        errorMessage = (error as any)?.message || 'Unknown error occurred';
       }
       
       console.log('📱 [IMPORT SHARED] Final error message:', errorMessage);

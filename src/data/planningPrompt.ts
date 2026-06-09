@@ -340,16 +340,19 @@ export const getRule13 = (duration: string): string => {
   }
 };
 
-export const RULE_16 = `17. **Mesocycle structure for programs 13+ weeks:** Any program longer than 12 weeks must be organised into mesocycles. Each mesocycle is typically 12-13 weeks (2-3 blocks). Each mesocycle shifts training emphasis — e.g., Mesocycle 1: Hypertrophy (8-12 reps), Mesocycle 2: Strength-Hypertrophy (6-10 reps), Mesocycle 3: Metabolic/Intensity (10-15 reps + advanced techniques).
+export const RULE_16 = `17. **Mesocycle structure for programs 13+ weeks:** Any program longer than 12 weeks must be organised into mesocycles. Each mesocycle is 2–3 blocks (~10–18 weeks) sharing one rep/emphasis theme. Each mesocycle shifts training emphasis — e.g., Mesocycle 1: Hypertrophy (8-12 reps), Mesocycle 2: Strength-Hypertrophy (6-10 reps), Mesocycle 3: Metabolic/Intensity (10-15 reps + advanced techniques).
 
-**Declare the full mesocycle structure upfront** before detailing any exercises — output a Mesocycle Roadmap table in this format:
+**Always refer to a block as "Mesocycle M, Block B"** — where B is the block's index *within* mesocycle M (it resets to 1 at the start of each mesocycle). Use this exact form throughout the plan and carry it into JSON generation. Do not use standalone global block numbers ("Block 7") or block letters ("Block A/B").
 
-| Mesocycle | Phase Name | Rep Focus | Emphasis | Weeks | Blocks |
-|-----------|-----------|-----------|----------|-------|--------|
-| 1 | [name] | [e.g. 8-12] | [e.g. Hypertrophy] | [X] | [X] |
-| 2 | [name] | [e.g. 6-10] | [e.g. Strength-Hypertrophy] | [X] | [X] |
+**Declare the full mesocycle structure upfront** before detailing any exercises — output a block-level Mesocycle Roadmap table (one row per block, not one row per mesocycle) in this format:
 
-Then detail exercises for **Block 1 of Mesocycle 1 only**. The user will approve each block before requesting the next. Do not generate Block 2 or any subsequent blocks until asked.`;
+| Mesocycle | Block (in meso) | Overall Block | Phase / Rep Focus | Emphasis | Weeks |
+|-----------|-----------------|---------------|-------------------|----------|-------|
+| 1 | 1 | 1 | [e.g. 8-12] | [e.g. Hypertrophy] | [e.g. 1–6] |
+| 1 | 2 | 2 | [e.g. 8-12] | [e.g. Hypertrophy] | [e.g. 7–12] |
+| 2 | 1 | 3 | [e.g. 6-10] | [e.g. Strength-Hypertrophy] | [e.g. 13–18] |
+
+The "Weeks" column is the absolute program range for each block. Then detail exercises for **Mesocycle 1, Block 1 only**. The user will approve each block before requesting the next. Do not generate any subsequent block until asked.`;
 
 export const RECOVERY_PROGRESSION_HEADER = `
 ### Recovery and Progression`;
@@ -662,27 +665,6 @@ export const getGoalGuidance = (goal: string): string => {
 // ================================
 // HELPER FUNCTIONS
 // ================================
-
-/**
- * Calculate mesocycle structure from program duration
- */
-function calculateMesocycleDefaults(duration: string): {
-  totalMesocycles: number;
-  mesocycleWeeks: number;
-  mesocycleBlocks: number;
-} {
-  switch (duration) {
-    case '6_months':
-      return { totalMesocycles: 2, mesocycleWeeks: 13, mesocycleBlocks: 2 };
-    case '1_year':
-      return { totalMesocycles: 3, mesocycleWeeks: 17, mesocycleBlocks: 3 };
-    case 'custom':
-      // Default fallback - could be enhanced to parse custom duration
-      return { totalMesocycles: 3, mesocycleWeeks: 18, mesocycleBlocks: 3 };
-    default:
-      return { totalMesocycles: 1, mesocycleWeeks: 12, mesocycleBlocks: 2 };
-  }
-}
 
 /**
  * Generate the plan output format

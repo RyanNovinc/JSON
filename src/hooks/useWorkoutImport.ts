@@ -30,6 +30,8 @@ export interface UseWorkoutImportOptions {
   targetWorkoutId?: string;
   prefilledJson?: string;
   shareId?: string;
+  isCurated?: boolean;
+  curatedSlug?: string;
 }
 
 export interface UseWorkoutImportReturn {
@@ -65,7 +67,9 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
     mode, 
     targetWorkoutId, 
     prefilledJson, 
-    shareId 
+    shareId,
+    isCurated,
+    curatedSlug
   } = options;
 
   // State (copied verbatim from ImportRoutineScreen)
@@ -324,10 +328,10 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
       }
       
       // Restore exercise preferences (global, not routine-specific)
-      // Skip for sample plans to prevent contaminating user preferences
+      // Skip for sample plans and curated programs to prevent contaminating user preferences
       if (metadata.exercisePreferences && 
           Object.keys(metadata.exercisePreferences).length > 0 &&
-          !metadata.isSamplePlan) {
+          !metadata.isSamplePlan && !isCurated) {
         try {
           // Load existing preferences
           const existingPreferencesData = await AsyncStorage.getItem('exercise_preferences');
@@ -343,8 +347,8 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
         } catch (error) {
           console.log('Could not restore exercise preferences:', error);
         }
-      } else if (metadata.isSamplePlan && metadata.exercisePreferences) {
-        console.log('🚫 Skipped applying exercise preferences from sample plan to prevent user preference contamination');
+      } else if ((metadata.isSamplePlan || isCurated) && metadata.exercisePreferences) {
+        console.log(`🚫 Skipped applying exercise preferences from ${isCurated ? 'curated program' : 'sample plan'} to prevent user preference contamination`);
       }
       
       // For complete state imports with multiple mesocycles, create individual mesocycle routines
@@ -424,6 +428,23 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
         await ProgramStorage.addProgram(program);
       }
       
+      // For curated imports, check for existing routine with same fingerprint
+      if (isCurated && curatedSlug) {
+        const curatedFingerprint = `curated:${curatedSlug}`;
+        const existingRoutines = await WorkoutStorage.loadRoutines();
+        const existingRoutine = existingRoutines.find(r => r.fingerprint === curatedFingerprint);
+        
+        if (existingRoutine) {
+          console.log(`🔍 Found existing curated program: ${existingRoutine.name}`);
+          // TODO: Navigate to existing routine and show toast
+          // For now, call the import complete callback with the existing routine's data
+          if (onImportComplete && existingRoutine.data) {
+            onImportComplete(existingRoutine.data);
+          }
+          return existingRoutine;
+        }
+      }
+
       // Create the routine (always without mesocycleNumber for unified imports)
       const newRoutineId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       const newRoutine: WorkoutRoutine = {
@@ -432,7 +453,8 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
         days: metadata.originalDaysPerWeek || importedProgram.days_per_week || 5,
         blocks: importedProgram.blocks?.length || 0,
         data: importedProgram,
-        programId: program?.id
+        programId: program?.id,
+        fingerprint: isCurated && curatedSlug ? `curated:${curatedSlug}` : undefined
         // NO mesocycleNumber - this ensures unified handling in BlocksScreen
       };
       

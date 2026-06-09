@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 
 /**
  * Custom bottom tab bar for JSON.fit.
@@ -106,6 +106,10 @@ export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             }
           };
 
+          const activeColor = isFocused 
+            ? (route.name === 'Nutrition' ? NUTRITION_GREEN.primary : themeColor)
+            : '#52525b';
+
           return (
             <Pressable
               key={route.key}
@@ -118,13 +122,13 @@ export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
               <Ionicons
                 name={isFocused ? config.active : config.inactive}
                 size={24}
-                color={isFocused ? themeColor : '#52525b'}
+                color={activeColor}
               />
               <Text
                 style={[
                   styles.tabLabel,
                   {
-                    color: isFocused ? themeColor : '#52525b',
+                    color: activeColor,
                     fontWeight: isFocused ? '500' : '400',
                   },
                 ]}

@@ -42,7 +42,7 @@ export default function ImportRoutineScreen() {
   const route = useRoute<ImportScreenRouteProp>();
   const { themeColor } = useTheme();
   // Check if we have shareId and should show loading immediately
-  const { shareId } = route.params || {};
+  const { shareId, isCurated, curatedSlug } = route.params || {};
   const [isLoading, setIsLoading] = useState(!!shareId); // Start loading if we have shareId
   const [parsedProgram, setParsedProgram] = useState<WorkoutProgram | null>(null);
   const [accumulatedPrograms, setAccumulatedPrograms] = useState<WorkoutProgram[]>([]);
@@ -1516,10 +1516,10 @@ export default function ImportRoutineScreen() {
       }
       
       // Restore exercise preferences (global, not routine-specific)
-      // Skip for sample plans to prevent contaminating user preferences
+      // Skip for sample plans and curated programs to prevent contaminating user preferences
       if (metadata.exercisePreferences && 
           Object.keys(metadata.exercisePreferences).length > 0 &&
-          !metadata.isSamplePlan) {
+          !metadata.isSamplePlan && !isCurated) {
         try {
           // Load existing preferences
           const existingPreferencesData = await AsyncStorage.getItem('exercise_preferences');
@@ -1535,8 +1535,8 @@ export default function ImportRoutineScreen() {
         } catch (error) {
           console.log('Could not restore exercise preferences:', error);
         }
-      } else if (metadata.isSamplePlan && metadata.exercisePreferences) {
-        console.log('🚫 Skipped applying exercise preferences from sample plan to prevent user preference contamination');
+      } else if ((metadata.isSamplePlan || isCurated) && metadata.exercisePreferences) {
+        console.log(`🚫 Skipped applying exercise preferences from ${isCurated ? 'curated program' : 'sample plan'} to prevent user preference contamination`);
       }
       
       // For complete state imports with multiple mesocycles, create individual mesocycle routines
@@ -1648,6 +1648,22 @@ export default function ImportRoutineScreen() {
         await ProgramStorage.addProgram(program);
       }
       
+      // For curated imports, check for existing routine with same fingerprint
+      if (isCurated && curatedSlug) {
+        const curatedFingerprint = `curated:${curatedSlug}`;
+        const existingRoutines = await WorkoutStorage.loadRoutines();
+        const existingRoutine = existingRoutines.find(r => r.fingerprint === curatedFingerprint);
+        
+        if (existingRoutine) {
+          console.log(`🔍 Found existing curated program: ${existingRoutine.name}`);
+          // Navigate to the existing routine (Home screen will show it)
+          navigation.navigate('Home');
+          // Show toast (you can add toast implementation here)
+          Alert.alert('Program Already Added', `You already have "${existingRoutine.name}". Opening your existing copy.`);
+          return existingRoutine;
+        }
+      }
+
       // Create the routine (always without mesocycleNumber for unified imports)
       const newRoutineId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       const newRoutine: WorkoutRoutine = {
@@ -1656,7 +1672,8 @@ export default function ImportRoutineScreen() {
         days: metadata.originalDaysPerWeek || importedProgram.days_per_week || 5,
         blocks: importedProgram.blocks?.length || 0,
         data: importedProgram,
-        programId: program?.id
+        programId: program?.id,
+        fingerprint: isCurated && curatedSlug ? `curated:${curatedSlug}` : undefined
         // NO mesocycleNumber - this ensures unified handling in BlocksScreen
       };
       

@@ -15,6 +15,7 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
+  Linking,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { TouchableOpacity as RNTouchable } from 'react-native';
@@ -54,6 +55,14 @@ const PROGRAM_GRADIENTS: Record<string, [string, string]> = {
   builder: ['#1a1a1a', '#3a1f1a'],
   mass: ['#1a1a1a', '#4a2820'],
 };
+
+// ============================================================================
+// More programs live on json.fit, not bundled in the app (the full files are
+// huge — 20k+ lines each). This single card sends users to the web library to
+// browse and import. Bump the count if you add/remove programs on the site.
+// ============================================================================
+const WEB_PROGRAMS_URL = 'https://json.fit/programs';
+const WEB_PROGRAMS_COUNT = 3;
 
 // ============================================================================
 // Week strip
@@ -1004,6 +1013,25 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             </TouchableOpacity>
           );
         })}
+
+        {/* More programs live on json.fit — open the web library to browse & import */}
+        <TouchableOpacity
+          style={[styles.bulkingCard, styles.bulkingMoreCard, { borderColor: themeColor + '55' }]}
+          onPress={() => Linking.openURL(WEB_PROGRAMS_URL).catch(() => {})}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${WEB_PROGRAMS_COUNT} more programs on json.fit`}
+        >
+          <View style={[styles.bulkingMoreIcon, { borderColor: themeColor + '55' }]}>
+            <Ionicons name="cloud-download-outline" size={26} color={themeColor} />
+          </View>
+          <Text style={[styles.bulkingMoreTitle, { color: themeColor }]} numberOfLines={2}>Full year-long programs</Text>
+          <Text style={styles.bulkingMoreSub}>Beginner → Advanced · free</Text>
+          <View style={styles.bulkingMoreLinkRow}>
+            <Ionicons name="globe-outline" size={11} color="#71717a" />
+            <Text style={styles.bulkingMoreLinkText}>View {WEB_PROGRAMS_COUNT} on json.fit</Text>
+          </View>
+        </TouchableOpacity>
       </ScrollView>
     </>
   );
@@ -1841,6 +1869,46 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 10,
     fontWeight: '600',
+  },
+  bulkingMoreCard: {
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    backgroundColor: '#0e0e12',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  bulkingMoreIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  bulkingMoreTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 3,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  bulkingMoreSub: {
+    color: '#71717a',
+    fontSize: 12,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  bulkingMoreLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  bulkingMoreLinkText: {
+    color: '#71717a',
+    fontSize: 11,
+    fontWeight: '500',
   },
   bulkingCardBody: {
     flex: 1,

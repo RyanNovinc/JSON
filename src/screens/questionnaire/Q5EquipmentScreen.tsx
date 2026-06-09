@@ -43,6 +43,7 @@ interface EquipmentOption {
   title: string;
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
+  comingSoon?: boolean;
 }
 
 const OPTIONS: EquipmentOption[] = [
@@ -55,20 +56,23 @@ const OPTIONS: EquipmentOption[] = [
   {
     value: 'home_gym',
     title: 'Home gym',
-    subtitle: 'Barbell, plates, rack, bench.',
+    subtitle: 'Custom home workouts with your equipment.',
     icon: 'home',
+    comingSoon: true,
   },
   {
     value: 'basic_equipment',
     title: 'Basic equipment',
-    subtitle: 'Dumbbells, resistance bands, pull-up bar.',
+    subtitle: 'Minimal equipment routines and bodyweight hybrids.',
     icon: 'barbell-outline',
+    comingSoon: true,
   },
   {
     value: 'bodyweight',
     title: 'Bodyweight only',
-    subtitle: 'No equipment. Calisthenics-focused programming.',
+    subtitle: 'No-equipment calisthenics and progressions.',
     icon: 'body',
+    comingSoon: true,
   },
 ];
 
@@ -89,6 +93,12 @@ export default function Q5EquipmentScreen() {
   );
 
   const toggle = (value: EquipmentValue) => {
+    const option = OPTIONS.find(opt => opt.value === value);
+    if (option?.comingSoon) {
+      // Don't allow selection of coming soon options
+      return;
+    }
+    
     setSelected((prev) =>
       prev.includes(value)
         ? prev.filter((v) => v !== value)
@@ -139,14 +149,49 @@ export default function Q5EquipmentScreen() {
 
         <View>
           {OPTIONS.map((opt) => (
-            <QuestionCard
+            <TouchableOpacity
               key={opt.value}
-              icon={opt.icon}
-              title={opt.title}
-              subtitle={opt.subtitle}
-              selected={selected.includes(opt.value)}
+              activeOpacity={opt.comingSoon ? 1 : 0.85}
               onPress={() => toggle(opt.value)}
-            />
+              style={[
+                styles.card,
+                selected.includes(opt.value) && styles.cardSelected,
+                opt.comingSoon && styles.cardDisabled,
+              ]}
+            >
+              {opt.comingSoon && (
+                <View style={styles.comingSoonBadge}>
+                  <Text style={styles.comingSoonText}>Coming Soon</Text>
+                </View>
+              )}
+              <View style={styles.cardContent}>
+                <View style={styles.cardLeft}>
+                  <Ionicons 
+                    name={opt.icon} 
+                    size={20} 
+                    color={opt.comingSoon ? '#52525b' : selected.includes(opt.value) ? themeColor : '#d4d4d8'} 
+                  />
+                  <View style={styles.cardTexts}>
+                    <Text style={[
+                      styles.cardTitle, 
+                      opt.comingSoon && styles.cardTitleDisabled,
+                      selected.includes(opt.value) && styles.cardTitleSelected
+                    ]}>
+                      {opt.title}
+                    </Text>
+                    <Text style={[
+                      styles.cardSubtitle,
+                      opt.comingSoon && styles.cardSubtitleDisabled
+                    ]}>
+                      {opt.subtitle}
+                    </Text>
+                  </View>
+                </View>
+                {selected.includes(opt.value) && !opt.comingSoon && (
+                  <Ionicons name="checkmark-circle" size={20} color={themeColor} />
+                )}
+              </View>
+            </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
@@ -220,5 +265,74 @@ const styles = StyleSheet.create({
   ctaText: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  card: {
+    backgroundColor: '#131316',
+    borderWidth: 1.5,
+    borderColor: '#27272a',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    position: 'relative',
+  },
+  cardSelected: {
+    borderColor: '#22d3ee',
+    backgroundColor: 'rgba(34, 211, 238, 0.08)',
+  },
+  cardDisabled: {
+    opacity: 0.6,
+    backgroundColor: '#0f0f10',
+  },
+  comingSoonBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#374151',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    zIndex: 1,
+  },
+  comingSoonText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#9ca3af',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: 12,
+  },
+  cardTexts: {
+    marginLeft: 14,
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  cardTitleSelected: {
+    color: '#22d3ee',
+  },
+  cardTitleDisabled: {
+    color: '#71717a',
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: '#9ca3af',
+    lineHeight: 18,
+  },
+  cardSubtitleDisabled: {
+    color: '#52525b',
   },
 });

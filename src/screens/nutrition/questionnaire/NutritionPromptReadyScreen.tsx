@@ -536,8 +536,18 @@ const ReturnState: React.FC<ReturnStateProps> = ({
     </View>
 
     <View style={styles.returnBody}>
-      <TouchableOpacity style={styles.pasteZone} onPress={onPaste} activeOpacity={0.85}>
-        <View style={styles.pasteZoneIcon}>
+      <TouchableOpacity 
+        style={[
+          styles.pasteZone, 
+          { 
+            backgroundColor: themeColor + '0F', // 6% opacity
+            borderColor: themeColor + '59'      // 35% opacity
+          }
+        ]} 
+        onPress={onPaste} 
+        activeOpacity={0.85}
+      >
+        <View style={[styles.pasteZoneIcon, { backgroundColor: themeColor + '26' }]}>
           <Ionicons name="clipboard-outline" size={28} color={themeColor} />
         </View>
         <Text style={styles.pasteZoneTitle}>Paste your file</Text>
@@ -832,9 +842,7 @@ const styles = StyleSheet.create({
   pasteZone: {
     flex: 1,
     minHeight: 220,
-    backgroundColor: 'rgba(34, 211, 238, 0.06)',
     borderWidth: 1.5,
-    borderColor: 'rgba(34, 211, 238, 0.35)',
     borderStyle: 'dashed',
     borderRadius: 20,
     paddingHorizontal: 20,
@@ -845,7 +853,6 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 17,
-    backgroundColor: 'rgba(34, 211, 238, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },

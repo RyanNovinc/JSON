@@ -7,6 +7,8 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  Share,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -198,6 +200,20 @@ export default function RecipeDetailScreen() {
     }
   };
 
+  const handleShare = async () => {
+    try {
+      const url = `https://json.fit/r/?meal=${meal.slug}&plate=${plate.id}`;
+      const caption = `${plate.display_name} — ${macros.kcal} cal, ${macros.protein_g}g protein`;
+      await Share.share(
+        Platform.OS === 'ios'
+          ? { message: caption, url }
+          : { message: `${caption}\n\n${url}` }
+      );
+    } catch (err) {
+      console.warn('Share failed:', err);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -220,6 +236,15 @@ export default function RecipeDetailScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="chevron-back" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerShareBtn, { top: insets.top + 8 }]}
+            onPress={handleShare}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Share recipe"
+          >
+            <Ionicons name="share-outline" size={18} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerHeartBtn, { top: insets.top + 8 }]}
@@ -580,12 +605,23 @@ const styles = StyleSheet.create({
   heroWrap: { width: '100%', backgroundColor: '#000', position: 'relative' },
   heroImage16x9: { 
     width: '100%', 
-    height: Math.round(SCREEN_WIDTH * (9 / 16)),
+    height: 220,
+    backgroundColor: 'blue',
   },
   heroPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#27272a' },
   headerBackBtn: {
     position: 'absolute',
     left: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerShareBtn: {
+    position: 'absolute',
+    right: 56,
     width: 36,
     height: 36,
     borderRadius: 18,

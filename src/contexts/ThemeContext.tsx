@@ -9,6 +9,14 @@ export interface ThemeColors {
   primaryAlpha10: string;
 }
 
+export const NUTRITION_GREEN = {
+  primary:        '#22c55e',
+  primaryLight:   '#22c55e40',
+  primaryDark:    '#16a34a',
+  primaryAlpha20: '#22c55e20',
+  primaryAlpha10: '#22c55e10',
+};
+
 interface ThemeContextType {
   isPinkTheme: boolean;
   setIsPinkTheme: (isPink: boolean) => void;
@@ -84,3 +92,22 @@ export const useTheme = (): ThemeContextType => {
   }
   return context;
 };
+
+export function NutritionThemeProvider({ children }: { children: ReactNode }) {
+  const parent = useTheme();
+  const value = useMemo(() => ({
+    ...parent,
+    themeColor: NUTRITION_GREEN.primary,
+    themeColorLight: NUTRITION_GREEN.primaryLight,
+    colors: {
+      ...parent.colors,
+      primary:        NUTRITION_GREEN.primary,
+      primaryLight:   NUTRITION_GREEN.primaryLight,
+      primaryDark:    NUTRITION_GREEN.primaryDark,
+      primaryAlpha20: NUTRITION_GREEN.primaryAlpha20,
+      primaryAlpha10: NUTRITION_GREEN.primaryAlpha10,
+    },
+  }), [parent]);
+  
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}

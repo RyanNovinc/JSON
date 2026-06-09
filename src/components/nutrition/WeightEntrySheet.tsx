@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  KeyboardAvoidingView,
+  Animated,
+  Keyboard,
   Platform,
   ActivityIndicator,
   Pressable,
@@ -37,13 +38,23 @@ import { finalizeNutrition } from '../../utils/nutritionMacros';
  *     recalc against). This fixes the bug where the old WeightTracker
  *     duplicated the BMR formula inline and could drift from nutritionMacros.
  *
+ * Animation:
+ *   - animationType is "none" on the Modal. We drive two animations off a
+ *     single `progress` value (0 hidden → 1 shown): the backdrop FADES via
+ *     opacity, and the panel SLIDES up via translateY. The old
+ *     animationType="slide" moved backdrop + panel together, which is why
+ *     the dark overlay rode up instead of fading in.
+ *   - The Modal stays mounted through the exit animation (`mounted` state),
+ *     then unmounts once the slide-out finishes.
+ *
  * Keyboard behaviour:
- *   - Input is near the TOP of the sheet content, so KeyboardAvoidingView
- *     pushing the sheet up never hides it.
- *   - On iOS we use behavior='padding', which pushes the entire sheet up
- *     when the keyboard appears.
+ *   - We listen for the keyboard directly and lift the whole panel by its
+ *     height (folded into the same translateY). This replaces
+ *     KeyboardAvoidingView, which didn't reliably lift a bottom-anchored
+ *     sheet on iOS and did nothing at all on Android (behavior was
+ *     undefined there), leaving the input covered.
  *   - decimal-pad keyboard with returnKeyType='done' gives an explicit
- *     dismiss path even on iPhones with no hardware return key behaviour.
+ *     dismiss path.
  *
  * Photos are deliberately NOT in this entry flow. They're a per-entry
  * add-on accessed from the history detail view in WeightTracker.
@@ -91,10 +102,75 @@ export default function WeightEntrySheet({
   const [saving, setSaving] = useState(false);
   const [latestEntry, setLatestEntry] = useState<WeightEntry | null>(null);
 
-  // Reset form + prefill the unit from the most recent entry every time
-  // the sheet opens. Don't prefill the weight number itself — encouraging
-  // the user to retype is intentional (no accidental "save without
-  // weighing" by tapping Save on yesterday's number).
+  // ---------- Animation state ----------
+  // Keep the modal mounted through the exit animation; unmount after.
+  const [mounted, setMounted] = useState(false);
+  // Measured panel height — drives how far translateY travels on entrance.
+  const [sheetH, setSheetH] = useState(600);
+  const progress = useRef(new Animated.Value(0)).current; // 0 hidden, 1 shown
+  const kb = useRef(new Animated.Value(0)).current; // current keyboard height
+
+  // Drive open/close. On open we also reset the form here (previously this
+  // happened on close, which flashed cleared inputs during the slide-out).
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      setWeight('');
+      setNotes('');
+      setShowNotes(false);
+      setSaving(false);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 240,
+        useNativeDriver: false,
+      }).start();
+    } else if (mounted) {
+      Animated.timing(progress, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  // Track keyboard height and animate the panel up by it. On iOS the
+  // *Will* events fire in step with the keyboard so the lift tracks
+  // smoothly; on Android only the *Did* events report a usable height.
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: any) =>
+      Animated.timing(kb, {
+        toValue: e?.endCoordinates?.height ?? 0,
+        duration: e?.duration || 250,
+        useNativeDriver: false,
+      }).start();
+
+    const onHide = (e: any) =>
+      Animated.timing(kb, {
+        toValue: 0,
+        duration: e?.duration || 200,
+        useNativeDriver: false,
+      }).start();
+
+    const showSub = Keyboard.addListener(showEvt, onShow);
+    const hideSub = Keyboard.addListener(hideEvt, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [kb]);
+
+  // Prefill the unit hint from the most recent entry every time the sheet
+  // opens. Don't prefill the weight number itself — encouraging the user
+  // to retype is intentional (no accidental "save without weighing" by
+  // tapping Save on yesterday's number).
   useEffect(() => {
     if (!visible) return;
     let active = true;
@@ -105,8 +181,7 @@ export default function WeightEntrySheet({
         const sorted = [...history].sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         );
-        const latest = sorted[0];
-        setLatestEntry(latest);
+        setLatestEntry(sorted[0]);
       } catch (e) {
         console.error('WeightEntrySheet prefill failed', e);
       }
@@ -116,12 +191,10 @@ export default function WeightEntrySheet({
     };
   }, [visible]);
 
-  // Clear local state on close so reopening doesn't show last attempt
+  // Dismiss the keyboard on close so it animates down alongside the sheet.
+  // Form reset now happens on open (see effect above).
   const handleClose = useCallback(() => {
-    setWeight('');
-    setNotes('');
-    setShowNotes(false);
-    setSaving(false);
+    Keyboard.dismiss();
     onClose();
   }, [onClose]);
 
@@ -184,150 +257,150 @@ export default function WeightEntrySheet({
     ? `Last: ${latestEntry.weight} ${latestEntry.unit}`
     : null;
 
+  // Panel transform: entrance slide (sheetH → 0 as progress 0 → 1) minus
+  // the current keyboard height, so the panel lifts above the keyboard.
+  const translateY = Animated.subtract(
+    progress.interpolate({ inputRange: [0, 1], outputRange: [sheetH, 0] }),
+    kb
+  );
+
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={handleClose}
       statusBarTranslucent
     >
-      {/* Backdrop — tap to dismiss */}
-      <Pressable style={styles.backdrop} onPress={handleClose}>
-        {/* Inner Pressable swallows touches on the sheet itself so they
-            don't bubble back up to the backdrop and close it. */}
-        <Pressable onPress={() => { /* swallow */ }} style={{ width: '100%' }}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
-            <View
-              style={[
-                styles.sheet,
-                {
-                  paddingBottom: Math.max(insets.bottom, 16) + 16,
-                  borderColor: themeColor + '40',
-                },
-              ]}
+      <View style={styles.root}>
+        {/* Backdrop fades in via opacity; tap anywhere outside to dismiss */}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: progress }]}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
+
+        {/* Panel slides up and lifts above the keyboard */}
+        <Animated.View
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h > 0 && Math.abs(h - sheetH) > 1) setSheetH(h);
+          }}
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: Math.max(insets.bottom, 16) + 16,
+              borderColor: themeColor + '40',
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+          {/* Grab handle */}
+          <View style={styles.handle} />
+
+          {/* Title row */}
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{title}</Text>
+            <TouchableOpacity
+              onPress={handleClose}
+              style={styles.closeBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
             >
-              {/* Grab handle */}
-              <View style={styles.handle} />
+              <Ionicons name="close" size={18} color="#a1a1aa" />
+            </TouchableOpacity>
+          </View>
 
-              {/* Title row */}
-              <View style={styles.titleRow}>
-                <Text style={styles.title}>{title}</Text>
-                <TouchableOpacity
-                  onPress={handleClose}
-                  style={styles.closeBtn}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="close" size={18} color="#a1a1aa" />
-                </TouchableOpacity>
-              </View>
+          {/* Last entry hint */}
+          {lastWeightHint && (
+            <Text style={styles.lastHint}>{lastWeightHint}</Text>
+          )}
 
-              {/* Last entry hint */}
-              {lastWeightHint && (
-                <Text style={styles.lastHint}>{lastWeightHint}</Text>
-              )}
-
-              {/* Weight input row — sits near the top so the keyboard
-                  never covers it once the sheet is pushed up. */}
-              <View style={styles.inputRow}>
-                <View
-                  style={[
-                    styles.inputBox,
-                    { borderColor: themeColor },
-                  ]}
-                >
-                  <TextInput
-                    style={styles.input}
-                    value={weight}
-                    onChangeText={setWeight}
-                    placeholder="0.0"
-                    placeholderTextColor="#3f3f46"
-                    keyboardType="decimal-pad"
-                    returnKeyType="done"
-                    autoFocus
-                    maxLength={5}
-                    onSubmitEditing={handleSave}
-                  />
-                </View>
-
-                <View style={styles.unitDisplay}>
-                  <Text style={styles.unitText}>
-                    {unit}
-                  </Text>
-                  <Text style={styles.unitSubtext}>
-                    Change in Profile settings
-                  </Text>
-                </View>
-              </View>
-
-              {/* Notes toggle — collapsed by default to keep the sheet
-                  short. Tapping reveals a small text area. */}
-              {!showNotes ? (
-                <TouchableOpacity
-                  style={styles.notesToggle}
-                  onPress={() => setShowNotes(true)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="add" size={14} color="#71717a" />
-                  <Text style={styles.notesToggleText}>Add note</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.notesWrap}>
-                  <TextInput
-                    style={styles.notesInput}
-                    value={notes}
-                    onChangeText={setNotes}
-                    placeholder="e.g. morning, after workout"
-                    placeholderTextColor="#52525b"
-                    maxLength={120}
-                    returnKeyType="done"
-                    blurOnSubmit
-                  />
-                </View>
-              )}
-
-              {/* Save button */}
-              <TouchableOpacity
-                style={[
-                  styles.saveBtn,
-                  {
-                    backgroundColor:
-                      valid && !saving ? themeColor : '#1c1c1f',
-                  },
-                ]}
-                onPress={handleSave}
-                disabled={!valid || saving}
-                activeOpacity={0.85}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#0a0a0b" />
-                ) : (
-                  <Text
-                    style={[
-                      styles.saveText,
-                      { color: valid ? '#0a0a0b' : '#3f3f46' },
-                    ]}
-                  >
-                    Save
-                  </Text>
-                )}
-              </TouchableOpacity>
+          {/* Weight input row */}
+          <View style={styles.inputRow}>
+            <View style={[styles.inputBox, { borderColor: themeColor }]}>
+              <TextInput
+                style={styles.input}
+                value={weight}
+                onChangeText={setWeight}
+                placeholder="0.0"
+                placeholderTextColor="#3f3f46"
+                keyboardType="decimal-pad"
+                returnKeyType="done"
+                autoFocus
+                maxLength={5}
+                onSubmitEditing={handleSave}
+              />
             </View>
-          </KeyboardAvoidingView>
-        </Pressable>
-      </Pressable>
+
+            <View style={styles.unitDisplay}>
+              <Text style={styles.unitText}>{unit}</Text>
+              <Text style={styles.unitSubtext}>Change in Profile settings</Text>
+            </View>
+          </View>
+
+          {/* Notes toggle — collapsed by default to keep the sheet short.
+              Tapping reveals a small text area. */}
+          {!showNotes ? (
+            <TouchableOpacity
+              style={styles.notesToggle}
+              onPress={() => setShowNotes(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="add" size={14} color="#71717a" />
+              <Text style={styles.notesToggleText}>Add note</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.notesWrap}>
+              <TextInput
+                style={styles.notesInput}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="e.g. morning, after workout"
+                placeholderTextColor="#52525b"
+                maxLength={120}
+                returnKeyType="done"
+                blurOnSubmit
+              />
+            </View>
+          )}
+
+          {/* Save button */}
+          <TouchableOpacity
+            style={[
+              styles.saveBtn,
+              { backgroundColor: valid && !saving ? themeColor : '#1c1c1f' },
+            ]}
+            onPress={handleSave}
+            disabled={!valid || saving}
+            activeOpacity={0.85}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#0a0a0b" />
+            ) : (
+              <Text
+                style={[
+                  styles.saveText,
+                  { color: valid ? '#0a0a0b' : '#3f3f46' },
+                ]}
+              >
+                Save
+              </Text>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  root: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
     backgroundColor: '#131316',

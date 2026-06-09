@@ -48,9 +48,8 @@ import { WorkoutStorage } from '../../../utils/storage';
 
 type NavProp = StackNavigationProp<any>;
 
-// Macro bar colours — protein cyan (theme), carbs amber, fat pink.
+// Macro bar colours — carbs amber, fat pink. Protein uses theme color dynamically.
 const MACRO_COLORS = {
-  protein: '#22d3ee',
   carbs: '#fbbf24',
   fat: '#f472b6',
 };
@@ -159,6 +158,7 @@ const ROWS: RowConfig[] = [
       if (!a.dessertFrequency || a.dessertFrequency === '0') return 'None';
       if (a.dessertFrequency === 'every_night') return 'Every night';
       if (a.dessertFrequency === 'most_nights') return 'Most nights';
+      if (a.dessertFrequency === 'once_per_week') return 'Once a week';
       if (a.dessertFrequency === 'few_per_week') return 'A few nights a week';
       if (a.dessertFrequency === 'ai_decide') return 'Let AI decide';
       return '—';
@@ -198,7 +198,7 @@ const ROWS: RowConfig[] = [
 export default function NutritionSummaryScreen() {
   const navigation = useNavigation<NavProp>();
   const insets = useSafeAreaInsets();
-  const { themeColor } = useTheme();
+  const { themeColor, colors } = useTheme();
 
   const [answers, setAnswers] = useState<NutritionAnswers | null>(null);
   const [loading, setLoading] = useState(true);
@@ -462,7 +462,7 @@ export default function NutritionSummaryScreen() {
                     label: 'Protein',
                     grams: macros.protein ?? 0,
                     pct: pct(pCal),
-                    color: MACRO_COLORS.protein,
+                    color: themeColor,
                   },
                   {
                     label: 'Carbs',

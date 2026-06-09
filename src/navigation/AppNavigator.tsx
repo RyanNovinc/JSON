@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, getStateFromPath as getStateFromPathDefault } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,7 +49,7 @@ import { AppModeProvider } from '../contexts/AppModeContext';
 import { MealPlanningProvider } from '../contexts/MealPlanningContext';
 import { SimplifiedMealPlanningProvider } from '../contexts/SimplifiedMealPlanningContext';
 import { WeightUnitProvider } from '../contexts/WeightUnitContext';
-import { ThemeProvider } from '../contexts/ThemeContext';
+import { ThemeProvider, NutritionThemeProvider } from '../contexts/ThemeContext';
 import { WorkoutRoutineProvider } from '../contexts/WorkoutRoutineContext';
 import { TimerProvider } from '../contexts/TimerContext';
 import { CookTimerProvider } from '../contexts/CookTimerContext';
@@ -135,7 +135,7 @@ export type RootStackParamList = {
   Main: undefined;
   CreateFlow: undefined;
   SamplePlanDetail: { plan: any };
-  ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean };
+  ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean; isCurated?: boolean; curatedSlug?: string };
   ImportSharedContent: { shareId: string };
   ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
   MyWorkouts: undefined;
@@ -388,7 +388,14 @@ function MainNavigator() {
       tabBar={(props) => <CustomTabBar {...props} />}
     >
       <Tab.Screen name="Workouts" component={HomeScreen} />
-      <Tab.Screen name="Nutrition" component={NutritionHomeScreen} />
+      <Tab.Screen 
+        name="Nutrition" 
+        children={() => (
+          <NutritionThemeProvider>
+            <NutritionHomeScreen />
+          </NutritionThemeProvider>
+        )} 
+      />
       <Tab.Screen
         name={CREATE_ROUTE}
         component={CreateNeverRenders}
@@ -418,7 +425,7 @@ interface AppNavigatorProps {
 // the new tab name.
 // ============================================================================
 const linking = {
-  prefixes: [Linking.createURL('/'), 'https://json.fit'],
+  prefixes: ['https://json.fit'],
   config: {
     screens: {
       Main: {
@@ -440,6 +447,23 @@ const linking = {
         },
       },
     },
+  },
+  // Curated program links (/p/program/<slug>) are a two-segment path that the
+  // declarative `p/:shareId` rule can't match — a `:param` only captures one
+  // segment. Map them explicitly to ImportSharedContent with shareId =
+  // "program/<slug>", which is exactly what that screen already expects.
+  // Everything else falls through to the default matcher, so normal shares
+  // are unaffected.
+  getStateFromPath(path: string, options: any) {
+    const m = path.match(/p\/program\/([a-z0-9-]+)/i);
+    if (m) {
+      return {
+        routes: [
+          { name: 'ImportSharedContent', params: { shareId: 'program/' + m[1] } },
+        ],
+      };
+    }
+    return getStateFromPathDefault(path, options);
   },
   // Custom URL matcher to handle multiple patterns
   async getInitialURL() {
@@ -621,7 +645,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="ImportMealPlan"
-                component={ImportMealPlanScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <ImportMealPlanScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   animationTypeForReplace: 'push',
@@ -652,7 +680,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MyMealPlans"
-                component={MyMealPlansScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MyMealPlansScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
@@ -660,7 +692,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="SampleMealPlans"
-                component={SampleMealPlansScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <SampleMealPlansScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
@@ -710,42 +746,66 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPlanWeeks"
-                component={MealPlanWeeksScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPlanWeeksScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="MealPlanDays"
-                component={MealPlanDaysScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPlanDaysScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="MealPlanDay"
-                component={MealPlanDayScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPlanDayScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="MealPlanMealDetail"
-                component={MealPlanMealDetailScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPlanMealDetailScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="MealPrepSession"
-                component={MealPrepSessionScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPrepSessionScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="MealPrepDetail"
-                component={MealPrepDetailScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPrepDetailScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
@@ -781,7 +841,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               {/* Nutrition Screens */}
               <RootStack.Screen
                 name="NutritionQuestionnaire"
-                component={NutritionQuestionnaireScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <NutritionQuestionnaireScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
@@ -789,7 +853,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="BudgetCookingQuestionnaire"
-                component={BudgetCookingQuestionnaireScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <BudgetCookingQuestionnaireScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
@@ -797,7 +865,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="FridgePantryQuestionnaire"
-                component={FridgePantryQuestionnaireScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <FridgePantryQuestionnaireScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   presentation: 'modal'
@@ -813,7 +885,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="NutritionDashboard"
-                component={NutritionDashboardScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <NutritionDashboardScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   animationTypeForReplace: 'push',
@@ -906,7 +982,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="NutritionRequiredSetup"
-                component={NutritionRequiredSetupScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <NutritionRequiredSetupScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   cardStyleInterpolator: ({ current }) => ({
@@ -918,7 +998,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="NutritionOptionalTools"
-                component={NutritionOptionalToolsScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <NutritionOptionalToolsScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   cardStyleInterpolator: ({ current }) => ({
@@ -946,56 +1030,88 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealCalendar"
-                component={MealCalendarScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealCalendarScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="GroceryList"
-                component={GroceryListScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <GroceryListScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="MealRatings"
-                component={MealRatingsScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealRatingsScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="FavoriteMeals"
-                component={FavoriteMealsScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <FavoriteMealsScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="AddMeal"
-                component={AddMealScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <AddMealScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="ManualMealEntry"
-                component={ManualMealEntryScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <ManualMealEntryScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="MealPlanHelp"
-                component={MealPlanHelpScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPlanHelpScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
               />
               <RootStack.Screen
                 name="MealPlanTest"
-                component={MealPlanTestScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPlanTestScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}
@@ -1083,12 +1199,20 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="RecipeDetail"
-                component={RecipeDetailScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <RecipeDetailScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{ headerShown: false }}
               />
               <RootStack.Screen
                 name="MealsLibrary"
-                component={MealsLibraryScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealsLibraryScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{ headerShown: false }}
               />
               <RootStack.Screen
@@ -1098,7 +1222,11 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="CookMode"
-                component={CookModeScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <CookModeScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                   gestureEnabled: false,
@@ -1188,127 +1316,263 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               }} />
 
               {/* Nutrition questionnaire screens */}
-              <RootStack.Screen name="N1Goal" component={N1GoalScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N2Rate" component={N2RateScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N3AboutYou" component={N3AboutYouScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N4Activity" component={N4ActivityScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N5DietType" component={N5DietTypeScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N5bAllergies" component={N5bAllergiesScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N5cSleep" component={N5cSleepScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N6MealsSnacking" component={N6MealsSnackingScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
+              <RootStack.Screen 
+                name="N1Goal" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N1GoalScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N2Rate" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N2RateScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N3AboutYou" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N3AboutYouScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N4Activity" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N4ActivityScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N5DietType" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N5DietTypeScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N5bAllergies" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N5bAllergiesScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N5cSleep" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N5cSleepScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N6MealsSnacking" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N6MealsSnackingScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
               <RootStack.Screen
                 name="N6aDessert"
-                component={N6aDessertScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N6aDessertScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
               />
-              <RootStack.Screen name="N7Location" component={N7LocationScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N8Budget" component={N8BudgetScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="N9PlanLength" component={N9PlanLengthScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="NutritionRefinements" component={NutritionRefinementsScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="NutritionSummary" component={NutritionSummaryScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="NutritionPromptReady" component={NutritionPromptReadyScreen} options={{ 
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
-              <RootStack.Screen name="CuratedFavorites" component={CuratedFavoritesScreen} options={{ headerShown: false }} />
-              <RootStack.Screen name="FridgePantry" component={FridgePantryScreen} options={{ headerShown: false, presentation: 'modal' }} />
+              <RootStack.Screen 
+                name="N7Location" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N7LocationScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N8Budget" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N8BudgetScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N9PlanLength" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <N9PlanLengthScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="NutritionRefinements" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <NutritionRefinementsScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="NutritionSummary" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <NutritionSummaryScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="NutritionPromptReady" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <NutritionPromptReadyScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="CuratedFavorites" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <CuratedFavoritesScreen {...props} />
+                  </NutritionThemeProvider>
+                )} 
+                options={{ headerShown: false }} 
+              />
+              <RootStack.Screen 
+                name="FridgePantry" 
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <FridgePantryScreen {...props} />
+                  </NutritionThemeProvider>
+                )} 
+                options={{ headerShown: false, presentation: 'modal' }} 
+              />
               <RootStack.Screen
                 name="MealDetail"
-                component={MealDetailScreen}
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealDetailScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   presentation: 'modal',
                   headerShown: false,

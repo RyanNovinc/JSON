@@ -65,23 +65,24 @@ interface StrictOption {
   desc: string;
 }
 
-// Reframed for a BULKING app: the axis is "how much should timing override
-// just hitting calories", not generic sleep hygiene. Default = balanced.
+// Sleep quality directly impacts muscle recovery and growth hormone release.
+// Deep sleep triggers GH bursts essential for muscle protein synthesis.
+// Research shows: small protein snacks (30min), light meals (1h), large meals (2-3h+).
 const STRICT_OPTIONS: StrictOption[] = [
   {
     value: 'minimal',
-    title: 'Relaxed',
-    desc: 'Calories matter more than timing — eat whenever suits. Last meal ~2h before bed.',
+    title: 'Performance-focused',
+    desc: 'Protein snacks anytime, light meals 1h before bed. Optimize muscle building over timing.',
   },
   {
     value: 'moderate',
     title: 'Balanced',
-    desc: 'A gentle wind-down. Last meal ~3h before bed. Good default.',
+    desc: 'Small protein snacks OK, larger meals 2h before bed. Good balance for most people.',
   },
   {
     value: 'maximum',
-    title: 'Strict',
-    desc: 'For reflux or poor sleep — bigger buffer, calories earlier. Last meal 4h+ before bed.',
+    title: 'Sleep-first',
+    desc: 'All food 3+ hours before bed. Prioritize deep sleep and growth hormone over late nutrition.',
   },
 ];
 
@@ -231,10 +232,9 @@ export default function N5cSleepScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.question}>When do you sleep?</Text>
+        <Text style={styles.question}>Sleep & recovery</Text>
         <Text style={styles.subtitle}>
-          Helps the AI time your meals — when to front-load calories and how
-          early to stop eating before bed. Optional — skip if you'd rather not.
+          Deep sleep triggers growth hormone for muscle recovery. Meal timing affects sleep quality and your body's ability to build muscle overnight.
         </Text>
 
         <Text style={styles.label}>Bedtime</Text>
@@ -245,9 +245,9 @@ export default function N5cSleepScreen() {
 
         {bothTimesSet && (
           <>
-            <Text style={[styles.label, { marginTop: 6 }]}>How strict on timing?</Text>
+            <Text style={[styles.label, { marginTop: 6 }]}>Meal timing approach</Text>
             <Text style={styles.labelHint}>
-              How much should meal timing override simply hitting your calories?
+              How important is optimizing meal timing for sleep quality and recovery?
             </Text>
             {STRICT_OPTIONS.map((opt) => {
               const on = strictness === opt.value;

@@ -27,7 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 import { getCreateImage } from '../assets/createImages';
 import { WorkoutStorage } from '../utils/storage';
 import { hasCompleteQuestionnaire, loadQuestionnaireAnswers } from '../utils/questionnaireStorage';
@@ -131,6 +131,7 @@ export default function CreateChooserScreen() {
         {/* Cards */}
         {OPTIONS.map((option) => {
           const imageSource = getCreateImage(option.id);
+          const arrowColor = option.id === 'nutrition' ? NUTRITION_GREEN.primary : themeColor;
           return (
             <TouchableOpacity
               key={option.id}
@@ -167,7 +168,7 @@ export default function CreateChooserScreen() {
                     <View
                       style={[
                         styles.cardArrowButton,
-                        { backgroundColor: themeColor, shadowColor: themeColor },
+                        { backgroundColor: arrowColor, shadowColor: arrowColor },
                       ]}
                     >
                       <Ionicons name="arrow-forward" size={20} color="#0a0a0b" />

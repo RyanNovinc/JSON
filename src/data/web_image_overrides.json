@@ -1,0 +1,94 @@
+{
+  "butter_chicken": {
+    "image_filename": "butter-chicken-curry.png",
+    "plates": {
+      "Butter Chicken": "butter-chicken-curry.png",
+      "Butter Chicken with Basmati Rice": "butter-chicken-with-rice.png"
+    }
+  },
+  "pulled_pork": {
+    "image_filename": "pulled_pork.png",
+    "plates": {
+      "BBQ Pulled Pork Burger": "pulled-pork-sandwich.png",
+      "Pulled Pork Rice Bowl": "pulled-pork-bowl.png",
+      "Loaded Pulled Pork Baked Potato": "pulled-pork-baked-potato.png",
+      "Pulled Pork Tacos": "pulled-pork-tacos.png",
+      "Pulled Pork Mac & Cheese Stack": "pulled-pork-mac-cheese.png"
+    }
+  },
+  "bolognese": {
+    "plates": {
+      "Spaghetti Bolognese": "bolognese-spaghetti.png",
+      "Loaded Bolognese Baked Potato": "bolognese-baked-potato.png",
+      "Bolognese with Garlic Bread": "bolognese-garlic-bread.png",
+      "Bolognese Lasagne": "bolognese-lasagne.png"
+    }
+  },
+  "massaman": {
+    "plates": {
+      "Massaman Beef Curry with Rice": "massaman-rice.png"
+    }
+  },
+  "chilli_con_carne": {
+    "image_filename": "chilli_con_carne.png",
+    "plates": {
+      "Bulking Chilli Bowl": "chilli-con-carne-bowl.png",
+      "Loaded Chilli Nachos": "chilli-con-carne-nachos.png"
+    }
+  },
+  "lamb_shanks": {
+    "image_filename": "lamb_shanks.png",
+    "plates": {
+      "Lamb Shank on Creamy Mash": "lamb-shanks-mash.png"
+    }
+  },
+  "beef_stew": {
+    "image_filename": "beef_stew.png",
+    "plates": {
+      "Beef Stew on Creamy Mash": "beef-stew-mash.png",
+      "Beef Stew with Crusty Bread": "beef-stew-bread.png"
+    }
+  },
+  "overnight_oats": {
+    "image_filename": "overnight_oats.png"
+  },
+  "greek_yoghurt_bowl": {
+    "image_filename": "greek_yoghurt_bowl.png"
+  },
+  "protein_pancakes": {
+    "image_filename": "protein_pancakes.png"
+  },
+  "baked_oats": {
+    "image_filename": "baked_oats.png"
+  },
+  "thai_basil_chicken": {
+    "image_filename": "thai_basil_chicken.png",
+    "plates": {
+      "Thai Basil Chicken over Rice": "Thai Basil Chicken over Rice (standard).png",
+      "Thai Basil Chicken with Fried Egg": "Thai Basil Chicken with Fried Egg (fried_egg).png"
+    }
+  },
+  "spicy_chipotle_chicken_burrito": {
+    "image_filename": "Spicy Chipotle Chicken Burrito.png",
+    "plates": {
+      "Spicy Chipotle Chicken Burrito": "Spicy Chipotle Chicken Burrito (standard).png",
+      "Spicy Chipotle Chicken Burrito (Extra Hot)": "Spicy Chipotle Chicken Burrito (standard).png",
+      "Spicy Chipotle Chicken Burrito Bowl": "Spicy Chipotle Chicken Burrito Bowl (burrito_bowl).png"
+    }
+  },
+  "chicken_shawarma": {
+    "image_filename": "chicken_shawarma.png",
+    "plates": {
+      "Chicken Shawarma Wrap": "Chicken Shawarma Wrap (wrap).png",
+      "Chicken Shawarma Rice Bowl": "Chicken Shawarma Rice Bowl (rice_bowl).png"
+    }
+  },
+  "chicken_schnitzel": {
+    "image_filename": "Chicken Schnitzel.png",
+    "plates": {
+      "Schnitzel Plate": "Schnitzel Plate (plate).png",
+      "Schnitzel Roll": "Schnitzel Roll (roll).png",
+      "Chicken Parma": "Chicken Parma (parma).png"
+    }
+  }
+}

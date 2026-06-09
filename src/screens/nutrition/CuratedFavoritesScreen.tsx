@@ -464,7 +464,47 @@ const MealCard = React.memo(function MealCard({
   onPress,
   onInfoPress,
 }: MealCardProps) {
-  const imageSource = getMealImage(meal.image_filename);
+  // Robust image loading with fallback
+  const imageSource = getMealImage(meal.image_filename ?? meal.plates?.[0]?.image_filename);
+  
+  // [CEVAPI] Debug log for Cevapi meal
+  if (meal.slug === 'cevapi') {
+    console.log('[CEVAPI] Image resolution:', {
+      meal_image_filename: meal.image_filename,
+      first_plate_filename: meal.plates?.[0]?.image_filename,
+      resolved: imageSource ? 'FOUND' : 'undefined'
+    });
+  }
+  
+  // Strategy 3: For specific problematic meals, try alternative keys
+  if (!imageSource && meal.slug === 'cevapi') {
+    // Try alternative filename patterns
+    const alternatives = [
+      'cevapi_with_flatbread.png',
+      'cevapi.png',
+      'cevapi_flatbread.png'
+    ];
+    for (const alt of alternatives) {
+      imageSource = getMealImage(alt);
+      if (imageSource) {
+        console.log(`✅ Found Cevapi image using alternative key: ${alt}`);
+        break;
+      }
+    }
+  }
+  
+  // DEBUG: Enhanced logging for Cevapi specifically
+  if (meal.slug === 'cevapi') {
+    console.log('🔍 DEBUG Cevapi meal image resolution:', {
+      slug: meal.slug,
+      display_name: meal.display_name,
+      base_image_filename: meal.image_filename,
+      first_plate_image_filename: meal.plates?.[0]?.image_filename,
+      final_imageSource: !!imageSource ? 'FOUND' : 'NOT FOUND',
+      imageSource_type: typeof imageSource
+    });
+  }
+  
   const multi = isMultiPlate(meal);
 
   // pick count for this meal across all plate-keys
@@ -497,6 +537,11 @@ const MealCard = React.memo(function MealCard({
               style={styles.cardImage}
               contentFit="cover"
               transition={200}
+              onError={(error) => {
+                if (meal.slug === 'cevapi') {
+                  console.log('[CEVAPI] onError fired:', error);
+                }
+              }}
             />
           ) : (
             <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
@@ -591,7 +636,16 @@ function PlatePanel({
   onClose,
   onTogglePlate,
 }: PlatePanelProps) {
-  const baseImg = getMealImage(meal.image_filename);
+  // Enhanced base image loading with fallbacks
+  let baseImg = getMealImage(meal.image_filename);
+  if (!baseImg && meal.plates?.[0]?.image_filename) {
+    baseImg = getMealImage(meal.plates[0].image_filename);
+  }
+  // Special case for Cevapi
+  if (!baseImg && meal.slug === 'cevapi') {
+    baseImg = getMealImage('cevapi_with_flatbread.png');
+  }
+  
   const baseKcal = meal.plates?.[0]?.plate_macros?.kcal ?? 0;
   const baseProtein = meal.plates?.[0]?.plate_macros?.protein_g ?? 0;
   const serves = meal.produces_servings ?? 1;
@@ -1281,10 +1335,7 @@ export default function CuratedFavoritesScreen() {
                           // Navigate to MealDetail — registered on the stack
                           // with presentation: 'formSheet', so iOS renders it
                           // as a native sheet with real UIKit physics.
-                          navigation.navigate(
-                            'MealDetail' as never,
-                            { slug: m.slug } as never
-                          );
+                          navigation.navigate('MealDetail', { slug: m.slug });
                         }}
                       />
                     ))}
@@ -1634,7 +1685,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0b',
     position: 'relative',
   },
-  cardImage: { width: '100%', height: '100%' },
+  cardImage: { width: '100%', height: 150, backgroundColor: 'orange' },
   cardImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -772,6 +772,10 @@ const getDessertGuidance = (dessertFrequency?: string): string => {
     return `FREQUENT DESSERTS: User wants dessert most nights (4-5 nights per week). Include desserts on the majority of days but leave 2-3 days without dessert. Distribute naturally across the week. Each dessert 200-500 kcal, protein-forward where possible.`;
   }
 
+  if (dessertFrequency === 'once_per_week') {
+    return `WEEKLY DESSERT: User wants dessert once per week. Include one dessert on a single day, preferably weekend or post-workout day. Make it special and satisfying. Each dessert 200-500 kcal, protein-forward where possible.`;
+  }
+
   if (dessertFrequency === 'few_per_week') {
     return `OCCASIONAL DESSERTS: User wants desserts a few nights per week (2-3 nights). Distribute across non-consecutive days for variety. Use desserts as a planned treat, not a daily expectation. Each dessert 200-500 kcal, protein-forward where possible.`;
   }

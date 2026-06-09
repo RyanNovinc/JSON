@@ -41,6 +41,15 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // call it "Dinner" or "Slow cooker".
 const MAINS_TITLE = 'Mains';
 
+// Title for the single activity-driven shelf. This shelf is NOT derived from
+// `cuisine` (a meal only has one cuisine); it's derived from TAGS, so the same
+// meal can appear here *and* on its cuisine shelf (e.g. a whey-banana smoothie
+// shows in both Smoothies and here). It merges pre- and post-workout meals into
+// one shelf — each card carries a PRE / POST badge (see renderFeedCard) so the
+// shelf stays the exact same height as every other category shelf. See
+// `mealHasTag` / `getWorkoutTagLabel` below.
+const AROUND_WORKOUT_TITLE = 'Around your workout';
+
 // ============================================================================
 // HELPERS — preserved verbatim from the original file. These are pure
 // functions and have been tested in production.
@@ -259,10 +268,64 @@ function formatTime(minutes: number): string {
 }
 
 // ============================================================================
+// HELPERS — tag matching for the activity-driven shelves
+// ============================================================================
+
+/**
+ * Normalise a tag so casing/separators don't matter:
+ *   "Pre-Workout" → "preworkout"
+ *   "pre_workout" → "preworkout"
+ *   "pre workout" → "preworkout"
+ * This means you can tag a meal in the data file however you like and it will
+ * still land on the right shelf.
+ */
+function normalizeTag(s: string): string {
+  return String(s).toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+/**
+ * Returns true if a curated meal carries the given tag.
+ *
+ * IMPORTANT: this reads `meal.tags` (an array of strings). To make the
+ * Pre-workout / Post-workout shelves populate, tag the relevant meals in
+ * your data file, e.g.:
+ *
+ *   tags: ['pre-workout']           // or 'post-workout'
+ *
+ * A meal can carry both tags. If your CuratedMeal type stores tags somewhere
+ * other than the root (e.g. per-plate), this is the single place to adjust.
+ */
+function mealHasTag(meal: CuratedMeal, tag: string): boolean {
+  const target = normalizeTag(tag);
+  const tags = (meal as any).tags;
+  if (Array.isArray(tags)) {
+    return tags.some((t: any) => normalizeTag(t) === target);
+  }
+  return false;
+}
+
+/**
+ * Short badge label for the "Around your workout" shelf cards.
+ * Returns 'PRE', 'POST', or null. If a meal somehow carries both tags it's
+ * shown as PRE (deterministic — pre comes first chronologically). Only the
+ * workout shelf passes showWorkoutBadge, so this never affects other shelves.
+ */
+function getWorkoutTagLabel(meal: CuratedMeal): 'PRE' | 'POST' | null {
+  if (mealHasTag(meal, 'pre-workout')) return 'PRE';
+  if (mealHasTag(meal, 'post-workout')) return 'POST';
+  return null;
+}
+
+// ============================================================================
 // DAYPART FLOAT — decides which single category shelf floats to the top of
 // the feed and what contextual eyebrow + title it gets, based on the device's
 // LOCAL time (works for users in any timezone). Everything else stays in a
 // fixed order below it so muscle memory is preserved.
+//
+// NOTE: the daypart float only ever points at a food-time shelf (mains /
+// breakfast / snacks / desserts). The Pre-workout / Post-workout shelves are
+// activity-driven, not time-driven, so they're never floated — they keep their
+// fixed position in the list below.
 // ============================================================================
 type DaypartFloat = { key: string; eyebrow: string; title: string };
 
@@ -280,8 +343,9 @@ function getDaypart(): DaypartFloat {
 type HomeCategorySection = {
   key: string;
   title: string;
-  cuisine: string; // route param for CategoryLibrary ('mains' is a sentinel)
+  cuisine: string; // route param for CategoryLibrary ('mains' / 'workout' are sentinels)
   meals: CuratedMeal[];
+  showWorkoutBadge?: boolean; // only the "Around your workout" shelf sets this
 };
 
 // ============================================================================
@@ -290,7 +354,7 @@ type HomeCategorySection = {
 export default function NutritionHomeScreen({ route }: any) {
   const navigation = useNavigation<NutritionNavigationProp>();
   const insets = useSafeAreaInsets();
-  const { isPinkTheme, themeColor, themeColorLight } = useTheme();
+  const { isPinkTheme, themeColor, themeColorLight, colors } = useTheme();
   const { mealPlans, currentPlan, setCurrentPlan, deleteMealPlan, saveMealPlan } = useSimplifiedMealPlanning();
 
   // Convert SimplifiedMealPlans to legacy format for UI compatibility (unchanged).
@@ -310,7 +374,11 @@ export default function NutritionHomeScreen({ route }: any) {
   // field. "mains" is everything that isn't one of the four leaf categories
   // (breakfast / snack / dessert / smoothie) — i.e. the savoury main dishes
   // scattered across australian, indian, mexican, italian, thai.
-  const { mains, breakfast, snacks, desserts, smoothies } = useMemo(() => {
+  //
+  // aroundWorkout is the exception: it's derived from TAGS, not cuisine, so it
+  // can overlap with any cuisine shelf. It merges pre- and post-workout meals
+  // into one deduped list (pre first), each badged PRE / POST at render time.
+  const { mains, breakfast, snacks, desserts, smoothies, aroundWorkout } = useMemo(() => {
     const all = Object.values(CURATED_MEALS);
 
     const breakfast = all.filter(m => m.cuisine === 'breakfast');
@@ -350,7 +418,22 @@ export default function NutritionHomeScreen({ route }: any) {
     const LEAF = new Set(['breakfast', 'snack', 'dessert', 'smoothie']);
     const mains = all.filter(m => !LEAF.has(m.cuisine));
 
-    return { mains, breakfast, snacks, desserts, smoothies };
+    // Activity-driven shelf — tag-based, can overlap with any cuisine.
+    // Merge pre- and post-workout meals into ONE shelf (pre first), deduped by
+    // slug so a meal tagged for both timings only appears once. Each card is
+    // badged PRE / POST in renderFeedCard. Stays empty — and therefore hidden,
+    // see renderCategorySection's <3 guard — until you tag meals 'pre-workout'
+    // / 'post-workout' in the data file.
+    const preWorkout = all.filter(m => mealHasTag(m, 'pre-workout'));
+    const postWorkout = all.filter(m => mealHasTag(m, 'post-workout'));
+    const seenWorkout = new Set<string>();
+    const aroundWorkout = [...preWorkout, ...postWorkout].filter(m => {
+      if (seenWorkout.has(m.slug)) return false;
+      seenWorkout.add(m.slug);
+      return true;
+    });
+
+    return { mains, breakfast, snacks, desserts, smoothies, aroundWorkout };
   }, []);
 
   // Decide the daypart float for this render (cheap; reads local time).
@@ -359,12 +442,18 @@ export default function NutritionHomeScreen({ route }: any) {
   // Fixed shelf order. The daypart-floated shelf is hoisted to the front;
   // everything else keeps this relative order so the screen never reshuffles
   // beyond that single top slot.
+  //
+  // The "Around your workout" shelf sits just under Mains — high in the list
+  // because it's the highest-intent shelf for a training-focused user. It's a
+  // single shelf (not two) so it keeps the exact same height/rhythm as every
+  // other category. Reorder this array freely — nothing else depends on order.
   const categorySections: HomeCategorySection[] = [
-    { key: 'mains',      title: MAINS_TITLE,  cuisine: 'mains',     meals: mains },
-    { key: 'breakfast',  title: 'Breakfast',  cuisine: 'breakfast', meals: breakfast },
-    { key: 'snacks',     title: 'Snacks',     cuisine: 'snack',     meals: snacks },
-    { key: 'desserts',   title: 'Desserts',   cuisine: 'dessert',   meals: desserts },
-    { key: 'smoothies',  title: 'Smoothies',  cuisine: 'smoothie',  meals: smoothies },
+    { key: 'mains',     title: MAINS_TITLE,           cuisine: 'mains',     meals: mains },
+    { key: 'workout',   title: AROUND_WORKOUT_TITLE,  cuisine: 'workout',   meals: aroundWorkout, showWorkoutBadge: true },
+    { key: 'breakfast', title: 'Breakfast',           cuisine: 'breakfast', meals: breakfast },
+    { key: 'snacks',    title: 'Snacks',              cuisine: 'snack',     meals: snacks },
+    { key: 'desserts',    title: 'Desserts',         cuisine: 'dessert',      meals: desserts },
+    { key: 'smoothies',   title: 'Smoothies',        cuisine: 'smoothie',     meals: smoothies },
   ];
 
   const orderedSections: HomeCategorySection[] = (() => {
@@ -826,6 +915,12 @@ export default function NutritionHomeScreen({ route }: any) {
   // sentinel meaning "all savoury mains" (any cuisine except breakfast / snack
   // / dessert / smoothie) — the CategoryLibrary screen interprets it.
   //
+  // The activity shelf passes 'workout' as a sentinel too, but it's a TAG
+  // filter rather than a cuisine filter. The MealsLibrary screen must
+  // special-case 'workout' and show any meal carrying a 'pre-workout' OR
+  // 'post-workout' tag (using the same normalizeTag logic) instead of filtering
+  // by cuisine.
+  //
   // NOTE: 'CategoryLibrary' must be registered in AppNavigator and accept
   // { cuisine, title } params. The legacy MealsLibrary / SmoothiesLibrary
   // screens are left intact in the navigator but are no longer routed to here.
@@ -841,10 +936,16 @@ export default function NutritionHomeScreen({ route }: any) {
    * Renders a single horizontal scroll card for any category feed.
    * Hero image with title overlay, footer chip row with time and macros.
    * Width is fixed at 280px to give a clean snap-feel as user scrolls.
+   *
+   * showWorkoutBadge: only the "Around your workout" shelf passes true. When
+   * set, a small PRE / POST pill is overlaid on the image (top-left). Every
+   * other shelf calls this without the flag, so no other shelf shows a badge —
+   * even if a meal happens to carry a workout tag.
    */
-  const renderFeedCard = (meal: CuratedMeal) => {
+  const renderFeedCard = (meal: CuratedMeal, showWorkoutBadge: boolean = false) => {
     const { kcal, protein, carbs, fat, totalMinutes } = getCardSummary(meal);
-    const imageSource = getMealImage(meal.image_filename);
+    const imageSource = getMealImage(meal.plates?.[0]?.image_filename ?? meal.image_filename);
+    const workoutLabel = showWorkoutBadge ? getWorkoutTagLabel(meal) : null;
 
     return (
       <TouchableOpacity
@@ -864,6 +965,18 @@ export default function NutritionHomeScreen({ route }: any) {
           ) : (
             <View style={[styles.feedCardImage, styles.feedCardImagePlaceholder]}>
               <Ionicons name="restaurant-outline" size={28} color="#52525b" />
+            </View>
+          )}
+
+          {/* PRE / POST badge — overlaid on the image so it adds zero vertical
+              space and the workout shelf stays the same height as the others.
+              Accent uses themeColor so it tracks the active theme (incl. pink). */}
+          {workoutLabel && (
+            <View style={styles.feedCardBadge}>
+              <View style={[styles.feedCardBadgeDot, { backgroundColor: themeColor }]} />
+              <Text style={[styles.feedCardBadgeText, { color: themeColor }]}>
+                {workoutLabel}
+              </Text>
             </View>
           )}
         </View>
@@ -940,7 +1053,7 @@ export default function NutritionHomeScreen({ route }: any) {
         <View style={styles.seeMoreImageWrap}>
           <View style={styles.seeMoreGrid}>
             {thumbs.map((meal, idx) => {
-              const imageSource = getMealImage(meal.image_filename);
+              const imageSource = getMealImage(meal.plates?.[0]?.image_filename ?? meal.image_filename);
               return (
                 <View
                   key={meal.slug}
@@ -1070,13 +1183,6 @@ export default function NutritionHomeScreen({ route }: any) {
           >
             <Text style={styles.title}>Nutrition</Text>
 
-            {/* Section label only shown when there's more than one plan —
-                mirrors HomeScreen's "YOUR PLANS" header behaviour. */}
-            {convertedMealPlans.length > 1 && (
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionLabel}>YOUR PLANS</Text>
-              </View>
-            )}
 
             {currentPlanLegacy && (
               <View style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}>
@@ -1337,7 +1443,7 @@ export default function NutritionHomeScreen({ route }: any) {
             onPress={() => setShareModal({ visible: false, plan: null, qrCode: undefined, shareUrl: undefined, isGenerating: false })}
           />
 
-          <View style={[styles.newShareModal, { borderColor: themeColor }]}>
+          <View style={[styles.newShareModal, { borderColor: themeColor, shadowColor: themeColor }]}>
             <View style={styles.newShareHeader}>
               <TouchableOpacity
                 style={styles.newShareClose}
@@ -1409,7 +1515,7 @@ export default function NutritionHomeScreen({ route }: any) {
         onRequestClose={() => setRenameModal({ visible: false, plan: null, newName: '' })}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.renameContainer}>
+          <View style={[styles.renameContainer, { shadowColor: themeColor }]}>
             <View style={styles.renameIconContainer}>
               <Ionicons name="create-outline" size={32} color={themeColor} />
             </View>
@@ -1480,6 +1586,10 @@ export default function NutritionHomeScreen({ route }: any) {
    * sparse shelf never looks broken. The first shelf in `orderedSections` is
    * the daypart-floated one and gets a contextual eyebrow + title; every other
    * shelf shows its plain category title.
+   *
+   * NOTE: this <3 guard is what makes the Pre-workout / Post-workout shelves
+   * safe to ship before any meals are tagged — an empty/sparse tag set simply
+   * means the shelf doesn't render.
    */
   function renderCategorySection(section: HomeCategorySection, isFloated: boolean) {
     if (!section.meals || section.meals.length < 3) return null;
@@ -1516,7 +1626,7 @@ export default function NutritionHomeScreen({ route }: any) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.feedScrollContent}
         >
-          {displayed.map(renderFeedCard)}
+          {displayed.map(meal => renderFeedCard(meal, section.showWorkoutBadge))}
           {showSeeMoreCard && renderSeeMoreCard(section, previewThumbs, section.meals.length)}
         </ScrollView>
       </View>
@@ -1821,6 +1931,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 16 / 9,
     backgroundColor: '#0a0a0b',
+    position: 'relative',
   },
   feedCardImage: {
     width: '100%',
@@ -1830,6 +1941,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#27272a',
+  },
+  // PRE / POST badge — neutral dark pill so it reads on any food photo; the
+  // dot + text take themeColor inline. Overlaid top-left, adds no card height.
+  feedCardBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(10,10,11,0.72)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 7,
+  },
+  feedCardBadgeDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  feedCardBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.6,
   },
   feedCardBody: {
     padding: 14,
@@ -2039,7 +2176,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 2,
     borderLeftWidth: 2,
     borderRightWidth: 2,
-    borderColor: '#22d3ee',
     marginHorizontal: 4,
   },
   handleBar: {
@@ -2176,7 +2312,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     overflow: 'hidden',
-    shadowColor: '#22d3ee',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -2282,7 +2417,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 350,
     alignItems: 'center',
-    shadowColor: '#22d3ee',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -2386,7 +2520,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   successButton: {
-    backgroundColor: '#22d3ee',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 32,
