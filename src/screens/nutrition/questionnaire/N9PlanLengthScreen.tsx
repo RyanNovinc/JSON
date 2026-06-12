@@ -25,6 +25,12 @@ import { finalizeNutrition } from '../../../utils/nutritionMacros';
  * N9 — Plan length & start
  * Step 9. Sets `planDuration` (days) and `startDate`
  * ('today' | 'tomorrow' | 'next_monday'), both read by the prompt builder.
+ *
+ * Completion routing: finalize, then reset to CuratedFavorites (the "Foods
+ * you like" step) with NutritionSummary underneath in the stack — picking is
+ * the last step of the flow, and both Save and "Choose for me" on that
+ * screen land on the summary via goBack(). Edit mode is untouched: it still
+ * goBack()s, so later edits never re-force the picks step.
  */
 
 const DURATIONS = [
@@ -91,10 +97,19 @@ export default function N9PlanLengthScreen() {
         return;
       }
 
+      // Picks are the final step. Reset with the summary UNDERNEATH the
+      // picks screen so both Save and "Choose for me" land there via
+      // goBack() — no navigation changes needed inside CuratedFavorites.
       navigation.dispatch(
         CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'NutritionSummary' }],
+          index: 1,
+          routes: [
+            { name: 'NutritionSummary' },
+            {
+              name: 'CuratedFavorites',
+              params: { fromQuestionnaire: true, answersSoFar: finalAnswers },
+            },
+          ],
         })
       );
       setSaving(false);

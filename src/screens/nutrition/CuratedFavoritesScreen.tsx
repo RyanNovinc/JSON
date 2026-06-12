@@ -1,51 +1,63 @@
 // src/screens/nutrition/CuratedFavoritesScreen.tsx
 //
-// "Foods you like" — REDESIGN.
+// "Foods you like" — WeekStrip build.
 //
-// Visual direction: photo-forward gallery, calm, premium, hungry-making.
-// Inspired by the "Drink up." vibe (big imagery, demoted metadata, lots of
-// breathing room, one bright CTA).
+// MENTAL MODEL (locked):
+//   Picks are the meals the user will eat this week. One pick per slot is a
+//   complete, respected answer (it repeats daily). More picks = rotation.
+//   Empty slot = delegation ("we'll choose for you"), never "skip".
+//   Macros are handled invisibly at plan-generation time — with ONE narrow
+//   exception: a hard-infeasible basket gets a single heads-up row in the
+//   confirm sheet, with certified one-tap fixes. Never while picking, never
+//   blocking, never red.
 //
-// MENTAL MODEL (post-reframe):
-//   Selection no longer means "build a library the AI picks from." It means
-//   "these are the meals you'll eat this week." 1 pick per slot is a valid,
-//   respected choice — that meal is eaten every day for that slot. More picks
-//   = more variety. The count IS the variety dial.
+// What changed vs the previous shipped file:
+// - NEW WeekStrip HUD pinned above Save: live preview of the active slot
+//   (7 circles for daily slots, cluster for snacks/dessert) + one sentence.
+//   The subtitle shrinks to one line; the strip now teaches the model.
+// - Tap toggles the MEAL: no picks → picks the hero plate (the one in the
+//   photo); any picks — one plate or five — → clears them all in one tap.
+//   A full-width FOOTER BAR on multi-plate cards is the door to the
+//   PlateSheet and reads plate state ("2 ways ›" / "Berry & Yoghurt Bowl ›"
+//   / "2 of 2 ways ›"). The old inline PlatePanel (hero image + macro strip
+//   + horizontal mini-cards injected into the grid) is gone — plate choice
+//   is a bottom sheet with full-width rows: thumbnail, name, kcal/protein,
+//   treat + "in the photo" tags, big tap targets, all plates visible at
+//   once, no grid reflow.
+// - buildSkipSentence DELETED. The confirm sheet now shows a row for EVERY
+//   tab — picked rows mirror the strip; empty rows read as delegation
+//   ("We'll pick your lunches for you.").
+// - Confirm sheet runs the feasibility engine (src/utils/mealFeasibility).
+//   Infeasible → quiet "Heads-up" row + up to 3 certified fix cards
+//   (tap = real pick, verdict recomputes live) + primary button relabels
+//   "Save anyway". Feasible / engine unavailable → identical to before.
+// - Taste section UI REMOVED. avoid/likedDishes are loaded and written back
+//   unchanged (same pass-through pattern as cuisines) so the storage payload
+//   and prompt-builder contract are untouched.
+// - Header "N selected" count removed; per-slot meaning lives in the strip.
+// - Filter chips: All / Quick / No-cook / Big batch (produces_servings > 1).
+//   The equipment-flavoured "Oven" chip is gone.
+// - Tab dot stays binary but is now ring (empty) vs filled (has picks) —
+//   shape + colour, colourblind-safe.
+// - Questionnaire-step mode: pass fromQuestionnaire: true to run this screen
+//   as the step between N9 and the summary — back chevron hidden, top-right
+//   "Choose for me" skip shown. N9 wiring snippet documented above ParamList.
+// - V2 SLOT-SCOPED PICKS: selection keys are `${slot}|${key}` — the tab you
+//   pick on IS the slot. Lunch picks no longer mirror into Dinner (nor
+//   dessert into Snacks); the Brunch-dot eligibility quirk dies with it.
+//   Storage writes picks[] plus a base-slug legacy mirror so the live prompt
+//   builder keeps working; legacy slug-only saves hydrate into every
+//   eligible tab once. Lunch↔dinner stay interchangeable at SCHEDULING time
+//   (engine borrow group + prompt rule) — that's a different layer.
 //
-// What changed (UX):
-// - Slot strips → ONE active tab at a time (Breakfast / Lunch / Dinner /
-//   Snacks / exotic-as-needed). The visible tab set is driven by the user's
-//   questionnaire answers (mealsPerDay, snackFrequency) so the screen mirrors
-//   THEIR eating structure, not a generic four-shelf catalogue.
-// - Collapsing header: title + subtitle scroll AWAY; the tab strip pins so
-//   slot-switching stays one tap. Maximises photography at full scroll.
-// - Cards: 3:4 photo-poster with name only. No macro grid, no kcal, no
-//   effort badge in browse. Macros / cook-time live in the plate panel that
-//   already opens on tap.
-// - Lean-threshold mechanic is GONE. Amber "add 2 more" labels: gone. The
-//   "Pick N more for breakfast" floating Save state: gone. One pick is a
-//   complete answer, not a deficiency. The tab dot is now binary — cyan if
-//   the slot has any picks, dim if empty — and that is purely informational.
-// - Filter bar: collapsed into a single horizontal chip row.
-// - Save flow: tapping Save opens a confirm sheet that reads the user's week
-//   back to them in plain language ("Banana Bulk, every morning. 3 lunches on
-//   rotation. ..."). They confirm the plan ("Looks good") or go back to edit
-//   ("Keep editing"). This is the moment the consequence of one-pick-per-slot
-//   becomes real — deliberate users confirm with certainty; accidental picks
-//   get noticed before commit.
+// Contracts preserved: SHELF_SLOTS / EXOTIC_SLOTS / mealsForSlots /
+// loadCuratedFavorites / saveCuratedFavorites payload (slugs, cuisines,
+// avoid, likedDishes), selection key format (slug or `slug:plateId`),
+// MealDetail navigation from the ⓘ button.
 //
-// What is UNCHANGED (logic — single source of truth preserved):
-// - SHELF_SLOTS / EXOTIC_SLOTS / mealsForSlots / isMealPicked are imported
-//   and called exactly as before.
-// - coreShelfStatus / exoticShelfStatus are still called for the `picked`
-//   count (which drives the binary tab dot). Their `status` and `needed`
-//   fields are now unused by this screen — they remain available in the data
-//   layer for other consumers.
-// - Selection model (Set<string> of slug or `${slug}:${plateId}`),
-//   loadCuratedFavorites / saveCuratedFavorites payload (slugs, cuisines,
-//   avoid, likedDishes), plate-panel flip behaviour, multi-plate semantics.
-// - The cuisines field is still written back from its loaded value so the
-//   prompt-builder contract is untouched.
+// TODO(ryan): resolveTargets() below sniffs computeMacros()'s return shape
+// tolerantly because the exact MacroResults field names weren't in front of
+// me. Replace the key-sniffing with the real fields and delete the comment.
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
@@ -55,17 +67,16 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
-  TextInput,
   Animated,
   Easing,
   Platform,
   Modal,
-  // RN core TouchableOpacity, aliased. Used specifically for the ⓘ button on
-  // the card. Gesture-handler's TouchableOpacity has a long-standing bug
-  // (issues #675, #1163) where absolutely-positioned instances fail to render
-  // reliably — the button shows up blank or not at all. Native RN's
-  // TouchableOpacity works fine with absolute positioning. Both libraries'
-  // touchables can coexist in the same tree.
+  // RN core TouchableOpacity, aliased. Used for the ⓘ badge and the card
+  // footer bar. Gesture-handler's TouchableOpacity has two layout quirks:
+  // absolutely-positioned instances fail to render reliably (issues #675,
+  // #1163), and it does NOT propagate flex sizing — its native wrapper sizes
+  // to content, so a flex:1 child inside it collapses to zero height. Size
+  // children of RNGH touchables intrinsically (explicit height/aspectRatio).
   TouchableOpacity as RNTouchableOpacity,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -79,35 +90,68 @@ import { CURATED_MEALS } from '../../data/curated_meals';
 import { CuratedMeal } from '../../types/curated_meals';
 import { getMealImage } from '../../assets/mealImages';
 import {
-  loadCuratedFavorites,
-  saveCuratedFavorites,
+  loadCuratedFavoritesV2,
+  saveCuratedFavoritesV2,
+  CuratedFavoritesV2,
+  SlotPick,
+  PlanSlot,
 } from '../../utils/curatedFavoritesStorage';
 import { loadNutritionAnswers } from '../../utils/nutritionQuestionnaireStorage';
+import { computeMacros } from '../../utils/nutritionMacros';
 import {
   CoreShelf,
   MealSlot,
-  TimeBucket,
-  FilterState,
   SHELF_SLOTS,
-  EXOTIC_SLOTS,
   emptyFilter,
-  isMealPicked,
-  coreShelfStatus,
-  exoticShelfStatus,
   mealsForSlots,
 } from '../../utils/curatedShelves';
+import {
+  assessBasket,
+  BasketVerdict,
+  CertifiedFix,
+  SlotSpec,
+  Targets,
+} from '../../utils/mealFeasibility';
 
 type NavProp = StackNavigationProp<any>;
 
-// Optional params: when this screen is reached mid-questionnaire the answers
-// so far are passed through. mealsPerDay + snackFrequency drive the tab set.
+// FLOW MODES
+// 1) Standalone editor (default): pushed from the summary's "Foods you like"
+//    card. Back chevron shows; Save → goBack() returns to the summary.
+// 2) Questionnaire step (fromQuestionnaire: true): N9's completion path
+//    resets the stack so the summary sits UNDERNEATH this screen — wiring
+//    for N9PlanLengthScreen (replace its existing reset to NutritionSummary):
+//
+//      navigation.dispatch(
+//        CommonActions.reset({
+//          index: 1,
+//          routes: [
+//            { name: 'NutritionSummary' },
+//            {
+//              name: 'CuratedFavorites',
+//              params: { fromQuestionnaire: true, answersSoFar: finalAnswers },
+//            },
+//          ],
+//        })
+//      );
+//
+//    In this mode the back chevron is hidden (it would imply returning to
+//    N9, which the reset made impossible) and a top-right "Choose for me"
+//    skip shows instead — delegation as a first-class exit. Both Save
+//    ("Looks good") and the skip land on the summary via goBack(). The skip
+//    deliberately lives top-right rather than as an enabled bottom CTA: a
+//    big enabled bottom button at landing invites tapping through without
+//    ever looking at the food, and the entire point of this step is the
+//    encounter. Save stays pick-gated; the skip is the zero-pick exit.
 type ParamList = {
   CuratedFavorites:
     | {
+        fromQuestionnaire?: boolean;
         answersSoFar?: {
           mealsPerDay?: number;
           snackFrequency?: string;
           dessertFrequency?: string;
+          allergies?: string[];
           [k: string]: any;
         };
       }
@@ -116,25 +160,32 @@ type ParamList = {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Grid: two columns, generous gutter, tall posters.
 const GRID_H_PADDING = 18;
 const GRID_GAP = 12;
 const CARD_WIDTH = (SCREEN_WIDTH - GRID_H_PADDING * 2 - GRID_GAP) / 2;
+const FOOTER_HEIGHT = 34;
+const CARD_HEIGHT = Math.round((CARD_WIDTH * 4) / 3);
 
-// Header collapse mechanics
-const TITLE_BLOCK_HEIGHT = 96; // serif title + subtitle
+const TITLE_BLOCK_HEIGHT = 78; // serif title + one-line subtitle
 const TAB_BAR_HEIGHT = 46;
+const STRIP_HEIGHT = 78; // week strip block inside the footer
 
 const isMultiPlate = (m: CuratedMeal) => (m.plates?.length ?? 0) > 1;
 const plateKey = (slug: string, plateId: string) => `${slug}:${plateId}`;
 
+/** Footer-bar label: door to the plates + readout of which way you're set to. */
+function plateFooterLabel(meal: CuratedMeal, selected: Set<string>): string {
+  const picked = (meal.plates ?? []).filter((p: any) =>
+    selected.has(plateKey(meal.slug, p.id))
+  );
+  if (picked.length === 0) return `${meal.plates.length} ways`;
+  if (picked.length === 1) return (picked[0] as any).display_name;
+  return `${picked.length} of ${meal.plates.length} ways`;
+}
+
 // =============================================================================
-// Tab model — derived from the questionnaire answers
+// Tab model — unchanged derivation from questionnaire answers
 // =============================================================================
-//
-// A "tab" is either a core shelf ('breakfast' | 'lunch' | 'dinner' | 'snacks')
-// or an exotic slot ('brunch', 'pre_workout', etc.). The visible set is built
-// from mealsPerDay (how many meal tabs) + snackFrequency (snacks tab y/n).
 
 type TabKey =
   | { kind: 'core'; shelf: CoreShelf }
@@ -158,8 +209,6 @@ const SLOT_LABEL: Partial<Record<MealSlot, string>> = {
   post_workout: 'Post-workout',
 };
 
-// Order in which exotic slots fill in when the user eats more than 3 meals.
-// Conservative ordering — common cases first, gym slots last.
 const EXOTIC_FILL_ORDER: MealSlot[] = [
   'brunch',
   'second_lunch',
@@ -176,28 +225,27 @@ function tabId(t: TabKey): string {
   return t.kind === 'core' ? `core:${t.shelf}` : `exotic:${t.slot}`;
 }
 
-/**
- * Build the tab list from the user's questionnaire answers.
- *
- * Rules:
- * - 1 meal  → Dinner
- * - 2 meals → Lunch, Dinner
- * - 3 meals → Breakfast, Lunch, Dinner
- * - 4 meals → 3 core + 1 exotic (first available from EXOTIC_FILL_ORDER)
- * - 5 meals → 3 core + 2 exotic
- * - 6 meals → 3 core + 3 exotic
- * - Snacks appended iff snackFrequency is '1', '2', or 'ai_decide'.
- *
- * If no answers are present (e.g. accessed outside the questionnaire), default
- * to all four core shelves so the screen still works as a standalone editor.
- */
+/** Canonical PlanSlot for a tab — the scope picks are stored under, and the
+ *  SlotSpec.id the feasibility engine matches scoped keys against. */
+function tabSlot(t: TabKey): PlanSlot {
+  if (t.kind === 'core') return (t.shelf === 'snacks' ? 'snack' : t.shelf) as PlanSlot;
+  return t.slot as PlanSlot;
+}
+
+/** Selection-state keys are slot-scoped: `${slot}|${slug}` or
+ *  `${slot}|${slug}:${plateId}`. Same format the engine consumes. */
+const scopeKey = (slot: PlanSlot, key: string) => `${slot}|${key}`;
+function unscopeKey(scoped: string): { slot: PlanSlot; key: string } {
+  const i = scoped.indexOf('|');
+  return { slot: scoped.slice(0, i) as PlanSlot, key: scoped.slice(i + 1) };
+}
+
 function buildTabs(
   mealsPerDay: number | undefined,
   snackFrequency: string | undefined,
   dessertFrequency: string | undefined,
   allMeals: CuratedMeal[]
 ): TabKey[] {
-  // Fallback: behave like the old four-shelf board.
   if (mealsPerDay == null) {
     const tabs: TabKey[] = [
       { kind: 'core', shelf: 'breakfast' },
@@ -207,7 +255,6 @@ function buildTabs(
     if (snackFrequency !== '0') tabs.push({ kind: 'core', shelf: 'snacks' });
     return tabs;
   }
-
   const coreByCount: Record<number, CoreShelf[]> = {
     1: ['dinner'],
     2: ['lunch', 'dinner'],
@@ -219,14 +266,11 @@ function buildTabs(
   const coreShelves = coreByCount[mealsPerDay] ?? ['breakfast', 'lunch', 'dinner'];
   const tabs: TabKey[] = coreShelves.map((shelf) => ({ kind: 'core', shelf }));
 
-  // Exotic fill (only if the user picked more than 3 meals)
   const extraNeeded = Math.max(0, mealsPerDay - 3);
   if (extraNeeded > 0) {
     let added = 0;
     for (const slot of EXOTIC_FILL_ORDER) {
       if (added >= extraNeeded) break;
-      // Only add an exotic slot if at least one curated meal is eligible for it,
-      // otherwise the tab would be empty.
       const eligible = mealsForSlots([slot], allMeals, emptyFilter(), 'default');
       if (eligible.length > 0) {
         tabs.push({ kind: 'exotic', slot });
@@ -234,224 +278,248 @@ function buildTabs(
       }
     }
   }
-
-  // Snacks tab
   if (snackFrequency && snackFrequency !== '0') {
     tabs.push({ kind: 'core', shelf: 'snacks' });
   }
-
-  // Dessert tab — appears whenever the user wants any dessert frequency.
-  // Cadence (every_night / most_nights / few_per_week / ai_decide) doesn't
-  // affect whether the tab shows, only how the prompt builder uses the value.
   if (dessertFrequency && dessertFrequency !== '0') {
     tabs.push({ kind: 'core', shelf: 'dessert' });
   }
-
   return tabs;
 }
 
-// Per-tab status — delegates entirely to the existing logic.
-// Note: post-reframe we only consume `picked` (for the binary tab dot).
-// `status` and `needed` are returned by the data layer but unused here.
-function statusForTab(
-  tab: TabKey,
-  allMeals: CuratedMeal[],
-  selected: Set<string>
-): { status: 'empty' | 'lean' | 'ready'; needed: number; picked: number } {
-  if (tab.kind === 'core') {
-    const slots = SHELF_SLOTS[tab.shelf];
-    const meals = mealsForSlots(slots, allMeals, emptyFilter(), 'default');
-    return coreShelfStatus(tab.shelf, meals, selected);
-  }
-  const meals = mealsForSlots([tab.slot], allMeals, emptyFilter(), 'default');
-  return exoticShelfStatus(meals, selected);
+function slotsForTab(tab: TabKey): MealSlot[] {
+  return tab.kind === 'core' ? SHELF_SLOTS[tab.shelf] : [tab.slot];
 }
 
-// =============================================================================
-// Week recap — turn picks into the friendly read-back lines used by the
-// confirm sheet. One line per tab that has at least one pick. Empty slots are
-// silent (no "no snacks" line).
-// =============================================================================
+// 'daily' slots speak in rotation ("every morning"); 'mix' slots speak in
+// mix-ins. Dessert at every_night is behaviourally daily.
+type TabRhythm = 'daily' | 'mix';
+function tabRhythm(tab: TabKey, dessertFrequency?: string): TabRhythm {
+  if (tab.kind === 'core' && tab.shelf === 'snacks') return 'mix';
+  if (tab.kind === 'core' && tab.shelf === 'dessert')
+    return dessertFrequency === 'every_night' ? 'daily' : 'mix';
+  if (
+    tab.kind === 'exotic' &&
+    (tab.slot === 'morning_snack' ||
+      tab.slot === 'afternoon_snack' ||
+      tab.slot === 'evening_snack')
+  )
+    return 'mix';
+  return 'daily';
+}
 
-type RecapLine = { label: string; sentence: string };
-
-/** Time-of-day phrase used when a slot has exactly one pick. */
 function singularWhen(tab: TabKey): string {
   if (tab.kind === 'core') {
     switch (tab.shelf) {
       case 'breakfast': return 'every morning';
       case 'lunch':     return 'every lunchtime';
       case 'dinner':    return 'every evening';
-      case 'snacks':    return 'as a snack';
-      case 'dessert':   return 'as your dessert';
+      case 'snacks':    return 'your go-to snack';
+      case 'dessert':   return 'your dessert';
     }
-    return 'every day'; // unreachable, satisfies the type-checker
+    return 'every day';
   }
   switch (tab.slot) {
-    case 'brunch':           return 'every late morning';
-    case 'second_lunch':     return 'every afternoon';
-    case 'early_dinner':     return 'every early evening';
-    case 'morning_snack':    return 'every morning, as a snack';
-    case 'afternoon_snack':  return 'every afternoon, as a snack';
-    case 'evening_snack':    return 'every evening, as a snack';
-    case 'pre_workout':      return 'before every workout';
-    case 'post_workout':     return 'after every workout';
-    default:                 return 'every day';
+    case 'brunch':          return 'every late morning';
+    case 'second_lunch':    return 'every afternoon';
+    case 'early_dinner':    return 'every early evening';
+    case 'morning_snack':   return 'your morning snack';
+    case 'afternoon_snack': return 'your afternoon snack';
+    case 'evening_snack':   return 'your evening snack';
+    case 'pre_workout':     return 'before every workout';
+    case 'post_workout':    return 'after every workout';
+    default:                return 'every day';
   }
 }
 
-/** Plural noun + tail used when a slot has 2+ picks. */
-function pluralPhrase(tab: TabKey, n: number): string {
-  // Desserts get "to mix in" treatment — they're optional and rotational,
-  // not a slot the user expects to fill every day.
-  if (tab.kind === 'core' && tab.shelf === 'dessert') {
-    return `${n} desserts to mix in`;
-  }
-  // Snacks are not strictly daily — "to mix in" is gentler than "on rotation".
-  if (tab.kind === 'core' && tab.shelf === 'snacks') {
-    return `${n} snacks to mix in`;
-  }
-  if (
-    tab.kind === 'exotic' &&
-    (tab.slot === 'morning_snack' ||
-      tab.slot === 'afternoon_snack' ||
-      tab.slot === 'evening_snack')
-  ) {
-    return `${n} snacks to mix in`;
-  }
+function tabNoun(tab: TabKey): string {
   if (tab.kind === 'core') {
-    const noun =
-      tab.shelf === 'breakfast' ? 'breakfasts'
-      : tab.shelf === 'lunch'   ? 'lunches'
-      : tab.shelf === 'dinner'  ? 'dinners'
-      : 'meals'; // unreachable: snacks + dessert handled above
-    return `${n} ${noun} on rotation`;
+    switch (tab.shelf) {
+      case 'breakfast': return 'breakfasts';
+      case 'lunch':     return 'lunches';
+      case 'dinner':    return 'dinners';
+      case 'snacks':    return 'snacks';
+      case 'dessert':   return 'desserts';
+    }
   }
-  // Exotic non-snack slots get a slot-named rotation.
-  const noun = (SLOT_LABEL[tab.slot] ?? String(tab.slot)).toLowerCase();
-  return `${n} ${noun} options on rotation`;
+  return `${tabLabel(tab).toLowerCase()} options`;
 }
 
-/**
- * Resolve `selected` (mix of bare slugs and `slug:plateId` keys) into the
- * display names of the meals that are picked for a given tab. We count each
- * plate-key as its own pick (e.g. pulled-pork:bowl and pulled-pork:taco both
- * count) — but for single-pick phrasing we display the parent meal's name to
- * avoid awkwardness ("Pulled pork bowl, every lunchtime" is fine; needing the
- * plate name only matters when we're naming a single specific dish).
- */
-function pickedNamesForTab(
+// =============================================================================
+// Pick units — ordered picks for a tab, with images for the strip
+// =============================================================================
+
+interface PickUnit {
+  slug: string;
+  name: string;
+  imageFilename?: string;
+}
+
+function unitsForTab(
   tab: TabKey,
   allMeals: CuratedMeal[],
   selected: Set<string>
-): { count: number; firstName: string | null } {
-  const slots = tab.kind === 'core' ? SHELF_SLOTS[tab.shelf] : [tab.slot];
-  const eligible = mealsForSlots(slots, allMeals, emptyFilter(), 'default');
-
-  let count = 0;
-  let firstName: string | null = null;
+): PickUnit[] {
+  // Membership is the tab's OWN scoped picks — a lunch pick says nothing
+  // about dinner. (Eligibility still defines the shelf, not the picks.)
+  const slot = tabSlot(tab);
+  const eligible = mealsForSlots(slotsForTab(tab), allMeals, emptyFilter(), 'default');
+  const units: PickUnit[] = [];
   for (const meal of eligible) {
-    let mealPicks = 0;
-    if (selected.has(meal.slug)) mealPicks += 1;
-    const prefix = meal.slug + ':';
-    selected.forEach((k) => { if (k.startsWith(prefix)) mealPicks += 1; });
-    if (mealPicks > 0) {
-      count += mealPicks;
-      if (firstName == null) firstName = meal.display_name;
+    if (selected.has(scopeKey(slot, meal.slug))) {
+      units.push({
+        slug: meal.slug,
+        name: meal.display_name,
+        imageFilename: meal.image_filename,
+      });
+    }
+    for (const plate of meal.plates ?? []) {
+      if (selected.has(scopeKey(slot, plateKey(meal.slug, (plate as any).id)))) {
+        units.push({
+          slug: meal.slug,
+          name: meal.display_name,
+          imageFilename: (plate as any).image_filename ?? meal.image_filename,
+        });
+      }
     }
   }
-  return { count, firstName };
+  return units;
 }
 
-/** Top-level: build the ordered list of recap lines for the confirm sheet. */
-function buildRecap(
-  tabs: TabKey[],
-  allMeals: CuratedMeal[],
-  selected: Set<string>
-): RecapLine[] {
-  const lines: RecapLine[] = [];
-  for (const tab of tabs) {
-    const { count, firstName } = pickedNamesForTab(tab, allMeals, selected);
-    if (count === 0) continue; // empty slots are silent
-    const label = tabLabel(tab).toUpperCase();
-    const sentence =
-      count === 1 && firstName
-        ? `${firstName}, ${singularWhen(tab)}`
-        : pluralPhrase(tab, count);
-    lines.push({ label, sentence });
+// One sentence per tab. The strip and the confirm sheet share these so the
+// sheet never says anything the user hasn't already watched form.
+function slotSentence(
+  tab: TabKey,
+  units: PickUnit[],
+  dessertFrequency: string | undefined,
+  inSheet: boolean
+): string {
+  const n = units.length;
+  const rhythm = tabRhythm(tab, dessertFrequency);
+  const noun = tabNoun(tab);
+  const isDessert = tab.kind === 'core' && tab.shelf === 'dessert';
+  const isSnacks =
+    (tab.kind === 'core' && tab.shelf === 'snacks') ||
+    (tab.kind === 'exotic' &&
+      (tab.slot === 'morning_snack' ||
+        tab.slot === 'afternoon_snack' ||
+        tab.slot === 'evening_snack'));
+
+  if (n === 0) {
+    if (inSheet) {
+      if (isDessert) return "We'll keep dessert covered for you.";
+      return `We'll pick your ${noun} for you.`;
+    }
+    if (isDessert)
+      return "Dessert's covered either way — pick favourites to make it yours.";
+    return `We'll choose your ${noun} — pick anything to take over.`;
   }
-  return lines;
+  if (n === 1) {
+    if (isSnacks || isDessert) return `${units[0].name}, ${singularWhen(tab)}.`;
+    if (isDessert && rhythm === 'daily') return `${units[0].name}, every night.`;
+    return `${units[0].name}, ${singularWhen(tab)}.`;
+  }
+  const allSameSlug = units.every((u) => u.slug === units[0].slug);
+  if (allSameSlug) {
+    return rhythm === 'daily'
+      ? `${units[0].name}, ${n} ways — we'll rotate them.`
+      : `${units[0].name}, ${n} ways — we'll mix them in.`;
+  }
+  if (rhythm === 'daily')
+    return `${n} ${noun} on rotation — we'll set the order.`;
+  return `${n} ${noun} to mix in.`;
 }
 
-/**
- * Build the soft skip-warning sentence shown in the confirm sheet when the
- * user has empty tabs. Phrased as a question so it lands as a check-in rather
- * than a warning. Returns null when nothing is empty.
- *
- * Examples:
- *   1 empty (lunch)            → "You'll skip lunch this week — sound right?"
- *   2 empty (lunch + snacks)   → "You'll skip lunch and snacks this week — sound right?"
- *   3+ empty (b + l + d)       → "You'll skip breakfast, lunch and dinner — sound right?"
- */
-function buildSkipSentence(emptyTabs: TabKey[]): string | null {
-  if (emptyTabs.length === 0) return null;
-  const names = emptyTabs.map((t) => tabLabel(t).toLowerCase());
-  let joined: string;
-  if (names.length === 1) {
-    joined = names[0];
-  } else if (names.length === 2) {
-    joined = `${names[0]} and ${names[1]}`;
+// =============================================================================
+// WeekStrip — the live consequence preview, pinned above Save
+// =============================================================================
+
+function WeekStrip({
+  tab,
+  units,
+  dessertFrequency,
+  themeColor,
+}: {
+  tab: TabKey;
+  units: PickUnit[];
+  dessertFrequency?: string;
+  themeColor: string;
+}) {
+  const rhythm = tabRhythm(tab, dessertFrequency);
+  const scale = useRef(new Animated.Value(1)).current;
+  const hash = units.map((u) => u.name).join('|');
+
+  useEffect(() => {
+    scale.setValue(1);
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 1.05, duration: 120, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 140, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash]);
+
+  const renderDot = (unit: PickUnit | null, i: number, size: number, overlap: boolean) => {
+    const img = unit ? getMealImage(unit.imageFilename) : null;
+    return (
+      <View
+        key={i}
+        style={[
+          styles.stripDot,
+          { width: size, height: size, borderRadius: size / 2 },
+          overlap && i > 0 && { marginLeft: -size * 0.28 },
+          unit
+            ? { borderStyle: 'solid', borderColor: '#26262b', backgroundColor: '#1c1c1f', overflow: 'hidden' }
+            : { borderStyle: 'dashed', borderColor: '#3f3f46' },
+        ]}
+      >
+        {unit && img ? (
+          <Image source={img} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+        ) : unit ? (
+          <Ionicons name="restaurant-outline" size={size * 0.5} color="#71717a" />
+        ) : null}
+      </View>
+    );
+  };
+
+  let dots: React.ReactNode;
+  if (rhythm === 'daily') {
+    dots = (
+      <View style={styles.stripDots}>
+        {Array.from({ length: 7 }).map((_, i) =>
+          renderDot(units.length ? units[i % units.length] : null, i, 27, false)
+        )}
+      </View>
+    );
   } else {
-    joined = `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-  }
-  // For 1–2 empty slots: "this week" reads naturally. For 3+ it would sound
-  // odd ("skip breakfast, lunch and dinner this week"), so drop the qualifier.
-  const tail = emptyTabs.length <= 2 ? ' this week' : '';
-  return `You'll skip ${joined}${tail} — sound right?`;
-}
-
-// =============================================================================
-// Filter chips — one row only. Time bucket + a "no-cook" shortcut.
-// (Equipment as a separate row is gone; surface it later via a sheet if needed.)
-// =============================================================================
-
-type QuickFilter = 'all' | 'quick' | 'no_cook' | 'oven';
-
-function applyQuickFilter(meals: CuratedMeal[], qf: QuickFilter): CuratedMeal[] {
-  if (qf === 'all') return meals;
-  if (qf === 'quick') {
-    return meals.filter((m) => {
-      const t = m.methods?.[0]?.time_total_minutes ?? 0;
-      return t > 0 && t <= 15;
-    });
-  }
-  if (qf === 'no_cook') {
-    return meals.filter((m) => {
-      const t = m.methods?.[0]?.time_total_minutes ?? 0;
-      return t === 0;
-    });
-  }
-  if (qf === 'oven') {
-    return meals.filter((m) =>
-      (m.methods?.[0]?.equipment ?? []).some((e: string) =>
-        ['oven', 'air_fryer', 'slow_cooker'].includes(e)
-      )
+    const shown = units.length ? units.slice(0, 5) : [null, null, null];
+    dots = (
+      <View style={styles.stripDots}>
+        {shown.map((u, i) => renderDot(u, i, 27, true))}
+      </View>
     );
   }
-  return meals;
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      {dots}
+      <Text style={styles.stripLine} numberOfLines={2}>
+        {slotSentence(tab, units, dessertFrequency, false)}
+      </Text>
+    </Animated.View>
+  );
 }
 
 // =============================================================================
-// MealCard — photo-poster. Name only.
+// MealCard — photo poster. Tap toggles (hero plate on multi-plate meals).
 // =============================================================================
 
 interface MealCardProps {
   meal: CuratedMeal;
   width: number;
   selected: Set<string>;
-  isOpen: boolean;
   themeColor: string;
   onPress: () => void;
+  onWaysPress: () => void;
   onInfoPress: () => void;
 }
 
@@ -459,55 +527,14 @@ const MealCard = React.memo(function MealCard({
   meal,
   width,
   selected,
-  isOpen,
   themeColor,
   onPress,
+  onWaysPress,
   onInfoPress,
 }: MealCardProps) {
-  // Robust image loading with fallback
   const imageSource = getMealImage(meal.image_filename ?? meal.plates?.[0]?.image_filename);
-  
-  // [CEVAPI] Debug log for Cevapi meal
-  if (meal.slug === 'cevapi') {
-    console.log('[CEVAPI] Image resolution:', {
-      meal_image_filename: meal.image_filename,
-      first_plate_filename: meal.plates?.[0]?.image_filename,
-      resolved: imageSource ? 'FOUND' : 'undefined'
-    });
-  }
-  
-  // Strategy 3: For specific problematic meals, try alternative keys
-  if (!imageSource && meal.slug === 'cevapi') {
-    // Try alternative filename patterns
-    const alternatives = [
-      'cevapi_with_flatbread.png',
-      'cevapi.png',
-      'cevapi_flatbread.png'
-    ];
-    for (const alt of alternatives) {
-      imageSource = getMealImage(alt);
-      if (imageSource) {
-        console.log(`✅ Found Cevapi image using alternative key: ${alt}`);
-        break;
-      }
-    }
-  }
-  
-  // DEBUG: Enhanced logging for Cevapi specifically
-  if (meal.slug === 'cevapi') {
-    console.log('🔍 DEBUG Cevapi meal image resolution:', {
-      slug: meal.slug,
-      display_name: meal.display_name,
-      base_image_filename: meal.image_filename,
-      first_plate_image_filename: meal.plates?.[0]?.image_filename,
-      final_imageSource: !!imageSource ? 'FOUND' : 'NOT FOUND',
-      imageSource_type: typeof imageSource
-    });
-  }
-  
   const multi = isMultiPlate(meal);
 
-  // pick count for this meal across all plate-keys
   let picks = 0;
   const prefix = meal.slug + ':';
   if (selected.has(meal.slug)) picks += 1;
@@ -518,87 +545,81 @@ const MealCard = React.memo(function MealCard({
 
   return (
     <View style={[styles.card, { width }]}>
-      {/* Image + overlays. Wrapped in a touchable that fills the whole card. */}
       <TouchableOpacity
         style={styles.cardTapArea}
         activeOpacity={0.88}
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityState={{
-          selected: isSel,
-          expanded: multi ? isOpen : undefined,
-        }}
+        accessibilityState={{ selected: isSel }}
         accessibilityLabel={meal.display_name}
+        accessibilityHint={
+          isSel
+            ? 'Tap to clear all picks for this meal'
+            : multi
+            ? 'Tap to pick the plate shown in the photo'
+            : 'Tap to pick'
+        }
       >
-        <View style={styles.cardImageWrap}>
+        <View
+          style={[
+            styles.cardImageWrap,
+            { height: CARD_HEIGHT - (multi ? FOOTER_HEIGHT : 0) },
+          ]}
+        >
           {imageSource ? (
-            <Image
-              source={imageSource}
-              style={styles.cardImage}
-              contentFit="cover"
-              transition={200}
-              onError={(error) => {
-                if (meal.slug === 'cevapi') {
-                  console.log('[CEVAPI] onError fired:', error);
-                }
-              }}
-            />
+            <Image source={imageSource} style={styles.cardImage} contentFit="cover" transition={200} />
           ) : (
             <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
               <Ionicons name="restaurant-outline" size={28} color="#52525b" />
             </View>
           )}
 
-          {/* Selection scrim — lifts the check on selected cards, very subtle. */}
           {isSel && <View style={styles.selectedScrim} pointerEvents="none" />}
 
-          {/* Selection ring (top-right). Hidden while this meal's panel is open. */}
-          {!isOpen && (
-            <View
-              style={[
-                styles.checkBadge,
-                isSel
-                  ? { backgroundColor: themeColor, borderColor: themeColor }
-                  : {
-                      backgroundColor: 'rgba(10,10,11,0.45)',
-                      borderColor: 'rgba(255,255,255,0.35)',
-                    },
-              ]}
-              pointerEvents="none"
-            >
-              {isSel ? (
-                multi ? (
-                  <Text style={styles.badgeCount}>{picks}</Text>
-                ) : (
-                  <Ionicons name="checkmark" size={15} color="#0a0a0b" />
-                )
-              ) : null}
-            </View>
-          )}
+          <View
+            style={[
+              styles.checkBadge,
+              isSel
+                ? { backgroundColor: themeColor, borderColor: themeColor }
+                : {
+                    backgroundColor: 'rgba(10,10,11,0.45)',
+                    borderColor: 'rgba(255,255,255,0.35)',
+                  },
+            ]}
+            pointerEvents="none"
+          >
+            {isSel ? (
+              multi && picks > 1 ? (
+                <Text style={styles.badgeCount}>{picks}</Text>
+              ) : (
+                <Ionicons name="checkmark" size={15} color="#0a0a0b" />
+              )
+            ) : null}
+          </View>
 
-          {/* "N ways" hint for multi-plate meals (bottom-left, very small) */}
-          {multi && (
-            <View style={styles.waysTag} pointerEvents="none">
-              <Text style={styles.waysTagText}>
-                {isOpen ? 'Close' : `${meal.plates.length} ways`}
-              </Text>
-            </View>
-          )}
-
-          {/* Title sits OVER the image, bottom-left, like the reference */}
           <Text style={styles.cardTitle} numberOfLines={2}>
             {meal.display_name}
           </Text>
         </View>
       </TouchableOpacity>
 
-      {/* Info button — sibling of the card-tap surface (NOT a child).
-          Uses RN core TouchableOpacity (RNTouchableOpacity) rather than the
-          gesture-handler version. Gesture-handler's TouchableOpacity has a
-          long-standing bug (issues #675, #1163) where absolutely-positioned
-          instances silently fail to render. RN core's works fine with absolute
-          positioning and composes alongside the gesture-handler card-tap
-          surface as siblings. */}
+      {/* Footer bar — the door to the plates, and a readout of which way
+          you're set to. Its own zone, so a near-miss never clears picks. */}
+      {multi && (
+        <RNTouchableOpacity
+          style={styles.cardFooter}
+          onPress={onWaysPress}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`${plateFooterLabel(meal, selected)}. Choose plates for ${meal.display_name}`}
+        >
+          <Text style={styles.footLabel} numberOfLines={1}>
+            {plateFooterLabel(meal, selected)}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color="#8b8b94" />
+        </RNTouchableOpacity>
+      )}
+
       <RNTouchableOpacity
         style={styles.infoBadge}
         onPress={onInfoPress}
@@ -607,202 +628,207 @@ const MealCard = React.memo(function MealCard({
         accessibilityRole="button"
         accessibilityLabel={`More about ${meal.display_name}`}
       >
-        <Ionicons
-          name="information-circle-outline"
-          size={20}
-          color="#ffffff"
-        />
+        <Ionicons name="information-circle-outline" size={20} color="#ffffff" />
       </RNTouchableOpacity>
     </View>
   );
 });
 
 // =============================================================================
-// PlatePanel — preserved behaviour, restyled for calmer palette.
+// BottomSheet shell — shared spring/backdrop for PlateSheet + ConfirmSheet
 // =============================================================================
 
-interface PlatePanelProps {
-  meal: CuratedMeal;
-  selected: Set<string>;
-  themeColor: string;
+function BottomSheet({
+  open,
+  onClose,
+  children,
+  paddingBottom,
+}: {
+  open: boolean;
   onClose: () => void;
-  onTogglePlate: (slug: string, plateId: string) => void;
+  children: React.ReactNode;
+  paddingBottom: number;
+}) {
+  const [rendered, setRendered] = useState(false);
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (open) {
+      setRendered(true);
+      requestAnimationFrame(() => {
+        Animated.spring(anim, { toValue: 1, tension: 65, friction: 11, useNativeDriver: true }).start();
+      });
+    } else if (rendered) {
+      Animated.spring(anim, { toValue: 0, tension: 90, friction: 12, useNativeDriver: true }).start(
+        ({ finished }) => {
+          if (finished) setRendered(false);
+        }
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, anim]);
+
+  return (
+    <Modal visible={rendered} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[styles.sheetBackdrop, { opacity: anim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+          accessibilityLabel="Dismiss"
+          accessibilityRole="button"
+        />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.sheetWrap,
+          {
+            transform: [
+              { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [600, 0] }) },
+            ],
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <View style={[styles.sheet, { paddingBottom }]}>
+          <View style={styles.sheetGrabber} />
+          {children}
+        </View>
+      </Animated.View>
+    </Modal>
+  );
 }
 
-function PlatePanel({
+// =============================================================================
+// PlateSheet — redesigned plate picker
+// =============================================================================
+//
+// What was wrong with the old inline panel: it duplicated the card you just
+// tapped (hero image + macro strip), reflowed the whole grid when it opened,
+// hid plates 3+ behind a horizontal scroll of 140px cards, and mixed "meal
+// detail" with "plate choice" (detail now lives in MealDetail). This sheet
+// has ONE job — which ways? — with every plate visible as a full-width row.
+
+function PlateSheet({
   meal,
   selected,
   themeColor,
+  open,
   onClose,
   onTogglePlate,
-}: PlatePanelProps) {
-  // Enhanced base image loading with fallbacks
-  let baseImg = getMealImage(meal.image_filename);
-  if (!baseImg && meal.plates?.[0]?.image_filename) {
-    baseImg = getMealImage(meal.plates[0].image_filename);
-  }
-  // Special case for Cevapi
-  if (!baseImg && meal.slug === 'cevapi') {
-    baseImg = getMealImage('cevapi_with_flatbread.png');
-  }
-  
-  const baseKcal = meal.plates?.[0]?.plate_macros?.kcal ?? 0;
-  const baseProtein = meal.plates?.[0]?.plate_macros?.protein_g ?? 0;
-  const serves = meal.produces_servings ?? 1;
-  const totalMin = meal.methods?.[0]?.time_total_minutes ?? 0;
-  const timeLabel =
-    totalMin >= 60
-      ? `${Math.round(totalMin / 60)}h`
-      : totalMin > 0
-      ? `${totalMin} min`
-      : null;
-
+  paddingBottom,
+}: {
+  meal: CuratedMeal | null;
+  selected: Set<string>;
+  themeColor: string;
+  open: boolean;
+  onClose: () => void;
+  onTogglePlate: (slug: string, plateId: string) => void;
+  paddingBottom: number;
+}) {
   return (
-    <View style={styles.platePanel}>
-      <View style={styles.platePanelHeader}>
-        <Text style={styles.platePanelTitle} numberOfLines={1}>
-          {meal.display_name}
-        </Text>
-        <TouchableOpacity
-          onPress={onClose}
-          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-        >
-          <Ionicons name="close" size={20} color="#71717a" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.heroWrap}>
-        {baseImg ? (
-          <Image source={baseImg} style={styles.cardImage} contentFit="cover" transition={150} />
-        ) : (
-          <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-            <Ionicons name="restaurant-outline" size={32} color="#52525b" />
-          </View>
-        )}
-      </View>
-
-      {/* Demoted macro strip — calm, hairline-divided, in the spirit of "Drink up." */}
-      <View style={styles.panelMacroStrip}>
-        <View style={styles.panelMacroCell}>
-          <Text style={styles.panelMacroLabel}>CAL</Text>
-          <Text style={styles.panelMacroValue}>{baseKcal}</Text>
-        </View>
-        <View style={styles.panelMacroDivider} />
-        <View style={styles.panelMacroCell}>
-          <Text style={styles.panelMacroLabel}>PROTEIN</Text>
-          <Text style={styles.panelMacroValue}>
-            {baseProtein}
-            <Text style={styles.panelMacroUnit}>g</Text>
-          </Text>
-        </View>
-        {timeLabel && (
-          <>
-            <View style={styles.panelMacroDivider} />
-            <View style={styles.panelMacroCell}>
-              <Text style={styles.panelMacroLabel}>TIME</Text>
-              <Text style={styles.panelMacroValue}>{timeLabel}</Text>
-            </View>
-          </>
-        )}
-        {serves > 1 && (
-          <>
-            <View style={styles.panelMacroDivider} />
-            <View style={styles.panelMacroCell}>
-              <Text style={styles.panelMacroLabel}>SERVES</Text>
-              <Text style={styles.panelMacroValue}>{serves}</Text>
-            </View>
-          </>
-        )}
-      </View>
-
-      {meal.plates && meal.plates.length > 1 && (
+    <BottomSheet open={open && !!meal} onClose={onClose} paddingBottom={paddingBottom}>
+      {meal && (
         <>
-          <Text style={styles.eatLabel}>How would you eat it?</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.plateScrollContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            {meal.plates.map((plate) => {
+          <Text style={styles.sheetTitle}>{meal.display_name}</Text>
+          <Text style={styles.plateSheetSub}>
+            How would you eat it? Pick one or a few — a few ways keeps one batch interesting.
+          </Text>
+          <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+            {(meal.plates ?? []).map((plate: any, idx: number) => {
               const key = plateKey(meal.slug, plate.id);
               const on = selected.has(key);
-              const plateImg =
-                getMealImage(plate.image_filename) ||
-                getMealImage(meal.image_filename);
+              const img =
+                getMealImage(plate.image_filename) || getMealImage(meal.image_filename);
+              const pm: any = plate.plate_macros ?? {};
+              const meta = `${pm.kcal ?? 0} cal · ${pm.protein_g ?? 0}g protein`;
               return (
                 <TouchableOpacity
                   key={plate.id}
-                  style={[
-                    styles.plateCard,
-                    on && { borderColor: themeColor, borderWidth: 2 },
-                  ]}
-                  activeOpacity={0.85}
+                  style={styles.plateRow}
+                  activeOpacity={0.8}
                   onPress={() => onTogglePlate(meal.slug, plate.id)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
-                  accessibilityLabel={plate.display_name}
+                  accessibilityLabel={`${plate.display_name}, ${meta}`}
                 >
-                  <View style={styles.plateImageWrap}>
-                    {plateImg ? (
-                      <Image
-                        source={plateImg}
-                        style={styles.cardImage}
-                        contentFit="cover"
-                        transition={150}
-                      />
+                  <View style={styles.plateThumbWrap}>
+                    {img ? (
+                      <Image source={img} style={styles.plateThumb} contentFit="cover" transition={120} />
                     ) : (
-                      <View
-                        style={[styles.cardImage, styles.cardImagePlaceholder]}
-                      >
-                        <Ionicons
-                          name="restaurant-outline"
-                          size={22}
-                          color="#52525b"
-                        />
-                      </View>
-                    )}
-                    {on && <View style={styles.selectedScrim} pointerEvents="none" />}
-                    <View
-                      style={[
-                        styles.checkBadge,
-                        on
-                          ? { backgroundColor: themeColor, borderColor: themeColor }
-                          : {
-                              backgroundColor: 'rgba(10,10,11,0.45)',
-                              borderColor: 'rgba(255,255,255,0.35)',
-                            },
-                      ]}
-                      pointerEvents="none"
-                    >
-                      {on && (
-                        <Ionicons name="checkmark" size={15} color="#0a0a0b" />
-                      )}
-                    </View>
-                    {plate.is_stunt_plate && (
-                      <View style={styles.stuntTag} pointerEvents="none">
-                        <Text style={styles.stuntTagText}>treat</Text>
+                      <View style={[styles.plateThumb, styles.cardImagePlaceholder]}>
+                        <Ionicons name="restaurant-outline" size={18} color="#52525b" />
                       </View>
                     )}
                   </View>
-                  <View style={styles.plateBody}>
-                    <Text style={styles.plateTitle} numberOfLines={2}>
-                      {plate.display_name}
-                    </Text>
-                    <Text style={styles.plateMeta}>
-                      {plate.plate_macros?.kcal ?? 0} cal
-                    </Text>
+                  <View style={styles.plateRowBody}>
+                    <View style={styles.plateRowNameLine}>
+                      <Text style={styles.plateRowName} numberOfLines={1}>
+                        {plate.display_name}
+                      </Text>
+                      {plate.is_stunt_plate && (
+                        <View style={styles.treatPill}>
+                          <Text style={styles.treatPillText}>treat</Text>
+                        </View>
+                      )}
+                      {idx === 0 && (
+                        <View style={styles.heroPill}>
+                          <Text style={styles.heroPillText}>in the photo</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.plateRowMeta}>{meta}</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.plateRowCheck,
+                      on
+                        ? { backgroundColor: themeColor, borderColor: themeColor }
+                        : { borderColor: '#3f3f46' },
+                    ]}
+                  >
+                    {on && <Ionicons name="checkmark" size={14} color="#0a0a0b" />}
                   </View>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onPress={onClose}
+            style={[styles.confirmBtn, { backgroundColor: themeColor, marginTop: 8 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Done"
+          >
+            <Text style={styles.confirmBtnText}>Done</Text>
+          </TouchableOpacity>
         </>
       )}
-    </View>
+    </BottomSheet>
   );
+}
+
+// =============================================================================
+// Heads-up copy — templated by the worst failure
+// =============================================================================
+
+function headsUpSentence(verdict: BasketVerdict): string {
+  const f = verdict.failures[0];
+  const hasFixes = verdict.fixes.length > 0;
+  if (!f) return '';
+  if (verdict.unfixableBySingleAdd) {
+    return "Your picks make a light week on their own — we'll lean on shakes and simple sides and get each day as close as we can.";
+  }
+  if (f.direction === 'floor') {
+    const axis = f.axis === 'protein' ? 'protein' : f.axis === 'fiber' ? 'fibre' : 'calories';
+    return `Even scaled up and topped up, these picks can't reach your daily ${axis}. ${
+      hasFixes ? 'Any one of these fixes it' : 'One complementary pick fixes it'
+    } — or save anyway and we'll get each day as close as we can.`;
+  }
+  const axis = f.axis === 'fat' ? 'fat' : f.axis === 'carbs' ? 'carbs' : 'calories';
+  return `These picks run over your ${axis} target, and we can only add food, never take it away — but one lighter option in the rotation balances it. ${
+    hasFixes ? 'Any of these works' : 'Add one'
+  }, or save anyway and we'll keep the week as close as we can.`;
 }
 
 // =============================================================================
@@ -815,40 +841,23 @@ export default function CuratedFavoritesScreen() {
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
 
-  const allMeals = useMemo(
-    () => Object.values(CURATED_MEALS) as CuratedMeal[],
-    []
-  );
+  const allMeals = useMemo(() => Object.values(CURATED_MEALS) as CuratedMeal[], []);
 
-  // Answers can arrive two ways:
-  //   1. As route params during the questionnaire flow (synchronous, no async needed)
-  //   2. From saved storage when entered standalone (e.g. from summary/edit screens)
-  // If route params are absent, fall back to loading from storage so the screen
-  // always knows which tabs to show.
+  // ---- answers (route params during questionnaire; storage when standalone) ----
   const paramAnswers = route.params?.answersSoFar;
-  const [loadedAnswers, setLoadedAnswers] = useState<{
-    mealsPerDay?: number;
-    snackFrequency?: string;
-    dessertFrequency?: string;
-  } | null>(null);
+  const fromQuestionnaire = route.params?.fromQuestionnaire ?? false;
+  const [loadedAnswers, setLoadedAnswers] = useState<any | null>(null);
 
   useEffect(() => {
-    // Only load from storage if we don't already have params
     if (paramAnswers) {
-      setLoadedAnswers(null); // ensure paramAnswers wins
+      setLoadedAnswers(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
         const saved = await loadNutritionAnswers();
-        if (!cancelled && saved) {
-          setLoadedAnswers({
-            mealsPerDay: saved.mealsPerDay,
-            snackFrequency: saved.snackFrequency,
-            dessertFrequency: saved.dessertFrequency,
-          });
-        }
+        if (!cancelled && saved) setLoadedAnswers(saved);
       } catch (err) {
         console.warn('[CuratedFavorites] Failed to load saved answers:', err);
       }
@@ -858,7 +867,7 @@ export default function CuratedFavoritesScreen() {
     };
   }, [paramAnswers]);
 
-  const effectiveAnswers = paramAnswers ?? loadedAnswers ?? {};
+  const effectiveAnswers: any = paramAnswers ?? loadedAnswers ?? {};
   const mealsPerDay = effectiveAnswers.mealsPerDay;
   const snackFrequency = effectiveAnswers.snackFrequency;
   const dessertFrequency = effectiveAnswers.dessertFrequency;
@@ -870,9 +879,13 @@ export default function CuratedFavoritesScreen() {
 
   // ---- persisted state ----
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [avoidText, setAvoidText] = useState('');
-  const [dishesText, setDishesText] = useState('');
+  const [loadedFav, setLoadedFav] = useState<CuratedFavoritesV2 | null>(null);
+  // Pass-through fields: the taste-section UI is gone, but the storage payload
+  // keeps its shape. Loaded values are written back untouched (same pattern as
+  // cuisines).
   const [loadedCuisines, setLoadedCuisines] = useState<string[]>([]);
+  const [loadedAvoid, setLoadedAvoid] = useState<string[]>([]);
+  const [loadedDishes, setLoadedDishes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -880,28 +893,23 @@ export default function CuratedFavoritesScreen() {
   const [activeTabId, setActiveTabId] = useState<string>(() =>
     tabs[0] ? tabId(tabs[0]) : ''
   );
+  type QuickFilter = 'all' | 'quick' | 'no_cook' | 'batch';
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
-  const [openSlug, setOpenSlug] = useState<string | null>(null);
-  const [showTasteSheet, setShowTasteSheet] = useState(false);
+  const [plateSheetSlug, setPlateSheetSlug] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView | null>(null);
-
-  // Fades the bottom Save button out while the confirm sheet is open.
-  // Without this the screen's Save sits visibly behind the sheet on iOS — the
-  // Modal doesn't cover absolutely-positioned siblings that are outside the
-  // Modal's tree. The effect tying it to sheet state is further down,
-  // after confirmOpen is declared.
   const saveBarAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const fav = await loadCuratedFavorites();
+      const fav = await loadCuratedFavoritesV2();
       if (!cancelled) {
-        setSelected(new Set(fav.slugs));
+        setLoadedFav(fav);
         setLoadedCuisines(fav.cuisines);
-        setAvoidText(fav.avoid.join(', '));
-        setDishesText(fav.likedDishes.join(', '));
+        setLoadedAvoid(fav.avoid);
+        setLoadedDishes(fav.likedDishes);
         setLoading(false);
       }
     })();
@@ -910,8 +918,40 @@ export default function CuratedFavoritesScreen() {
     };
   }, []);
 
-  // If the tab set changes (route params arrive late, etc.) and the active tab
-  // is no longer valid, fall back to the first.
+  // Hydrate the scoped selection once tabs are known. V2 picks map straight
+  // in (including picks for slots the current structure doesn't show — they
+  // stay invisible but survive a round-trip). Mirror-only slugs — legacy
+  // data, or slugs added via the V1 API with no slot context — hydrate into
+  // every eligible tab once; the user prunes from there.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || !loadedFav || tabs.length === 0) return;
+    hydratedRef.current = true;
+    const next = new Set<string>();
+    const pickedSlugs = new Set<string>();
+    for (const p of loadedFav.picks) {
+      pickedSlugs.add(p.slug);
+      next.add(
+        scopeKey(p.slot, p.plate_id ? plateKey(p.slug, p.plate_id) : p.slug)
+      );
+    }
+    for (const slug of loadedFav.slugs) {
+      if (pickedSlugs.has(slug)) continue;
+      for (const t of tabs) {
+        const eligible = mealsForSlots(
+          slotsForTab(t),
+          allMeals,
+          emptyFilter(),
+          'default'
+        );
+        if (eligible.some((m) => m.slug === slug)) {
+          next.add(scopeKey(tabSlot(t), slug));
+        }
+      }
+    }
+    if (next.size > 0) setSelected(next);
+  }, [loadedFav, tabs, allMeals]);
+
   useEffect(() => {
     if (!tabs.length) return;
     if (!tabs.some((t) => tabId(t) === activeTabId)) {
@@ -919,129 +959,198 @@ export default function CuratedFavoritesScreen() {
     }
   }, [tabs, activeTabId]);
 
-  // ---- selection toggles ----
-  const toggleMeal = useCallback((slug: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      return next;
-    });
-  }, []);
-
-  const togglePlate = useCallback((slug: string, plateId: string) => {
-    const key = plateKey(slug, plateId);
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  const onCardPress = useCallback(
-    (meal: CuratedMeal) => {
-      if (isMultiPlate(meal)) {
-        setOpenSlug((cur) => (cur === meal.slug ? null : meal.slug));
-      } else {
-        toggleMeal(meal.slug);
-      }
-    },
-    [toggleMeal]
-  );
-
-  // ---- derived: active tab data ----
+  // ---- derived: active tab (needed by the toggles — picks are scoped to it) ----
   const activeTab = useMemo<TabKey | null>(
     () => tabs.find((t) => tabId(t) === activeTabId) ?? tabs[0] ?? null,
     [tabs, activeTabId]
   );
+  const activeSlot: PlanSlot | null = activeTab ? tabSlot(activeTab) : null;
+
+  // ---- selection toggles (all writes are scoped: the tab you're on IS the slot) ----
+  const toggleKey = useCallback((slot: PlanSlot, key: string) => {
+    const scoped = scopeKey(slot, key);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(scoped)) next.delete(scoped);
+      else next.add(scoped);
+      return next;
+    });
+  }, []);
+
+  const togglePlate = useCallback(
+    (slot: PlanSlot, slug: string, plateId: string) =>
+      toggleKey(slot, plateKey(slug, plateId)),
+    [toggleKey]
+  );
+
+  // Picks for this meal IN THE ACTIVE TAB only — clearing lunch butter
+  // chicken never touches a dinner butter chicken pick.
+  const mealPickKeys = useCallback(
+    (meal: CuratedMeal): string[] => {
+      if (!activeSlot) return [];
+      const exact = scopeKey(activeSlot, meal.slug);
+      const prefix = scopeKey(activeSlot, meal.slug + ':');
+      return Array.from(selected).filter(
+        (k) => k === exact || k.startsWith(prefix)
+      );
+    },
+    [selected, activeSlot]
+  );
+
+  // Tap toggles the MEAL. Empty → pick the hero plate (the one in the
+  // photo). Anything picked — one plate or five — → clear it all in one tap.
+  // Plate refinement lives behind the footer bar; the card is never the way
+  // you get stuck.
+  const onCardPress = useCallback(
+    (meal: CuratedMeal) => {
+      if (!activeSlot) return;
+      const keys = mealPickKeys(meal);
+      if (keys.length > 0) {
+        setSelected((prev) => {
+          const next = new Set(prev);
+          keys.forEach((k) => next.delete(k));
+          return next;
+        });
+      } else if (isMultiPlate(meal)) {
+        togglePlate(activeSlot, meal.slug, (meal.plates[0] as any).id);
+      } else {
+        toggleKey(activeSlot, meal.slug);
+      }
+    },
+    [activeSlot, mealPickKeys, togglePlate, toggleKey]
+  );
+
+  const applyQuickFilter = useCallback(
+    (meals: CuratedMeal[], qf: QuickFilter): CuratedMeal[] => {
+      if (qf === 'all') return meals;
+      if (qf === 'quick')
+        return meals.filter((m) => {
+          const t = (m as any).methods?.[0]?.time_total_minutes ?? 0;
+          return t > 0 && t <= 15;
+        });
+      if (qf === 'no_cook')
+        return meals.filter(
+          (m) => ((m as any).methods?.[0]?.time_total_minutes ?? 0) === 0
+        );
+      return meals.filter((m) => ((m as any).produces_servings ?? 1) > 1);
+    },
+    []
+  );
 
   const activeMeals = useMemo(() => {
     if (!activeTab) return [] as CuratedMeal[];
-    const slots =
-      activeTab.kind === 'core' ? SHELF_SLOTS[activeTab.shelf] : [activeTab.slot];
-    const baseMeals = mealsForSlots(slots, allMeals, emptyFilter(), 'default');
+    const baseMeals = mealsForSlots(slotsForTab(activeTab), allMeals, emptyFilter(), 'default');
     return applyQuickFilter(baseMeals, quickFilter);
-  }, [activeTab, allMeals, quickFilter]);
+  }, [activeTab, allMeals, quickFilter, applyQuickFilter]);
 
-  // Per-tab status (used only for the binary `picked > 0` tab dot now).
-  const tabStatuses = useMemo(
-    () => tabs.map((t) => ({ tab: t, ...statusForTab(t, allMeals, selected) })),
-    [tabs, allMeals, selected]
-  );
+  const unitsByTabId = useMemo(() => {
+    const map = new Map<string, PickUnit[]>();
+    for (const t of tabs) map.set(tabId(t), unitsForTab(t, allMeals, selected));
+    return map;
+  }, [tabs, allMeals, selected]);
 
-  // Recap lines for the confirm sheet (only slots with picks; one line each).
-  const recapLines = useMemo(
-    () => buildRecap(tabs, allMeals, selected),
-    [tabs, allMeals, selected]
-  );
+  const activeUnits = activeTab ? unitsByTabId.get(tabId(activeTab)) ?? [] : [];
+  const hasAnyPicks = [...unitsByTabId.values()].some((u) => u.length > 0);
 
-  // Tabs the user said they eat but hasn't picked anything for. The confirm
-  // sheet calls these out gently — "You'll skip lunch this week — sound right?"
-  // The user can still proceed (some people genuinely skip a meal), but the
-  // consequence is named before they commit.
-  const emptyTabs = useMemo(
-    () => tabStatuses.filter((s) => s.picked === 0).map((s) => s.tab),
-    [tabStatuses]
-  );
-
-  // Save is enabled as soon as the user has picked anything at all. There's no
-  // per-slot minimum; one pick is a complete answer.
-  const hasAnyPicks = recapLines.length > 0;
-
-  // Confirm-sheet visibility. Two pieces:
-  //  - `confirmOpen`: the logical "should this be shown" toggle.
-  //  - `confirmRendered`: whether the Modal is mounted right now. Lags
-  //    confirmOpen by the close animation so the sheet animates OUT before
-  //    being unmounted (RN's <Modal animationType="none"> unmounts instantly,
-  //    which would clip the fade).
-  //  - `confirmAnim`: 0 (closed) → 1 (open), driving both backdrop opacity
-  //    and sheet translateY independently.
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmRendered, setConfirmRendered] = useState(false);
-  const confirmAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (confirmOpen) {
-      setConfirmRendered(true);
-      // Next frame so the Modal mounts at 0 then animates to 1
-      requestAnimationFrame(() => {
-        // Spring open — same tension/friction as the detail sheet so both
-        // sheets feel like one family.
-        Animated.spring(confirmAnim, {
-          toValue: 1,
-          tension: 65,
-          friction: 11,
-          useNativeDriver: true,
-        }).start();
-      });
-    } else if (confirmRendered) {
-      Animated.spring(confirmAnim, {
-        toValue: 0,
-        tension: 90,
-        friction: 12,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) setConfirmRendered(false);
-      });
+  // Unscoped view of the ACTIVE tab's picks. MealCard, PlateSheet and the
+  // footer label consume plain keys and stay slot-agnostic — scoping lives
+  // entirely in this component's read/write layer.
+  const viewSelected = useMemo(() => {
+    const out = new Set<string>();
+    if (!activeSlot) return out;
+    const pre = activeSlot + '|';
+    for (const k of selected) {
+      if (k.startsWith(pre)) out.add(k.slice(pre.length));
     }
-    // confirmRendered intentionally omitted from deps — we drive it from here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirmOpen, confirmAnim]);
+    return out;
+  }, [selected, activeSlot]);
 
-  // Drive saveBarAnim from confirm sheet state. (Detail view is now a
-  // separate navigation screen, so it doesn't compete for the Save button's
-  // space — the whole screen is covered by the iOS sheet.)
+  // ---- targets + feasibility ----
+  // TODO(ryan): replace key-sniffing with the real MacroResults field names.
+  const targets = useMemo<Targets | null>(() => {
+    try {
+      const r: any = computeMacros(effectiveAnswers);
+      if (!r) return null;
+      const kcal = r.calories ?? r.targetCalories ?? r.kcal ?? r.dailyCalories;
+      const protein = r.protein ?? r.proteinTarget ?? r.protein_g ?? r.proteinGrams;
+      if (!kcal || !protein) return null;
+      return {
+        kcal,
+        protein_g: protein,
+        carbs_g: r.carbs ?? r.carbsTarget ?? r.carbs_g,
+        fat_g: r.fat ?? r.fatTarget ?? r.fat_g,
+        fiber_g: r.fiber ?? r.fiberTarget ?? r.fiber_g ?? Math.round((kcal * 14) / 1000),
+      };
+    } catch {
+      return null; // no targets → feasibility check silently skipped
+    }
+  }, [effectiveAnswers]);
+
+  const slotSpecs = useMemo<SlotSpec[]>(() => {
+    const snackPerDay =
+      snackFrequency === '2' ? 2
+      : snackFrequency === '3+' ? 3
+      : snackFrequency === 'ai_decide' ? (targets && targets.kcal >= 2800 ? 2 : 1)
+      : 1;
+    const dessertWeekly =
+      dessertFrequency === 'every_night' ? 7
+      : dessertFrequency === 'most_nights' ? 5
+      : dessertFrequency === 'few_per_week' ? 3
+      : dessertFrequency === 'once_per_week' ? 1
+      : dessertFrequency === 'ai_decide' ? 3
+      : 0;
+    return tabs.map((t) => {
+      const isSnacks = t.kind === 'core' && t.shelf === 'snacks';
+      const isDessert = t.kind === 'core' && t.shelf === 'dessert';
+      const isMain =
+        t.kind === 'core' && (t.shelf === 'lunch' || t.shelf === 'dinner');
+      return {
+        // tabSlot, not tabId: the engine matches scoped keys (`slot|key`)
+        // against SlotSpec.id, and CertifiedFix.slot round-trips through it.
+        id: tabSlot(t),
+        label: tabLabel(t),
+        mealSlots: slotsForTab(t),
+        perDay: isSnacks ? snackPerDay : 1,
+        weeklyOccurrences: isSnacks ? snackPerDay * 7 : isDessert ? dessertWeekly : 7,
+        borrowGroup: isMain ? ('main' as const) : undefined,
+      };
+    });
+  }, [tabs, snackFrequency, dessertFrequency, targets]);
+
+  const [verdict, setVerdict] = useState<BasketVerdict | null>(null);
+
+  // Assess when the sheet opens, and re-assess live while it's open (so a
+  // tapped fix card resolves the heads-up in place).
+  useEffect(() => {
+    if (!confirmOpen) return;
+    if (!targets) {
+      setVerdict(null);
+      return;
+    }
+    setVerdict(
+      assessBasket({
+        slots: slotSpecs,
+        selectedKeys: Array.from(selected),
+        allMeals,
+        targets,
+        allergies: effectiveAnswers.allergies,
+        avoid: loadedAvoid,
+      })
+    );
+  }, [confirmOpen, selected, slotSpecs, targets, allMeals, effectiveAnswers.allergies, loadedAvoid]);
+
+  const infeasible = !!verdict && !verdict.feasible;
+
   useEffect(() => {
     Animated.timing(saveBarAnim, {
-      toValue: confirmOpen ? 0 : 1,
-      duration: confirmOpen ? 180 : 240,
-      easing: confirmOpen ? Easing.in(Easing.cubic) : Easing.out(Easing.cubic),
+      toValue: confirmOpen || plateSheetSlug ? 0 : 1,
+      duration: confirmOpen || plateSheetSlug ? 180 : 240,
+      easing: confirmOpen || plateSheetSlug ? Easing.in(Easing.cubic) : Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [confirmOpen, saveBarAnim]);
+  }, [confirmOpen, plateSheetSlug, saveBarAnim]);
 
-  // ---- header collapse interpolations ----
+  // ---- header collapse ----
   const titleOpacity = scrollY.interpolate({
     inputRange: [0, TITLE_BLOCK_HEIGHT * 0.4, TITLE_BLOCK_HEIGHT],
     outputRange: [1, 0.3, 0],
@@ -1061,11 +1170,6 @@ export default function CuratedFavoritesScreen() {
   // ---- save flow ----
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
 
-  const splitList = (s: string): string[] =>
-    s.split(/[,\n]/).map((x) => x.trim()).filter((x) => x.length > 0);
-
-  // Save button just opens the confirm sheet — the real write happens after
-  // the user taps "Looks good".
   const openConfirm = useCallback(() => {
     if (!hasAnyPicks || saving) return;
     setConfirmOpen(true);
@@ -1075,11 +1179,21 @@ export default function CuratedFavoritesScreen() {
     if (saving) return;
     setSaving(true);
     try {
-      await saveCuratedFavorites({
-        slugs: Array.from(selected),
+      // Decompose scoped keys into slot picks. The storage layer derives the
+      // legacy base-slug mirror itself, so the live prompt builder keeps
+      // reading clean bare slugs until the builder rebuild ships.
+      const picks: SlotPick[] = Array.from(selected).map((scoped) => {
+        const { slot, key } = unscopeKey(scoped);
+        const ci = key.indexOf(':');
+        return ci === -1
+          ? { slot, slug: key }
+          : { slot, slug: key.slice(0, ci), plate_id: key.slice(ci + 1) };
+      });
+      await saveCuratedFavoritesV2({
+        picks,
         cuisines: loadedCuisines,
-        avoid: splitList(avoidText),
-        likedDishes: splitList(dishesText),
+        avoid: loadedAvoid,
+        likedDishes: loadedDishes,
       });
       setConfirmOpen(false);
       navigation.goBack();
@@ -1087,42 +1201,7 @@ export default function CuratedFavoritesScreen() {
       console.error('save curated favorites failed', e);
       setSaving(false);
     }
-  }, [saving, selected, loadedCuisines, avoidText, dishesText, navigation]);
-
-  // Subtitle confirms structure and lands the variety dial in one breath.
-  // Voice matches the confirm sheet — friendly, confident, the screen talking
-  // to the user rather than instructing them. Two parallel sentences:
-  //   "{N meals [and snacks]}. Pick one and you'll have it every day. Pick a
-  //    few and we'll rotate them for you."
-  // Prefix variants:
-  //   1 meal              → "One meal a day."
-  //   2+ meals, no snacks → "{N} meals a day."
-  //   3 + snacks          → "3 meals and snacks."     (no "a day" — reads
-  //                                                    cleaner with the
-  //                                                    "and snacks" tail)
-  const subtitleText = useMemo(() => {
-    const tail =
-      "Pick one and you'll have it every day. Pick a few and we'll rotate them for you.";
-
-    if (mealsPerDay == null) {
-      // No questionnaire context (standalone editor). Skip the count line and
-      // go straight to the rule.
-      return tail;
-    }
-
-    const hasSnacks = !!snackFrequency && snackFrequency !== '0';
-
-    let prefix: string;
-    if (mealsPerDay === 1) {
-      prefix = hasSnacks ? 'One meal and snacks.' : 'One meal a day.';
-    } else {
-      prefix = hasSnacks
-        ? `${mealsPerDay} meals and snacks.`
-        : `${mealsPerDay} meals a day.`;
-    }
-
-    return `${prefix} ${tail}`;
-  }, [mealsPerDay, snackFrequency]);
+  }, [saving, selected, loadedCuisines, loadedAvoid, loadedDishes, navigation]);
 
   // ---- render ----
 
@@ -1136,41 +1215,48 @@ export default function CuratedFavoritesScreen() {
     );
   }
 
-  const openMeal = activeMeals.find((m) => m.slug === openSlug) || null;
+  const plateSheetMeal = allMeals.find((m) => m.slug === plateSheetSlug) ?? null;
 
-  // Build the grid as rows of two, so the plate panel can be injected
-  // immediately under the row that contains the open meal (preserving the
-  // original "flip in place" behaviour).
   const rows: CuratedMeal[][] = [];
   for (let i = 0; i < activeMeals.length; i += 2) {
     rows.push(activeMeals.slice(i, i + 2));
   }
 
+  const sheetPaddingBottom = Math.max(insets.bottom, 14) + 10;
+
   return (
     <View style={styles.container}>
-      {/* ===== Fixed header layer (back chevron + collapsing title block + pinned tab bar) ===== */}
-      <View
-        style={[styles.headerLayer, { paddingTop: insets.top }]}
-        pointerEvents="box-none"
-      >
-        {/* Top row: back + selected count */}
+      {/* ===== Fixed header ===== */}
+      <View style={[styles.headerLayer, { paddingTop: insets.top }]} pointerEvents="box-none">
         <View style={styles.topRow}>
-          <TouchableOpacity
-            onPress={handleBack}
-            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <Ionicons name="chevron-back" size={26} color={themeColor} />
-          </TouchableOpacity>
-          {selected.size > 0 ? (
-            <Text style={styles.selectedCount}>{selected.size} selected</Text>
+          {fromQuestionnaire ? (
+            <View />
+          ) : (
+            <TouchableOpacity
+              onPress={handleBack}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <Ionicons name="chevron-back" size={26} color={themeColor} />
+            </TouchableOpacity>
+          )}
+          {fromQuestionnaire ? (
+            <TouchableOpacity
+              onPress={handleBack}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Choose for me. Skip picking and let the app choose your meals"
+            >
+              <Text style={[styles.skipText, { color: themeColor }]}>
+                Choose for me
+              </Text>
+            </TouchableOpacity>
           ) : (
             <View />
           )}
         </View>
 
-        {/* Collapsing title block */}
         <Animated.View
           style={{
             opacity: titleOpacity,
@@ -1181,11 +1267,14 @@ export default function CuratedFavoritesScreen() {
         >
           <View style={styles.titleBlock}>
             <Text style={styles.title}>Foods you like</Text>
-            <Text style={styles.subtitle}>{subtitleText}</Text>
+            <Text style={styles.subtitle}>
+              {fromQuestionnaire
+                ? "Last step — pick what you'll eat this week."
+                : "Pick what you'll eat this week."}
+            </Text>
           </View>
         </Animated.View>
 
-        {/* Pinned tab strip */}
         <View style={styles.tabBar}>
           <ScrollView
             horizontal
@@ -1193,46 +1282,41 @@ export default function CuratedFavoritesScreen() {
             contentContainerStyle={styles.tabBarContent}
             keyboardShouldPersistTaps="handled"
           >
-            {tabStatuses.map(({ tab, picked }) => {
+            {tabs.map((tab) => {
               const id = tabId(tab);
               const active = id === activeTabId;
-              const hasPicks = picked > 0;
-              const dotColor = hasPicks ? themeColor : '#3f3f46';
+              const hasPicks = (unitsByTabId.get(id) ?? []).length > 0;
               return (
                 <TouchableOpacity
                   key={id}
                   activeOpacity={0.75}
                   onPress={() => {
                     setActiveTabId(id);
-                    setOpenSlug(null);
+                    setPlateSheetSlug(null);
                     scrollViewRef.current?.scrollTo({ y: 0, animated: false });
                   }}
                   style={styles.tabBtn}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
-                  accessibilityLabel={`${tabLabel(tab)}${
-                    hasPicks ? ', has picks' : ''
-                  }`}
+                  accessibilityLabel={`${tabLabel(tab)}${hasPicks ? ', has picks' : ''}`}
                 >
                   <View
                     style={[
                       styles.tabInner,
-                      active && {
-                        borderBottomColor: themeColor,
-                        borderBottomWidth: 2,
-                      },
+                      active && { borderBottomColor: themeColor, borderBottomWidth: 2 },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.tabLabel,
-                        active && styles.tabLabelActive,
-                      ]}
-                    >
+                    <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
                       {tabLabel(tab)}
                     </Text>
+                    {/* Ring (empty) vs filled (has picks): shape + colour. */}
                     <View
-                      style={[styles.tabDot, { backgroundColor: dotColor }]}
+                      style={[
+                        styles.tabDot,
+                        hasPicks
+                          ? { backgroundColor: themeColor, borderColor: themeColor }
+                          : { backgroundColor: 'transparent', borderColor: '#3f3f46' },
+                      ]}
                     />
                   </View>
                 </TouchableOpacity>
@@ -1246,19 +1330,17 @@ export default function CuratedFavoritesScreen() {
       <Animated.ScrollView
         ref={scrollViewRef as any}
         contentContainerStyle={{
-          paddingTop:
-            insets.top + 44 /* top row */ + TITLE_BLOCK_HEIGHT + TAB_BAR_HEIGHT,
-          paddingBottom: 180,
+          paddingTop: insets.top + 44 + TITLE_BLOCK_HEIGHT + TAB_BAR_HEIGHT,
+          paddingBottom: 200 + STRIP_HEIGHT,
         }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Quick filter row — single horizontal scroll, no caps, no equipment matrix. */}
+        {/* Filter chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -1270,7 +1352,7 @@ export default function CuratedFavoritesScreen() {
               { key: 'all', label: 'All' },
               { key: 'quick', label: 'Quick' },
               { key: 'no_cook', label: 'No-cook' },
-              { key: 'oven', label: 'Oven' },
+              { key: 'batch', label: 'Big batch' },
             ] as { key: QuickFilter; label: string }[]
           ).map((opt) => {
             const on = quickFilter === opt.key;
@@ -1279,16 +1361,9 @@ export default function CuratedFavoritesScreen() {
                 key={opt.key}
                 activeOpacity={0.75}
                 onPress={() => setQuickFilter(opt.key)}
-                style={[
-                  styles.chip,
-                  on && [styles.chipActive, { backgroundColor: '#fafafa' }],
-                ]}
+                style={[styles.chip, on && [styles.chipActive, { backgroundColor: '#fafafa' }]]}
               >
-                <Text
-                  style={[styles.chipText, on && styles.chipTextActive]}
-                >
-                  {opt.label}
-                </Text>
+                <Text style={[styles.chipText, on && styles.chipTextActive]}>{opt.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -1297,120 +1372,36 @@ export default function CuratedFavoritesScreen() {
         {/* Grid */}
         {activeMeals.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons
-              name="restaurant-outline"
-              size={28}
-              color="#3f3f46"
-            />
-            <Text style={styles.emptyStateText}>
-              No matches with this filter.
-            </Text>
-            <TouchableOpacity
-              onPress={() => setQuickFilter('all')}
-              style={styles.emptyStateAction}
-            >
-              <Text style={[styles.emptyStateActionText, { color: themeColor }]}>
-                Clear filter
-              </Text>
+            <Ionicons name="restaurant-outline" size={28} color="#3f3f46" />
+            <Text style={styles.emptyStateText}>No matches with this filter.</Text>
+            <TouchableOpacity onPress={() => setQuickFilter('all')} style={styles.emptyStateAction}>
+              <Text style={[styles.emptyStateActionText, { color: themeColor }]}>Clear filter</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.grid}>
-            {rows.map((pair, ri) => {
-              const openInRow = pair.find((m) => m.slug === openSlug);
-              return (
-                <View key={`r${ri}`}>
-                  <View style={styles.gridRow}>
-                    {pair.map((m) => (
-                      <MealCard
-                        key={m.slug}
-                        meal={m}
-                        width={CARD_WIDTH}
-                        selected={selected}
-                        isOpen={openSlug === m.slug}
-                        themeColor={themeColor}
-                        onPress={() => onCardPress(m)}
-                        onInfoPress={() => {
-                          setOpenSlug(null); // collapse any inline plate panel
-                          // Navigate to MealDetail — registered on the stack
-                          // with presentation: 'formSheet', so iOS renders it
-                          // as a native sheet with real UIKit physics.
-                          navigation.navigate('MealDetail', { slug: m.slug });
-                        }}
-                      />
-                    ))}
-                    {pair.length === 1 && <View style={{ width: CARD_WIDTH }} />}
-                  </View>
-                  {openInRow && (
-                    <PlatePanel
-                      meal={openInRow}
-                      selected={selected}
-                      themeColor={themeColor}
-                      onClose={() => setOpenSlug(null)}
-                      onTogglePlate={togglePlate}
-                    />
-                  )}
-                </View>
-              );
-            })}
+            {rows.map((pair, ri) => (
+              <View key={`r${ri}`} style={styles.gridRow}>
+                {pair.map((m) => (
+                  <MealCard
+                    key={m.slug}
+                    meal={m}
+                    width={CARD_WIDTH}
+                    selected={viewSelected}
+                    themeColor={themeColor}
+                    onPress={() => onCardPress(m)}
+                    onWaysPress={() => setPlateSheetSlug(m.slug)}
+                    onInfoPress={() => navigation.navigate('MealDetail', { slug: m.slug })}
+                  />
+                ))}
+                {pair.length === 1 && <View style={{ width: CARD_WIDTH }} />}
+              </View>
+            ))}
           </View>
         )}
-
-        {/* Taste-profile entry — tucked at the very bottom, behind a quiet expand. */}
-        <View style={styles.tasteSection}>
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => setShowTasteSheet((v) => !v)}
-            style={styles.tasteToggle}
-          >
-            <Text style={styles.tasteToggleText}>
-              Other meals you love · foods to avoid
-            </Text>
-            <Ionicons
-              name={showTasteSheet ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color="#71717a"
-            />
-          </TouchableOpacity>
-
-          {showTasteSheet && (
-            <View style={styles.tasteSheet}>
-              <Text style={styles.tasteFieldLabel}>Other meals you love</Text>
-              <Text style={styles.tasteHint}>
-                Anything not in the library — just name the dish. Separate with
-                commas.
-              </Text>
-              <TextInput
-                style={styles.tasteInput}
-                value={dishesText}
-                onChangeText={setDishesText}
-                placeholder="butter chicken, fried rice, lasagne…"
-                placeholderTextColor="#52525b"
-                multiline
-              />
-              <Text style={[styles.tasteFieldLabel, { marginTop: 22 }]}>
-                Anything to avoid?
-              </Text>
-              <Text style={styles.tasteHint}>
-                Foods you would rather not see.
-              </Text>
-              <TextInput
-                style={styles.tasteInput}
-                value={avoidText}
-                onChangeText={setAvoidText}
-                placeholder="mushrooms, blue cheese, olives…"
-                placeholderTextColor="#52525b"
-                multiline
-              />
-            </View>
-          )}
-        </View>
       </Animated.ScrollView>
 
-      {/* ===== Bottom CTA — single-state. Live whenever there's any pick. =====
-          Wrapped in Animated.View so it fades/slides out of the way when the
-          detail sheet opens (otherwise it sits visibly behind the sheet on
-          iOS, since the Modal doesn't cover absolutely-positioned siblings). */}
+      {/* ===== Footer: WeekStrip + Save ===== */}
       <Animated.View
         style={[
           styles.footer,
@@ -1419,133 +1410,171 @@ export default function CuratedFavoritesScreen() {
             opacity: saveBarAnim,
             transform: [
               {
-                translateY: saveBarAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [40, 0], // slides down a touch as it fades
-                }),
+                translateY: saveBarAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }),
               },
             ],
           },
         ]}
-        pointerEvents={confirmOpen ? 'none' : 'box-none'}
+        pointerEvents={confirmOpen || plateSheetSlug ? 'none' : 'box-none'}
       >
+        {activeTab && (
+          <View style={styles.stripBlock}>
+            <WeekStrip
+              tab={activeTab}
+              units={activeUnits}
+              dessertFrequency={dessertFrequency}
+              themeColor={themeColor}
+            />
+          </View>
+        )}
         <TouchableOpacity
           activeOpacity={0.85}
           disabled={!hasAnyPicks || saving}
           onPress={openConfirm}
-          style={[
-            styles.saveBtn,
-            hasAnyPicks
-              ? { backgroundColor: themeColor }
-              : styles.saveBtnBlocked,
-          ]}
+          style={[styles.saveBtn, hasAnyPicks ? { backgroundColor: themeColor } : styles.saveBtnBlocked]}
           accessibilityRole="button"
           accessibilityState={{ disabled: !hasAnyPicks }}
           accessibilityLabel="Save"
         >
-          <Text
-            style={hasAnyPicks ? styles.saveBtnText : styles.saveBtnBlockedText}
-          >
-            Save
-          </Text>
+          <Text style={hasAnyPicks ? styles.saveBtnText : styles.saveBtnBlockedText}>Save</Text>
         </TouchableOpacity>
       </Animated.View>
 
-      {/* ===== Confirm sheet — reads the user's week back to them ===== */}
-      {/* animationType="none" because we drive backdrop fade and sheet slide
-          independently via confirmAnim — RN's built-in slide animates the
-          backdrop along with the sheet, which looks janky. */}
-      <Modal
-        visible={confirmRendered}
-        transparent
-        animationType="none"
-        onRequestClose={() => !saving && setConfirmOpen(false)}
+      {/* ===== Plate sheet ===== */}
+      <PlateSheet
+        meal={plateSheetMeal}
+        selected={viewSelected}
+        themeColor={themeColor}
+        open={!!plateSheetSlug}
+        onClose={() => setPlateSheetSlug(null)}
+        onTogglePlate={(slug, plateId) => {
+          if (activeSlot) togglePlate(activeSlot, slug, plateId);
+        }}
+        paddingBottom={sheetPaddingBottom}
+      />
+
+      {/* ===== Confirm sheet ===== */}
+      <BottomSheet
+        open={confirmOpen}
+        onClose={() => !saving && setConfirmOpen(false)}
+        paddingBottom={sheetPaddingBottom}
       >
-        {/* Backdrop: fades in/out via opacity */}
-        <Animated.View
-          style={[
-            styles.sheetBackdrop,
-            {
-              opacity: confirmAnim,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => !saving && setConfirmOpen(false)}
-            accessibilityLabel="Dismiss"
-            accessibilityRole="button"
-          />
-        </Animated.View>
+        <Text style={styles.sheetTitle}>Your week, then.</Text>
 
-        {/* Sheet: slides up from bottom via translateY */}
-        <Animated.View
-          style={[
-            styles.sheetWrap,
-            {
-              transform: [
-                {
-                  translateY: confirmAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [600, 0], // off-screen → resting
-                  }),
-                },
-              ],
-            },
-          ]}
-          pointerEvents="box-none"
-        >
-          <View
-            style={[
-              styles.sheet,
-              { paddingBottom: Math.max(insets.bottom, 14) + 10 },
-            ]}
-          >
-            <View style={styles.sheetGrabber} />
-            <Text style={styles.sheetTitle}>Your week, then.</Text>
-
-            <View style={styles.sheetRecap}>
-              {recapLines.map((line, i) => (
-                <View key={`${line.label}-${i}`} style={styles.recapRow}>
-                  <Text style={styles.recapLabel}>{line.label}</Text>
-                  <Text style={styles.recapSentence}>{line.sentence}</Text>
+        <View style={styles.sheetRecap}>
+          {tabs.map((tab) => {
+            const units = unitsByTabId.get(tabId(tab)) ?? [];
+            const rhythm = tabRhythm(tab, dessertFrequency);
+            const mini =
+              rhythm === 'daily'
+                ? Array.from({ length: 7 }).map((_, i) =>
+                    units.length ? units[i % units.length] : null
+                  )
+                : units.length
+                ? units.slice(0, 5)
+                : [null, null, null];
+            return (
+              <View key={tabId(tab)} style={styles.recapRow}>
+                <Text style={styles.recapLabel}>{tabLabel(tab)}</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={[styles.miniDots, rhythm === 'mix' && { gap: 0 }]}>
+                    {mini.map((u, i) => {
+                      const img = u ? getMealImage(u.imageFilename) : null;
+                      return (
+                        <View
+                          key={i}
+                          style={[
+                            styles.miniDot,
+                            rhythm === 'mix' && i > 0 && { marginLeft: -5 },
+                            u
+                              ? { borderStyle: 'solid', borderColor: '#26262b', backgroundColor: '#1c1c1f', overflow: 'hidden' }
+                              : { borderStyle: 'dashed', borderColor: '#3f3f46' },
+                          ]}
+                        >
+                          {u && img ? (
+                            <Image source={img} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.recapSentence}>
+                    {slotSentence(tab, units, dessertFrequency, true)}
+                  </Text>
                 </View>
-              ))}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Heads-up — only on hard infeasibility. Same row grammar, slightly
+            brighter text, no icon, no red, never blocks. */}
+        {infeasible && verdict && (
+          <>
+            <View style={styles.headsUpRow}>
+              <Text style={styles.recapLabel}>Heads-up</Text>
+              <Text style={styles.headsUpText}>{headsUpSentence(verdict)}</Text>
             </View>
-
-            {emptyTabs.length > 0 && (
-              <Text style={styles.skipNote}>{buildSkipSentence(emptyTabs)}</Text>
+            {verdict.fixes.length > 0 && (
+              <View style={styles.fixRow}>
+                {verdict.fixes.map((fix: CertifiedFix) => {
+                  const img = getMealImage(fix.imageFilename);
+                  return (
+                    <TouchableOpacity
+                      key={`${fix.slug}:${fix.plateId}`}
+                      style={styles.fixCard}
+                      activeOpacity={0.8}
+                      onPress={() => togglePlate(fix.slot as PlanSlot, fix.slug, fix.plateId)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add ${fix.name} to ${fix.slotLabel}`}
+                    >
+                      <View style={styles.fixThumbWrap}>
+                        {img ? (
+                          <Image source={img} style={styles.fixThumb} contentFit="cover" />
+                        ) : (
+                          <View style={[styles.fixThumb, styles.cardImagePlaceholder]}>
+                            <Ionicons name="restaurant-outline" size={16} color="#52525b" />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.fixName} numberOfLines={2}>
+                        {fix.name}
+                      </Text>
+                      <Text style={styles.fixSlot}>{fix.slotLabel}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             )}
+          </>
+        )}
 
-            <TouchableOpacity
-              activeOpacity={0.88}
-              disabled={saving}
-              onPress={handleConfirm}
-              style={[styles.confirmBtn, { backgroundColor: themeColor }]}
-              accessibilityRole="button"
-              accessibilityLabel="Looks good, confirm"
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color="#0a0a0b" />
-              ) : (
-                <Text style={styles.confirmBtnText}>Looks good</Text>
-              )}
-            </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.88}
+          disabled={saving}
+          onPress={handleConfirm}
+          style={[styles.confirmBtn, { backgroundColor: themeColor }]}
+          accessibilityRole="button"
+          accessibilityLabel={infeasible ? 'Save anyway' : 'Looks good, confirm'}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#0a0a0b" />
+          ) : (
+            <Text style={styles.confirmBtnText}>{infeasible ? 'Save anyway' : 'Looks good'}</Text>
+          )}
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.75}
-              disabled={saving}
-              onPress={() => setConfirmOpen(false)}
-              style={styles.editBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Keep editing"
-            >
-              <Text style={styles.editBtnText}>Keep editing</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </Modal>
+        <TouchableOpacity
+          activeOpacity={0.75}
+          disabled={saving}
+          onPress={() => setConfirmOpen(false)}
+          style={styles.editBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Keep editing"
+        >
+          <Text style={styles.editBtnText}>Keep editing</Text>
+        </TouchableOpacity>
+      </BottomSheet>
     </View>
   );
 }
@@ -1558,7 +1587,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0b' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Fixed header layer sits above the scroll view.
   headerLayer: {
     position: 'absolute',
     left: 0,
@@ -1574,26 +1602,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  selectedCount: {
-    fontSize: 13,
-    color: '#52525b',
-    fontWeight: '500',
-  },
+  skipText: { fontSize: 14, fontWeight: '500', letterSpacing: -0.1 },
 
-  // Title block (collapses on scroll)
   titleBlock: {
     paddingHorizontal: GRID_H_PADDING,
     paddingTop: 6,
     paddingBottom: 12,
   },
   title: {
-    // The reference uses a confident serif. Falls back gracefully on devices
-    // without it. (Wire in your custom font here if you ship one.)
-    fontFamily: Platform.select({
-      ios: 'Georgia',
-      android: 'serif',
-      default: 'Georgia',
-    }),
+    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' }),
     fontSize: 32,
     fontWeight: '400',
     color: '#ffffff',
@@ -1607,7 +1624,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Tab strip — pinned
   tabBar: {
     height: TAB_BAR_HEIGHT,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -1628,16 +1644,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  tabLabel: {
-    fontSize: 14,
-    color: '#71717a',
-    fontWeight: '500',
-    letterSpacing: -0.1,
-  },
+  tabLabel: { fontSize: 14, color: '#71717a', fontWeight: '500', letterSpacing: -0.1 },
   tabLabelActive: { color: '#ffffff', fontWeight: '600' },
-  tabDot: { width: 6, height: 6, borderRadius: 3 },
+  tabDot: { width: 7, height: 7, borderRadius: 3.5, borderWidth: 1.5 },
 
-  // Quick filter row
   filterRow: {
     paddingHorizontal: GRID_H_PADDING,
     paddingTop: 16,
@@ -1656,36 +1666,24 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: '#d4d4d8', fontWeight: '500' },
   chipTextActive: { color: '#0a0a0b', fontWeight: '600' },
 
-  // Grid
   grid: { paddingHorizontal: GRID_H_PADDING },
-  gridRow: {
-    flexDirection: 'row',
-    gap: GRID_GAP,
-    marginBottom: GRID_GAP,
-  },
+  gridRow: { flexDirection: 'row', gap: GRID_GAP, marginBottom: GRID_GAP },
 
-  // Card — photo poster
   card: {
+    height: CARD_HEIGHT,
     borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: '#16161a',
-    // The card is now a plain View hosting the tap surface + the ⓘ as
-    // siblings. `overflow:hidden` ensures the image inside the touchable
-    // still clips to the rounded corners.
     position: 'relative',
+    flexDirection: 'column',
   },
-  // Full-bleed touchable that handles "select / open plate panel" — sibling
-  // of the ⓘ button so the two never compete for the same gesture handler.
-  cardTapArea: {
-    width: '100%',
-  },
+  cardTapArea: { width: '100%' },
   cardImageWrap: {
     width: '100%',
-    aspectRatio: 3 / 4,
     backgroundColor: '#0a0a0b',
     position: 'relative',
   },
-  cardImage: { width: '100%', height: 150, backgroundColor: 'orange' },
+  cardImage: { width: '100%', height: '100%' },
   cardImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1707,16 +1705,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeCount: { fontSize: 12, fontWeight: '700', color: '#0a0a0b' },
-  waysTag: {
-    position: 'absolute',
-    left: 11,
-    bottom: 44,
-    backgroundColor: 'rgba(10,10,11,0.72)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+  cardFooter: {
+    height: FOOTER_HEIGHT,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#26262b',
+    backgroundColor: '#1c1c20',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
   },
-  waysTagText: { fontSize: 10, color: '#e4e4e7', fontWeight: '600' },
+  footLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#e4e4e7',
+    flexShrink: 1,
+    marginRight: 6,
+  },
   cardTitle: {
     position: 'absolute',
     left: 12,
@@ -1727,14 +1732,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.2,
     lineHeight: 19,
-    // Soft drop-shadow so the title stays legible over bright food (mango,
-    // strawberry, etc.) without dimming the image itself.
     textShadowColor: 'rgba(0,0,0,0.75)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
+  infoBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(10,10,11,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
 
-  // Empty state for an over-aggressive filter
   emptyState: {
     paddingVertical: 60,
     paddingHorizontal: GRID_H_PADDING,
@@ -1745,202 +1760,39 @@ const styles = StyleSheet.create({
   emptyStateAction: { paddingVertical: 8, paddingHorizontal: 16 },
   emptyStateActionText: { fontSize: 13, fontWeight: '600' },
 
-  // ===== Plate panel =====
-  platePanel: {
-    backgroundColor: '#101012',
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: GRID_GAP,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#1f1f23',
-  },
-  platePanelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  platePanelTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    letterSpacing: -0.2,
-  },
-  heroWrap: {
-    width: '100%',
-    aspectRatio: 16 / 10,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#0a0a0b',
-    marginBottom: 12,
-  },
-  panelMacroStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#1f1f23',
-    marginBottom: 14,
-  },
-  panelMacroCell: { flex: 1, alignItems: 'center' },
-  panelMacroDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 24,
-    backgroundColor: '#1f1f23',
-  },
-  panelMacroLabel: {
-    fontSize: 9,
-    color: '#71717a',
-    letterSpacing: 0.6,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  panelMacroValue: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: '600',
-    letterSpacing: -0.3,
-  },
-  panelMacroUnit: { fontSize: 11, color: '#a1a1aa', fontWeight: '500' },
-  eatLabel: {
-    fontSize: 10,
-    letterSpacing: 0.5,
-    color: '#71717a',
-    textTransform: 'uppercase',
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  plateScrollContent: { gap: GRID_GAP, paddingRight: 4 },
-  plateCard: {
-    width: 140,
-    backgroundColor: '#18181b',
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-  },
-  plateImageWrap: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#0a0a0b',
-    position: 'relative',
-  },
-  plateBody: { padding: 10 },
-  plateTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
-    lineHeight: 15,
-    letterSpacing: -0.2,
-    minHeight: 30,
-  },
-  plateMeta: { fontSize: 10, color: '#71717a', marginTop: 3 },
-  stuntTag: {
-    position: 'absolute',
-    left: 7,
-    bottom: 7,
-    backgroundColor: 'rgba(212,83,126,0.92)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  stuntTagText: { fontSize: 9, color: '#0a0a0b', fontWeight: '700' },
-
-  // ===== Taste profile (collapsed by default) =====
-  tasteSection: {
-    paddingHorizontal: GRID_H_PADDING,
-    paddingTop: 28,
-  },
-  tasteToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#1f1f23',
-  },
-  tasteToggleText: {
-    fontSize: 13,
-    color: '#a1a1aa',
-    fontWeight: '500',
-  },
-  tasteSheet: { paddingTop: 8, paddingBottom: 8 },
-  tasteFieldLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
-    letterSpacing: -0.1,
-    marginBottom: 3,
-  },
-  tasteHint: {
-    fontSize: 12,
-    color: '#71717a',
-    lineHeight: 17,
-    marginBottom: 10,
-  },
-  tasteInput: {
-    backgroundColor: '#131316',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#ffffff',
-    minHeight: 48,
-    textAlignVertical: 'top',
-  },
-
-  // ===== Bottom CTA =====
+  // ===== Footer: strip + Save =====
   footer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     paddingHorizontal: GRID_H_PADDING,
-    paddingTop: 14,
+    paddingTop: 12,
+    backgroundColor: '#0c0c0f',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#1f1f23',
   },
-  saveBtn: {
-    height: 54,
-    borderRadius: 16,
+  stripBlock: { marginBottom: 12, minHeight: STRIP_HEIGHT - 24 },
+  stripDots: { flexDirection: 'row', gap: 6, marginBottom: 8 },
+  stripDot: {
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  stripLine: { fontSize: 13, color: '#d4d4d8', lineHeight: 18 },
+
+  saveBtn: { height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   saveBtnBlocked: {
     backgroundColor: '#16161a',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
   },
   saveBtnText: { fontSize: 16, fontWeight: '600', color: '#0a0a0b' },
-  saveBtnBlockedText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#a1a1aa',
-    letterSpacing: -0.1,
-  },
+  saveBtnBlockedText: { fontSize: 14, fontWeight: '500', color: '#a1a1aa', letterSpacing: -0.1 },
 
-  // ===== Confirm sheet =====
-  // Bottom-anchored modal: dim backdrop, rounded top, mirrors the dark calm
-  // of the rest of the screen. Headline → divider → recap rows → primary →
-  // secondary. No subhead — the headline carries warmth, the recap carries
-  // information; anything between them is noise.
-  //
-  // Animation: backdrop fades in via opacity, sheet slides up via translateY,
-  // driven independently from confirmAnim. Modal itself uses animationType
-  // "none" — the built-in slide animates both layers as one, which makes the
-  // backdrop slide up with the sheet (looks broken).
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  sheetWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
+  // ===== Sheets (shared shell) =====
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheetWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   sheet: {
     backgroundColor: '#0d0d10',
     borderTopLeftRadius: 24,
@@ -1959,55 +1811,91 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   sheetTitle: {
-    fontFamily: Platform.select({
-      ios: 'Georgia',
-      android: 'serif',
-      default: 'Georgia',
-    }),
+    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' }),
     fontSize: 28,
     fontWeight: '400',
     color: '#ffffff',
     letterSpacing: -0.5,
     lineHeight: 32,
-    marginBottom: 18,
+    marginBottom: 14,
   },
+
+  // ===== Plate sheet =====
+  plateSheetSub: { fontSize: 13, color: '#8b8b94', lineHeight: 18, marginBottom: 14 },
+  plateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#1c1c1f',
+  },
+  plateThumbWrap: { width: 56, height: 56, borderRadius: 12, overflow: 'hidden' },
+  plateThumb: { width: '100%', height: '100%' },
+  plateRowBody: { flex: 1 },
+  plateRowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  plateRowName: { fontSize: 14, fontWeight: '600', color: '#ffffff', letterSpacing: -0.2, flexShrink: 1 },
+  plateRowMeta: { fontSize: 12, color: '#8b8b94', marginTop: 3 },
+  treatPill: {
+    backgroundColor: 'rgba(212,83,126,0.92)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  treatPillText: { fontSize: 9, color: '#0a0a0b', fontWeight: '700' },
+  heroPill: {
+    backgroundColor: '#1f1f23',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  heroPillText: { fontSize: 9, color: '#a1a1aa', fontWeight: '600' },
+  plateRowCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ===== Confirm sheet =====
   sheetRecap: {
-    paddingVertical: 18,
+    paddingVertical: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: '#1f1f23',
-    marginBottom: 18,
-    gap: 14,
+    marginBottom: 14,
+    gap: 13,
   },
-  recapRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 12,
-  },
+  recapRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   recapLabel: {
-    width: 78,
-    fontSize: 10,
-    color: '#52525b',
-    letterSpacing: 0.7,
-    fontWeight: '700',
+    width: 72,
+    fontSize: 11,
+    color: '#6b6b74',
+    fontWeight: '600',
+    paddingTop: 2,
   },
-  recapSentence: {
+  miniDots: { flexDirection: 'row', gap: 3, marginBottom: 4 },
+  miniDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1 },
+  recapSentence: { fontSize: 13.5, color: '#e4e4e7', lineHeight: 19, letterSpacing: -0.1 },
+
+  headsUpRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  headsUpText: { flex: 1, fontSize: 13.5, color: '#f4f4f5', lineHeight: 19.5, letterSpacing: -0.1 },
+  fixRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  fixCard: {
     flex: 1,
-    fontSize: 14,
-    color: '#e4e4e7',
-    lineHeight: 20,
-    letterSpacing: -0.1,
+    backgroundColor: '#16161a',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#2a2a2e',
+    borderRadius: 12,
+    padding: 10,
   },
-  // Soft check-in line when the user has empty slots. Dimmer than the recap
-  // rows above; phrased as a question, not a warning. Lives between the recap
-  // block and the primary action.
-  skipNote: {
-    fontSize: 13,
-    color: '#a1a1aa',
-    lineHeight: 19,
-    letterSpacing: -0.1,
-    marginBottom: 18,
-  },
+  fixThumbWrap: { width: '100%', aspectRatio: 1.6, borderRadius: 8, overflow: 'hidden', marginBottom: 7 },
+  fixThumb: { width: '100%', height: '100%' },
+  fixName: { fontSize: 12, fontWeight: '600', color: '#ffffff', lineHeight: 15, letterSpacing: -0.2 },
+  fixSlot: { fontSize: 11, color: '#8b8b94', marginTop: 3 },
+
   confirmBtn: {
     height: 54,
     borderRadius: 16,
@@ -2016,35 +1904,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   confirmBtnText: { fontSize: 16, fontWeight: '600', color: '#0a0a0b' },
-  editBtn: {
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editBtnText: {
-    fontSize: 14,
-    color: '#a1a1aa',
-    fontWeight: '500',
-    letterSpacing: -0.1,
-  },
-
-  // ===== Info button on card (top-left) =====
-  // The Ionicons `information-circle-outline` glyph is itself a circle, so the
-  // badge here is just a small dark backdrop for legibility on bright food
-  // (mango, strawberry). Tap target is expanded via hitSlop in the JSX.
-  // zIndex/elevation guarantee it sits above the sibling cardTapArea.
-  infoBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(10,10,11,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    elevation: 10,
-  },
-
+  editBtn: { height: 46, alignItems: 'center', justifyContent: 'center' },
+  editBtnText: { fontSize: 14, color: '#a1a1aa', fontWeight: '500', letterSpacing: -0.1 },
 });

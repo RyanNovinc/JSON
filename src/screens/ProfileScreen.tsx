@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
@@ -31,16 +31,17 @@ const APP_STORE_URL_IOS = 'https://apps.apple.com/au/app/json-09d4ce/id675835783
  * ProfileScreen — the user-level utility hub.
  *
  * What lives here:
+ *  - Training stats strip (sessions this week / this month / all time,
+ *    computed from WorkoutStorage.loadWorkoutHistory — same source as the
+ *    home screen's week strip; hidden until the first logged workout)
  *  - Weight tracker quick access
  *  - App preferences (theme, weight units)
- *  - Subscription status (read-only for v1; upgrade/manage come later)
- *  - About: feedback, privacy, terms, rate the app
- *  - Developer tools (only shown in __DEV__): debug, reset onboarding, clear data
+ *  - About: feedback, rate, json.fit website, privacy, terms
+ *  - Developer tools (only shown in __DEV__): reset onboarding, clear data
  *  - App version footer
  *
  * What doesn't live here yet (because there's no user-accounts system):
  *  - Account / sign-in
- *  - Personal stats / streaks / total workouts
  *  - Avatar, name, etc.
  *
  * Things this screen REPLACES from elsewhere in the app:
@@ -59,6 +60,59 @@ export default function ProfileScreen() {
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
+
+  // ===== Training stats — sessions this week / this month / all time.
+  // Parses history entries exactly like HomeScreen.loadWeekHistory does
+  // (timestamp first, then 'YYYY-MM-DD' date strings). Monday week start.
+  // Any failure or an empty history simply hides the strip.
+  const [trainingStats, setTrainingStats] = useState<{
+    week: number;
+    month: number;
+    total: number;
+  } | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const history = await WorkoutStorage.loadWorkoutHistory();
+          if (!Array.isArray(history) || history.length === 0) {
+            if (!cancelled) setTrainingStats(null);
+            return;
+          }
+          const now = new Date();
+          const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+          let week = 0;
+          let month = 0;
+          let total = 0;
+          history.forEach((workout: any) => {
+            let d: Date | null = null;
+            if (workout.timestamp) {
+              d = new Date(workout.timestamp);
+            } else if (workout.date) {
+              const [y, m, dd] = String(workout.date).split('-');
+              d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(dd, 10));
+            }
+            if (!d || isNaN(d.getTime())) return;
+            total += 1;
+            if (d >= monthStart) month += 1;
+            if (d >= weekStart) week += 1;
+          });
+
+          if (!cancelled) setTrainingStats(total > 0 ? { week, month, total } : null);
+        } catch (error) {
+          if (!cancelled) setTrainingStats(null);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   // ===== Handlers =====
   const openWeightTracker = () => {
@@ -137,9 +191,43 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ============================================================
+            TRAINING STATS — sessions this week / this month / all time.
+            Same mini-stat grid language as the Library cards. Hidden
+            until the user has logged at least one workout.
+            ============================================================ */}
+        {trainingStats && (
+          <View style={styles.statsStrip}>
+            <Text style={styles.statsStripLabel}>TRAINING</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statsCell}>
+                <Text style={[styles.statsValue, { color: themeColor }]}>
+                  {trainingStats.week}
+                </Text>
+                <Text style={styles.statsCellLabel}>this week</Text>
+              </View>
+              <View style={styles.statsDivider} />
+              <View style={styles.statsCell}>
+                <Text style={[styles.statsValue, { color: themeColor }]}>
+                  {trainingStats.month}
+                </Text>
+                <Text style={styles.statsCellLabel}>this month</Text>
+              </View>
+              <View style={styles.statsDivider} />
+              <View style={styles.statsCell}>
+                <Text style={[styles.statsValue, { color: themeColor }]}>
+                  {trainingStats.total.toLocaleString()}
+                </Text>
+                <Text style={styles.statsCellLabel}>all time</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ============================================================
             WEIGHT TRACKER — hero link at top.
             Weight is user-level data (not just nutrition), so this is
-            where it belongs long-term.
+            where it belongs long-term. Styled to match the home-screen
+            hero language: black surface, 1.5px themed border + glow.
             ============================================================ */}
         <TouchableOpacity
           style={[styles.heroLink, { borderColor: themeColor, shadowColor: themeColor }]}
@@ -239,6 +327,23 @@ export default function ProfileScreen() {
           <View style={styles.rowText}>
             <Text style={styles.rowTitle}>Rate JSON.fit</Text>
             <Text style={styles.rowSub}>Leave a review on the App Store</Text>
+          </View>
+          <Ionicons name="open-outline" size={14} color="#71717a" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => openExternalUrl('https://json.fit')}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Visit json.fit website"
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="globe-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Visit json.fit</Text>
+            <Text style={styles.rowSub}>Programs, recipes, and the blog</Text>
           </View>
           <Ionicons name="open-outline" size={14} color="#71717a" />
         </TouchableOpacity>
@@ -360,11 +465,55 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
 
-  // Hero link (weight tracker)
-  heroLink: {
+  // ===== Training stats strip =====
+  statsStrip: {
     backgroundColor: '#18181b',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    borderRadius: 14,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    marginBottom: 12,
+  },
+  statsStripLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#71717a',
+    letterSpacing: 1.2,
+    marginBottom: 10,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+  },
+  statsCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statsDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: '#27272a',
+    marginVertical: 2,
+  },
+  statsValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    lineHeight: 20,
+  },
+  statsCellLabel: {
+    fontSize: 10,
+    color: '#71717a',
+    marginTop: 4,
+    letterSpacing: 0.2,
+  },
+
+  // Hero link (weight tracker) — home-hero language: black surface,
+  // 1.5px themed border, glow.
+  heroLink: {
+    backgroundColor: '#000',
     borderRadius: 18,
-    borderWidth: 2,
+    borderWidth: 1.5,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',

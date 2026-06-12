@@ -181,7 +181,11 @@ export default function PromptReadyScreen() {
         const fitnessGoals = await WorkoutStorage.loadFitnessGoalsResults();
         const equipment =
           await WorkoutStorage.loadEquipmentPreferencesResults();
-        const merged = { ...(fitnessGoals || {}), ...(equipment || {}) };
+        
+        // Only use completed questionnaire data to prevent incomplete answers from being sent
+        const validFitnessGoals = fitnessGoals?.completedAt ? fitnessGoals : {};
+        const validEquipment = equipment?.completedAt ? equipment : {};
+        const merged = { ...validFitnessGoals, ...validEquipment };
         const assembled = assemblePlanningPrompt(merged);
 
         setPrompt(assembled);

@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { assembleMealPlanningPrompt } from '../data/mealPlanningPrompt';
+import { assembleMealPlanPromptV2 } from '../utils/mealPlanPromptV2';
 import { useTheme } from '../contexts/ThemeContext';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 import { WorkoutStorage } from '../utils/storage';
@@ -91,9 +91,9 @@ export default function NutritionGeneratorStep1({ onNext, onBack }: NutritionGen
 
       let planningPrompt: string;
       try {
-        planningPrompt = await assembleMealPlanningPrompt();
+        planningPrompt = await assembleMealPlanPromptV2();
       } catch (promptError) {
-        console.error('Error in assembleMealPlanningPrompt:', promptError);
+        console.error('Error in assembleMealPlanPromptV2:', promptError);
         
         // Fallback: use basic prompt
         planningPrompt = `# Basic Meal Plan Prompt

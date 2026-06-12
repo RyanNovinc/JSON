@@ -1935,6 +1935,7 @@ function SetsTable({
           onSetTapWhenNotStarted={onSetTapWhenNotStarted}
           onFocusField={(field) => onFocusField(i, field)}
           registerWeightRef={(ref) => registerWeightRef(i, ref)}
+          globalUnit={unit}
         />
       ))}
 
@@ -1964,6 +1965,7 @@ interface SetRowProps {
   onSetTapWhenNotStarted?: () => void;
   onFocusField: (field: 'weight' | 'reps') => void;
   registerWeightRef: (ref: TextInput | null) => void;
+  globalUnit: 'kg' | 'lbs'; // Added for unit indicator
 }
 
 function SetRow({
@@ -1980,6 +1982,7 @@ function SetRow({
   onSetTapWhenNotStarted,
   onFocusField,
   registerWeightRef,
+  globalUnit,
 }: SetRowProps) {
   const completed = set.completed;
   const accessoryProps = Platform.OS === 'ios' ? { inputAccessoryViewID: ACCESSORY_ID } : {};
@@ -2013,23 +2016,28 @@ function SetRow({
           </Text>
         </View>
 
-        <TextInput
-          ref={(r) => registerWeightRef(r)}
-          style={[styles.setInput, { flex: 1 }]}
-          value={set.weight}
-          onChangeText={(v) => onUpdate('weight', v)}
-          onFocus={() => onFocusField('weight')}
-          onPressIn={() => {
-            if (!workoutStarted && onSetTapWhenNotStarted) {
-              onSetTapWhenNotStarted();
-            }
-          }}
-          keyboardType="decimal-pad"
-          placeholder={previous?.weight || '0'}
-          placeholderTextColor="#3a3a44"
-          editable={workoutStarted && !completed}
-          {...accessoryProps}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <TextInput
+            ref={(r) => registerWeightRef(r)}
+            style={[styles.setInput, { flex: 1 }]}
+            value={set.weight}
+            onChangeText={(v) => onUpdate('weight', v)}
+            onFocus={() => onFocusField('weight')}
+            onPressIn={() => {
+              if (!workoutStarted && onSetTapWhenNotStarted) {
+                onSetTapWhenNotStarted();
+              }
+            }}
+            keyboardType="decimal-pad"
+            placeholder={`${previous?.weight || '0'} ${globalUnit}`}
+            placeholderTextColor="#3a3a44"
+            editable={workoutStarted && !completed}
+            {...accessoryProps}
+          />
+          <Text style={{ color: '#9898a4', fontSize: 11, marginLeft: 4, fontFamily: 'DMMono-Medium' }}>
+            {globalUnit.toUpperCase()}
+          </Text>
+        </View>
 
         <TextInput
           style={[styles.setInput, { flex: 1 }]}

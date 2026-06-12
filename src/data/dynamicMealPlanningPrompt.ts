@@ -1,3 +1,6 @@
+// LEGACY — replaced by mealPlanPromptV2.ts; delete once the v2 flow
+// is verified end-to-end (generate → review → JSON → import).
+//
 // ================================
 // DYNAMIC MEAL PLANNING PROMPT SYSTEM
 // ================================

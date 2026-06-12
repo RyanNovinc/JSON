@@ -157,6 +157,110 @@ const roundPercentagesToTotal = (percentages: number[], targetTotal: number = 10
   return result;
 };
 
+// ---------------------------------------------------------------------------
+// Hero-card helpers — today filmstrip, day progress, daily averages.
+// All pure functions; the component wires them up via useMemo below.
+// ---------------------------------------------------------------------------
+
+/** Local date as YYYY-MM-DD (device timezone — NOT toISOString, which is UTC). */
+const localTodayISO = (): string => {
+  const d = new Date();
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** "7:45 AM" → minutes since midnight, for sorting today's meals. Unparseable → end of day. */
+const clockToMinutes = (s?: string): number => {
+  if (!s) return 24 * 60;
+  const m = s.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!m) return 24 * 60;
+  let h = parseInt(m[1], 10) % 12;
+  if ((m[3] || '').toUpperCase() === 'PM') h += 12;
+  return h * 60 + parseInt(m[2], 10);
+};
+
+/** Average daily kcal + protein across the plan (legacy shape; weeks fallback). */
+const getPlanDailyAverages = (plan: MealPlan): { kcal: number; protein: number } | null => {
+  const days: any[] | null = plan.data?.days?.length
+    ? plan.data.days
+    : (plan.data as any)?.weeks?.[0]?.days?.length
+    ? (plan.data as any).weeks[0].days
+    : null;
+  if (!days) return null;
+  let kcal = 0;
+  let protein = 0;
+  let n = 0;
+  for (const day of days) {
+    if (!day?.meals?.length) continue;
+    kcal += day.meals.reduce((t: number, m: any) => t + (m.calories || 0), 0);
+    protein += day.meals.reduce((t: number, m: any) => t + (m.macros?.protein || 0), 0);
+    n++;
+  }
+  if (n === 0 || kcal === 0) return null;
+  return { kcal: Math.round(kcal / n / 10) * 10, protein: Math.round(protein / n) };
+};
+
+/** One thumbnail's worth of info for the hero filmstrip. */
+interface HeroStripMeal {
+  key: string;
+  name: string;
+  image: any | null; // resolved via getMealImage for curated refs; null = monogram tile
+}
+
+/**
+ * Resolve "today" against the ORIGINAL SimplifiedMealPlan. The legacy
+ * conversion drops curated_meal_slug / plate_id, and those are exactly what
+ * give the filmstrip its images — so this reads the unconverted plan.
+ * Day matching: exact date key → today's weekday name (so a finished plan
+ * still previews a sensible day) → day 1.
+ */
+const getHeroToday = (
+  original: SimplifiedMealPlan | undefined,
+  curatedBySlug: Map<string, CuratedMeal>
+): { dayIndex: number; totalDays: number; stripLabel: string; meals: HeroStripMeal[] } | null => {
+  if (!original?.dailyMeals) return null;
+  const keys = Object.keys(original.dailyMeals).sort();
+  if (keys.length === 0) return null;
+
+  const todayISO = localTodayISO();
+  const todayName = WEEKDAY_NAMES[new Date().getDay()];
+
+  let matched: 'date' | 'weekday' | 'first' = 'date';
+  let key = keys.find((k) => k === todayISO);
+  if (!key) {
+    key = keys.find((k) => ((original.dailyMeals as any)[k]?.dayName || '') === todayName);
+    matched = key ? 'weekday' : 'first';
+  }
+  if (!key) key = keys[0];
+
+  const dayIndex = keys.indexOf(key);
+  const day: any = (original.dailyMeals as any)[key];
+  const meals: HeroStripMeal[] = [...(day?.meals || [])]
+    .sort((a: any, b: any) => clockToMinutes(a.time) - clockToMinutes(b.time))
+    .map((m: any, i: number): HeroStripMeal => {
+      const curated = m.curated_meal_slug ? curatedBySlug.get(m.curated_meal_slug) : undefined;
+      const plate: any = curated?.plates?.find((p: any) => p.id === m.plate_id) ?? curated?.plates?.[0];
+      const filename = plate?.image_filename ?? curated?.image_filename;
+      return {
+        key: `${key}_${i}`,
+        name: curated ? plate?.display_name || curated.display_name : m.name || 'Meal',
+        image: filename ? getMealImage(filename) : null,
+      };
+    });
+
+  const stripLabel =
+    matched === 'date'
+      ? `TODAY · ${(day?.dayName || todayName).toUpperCase()}`
+      : matched === 'weekday'
+      ? (day?.dayName || todayName).toUpperCase()
+      : `DAY 1${day?.dayName ? ` · ${String(day.dayName).toUpperCase()}` : ''}`;
+
+  return { dayIndex, totalDays: keys.length, stripLabel, meals };
+};
+
 // Display string like "30P/45C/25F" for a plan. Tries plan-level macro_targets
 // first, falls back to computing from the first day's meals, then to old
 // weeks-structure for backwards compatibility.
@@ -367,6 +471,24 @@ export default function NutritionHomeScreen({ route }: any) {
     convertedMealPlans[0] ||
     null;
   const otherPlans = convertedMealPlans.filter(p => p.id !== currentPlanLegacy?.id);
+
+  // ===== Hero card derived data (filmstrip / day progress / daily averages) =====
+  const curatedBySlug = useMemo(() => {
+    const map = new Map<string, CuratedMeal>();
+    Object.values(CURATED_MEALS).forEach((m) => map.set(m.slug, m));
+    return map;
+  }, []);
+
+  // The legacy conversion drops curated_meal_slug — read the ORIGINAL plan.
+  const heroOriginal = currentPlanLegacy
+    ? mealPlans.find((p) => p.id === currentPlanLegacy.id) ||
+      mealPlans.find((p) => p.name === currentPlanLegacy.name)
+    : undefined;
+  const heroToday = useMemo(
+    () => getHeroToday(heroOriginal, curatedBySlug),
+    [heroOriginal, curatedBySlug]
+  );
+  const heroAverages = currentPlanLegacy ? getPlanDailyAverages(currentPlanLegacy) : null;
 
   // ===== Curated meals — split into category groups =====
   // Memoised because the source is a constant import; no point reconstituting
@@ -602,7 +724,7 @@ export default function NutritionHomeScreen({ route }: any) {
     }
   };
 
-  const handleMealPlanNavigation = (plan: MealPlan) => {
+  const handleMealPlanNavigation = (plan: MealPlan, opts?: { openGrocery?: boolean }) => {
     console.log('🍽️ Navigating to meal plan (no scaling):', plan.name);
 
     handleMealPlanSwitch(plan);
@@ -667,6 +789,9 @@ export default function NutritionHomeScreen({ route }: any) {
         mealPrepSession,
         allMealPrepSessions: plan.data?.meal_prep_sessions || (mealPrepSession ? [mealPrepSession] : []),
         groceryList: plan.data?.grocery_list,
+        // Optional hint for MealPlanDays: when set, open/scroll to the
+        // grocery list section. A no-op until that screen reads it.
+        ...(opts?.openGrocery ? { openGrocery: true } : {}),
       });
       return;
     }
@@ -681,6 +806,7 @@ export default function NutritionHomeScreen({ route }: any) {
         mealPrepSession: plan.data.meal_prep_session,
         allMealPrepSessions: plan.data?.meal_prep_sessions || [],
         groceryList: plan.data?.grocery_list,
+        ...(opts?.openGrocery ? { openGrocery: true } : {}),
       });
       return;
     }
@@ -1183,6 +1309,18 @@ export default function NutritionHomeScreen({ route }: any) {
           >
             <Text style={styles.title}>Nutrition</Text>
 
+            <View style={styles.sectionHeaderActionRow}>
+              <Text style={styles.sectionLabel}>YOUR PLANS</Text>
+              <TouchableOpacity
+                onPress={openCreateFlow}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Create a new meal plan"
+              >
+                <Text style={[styles.sectionAction, { color: themeColor }]}>+ New plan</Text>
+              </TouchableOpacity>
+            </View>
 
             {currentPlanLegacy && (
               <View style={[styles.heroCard, { borderColor: themeColor, shadowColor: themeColor }]}>
@@ -1206,15 +1344,89 @@ export default function NutritionHomeScreen({ route }: any) {
                   onLongPress={() => handleActionRequest(currentPlanLegacy)}
                   delayLongPress={600}
                 >
-                  <Text style={[styles.heroEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
+                  <View style={styles.heroEyebrowRow}>
+                    <Text style={[styles.heroEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
+                    {heroToday && (
+                      <View style={styles.heroDayBadge}>
+                        <Text style={styles.heroDayBadgeText}>
+                          DAY {heroToday.dayIndex + 1} OF {heroToday.totalDays}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.heroTitleText} numberOfLines={2}>
                     {currentPlanLegacy.name}
                   </Text>
-                  <Text style={styles.heroSubtitle}>
-                    {currentPlanLegacy.duration} {currentPlanLegacy.duration === 1 ? 'day' : 'days'}
-                    {getMacroSplitDisplay(currentPlanLegacy) ? ` • ${getMacroSplitDisplay(currentPlanLegacy)}` : ''}
-                  </Text>
+                  {heroAverages ? (
+                    <Text style={styles.heroSubtitle}>
+                      <Text style={styles.heroSubtitleStrong}>
+                        {heroAverages.kcal.toLocaleString()} kcal
+                      </Text>
+                      {' · '}
+                      <Text style={styles.heroSubtitleStrong}>{heroAverages.protein}g protein</Text>
+                      {' per day'}
+                    </Text>
+                  ) : (
+                    <Text style={styles.heroSubtitle}>
+                      {currentPlanLegacy.duration} {currentPlanLegacy.duration === 1 ? 'day' : 'days'}
+                      {getMacroSplitDisplay(currentPlanLegacy) ? ` • ${getMacroSplitDisplay(currentPlanLegacy)}` : ''}
+                    </Text>
+                  )}
                 </Pressable>
+
+                {/* TODAY filmstrip — today's meals as photo thumbnails, resolved
+                    from the plan's curated references. Invented meals get a
+                    monogram tile; overflow collapses into a "+N" tile. Tapping
+                    anywhere on the strip is the same as the Start button. */}
+                {heroToday && heroToday.meals.length > 0 && (
+                  <Pressable onPress={() => handleJumpToToday(currentPlanLegacy)}>
+                    <Text style={styles.heroStripLabel}>{heroToday.stripLabel}</Text>
+                    <View style={styles.heroStrip}>
+                      {heroToday.meals.slice(0, 4).map((m) => (
+                        <View key={m.key} style={styles.heroThumb}>
+                          {m.image ? (
+                            <Image
+                              source={m.image}
+                              style={styles.heroThumbImg}
+                              contentFit="cover"
+                              transition={120}
+                            />
+                          ) : (
+                            <View style={styles.heroThumbMono}>
+                              <Text style={styles.heroThumbMonoText}>
+                                {(m.name || '?').slice(0, 1).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={styles.heroThumbNameWrap}>
+                            <Text style={styles.heroThumbName} numberOfLines={1}>
+                              {m.name}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                      {heroToday.meals.length > 4 && (
+                        <View style={[styles.heroThumb, styles.heroThumbMore]}>
+                          <Text style={styles.heroThumbMoreCount}>
+                            +{heroToday.meals.length - 4}
+                          </Text>
+                          <Text style={styles.heroThumbMoreLabel}>MORE</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.heroProgressTrack}>
+                      <View
+                        style={[
+                          styles.heroProgressFill,
+                          {
+                            backgroundColor: themeColor,
+                            width: `${Math.round(((heroToday.dayIndex + 1) / heroToday.totalDays) * 100)}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                  </Pressable>
+                )}
 
                 {/* Primary: full-width "Start today's meals" button.
                     Routes through handleJumpToToday → cleanMealPlanNavigation
@@ -1230,17 +1442,32 @@ export default function NutritionHomeScreen({ route }: any) {
                   <Text style={styles.heroTodayText}>Start today's meals</Text>
                 </TouchableOpacity>
 
-                {/* Secondary: subtle text link to full plan view */}
-                <TouchableOpacity
-                  style={styles.heroPlanLink}
-                  onPress={() => handleMealPlanNavigation(currentPlanLegacy)}
-                  activeOpacity={0.6}
-                  accessibilityRole="button"
-                  accessibilityLabel="View full plan"
-                >
-                  <Text style={[styles.heroPlanLinkText, { color: themeColor }]}>View full plan</Text>
-                  <Ionicons name="chevron-forward" size={13} color={themeColor} />
-                </TouchableOpacity>
+                {/* Footer links: full plan + grocery list (people open this
+                    screen standing in the supermarket — the list shouldn't be
+                    two taps deep). */}
+                <View style={styles.heroLinksRow}>
+                  <TouchableOpacity
+                    style={styles.heroLinkBtn}
+                    onPress={() => handleMealPlanNavigation(currentPlanLegacy)}
+                    activeOpacity={0.6}
+                    accessibilityRole="button"
+                    accessibilityLabel="View full plan"
+                  >
+                    <Text style={[styles.heroPlanLinkText, { color: themeColor }]}>View full plan</Text>
+                    <Ionicons name="chevron-forward" size={13} color={themeColor} />
+                  </TouchableOpacity>
+                  <View style={styles.heroLinkSep} />
+                  <TouchableOpacity
+                    style={styles.heroLinkBtn}
+                    onPress={() => handleMealPlanNavigation(currentPlanLegacy, { openGrocery: true })}
+                    activeOpacity={0.6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open grocery list"
+                  >
+                    <Ionicons name="cart-outline" size={13} color={themeColor} />
+                    <Text style={[styles.heroPlanLinkText, { color: themeColor }]}>Grocery list</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -1251,13 +1478,12 @@ export default function NutritionHomeScreen({ route }: any) {
             {/* "Start today's meals" button.                           */}
             {/* ====================================================== */}
             {otherPlans.map((plan) => {
-              const originalPlan = mealPlans.find(p => p.name === plan.name);
-              const planId = originalPlan?.fingerprint || originalPlan?.id || plan.id;
               const macroSplit = getMacroSplitDisplay(plan);
+              const averages = getPlanDailyAverages(plan);
               return (
-                <View key={plan.id} style={styles.planCardSecondary}>
+                <View key={plan.id} style={styles.planRow}>
                   <RNTouchable
-                    style={styles.planMenuBtn}
+                    style={styles.planRowMenuBtn}
                     onPress={(e) => {
                       e.stopPropagation();
                       handleActionRequest(plan);
@@ -1267,32 +1493,36 @@ export default function NutritionHomeScreen({ route }: any) {
                     accessibilityRole="button"
                     accessibilityLabel="More options"
                   >
-                    <Ionicons name="ellipsis-horizontal" size={16} color="#a1a1aa" />
+                    <Ionicons name="ellipsis-horizontal" size={15} color="#a1a1aa" />
                   </RNTouchable>
 
                   <Pressable
+                    style={styles.planRowInfo}
                     onPress={() => handleMealPlanNavigation(plan)}
                     onLongPress={() => handleActionRequest(plan)}
                     delayLongPress={600}
                   >
-                    <Text style={styles.planTitleSecondary} numberOfLines={2}>
+                    <Text style={styles.planRowTitle} numberOfLines={1}>
                       {plan.name}
                     </Text>
-                    <Text style={styles.planSubtitleSecondary}>
+                    <Text style={styles.planRowSub} numberOfLines={1}>
                       {plan.duration} {plan.duration === 1 ? 'day' : 'days'}
-                      {macroSplit ? ` · ${macroSplit}` : ''}
+                      {averages
+                        ? ` · ${averages.kcal.toLocaleString()} kcal · ${averages.protein}g protein`
+                        : macroSplit
+                        ? ` · ${macroSplit}`
+                        : ''}
                     </Text>
                   </Pressable>
 
                   <TouchableOpacity
-                    style={styles.planStartBtnSecondary}
+                    style={styles.planRowGo}
                     onPress={() => handleJumpToToday(plan)}
                     activeOpacity={0.85}
                     accessibilityRole="button"
                     accessibilityLabel="Start today's meals"
                   >
-                    <Ionicons name="restaurant" size={13} color="#d4d4d8" />
-                    <Text style={styles.planStartBtnSecondaryText}>Start today's meals</Text>
+                    <Ionicons name="restaurant" size={15} color="#d4d4d8" />
                   </TouchableOpacity>
                 </View>
               );
@@ -1700,6 +1930,198 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#71717a',
     letterSpacing: 1.2,
+  },
+
+  // ===== "YOUR PLANS" row with the + New plan action =====
+  sectionHeaderActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+    marginBottom: 10,
+  },
+  sectionAction: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // ===== Hero additions: day badge, filmstrip, progress, footer links =====
+  heroEyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+    paddingRight: 30,
+  },
+  heroDayBadge: {
+    backgroundColor: '#1c1c21',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  heroDayBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: '#a1a1aa',
+  },
+  heroSubtitleStrong: {
+    color: '#d4d4d8',
+    fontWeight: '600',
+  },
+  heroStripLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+    color: '#52525b',
+    marginBottom: 7,
+  },
+  heroStrip: {
+    flexDirection: 'row',
+    gap: 7,
+    marginBottom: 13,
+  },
+  heroThumb: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 11,
+    overflow: 'hidden',
+    backgroundColor: '#18181b',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#222227',
+    position: 'relative',
+  },
+  heroThumbImg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  heroThumbMono: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroThumbMonoText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#52525b',
+  },
+  heroThumbNameWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+  },
+  heroThumbName: {
+    fontSize: 8.5,
+    fontWeight: '600',
+    color: '#e9e9ec',
+  },
+  heroThumbMore: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#3f3f46',
+  },
+  heroThumbMoreCount: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#d4d4d8',
+  },
+  heroThumbMoreLabel: {
+    fontSize: 8,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    color: '#52525b',
+    marginTop: 1,
+  },
+  heroProgressTrack: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#1f1f24',
+    overflow: 'hidden',
+    marginBottom: 15,
+  },
+  heroProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  heroLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    paddingTop: 13,
+    paddingBottom: 2,
+  },
+  heroLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  heroLinkSep: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#3f3f46',
+  },
+
+  // ===== Compact secondary plan rows =====
+  planRow: {
+    backgroundColor: '#18181b',
+    borderRadius: 14,
+    borderColor: '#27272a',
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    position: 'relative',
+  },
+  planRowInfo: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 20,
+  },
+  planRowTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  planRowSub: {
+    color: '#71717a',
+    fontSize: 12,
+  },
+  planRowGo: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#3f3f46',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planRowMenuBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
 
   // Section grouping (for "Other plans" — old style)

@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import * as Clipboard from 'expo-clipboard';
-import { assembleMealPlanningPrompt } from '../data/mealPlanningPrompt';
+import { assembleMealPlanPromptV2 } from '../utils/mealPlanPromptV2';
 
 interface NutritionGeneratorStep1NewProps {
   onNext: () => void;
@@ -33,10 +33,10 @@ export default function NutritionGeneratorStep1New({ onNext, onBack }: Nutrition
       
       // Try the real prompt function
       try {
-        const realPrompt = await assembleMealPlanningPrompt();
+        const realPrompt = await assembleMealPlanPromptV2();
         await Clipboard.setStringAsync(realPrompt);
       } catch (promptError) {
-        console.error('assembleMealPlanningPrompt error:', promptError);
+        console.error('assembleMealPlanPromptV2 error:', promptError);
         // Keep the test prompt if real one fails
       }
     } catch (error) {

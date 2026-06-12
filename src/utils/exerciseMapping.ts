@@ -96,6 +96,9 @@ export function getExerciseVariations(exerciseName: string): string[] {
  * @param exercise1 First exercise name
  * @param exercise2 Second exercise name 
  * @returns True if they share the same canonical mapping
+ * 
+ * @deprecated Use exercisesShareHistory from exerciseIdentity.ts for history tracking.
+ * This function is kept for backward compatibility with suggestions/dedup.
  */
 export function exercisesShareHistory(exercise1: string, exercise2: string): boolean {
   return getCanonicalExerciseName(exercise1) === getCanonicalExerciseName(exercise2);

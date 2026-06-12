@@ -101,17 +101,18 @@ export async function finalizeNutrition(
   const now = new Date().toISOString();
   const targetRate = computeTargetRate(a);
 
-  const nutritionResults = {
+  const nutritionResults: import('./storage').NutritionQuestionnaireResults = {
     formData: {
-      goal: a.goal,
+      goal: String(a.goal || ''),
       // builder parseFloat()s this; maintain → null so it shows a sane default
-      rate: a.goal === 'maintain' ? null : targetRate,
-      gender: a.gender,
-      age: a.age,
-      height: a.height,
-      weight: a.weight,
-      activityLevel: a.activityLevel,
-      dietType: a.dietType,
+      rate: a.goal === 'maintain' ? '0' : String(targetRate),
+      gender: String(a.gender || ''),
+      age: String(a.age || ''),
+      height: String(a.height || ''),
+      weight: String(a.weight || ''),
+      heightUnit: 'cm', // default unit
+      weightUnit: 'kg', // default unit
+      activityLevel: String(a.activityLevel || ''),
       jobType: 'desk_job', // not collected in this flow; builder default
     },
     macroResults: {
@@ -121,38 +122,46 @@ export async function finalizeNutrition(
       fat: macros.fat,
       bmr: macros.bmr,
       tdee: macros.tdee,
+      weeklyWeightChange: targetRate,
     },
     completedAt: now,
   };
 
-  const budgetCookingResults = {
+  const budgetCookingResults: import('./storage').BudgetCookingQuestionnaireResults = {
     formData: {
-      mealsPerDay: a.mealsPerDay,
-      snackingStyle: a.snackingStyle,
+      weeklyBudget: String(a.weeklyBudget || ''),
+      country: String(a.country || ''),
+      countryCode: String(a.countryCode || ''),
+      city: String(a.city || ''),
+      groceryStore: String(a.groceryStore || ''),
+      planningStyle: Number(a.planningStyle ?? 3), // batch/leftover preference; builder default is 3
+      cookingEnjoyment: 3, // default value since not collected in this flow
+      timeInvestment: a.timeInvestment ?? 60,
+      varietySeeking: 3, // default value since not collected in this flow
+      skillConfidence: a.skillConfidence ?? 3,
+      mealsPerDay: a.mealsPerDay ?? 3,
+      snackingStyle: String(a.snackingStyle || ''),
       snackFrequency: a.snackFrequency,
-      dessertFrequency: a.dessertFrequency,
-      country: a.country,
-      city: a.city,
-      countryCode: a.countryCode,
-      groceryStore: a.groceryStore,
-      weeklyBudget: a.weeklyBudget,
+      dessertFrequency: a.dessertFrequency as '0' | 'few_per_week' | 'most_nights' | 'every_night' | 'ai_decide' | undefined,
       budgetMin: a.budgetMin,
       budgetMax: a.budgetMax,
       planDuration: a.planDuration,
       startDate: a.startDate,
-      skillConfidence: a.skillConfidence,
-      timeInvestment: a.timeInvestment,
-      planningStyle: a.planningStyle ?? 3, // batch/leftover preference; builder default is 3
       cookingEquipment: a.cookingEquipment ?? [],
+      eatingChallenges: a.eatingChallenges ?? [],
       allergies: a.allergies ?? [],
       avoidFoods: a.avoidFoods ?? [],
-      eatingChallenges: a.eatingChallenges ?? [],
     },
     completedAt: now,
   };
 
   await WorkoutStorage.saveNutritionResults(nutritionResults);
   await WorkoutStorage.saveBudgetCookingResults(budgetCookingResults);
+
+  // Clear the nutrition draft to prevent draft/final divergence
+  // Draft answers are no longer needed once final results are saved
+  const { clearNutritionAnswers } = await import('./nutritionQuestionnaireStorage');
+  await clearNutritionAnswers();
 
   return macros;
 }

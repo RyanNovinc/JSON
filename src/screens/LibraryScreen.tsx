@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,9 @@ import {
   Alert,
   RefreshControl,
   TouchableOpacity,
+  Pressable,
   Image,
 } from 'react-native';
-import { TouchableOpacity as GHTouchable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,6 +31,23 @@ function formatTime(minutes: number): string {
   const remainder = minutes % 60;
   if (remainder === 0) return `${hours}h`;
   return `${hours}h ${remainder}m`;
+}
+
+// Collapse a list so each logical item appears once. Saved workouts / meal
+// plans can end up with two entries sharing the same id (e.g. a plan re-added
+// through an older save path). Duplicate ids crash the list with a
+// "two children with the same key" React error AND make items bleed between
+// tabs as React reconciles non-unique keys. De-duping here is a defensive
+// guard so the same plan only ever renders once regardless of what storage
+// hands back.
+function dedupeByKey<T>(arr: T[], keyFn: (x: T) => string): T[] {
+  const seen = new Set<string>();
+  return arr.filter((item) => {
+    const k = keyFn(item);
+    if (!k || seen.has(k)) return seen.has(k) ? false : (seen.add(k), true);
+    seen.add(k);
+    return true;
+  });
 }
 
 // Pulls the headline summary for a favourite recipe card. Reads from the
@@ -55,14 +72,62 @@ function getRecipeSummary(meal: CuratedMeal): {
   };
 }
 
+// Week-span helper: "1-4" → 4, "5" → 1. Same parsing as HomeScreen's
+// resolveBlockPosition, so the Library and the hero badge always agree.
+const spanOfWeeks = (w: any): number => {
+  const s = String(w ?? '1');
+  if (s.includes('-')) {
+    const [lo, hi] = s.split('-').map((x: string) => parseInt(x, 10));
+    return Number.isFinite(lo) && Number.isFinite(hi) && hi >= lo ? hi - lo + 1 : 1;
+  }
+  return 1;
+};
+
+// Average daily kcal + protein across a saved plan. Handles all three shapes a
+// saved plan can take: SimplifiedMealPlan (data.dailyMeals, keyed by date),
+// legacy data.days[], and legacy data.weeks[0].days[]. Keeps the Library card
+// in lockstep with MealPlanPreviewScreen, which reads the same shapes — a
+// saved plan stores dailyMeals, so the old days-only version always returned
+// null here and the card showed "—".
+const getPlanDailyAverages = (plan: MealPlan): { kcal: number; protein: number } | null => {
+  const data: any = plan.data;
+  let days: any[] | null = null;
+
+  if (data?.dailyMeals && typeof data.dailyMeals === 'object') {
+    days = Object.values(data.dailyMeals);
+  } else if (data?.days?.length) {
+    days = data.days;
+  } else if (data?.weeks?.[0]?.days?.length) {
+    days = data.weeks[0].days;
+  }
+  if (!days) return null;
+
+  let kcal = 0;
+  let protein = 0;
+  let n = 0;
+  for (const day of days) {
+    if (!day?.meals?.length) continue;
+    kcal += day.meals.reduce((t: number, m: any) => t + (m.calories || 0), 0);
+    protein += day.meals.reduce((t: number, m: any) => t + (m.macros?.protein || 0), 0);
+    n++;
+  }
+  if (n === 0 || kcal === 0) return null;
+  return { kcal: Math.round(kcal / n / 10) * 10, protein: Math.round(protein / n) };
+};
+
 /**
  * LibraryScreen — your saved workouts, meal plans, and favourite recipes.
  *
  * Workout / meal-plan cards use the mini stat grid pattern (matches
  * WorkoutPreviewScreen and the JSON.fit share page):
- *   - Title at top
+ *   - Title at top, ••• remove top-right
  *   - Hairline divider
  *   - 3-column grid with cyan numbers + gray labels
+ *
+ * Meal-plan stats are computed from the plan's actual days (avg kcal/day and
+ * protein/day) — the old target_calories field never existed on real plans,
+ * so that cell was a permanent "—". Workout "program" is the week count
+ * summed across ALL blocks, matching the hero card's WEEK N OF M badge.
  *
  * Recipe cards use a compact thumbnail row (photo · name · meta · heart) since
  * favourites is a retrieval surface — density beats big imagery here.
@@ -70,7 +135,7 @@ function getRecipeSummary(meal: CuratedMeal): {
  * Tap workout → WorkoutPreviewScreen
  * Tap meal plan → MealPlanDays / MealPlanWeeks based on shape
  * Tap recipe → RecipeDetail
- * Long-press workout/meal → confirm remove. Recipe heart → instant un-save.
+ * ••• or long-press workout/meal → confirm remove. Recipe heart → instant un-save.
  */
 export default function LibraryScreen() {
   const navigation = useNavigation<any>();
@@ -90,15 +155,28 @@ export default function LibraryScreen() {
         WorkoutStorage.loadMealPlans(),
         RecipeFavorites.loadFavoriteSlugs(),
       ]);
-      setSavedWorkouts(Array.isArray(workouts) ? workouts : []);
-      setSavedMeals(Array.isArray(meals) ? meals : []);
+
+      // De-dupe on fingerprint||id so a plan that exists twice in storage only
+      // renders once (and never collides on a React key).
+      setSavedWorkouts(
+        dedupeByKey(
+          Array.isArray(workouts) ? workouts : [],
+          (r) => r.fingerprint || r.id || ''
+        )
+      );
+      setSavedMeals(
+        dedupeByKey(
+          Array.isArray(meals) ? meals : [],
+          (p) => p.fingerprint || p.id || ''
+        )
+      );
 
       // Resolve slugs → meals at render time (single source of truth), drop
-      // any slug that no longer maps to a meal.
+      // any slug that no longer maps to a meal, then de-dupe by slug.
       const recipes = recipeSlugs
         .map((slug) => (CURATED_MEALS as any)[slug] as CuratedMeal | undefined)
         .filter(Boolean) as CuratedMeal[];
-      setSavedRecipes(recipes);
+      setSavedRecipes(dedupeByKey(recipes, (r) => r.slug));
     } catch (error) {
       console.error('Failed to load library:', error);
       setSavedWorkouts([]);
@@ -127,31 +205,12 @@ export default function LibraryScreen() {
     navigation.navigate('WorkoutPreview' as any, { routine });
   };
 
-  // Tap a saved meal plan → appropriate view based on data shape
+  // Tap a saved meal plan → summary/preview screen (mirrors workouts).
+  // The full plan views (MealPlanDays / MealPlanWeeks) are still reached from
+  // NutritionHomeScreen for the active plan; from the Library we show a
+  // summary + import CTA instead of dropping straight into the full plan.
   const openMealPlan = (plan: MealPlan) => {
-    if (plan.data?.days) {
-      const week = { week_number: 1, days: plan.data.days };
-      navigation.navigate('MealPlanDays' as any, {
-        week,
-        mealPlanName: plan.name,
-      });
-      return;
-    }
-    if (plan.data?.weeks && plan.data.weeks.length > 1) {
-      navigation.navigate('MealPlanWeeks' as any, { mealPlan: plan });
-      return;
-    }
-    if (plan.data?.weeks && plan.data.weeks.length === 1) {
-      navigation.navigate('MealPlanDays' as any, {
-        week: plan.data.weeks[0],
-        mealPlanName: plan.name,
-      });
-      return;
-    }
-    navigation.navigate('MealPlanDays' as any, {
-      planId: plan.id,
-      planName: plan.name,
-    });
+    navigation.navigate('MealPlanPreview' as any, { plan });
   };
 
   const removeWorkout = (routine: WorkoutRoutine) => {
@@ -219,20 +278,13 @@ export default function LibraryScreen() {
     navigation.navigate('RecipeDetail' as any, { mealSlug: recipe.slug });
   };
 
-  // ===== Compute weeks label for a routine (e.g. "4wk" from "1-4") =====
+  // ===== Program weeks label — summed across ALL blocks (e.g. "12wk"), so
+  // it agrees with the home hero's WEEK N OF M badge. =====
   const getWeeksLabel = (routine: WorkoutRoutine): string => {
     const blocks = routine.data?.blocks;
     if (!Array.isArray(blocks) || blocks.length === 0) return '—';
-    const w = blocks[0].weeks;
-    if (typeof w === 'string') {
-      const match = w.match(/(\d+)-?(\d+)?/);
-      if (match) {
-        const start = parseInt(match[1], 10);
-        const end = match[2] ? parseInt(match[2], 10) : start;
-        return `${end - start + 1}wk`;
-      }
-    }
-    return '—';
+    const total = blocks.reduce((t: number, b: any) => t + spanOfWeeks(b?.weeks), 0);
+    return total > 0 ? `${total}wk` : '—';
   };
 
   const items =
@@ -355,18 +407,31 @@ export default function LibraryScreen() {
       >
         {hasItems ? (
           segment === 'workouts' ? (
-            savedWorkouts.map(routine => {
+            savedWorkouts.map((routine, index) => {
               const weeksLabel = getWeeksLabel(routine);
               const blocksCount = routine.blocks || routine.data?.blocks?.length || 0;
               return (
-                <GHTouchable
-                  key={routine.id}
-                  style={styles.statCard}
-                  activeOpacity={0.85}
-                  onPress={() => openWorkout(routine)}
-                  onLongPress={() => removeWorkout(routine)}
-                  delayLongPress={600}
-                >
+                <View key={`workout-${routine.id}-${index}`} style={styles.statCard}>
+                  {/* Visible remove affordance — same confirm Alert the
+                      long-press triggers. Long-press still works. */}
+                  <TouchableOpacity
+                    style={styles.cardMenuBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      removeWorkout(routine);
+                    }}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${routine.name} from library`}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#a1a1aa" />
+                  </TouchableOpacity>
+
+                  <Pressable
+                    onPress={() => openWorkout(routine)}
+                    onLongPress={() => removeWorkout(routine)}
+                    delayLongPress={600}
+                  >
                   <View style={styles.cardTitleRow}>
                     <Ionicons name="barbell" size={17} color={themeColor} />
                     <Text style={styles.cardTitle} numberOfLines={1}>{routine.name}</Text>
@@ -395,24 +460,37 @@ export default function LibraryScreen() {
                       </Text>
                     </View>
                   </View>
-                </GHTouchable>
+                  </Pressable>
+                </View>
               );
             })
           ) : segment === 'meals' ? (
-            savedMeals.map(plan => {
+            savedMeals.map((plan, index) => {
               const duration = plan.duration || 0;
-              const mealsCount = plan.meals || 0;
-              // Try to extract daily kcal target if available
-              const kcalTarget = plan.data?.target_calories || plan.data?.daily_calories || null;
+              // Real numbers from the plan's actual days — the old
+              // target_calories field never existed on saved plans, so the
+              // kcal cell was a permanent "—".
+              const averages = getPlanDailyAverages(plan);
               return (
-                <GHTouchable
-                  key={plan.id}
-                  style={styles.statCard}
-                  activeOpacity={0.85}
-                  onPress={() => openMealPlan(plan)}
-                  onLongPress={() => removeMealPlan(plan)}
-                  delayLongPress={600}
-                >
+                <View key={`meal-${plan.id}-${index}`} style={styles.statCard}>
+                  <TouchableOpacity
+                    style={styles.cardMenuBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      removeMealPlan(plan);
+                    }}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${plan.name} from library`}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#a1a1aa" />
+                  </TouchableOpacity>
+
+                  <Pressable
+                    onPress={() => openMealPlan(plan)}
+                    onLongPress={() => removeMealPlan(plan)}
+                    delayLongPress={600}
+                  >
                   <View style={styles.cardTitleRow}>
                     <Ionicons name="restaurant" size={17} color={themeColor} />
                     <Text style={styles.cardTitle} numberOfLines={1}>{plan.name}</Text>
@@ -429,29 +507,30 @@ export default function LibraryScreen() {
                     <View style={styles.miniStatDivider} />
                     <View style={styles.miniStatCell}>
                       <Text style={[styles.miniStatValue, { color: themeColor }]}>
-                        {mealsCount || '—'}
+                        {averages ? averages.kcal.toLocaleString() : '—'}
                       </Text>
-                      <Text style={styles.miniStatLabel}>meals</Text>
+                      <Text style={styles.miniStatLabel}>kcal/day</Text>
                     </View>
                     <View style={styles.miniStatDivider} />
                     <View style={styles.miniStatCell}>
                       <Text style={[styles.miniStatValue, { color: themeColor }]}>
-                        {kcalTarget ? Math.round(kcalTarget).toLocaleString() : '—'}
+                        {averages ? `${averages.protein}g` : '—'}
                       </Text>
-                      <Text style={styles.miniStatLabel}>kcal/day</Text>
+                      <Text style={styles.miniStatLabel}>protein/day</Text>
                     </View>
                   </View>
-                </GHTouchable>
+                  </Pressable>
+                </View>
               );
             })
           ) : (
             // ================= RECIPES — thumbnail rows =================
-            savedRecipes.map(recipe => {
+            savedRecipes.map((recipe, index) => {
               const { name, cuisine, kcal, protein, totalMinutes } = getRecipeSummary(recipe);
               const imageSource = getMealImage(recipe.image_filename);
               return (
                 <TouchableOpacity
-                  key={recipe.slug}
+                  key={`recipe-${recipe.slug}-${index}`}
                   style={styles.recipeRow}
                   activeOpacity={0.85}
                   onPress={() => openRecipe(recipe)}
@@ -475,7 +554,8 @@ export default function LibraryScreen() {
                       {name}
                     </Text>
                     <Text style={styles.recipeMeta} numberOfLines={1}>
-                      {cuisine ? `${cuisine} · ` : ''}{formatTime(totalMinutes)} · {protein}g protein
+                      {cuisine ? `${cuisine} · ` : ''}{formatTime(totalMinutes)}
+                      {kcal ? ` · ${kcal} kcal` : ''} · {protein}g protein
                     </Text>
                   </View>
 
@@ -526,12 +606,6 @@ export default function LibraryScreen() {
               </TouchableOpacity>
             )}
           </View>
-        )}
-
-        {hasItems && segment !== 'recipes' && (
-          <Text style={styles.hint}>
-            Long-press an item to remove it from your library
-          </Text>
         )}
       </ScrollView>
     </View>
@@ -585,21 +659,36 @@ const styles = StyleSheet.create({
   },
 
   // ===== Stat card (workouts + meal plans) =====
+  // Surface unified with the rest of the app (#18181b / #27272a) — the old
+  // #141416 / #232327 pair was the only place those values appeared.
   statCard: {
-    backgroundColor: '#141416',
+    backgroundColor: '#18181b',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#232327',
+    borderColor: '#27272a',
     borderRadius: 14,
     paddingTop: 14,
     paddingHorizontal: 16,
     paddingBottom: 12,
     marginBottom: 12,
+    position: 'relative',
+  },
+  cardMenuBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
   cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     marginBottom: 14,
+    paddingRight: 28,
   },
   cardTitle: {
     color: '#ffffff',
@@ -613,7 +702,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#232327',
+    borderTopColor: '#27272a',
   },
   miniStatCell: {
     flex: 1,
@@ -621,7 +710,7 @@ const styles = StyleSheet.create({
   },
   miniStatDivider: {
     width: StyleSheet.hairlineWidth,
-    backgroundColor: '#232327',
+    backgroundColor: '#27272a',
     marginVertical: 2,
   },
   miniStatValue: {
@@ -668,15 +757,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 19,
     maxWidth: 280,
-  },
-
-  // Hint
-  hint: {
-    fontSize: 11,
-    color: '#52525b',
-    textAlign: 'center',
-    marginTop: 16,
-    fontStyle: 'italic',
   },
 
   // ===== Recipe thumbnail row =====

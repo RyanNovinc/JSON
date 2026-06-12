@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
-import { assembleMealPlanningPrompt, getMealPlanReviewPrompt } from '../data/mealPlanningPrompt';
+import { assembleMealPlanPromptV2, buildReviewLauncherFromStorage } from '../utils/mealPlanPromptV2';
 import { generateJsonConversionPrompt } from '../data/generateJsonConversionPrompt';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
@@ -786,7 +786,7 @@ export default function ImportMealPlanScreen() {
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
-                      const planningPrompt = await assembleMealPlanningPrompt();
+                      const planningPrompt = await assembleMealPlanPromptV2();
                       
                       // Try to copy to clipboard with better error handling
                       try {
@@ -834,7 +834,7 @@ export default function ImportMealPlanScreen() {
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
-                      const reviewPrompt = await getMealPlanReviewPrompt();
+                      const reviewPrompt = await buildReviewLauncherFromStorage();
                       
                       try {
                         await Clipboard.setStringAsync(reviewPrompt);

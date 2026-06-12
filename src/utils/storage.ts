@@ -13,6 +13,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from './robustStorage';
+import { resolveExerciseId } from './exerciseIdentity';
 
 export interface WorkoutRoutine {
   id: string;
@@ -41,6 +42,7 @@ export interface WorkoutHistory {
   routineName: string;
   dayName: string;
   exerciseName: string;
+  exerciseId?: string; // Stable exercise identity for history tracking
   date: string;
   sets: {
     setNumber: number;
@@ -370,6 +372,10 @@ export class WorkoutStorage {
       return;
     }
     const filtered = myRoutines.filter(r => r.id !== routineId && r.fingerprint !== routineId);
+    
+    // Use P6E purge-all-copies + tombstone delete since my_routines uses RobustStorage
+    // This prevents resurrection from duplicate copies across storage channels
+    await RobustStorage.removeItem(STORAGE_KEYS.MY_ROUTINES, true);
     await this.saveMyRoutines(filtered);
   }
 
@@ -496,6 +502,11 @@ export class WorkoutStorage {
   }
 
   static async addWorkoutEntry(entry: WorkoutHistory): Promise<void> {
+    // Populate exerciseId if not already present (for new entries)
+    if (!entry.exerciseId) {
+      entry.exerciseId = resolveExerciseId(entry.exerciseName);
+    }
+    
     const history = await this.loadWorkoutHistory();
     history.push(entry);
     await this.saveWorkoutHistory(history);
@@ -503,7 +514,14 @@ export class WorkoutStorage {
 
   static async getExerciseHistory(exerciseName: string): Promise<WorkoutHistory[]> {
     const history = await this.loadWorkoutHistory();
-    return history.filter(entry => entry.exerciseName === exerciseName);
+    const targetExerciseId = resolveExerciseId(exerciseName);
+    
+    return history.filter(entry => {
+      // Always resolve from immutable name to prevent drift when table changes
+      // exerciseId is kept as a cache but is not authoritative for matching
+      const entryExerciseId = resolveExerciseId(entry.exerciseName);
+      return entryExerciseId === targetExerciseId;
+    });
   }
 
   // Current workout progress (for resuming sessions)

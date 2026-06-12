@@ -838,6 +838,123 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     await WorkoutStorage.setOnboardingCompleted();
   };
 
+  // Shared "where am I in this routine" resolver — used by both the Start
+  // button and the hero card's week badge. Pure reads, no navigation. The
+  // week-scan logic is lifted verbatim from the old handler.
+  const resolveBlockPosition = async (
+    activeRoutine: WorkoutRoutine
+  ): Promise<{
+    blockIndex: number;
+    block: any;
+    currentWeek: number;
+    totalWeeks: number;
+    programWeek: number;
+    programTotalWeeks: number;
+  } | null> => {
+    if (!activeRoutine?.data?.blocks || activeRoutine.data.blocks.length === 0) return null;
+
+    const spanOf = (w: any): number => {
+      const s = String(w ?? '1');
+      if (s.includes('-')) {
+        const [lo, hi] = s.split('-').map((x: string) => parseInt(x, 10));
+        return Number.isFinite(lo) && Number.isFinite(hi) && hi >= lo ? hi - lo + 1 : 1;
+      }
+      return 1;
+    };
+
+    let blockIndex = 0;
+    try {
+      const savedActiveBlock = await WorkoutStorage.getActiveBlock(activeRoutine.id);
+      if (
+        savedActiveBlock !== null &&
+        savedActiveBlock >= 0 &&
+        savedActiveBlock < activeRoutine.data.blocks.length
+      ) {
+        blockIndex = savedActiveBlock;
+      } else {
+        blockIndex = 0;
+      }
+    } catch (error) {
+      blockIndex = 0;
+    }
+
+    const block = activeRoutine.data.blocks[blockIndex];
+    if (!block || !block.weeks) return null;
+
+    let currentWeek = 1;
+    const totalWeeks = spanOf(block.weeks);
+
+    try {
+      const bookmarkData = await WorkoutStorage.getBookmark(block.block_name);
+
+      if (bookmarkData?.isBookmarked) {
+        currentWeek = bookmarkData.week;
+      } else {
+        for (let week = 1; week <= totalWeeks; week++) {
+          const key = `completed_${block.block_name}_week${week}`;
+
+          let completed = await RobustStorage.getItem(key, true);
+          if (!completed) {
+            completed = await AsyncStorage.getItem(key);
+          }
+
+          let completedWorkouts: string[] = [];
+          if (completed) {
+            try {
+              const parsedCompleted = JSON.parse(completed);
+              completedWorkouts = Array.isArray(parsedCompleted) ? parsedCompleted : [];
+            } catch (error) {
+              completedWorkouts = [];
+            }
+          }
+
+          if (!completedWorkouts || completedWorkouts.length === 0) {
+            currentWeek = week;
+            break;
+          }
+
+          const workoutDays = block.days.filter(day =>
+            day.day_name && !day.day_name.toLowerCase().includes('rest')
+          );
+
+          const allDaysCompleted = workoutDays.every(day => {
+            const expectedKey = `${day.day_name}_week${week}`;
+            return completedWorkouts.includes(expectedKey);
+          });
+
+          if (!allDaysCompleted) {
+            currentWeek = week;
+            break;
+          }
+
+          if (week === totalWeeks) {
+            currentWeek = totalWeeks;
+          }
+        }
+      }
+    } catch (error) {
+      currentWeek = 1;
+    }
+
+    let priorWeeks = 0;
+    for (let i = 0; i < blockIndex; i++) {
+      priorWeeks += spanOf(activeRoutine.data.blocks[i]?.weeks);
+    }
+    const programTotalWeeks = activeRoutine.data.blocks.reduce(
+      (t: number, b: any) => t + spanOf(b?.weeks),
+      0
+    );
+
+    return {
+      blockIndex,
+      block,
+      currentWeek,
+      totalWeeks,
+      programWeek: priorWeeks + currentWeek,
+      programTotalWeeks,
+    };
+  };
+
   const handleGoToTodayWorkoutForRoutine = async (activeRoutine: WorkoutRoutine) => {
     try {
       if (!activeRoutine.data?.blocks || activeRoutine.data.blocks.length === 0) {
@@ -849,21 +966,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         return;
       }
 
-      let activeBlockIndex = 0;
-      try {
-        const savedActiveBlock = await WorkoutStorage.getActiveBlock(activeRoutine.id);
-        if (savedActiveBlock !== null && savedActiveBlock >= 0 && savedActiveBlock < activeRoutine.data.blocks.length) {
-          activeBlockIndex = savedActiveBlock;
-        } else {
-          activeBlockIndex = 0;
-        }
-      } catch (error) {
-        activeBlockIndex = 0;
-      }
+      const pos = await resolveBlockPosition(activeRoutine);
 
-      const activeBlock = activeRoutine.data.blocks[activeBlockIndex];
-
-      if (!activeBlock || !activeBlock.weeks) {
+      if (!pos || !pos.block) {
         Alert.alert(
           'Invalid Block',
           'The selected workout block is missing or invalid.',
@@ -872,68 +977,10 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         return;
       }
 
-      let currentWeek = 1;
-      const totalWeeks = activeBlock.weeks.includes('-')
-        ? parseInt(activeBlock.weeks.split('-')[1]) - parseInt(activeBlock.weeks.split('-')[0]) + 1
-        : 1;
-
-      try {
-        const bookmarkData = await WorkoutStorage.getBookmark(activeBlock.block_name);
-
-        if (bookmarkData?.isBookmarked) {
-          currentWeek = bookmarkData.week;
-        } else {
-          for (let week = 1; week <= totalWeeks; week++) {
-            const key = `completed_${activeBlock.block_name}_week${week}`;
-
-            let completed = await RobustStorage.getItem(key, true);
-            if (!completed) {
-              completed = await AsyncStorage.getItem(key);
-            }
-
-            let completedWorkouts: string[] = [];
-            if (completed) {
-              try {
-                const parsedCompleted = JSON.parse(completed);
-                completedWorkouts = Array.isArray(parsedCompleted) ? parsedCompleted : [];
-              } catch (error) {
-                completedWorkouts = [];
-              }
-            }
-
-            if (!completedWorkouts || completedWorkouts.length === 0) {
-              currentWeek = week;
-              break;
-            }
-
-            const workoutDays = activeBlock.days.filter(day =>
-              day.day_name && !day.day_name.toLowerCase().includes('rest')
-            );
-
-            const allDaysCompleted = workoutDays.every(day => {
-              const expectedKey = `${day.day_name}_week${week}`;
-              return completedWorkouts.includes(expectedKey);
-            });
-
-            if (!allDaysCompleted) {
-              currentWeek = week;
-              break;
-            }
-
-            if (week === totalWeeks) {
-              currentWeek = totalWeeks;
-            }
-          }
-        }
-      } catch (error) {
-        currentWeek = 1;
-      }
-
-      const todayActiveBlock = activeRoutine.data.blocks[activeBlockIndex];
       navigation.navigate('Days' as any, {
-        block: todayActiveBlock,
+        block: pos.block,
         routineName: activeRoutine.name,
-        initialWeek: currentWeek
+        initialWeek: pos.currentWeek
       });
 
     } catch (error) {
@@ -955,6 +1002,45 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   };
 
   const weekDays = getWeekDays(workoutDates);
+
+  // Resolve the CURRENT routine's position (block name + program week) for
+  // the hero card badge. Best-effort: any failure just hides the badge.
+  const [heroPosition, setHeroPosition] = useState<{
+    blockName: string;
+    programWeek: number;
+    programTotalWeeks: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const current = routines[0];
+    if (!current) {
+      setHeroPosition(null);
+      return;
+    }
+    (async () => {
+      try {
+        const pos = await resolveBlockPosition(current);
+        if (!cancelled) {
+          setHeroPosition(
+            pos
+              ? {
+                  blockName: pos.block?.block_name || '',
+                  programWeek: pos.programWeek,
+                  programTotalWeeks: pos.programTotalWeeks,
+                }
+              : null
+          );
+        }
+      } catch {
+        if (!cancelled) setHeroPosition(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routines]);
 
   // ==========================================================================
   // Render helpers
@@ -1153,20 +1239,70 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             }
           >
             <Text style={styles.title}>Workouts</Text>
-            {routines.length > 1 && (
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionLabel}>YOUR PLANS</Text>
-              </View>
-            )}
+            <View style={styles.sectionHeaderActionRow}>
+              <Text style={styles.sectionLabel}>YOUR PLANS</Text>
+              <TouchableOpacity
+                onPress={openCreateFlow}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Create a new workout plan"
+              >
+                <Text style={[styles.sectionAction, { color: themeColor }]}>+ New plan</Text>
+              </TouchableOpacity>
+            </View>
 
             {routines.map((routine, idx) => {
               const isPrimary = idx === 0;
+              if (!isPrimary) {
+                return (
+                  <View key={routine.id} style={styles.planRow}>
+                    <RNTouchable
+                      style={styles.planRowMenuBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleActionRequest(routine);
+                      }}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="More options"
+                    >
+                      <Ionicons name="ellipsis-horizontal" size={15} color="#a1a1aa" />
+                    </RNTouchable>
+
+                    <Pressable
+                      style={styles.planRowInfo}
+                      onPress={() => navigation.navigate('Blocks' as any, { routine })}
+                      onLongPress={() => handleActionRequest(routine)}
+                      delayLongPress={600}
+                    >
+                      <Text style={styles.planRowTitle} numberOfLines={1}>
+                        {routine.name}
+                      </Text>
+                      <Text style={styles.planRowSub} numberOfLines={1}>
+                        {routine.days} days / week · {routine.blocks} {routine.blocks === 1 ? 'block' : 'blocks'}
+                      </Text>
+                    </Pressable>
+
+                    <TouchableOpacity
+                      style={styles.planRowGo}
+                      onPress={() => handleGoToTodayWorkoutForRoutine(routine)}
+                      activeOpacity={0.85}
+                      accessibilityRole="button"
+                      accessibilityLabel="Start today's workout"
+                    >
+                      <Ionicons name="play" size={15} color="#d4d4d8" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
               return (
                 <View
                   key={routine.id}
                   style={[
-                    isPrimary ? styles.planCardPrimary : styles.planCardSecondary,
-                    isPrimary && {
+                    styles.planCardPrimary,
+                    {
                       borderColor: themeColor,
                       shadowColor: themeColor,
                     },
@@ -1183,64 +1319,73 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                     accessibilityRole="button"
                     accessibilityLabel="More options"
                   >
-                    <Ionicons name="ellipsis-horizontal" size={isPrimary ? 18 : 16} color="#a1a1aa" />
+                    <Ionicons name="ellipsis-horizontal" size={18} color="#a1a1aa" />
                   </RNTouchable>
-
-                  {isPrimary && (
-                    <Text style={[styles.planEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
-                  )}
 
                   <Pressable
                     onPress={() => navigation.navigate('Blocks' as any, { routine })}
                     onLongPress={() => handleActionRequest(routine)}
                     delayLongPress={600}
                   >
-                    <Text style={isPrimary ? styles.planTitlePrimary : styles.planTitleSecondary} numberOfLines={2}>
+                    <View style={styles.planEyebrowRow}>
+                      <Text style={[styles.planEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
+                      {heroPosition && heroPosition.programTotalWeeks > 0 && (
+                        <View style={styles.planWeekBadge}>
+                          <Text style={styles.planWeekBadgeText}>
+                            WEEK {heroPosition.programWeek} OF {heroPosition.programTotalWeeks}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.planTitlePrimary} numberOfLines={2}>
                       {routine.name}
                     </Text>
-                    <Text style={isPrimary ? styles.planSubtitlePrimary : styles.planSubtitleSecondary}>
-                      {routine.days} days / week · {routine.blocks} {routine.blocks === 1 ? 'block' : 'blocks'}
+                    <Text style={styles.planSubtitlePrimary}>
+                      {heroPosition?.blockName ? `${heroPosition.blockName} · ` : ''}
+                      {routine.days} days / week
+                      {heroPosition?.blockName ? '' : ` · ${routine.blocks} ${routine.blocks === 1 ? 'block' : 'blocks'}`}
                     </Text>
                   </Pressable>
 
-                  {isPrimary ? (
-                    <>
-                      <TouchableOpacity
-                        style={[styles.planStartBtnPrimary, { backgroundColor: themeColor, shadowColor: themeColor }]}
-                        onPress={() => handleGoToTodayWorkoutForRoutine(routine)}
-                        activeOpacity={0.85}
-                        accessibilityRole="button"
-                        accessibilityLabel="Start today's workout"
-                      >
-                        <Ionicons name="play" size={14} color="#0a0a0b" />
-                        <Text style={styles.planStartBtnPrimaryText}>Start today's workout</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.planViewLink}
-                        onPress={() => navigation.navigate('Blocks' as any, { routine })}
-                        activeOpacity={0.6}
-                      >
-                        <Text style={[styles.planViewLinkText, { color: themeColor }]}>View full plan</Text>
-                        <Ionicons name="chevron-forward" size={13} color={themeColor} />
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.planStartBtnSecondary}
-                      onPress={() => handleGoToTodayWorkoutForRoutine(routine)}
-                      activeOpacity={0.85}
-                    >
-                      <Ionicons name="play" size={13} color="#d4d4d8" />
-                      <Text style={styles.planStartBtnSecondaryText}>Start today's workout</Text>
-                    </TouchableOpacity>
+                  {heroPosition && heroPosition.programTotalWeeks > 0 && (
+                    <View style={styles.planProgressTrack}>
+                      <View
+                        style={[
+                          styles.planProgressFill,
+                          {
+                            backgroundColor: themeColor,
+                            width: `${Math.min(100, Math.round((heroPosition.programWeek / heroPosition.programTotalWeeks) * 100))}%`,
+                          },
+                        ]}
+                      />
+                    </View>
                   )}
+
+                  <TouchableOpacity
+                    style={[styles.planStartBtnPrimary, { backgroundColor: themeColor, shadowColor: themeColor }]}
+                    onPress={() => handleGoToTodayWorkoutForRoutine(routine)}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Start today's workout"
+                  >
+                    <Ionicons name="play" size={14} color="#0a0a0b" />
+                    <Text style={styles.planStartBtnPrimaryText}>Start today's workout</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.planViewLink}
+                    onPress={() => navigation.navigate('Blocks' as any, { routine })}
+                    activeOpacity={0.6}
+                  >
+                    <Text style={[styles.planViewLinkText, { color: themeColor }]}>View full plan</Text>
+                    <Ionicons name="chevron-forward" size={13} color={themeColor} />
+                  </TouchableOpacity>
                 </View>
               );
             })}
 
-            {renderBulkingPrograms()}
             {renderWeekStrip()}
+            {renderBulkingPrograms()}
           </ScrollView>
         )}
       </Animated.View>
@@ -1678,6 +1823,103 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#71717a',
     letterSpacing: 1.2,
+  },
+
+  // ===== "YOUR PLANS" row with the + New plan action =====
+  sectionHeaderActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+    marginBottom: 10,
+  },
+  sectionAction: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // ===== Hero additions: eyebrow row, week badge, program progress =====
+  planEyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+    paddingRight: 30,
+  },
+  planWeekBadge: {
+    backgroundColor: '#1c1c21',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  planWeekBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: '#a1a1aa',
+  },
+  planProgressTrack: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#1f1f24',
+    overflow: 'hidden',
+    marginBottom: 15,
+  },
+  planProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  // ===== Compact secondary plan rows =====
+  planRow: {
+    backgroundColor: '#18181b',
+    borderRadius: 14,
+    borderColor: '#27272a',
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    position: 'relative',
+  },
+  planRowInfo: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 20,
+  },
+  planRowTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  planRowSub: {
+    color: '#71717a',
+    fontSize: 12,
+  },
+  planRowGo: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#3f3f46',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planRowMenuBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
 
   planCardPrimary: {

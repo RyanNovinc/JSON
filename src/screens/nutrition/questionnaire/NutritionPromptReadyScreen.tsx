@@ -39,7 +39,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { WorkoutStorage } from '../../../utils/storage';
-import { assembleMealPlanningPrompt } from '../../../data/mealPlanningPrompt';
+import { assembleMealPlanPromptV2 } from '../../../utils/mealPlanPromptV2';
 import { AIProvider } from '../../../components/questionnaire/AILaunchSheet';
 import { useSimplifiedMealPlanning } from '../../../contexts/SimplifiedMealPlanningContext';
 import { useMealPlanImport } from '../../../hooks/useMealPlanImport';
@@ -160,10 +160,10 @@ export default function NutritionPromptReadyScreen() {
         setPromptPreview(buildNutritionPreview(nutrition, budget));
 
         try {
-          const assembled = await assembleMealPlanningPrompt();
+          const assembled = await assembleMealPlanPromptV2();
           setPrompt(assembled);
         } catch (promptErr) {
-          console.error('assembleMealPlanningPrompt failed', promptErr);
+          console.error('assembleMealPlanPromptV2 failed', promptErr);
           // Leave prompt empty; ensureCopied guards on this.
         }
       } catch (e) {

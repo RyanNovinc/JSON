@@ -14,6 +14,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import WorkoutPreviewScreen from '../screens/WorkoutPreviewScreen';
+import MealPlanPreviewScreen from '../screens/MealPlanPreviewScreen';
 import SamplePlanDetailScreen from '../screens/SamplePlanDetailScreen';
 // ModeTransitionContainer is no longer wired in — mode switching is now via
 // the bottom tab bar. Import kept in case it's needed elsewhere.
@@ -165,6 +166,17 @@ export type RootStackParamList = {
       data?: any;
       programId?: string;
       mesocycleNumber?: number;
+      fingerprint?: string;
+      createdAt?: number;
+    };
+  };
+  MealPlanPreview: {
+    plan: {
+      id: string;
+      name: string;
+      duration: number;
+      meals: number;
+      data?: any;
       fingerprint?: string;
       createdAt?: number;
     };
@@ -733,6 +745,18 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               <RootStack.Screen
                 name="WorkoutPreview"
                 component={WorkoutPreviewScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              {/* MealPlanPreview — summary + import screen for saved meal plans */}
+              <RootStack.Screen
+                name="MealPlanPreview"
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <MealPlanPreviewScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
                 options={{
                   headerShown: false,
                 }}

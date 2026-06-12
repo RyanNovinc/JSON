@@ -428,14 +428,21 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
         await ProgramStorage.addProgram(program);
       }
       
-      // For curated imports, check for existing routine with same fingerprint
+      // Check for existing routine with same fingerprint (curated or generated)
+      const existingRoutines = await WorkoutStorage.loadRoutines();
+      let fingerprint: string | undefined;
+      
       if (isCurated && curatedSlug) {
-        const curatedFingerprint = `curated:${curatedSlug}`;
-        const existingRoutines = await WorkoutStorage.loadRoutines();
-        const existingRoutine = existingRoutines.find(r => r.fingerprint === curatedFingerprint);
+        fingerprint = `curated:${curatedSlug}`;
+      } else if (importedProgram.fingerprint) {
+        fingerprint = importedProgram.fingerprint;
+      }
+      
+      if (fingerprint) {
+        const existingRoutine = existingRoutines.find(r => r.fingerprint === fingerprint);
         
         if (existingRoutine) {
-          console.log(`🔍 Found existing curated program: ${existingRoutine.name}`);
+          console.log(`🔍 Found existing program with fingerprint ${fingerprint}: ${existingRoutine.name}`);
           // TODO: Navigate to existing routine and show toast
           // For now, call the import complete callback with the existing routine's data
           if (onImportComplete && existingRoutine.data) {
@@ -460,9 +467,9 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
       
       
       // Save the routine
-      const existingRoutines = await WorkoutStorage.loadRoutines();
-      existingRoutines.push(newRoutine);
-      await WorkoutStorage.saveRoutines(existingRoutines);
+      const allRoutines = await WorkoutStorage.loadRoutines();
+      allRoutines.push(newRoutine);
+      await WorkoutStorage.saveRoutines(allRoutines);
       
       // Handle custom mesocycles if any
       if (customMesocycles.length > 0) {
@@ -1107,6 +1114,10 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
       detailedError += `"${text.substring(0, 100).replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}"`;
       
       setErrorMessage(detailedError);
+      // Clear awaiting_import flag on parse failure
+      WorkoutStorage.setAwaitingImport(false).catch(e => 
+        console.error('Failed to clear awaiting import flag on parse error:', e)
+      );
       return null;
     }
     
@@ -1582,7 +1593,14 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
   };
 
   // 26. handleModalCancel (verbatim copy with mechanical edit)
-  const handleModalCancel = () => {
+  const handleModalCancel = async () => {
+    // Clear awaiting_import flag on cancel to prevent stuck banner
+    try {
+      await WorkoutStorage.setAwaitingImport(false);
+    } catch (error) {
+      console.error('Failed to clear awaiting import flag on cancel:', error);
+    }
+    
     // If this was from a shared import (shareId or prefilledJson), navigate back to home instead of staying here
     if (prefilledJson || shareId) {
       setPrefilledCancelled(true);

@@ -112,16 +112,25 @@ class RobustStorage {
             console.log(`🔐 [ROBUST-STORAGE] ✅ Critical data saved and verified after ${verificationAttempts} attempts`);
             
             // EXTRA AGGRESSIVE: Save to additional emergency locations immediately
+            const sanitizedKey = key.replace(/[^a-zA-Z0-9]/g, '_');
+            const keyHash = this.generateChecksum(key); // Use key as hash for uniqueness
             const emergencyKeys = [
-              `${key}_emergency_${Date.now()}`,
-              `emergency_${key.replace(/[^a-zA-Z0-9]/g, '_')}`,
-              `backup_critical_${timestamp}`
+              `${sanitizedKey}_emergency_${timestamp}`,
+              `emergency_${sanitizedKey}_${keyHash}`,
+              `backup_critical_${sanitizedKey}_${timestamp}`
             ];
             
             console.log(`🔐 [ROBUST-STORAGE] 🆘 Saving to ${emergencyKeys.length} emergency locations...`);
             for (const emergencyKey of emergencyKeys) {
               try {
-                await AsyncStorage.setItem(emergencyKey, value);
+                // Create backup with metadata to verify ownership
+                const backupData = {
+                  originalKey: key,
+                  data: value,
+                  timestamp,
+                  checksum: this.generateChecksum(value)
+                };
+                await AsyncStorage.setItem(emergencyKey, JSON.stringify(backupData));
                 console.log(`🔐 [ROBUST-STORAGE] ✅ Emergency backup saved: ${emergencyKey}`);
               } catch (error) {
                 console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Emergency backup failed: ${emergencyKey}`, error);
@@ -169,6 +178,36 @@ class RobustStorage {
         return await AsyncStorageDebugger.getItem(key);
       }
 
+      // Check for tombstones first - if key was explicitly deleted, don't resurrect it
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const tombstones = allKeys.filter(k => k.startsWith(`tombstone_${key}_`));
+        
+        for (const tombstoneKey of tombstones) {
+          try {
+            const tombstoneData = await AsyncStorageDebugger.getItem(tombstoneKey);
+            if (tombstoneData) {
+              const tombstone = JSON.parse(tombstoneData);
+              if (tombstone.deletedKey === key) {
+                // Check if tombstone is still valid (not expired)
+                if (tombstone.tombstoneExpiry && Date.now() < tombstone.tombstoneExpiry) {
+                  console.log(`🔐 [ROBUST-STORAGE] 🪦 Key "${key}" is tombstoned, refusing to resurrect`);
+                  return null;
+                } else {
+                  // Expired tombstone, clean it up
+                  console.log(`🔐 [ROBUST-STORAGE] 🧹 Cleaning up expired tombstone: ${tombstoneKey}`);
+                  await AsyncStorageDebugger.removeItem(tombstoneKey);
+                }
+              }
+            }
+          } catch (tombstoneError) {
+            console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Failed to check tombstone ${tombstoneKey}:`, tombstoneError);
+          }
+        }
+      } catch (error) {
+        console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Failed to check tombstones:`, error);
+      }
+
       const keys = this.getBackupKeys(key);
       
       // Try to get metadata first
@@ -188,13 +227,16 @@ class RobustStorage {
       // Try primary, then backups, then emergency backups
       const keysToTry = [keys.primary, keys.backup1, keys.backup2];
       
-      // AGGRESSIVE MODE: Also check for emergency backups
+      // AGGRESSIVE MODE: Also check for emergency backups - key-specific matching
       try {
         const allKeys = await AsyncStorage.getAllKeys();
+        const sanitizedKey = key.replace(/[^a-zA-Z0-9]/g, '_');
+        const keyHash = this.generateChecksum(key);
+        
         const emergencyKeys = allKeys.filter(k => 
-          k.includes(`${key}_emergency_`) || 
-          k.includes(`emergency_${key.replace(/[^a-zA-Z0-9]/g, '_')}`) ||
-          k.includes('backup_critical_')
+          k.includes(`${sanitizedKey}_emergency_`) || 
+          k.includes(`emergency_${sanitizedKey}_${keyHash}`) ||
+          k.includes(`backup_critical_${sanitizedKey}_`)
         );
         keysToTry.push(...emergencyKeys);
         console.log(`🔐 [ROBUST-STORAGE] 🔍 Found ${emergencyKeys.length} emergency backup keys to try`);
@@ -206,27 +248,51 @@ class RobustStorage {
         const data = await AsyncStorageDebugger.getItem(keyToTry);
         
         if (data !== null) {
+          let actualData = data;
+          let actualChecksum = expectedChecksum;
+          
+          // Check if this is an emergency backup with metadata
+          if (keyToTry.includes('_emergency_') || keyToTry.includes('emergency_') || keyToTry.includes('backup_critical_')) {
+            try {
+              const backupData = JSON.parse(data);
+              if (backupData.originalKey && backupData.data) {
+                // Verify ownership - backup must belong to the requested key
+                if (backupData.originalKey !== key) {
+                  console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Backup ownership mismatch: ${keyToTry} belongs to "${backupData.originalKey}", not "${key}"`);
+                  continue;
+                }
+                
+                actualData = backupData.data;
+                actualChecksum = backupData.checksum || expectedChecksum;
+                console.log(`🔐 [ROBUST-STORAGE] ✅ Emergency backup ownership verified for ${keyToTry}`);
+              }
+            } catch (parseError) {
+              // Legacy backup without metadata, treat as raw data
+              console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Legacy emergency backup format: ${keyToTry}`);
+            }
+          }
+          
           // Verify checksum if we have it
-          if (expectedChecksum) {
-            const dataChecksum = this.generateChecksum(data);
-            if (dataChecksum === expectedChecksum) {
+          if (actualChecksum) {
+            const dataChecksum = this.generateChecksum(actualData);
+            if (dataChecksum === actualChecksum) {
               console.log(`🔐 [ROBUST-STORAGE] ✅ Retrieved valid data from ${keyToTry}`);
               
               // If this wasn't the primary key, restore to primary
               if (keyToTry !== keys.primary) {
                 console.log(`🔐 [ROBUST-STORAGE] 🔄 Restoring data to primary key`);
-                await this.setItem(key, data, true);
+                await this.setItem(key, actualData, true);
               }
               
-              return data;
+              return actualData;
             } else {
-              console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Checksum mismatch for ${keyToTry} (expected: ${expectedChecksum}, got: ${dataChecksum})`);
+              console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Checksum mismatch for ${keyToTry} (expected: ${actualChecksum}, got: ${dataChecksum})`);
               continue;
             }
           } else {
             // No checksum available, return the data but warn
             console.warn(`🔐 [ROBUST-STORAGE] ⚠️ No checksum verification possible for ${keyToTry}`);
-            return data;
+            return actualData;
           }
         }
       }
@@ -286,8 +352,8 @@ class RobustStorage {
     }
   }
 
-  // Remove item and all its backups
-  static async removeItem(key: string, critical: boolean = true): Promise<boolean> {
+  // Remove item and ALL its copies (primary, backups, emergency, cross-session)
+  static async removeItem(key: string, critical: boolean = true, createTombstone: boolean = true): Promise<boolean> {
     console.log(`🔐 [ROBUST-STORAGE] Removing key: "${key}" (critical: ${critical})`);
     
     try {
@@ -295,6 +361,7 @@ class RobustStorage {
         return await AsyncStorageDebugger.removeItem(key);
       }
 
+      // Get all standard backup keys
       const keys = this.getBackupKeys(key);
       const removePromises = [
         AsyncStorageDebugger.removeItem(keys.primary),
@@ -303,11 +370,67 @@ class RobustStorage {
         AsyncStorageDebugger.removeItem(keys.metadata)
       ];
 
+      // Find and remove ALL emergency backups for this key
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const sanitizedKey = key.replace(/[^a-zA-Z0-9]/g, '_');
+        const keyHash = this.generateChecksum(key);
+        
+        const emergencyKeys = allKeys.filter(k => 
+          k.includes(`${sanitizedKey}_emergency_`) || 
+          k.includes(`emergency_${sanitizedKey}_${keyHash}`) ||
+          k.includes(`backup_critical_${sanitizedKey}_`)
+        );
+
+        console.log(`🔐 [ROBUST-STORAGE] Found ${emergencyKeys.length} emergency keys to remove for "${key}"`);
+        
+        // Add emergency key removals
+        for (const emergencyKey of emergencyKeys) {
+          removePromises.push(AsyncStorageDebugger.removeItem(emergencyKey));
+        }
+      } catch (emergencyError) {
+        console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Failed to find emergency keys:`, emergencyError);
+      }
+
+      // Remove from cross-session storage
+      try {
+        const crossSessionKeys = await AsyncStorage.getAllKeys();
+        const crossKeys = crossSessionKeys.filter(k => 
+          k.startsWith(`cross_${key}_`) || k === `cross_latest_${key}`
+        );
+        
+        console.log(`🔐 [ROBUST-STORAGE] Found ${crossKeys.length} cross-session keys to remove for "${key}"`);
+        
+        for (const crossKey of crossKeys) {
+          removePromises.push(AsyncStorageDebugger.removeItem(crossKey));
+        }
+      } catch (crossError) {
+        console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Failed to find cross-session keys:`, crossError);
+      }
+
+      // Execute all removals
       const results = await Promise.all(removePromises);
       const successCount = results.filter(Boolean).length;
       
-      console.log(`🔐 [ROBUST-STORAGE] Removed from ${successCount}/4 locations`);
-      return successCount >= 2;
+      // Create tombstone to prevent resurrection during recovery (only for intentional deletions)
+      if (createTombstone) {
+        const tombstoneKey = `tombstone_${key}_${Date.now()}`;
+        try {
+          await AsyncStorageDebugger.setItem(tombstoneKey, JSON.stringify({
+            deletedKey: key,
+            deletedAt: new Date().toISOString(),
+            tombstoneExpiry: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+          }));
+          console.log(`🔐 [ROBUST-STORAGE] Created tombstone: ${tombstoneKey}`);
+        } catch (tombstoneError) {
+          console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Failed to create tombstone:`, tombstoneError);
+        }
+      } else {
+        console.log(`🔐 [ROBUST-STORAGE] Skipping tombstone creation (test cleanup)`);
+      }
+      
+      console.log(`🔐 [ROBUST-STORAGE] Removed from ${successCount}/${removePromises.length} locations`);
+      return successCount >= 2; // Require at least primary + backup removal
       
     } catch (error) {
       console.error(`🔐 [ROBUST-STORAGE] Error in removeItem:`, error);

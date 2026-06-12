@@ -35,8 +35,9 @@ export default function WorkoutGeneratorStep1New({ onNext, onBack }: WorkoutGene
         WorkoutStorage.loadEquipmentPreferencesResults(),
       ]);
 
-      const fitnessGoals: any = fitnessGoalsData || {};
-      const equipmentPrefs: any = equipmentPreferencesData || {};
+      // Only use completed questionnaire data to prevent incomplete answers from being used
+      const fitnessGoals: any = (fitnessGoalsData?.completedAt) ? fitnessGoalsData : {};
+      const equipmentPrefs: any = (equipmentPreferencesData?.completedAt) ? equipmentPreferencesData : {};
 
       const consolidatedData: QuestionnaireData = {
         // From fitnessGoalsData

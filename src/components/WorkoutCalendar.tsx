@@ -28,7 +28,7 @@ interface WorkoutCalendarProps {
 export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCalendarProps) {
   const navigation = useNavigation();
   const { themeColor } = useTheme();
-  const { convertWeight } = useWeightUnit();
+  const { convertWeight, globalUnit } = useWeightUnit();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [workoutDays, setWorkoutDays] = useState<Map<string, any[]>>(new Map());
@@ -69,6 +69,24 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
     let currentMonthVolume = 0;
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
+    
+    // Optional: Unit mismatch detection for UX hint
+    const unitCounts = { kg: 0, lbs: 0, undefined: 0 };
+    history.forEach(workout => {
+      workout.sets?.forEach(set => {
+        const unit = set.unit || 'undefined';
+        unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+      });
+    });
+    
+    const totalSets = unitCounts.kg + unitCounts.lbs + unitCounts.undefined;
+    const dominantUnit = unitCounts.kg > unitCounts.lbs ? 'kg' : 'lbs';
+    const isUnitMismatch = totalSets > 10 && unitCounts[dominantUnit] / totalSets > 0.7 && 
+                          dominantUnit !== globalUnit;
+    
+    if (isUnitMismatch) {
+      console.log(`💡 Unit Notice: Most of your history (${Math.round(unitCounts[dominantUnit] / totalSets * 100)}%) uses ${dominantUnit}, but your current preference is ${globalUnit}. Check Profile → Weight Units if needed.`);
+    }
 
     history.forEach((workout: any) => {
       let dateKey: string;
@@ -90,34 +108,34 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
         if (workoutData.sets && Array.isArray(workoutData.sets)) {
           workoutData.sets.forEach((set: any) => {
             const weight = parseFloat(set.weight) || 0;
-            const weightInKg = convertWeight(weight, set.unit || 'kg', 'kg');
+            const weightInUserUnit = convertWeight(weight, set.unit || 'kg', globalUnit);
             const reps = parseInt(set.reps) || 0;
-            volume += weightInKg * reps;
+            volume += weightInUserUnit * reps;
 
             if (set.drops && Array.isArray(set.drops)) {
               set.drops.forEach((drop: any) => {
                 if (drop.completed !== false) {
                   const dropWeight = parseFloat(drop.weight) || 0;
-                  const dropWeightInKg = convertWeight(dropWeight, drop.unit || 'kg', 'kg');
+                  const dropWeightInUserUnit = convertWeight(dropWeight, drop.unit || 'kg', globalUnit);
                   const dropReps = parseInt(drop.reps) || 0;
-                  volume += dropWeightInKg * dropReps;
+                  volume += dropWeightInUserUnit * dropReps;
                 }
               });
             }
           });
         } else {
           const weight = parseFloat(workoutData.weight) || 0;
-          const weightInKg = convertWeight(weight, workoutData.unit || 'kg', 'kg');
+          const weightInUserUnit = convertWeight(weight, workoutData.unit || 'kg', globalUnit);
           const reps = parseInt(workoutData.reps) || 0;
-          volume += weightInKg * reps;
+          volume += weightInUserUnit * reps;
 
           if (workoutData.drops && Array.isArray(workoutData.drops)) {
             workoutData.drops.forEach((drop: any) => {
               if (drop.completed !== false) {
                 const dropWeight = parseFloat(drop.weight) || 0;
-                const dropWeightInKg = convertWeight(dropWeight, drop.unit || 'kg', 'kg');
+                const dropWeightInUserUnit = convertWeight(dropWeight, drop.unit || 'kg', globalUnit);
                 const dropReps = parseInt(drop.reps) || 0;
-                volume += dropWeightInKg * dropReps;
+                volume += dropWeightInUserUnit * dropReps;
               }
             });
           }
@@ -385,12 +403,12 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
             <StatCard
               label="ALL VOLUME"
               value={Math.round(totalVolumeLifted).toLocaleString()}
-              unit="kg"
+              unit={globalUnit}
             />
             <StatCard
               label="MONTH VOLUME"
               value={Math.round(monthlyVolumeLifted).toLocaleString()}
-              unit="kg"
+              unit={globalUnit}
             />
           </View>
         </ScrollView>
@@ -455,7 +473,7 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
                     <View style={styles.setsTable}>
                       <View style={styles.setsTableHeader}>
                         <Text style={[styles.setsTableHeaderCell, { width: 36 }]}>SET</Text>
-                        <Text style={[styles.setsTableHeaderCell, { flex: 1 }]}>KG</Text>
+                        <Text style={[styles.setsTableHeaderCell, { flex: 1 }]}>{globalUnit.toUpperCase()}</Text>
                         <Text style={[styles.setsTableHeaderCell, { flex: 1 }]}>REPS</Text>
                       </View>
 
@@ -466,7 +484,7 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
                               {workout.setNumber || index + 1}
                             </Text>
                             <Text style={[styles.setValue, { flex: 1, color: themeColor }]}>
-                              {workout.weight}
+                              {convertWeight(parseFloat(workout.weight) || 0, workout.unit || 'kg', globalUnit)}
                             </Text>
                             <Text style={[styles.setValue, { flex: 1 }]}>
                               {workout.reps}
@@ -479,7 +497,7 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
                                 <View key={dropIndex} style={styles.dropSetRow}>
                                   <Text style={[styles.dropSetLabel, { width: 36 }]}>↳</Text>
                                   <Text style={[styles.dropSetValue, { flex: 1, color: hexA(themeColor, 0.7) }]}>
-                                    {drop.weight}
+                                    {convertWeight(parseFloat(drop.weight) || 0, drop.unit || 'kg', globalUnit)}
                                   </Text>
                                   <Text style={[styles.dropSetValue, { flex: 1 }]}>
                                     {drop.reps}

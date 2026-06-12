@@ -17,8 +17,15 @@
 //  - Fridge & pantry removed entirely (dead in the curated model).
 //  - Refinements (eating challenges) folded into the "Your answers" table as
 //    a normal row instead of its own section.
-//  - Soft gate on Continue: if no meals are picked, confirm before proceeding
-//    (the AI would otherwise invent the whole plan). Not a hard block.
+//  - Picks now happen ON the rails: N9 resets to CuratedFavorites with this
+//    summary underneath in the stack, so by the time anyone lands here they
+//    have either picked meals or explicitly tapped "Choose for me".
+//  - Soft-gate Alert on Continue REMOVED: the encounter is structural now,
+//    and an empty selection is the output of a sanctioned skip — re-asking
+//    here would be a second ask at the worst moment, with "Continue anyway"
+//    styled destructive against a choice the model treats as valid.
+//  - Empty "Foods you like" card reads as delegation state ("We'll choose
+//    your meals for you — tap to take over."), not an amber warning.
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
@@ -43,7 +50,7 @@ import {
   NutritionAnswers,
 } from '../../../utils/nutritionQuestionnaireStorage';
 import { computeMacros, finalizeNutrition } from '../../../utils/nutritionMacros';
-import { loadCuratedFavorites, favoritesCount } from '../../../utils/curatedFavoritesStorage';
+import { loadCuratedFavoritesV2, picksCount } from '../../../utils/curatedFavoritesStorage';
 import { WorkoutStorage } from '../../../utils/storage';
 
 type NavProp = StackNavigationProp<any>;
@@ -224,7 +231,7 @@ export default function NutritionSummaryScreen() {
 
       (async () => {
         const data = await loadNutritionAnswers();
-        const favs = await loadCuratedFavorites();
+        const favs = await loadCuratedFavoritesV2();
         let sleepText: string | null = null;
         try {
           const sleep = await WorkoutStorage.loadSleepOptimizationResults();
@@ -243,7 +250,7 @@ export default function NutritionSummaryScreen() {
         }
         if (!cancelled) {
           setAnswers(data);
-          setFavCount(favoritesCount(favs));
+          setFavCount(picksCount(favs));
           setSleepSummary(sleepText);
           setLoading(false);
           setContinuing(false);
@@ -299,8 +306,8 @@ export default function NutritionSummaryScreen() {
     navigation.push('N5cSleep' as never, { editMode: true } as never);
   };
 
-  // Proceeds to the prompt step after re-finalizing. Pulled out so both the
-  // direct path and the "Continue anyway" soft-gate path can call it.
+  // Proceeds to the prompt step after re-finalizing, so any edits made on
+  // this screen are written before the prompt screen reads the storage keys.
   const proceedToPrompt = async () => {
     if (!answers) return;
     setContinuing(true);
@@ -326,32 +333,6 @@ export default function NutritionSummaryScreen() {
 
   const handleContinue = async () => {
     if (!answers || continuing) return;
-
-    // Soft gate: in the curated model, an empty "Foods you like" selection
-    // means the AI invents the entire plan from scratch. Don't hard-block —
-    // just make the consequence clear so there's no confusion downstream.
-    if (favCount === 0) {
-      Alert.alert(
-        'No meals picked yet',
-        "Without any picks, the AI builds your whole plan from scratch. Pick a few foods you like for a plan built around them — or continue anyway.",
-        [
-          {
-            text: 'Pick foods',
-            onPress: () => navigation.push('CuratedFavorites' as never),
-          },
-          {
-            text: 'Continue anyway',
-            style: 'destructive',
-            onPress: () => {
-              void proceedToPrompt();
-            },
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
-      return;
-    }
-
     await proceedToPrompt();
   };
 
@@ -437,7 +418,7 @@ export default function NutritionSummaryScreen() {
       >
         <Text style={styles.title}>Looking good.</Text>
         <Text style={styles.subtitle}>
-          Review your plan details and add your favorite meals below.
+          Everything your plan is built from. Tap any row to change it.
         </Text>
 
         {/* Macro recap */}
@@ -523,20 +504,12 @@ export default function NutritionSummaryScreen() {
               <Text style={styles.primaryAddonTitle}>Foods you like</Text>
               <Text style={styles.primaryAddonSub}>
                 {favCount > 0
-                  ? `${favCount} meal${favCount === 1 ? '' : 's'} picked`
-                  : 'The meals your plan is built from'}
+                  ? `${favCount} pick${favCount === 1 ? '' : 's'}`
+                  : "We'll choose your meals for you — tap to take over."}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#52525b" />
           </View>
-          {favCount === 0 && (
-            <View style={styles.primaryAddonNotice}>
-              <Ionicons name="alert-circle-outline" size={14} color="#d97706" />
-              <Text style={styles.primaryAddonNoticeText}>
-                Nothing picked yet — pick meals for a plan built around your tastes
-              </Text>
-            </View>
-          )}
         </TouchableOpacity>
 
         {/* Your answers — everything completed in the flow, uniform rows */}
@@ -765,21 +738,6 @@ const styles = StyleSheet.create({
   },
   primaryAddonTitle: { fontSize: 15, fontWeight: '500', color: '#ffffff' },
   primaryAddonSub: { fontSize: 12, color: '#a1a1aa', marginTop: 2, lineHeight: 16 },
-  primaryAddonNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginTop: 13,
-    paddingTop: 13,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#27272a',
-  },
-  primaryAddonNoticeText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#d97706',
-    lineHeight: 16,
-  },
   macroTop: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 16 },
   macroCals: { fontSize: 40, fontWeight: '700', letterSpacing: -1 },
   macroCalsUnit: { fontSize: 13, color: '#71717a', marginLeft: 8 },
