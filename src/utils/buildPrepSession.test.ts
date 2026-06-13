@@ -7,7 +7,7 @@
  * Run: transpile to JS (with a stub for ../data/curated_meals) and `node` it.
  */
 
-import { buildPrepSession } from './buildPrepSession';
+import { buildPrepSession, buildPrepSessionWithFreshness, buildFreshnessIndex } from './buildPrepSession';
 import type {
   CuratedMeal,
   Plate,
@@ -328,6 +328,107 @@ const badDay = buildPrepSession(
   CURATED,
 );
 eq('day with no meals array → no crash, empty', badDay.cookAhead.length, 0);
+
+// ---------------------------------------------------------------------------
+// FRESHNESS TESTS
+// ---------------------------------------------------------------------------
+console.log('\nFRESHNESS TESTS');
+
+// Create a meal with custom fridge_days for testing
+const customFridgeMeal = makeMeal(
+  'custom_fridge',
+  [makePlate('standard', { display_name: 'Custom Fridge Meal' })],
+  [makeMethod('stovetop', 30, 20, [step('Cook')], ['stovetop'])],
+  { strategy: 'full', prep_note: 'Custom fridge meal', storage: { fridge_days: 2, freeze_months: 2 } },
+);
+
+const FRESHNESS_CURATED = { ...CURATED, custom_fridge: customFridgeMeal };
+
+// Test case a: serves-8 meal eaten days 1–7: freeze_dates = days 5,6,7 (offsets 4,5,6 with default fridge_days 4)
+const planFreshnessA = makePlan({
+  '2026-01-01': day('2026-01-01', [planMeal('Butter Chicken Day 1', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-02': day('2026-01-02', [planMeal('Butter Chicken Day 2', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-03': day('2026-01-03', [planMeal('Butter Chicken Day 3', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-04': day('2026-01-04', [planMeal('Butter Chicken Day 4', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-05': day('2026-01-05', [planMeal('Butter Chicken Day 5', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-06': day('2026-01-06', [planMeal('Butter Chicken Day 6', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-07': day('2026-01-07', [planMeal('Butter Chicken Day 7', { slug: 'butter_chicken', plateId: 'standard' })]),
+});
+const sessionA = buildPrepSessionWithFreshness(planFreshnessA, FRESHNESS_CURATED);
+eq('serves-8 meal sessionDate', sessionA?.sessionDate, '2026-01-01');
+eq('serves-8 meal has items', sessionA?.items.length, 1);
+const itemA = sessionA?.items[0];
+eq('serves-8 meal total servings', itemA?.total_servings, 7);
+eq('serves-8 meal fridge days', itemA?.freshness?.fridge_days, 4);
+eq('serves-8 meal fridge dates length', itemA?.freshness?.fridge_dates.length, 4);
+eq('serves-8 meal freeze dates', itemA?.freshness?.freeze_dates, ['2026-01-05', '2026-01-06', '2026-01-07']);
+eq('serves-8 meal freeze servings', itemA?.freshness?.freeze_servings, 3);
+check('serves-8 meal has freeze note', !!itemA?.freshness?.freeze_note);
+
+// Test case b: meal eaten days 1–3 only: freshness.freeze_dates empty, no note
+const planFreshnessB = makePlan({
+  '2026-01-01': day('2026-01-01', [planMeal('Butter Chicken B1', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-02': day('2026-01-02', [planMeal('Butter Chicken B2', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-03': day('2026-01-03', [planMeal('Butter Chicken B3', { slug: 'butter_chicken', plateId: 'standard' })]),
+});
+const sessionB = buildPrepSessionWithFreshness(planFreshnessB, FRESHNESS_CURATED);
+const itemB = sessionB?.items[0];
+eq('short meal freeze dates empty', itemB?.freshness?.freeze_dates, []);
+eq('short meal freeze servings', itemB?.freshness?.freeze_servings, 0);
+eq('short meal no freeze note', itemB?.freshness?.freeze_note, undefined);
+
+// Test case c: authored fridge_days: 2 on the meal: days 3+ flagged
+const planFreshnessC = makePlan({
+  '2026-01-01': day('2026-01-01', [planMeal('Custom Fridge C1', { slug: 'custom_fridge', plateId: 'standard' })]),
+  '2026-01-02': day('2026-01-02', [planMeal('Custom Fridge C2', { slug: 'custom_fridge', plateId: 'standard' })]),
+  '2026-01-03': day('2026-01-03', [planMeal('Custom Fridge C3', { slug: 'custom_fridge', plateId: 'standard' })]),
+  '2026-01-04': day('2026-01-04', [planMeal('Custom Fridge C4', { slug: 'custom_fridge', plateId: 'standard' })]),
+});
+const sessionC = buildPrepSessionWithFreshness(planFreshnessC, FRESHNESS_CURATED);
+const itemC = sessionC?.items[0];
+eq('custom fridge days', itemC?.freshness?.fridge_days, 2);
+eq('custom fridge freeze dates', itemC?.freshness?.freeze_dates, ['2026-01-03', '2026-01-04']);
+
+// Test case d: item whose first eat date is day 5 of the plan (cook day = session date = day 1): day 5 serving has offset 4 → frozen
+const planFreshnessD = makePlan({
+  '2026-01-01': day('2026-01-01', []),
+  '2026-01-02': day('2026-01-02', []),
+  '2026-01-03': day('2026-01-03', []),
+  '2026-01-04': day('2026-01-04', []),
+  '2026-01-05': day('2026-01-05', [planMeal('Butter Chicken D5', { slug: 'butter_chicken', plateId: 'standard' })]),
+});
+const sessionD = buildPrepSessionWithFreshness(planFreshnessD, FRESHNESS_CURATED);
+eq('late meal sessionDate', sessionD?.sessionDate, '2026-01-05');
+const itemD = sessionD?.items[0];
+eq('late meal freeze dates', itemD?.freshness?.freeze_dates, []);
+eq('late meal fridge dates', itemD?.freshness?.fridge_dates, ['2026-01-05']);
+
+// Test buildFreshnessIndex
+const indexA = buildFreshnessIndex(planFreshnessA);
+eq('freshness index size', indexA.size, 1);
+const freezeSet = indexA.get('butter_chicken_standard');
+eq('freshness index freeze dates', Array.from(freezeSet || []).sort(), ['2026-01-05', '2026-01-06', '2026-01-07']);
+
+// Test two-group offset calculation
+const planTwoGroups = makePlan({
+  '2026-01-01': day('2026-01-01', [planMeal('Butter Chicken A1', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-02': day('2026-01-02', [planMeal('Butter Chicken A2', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-03': day('2026-01-03', [planMeal('Butter Chicken A3', { slug: 'butter_chicken', plateId: 'standard' })]),
+  '2026-01-04': day('2026-01-04', []), // empty day
+  '2026-01-05': day('2026-01-05', [planMeal('Beef Stew B1', { slug: 'beef_stew', plateId: 'standard' })]),
+  '2026-01-06': day('2026-01-06', [planMeal('Beef Stew B2', { slug: 'beef_stew', plateId: 'standard' })]),
+  '2026-01-07': day('2026-01-07', [planMeal('Beef Stew B3', { slug: 'beef_stew', plateId: 'standard' })]),
+});
+const sessionTwoGroups = buildPrepSessionWithFreshness(planTwoGroups, FRESHNESS_CURATED);
+eq('two groups session date', sessionTwoGroups?.sessionDate, '2026-01-01');
+eq('two groups item count', sessionTwoGroups?.items.length, 2);
+const groupA = sessionTwoGroups?.items.find(item => item.curated_meal_slug === 'butter_chicken');
+const groupB = sessionTwoGroups?.items.find(item => item.curated_meal_slug === 'beef_stew');
+eq('group A freeze dates', groupA?.freshness?.freeze_dates, []);
+eq('group A freeze servings', groupA?.freshness?.freeze_servings, 0);
+eq('group B freeze dates', groupB?.freshness?.freeze_dates, ['2026-01-05', '2026-01-06', '2026-01-07']);
+eq('group B freeze servings', groupB?.freshness?.freeze_servings, 3);
+check('group B has freeze note', !!groupB?.freshness?.freeze_note);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed} passed, ${failed} failed`);

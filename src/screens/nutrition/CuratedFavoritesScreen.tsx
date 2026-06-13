@@ -71,6 +71,7 @@ import {
   Easing,
   Platform,
   Modal,
+  Alert,
   // RN core TouchableOpacity, aliased. Used for the ⓘ badge and the card
   // footer bar. Gesture-handler's TouchableOpacity has two layout quirks:
   // absolutely-positioned instances fail to render reliably (issues #675,
@@ -1170,6 +1171,25 @@ export default function CuratedFavoritesScreen() {
   // ---- save flow ----
   const handleBack = useCallback(() => navigation.goBack(), [navigation]);
 
+  const handleReset = useCallback(() => {
+    if (saving) return;
+    Alert.alert(
+      'Start fresh?',
+      'This clears every pick across all tabs.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear all',
+          style: 'destructive',
+          onPress: () => {
+            setSelected(new Set());
+            setPlateSheetSlug(null);
+          },
+        },
+      ]
+    );
+  }, [saving]);
+
   const openConfirm = useCallback(() => {
     if (!hasAnyPicks || saving) return;
     setConfirmOpen(true);
@@ -1251,6 +1271,15 @@ export default function CuratedFavoritesScreen() {
               <Text style={[styles.skipText, { color: themeColor }]}>
                 Choose for me
               </Text>
+            </TouchableOpacity>
+          ) : hasAnyPicks ? (
+            <TouchableOpacity
+              onPress={handleReset}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Reset. Clear all your picks and start fresh"
+            >
+              <Text style={[styles.skipText, { color: '#a1a1aa' }]}>Reset</Text>
             </TouchableOpacity>
           ) : (
             <View />

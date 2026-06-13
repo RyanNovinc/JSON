@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningCon
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMeal, SimplifiedMealPlanDay } from '../types/nutrition';
+import { buildFreshnessIndex } from '../utils/buildPrepSession';
 import RecipeFavorites from '../utils/recipeFavorites';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { getMealImage } from '../assets/mealImages';
@@ -54,9 +55,11 @@ interface MealCardProps {
   mealIcon: string;
   mealColor: string;
   isCompleted: boolean;
+  freshnessIndex: Map<string, Set<string>>;
+  currentDate: string;
 }
 
-function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, mealIcon, mealColor, isCompleted }: MealCardProps) {
+function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, mealIcon, mealColor, isCompleted, freshnessIndex, currentDate }: MealCardProps) {
   // Resolve the meal photo. Manually-logged meals carry image_filename / photo_url
   // directly. Curated meals (incl. AI-imported plans) carry only curated_meal_slug
   // + plate_id, so hydrate the image from the curated DB: per-plate image_filename
@@ -113,7 +116,25 @@ function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, me
           <Text style={[styles.mname, isCompleted && styles.mnameDone]} numberOfLines={2}>
             {meal.name || 'Unknown Meal'}
           </Text>
-          <Text style={[styles.mmacro, isCompleted && styles.mmacroDone]}>{cal} kcal · P{p} C{c} F{f}</Text>
+          <View style={styles.subtitleRow}>
+            <Text style={[styles.mmacro, isCompleted && styles.mmacroDone]}>{cal} kcal · P{p} C{c} F{f}</Text>
+            {(() => {
+              // Check if this meal needs "From freezer" chip
+              if (meal.curated_meal_slug) {
+                const key = `${meal.curated_meal_slug}_${meal.plate_id || 'standard'}`;
+                const freezeDates = freshnessIndex.get(key);
+                if (freezeDates && freezeDates.has(currentDate)) {
+                  return (
+                    <View style={styles.freezerChip}>
+                      <Ionicons name="snow-outline" size={12} color="#3b82f6" />
+                      <Text style={styles.freezerChipText}>From freezer — thaw overnight</Text>
+                    </View>
+                  );
+                }
+              }
+              return null;
+            })()}
+          </View>
         </View>
       </Pressable>
     </View>
@@ -134,6 +155,11 @@ export default function MealPlanDayScreen() {
   
   const { getFavoriteMeals } = useMealPlanning();
   const favoriteMeals = getFavoriteMeals();
+
+  // Build freshness index for freezer chips
+  const freshnessIndex = useMemo(() => {
+    return currentPlan ? buildFreshnessIndex(currentPlan) : new Map();
+  }, [currentPlan]);
 
   // Clean parameter extraction with fallback support
   const cleanParams = route.params as any;
@@ -1006,34 +1032,8 @@ export default function MealPlanDayScreen() {
   };
 
   const handleMealPress = (meal: Meal) => {
-    // If this meal maps to a curated recipe, open the rich RecipeDetail screen.
-    const slug = (meal as any).slug;
-    if (slug && (CURATED_MEALS as any)[slug]) {
-      const plateId = (meal as any).plate_id;
-      navigation.navigate('RecipeDetail', { mealSlug: slug, ...(plateId ? { plateId } : {}) } as any);
-      return;
-    }
-
-    // Otherwise (manually-logged meals with no curated source) fall back to the
-    // simple meal detail.
-    // Calculate the current viewing date using the same logic as loadCurrentDayMeals
-    let currentViewingDate = legacyCalculatedDateString || legacyDay?.date || parseDayNameToDate(legacyDay?.day_name);
-    
-    // Map dayIndex to actual plan dates (same as display logic)
-    if (currentPlan && typeof dayIndex === 'number') {
-      const availableDates = Object.keys(currentPlan.dailyMeals).sort();
-      if (dayIndex >= 0 && dayIndex < availableDates.length) {
-        currentViewingDate = availableDates[dayIndex];
-      }
-    }
-    
-    navigation.navigate('MealPlanMealDetail', {
-      meal,
-      dayName: legacyCalculatedDayName,
-      weekNumber: legacyWeekNumber,
-      mealPlanName: legacyMealPlanName,
-      dateString: currentViewingDate, // Add the date for refreshing
-    });
+    // Navigate to the nutrition MealDetailScreen for all meals
+    navigation.navigate('MealDetail', { meal } as any);
   };
 
   // Helper function to convert time string to minutes for sorting
@@ -1140,6 +1140,8 @@ export default function MealPlanDayScreen() {
                   mealIcon={getMealIcon(meal.type)}
                   mealColor={getMealColor(meal.type)}
                   isCompleted={isCompleted}
+                  freshnessIndex={freshnessIndex}
+                  currentDate={targetDate}
                 />
               );
             })}
@@ -1164,6 +1166,8 @@ export default function MealPlanDayScreen() {
                   mealIcon={getMealIcon(meal.type)}
                   mealColor={getMealColor(meal.type)}
                   isCompleted={isCompleted}
+                  freshnessIndex={freshnessIndex}
+                  currentDate={targetDate}
                 />
               );
             })}
@@ -1584,6 +1588,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: MUTED,
     marginTop: 5,
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
+  freezerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e3a8a',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    gap: 3,
+  },
+  freezerChipText: {
+    fontSize: 10,
+    color: '#60a5fa',
+    fontWeight: '500',
   },
 
   emptyState: {

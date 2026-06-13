@@ -118,7 +118,7 @@ interface Adjuster {
   curatedRef?: string; // slug to emit as curated reference
 }
 const ADJUSTERS: Adjuster[] = [
-  { id: 'whey_scoop',        unit: '30 g + water', kcal: 120, p: 24,  c: 3,  f: 1,  fib: 0, axis: 'protein',  maxPerDay: 2, curatedRef: 'protein_shake' },
+  { id: 'whey_scoop',        unit: '30 g + water', kcal: 120, p: 24,  c: 3,  f: 1.5,  fib: 0, axis: 'protein',  maxPerDay: 2 },
   { id: 'greek_yoghurt_pot', unit: '170 g',        kcal: 170, p: 17,  c: 9,  f: 6,  fib: 0, axis: 'protein',  maxPerDay: 1, curatedRef: 'greek_yogurt_snack' },
   { id: 'tuna_pouch',        unit: '95 g',         kcal: 110, p: 25,  c: 0,  f: 1,  fib: 0, axis: 'protein',  maxPerDay: 1, curatedRef: 'tuna_pouch' },
   { id: 'rice_cooked',       unit: '100 g',        kcal: 130, p: 2.7, c: 28, f: 0.3, fib: 0.4, axis: 'carb',  maxPerDay: 3 },
@@ -242,14 +242,17 @@ const n5 = (x: number) => String(Math.round(x / 5) * 5);
 
 function sniffMacros(r: any): { kcal: number; protein: number; carbs: number; fat: number } | null {
   if (!r) return null;
+  // First try computeMacros field names, then legacy fields
   const kcal = r.calories ?? r.targetCalories ?? r.kcal ?? r.dailyCalories;
   const protein = r.protein ?? r.proteinTarget ?? r.protein_g ?? r.proteinGrams;
+  const carbs = r.carbs ?? r.carbsTarget ?? r.carbs_g ?? 0;
+  const fat = r.fat ?? r.fatTarget ?? r.fat_g ?? 0;
   if (!kcal || !protein) return null;
   return {
     kcal,
     protein,
-    carbs: r.carbs ?? r.carbsTarget ?? r.carbs_g ?? 0,
-    fat: r.fat ?? r.fatTarget ?? r.fat_g ?? 0,
+    carbs,
+    fat,
   };
 }
 
@@ -651,7 +654,7 @@ export function buildMealPlanPrompt(
       '1. Each option below is an OPTION for its slot, not a promise of appearance. Fill every occurrence of a slot by choosing ONE option and a scale factor. Options may repeat across the week. If a slot has more options than occurrences, leave some out — that is correct, not an error.',
       '2. scale_factor multiplies that plate\u2019s macros uniformly. Use steps of 0.05 within the stated [min\u2013max]. Macros for a serving = plate macros \u00d7 scale_factor.',
       '3. Serve options in their listed slot by default. Lunch and dinner options MAY be swapped between those two slots when it helps reuse a batch or hit a day\u2019s targets. All other slots use only their own options.',
-      '4. Batch meals (serves > 1): if you schedule one, schedule its full batch within the week, or state "freeze N portions" in the prep notes. Rotate its plates.',
+      '4. Batch meals (serves > 1): if you schedule one, schedule its full batch within the week, or state "freeze N portions" in the prep notes. Place fridge-eaten servings on consecutive days starting at the cook; any serving more than 4 days after the cook must be a frozen portion with a thaw note ("freeze N portions; thaw overnight before day X"). Rotate its plates.',
       `5. Maximum ${STUNT_CAP} stunt plate this week. Dessert appears exactly ${dessertOcc} time(s) — never more, never as "optional".`,
       `6. Adjusters (table below) are standalone items used to close a day\u2019s gaps. Maximum ${MAX_ADJUSTERS_PER_DAY} per day.`,
       '7. Fallback order when a day misses target: rescale \u2192 adjusters \u2192 swap option within the slot \u2192 universal fillers (marked UF) for uncovered occurrences \u2192 only if all else fails, invent a simple meal and say so in the plan notes.',
@@ -754,7 +757,23 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
   if (!answers) {
     throw new Error('Please complete the nutrition questionnaire first.');
   }
-  const macros = computeMacros(answers as NutritionAnswers);
+  
+  // Try to get macros from computeMacros(answers) first
+  let macros = computeMacros(answers as NutritionAnswers);
+  
+  // If computeMacros returns null, try legacy fallback
+  if (!macros) {
+    const legacyResults = await WorkoutStorage.loadNutritionResults();
+    if (legacyResults?.macroResults) {
+      macros = legacyResults.macroResults;
+    }
+  }
+  
+  // If both sources fail, throw
+  if (!macros) {
+    throw new Error('Macro targets are missing — complete the nutrition questionnaire first.');
+  }
+  
   const favorites = await loadCuratedFavoritesV2();
   let sleep: SleepDataLike | null = null;
   try {
@@ -775,7 +794,18 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
 export async function buildReviewLauncherFromStorage(): Promise<string> {
   const answers = await loadNutritionAnswers();
   if (!answers) throw new Error('Please complete the nutrition questionnaire first.');
-  const macros = computeMacros(answers as NutritionAnswers);
+  
+  // Try to get macros from computeMacros(answers) first
+  let macros = computeMacros(answers as NutritionAnswers);
+  
+  // If computeMacros returns null, try legacy fallback
+  if (!macros) {
+    const legacyResults = await WorkoutStorage.loadNutritionResults();
+    if (legacyResults?.macroResults) {
+      macros = legacyResults.macroResults;
+    }
+  }
+  
   const targets = deriveTargets(macros, (answers as any).weight);
   if (!targets) throw new Error('Macro targets are missing.');
   return buildReviewLauncher(targets);

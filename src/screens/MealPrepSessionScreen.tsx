@@ -20,9 +20,12 @@ import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningCon
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import {
   buildPrepSession,
+  buildPrepSessionWithFreshness,
   PrepGroup,
   MakeFreshItem,
   PrepSession,
+  PrepSessionWithFreshness,
+  PrepSessionItem,
 } from '../utils/buildPrepSession';
 import { clampCookPortions } from '../utils/cookPortions';
 import { getMealImage } from '../assets/mealImages';
@@ -353,6 +356,11 @@ export default function MealPrepSessionScreen() {
     [currentPlan]
   );
 
+  const freshnessSession: PrepSessionWithFreshness | null = useMemo(
+    () => (currentPlan ? buildPrepSessionWithFreshness(currentPlan) : null),
+    [currentPlan]
+  );
+
   const queue: WorkItem[] = useMemo(
     () => (session && !session.totals.isLegacyPlan ? buildWorklist(session) : []),
     [session]
@@ -623,6 +631,19 @@ export default function MealPrepSessionScreen() {
               <Text style={styles.nowStorage}>{storageLine(current.group.storage)}</Text>
             ) : null}
 
+            {/* Freezer note from freshness data */}
+            {(() => {
+              const freshnessItem = freshnessSession?.items.find(
+                item => item.curated_meal_slug === current.group.slug && item.plate_id === current.group.plateId
+              );
+              return freshnessItem?.freshness?.freeze_note ? (
+                <View style={styles.freezerNote}>
+                  <Ionicons name="snow-outline" size={14} color="#3b82f6" />
+                  <Text style={styles.freezerNoteText}>{freshnessItem.freshness.freeze_note}</Text>
+                </View>
+              ) : null;
+            })()}
+
             <View style={styles.nowActions}>
               <TouchableOpacity
                 style={[styles.primaryBtn, { backgroundColor: themeColor }]}
@@ -787,6 +808,20 @@ const styles = StyleSheet.create({
   nowInstruction: { color: '#fff', fontSize: 13, lineHeight: 19, marginTop: 9 },
   nowMeta: { color: '#a1a1aa', fontSize: 12, marginTop: 13 },
   nowStorage: { color: '#52525b', fontSize: 11, letterSpacing: 0.3, marginTop: 8 },
+  freezerNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 8,
+    paddingLeft: 2,
+  },
+  freezerNoteText: {
+    flex: 1,
+    color: '#3b82f6',
+    fontSize: 11,
+    lineHeight: 15,
+    letterSpacing: 0.2,
+  },
 
   // Prep-ahead now/day-of split
   splitBlock: {
