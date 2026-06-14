@@ -471,15 +471,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#22d3ee',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
   stepNumberText: {
     fontSize: 14,
     fontWeight: '600',

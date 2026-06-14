@@ -318,7 +318,7 @@ export default function MealPlanWeeksScreen() {
           <Text style={styles.title}>{mealPlan.name}</Text>
           <Text style={styles.subtitle}>{weeks.length} week meal plan</Text>
         </View>
-        <View style={styles.headerRight} />
+        <View style={styles.headerSpacer} />
       </View>
 
       {weeks.length === 0 ? (
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  headerRight: {
+  headerSpacer: {
     width: 44,
   },
   resetButton: {
