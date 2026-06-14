@@ -4,9 +4,9 @@ const path = require('path');
 // Exact slugifyImage transform from the website
 function slugifyImage(f) {
   if (!f) return '';
-  var ext = (f.match(/\.(png|jpe?g|webp)$/i) || ['', 'png'])[1].toLowerCase();
-  var base = f.replace(/\.(png|jpe?g|webp)$/i, '');
-  var slug = base.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  let ext = (f.match(/\.(png|jpe?g|webp)$/i) || ['', 'png'])[1].toLowerCase();
+  let base = f.replace(/\.(png|jpe?g|webp)$/i, '');
+  let slug = base.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-')
     .replace(/-+/g, '-').toLowerCase();
   return slug + '.' + ext;

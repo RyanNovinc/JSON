@@ -16,9 +16,8 @@ import {
   Pressable,
   RefreshControl,
   Linking,
-} from 'react-native';
+ TouchableOpacity as RNTouchable } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { TouchableOpacity as RNTouchable } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -68,7 +67,7 @@ const WEB_PROGRAMS_COUNT = 3;
 // ============================================================================
 type DayState = 'workedOut' | 'skipped' | 'today' | 'future';
 
-function getWeekDays(workoutDates: Set<string>): Array<{ letter: string; state: DayState; date: Date }> {
+function getWeekDays(workoutDates: Set<string>): { letter: string; state: DayState; date: Date }[] {
   const today = new Date();
   const dayOfWeek = today.getDay();
   const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -78,7 +77,7 @@ function getWeekDays(workoutDates: Set<string>): Array<{ letter: string; state: 
 
   const todayKey = new Date().toDateString();
 
-  const days: Array<{ letter: string; state: DayState; date: Date }> = [];
+  const days: { letter: string; state: DayState; date: Date }[] = [];
   const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   for (let i = 0; i < 7; i++) {
@@ -1020,7 +1019,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [routines]);
 
   // ==========================================================================

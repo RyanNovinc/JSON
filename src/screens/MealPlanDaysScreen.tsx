@@ -73,7 +73,7 @@ export default function MealPlanDaysScreen() {
       });
     });
     if (ingredients.size === 0) return null;
-    const cat = new Map<string, Array<{ name: string; data: any }>>();
+    const cat = new Map<string, { name: string; data: any }[]>();
     Array.from(ingredients.entries()).forEach(([name, data]) => {
       let category = 'Other';
       const n = name.toLowerCase();

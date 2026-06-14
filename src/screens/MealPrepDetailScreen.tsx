@@ -30,13 +30,13 @@ interface PrepMeal {
     fat: number;
     fiber: number;
   };
-  ingredients: Array<{
+  ingredients: {
     item: string;
     amount: string;
     unit: string;
     scalable: boolean;
     notes: string;
-  }>;
+  }[];
   instructions: string[];
   meal_prep_notes: string;
 }

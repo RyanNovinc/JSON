@@ -13,12 +13,12 @@ import { WorkoutStorage } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
 
+import { useNavigation } from '@react-navigation/native';
+
 const SCREEN_WIDTH = Dimensions.get('window').width;
 // Calendar inner width = screen width - (16 horizontal margin × 2) - (6 horizontal padding × 2) = 12px buffer
 const CALENDAR_INNER_WIDTH = SCREEN_WIDTH - 32 - 12;
 const DAY_CELL_WIDTH = Math.floor(CALENDAR_INNER_WIDTH / 7);
-
-import { useNavigation } from '@react-navigation/native';
 
 interface WorkoutCalendarProps {
   visible?: boolean;

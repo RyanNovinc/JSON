@@ -30,7 +30,7 @@ interface RestoreResult {
 class RevenueCatService {
   private static instance: RevenueCatService;
   private isConfigured = false;
-  private customerInfoUpdateCallbacks: Array<(customerInfo: CustomerInfo) => void> = [];
+  private customerInfoUpdateCallbacks: ((customerInfo: CustomerInfo) => void)[] = [];
   private offerings: any = null;
   private customerInfo: CustomerInfo | null = null;
 

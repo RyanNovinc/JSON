@@ -14,8 +14,7 @@ import {
   Pressable,
   Modal,
   Easing,
-} from 'react-native';
-import { TouchableOpacity } from 'react-native';
+ TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';

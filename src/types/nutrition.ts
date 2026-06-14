@@ -137,31 +137,31 @@ export interface SimplifiedMealPlan {
     total_estimated_cost_low?: number;    // New: lower bound
     total_estimated_cost_high?: number;   // New: upper bound with 10% buffer
     currency: string;
-    categories: Array<{
+    categories: {
       category_name: string;
-      items: Array<{
+      items: {
         item_name: string;
         quantity: string;
         unit: string;
         estimated_price: number;
         notes: string;
         is_purchased: boolean;
-      }>;
-    }>;
+      }[];
+    }[];
   };
   weekly_meal_prep?: {
     total_prep_time: number;
     unique_recipes: number;
     batch_proteins?: string[];
-    prep_session_guide: Array<{
+    prep_session_guide: {
       step: number;
       title: string;
       description: string;
       time_required: number;
-    }>;
+    }[];
   };
   // Multiple meal prep sessions support (new format)
-  meal_prep_sessions?: Array<{
+  meal_prep_sessions?: {
     session_name: string;
     prep_time: number;
     cook_time: number;
@@ -172,14 +172,14 @@ export interface SimplifiedMealPlan {
     equipment_needed: string[];
     instructions: string[];
     storage_guidelines: Record<string, string>;
-    ingredients?: Array<{
+    ingredients?: {
       item: string;
       amount: string;
       unit: string;
       scalable: boolean;
       notes: string;
-    }>;
-    prep_meals?: Array<{
+    }[];
+    prep_meals?: {
       meal_name: string;
       meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
       prep_time: number;
@@ -193,16 +193,16 @@ export interface SimplifiedMealPlan {
         fat: number;
         fiber: number;
       };
-      ingredients: Array<{
+      ingredients: {
         item: string;
         amount: string;
         unit: string;
         notes: string;
-      }>;
+      }[];
       instructions: string[];
       meal_prep_notes: string;
-    }>;
-  }>;
+    }[];
+  }[];
   // Legacy meal prep session structure (still used by MealPrepSessionScreen for backward compatibility)
   meal_prep_session?: {
     session_name: string;
@@ -219,14 +219,14 @@ export interface SimplifiedMealPlan {
       grains: string;
       vegetables: string;
     };
-    ingredients?: Array<{
+    ingredients?: {
       item: string;
       amount: string;
       unit: string;
       scalable: boolean;
       notes: string;
-    }>;
-    prep_meals?: Array<{
+    }[];
+    prep_meals?: {
       meal_name: string;
       meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
       prep_time: number;
@@ -240,19 +240,19 @@ export interface SimplifiedMealPlan {
         fat: number;
         fiber: number;
       };
-      ingredients: Array<{
+      ingredients: {
         item: string;
         amount: string;
         unit: string;
         notes: string;
-      }>;
+      }[];
       instructions: string[];
       meal_prep_notes: string;
-      weekly_meal_coverage?: Array<{
+      weekly_meal_coverage?: {
         day: string;
         meal_type: string;
-      }>;
-    }>;
+      }[];
+    }[];
   };
 }
 

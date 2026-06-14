@@ -766,7 +766,7 @@ export default function GroceryListScreen() {
     );
   };
 
-  const filterModes: Array<{ mode: 'all' | 'remaining' | 'completed'; label: string; count: number }> = [
+  const filterModes: { mode: 'all' | 'remaining' | 'completed'; label: string; count: number }[] = [
     { mode: 'all', label: 'All', count: totalItems },
     { mode: 'remaining', label: 'Remaining', count: totalItems - purchasedItems },
     { mode: 'completed', label: 'Done', count: purchasedItems },

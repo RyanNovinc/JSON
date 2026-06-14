@@ -23,11 +23,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutStorage } from '../utils/storage';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
+import { NUTRITION_STORAGE_KEYS , SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
+
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
-
-import { SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
 
 export default function ImportMealPlanScreen() {
   const navigation = useNavigation<ImportMealPlanNavigationProp>();

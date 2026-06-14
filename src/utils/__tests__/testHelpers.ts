@@ -90,14 +90,14 @@ export function makeSet(overrides: {
 }
 
 // Seed helper: Create multiple workout history entries for an exercise
-export function seedHistory(exerciseName: string, sessions: Array<{
+export function seedHistory(exerciseName: string, sessions: {
   date?: string;
-  sets: Array<{
+  sets: {
     weight: string;
     reps: string;
     completed?: boolean;
-  }>;
-}>): WorkoutHistory[] {
+  }[];
+}[]): WorkoutHistory[] {
   return sessions.map((session, index) => {
     const baseDate = new Date();
     baseDate.setDate(baseDate.getDate() - (sessions.length - index - 1) * 2); // Space sessions 2 days apart

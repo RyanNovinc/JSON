@@ -10,7 +10,7 @@ import {
   Linking,
   Animated,
   SafeAreaView,
-} from 'react-native';
+ Platform } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -25,16 +25,14 @@ import { WorkoutStorage } from '../utils/storage';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
-import { Platform } from 'react-native';
-import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
+import { NUTRITION_STORAGE_KEYS , SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
 import NutritionGeneratorStep1 from '../components/NutritionGeneratorStep1';
 import NutritionGeneratorStep4 from '../components/NutritionGeneratorStep4';
 import NutritionGeneratorStep1New from '../components/NutritionGeneratorStep1New';
 
+
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
 type ImportMealPlanRouteProp = RouteProp<RootStackParamList, 'ImportMealPlan'>;
-
-import { SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
 
 export default function ImportMealPlanScreen() {
   const navigation = useNavigation<ImportMealPlanNavigationProp>();

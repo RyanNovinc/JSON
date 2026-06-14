@@ -13,10 +13,10 @@ export interface SamplePlan {
     daysPerWeek: number;
     split: string;
     exerciseCount: number;
-    days: Array<{
+    days: {
       day_name: string;
       exerciseCount: number;
-    }>;
+    }[];
   };
 }
 

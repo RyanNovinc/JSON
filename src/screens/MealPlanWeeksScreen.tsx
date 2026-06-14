@@ -23,13 +23,13 @@ interface MealPrepSession {
   total_time: number;
   covers: string;
   recommended_timing: string;
-  ingredients: Array<{
+  ingredients: {
     item: string;
     amount: string;
     unit: string;
     scalable: boolean;
     notes: string;
-  }>;
+  }[];
   equipment_needed: string[];
   instructions: string[];
   storage_guidelines: {

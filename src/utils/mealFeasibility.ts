@@ -274,7 +274,7 @@ type DayType = Occ[];
 
 interface WeekModel {
   /** [dayType, daysPerWeek] — e.g. [base, 6], [base+dessert, 1]. */
-  dayTypes: Array<[DayType, number]>;
+  dayTypes: [DayType, number][];
 }
 
 function buildWeek(
@@ -511,7 +511,7 @@ export function assessBasket(args: AssessArgs): BasketVerdict | null {
   const allergies = (args.allergies ?? []).map((a) => a.toLowerCase());
   const avoid = (args.avoid ?? []).map((a) => a.toLowerCase());
 
-  const candidates: Array<CertifiedFix & { margin: number }> = [];
+  const candidates: (CertifiedFix & { margin: number })[] = [];
   for (const spec of slots) {
     const eligible = mealsForSlots(spec.mealSlots, allMeals, emptyFilter(), 'default');
     for (const meal of eligible) {

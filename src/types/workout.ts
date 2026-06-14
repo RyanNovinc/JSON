@@ -13,11 +13,11 @@ export interface StrengthExercise {
   rir_weekly?: { [week: string]: string };
   sets_weekly?: { [week: string]: number };
   notes?: string;
-  alternatives?: Array<{
+  alternatives?: {
     exercise: string;
     primaryMuscles: string[];
     secondaryMuscles: string[];
-  }>;
+  }[];
   primaryMuscles: string[];        // REQUIRED — from the muscle taxonomy
   secondaryMuscles: string[];      // REQUIRED — from the muscle taxonomy
   superset_group?: string;         // Optional — groups exercises for automatic superset linking
@@ -54,10 +54,10 @@ export interface CircuitExercise {
   rounds: number;                  // e.g., 4
   work_seconds: number;            // e.g., 40
   rest_seconds: number;            // e.g., 20
-  exercises: Array<{
+  exercises: {
     exercise: string;
     notes?: string;
-  }>;
+  }[];
   notes?: string;                  // overall circuit notes
 }
 
@@ -76,7 +76,7 @@ export interface WorkoutProgram {
   routine_name: string;
   description?: string;
   days_per_week: number;
-  blocks: Array<{
+  blocks: {
     block_name: string;
     weeks: string;                  // e.g., "1-4"
     structure?: string;             // e.g., "Push Pull Legs"
@@ -86,11 +86,11 @@ export interface WorkoutProgram {
       rep_range: string;            // e.g., "8-10" — typically Week 1 reps
       notes: string;                // e.g., "Use 60% of Week 3 weight. Focus on form and recovery."
     };
-    days: Array<{
+    days: {
       day_name: string;
       estimated_duration?: number;  // minutes
-      exercises: Array<Exercise>;   // Uses the Exercise union type above
-    }>;
-  }>;
+      exercises: Exercise[];   // Uses the Exercise union type above
+    }[];
+  }[];
 }
 

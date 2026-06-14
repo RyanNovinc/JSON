@@ -3,8 +3,7 @@ import { NavigationContainer, getStateFromPath as getStateFromPathDefault } from
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, Animated, StyleSheet } from 'react-native';
-import { Linking } from 'react-native';
+import { View, Text, Animated, StyleSheet , Linking } from 'react-native';
 import { navigationRef } from '../utils/navigationRef';
 
 // Import screens

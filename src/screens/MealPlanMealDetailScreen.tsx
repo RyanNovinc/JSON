@@ -33,12 +33,12 @@ interface Meal {
     fat: number;
     fiber?: number;
   };
-  ingredients: Array<{
+  ingredients: {
     item: string;
     amount: string;
     unit: string;
     notes?: string;
-  }>;
+  }[];
   instructions: string[];
   notes?: string;
   tags?: string[];

@@ -104,7 +104,7 @@ export const NutritionStep5: React.FC<Props> = ({
     const total = newMacros.protein + newMacros.carbs + newMacros.fat;
     if (total !== 100) {
       const difference = 100 - total;
-      const otherMacros = Object.keys(newMacros).filter(key => key !== macro) as Array<keyof typeof newMacros>;
+      const otherMacros = Object.keys(newMacros).filter(key => key !== macro) as (keyof typeof newMacros)[];
       
       if (otherMacros.length > 0) {
         const adjustment = difference / otherMacros.length;

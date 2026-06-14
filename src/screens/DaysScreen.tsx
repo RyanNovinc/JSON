@@ -27,7 +27,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const SECONDARY_MUSCLE_WEIGHT = 0.5;
 
-const getMuscleContributions = (exercise: any): Array<{muscle: string, weight: number}> => {
+const getMuscleContributions = (exercise: any): {muscle: string, weight: number}[] => {
   const muscleMapping: { [key: string]: string } = {
     'Chest': 'chest',
     'Upper Back': 'upper back',
@@ -59,7 +59,7 @@ const getMuscleContributions = (exercise: any): Array<{muscle: string, weight: n
     'Tibialis Anterior': 'shins',
   };
 
-  const contributions: Array<{muscle: string, weight: number}> = [];
+  const contributions: {muscle: string, weight: number}[] = [];
 
   (exercise.primaryMuscles || []).forEach((muscle: string) => {
     const mapped = muscleMapping[muscle];
