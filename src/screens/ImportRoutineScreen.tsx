@@ -43,7 +43,9 @@ export default function ImportRoutineScreen() {
   const { themeColor } = useTheme();
   // Check if we have shareId and should show loading immediately
   const { shareId, isCurated, curatedSlug } = route.params || {};
-  const [isLoading, setIsLoading] = useState(!!shareId); // Start loading if we have shareId
+  console.log('🔧 [ROUTE DEBUG] shareId:', shareId, 'isCurated:', isCurated, 'curatedSlug:', curatedSlug);
+  console.log('🔧 [ROUTE DEBUG] isLoading calculation: !!shareId && !isCurated =', !!shareId, '&&', !isCurated, '=', !!shareId && !isCurated);
+  const [isLoading, setIsLoading] = useState(!!shareId && !isCurated); // Start loading if we have shareId but not for curated imports
   const [parsedProgram, setParsedProgram] = useState<WorkoutProgram | null>(null);
   const [accumulatedPrograms, setAccumulatedPrograms] = useState<WorkoutProgram[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -722,6 +724,7 @@ export default function ImportRoutineScreen() {
       detailedError += `"${text.substring(0, 100).replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}"`;
       
       setErrorMessage(detailedError);
+      console.log('[VALIDATE] rejected: JSON parse error');
       return null;
     }
     
@@ -784,7 +787,7 @@ export default function ImportRoutineScreen() {
         if (!weekRange) {
           throw new Error(`Block "${block.block_name}" has invalid weeks field "${block.weeks}" - expected a range like "1-5" or a single number`);
         }
-        const { startWeek, endWeek, weekCount } = weekRange;
+        const { weekCount } = weekRange;
         const expectedWeekKeys = Array.from({ length: weekCount }, (_, i) => (i + 1).toString());
         
         // Validate optional block fields
@@ -800,9 +803,9 @@ export default function ImportRoutineScreen() {
             if (typeof week !== 'number' || week <= 0) {
               throw new Error(`Block "${block.block_name}" has invalid deload_weeks - must contain positive numbers`);
             }
-            // CHECK 1: Range validation
-            if (week < startWeek || week > endWeek) {
-              throw new Error(`Block "${block.block_name}" has deload_weeks ${week} outside its week range ${block.weeks}`);
+            // CHECK 1: Range validation — deload_weeks are BLOCK-RELATIVE (1..weekCount), same convention as sets_weekly keys
+            if (week > weekCount) {
+              throw new Error(`Block "${block.block_name}" has deload_weeks ${week} outside its ${weekCount}-week span`);
             }
           });
         }
@@ -873,6 +876,7 @@ export default function ImportRoutineScreen() {
       const detailedError = `⚠️ Validation Error:\n\n${error.message}\n\n💡 This means your JSON was parsed successfully, but the workout program structure has issues. Please check that all required fields are present and correctly formatted.`;
       
       setErrorMessage(detailedError);
+      console.log('[VALIDATE] rejected: structural validation error -', error.message);
       return null;
     }
   };
@@ -927,6 +931,10 @@ export default function ImportRoutineScreen() {
       console.log('⚙️ [PROCESS WORKOUT] Timeout callback started - about to call validateAndParseJSON');
       
       try {
+        // Debug logging before validateAndParseJSON call
+        console.log('🔍 [DEBUG] Fetched URL (if applicable):', route.params?.shareId ? `https://json.fit/programs/${route.params.shareId.replace('program/', '')}.json` : 'N/A - not curated import');
+        console.log('🔍 [DEBUG] Raw response text (first 200 chars):', text.substring(0, 200));
+        
         const program = validateAndParseJSON(text);
         console.log('⚙️ [PROCESS WORKOUT] validateAndParseJSON result:', program ? 'SUCCESS' : 'FAILED');
         

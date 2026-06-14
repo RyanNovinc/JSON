@@ -8,7 +8,9 @@ import {
   Linking,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+import { forceOnboardingRecheck } from '../onboarding/IntentForkModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -143,8 +145,10 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await WorkoutStorage.clearAllData();
-              Alert.alert('Done', 'Onboarding reset. Restart the app to see it.');
+              await AsyncStorage.removeItem('@onboarding/completedAt');
+              await AsyncStorage.removeItem('@onboarding/intent');
+              // Trigger the IntentForkModal to show
+              forceOnboardingRecheck();
             } catch (error) {
               console.error('Failed to reset onboarding:', error);
               Alert.alert('Error', 'Failed to reset. Please try again.');

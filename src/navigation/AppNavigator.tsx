@@ -101,6 +101,8 @@ import PromptReadyScreen from '../screens/questionnaire/PromptReadyScreen';
 import QuestionnaireSummaryScreen from '../screens/questionnaire/QuestionnaireSummaryScreen';
 
 // Import nutrition questionnaire screens
+import IntentForkModal from '../onboarding/IntentForkModal';
+import OnboardingContractScreen from '../onboarding/OnboardingContractScreen';
 import N1GoalScreen from '../screens/nutrition/questionnaire/N1GoalScreen';
 import N2RateScreen from '../screens/nutrition/questionnaire/N2RateScreen';
 import N3AboutYouScreen from '../screens/nutrition/questionnaire/N3AboutYouScreen';
@@ -306,7 +308,7 @@ export type RootStackParamList = {
   MealsLibrary: { cuisine?: string; title?: string } | undefined;
   SmoothiesLibrary: undefined;
   // Questionnaire screens
-  Q1PrimaryGoal: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q1PrimaryGoal: { answersSoFar?: Record<string, any>; editMode?: boolean; fromOnboarding?: boolean } | undefined;
   Q2Experience: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   Q3DaysPerWeek: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   Q4ProgramDuration: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
@@ -316,8 +318,9 @@ export type RootStackParamList = {
   QuestionnaireRefinements: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   PromptReady: undefined;
   QuestionnaireSummary: undefined;
+  OnboardingContract: { flow?: 'meal' | 'workout' };
   // Nutrition questionnaire screens
-  N1Goal: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N1Goal: { answersSoFar?: Record<string, any>; editMode?: boolean; fromOnboarding?: boolean } | undefined;
   N2Rate: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N3AboutYou: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
   N4Activity: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
@@ -1257,6 +1260,21 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   cardStyle: { backgroundColor: '#0a0a0b' }
                 }}
               />
+              <RootStack.Screen
+                name="OnboardingContract"
+                component={OnboardingContractScreen}
+                options={{
+                  headerShown: false,
+                  // Appear instantly (no fade). We navigate here while the fork
+                  // modal is still opaque on top, so the contract must fully cover
+                  // Main from the first frame — a fade-in would let the Main tab
+                  // show through behind the contract as the fork dismisses.
+                  animationEnabled: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: { opacity: current.progress },
+                  }),
+                }}
+              />
               {/* Questionnaire screens */}
               <RootStack.Screen name="Q1PrimaryGoal" component={Q1PrimaryGoalScreen} options={{ 
                 headerShown: false,
@@ -1605,6 +1623,7 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
             </>
         </RootStack.Navigator>
           <FloatingWorkoutIndicator />
+          <IntentForkModal />
           {/* <FeedbackModal 
             visible={feedbackModalVisible}
             onClose={() => setFeedbackModalVisible(false)}

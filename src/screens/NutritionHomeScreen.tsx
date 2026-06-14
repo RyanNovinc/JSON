@@ -28,6 +28,7 @@ import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningCon
 import { WorkoutStorage, NutritionCompletionStatus, MealPlan } from '../utils/storage';
 import { SimplifiedMealPlan } from '../types/nutrition';
 import { createShare, ShareError } from '../services/shareService';
+import ExamplePlanCard from '../onboarding/ExamplePlanCard';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { CuratedMeal } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
@@ -1261,36 +1262,7 @@ export default function NutritionHomeScreen({ route }: any) {
             }
           >
             <Text style={styles.title}>Nutrition</Text>
-            <View
-              style={[
-                styles.emptyHeroCard,
-                {
-                  borderColor: themeColor + '59',
-                  backgroundColor: themeColor + '14',
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.emptyHeroIcon,
-                  { backgroundColor: themeColor, shadowColor: themeColor },
-                ]}
-              >
-                <Ionicons name="restaurant" size={26} color="#0a0a0b" />
-              </View>
-              <Text style={styles.emptyHeroTitle}>Plan your meals</Text>
-              <Text style={styles.emptyHeroBody}>
-                A custom meal plan built around your goals — completely free.
-              </Text>
-              <TouchableOpacity
-                style={[styles.emptyHeroButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
-                onPress={openCreateFlow}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.emptyHeroButtonText}>Get started</Text>
-                <Ionicons name="arrow-forward" size={15} color="#0a0a0b" />
-              </TouchableOpacity>
-            </View>
+            <ExamplePlanCard />
 
             {/* Category sections, even without a plan */}
             {renderAllSections()}

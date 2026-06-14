@@ -34,6 +34,13 @@ import { getMealImage } from '../assets/mealImages';
  *     our avatar scans for), carbs/fat neutral.
  *   - Sticky "Use this plan" CTA unchanged.
  *
+ * Example mode (isExample route param): same screen, two changes only —
+ * overline reads "EXAMPLE PLAN" and the CTA reads "Build my own plan" and
+ * routes into the meal questionnaire instead of saving. There is NO save path
+ * in example mode, so a previewed example can never land in the user's plan
+ * list (open it with 0 plans or 50, it changes nothing). Real Library previews
+ * pass no flag and behave exactly as before.
+ *
  * Empty-data gate: if no days resolve, the hero/stats/chips are suppressed
  * entirely (no broken mosaic of fallback icons) — plain header + empty state
  * + CTA only.
@@ -55,7 +62,7 @@ import { getMealImage } from '../assets/mealImages';
  */
 
 type RouteParams = {
-  MealPlanPreview: { plan: MealPlan };
+  MealPlanPreview: { plan: MealPlan; isExample?: boolean };
 };
 
 type PreviewMeal = {
@@ -221,7 +228,7 @@ export default function MealPlanPreviewScreen() {
 
   const { saveMealPlan, migrateLegacyPlan } = useSimplifiedMealPlanning();
 
-  const { plan } = route.params;
+  const { plan, isExample } = route.params;
   const data = plan.data || {};
 
   const planName: string = data.name || plan.name || 'Untitled Plan';
@@ -280,7 +287,7 @@ export default function MealPlanPreviewScreen() {
   });
   const activeDay: PreviewDay | null = days[selectedDay] ?? days[0] ?? null;
 
-  const overline = `SAVED MEAL PLAN${
+  const overline = `${isExample ? 'EXAMPLE PLAN' : 'SAVED MEAL PLAN'}${
     dayCount ? ` · ${dayCount} ${dayCount === 1 ? 'DAY' : 'DAYS'}` : ''
   }`;
 
@@ -310,6 +317,13 @@ export default function MealPlanPreviewScreen() {
         },
       ]
     );
+  };
+
+  // Example mode: send them into the meal questionnaire to build a calibrated
+  // plan rather than adopting this fixed sample. (Swap 'N1Goal' for the
+  // onboarding contract screen once that's built.) No save happens here.
+  const handleBuildOwn = () => {
+    navigation.navigate('N1Goal');
   };
 
   // Adaptive mosaic for 1–4 photos. gap:2 keeps the photo-grid feel.
@@ -564,10 +578,12 @@ export default function MealPlanPreviewScreen() {
       <View style={[styles.ctaBar, { paddingBottom: insets.bottom + 12 }]}>
         <GHTouchable
           style={[styles.ctaButton, { backgroundColor: themeColor }]}
-          onPress={handleImport}
+          onPress={isExample ? handleBuildOwn : handleImport}
           activeOpacity={0.85}
         >
-          <Text style={styles.ctaButtonText}>Use this plan</Text>
+          <Text style={styles.ctaButtonText}>
+            {isExample ? 'Build my own plan' : 'Use this plan'}
+          </Text>
         </GHTouchable>
       </View>
     </View>

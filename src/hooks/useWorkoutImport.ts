@@ -1118,6 +1118,7 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
       WorkoutStorage.setAwaitingImport(false).catch(e => 
         console.error('Failed to clear awaiting import flag on parse error:', e)
       );
+      console.log('[VALIDATE] rejected: JSON parse error');
       return null;
     }
     
@@ -1272,6 +1273,7 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
       const detailedError = `⚠️ Validation Error:\n\n${error.message}\n\n💡 This means your JSON was parsed successfully, but the workout program structure has issues. Please check that all required fields are present and correctly formatted.`;
       
       setErrorMessage(detailedError);
+      console.log('[VALIDATE] rejected: structural validation error -', error.message);
       return null;
     }
   };

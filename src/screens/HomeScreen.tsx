@@ -32,7 +32,6 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutRoutine, MealPlan } from '../utils/storage';
 import WorkoutCalendar from '../components/WorkoutCalendar';
 import ImportFeedbackModal from '../components/ImportFeedbackModal';
-import OnboardingSlideshow from '../components/OnboardingSlideshow';
 import { useImportFeedback } from '../hooks/useImportFeedback';
 import { useTheme } from '../contexts/ThemeContext';
 import { ENABLE_NUTRITION_PAYWALL } from '../config/revenueCatConfig';
@@ -153,7 +152,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     routine: null,
     newName: '',
   });
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -214,19 +212,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     initializeApp();
   }, []);
 
-  useEffect(() => {
-    checkOnboarding();
-  }, []);
-
-  const checkOnboarding = async () => {
-    if (__DEV__) {
-      await AsyncStorage.removeItem('onboarding_completed');
-    }
-    const isCompleted = await WorkoutStorage.isOnboardingCompleted();
-    if (!isCompleted) {
-      setShowOnboarding(true);
-    }
-  };
 
   useEffect(() => {
     const handleImportedProgram = async () => {
@@ -833,10 +818,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     }
   };
 
-  const handleOnboardingComplete = async () => {
-    setShowOnboarding(false);
-    await WorkoutStorage.setOnboardingCompleted();
-  };
 
   // Shared "where am I in this routine" resolver — used by both the Start
   // button and the hero card's week badge. Pure reads, no navigation. The
@@ -1775,10 +1756,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </View>
       </Modal>
 
-      <OnboardingSlideshow
-        visible={showOnboarding}
-        onComplete={handleOnboardingComplete}
-      />
     </View>
   );
 }

@@ -71,6 +71,7 @@ export default function N1GoalScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const fromOnboarding = route.params?.fromOnboarding ?? false;
   const [selected, setSelected] = useState<GoalValue | null>(
     (answersSoFar.goal as GoalValue) ?? null
   );
@@ -96,7 +97,13 @@ export default function N1GoalScreen() {
   const handleClose = () => navigation.popToTop();
 
   const handleBack = () => {
-    navigation.navigate('CreateFlow' as never);
+    if (fromOnboarding) {
+      // Coming from onboarding - go back to the OnboardingContract screen
+      navigation.navigate('OnboardingContract' as never, { flow: 'meal' });
+    } else {
+      // Normal flow - go to CreateFlow
+      navigation.navigate('CreateFlow' as never);
+    }
   };
 
   return (

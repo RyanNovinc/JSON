@@ -1,4 +1,7 @@
-{
+// This is the inner SimplifiedMealPlan (curated-meal-picker shape): meals live
+// under dailyMeals, keyed by date. It is NOT what screens consume directly —
+// see the wrapped `exampleMealPlan` export at the bottom of this file.
+const exampleMealPlanData = {
   "id": "mealplan_20260613100000",
   "name": "7-Day Lean Bulk",
   "startDate": "2026-06-14",
@@ -1318,4 +1321,23 @@
     "totalCost_high": 193,
     "duration": 7
   }
-}
+};
+
+// MealPlanPreviewScreen (and the rest of the app) consume a *saved* MealPlan
+// whose `data` field holds the SimplifiedMealPlan above. This mirrors exactly
+// how a real curated plan is stored in NutritionHomeScreen.handleToggleSaveMealPlan:
+//   { id, name, duration, meals, data: <SimplifiedMealPlan>, fingerprint, createdAt }
+// Without this wrapper the screen reads plan.data.dailyMeals → undefined and
+// shows "This plan doesn't have detailed day data."
+export const exampleMealPlan = {
+  id: exampleMealPlanData.id,
+  name: exampleMealPlanData.name,
+  duration: Object.keys(exampleMealPlanData.dailyMeals).length,
+  meals: Object.values(exampleMealPlanData.dailyMeals).reduce(
+    (total: number, day: any) => total + (day?.meals?.length || 0),
+    0
+  ),
+  data: exampleMealPlanData,
+  fingerprint: exampleMealPlanData.id,
+  createdAt: Date.now(),
+};
