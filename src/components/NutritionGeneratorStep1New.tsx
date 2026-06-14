@@ -92,7 +92,7 @@ export default function NutritionGeneratorStep1New({ onNext, onBack }: Nutrition
               </Text>
               <Text style={styles.infoMessage}>
                 <Text style={[styles.stepNumber, { color: themeColor }]}>2. </Text>
-                Follow the AI's questions to refine your meal plan
+                Follow the AI&apos;s questions to refine your meal plan
               </Text>
               <Text style={styles.infoMessage}>
                 <Text style={[styles.stepNumber, { color: themeColor }]}>3. </Text>

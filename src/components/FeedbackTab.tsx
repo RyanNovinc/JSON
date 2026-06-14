@@ -206,7 +206,7 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
           <View style={styles.header}>
             <View>
               <Text style={styles.headerLabel}>FEEDBACK</Text>
-              <Text style={styles.title}>How's the app?</Text>
+              <Text style={styles.title}>How&apos;s the app?</Text>
             </View>
             <View style={styles.headerActions}>
               <TouchableOpacity

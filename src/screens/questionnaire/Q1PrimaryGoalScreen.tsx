@@ -140,7 +140,7 @@ export default function Q1PrimaryGoalScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.question}>What's your main goal?</Text>
+        <Text style={styles.question}>What&apos;s your main goal?</Text>
         <Text style={styles.subtitle}>
           Shapes rep ranges, rest times, and exercise selection.
         </Text>

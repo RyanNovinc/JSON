@@ -120,7 +120,7 @@ export default function N1GoalScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.question}>What's your main goal?</Text>
+        <Text style={styles.question}>What&apos;s your main goal?</Text>
         <Text style={styles.subtitle}>
           Sets your calorie target and how we split your macros.
         </Text>

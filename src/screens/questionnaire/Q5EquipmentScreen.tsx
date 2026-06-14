@@ -142,7 +142,7 @@ export default function Q5EquipmentScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.question}>What's available to you?</Text>
+        <Text style={styles.question}>What&apos;s available to you?</Text>
         <Text style={styles.subtitle}>
           Decides what exercises the AI can choose from. Pick all that apply.
         </Text>

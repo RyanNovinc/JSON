@@ -68,7 +68,7 @@ export const NutritionStep1: React.FC<Props> = ({
         <Animatable.View animation="fadeInDown" delay={200}>
           <View style={styles.header}>
             <Text style={[styles.stepNumber, { color: colors.primary }]}>1 of 6</Text>
-            <Text style={styles.title}>What's Your Goal?</Text>
+            <Text style={styles.title}>What&apos;s Your Goal?</Text>
             <Text style={styles.subtitle}>
               Choose your primary nutrition goal to get started
             </Text>

@@ -148,7 +148,7 @@ export default function WorkoutGeneratorStep1New({ onNext, onBack }: WorkoutGene
               </Text>
               <Text style={styles.infoMessage}>
                 <Text style={[styles.stepNumber, { color: themeColor }]}>2. </Text>
-                Follow the AI's questions to refine your program
+                Follow the AI&apos;s questions to refine your program
               </Text>
               <Text style={styles.infoMessage}>
                 <Text style={[styles.stepNumber, { color: themeColor }]}>3. </Text>
