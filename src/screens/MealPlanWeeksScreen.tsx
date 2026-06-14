@@ -422,12 +422,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#71717a',
   },
-  weekBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
   weekText: {
     fontSize: 12,
     fontWeight: '600',

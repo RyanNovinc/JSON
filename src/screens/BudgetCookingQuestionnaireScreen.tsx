@@ -518,7 +518,6 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
       'MA': 'MAD',
       'DZ': 'DA',
       'TN': 'DT',
-      'LY': 'LD',
       'SD': 'SDG',
       'SS': 'SSP',
       'ZW': 'ZW$',
@@ -3270,15 +3269,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
     marginBottom: 8,
-  },
-  textInput: {
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: '#ffffff',
   },
   customDateInput: {
     borderWidth: 1,

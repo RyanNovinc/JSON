@@ -446,18 +446,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#27272a',
     borderRadius: 8,
   },
-  ingredientAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-    minWidth: 80,
-  },
-  ingredientName: {
-    flex: 1,
-    fontSize: 14,
-    color: '#ffffff',
-    marginLeft: 12,
-  },
   ingredientCost: {
     fontSize: 12,
     color: '#71717a',
@@ -468,12 +456,6 @@ const styles = StyleSheet.create({
     color: '#71717a',
     fontStyle: 'italic',
     marginTop: 2,
-  },
-  optionalText: {
-    fontSize: 10,
-    color: '#71717a',
-    fontStyle: 'italic',
-    marginLeft: 8,
   },
   instructionsCard: {
     backgroundColor: '#18181b',
@@ -502,15 +484,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#0a0a0b',
-  },
-  instructionContent: {
-    flex: 1,
-  },
-  instructionText: {
-    fontSize: 14,
-    color: '#ffffff',
-    lineHeight: 20,
-    marginBottom: 4,
   },
   instructionMeta: {
     flexDirection: 'row',

@@ -1144,18 +1144,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a0b',
   },
-  header: {
-    paddingTop: 50,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoButton: {
-    width: 40,
-    height: 40,
-  },
   closeButtonWrapper: {
     position: 'absolute',
     top: 60,

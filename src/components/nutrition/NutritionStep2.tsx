@@ -237,10 +237,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  sliderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
   rateDisplay: {
     alignItems: 'center',
     marginBottom: 40,
