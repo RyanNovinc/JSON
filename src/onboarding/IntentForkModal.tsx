@@ -5,7 +5,6 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  Pressable,
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -256,7 +255,7 @@ function ForkBody({ onChoose }: { onChoose: (intent: Intent) => void }) {
             accessibilityRole="button"
             accessibilityLabel="Browse the meals"
           >
-            <Ionicons name="restaurant" size={20} color={C.greenText} />
+            <Ionicons name="library" size={20} color={C.greenText} />
             <Text style={styles.browseText}>Browse the meals</Text>
           </TouchableOpacity>
 
@@ -273,7 +272,7 @@ function ForkBody({ onChoose }: { onChoose: (intent: Intent) => void }) {
             accessibilityRole="button"
             accessibilityLabel="Build a meal plan"
           >
-            <Ionicons name="sparkles" size={19} color={C.cyan} />
+            <Ionicons name="restaurant" size={19} color={C.cyan} />
             <Text style={styles.buildText}>Build a meal plan</Text>
           </TouchableOpacity>
 
@@ -289,15 +288,7 @@ function ForkBody({ onChoose }: { onChoose: (intent: Intent) => void }) {
           </TouchableOpacity>
         </View>
 
-        <Pressable
-          onPress={() => onChoose('skipped')}
-          style={styles.skip}
-          accessibilityRole="button"
-          accessibilityLabel="Skip for now"
-          hitSlop={{ top: 10, bottom: 10, left: 20, right: 20 }}
-        >
-          <Text style={styles.skipText}>Skip for now</Text>
-        </Pressable>
+        <View style={styles.skip} />
       </View>
     </View>
   );
@@ -364,7 +355,7 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     textAlign: 'center',
     marginTop: 'auto',
-    marginBottom: 20,
+    marginBottom: 40,
   },
   h1Accent: {
     color: C.cyan,

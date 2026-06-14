@@ -11,6 +11,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { forceOnboardingShow } from './IntentForkModal';
 import { exampleMealPlan } from './exampleMealPlan';
+import { exampleWorkout } from './exampleWorkout';
 
 /**
  * OnboardingContractScreen — shown when a user chooses to BUILD (a meal plan or
@@ -90,7 +91,7 @@ const FLOW: Record<Flow, FlowConfig> = {
       { icon: 'barbell', label: 'Any kit' },
     ],
     steps: ['Set goals', 'AI builds', 'Train'],
-    hasExample: false,
+    hasExample: true,
   },
 };
 
@@ -123,10 +124,7 @@ export default function OnboardingContractScreen() {
 
   const onSeeExample = () => {
     if (flow === 'workout') {
-      // TODO: once you have a sample program (an `exampleWorkoutPlan`, built the
-      // same way as exampleMealPlan) and a preview route, wire it up here and set
-      // workout.hasExample = true above to reveal the link:
-      // navigation.navigate('WorkoutPreview', { plan: exampleWorkoutPlan, isExample: true });
+      navigation.navigate('WorkoutPreview', { routine: exampleWorkout, isExample: true });
       return;
     }
     navigation.navigate('MealPlanPreview', {
