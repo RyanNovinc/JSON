@@ -323,7 +323,7 @@ export default function MealPlanPreviewScreen() {
   // plan rather than adopting this fixed sample. (Swap 'N1Goal' for the
   // onboarding contract screen once that's built.) No save happens here.
   const handleBuildOwn = () => {
-    navigation.navigate('N1Goal');
+    navigation.navigate('N1Goal', { fromOnboarding: true });
   };
 
   // Adaptive mosaic for 1–4 photos. gap:2 keeps the photo-grid feel.
