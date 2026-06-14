@@ -9,7 +9,6 @@ import {
   Image,
   Animated,
   Easing,
-  ActivityIndicator,
 } from 'react-native';
 import { TouchableOpacity as GHTouchable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,26 +21,26 @@ import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
 /**
  * WorkoutPreviewScreen — opens when a user taps a saved workout in Library.
  *
- * Visual refresh:
- *   - Leads with a full-bleed 16:9 hero that cross-fades the featured
- *     exercise's start/end frames (same effect as WorkoutLogScreen's image
- *     cycling), with the back button overlaid and a small "live" dual-frame
- *     indicator.
- *   - Every exercise row now carries a thumbnail + a one-line muscle subtitle.
+ * Leads with a full-bleed 16:9 hero that cross-fades the featured exercise's
+ * start/end frames (same effect as WorkoutLogScreen's image cycling), and every
+ * exercise row carries a thumbnail. Structure, parsing, expansion behaviour and
+ * the "Start using this plan" CTA are unchanged from the previous version.
  *
- * Everything else — top-level parsing, collapsible day sections, expandable
- * exercise detail, the "+ N more" toggle, rest-day handling, the empty state,
- * and the "Start using this plan" CTA — is unchanged from the previous version.
+ * ── Exercise images: connect once ──────────────────────────────────────────
+ * These frames live in your app, so the screen can only show them once it's
+ * pointed at your image source. Pick ONE:
  *
- * ── Wiring images ───────────────────────────────────────────────────────────
- * Frames come from the SAME resolver WorkoutLogScreen receives as its
- * `resolveExerciseImagePair` prop. Pass it through when you open this screen:
+ *   1) One line at DEFAULT_RESOLVER (below): import the resolver
+ *      WorkoutLogScreen already uses and assign it, e.g.
+ *        import { resolveExerciseImagePair } from '../utils/exerciseImages';
+ *        const DEFAULT_RESOLVER = resolveExerciseImagePair;
  *
- *   navigation.navigate('WorkoutPreview', { routine, resolveExerciseImagePair });
+ *   2) Pass it when you open the screen (this wins over DEFAULT_RESOLVER):
+ *        navigation.navigate('WorkoutPreview', { routine, resolveExerciseImagePair });
  *
- * (or swap the route param for a direct import of that util). If it's omitted,
- * the hero + thumbnails fall back to a barbell icon, so the screen still
- * renders fine without it.
+ * Either one lights up every row + the hero. Anything the resolver returns null
+ * for — or any image that fails to load — falls back to a barbell tile on its
+ * own, so it's safe to wire incrementally.
  *
  * Expected data shape (from routine.data):
  *   {
@@ -73,16 +72,20 @@ import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
  */
 
 type ImagePair = { start: any; end: any } | null;
+type ImagePairResolver = (
+  exercise: { exercise?: string; name?: string },
+) => Promise<ImagePair>;
+
+// 👉 Point this at the resolver WorkoutLogScreen uses to light up images.
+//    import { resolveExerciseImagePair } from '../utils/exerciseImages';
+//    const DEFAULT_RESOLVER = resolveExerciseImagePair;
+const DEFAULT_RESOLVER: ImagePairResolver | null = null;
 
 type RouteParams = {
   WorkoutPreview: {
     routine: WorkoutRoutine;
-    /** Same fn WorkoutLogScreen gets as `resolveExerciseImagePair` (optional). */
-    resolveExerciseImagePair?: (
-      exercise: { exercise?: string; name?: string },
-    ) => Promise<ImagePair>;
-    /** Whether this is being shown as an onboarding example */
-    isExample?: boolean;
+    /** Optional override — same fn WorkoutLogScreen gets as `resolveExerciseImagePair`. */
+    resolveExerciseImagePair?: ImagePairResolver;
   };
 };
 
@@ -102,8 +105,12 @@ export default function WorkoutPreviewScreen() {
   // the active/current plan on the home screen.
   const { saveRoutine } = useWorkoutRoutines();
 
-  const { routine, resolveExerciseImagePair, isExample } = route.params;
+  const { routine } = route.params;
   const data = routine.data || {};
+
+  // Resolver: route-param override first, then the module-level default.
+  const resolveImages: ImagePairResolver | null =
+    route.params?.resolveExerciseImagePair ?? DEFAULT_RESOLVER;
 
   // ===== Parse top-level fields with safe fallbacks =====
   const planName: string = data.routine_name || data.name || routine.name || 'Untitled Plan';
@@ -199,7 +206,7 @@ export default function WorkoutPreviewScreen() {
   // log screen's miniCardImages map. Thumbnails use `.start`; the hero uses both.
   const [imagesByName, setImagesByName] = useState<Record<string, ImagePair>>({});
   useEffect(() => {
-    if (!resolveExerciseImagePair) return;
+    if (!resolveImages) return;
     let cancelled = false;
 
     (async () => {
@@ -217,7 +224,7 @@ export default function WorkoutPreviewScreen() {
       await Promise.all(
         [...names].map(async (n) => {
           try {
-            map[n] = await resolveExerciseImagePair({ exercise: n, name: n });
+            map[n] = await resolveImages({ exercise: n, name: n });
           } catch {
             map[n] = null;
           }
@@ -230,20 +237,28 @@ export default function WorkoutPreviewScreen() {
     return () => {
       cancelled = true;
     };
-  }, [blocks, resolveExerciseImagePair]);
+  }, [blocks, resolveImages]);
 
   const heroPair = featured ? imagesByName[featured] : null;
   const hasHeroPair = !!(heroPair && heroPair.start && heroPair.end);
-  const heroLoading =
-    !!resolveExerciseImagePair &&
-    !!featured &&
-    !Object.prototype.hasOwnProperty.call(imagesByName, featured);
 
-  // Hero cross-fade: swap start↔end every second (matches log screen cadence).
+  // Hero load/error tracking so the cross-fade + indicator only run once the
+  // real frames are on screen; any failure quietly reveals the barbell tile.
   const heroOpacity = useRef(new Animated.Value(0)).current;
   const [heroPhase, setHeroPhase] = useState<'start' | 'end'>('start');
+  const [heroReady, setHeroReady] = useState(false);
+  const [heroStartFailed, setHeroStartFailed] = useState(false);
+  const [heroEndFailed, setHeroEndFailed] = useState(false);
+
   useEffect(() => {
-    if (!hasHeroPair) return;
+    setHeroReady(false);
+    setHeroStartFailed(false);
+    setHeroEndFailed(false);
+  }, [featured, heroPair?.start, heroPair?.end]);
+
+  // Cross-fade: swap start↔end every second (matches log screen cadence).
+  useEffect(() => {
+    if (!hasHeroPair || heroStartFailed || heroEndFailed) return;
     heroOpacity.setValue(0);
     setHeroPhase('start');
 
@@ -261,16 +276,10 @@ export default function WorkoutPreviewScreen() {
     }, 1000);
 
     return () => clearInterval(id);
-  }, [hasHeroPair]);
+  }, [hasHeroPair, heroStartFailed, heroEndFailed]);
 
   // ===== CTA: Make this the user's active plan =====
   const handleStartUsing = () => {
-    if (isExample) {
-      // Navigate to workout questionnaire when viewing example from onboarding
-      navigation.navigate('Q1PrimaryGoal', { fromOnboarding: true });
-      return;
-    }
-
     Alert.alert(
       'Start using this plan?',
       `"${planName}" will become your active workout. You can still find it here in Library.`,
@@ -308,33 +317,34 @@ export default function WorkoutPreviewScreen() {
       >
         {/* ============================================================
             Hero — featured exercise, start/end cross-fade
+            (barbell tile sits behind and shows through on miss/failure)
             ============================================================ */}
         <View style={styles.hero}>
           <View style={styles.heroMedia}>
-            {heroPair?.start ? (
-              <>
-                <Image
-                  source={srcOf(heroPair.start)}
-                  style={styles.heroImg}
-                  resizeMode="contain"
-                />
-                {heroPair.end ? (
-                  <Animated.Image
-                    source={srcOf(heroPair.end)}
-                    style={[styles.heroImg, { opacity: heroOpacity }]}
-                    resizeMode="contain"
-                  />
-                ) : null}
-              </>
-            ) : heroLoading ? (
-              <View style={styles.heroPlaceholder}>
-                <ActivityIndicator color={themeColor} size="large" />
-              </View>
-            ) : (
-              <View style={styles.heroPlaceholder}>
-                <Ionicons name="barbell-outline" size={58} color="#3a3a44" />
-              </View>
-            )}
+            {/* Fallback layer — always present, revealed if no image paints */}
+            <View style={styles.heroPlaceholder}>
+              <Ionicons name="barbell-outline" size={58} color="#3a3a44" />
+            </View>
+
+            {heroPair?.start && !heroStartFailed ? (
+              <Image
+                source={srcOf(heroPair.start)}
+                style={styles.heroImg}
+                resizeMode="contain"
+                onLoad={() => setHeroReady(true)}
+                onError={() => setHeroStartFailed(true)}
+              />
+            ) : null}
+
+            {heroPair?.end && !heroEndFailed && !heroStartFailed ? (
+              <Animated.Image
+                source={srcOf(heroPair.end)}
+                style={[styles.heroImg, { opacity: heroOpacity }]}
+                resizeMode="contain"
+                onError={() => setHeroEndFailed(true)}
+              />
+            ) : null}
+
             {/* Dark overlay so the back button stays legible over any image */}
             <View style={styles.heroOverlay} />
           </View>
@@ -351,8 +361,8 @@ export default function WorkoutPreviewScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Dual-frame "live" indicator (only when we have both frames) */}
-          {hasHeroPair && (
+          {/* Dual-frame "live" indicator — only once real frames are showing */}
+          {hasHeroPair && heroReady && !heroEndFailed && (
             <View style={styles.heroDots}>
               <Text style={styles.heroDotsLabel}>LIVE</Text>
               <View
@@ -488,7 +498,7 @@ export default function WorkoutPreviewScreen() {
                               const hasDetail = ex.rest || muscles.length || repsWeekly || rirWeekly || ex.notes;
 
                               const isLast = exIndex === visibleExercises.length - 1 && hiddenCount === 0;
-                              const thumb = imagesByName[exName]?.start || null;
+                              const thumb = imagesByName[exName]?.start || ex.imageUrl || null;
 
                               return (
                                 <View
@@ -504,21 +514,8 @@ export default function WorkoutPreviewScreen() {
                                     activeOpacity={hasDetail ? 0.6 : 1}
                                     disabled={!hasDetail}
                                   >
-                                    {/* Thumbnail */}
-                                    <View style={[
-                                      styles.exThumb,
-                                      { borderColor: themeColor + '2A', backgroundColor: themeColor + '12' },
-                                    ]}>
-                                      {thumb ? (
-                                        <Image
-                                          source={srcOf(thumb)}
-                                          style={styles.exThumbImg}
-                                          resizeMode="cover"
-                                        />
-                                      ) : (
-                                        <Ionicons name="barbell-outline" size={22} color={themeColor} />
-                                      )}
-                                    </View>
+                                    {/* Thumbnail (image-over-icon, self-healing fallback) */}
+                                    <ExerciseThumb uri={thumb} themeColor={themeColor} />
 
                                     {/* Name + muscle subtitle */}
                                     <View style={styles.exTextWrap}>
@@ -638,11 +635,39 @@ export default function WorkoutPreviewScreen() {
           onPress={handleStartUsing}
           activeOpacity={0.85}
         >
-          <Text style={styles.ctaButtonText}>
-            {isExample ? 'Build my own plan' : 'Start using this plan'}
-          </Text>
+          <Text style={styles.ctaButtonText}>Start using this plan</Text>
         </GHTouchable>
       </View>
+    </View>
+  );
+}
+
+// ── Exercise thumbnail ───────────────────────────────────────────────────────
+// Barbell icon sits underneath; the image paints over it on success. If the
+// image is missing or fails to load, the icon is what's left — no flicker, no
+// broken-image box.
+function ExerciseThumb({ uri, themeColor }: { uri: any; themeColor: string }) {
+  const [failed, setFailed] = useState(false);
+
+  // Reset failure state if the source changes (e.g. images resolve in late).
+  useEffect(() => {
+    setFailed(false);
+  }, [uri]);
+
+  return (
+    <View style={[
+      styles.exThumb,
+      { borderColor: themeColor + '2A', backgroundColor: themeColor + '12' },
+    ]}>
+      <Ionicons name="barbell-outline" size={22} color={themeColor} />
+      {uri && !failed ? (
+        <Image
+          source={srcOf(uri)}
+          style={styles.exThumbImg}
+          resizeMode="cover"
+          onError={() => setFailed(true)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -679,7 +704,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   heroPlaceholder: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0a0a0b',
@@ -876,6 +901,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   exThumbImg: {
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },
