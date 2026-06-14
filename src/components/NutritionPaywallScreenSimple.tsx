@@ -186,7 +186,7 @@ export default function NutritionPaywallScreen({ onPurchaseSuccess, onRestoreSuc
       <SafeAreaView style={styles.container}>
         <View style={styles.purchasedContainer}>
           <Text style={styles.purchasedIcon}>🎉</Text>
-          <Text style={styles.purchasedTitle}>You're all set!</Text>
+          <Text style={styles.purchasedTitle}>You&apos;re all set!</Text>
           <Text style={styles.purchasedText}>
             You already have lifetime access to AI nutrition planning.
           </Text>

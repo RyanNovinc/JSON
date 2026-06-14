@@ -216,7 +216,7 @@ export default function RepSchemeModal({
                   <Ionicons name="information-circle-outline" size={18} color="#9898a4" />
                 </View>
                 <Text style={styles.infoText}>
-                  <Text style={styles.infoBold}>RIR</Text> = reps in reserve. How many reps you could still do before failure. Lower RIR means you're closer to failure and lifting harder.
+                  <Text style={styles.infoBold}>RIR</Text> = reps in reserve. How many reps you could still do before failure. Lower RIR means you&apos;re closer to failure and lifting harder.
                 </Text>
               </View>
             </>

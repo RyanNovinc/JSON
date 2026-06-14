@@ -228,7 +228,7 @@ export default function PurchaseSuccessModal({ visible, onClose }: PurchaseSucce
               ],
             }}
           >
-            <Text style={styles.title}>You're all set!</Text>
+            <Text style={styles.title}>You&apos;re all set!</Text>
             <Text style={styles.subtitle}>
               Nutrition is unlocked forever.{'\n'}
               <Text style={styles.subdesc}>No subscription. No renewals.</Text>
