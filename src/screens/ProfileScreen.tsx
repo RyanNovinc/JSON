@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { forceOnboardingRecheck } from '../onboarding/IntentForkModal';
+import { forceOnboardingShow } from '../onboarding/IntentForkModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -147,8 +147,8 @@ export default function ProfileScreen() {
             try {
               await AsyncStorage.removeItem('@onboarding/completedAt');
               await AsyncStorage.removeItem('@onboarding/intent');
-              // Trigger the IntentForkModal to show
-              forceOnboardingRecheck();
+              // Force the IntentForkModal to show immediately
+              forceOnboardingShow();
             } catch (error) {
               console.error('Failed to reset onboarding:', error);
               Alert.alert('Error', 'Failed to reset. Please try again.');
