@@ -8,7 +8,7 @@ import {
   mealsForCoreShelf, mealsForSlots,
   trailingCardState, equipmentChipCounts,
   SHELF_CARD_CAP,
-} from './curatedShelves';
+} from '../curatedShelves';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean) {
