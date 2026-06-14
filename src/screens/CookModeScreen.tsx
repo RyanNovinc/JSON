@@ -356,6 +356,14 @@ export default function CookModeScreen() {
   const [completed, setCompleted] = useState(false);
   const [showStopModal, setShowStopModal] = useState(false);
 
+  const sortedTimers = useMemo(() => {
+    return [...timers].sort((a, b) => {
+      if (a.state === 'finished' && b.state !== 'finished') return -1;
+      if (b.state === 'finished' && a.state !== 'finished') return 1;
+      return a.remaining_seconds - b.remaining_seconds;
+    });
+  }, [timers]);
+
   if (!meal || !plate || !method) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 20, padding: 20 }]}>
@@ -447,14 +455,6 @@ export default function CookModeScreen() {
       console.warn('Share failed:', err);
     }
   };
-
-  const sortedTimers = useMemo(() => {
-    return [...timers].sort((a, b) => {
-      if (a.state === 'finished' && b.state !== 'finished') return -1;
-      if (b.state === 'finished' && a.state !== 'finished') return 1;
-      return a.remaining_seconds - b.remaining_seconds;
-    });
-  }, [timers]);
 
   // ============================================================
   // COMPLETION SCREEN — Option A: Full-bleed celebration

@@ -231,6 +231,66 @@ export default function GroceryListScreen() {
 
   const showLoadingState = passedGroceryList && isLoadingPurchaseStates && !localGroceryState;
 
+  // Load purchase states from storage
+  useEffect(() => {
+    const loadPurchaseStates = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(groceryListKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setPurchasedItemsState(parsed);
+        } else {
+          setPurchasedItemsState({});
+        }
+      } catch (error) {
+        console.error('Failed to load purchase states:', error);
+      } finally {
+        setIsLoadingPurchaseStates(false);
+      }
+    };
+
+    if (groceryListKey) {
+      loadPurchaseStates();
+    }
+  }, [groceryListKey]);
+
+  // Initialize local state if using passed grocery list
+  useEffect(() => {
+    if (passedGroceryList && !isLoadingPurchaseStates) {
+      const converted = isNewSimplifiedFormat ?
+        convertSimplifiedGroceryList(passedGroceryList) :
+        convertMealPlanGroceryList(passedGroceryList);
+      if (converted) {
+        converted.items = converted.items.map((item: any) => ({
+          ...item,
+          isPurchased: purchasedItemsState[item.id] || false
+        }));
+      }
+      setLocalGroceryState(converted);
+    }
+  }, [passedGroceryList, purchasedItemsState, isLoadingPurchaseStates, isNewSimplifiedFormat]);
+
+  // Refresh data when screen comes back into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!passedGroceryList) {
+        // The context will automatically update via getGroceryList()
+      } else {
+        const updatedContextList = getGroceryList();
+        if (updatedContextList && currentMealPlan?.data?.grocery_list) {
+          const refreshedGroceryList = convertMealPlanGroceryList(currentMealPlan.data.grocery_list);
+          if (refreshedGroceryList) {
+            refreshedGroceryList.items = refreshedGroceryList.items.map((item: any) => ({
+              ...item,
+              isPurchased: purchasedItemsState[item.id] || false
+            }));
+            setLocalGroceryState(refreshedGroceryList);
+          }
+        }
+      }
+    }, [passedGroceryList, currentMealPlan, purchasedItemsState, getGroceryList])
+  );
+
   if (!groceryList && !showLoadingState) {
     return (
       <View style={styles.container}>
@@ -332,66 +392,6 @@ export default function GroceryListScreen() {
   const groceryListKey = passedGroceryList ?
     `grocery_purchases_${passedGroceryList.total_estimated_cost}_${passedGroceryList.categories?.length || 0}` :
     'grocery_purchases_context';
-
-  // Load purchase states from storage
-  useEffect(() => {
-    const loadPurchaseStates = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(groceryListKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setPurchasedItemsState(parsed);
-        } else {
-          setPurchasedItemsState({});
-        }
-      } catch (error) {
-        console.error('Failed to load purchase states:', error);
-      } finally {
-        setIsLoadingPurchaseStates(false);
-      }
-    };
-
-    if (groceryListKey) {
-      loadPurchaseStates();
-    }
-  }, [groceryListKey]);
-
-  // Initialize local state if using passed grocery list
-  useEffect(() => {
-    if (passedGroceryList && !isLoadingPurchaseStates) {
-      const converted = isNewSimplifiedFormat ?
-        convertSimplifiedGroceryList(passedGroceryList) :
-        convertMealPlanGroceryList(passedGroceryList);
-      if (converted) {
-        converted.items = converted.items.map((item: any) => ({
-          ...item,
-          isPurchased: purchasedItemsState[item.id] || false
-        }));
-      }
-      setLocalGroceryState(converted);
-    }
-  }, [passedGroceryList, purchasedItemsState, isLoadingPurchaseStates, isNewSimplifiedFormat]);
-
-  // Refresh data when screen comes back into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      if (!passedGroceryList) {
-        // The context will automatically update via getGroceryList()
-      } else {
-        const updatedContextList = getGroceryList();
-        if (updatedContextList && currentMealPlan?.data?.grocery_list) {
-          const refreshedGroceryList = convertMealPlanGroceryList(currentMealPlan.data.grocery_list);
-          if (refreshedGroceryList) {
-            refreshedGroceryList.items = refreshedGroceryList.items.map((item: any) => ({
-              ...item,
-              isPurchased: purchasedItemsState[item.id] || false
-            }));
-            setLocalGroceryState(refreshedGroceryList);
-          }
-        }
-      }
-    }, [passedGroceryList, currentMealPlan, purchasedItemsState, getGroceryList])
-  );
 
   const toggleItemPurchased = async (item: GroceryItem) => {
     try {
