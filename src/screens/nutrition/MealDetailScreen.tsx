@@ -135,6 +135,23 @@ export default function MealDetailScreen() {
     };
   }, []);
 
+  const ingredientNames = useMemo(() => {
+    if (!meal) return [] as string[];
+    const m = meal.methods[0];
+    if (!m) return [] as string[];
+    const p = meal.plates[plateIndex] ?? meal.plates[0];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const push = (id: string) => {
+      const name = getIngredientName(id);
+      const key = name.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); out.push(name); }
+    };
+    m.ingredients.forEach((ing) => push(ing.ingredient_id));
+    p?.additional_ingredients.forEach((ing) => push(ing.ingredient_id));
+    return out;
+  }, [meal, plateIndex]);
+
   // ---- meal not found ----
   if (!meal) {
     return (
@@ -163,22 +180,6 @@ export default function MealDetailScreen() {
     (plate?.image_filename && getMealImage(plate.image_filename)) ||
     getMealImage(meal.image_filename);
 
-  const ingredientNames = useMemo(() => {
-    if (!method) return [] as string[];
-    const seen = new Set<string>();
-    const out: string[] = [];
-    const push = (id: string) => {
-      const name = getIngredientName(id);
-      const key = name.toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        out.push(name);
-      }
-    };
-    method.ingredients.forEach((ing) => push(ing.ingredient_id));
-    plate?.additional_ingredients.forEach((ing) => push(ing.ingredient_id));
-    return out;
-  }, [method, plate]);
 
   // ---- mutation handlers ----
   // Toggle, persist immediately, then dismiss the sheet. The parent's

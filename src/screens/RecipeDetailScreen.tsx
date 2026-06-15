@@ -151,6 +151,14 @@ export default function RecipeDetailScreen() {
     }, [mealSlug, selectedPlateIndex])
   );
 
+  const imageSource = useMemo(() => {
+    if (!meal) return undefined;
+    const p = meal.plates[selectedPlateIndex];
+    const plateImg = p?.image_filename ? getMealImage(p.image_filename) : undefined;
+    if (plateImg) return plateImg;
+    return getMealImage(meal.image_filename);
+  }, [meal, selectedPlateIndex]);
+
   if (!meal) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 16, padding: 16 }]}>
@@ -165,11 +173,6 @@ export default function RecipeDetailScreen() {
   const plate: Plate = meal.plates[selectedPlateIndex];
   const method: CookingMethod = meal.methods[selectedMethodIndex];
 
-  const imageSource = useMemo(() => {
-    const plateImg = plate?.image_filename ? getMealImage(plate.image_filename) : undefined;
-    if (plateImg) return plateImg;
-    return getMealImage(meal.image_filename);
-  }, [plate?.image_filename, meal.image_filename]);
 
   const macros = plate.plate_macros;
   const showPlateSwitcher = meal.plates.length > 1;
