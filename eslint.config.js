@@ -6,20 +6,31 @@ module.exports = defineConfig([
   expoConfig,
   {
     ignores: [
-      'dist/*', 
-      'ios/*', 
-      'android/*', 
-      '.expo/*', 
+      'dist/*',
+      'ios/*',
+      'android/*',
+      '.expo/*',
       '**/DateDownMobile/**',
-      // Backend and build artifacts
       'aws-dashboard-backend.js',
-      'enhanced-dashboard-backend.js', 
+      'enhanced-dashboard-backend.js',
       'jsonfit-share-backend/**/*',
       'scripts/**/*',
-      // Jest config uses Jest globals
       'jest.setup.js',
-      // Backup files
-      '**/*.backup.*'
+      '**/*.backup.*',
     ],
+  },
+  {
+    // Apostrophes/quotes in JSX text render fine — this rule is pure noise.
+    rules: {
+      'react/no-unescaped-entities': 'off',
+    },
+  },
+  {
+    // React Navigation's <Screen> uses a children render-callback as its API,
+    // so no-children-prop is a false positive here. Rule stays on elsewhere.
+    files: ['src/navigation/**/*.{ts,tsx}'],
+    rules: {
+      'react/no-children-prop': 'off',
+    },
   },
 ]);
