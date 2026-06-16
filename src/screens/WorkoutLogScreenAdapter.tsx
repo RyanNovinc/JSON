@@ -11,6 +11,7 @@ import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { resolveExerciseImagePair } from '../utils/exerciseImages';
 import { WorkoutStorage } from '../utils/storage';
 import RobustStorage from '../utils/robustStorage';
+import { Analytics } from '../services/analytics';
 
 // This adapter connects the new beautiful WorkoutLogScreen with your existing app navigation and data structures
 
@@ -741,11 +742,16 @@ export default function WorkoutLogScreenAdapter() {
       statsMap.set(workoutKey, stats);
       await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
       console.log('🎯 [COMPLETION] Saved completion stats:', stats);
-      
+
     } catch (error) {
       console.error('🏁 FINISH WORKOUT: Error marking workout as completed:', error);
     }
-    
+
+    Analytics.track('workout_logged', {
+      exercise_count: exercises.length,
+      duration_ms: workoutDuration * 1000,
+    });
+
     // Clear saved workout data since workout is complete
     await WorkoutStorage.clearCurrentWorkout(day?.day_name, blockName);
     setWorkoutStarted(false);

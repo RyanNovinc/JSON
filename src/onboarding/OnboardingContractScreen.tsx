@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { forceOnboardingShow } from './IntentForkModal';
+import { OnboardingAnalytics } from '../services/onboardingAnalytics';
 import { exampleMealPlan } from './exampleMealPlan';
 import { exampleWorkout } from './exampleWorkout';
 import { startWorkoutFlow, startNutritionFlow } from '../utils/questionnaireRouting';
@@ -104,7 +105,13 @@ export default function OnboardingContractScreen() {
   const flow: Flow = route.params?.flow === 'workout' ? 'workout' : 'meal';
   const cfg = FLOW[flow];
 
+  useEffect(() => {
+    OnboardingAnalytics.stepViewed('contract', 2);
+  }, []);
+
   const onStart = async () => {
+    OnboardingAnalytics.stepCompleted();
+    OnboardingAnalytics.completed();
     if (flow === 'workout') {
       await startWorkoutFlow(navigation, { fromOnboarding: true });
     } else {
@@ -113,6 +120,7 @@ export default function OnboardingContractScreen() {
   };
 
   const onBack = () => {
+    OnboardingAnalytics.abandoned();
     // Re-show the fork over this screen. We deliberately don't reset/navigate
     // here: the fork is a full-screen modal, so fading it back in over the
     // contract is the natural reverse of how we got here (the fork faded OUT

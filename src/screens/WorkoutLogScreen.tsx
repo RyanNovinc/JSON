@@ -71,6 +71,7 @@ import ExerciseNotesModal, { NoteEntry } from '../components/ExerciseNotesModal'
 import WorkoutHeatmapModal from '../components/WorkoutHeatmapModal';
 import DeleteSetModal from '../components/DeleteSetModal';
 import OneRMProgressionModal from '../components/OneRMProgressionModal';
+import { Analytics } from '../services/analytics';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -951,6 +952,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           onIndexChange(target);
           dragX.setValue(0);
           setIsPaging(false);
+          Analytics.track('exercise_swiped', { direction: goNext ? 'next' : 'prev' });
         });
       } else {
         // Didn't pass the threshold — spring back to centre.
@@ -2049,7 +2051,7 @@ function SetRow({
               }
             }}
             keyboardType="decimal-pad"
-            placeholder={`${previous ? convertWeight(parseFloat(previous.weight) || 0, previous.unit ?? globalUnit, globalUnit).toFixed(1) : '0'} ${globalUnit}`}
+            placeholder={previous ? convertWeight(parseFloat(previous.weight) || 0, previous.unit ?? globalUnit, globalUnit).toFixed(1) : '0'}
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
             {...accessoryProps}

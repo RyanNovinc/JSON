@@ -169,9 +169,9 @@ export default function ImportSharedContent() {
       // Navigate to appropriate import screen
       console.log('📱 [IMPORT SHARED] About to navigate based on contentType:', contentType);
       if (contentType === 'meal_plan') {
-        console.log('📱 [IMPORT SHARED] Navigating to ImportMealPlan with prefilledJson');
+        console.log('📱 [IMPORT SHARED] Navigating to ImportSharedMealPlan with prefilledJson');
         console.log('📱 [IMPORT SHARED] Navigation params:', { prefilledJson: prefilledJson.substring(0, 100) + '...' });
-        navigation.replace('ImportMealPlan', { prefilledJson });
+        navigation.replace('ImportSharedMealPlan', { prefilledJson });
       } else {
         console.log('📱 [IMPORT SHARED] Navigating to ImportRoutine with prefilledJson');
         console.log('📱 [IMPORT SHARED] Navigation params:', { prefilledJson: prefilledJson.substring(0, 100) + '...' });

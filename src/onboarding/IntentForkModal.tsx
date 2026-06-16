@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -16,6 +17,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { navigationRef } from '../utils/navigationRef';
 import MealCycleHero from './MealCycleHero';
+import { OnboardingAnalytics } from '../services/onboardingAnalytics';
 
 // ============================================================================
 // IntentForkModal — first-open "what do you want to do first?" screen.
@@ -47,6 +49,17 @@ import MealCycleHero from './MealCycleHero';
 // Migration: anyone who finished the OLD onboarding has the legacy
 // 'onboarding_completed' key, so we write the new key for them silently and
 // never show the fork. New installs (neither key) see it.
+//
+// Anti-flash note (the important bit):
+//   On a fresh install the navigator mounts the Workouts/home tab BEHIND this
+//   component before the gate resolves. We hide it with an opaque `cover` View.
+//   A React Native <Modal> renders in its OWN native window above the whole app
+//   tree, so while the modal fades in (animationType="fade") the z-order is
+//   modal-window > cover > home — i.e. the cover sits behind the modal and keeps
+//   home hidden for the entire fade. The cover is therefore dropped from the
+//   modal's onShow (fully presented), NOT the instant we set visible=true.
+//   Dropping it early was the original bug: home showed through the half-faded
+//   modal for ~300ms.
 // ============================================================================
 
 const KEY_COMPLETED = '@onboarding/completedAt';
@@ -135,6 +148,26 @@ function Logo() {
 export default function IntentForkModal() {
   const [visible, setVisible] = useState(false);
   const [recheckTrigger, setRecheckTrigger] = useState(0);
+  // Opaque cover that hides the home screen during the async gate check on
+  // first launch. Starts at opacity 1, fades out for existing users, or is
+  // removed when the modal has finished presenting for fresh installs.
+  const coverOpacity = useRef(new Animated.Value(1)).current;
+  const [coverDone, setCoverDone] = useState(false);
+  // Fallback so we can never get stuck on the black cover if the modal's
+  // onShow never fires (rare Expo Go edge cases).
+  const coverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Drop the cover. Called from the Modal's onShow — the cover stays up, behind
+  // the modal, until the modal is FULLY presented; otherwise the home screen
+  // would show through while the modal is still fading in. Idempotent, and
+  // clears the fallback timer so it can't double-fire.
+  const dropCover = useCallback(() => {
+    if (coverTimerRef.current) {
+      clearTimeout(coverTimerRef.current);
+      coverTimerRef.current = null;
+    }
+    setCoverDone(true);
+  }, []);
 
   // Wire up the global triggers.
   useEffect(() => {
@@ -142,6 +175,8 @@ export default function IntentForkModal() {
       setRecheckTrigger((prev) => prev + 1);
     };
     triggerOnboardingShow = () => {
+      OnboardingAnalytics.started(false);
+      OnboardingAnalytics.stepViewed('intent_fork', 1);
       setVisible(true);
     };
     return () => {
@@ -153,11 +188,29 @@ export default function IntentForkModal() {
   // Gate check on mount and when recheckTrigger changes.
   useEffect(() => {
     let cancelled = false;
+    // Only the first run (initial mount) needs to fade the cover out.
+    // In-session rechecks (profile reset) happen when the cover is already gone.
+    const isInitialCheck = recheckTrigger === 0;
+
+    const fadeOutCover = () => {
+      if (!isInitialCheck) return;
+      Animated.timing(coverOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        if (!cancelled) setCoverDone(true);
+      });
+    };
+
     (async () => {
       try {
         const completed = await AsyncStorage.getItem(KEY_COMPLETED);
         if (cancelled) return;
-        if (completed) return; // already done, new-style
+        if (completed) {
+          fadeOutCover();
+          return; // already done, new-style
+        }
 
         const legacy = await AsyncStorage.getItem(LEGACY_KEY);
         if (cancelled) return;
@@ -168,16 +221,35 @@ export default function IntentForkModal() {
             [KEY_COMPLETED, new Date().toISOString()],
             [KEY_INTENT, 'skipped'],
           ]);
+          fadeOutCover();
           return;
         }
 
-        setVisible(true); // fresh install
+        // Fresh install — show the fork. Keep the opaque cover up *behind* the
+        // modal until the modal has finished presenting (Modal onShow ->
+        // dropCover). The modal uses animationType="fade", so dropping the cover
+        // here (as the old code did via setCoverDone(true)) would reveal the
+        // Workouts/home screen behind the half-faded modal for ~300ms — that was
+        // the flash. The setTimeout is only a safety net if onShow never fires.
+        OnboardingAnalytics.started(true);
+        OnboardingAnalytics.stepViewed('intent_fork', 1);
+        setVisible(true);
+        if (isInitialCheck) {
+          coverTimerRef.current = setTimeout(() => {
+            if (!cancelled) dropCover();
+          }, 800);
+        }
       } catch {
         // Fail open — never block the app behind a storage error.
+        fadeOutCover();
       }
     })();
     return () => {
       cancelled = true;
+      if (coverTimerRef.current) {
+        clearTimeout(coverTimerRef.current);
+        coverTimerRef.current = null;
+      }
     };
   }, [recheckTrigger]);
 
@@ -190,6 +262,13 @@ export default function IntentForkModal() {
     } catch {
       // ignore — still route + dismiss so the user is never trapped
     }
+    OnboardingAnalytics.intentChosen(intent);
+    if (intent === 'skipped') {
+      OnboardingAnalytics.abandoned();
+    } else {
+      OnboardingAnalytics.stepCompleted();
+    }
+
     // Route FIRST, while the modal is still fully opaque and covering
     // everything, so the destination is mounted before we reveal it. Then
     // dismiss — the fork fades out onto the destination, not the Main tab.
@@ -202,23 +281,32 @@ export default function IntentForkModal() {
   }, []);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent={false}
-      statusBarTranslucent
-      onRequestClose={() => choose('skipped')}
-    >
-      {/*
-        A React Native <Modal> renders in a separate native view hierarchy, so
-        it does NOT inherit the app's SafeAreaProvider — and this modal is
-        mounted at the root, where there's no provider above it anyway. So we
-        give the modal its own. initialMetrics avoids a first-frame flash.
-      */}
-      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-        <ForkBody onChoose={choose} />
-      </SafeAreaProvider>
-    </Modal>
+    <>
+      {!coverDone && (
+        <Animated.View
+          style={[styles.cover, { opacity: coverOpacity }]}
+          pointerEvents="none"
+        />
+      )}
+      <Modal
+        visible={visible}
+        animationType="fade"
+        transparent={false}
+        statusBarTranslucent
+        onShow={dropCover}
+        onRequestClose={() => choose('skipped')}
+      >
+        {/*
+          A React Native <Modal> renders in a separate native view hierarchy, so
+          it does NOT inherit the app's SafeAreaProvider — and this modal is
+          mounted at the root, where there's no provider above it anyway. So we
+          give the modal its own. initialMetrics avoids a first-frame flash.
+        */}
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+          <ForkBody onChoose={choose} />
+        </SafeAreaProvider>
+      </Modal>
+    </>
   );
 }
 
@@ -298,6 +386,15 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: C.bg,
+  },
+
+  // Full-screen cover that prevents the home screen from flashing through
+  // while the AsyncStorage gate check runs on first launch.
+  cover: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: C.bg,
+    zIndex: 9999,
+    elevation: 9999,
   },
 
   // Logo — the brand stamp, rendered over the hero scrim, centred.

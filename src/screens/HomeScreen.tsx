@@ -40,6 +40,7 @@ import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
 import { getProgramImage } from '../assets/programImages';
 import { SAMPLE_PLANS } from '../data/samplePlans';
 import { startWorkoutFlow } from '../utils/questionnaireRouting';
+import { Analytics } from '../services/analytics';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -979,6 +980,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   };
 
   const handleBulkingProgramPress = (plan: any) => {
+    Analytics.track('curated_program_opened', { program_id: plan.id });
     navigation.navigate('SamplePlanDetail' as any, { plan });
   };
 

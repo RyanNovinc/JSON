@@ -15,6 +15,8 @@ import { validateProductionEnvironment } from './src/utils/environmentValidator'
 import { validateAll } from './src/utils/curated_meals_validation';
 import { preloadCriticalImages } from './src/utils/imagePreloader';
 import { runMigrations } from './src/utils/migrationFramework';
+import { Analytics } from './src/services/analytics';
+import Constants from 'expo-constants';
 
 // Keep the native splash screen visible while loading
 ExpoSplashScreen.preventAutoHideAsync();
@@ -33,6 +35,12 @@ function AppContent() {
   const [migrationsComplete, setMigrationsComplete] = useState(false);
 
   useEffect(() => {
+    Analytics.init({
+      endpoint: 'https://kmgao3kfmhtqu47poior5mbqce0nyxfx.lambda-url.ap-southeast-2.on.aws/',
+      appVersion: Constants.expoConfig?.version ?? '1.0.20',
+      sharedSecret: 'd34039086646a0a1fdb3a3697742ca44',
+    });
+
     async function initializeApp() {
       try {
         // Validate production environment configuration

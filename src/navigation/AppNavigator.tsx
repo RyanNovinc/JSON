@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, Animated, StyleSheet , Linking } from 'react-native';
 import { navigationRef } from '../utils/navigationRef';
+import { Analytics } from '../services/analytics';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
@@ -21,6 +22,7 @@ import SamplePlanDetailScreen from '../screens/SamplePlanDetailScreen';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
 import ImportSharedContent from '../screens/ImportSharedContent';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
+import ImportSharedMealPlan from '../screens/ImportSharedMealPlan';
 import MyWorkoutsScreen from '../screens/MyWorkoutsScreen';
 import MyMealPlansScreen from '../screens/MyMealPlansScreen';
 import SampleMealPlansScreen from '../screens/SampleMealPlansScreen';
@@ -140,6 +142,7 @@ export type RootStackParamList = {
   ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean; isCurated?: boolean; curatedSlug?: string };
   ImportSharedContent: { shareId: string };
   ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
+  ImportSharedMealPlan: { prefilledJson?: string };
   MyWorkouts: undefined;
   MyMealPlans: undefined;
   SampleMealPlans: undefined;
@@ -547,7 +550,18 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   <CookTimerProvider>
                     <MealPlanningProvider>
                 <SimplifiedMealPlanningProvider>
-                <NavigationContainer ref={navigationRef} linking={linking}>
+                <NavigationContainer
+                  ref={navigationRef}
+                  linking={linking}
+                  onReady={() => {
+                    const route = navigationRef.getCurrentRoute();
+                    if (route?.name) Analytics.track('screen_viewed', { screen_name: route.name });
+                  }}
+                  onStateChange={() => {
+                    const route = navigationRef.getCurrentRoute();
+                    if (route?.name) Analytics.track('screen_viewed', { screen_name: route.name });
+                  }}
+                >
                 <ShareIntentHandler />
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             <>
@@ -632,6 +646,33 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 children={(props) => (
                   <NutritionThemeProvider>
                     <ImportMealPlanScreen {...props} />
+                  </NutritionThemeProvider>
+                )}
+                options={{
+                  headerShown: false,
+                  animationTypeForReplace: 'push',
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => {
+                    return {
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateX: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts.screen.width, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    };
+                  },
+                }}
+              />
+              <RootStack.Screen
+                name="ImportSharedMealPlan"
+                children={(props) => (
+                  <NutritionThemeProvider>
+                    <ImportSharedMealPlan {...props} />
                   </NutritionThemeProvider>
                 )}
                 options={{

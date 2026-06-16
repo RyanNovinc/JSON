@@ -44,6 +44,7 @@ import { AIProvider } from '../../../components/questionnaire/AILaunchSheet';
 import { useSimplifiedMealPlanning } from '../../../contexts/SimplifiedMealPlanningContext';
 import { useMealPlanImport } from '../../../hooks/useMealPlanImport';
 import MealPlanConfirmationModal from '../../../components/import/MealPlanConfirmationModal';
+import { Analytics } from '../../../services/analytics';
 
 type NavProp = StackNavigationProp<any>;
 
@@ -186,6 +187,7 @@ export default function NutritionPromptReadyScreen() {
           ? Date.now() - backgroundedAt.current
           : 0;
         if (elapsed >= RETURN_THRESHOLD_MS) {
+          Analytics.track('returned_from_ai', { prompt_type: 'meal', time_away_ms: elapsed });
           setReturnedFromAI(true);
           scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         }
@@ -205,6 +207,7 @@ export default function NutritionPromptReadyScreen() {
     }
     try {
       await Clipboard.setStringAsync(prompt);
+      Analytics.track('prompt_copied', { prompt_type: 'meal_v2', prompt_version: '2' });
       setCopied(true);
       if (copiedTimer.current) clearTimeout(copiedTimer.current);
       copiedTimer.current = setTimeout(() => setCopied(false), 2000);

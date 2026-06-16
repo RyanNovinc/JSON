@@ -68,10 +68,10 @@ import ImportConfirmationModal from '../../components/import/ImportConfirmationM
 import { useTheme } from '../../contexts/ThemeContext';
 import { WorkoutStorage } from '../../utils/storage';
 import { assemblePlanningPrompt } from '../../data/planningPrompt';
-import { generateProgramSpecs } from '../../data/workoutPrompt';
 import { AIProvider } from '../../components/questionnaire/AILaunchSheet';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useWorkoutImport } from '../../hooks/useWorkoutImport';
+import { Analytics } from '../../services/analytics';
 
 type NavProp = StackNavigationProp<RootStackParamList, 'PromptReady'>;
 
@@ -181,15 +181,16 @@ export default function PromptReadyScreen() {
         const fitnessGoals = await WorkoutStorage.loadFitnessGoalsResults();
         const equipment =
           await WorkoutStorage.loadEquipmentPreferencesResults();
-        
-        // Only use completed questionnaire data to prevent incomplete answers from being sent
-        const validFitnessGoals = fitnessGoals?.completedAt ? fitnessGoals : {};
-        const validEquipment = equipment?.completedAt ? equipment : {};
-        const merged = { ...validFitnessGoals, ...validEquipment };
+
+        // No completedAt gate. The Q1–Q7 flow saves via saveQuestionnaireAnswers and never
+        // stamps completedAt, so gating on it here discarded every answer (merged → {}),
+        // which left both the preview AND the copied prompt empty. Mirror
+        // NutritionPromptReadyScreen: pass the raw loaded data straight through.
+        const merged = { ...(fitnessGoals ?? {}), ...(equipment ?? {}) };
         const assembled = assemblePlanningPrompt(merged);
 
         setPrompt(assembled);
-        setPromptPreview(buildPromptPreview(merged));
+        setPromptPreview(buildWorkoutPreview(merged));
       } catch (e) {
         console.error('Failed to load prompt data', e);
       } finally {
@@ -218,6 +219,7 @@ export default function PromptReadyScreen() {
           ? Date.now() - backgroundedAt.current
           : 0;
         if (elapsed >= RETURN_THRESHOLD_MS) {
+          Analytics.track('returned_from_ai', { prompt_type: 'workout', time_away_ms: elapsed });
           setReturnedFromAI(true);
           scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         }
@@ -245,6 +247,7 @@ export default function PromptReadyScreen() {
     }
     try {
       await Clipboard.setStringAsync(prompt);
+      Analytics.track('prompt_copied', { prompt_type: 'workout', prompt_version: '1' });
       await WorkoutStorage.setAwaitingImport(true);
       setCopied(true);
       if (copiedTimer.current) clearTimeout(copiedTimer.current);
@@ -772,33 +775,121 @@ const HelpSheet: React.FC<HelpSheetProps> = ({
 // Helpers — build the program-recap content from questionnaire data
 // ============================================================================
 
-// Display version of the prompt preview: the user-facing PROFILE block
-// (the same one generateProgramSpecs embeds in the full prompt), lightly
-// cleaned of markdown so it reads as plain text in the mono card. This is
-// the part a human cares about — their own answers — not the machine
-// instructions that top the assembled prompt. The full prompt (machine
-// boilerplate included) still goes to the clipboard untouched.
-function buildPromptPreview(data: any): string {
-  let specs = '';
-  try {
-    specs = generateProgramSpecs(data) || '';
-  } catch (e) {
-    console.error('generateProgramSpecs failed for preview', e);
-  }
-  if (!specs) return '';
+// Display version of the prompt preview: a clean, sectioned recap built
+// straight from the questionnaire answers — same visual treatment as the
+// nutrition screen's buildNutritionPreview, so the card fills with
+// CAPS-labelled sections (GOAL / TRAINING / EQUIPMENT / FOCUS / PREFERENCES).
+// The full machine prompt still goes to the clipboard untouched.
+//
+// Keys match the real QuestionnaireData interface in workoutPrompt.ts. Coded
+// values are humanized automatically (build_muscle → "Build Muscle"), so we
+// don't hardcode every value enum. A section with no data is simply skipped.
+function buildWorkoutPreview(data: any): string {
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = data?.[k];
+      if (v !== undefined && v !== null && v !== '') return v;
+    }
+    return undefined;
+  };
 
-  return (
-    specs
-      // Strip markdown headers (#, ##) and horizontal rules (---).
-      .replace(/^#{1,6}\s*/gm, '')
-      .replace(/^\s*-{3,}\s*$/gm, '')
-      // Drop bold/italic emphasis markers but keep the words.
-      .replace(/\*\*/g, '')
-      .replace(/(^|\s)[*_]([^*_]+)[*_]/g, '$1$2')
-      // Collapse 3+ blank lines down to a single blank line.
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
-  );
+  const humanize = (s: any): string =>
+    String(s)
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
+
+  const lbl = (v: any): string | undefined =>
+    v != null && v !== '' ? humanize(v) : undefined;
+
+  // Accepts array | object (map of truthy values) | string → humanized labels.
+  const toList = (val: any): string[] => {
+    if (val == null || val === '') return [];
+    if (Array.isArray(val)) return val.filter(Boolean).map(humanize);
+    if (typeof val === 'object')
+      return Object.keys(val)
+        .filter((k) => val[k])
+        .map(humanize);
+    return [humanize(val)];
+  };
+
+  const lines: string[] = [];
+  const section = (header: string, body: string[]) => {
+    const filled = body.filter((l) => l && l.trim().length > 0);
+    if (filled.length === 0) return;
+    if (lines.length > 0) lines.push('');
+    lines.push(header, ...filled);
+  };
+
+  // GOAL
+  const goal = lbl(pick('primaryGoal', 'customPrimaryGoal'));
+  const experience = lbl(pick('trainingExperience'));
+  // Secondary goals live as the keys of integrationMethods
+  // ({ [goalId]: 'integrated' | 'dedicated' }).
+  const secondary = toList(pick('integrationMethods'));
+  section('GOAL', [
+    [goal, experience].filter(Boolean).join(' · '),
+    secondary.length ? `Also: ${secondary.join(', ')}` : '',
+  ]);
+
+  // TRAINING
+  const days = pick('totalTrainingDays', 'gymTrainingDays');
+  const duration = pick('programDuration', 'customDuration');
+  const durationLabel =
+    duration != null && /^\d+$/.test(String(duration))
+      ? `${duration}-week program`
+      : duration
+      ? humanize(duration)
+      : '';
+  const rest = lbl(pick('sessionStyle'));
+  const volume = pick('volumePreference');
+  const volumeLabel =
+    volume && volume !== 'not_sure' ? `${volume} sets/week` : '';
+  section('TRAINING', [
+    [days != null ? `${days} days per week` : '', durationLabel]
+      .filter(Boolean)
+      .join(' · '),
+    [rest ? `${rest} rest` : '', volumeLabel].filter(Boolean).join(' · '),
+  ]);
+
+  // EQUIPMENT
+  const equipment = toList(pick('selectedEquipment'));
+  const specific = toList(pick('specificEquipment'));
+  section('EQUIPMENT', [
+    equipment.length ? equipment.join(', ') : '',
+    specific.length ? specific.join(', ') : '',
+  ]);
+
+  // FOCUS
+  const priority = [
+    ...toList(pick('priorityMuscleGroups')),
+    ...toList(pick('customMuscleGroup')),
+  ];
+  const limits = [
+    ...toList(pick('movementLimitations')),
+    ...toList(pick('customLimitation')),
+  ];
+  section('FOCUS', [
+    priority.length ? `Priority: ${priority.join(', ')}` : '',
+    limits.length ? `Working around: ${limits.join(', ')}` : '',
+  ]);
+
+  // PREFERENCES
+  const style = [
+    ...toList(pick('trainingStylePreference')),
+    ...toList(pick('customTrainingStyle')),
+  ];
+  const liked = toList(pick('likedExercises'));
+  const disliked = toList(pick('dislikedExercises'));
+  const core = pick('includeDirectCore') ? 'Direct core work' : '';
+  section('PREFERENCES', [
+    style.length ? `Style: ${style.join(', ')}` : '',
+    liked.length ? `Include: ${liked.join(', ')}` : '',
+    disliked.length ? `Avoid: ${disliked.join(', ')}` : '',
+    core,
+  ]);
+
+  return lines.join('\n').trim();
 }
 
 // Convert a #rrggbb hex to an rgba() string at the given alpha. Lets the

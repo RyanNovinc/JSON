@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { exampleMealPlan } from './exampleMealPlan';
 import { startNutritionFlow } from '../utils/questionnaireRouting';
+import { OnboardingAnalytics } from '../services/onboardingAnalytics';
 
 /**
  * ExamplePlanCard — the "Peek at a finished plan" card for the Nutrition tab's
@@ -32,6 +33,17 @@ import { startNutritionFlow } from '../utils/questionnaireRouting';
 export default function ExamplePlanCard() {
   const navigation = useNavigation<any>();
   const { themeColor } = useTheme();
+  const stepDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (!OnboardingAnalytics.isActive()) return;
+    OnboardingAnalytics.stepViewed('example_plan', 3);
+    return () => {
+      if (!stepDoneRef.current && OnboardingAnalytics.isActive()) {
+        OnboardingAnalytics.abandoned();
+      }
+    };
+  }, []);
 
   const openExample = () => {
     navigation.navigate('MealPlanPreview', {
@@ -41,6 +53,11 @@ export default function ExamplePlanCard() {
   };
 
   const buildOwn = async () => {
+    if (OnboardingAnalytics.isActive()) {
+      stepDoneRef.current = true;
+      OnboardingAnalytics.stepCompleted();
+      OnboardingAnalytics.completed();
+    }
     await startNutritionFlow(navigation);
   };
 

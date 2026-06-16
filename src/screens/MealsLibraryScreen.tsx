@@ -215,7 +215,7 @@ export default function MealsLibraryScreen() {
   const renderCard = useCallback(
     ({ item: meal }: { item: CuratedMeal }) => {
       const { kcal, protein, carbs, fat, activeMinutes } = getCardSummary(meal);
-      const imageSource = getMealImage(meal.image_filename);
+      const imageSource = getMealImage(meal.plates?.[0]?.image_filename ?? meal.image_filename);
 
       return (
         <TouchableOpacity

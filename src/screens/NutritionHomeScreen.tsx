@@ -538,9 +538,25 @@ export default function NutritionHomeScreen({ route }: any) {
       ...allSmoothies.filter(s => !orderedSlugs.has(s.slug)),
     ];
 
-    // Mains = anything not in the four leaf categories.
+    // Mains = anything not in the four leaf categories, in a curated order.
     const LEAF = new Set(['breakfast', 'snack', 'dessert', 'smoothie']);
-    const mains = all.filter(m => !LEAF.has(m.cuisine));
+    const allMains = all.filter(m => !LEAF.has(m.cuisine));
+    const mainsOrder = [
+      'massaman',
+      'bolognese',
+      'pulled_pork',
+      'lamb_shanks',
+      'beef_stew',
+      'chilli_con_carne',
+    ];
+    const orderedMains = mainsOrder
+      .map(slug => allMains.find(m => m.slug === slug))
+      .filter(Boolean) as CuratedMeal[];
+    const orderedMainsSlugs = new Set(orderedMains.map(m => m.slug));
+    const mains = [
+      ...orderedMains,
+      ...allMains.filter(m => !orderedMainsSlugs.has(m.slug)),
+    ];
 
     // Activity-driven shelf — tag-based, can overlap with any cuisine.
     // Merge pre- and post-workout meals into ONE shelf (pre first), deduped by
@@ -1432,7 +1448,14 @@ export default function NutritionHomeScreen({ route }: any) {
                   <View style={styles.heroLinkSep} />
                   <TouchableOpacity
                     style={styles.heroLinkBtn}
-                    onPress={() => handleMealPlanNavigation(currentPlanLegacy, { openGrocery: true })}
+                    onPress={() => {
+                      const groceryList = heroOriginal?.grocery_list;
+                      if (groceryList) {
+                        navigation.navigate('GroceryList' as any, { groceryList });
+                      } else {
+                        handleMealPlanNavigation(currentPlanLegacy);
+                      }
+                    }}
                     activeOpacity={0.6}
                     accessibilityRole="button"
                     accessibilityLabel="Open grocery list"

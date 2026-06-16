@@ -10,7 +10,8 @@ import {
   Linking,
   Animated,
   SafeAreaView,
- Platform } from 'react-native';
+  Platform,
+} from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -25,11 +26,11 @@ import { WorkoutStorage } from '../utils/storage';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
-import { NUTRITION_STORAGE_KEYS , SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
+import { NUTRITION_STORAGE_KEYS, SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
 import NutritionGeneratorStep1 from '../components/NutritionGeneratorStep1';
 import NutritionGeneratorStep4 from '../components/NutritionGeneratorStep4';
 import NutritionGeneratorStep1New from '../components/NutritionGeneratorStep1New';
-
+import { Analytics } from '../services/analytics';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
 type ImportMealPlanRouteProp = RouteProp<RootStackParamList, 'ImportMealPlan'>;
@@ -39,7 +40,11 @@ export default function ImportMealPlanScreen() {
   const route = useRoute<ImportMealPlanRouteProp>();
   const { themeColor } = useTheme();
   const { saveMealPlan } = useSimplifiedMealPlanning();
-  const [isLoading, setIsLoading] = useState(false);
+  // Start in the loading state when we arrive with a meal plan to auto-import, so the
+  // "Paste Your Plan" UI never paints for a frame before processMealPlanData kicks in.
+  // (Safe here because the auto-import effect below doesn't gate on isLoading — unlike
+  // the workout screen, where this same one-liner would have blocked the import.)
+  const [isLoading, setIsLoading] = useState(!!route.params?.prefilledJson);
   const [showInstructions, setShowInstructions] = useState(false);
   const [planningPromptCopied, setPlanningPromptCopied] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
@@ -57,10 +62,10 @@ export default function ImportMealPlanScreen() {
 
   // Handle the showStep1New parameter
   const showStep1New = route.params?.showStep1New;
-  
+
   // Handle prefilledJson parameter for shared meal plans
   const prefilledJson = route.params?.prefilledJson;
-  
+
   // Auto-trigger import if prefilledJson is provided
   useEffect(() => {
     if (prefilledJson && !showStep1New) {
@@ -98,8 +103,6 @@ export default function ImportMealPlanScreen() {
     const targetDate = new Date(today.getTime() + ((n + 1) * 24 * 60 * 60 * 1000));
     return targetDate.toLocaleDateString('en-US', { weekday: 'long' });
   };
-
-
 
   const sampleMealPlan = {
     "id": "sample_3day_balanced",
@@ -383,64 +386,64 @@ export default function ImportMealPlanScreen() {
     }, 2000);
   };
 
-
   const validateAndParseJSON = (input: string): SimplifiedMealPlan | null => {
     try {
       // Normalize smart quotes to straight quotes before parsing
       let text = input;
       text = text.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"');  // curly double quotes
       text = text.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'");  // curly single quotes
-      
       const parsed = JSON.parse(text);
       console.log("📥 Parsed JSON successfully");
-      
+
       // Simple validation for SimplifiedMealPlan format
       if (!parsed.id) {
         setErrorMessage("❌ Missing required field: id");
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'missing_field', day_count: 0 });
         return null;
       }
-      
       if (!parsed.name) {
         setErrorMessage("❌ Missing required field: name");
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'missing_field', day_count: 0 });
         return null;
       }
-      
       if (!parsed.dailyMeals || typeof parsed.dailyMeals !== "object") {
         setErrorMessage("❌ Missing or invalid dailyMeals structure");
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'missing_field', day_count: 0 });
         return null;
       }
-      
       if (!parsed.metadata || !parsed.metadata.duration) {
         setErrorMessage("❌ Missing metadata.duration field");
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'missing_field', day_count: 0 });
         return null;
       }
-      
+
       // Validate that dailyMeals has at least one day
       const dailyMealsKeys = Object.keys(parsed.dailyMeals);
       if (dailyMealsKeys.length === 0) {
         setErrorMessage("❌ No meal days found in dailyMeals");
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'empty_plan', day_count: 0 });
         return null;
       }
-      
+
       // Quick validation of date format in keys
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       const invalidDates = dailyMealsKeys.filter(key => !dateRegex.test(key));
       if (invalidDates.length > 0) {
         setErrorMessage(`❌ Invalid date format in dailyMeals keys: ${invalidDates.join(", ")}. Expected YYYY-MM-DD format.`);
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'invalid_date_format', day_count: 0 });
         return null;
       }
-      
+
       console.log("✅ SimplifiedMealPlan format validated successfully");
       return parsed as SimplifiedMealPlan;
-      
     } catch (jsonError) {
       const error = jsonError as Error;
       let detailedError = '❌ JSON Parse Error:\n\n';
-      
+
       // Show first 100 characters of what was actually pasted
       detailedError += '🔍 What you pasted (first 100 characters):\n';
       detailedError += `"${input.substring(0, 100).replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}"\n\n`;
-      
+
       // Detect specific common issues
       if (input.includes('I got this error') || input.includes('JSON Parse Error')) {
         detailedError += '🔍 Issue: You copied an error message instead of JSON\n';
@@ -458,12 +461,13 @@ export default function ImportMealPlanScreen() {
         detailedError += '🔍 Issue: Invalid JSON format\n';
         detailedError += '💡 Solution: Check for syntax errors\n\n';
       }
-      
+
       detailedError += '📋 Technical error: ' + error.message;
-      
+
       console.log('JSON Parse Error:', error.message);
       console.log('First 100 chars:', input.substring(0, 100));
       setErrorMessage(detailedError);
+      Analytics.track('meal_plan_imported', { valid: false, error_type: 'json_parse_error', day_count: 0 });
       return null;
     }
   };
@@ -474,7 +478,6 @@ export default function ImportMealPlanScreen() {
       Alert.alert('Clipboard Empty', 'Copy your meal plan first', [{ text: 'OK' }]);
       return;
     }
-
     processMealPlanData(text);
   };
 
@@ -487,11 +490,9 @@ export default function ImportMealPlanScreen() {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const file = result.assets[0];
-        
         // Read file content
         const response = await fetch(file.uri);
         const text = await response.text();
-        
         processMealPlanData(text);
       }
     } catch (error) {
@@ -504,7 +505,7 @@ export default function ImportMealPlanScreen() {
     setIsLoading(true);
     const startTime = Date.now();
     setGenerationStartTime(startTime);
-    
+
     // Simulate processing time for better UX
     setTimeout(async () => {
       const mealPlan = validateAndParseJSON(text);
@@ -512,12 +513,12 @@ export default function ImportMealPlanScreen() {
       const totalTime = (endTime - startTime) / 1000; // Convert to seconds
       setGenerationTime(totalTime);
       setIsLoading(false);
-      
+
       if (mealPlan) {
         // Generate unique ID for this meal plan import
         const mealPlanId = Date.now().toString() + Math.random().toString(36);
         mealPlan.id = mealPlanId;
-        
+
         // Import the meal plan directly without confirmation modal
         await importMealPlanDirectly(mealPlan);
       } else {
@@ -539,7 +540,7 @@ export default function ImportMealPlanScreen() {
         meals: simplifiedPlan.dailyMeals[date].meals.map((meal: any) => ({
           name: meal.name,
           type: meal.type,
-          ingredients: (meal.ingredients || []).sort((a: any, b: any) => 
+          ingredients: (meal.ingredients || []).sort((a: any, b: any) =>
             (a.item || '').localeCompare(b.item || '')
           ),
           instructions: meal.instructions || [],
@@ -548,7 +549,7 @@ export default function ImportMealPlanScreen() {
         }))
       }))
     };
-    
+
     // Create a simple hash from the stringified content
     const contentString = JSON.stringify(contentToHash);
     let hash = 0;
@@ -563,32 +564,31 @@ export default function ImportMealPlanScreen() {
   const importMealPlanDirectly = async (simplifiedPlan: SimplifiedMealPlan) => {
     try {
       // Skip auto-saving to "My Meals" - users will manually save if they want
-      
       // Before importing, preserve any manually added meals from current plan
       const existingPlanData = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN);
       let mergedPlanData = { ...simplifiedPlan };
-      
+
       if (existingPlanData) {
         try {
           const existingPlan = JSON.parse(existingPlanData);
           console.log('🔄 Preserving manually added meals from existing plan');
-          
+
           // If the existing plan has manually added meals, merge them with the imported plan
           if (existingPlan.data?.days) {
             const existingDays = existingPlan.data.days;
-            
+
             // Create a merged days array that combines imported plan with manually added meals
             if (!mergedPlanData.days) {
               mergedPlanData.days = [];
             }
-            
+
             // Find and preserve manually added meals
             for (const existingDay of existingDays) {
               if (existingDay.meals && Array.isArray(existingDay.meals)) {
                 const manualMeals = existingDay.meals.filter(meal => meal.isManuallyAdded);
                 if (manualMeals.length > 0) {
                   console.log(`🔄 Found ${manualMeals.length} manual meals to preserve`);
-                  
+
                   // Find or create corresponding day in merged plan
                   let targetDay = mergedPlanData.days.find(d => d.date === existingDay.date);
                   if (!targetDay) {
@@ -599,7 +599,7 @@ export default function ImportMealPlanScreen() {
                     };
                     mergedPlanData.days.push(targetDay);
                   }
-                  
+
                   // Add the manual meals to the target day
                   if (!targetDay.meals) targetDay.meals = [];
                   targetDay.meals.push(...manualMeals);
@@ -612,12 +612,12 @@ export default function ImportMealPlanScreen() {
           console.error('⚠️ Error preserving manual meals:', error);
         }
       }
-      
+
       // Save the parsed meal plan to state and show confirmation
       console.log('📤 Meal plan ready for confirmation');
       setParsedMealPlan(simplifiedPlan);
       setShowConfirmation(true);
-      
+
       // Animate modal entrance
       Animated.parallel([
         Animated.timing(modalScale, {
@@ -636,8 +636,6 @@ export default function ImportMealPlanScreen() {
       Alert.alert('Error', 'Failed to import meal plan. Please try again.');
     }
   };
-
-
 
   const handleCancel = () => {
     navigation.navigate('ImportMealPlan', { showStep1New: true });
@@ -665,15 +663,21 @@ export default function ImportMealPlanScreen() {
 
   const handleConfirmImport = async () => {
     if (!parsedMealPlan) return;
-    
+
+    Analytics.track('meal_plan_imported', {
+      valid: true,
+      error_type: null,
+      day_count: Object.keys(parsedMealPlan.dailyMeals).length,
+    });
+
     try {
       // Save to SimplifiedMealPlanningContext
       console.log('📤 Importing meal plan to SimplifiedMealPlanningContext');
       await saveMealPlan(parsedMealPlan);
-      
+
       // Close the modal first
       setShowConfirmation(false);
-      
+
       // Check if we're already on nutrition home to avoid navigation conflicts
       const currentRoute = navigation.getState().routes[navigation.getState().index];
       if (currentRoute?.name === 'NutritionHome') {
@@ -683,7 +687,7 @@ export default function ImportMealPlanScreen() {
       } else {
         // Navigate to Home screen (ModeTransitionContainer) and set nutrition mode
         console.log('🏠 Navigating to Home screen in nutrition mode');
-        navigation.navigate('Home', { 
+        navigation.navigate('Home', {
           refresh: true
         } as any);
       }
@@ -761,14 +765,12 @@ export default function ImportMealPlanScreen() {
               <Text style={styles.headerTitle}>Meal Plan Generator</Text>
             </View>
           </View>
-          
-          <ScrollView 
+
+          <ScrollView
             style={styles.instructionsScrollView}
             contentContainerStyle={styles.instructionsContent}
             showsVerticalScrollIndicator={false}
           >
-            
-            
             <View style={styles.stepsContainer}>
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
@@ -780,12 +782,11 @@ export default function ImportMealPlanScreen() {
                 <Text style={styles.stepCardDescription}>
                   Customized based on your questionnaire answers
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
                       const planningPrompt = await assembleMealPlanPromptV2();
-                      
                       // Try to copy to clipboard with better error handling
                       try {
                         await Clipboard.setStringAsync(planningPrompt);
@@ -817,7 +818,7 @@ export default function ImportMealPlanScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
@@ -828,12 +829,11 @@ export default function ImportMealPlanScreen() {
                 <Text style={styles.stepCardDescription}>
                   Ask AI to review and improve the meal plan quality
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
                       const reviewPrompt = await buildReviewLauncherFromStorage();
-                      
                       try {
                         await Clipboard.setStringAsync(reviewPrompt);
                         setReviewPromptCopied(true);
@@ -865,7 +865,7 @@ export default function ImportMealPlanScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
@@ -876,9 +876,7 @@ export default function ImportMealPlanScreen() {
                 <Text style={styles.stepCardDescription}>
                   Ask the AI to format it for the app
                 </Text>
-                
-                
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.actionButton, { backgroundColor: themeColor }]}
                   onPress={async () => {
                     try {
@@ -905,7 +903,7 @@ export default function ImportMealPlanScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.stepCard}>
                 <View style={styles.stepCardHeader}>
                   <View style={[styles.stepBadge, { backgroundColor: themeColor }]}>
@@ -923,8 +921,7 @@ export default function ImportMealPlanScreen() {
             {__DEV__ && (
               <View style={styles.helpSection}>
                 <Text style={styles.helpTitle}>Need Help?</Text>
-                
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.tutorialButton, { backgroundColor: themeColor }]}
                   onPress={() => {
                     // Open YouTube tutorial
@@ -951,25 +948,22 @@ export default function ImportMealPlanScreen() {
     return (
       <View style={styles.errorContainer}>
         <View style={styles.closeButtonWrapper}>
-          <TouchableOpacity 
-            onPress={() => setErrorMessage(null)} 
+          <TouchableOpacity
+            onPress={() => setErrorMessage(null)}
             style={styles.closeButtonInner}
           >
             <Ionicons name="close" size={28} color="#71717a" />
           </TouchableOpacity>
         </View>
-        
         <View style={styles.errorContent}>
           <Ionicons name="alert-circle" size={64} color="#ef4444" />
           <Text style={styles.errorTitle}>Format Error</Text>
           <Text style={styles.errorText}>{errorMessage}</Text>
-          
           <TouchableOpacity
             style={[styles.copyErrorButton, { backgroundColor: themeColor }]}
             onPress={async () => {
               const debugMessage = `I got this error when trying to import my meal plan: "${errorMessage}". Please fix the JSON and make sure it follows the exact format.`;
               await Clipboard.setStringAsync(debugMessage);
-              
               setErrorMessage(null);
             }}
             activeOpacity={0.8}
@@ -989,7 +983,6 @@ export default function ImportMealPlanScreen() {
           <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
             <Ionicons name="chevron-back" size={24} color="#ffffff" />
           </TouchableOpacity>
-          
           <View style={styles.headerCenter}>
             <Ionicons name="restaurant" size={24} color={themeColor} style={styles.headerIcon} />
             <View style={styles.progressContainer}>
@@ -997,7 +990,6 @@ export default function ImportMealPlanScreen() {
               <View style={[styles.progressDot, { backgroundColor: themeColor }]} />
             </View>
           </View>
-
           <TouchableOpacity style={styles.infoButton} onPress={() => setShowInstructions(!showInstructions)}>
             <Ionicons name="information-circle-outline" size={24} color="#71717a" />
           </TouchableOpacity>
@@ -1014,38 +1006,37 @@ export default function ImportMealPlanScreen() {
         <View style={styles.content}>
           <View style={styles.centerContent}>
             {/* Upload Mode toggle */}
-            <TouchableOpacity 
-            style={[styles.uploadModeToggle, { borderColor: themeColor }]}
-            onPress={() => setUploadMode(!uploadMode)}
-            activeOpacity={0.8}
-          >
-            <Ionicons 
-              name={uploadMode ? "clipboard-outline" : "cloud-upload-outline"} 
-              size={20} 
-              color={themeColor} 
-            />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.uploadModeToggle, { borderColor: themeColor }]}
+              onPress={() => setUploadMode(!uploadMode)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={uploadMode ? "clipboard-outline" : "cloud-upload-outline"}
+                size={20}
+                color={themeColor}
+              />
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.mainButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
-            onPress={uploadMode ? handleFileUpload : handlePasteAndImport}
-            activeOpacity={0.9}
-          >
-            <Ionicons 
-              name={uploadMode ? "cloud-upload" : "restaurant"} 
-              size={40} 
-              color="#0a0a0b" 
-            />
-            <Text style={styles.mainButtonText}>
-              {uploadMode ? "Upload Your Plan" : "Paste Your Plan"}
-            </Text>
-            <Text style={styles.mainButtonSubtext}>
-              {uploadMode ? "Import the AI's file" : "Paste what the AI created"}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mainButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
+              onPress={uploadMode ? handleFileUpload : handlePasteAndImport}
+              activeOpacity={0.9}
+            >
+              <Ionicons
+                name={uploadMode ? "cloud-upload" : "restaurant"}
+                size={40}
+                color="#0a0a0b"
+              />
+              <Text style={styles.mainButtonText}>
+                {uploadMode ? "Upload Your Plan" : "Paste Your Plan"}
+              </Text>
+              <Text style={styles.mainButtonSubtext}>
+                {uploadMode ? "Import the AI's file" : "Paste what the AI created"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-
       </View>
 
       {/* Confirmation Modal */}
@@ -1054,16 +1045,16 @@ export default function ImportMealPlanScreen() {
         transparent
         animationType="none"
       >
-        <Animated.View 
+        <Animated.View
           style={[
             styles.modalOverlay,
             { opacity: modalOpacity }
           ]}
         >
-          <Animated.View 
+          <Animated.View
             style={[
               styles.modalContent,
-              { 
+              {
                 transform: [{ scale: modalScale }],
                 opacity: modalOpacity,
                 borderColor: themeColor,
@@ -1073,15 +1064,15 @@ export default function ImportMealPlanScreen() {
           >
             {/* Close Button */}
             <View style={styles.closeButtonWrapper}>
-              <TouchableOpacity 
-                style={styles.closeButton} 
+              <TouchableOpacity
+                style={styles.closeButton}
                 onPress={handleModalCancel}
                 activeOpacity={0.8}
               >
                 <Ionicons name="close" size={24} color="#71717a" />
               </TouchableOpacity>
             </View>
-            
+
             {parsedMealPlan && (
               <>
                 {/* Header Badge */}
@@ -1092,33 +1083,33 @@ export default function ImportMealPlanScreen() {
                     </View>
                   )}
                 </View>
-                
+
                 {/* Main Content */}
                 <View style={styles.mainContent}>
                   <Text style={styles.title}>Meal Plan Ready</Text>
                   <Text style={styles.routineName}>{parsedMealPlan.name}</Text>
                 </View>
-                
-                  {/* Meal Plan Summary */}
-                  <View style={styles.summaryCard}>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Duration</Text>
-                      <Text style={[styles.summaryValue, { color: themeColor }]}>{Object.keys(parsedMealPlan.dailyMeals).length} days</Text>
-                    </View>
-                    <View style={styles.summaryDivider} />
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Total Meals</Text>
-                      <Text style={[styles.summaryValue, { color: themeColor }]}>
-                        {Object.values(parsedMealPlan.dailyMeals).reduce((total, day) => total + day.meals.length, 0)} meals
-                      </Text>
-                    </View>
-                    <View style={styles.summaryDivider} />
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Start Date</Text>
-                      <Text style={[styles.summaryValue, { color: themeColor }]}>{new Date(parsedMealPlan.startDate).toLocaleDateString()}</Text>
-                    </View>
+
+                {/* Meal Plan Summary */}
+                <View style={styles.summaryCard}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Duration</Text>
+                    <Text style={[styles.summaryValue, { color: themeColor }]}>{Object.keys(parsedMealPlan.dailyMeals).length} days</Text>
                   </View>
-                
+                  <View style={styles.summaryDivider} />
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Total Meals</Text>
+                    <Text style={[styles.summaryValue, { color: themeColor }]}>
+                      {Object.values(parsedMealPlan.dailyMeals).reduce((total, day) => total + day.meals.length, 0)} meals
+                    </Text>
+                  </View>
+                  <View style={styles.summaryDivider} />
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Start Date</Text>
+                    <Text style={[styles.summaryValue, { color: themeColor }]}>{new Date(parsedMealPlan.startDate).toLocaleDateString()}</Text>
+                  </View>
+                </View>
+
                 {/* Actions */}
                 <View style={styles.actionSection}>
                   <TouchableOpacity
@@ -1134,7 +1125,6 @@ export default function ImportMealPlanScreen() {
           </Animated.View>
         </Animated.View>
       </Modal>
-
     </>
   );
 }

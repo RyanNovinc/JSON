@@ -23,6 +23,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NUTRITION_STORAGE_KEYS } from '../types/nutrition';
 import type { SimplifiedMealPlan } from '../types/nutrition';
+import { Analytics } from '../services/analytics';
 
 export interface UseMealPlanImportOptions {
   // Save handler from useSimplifiedMealPlanning() — passed in by the screen.
@@ -80,24 +81,29 @@ export const useMealPlanImport = (
 
       if (!parsed.id) {
         setErrorMessage('❌ Missing required field: id');
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'missing_field', day_count: 0 });
         return null;
       }
       if (!parsed.name) {
         setErrorMessage('❌ Missing required field: name');
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'missing_field', day_count: 0 });
         return null;
       }
       if (!parsed.dailyMeals || typeof parsed.dailyMeals !== 'object') {
         setErrorMessage('❌ Missing or invalid dailyMeals structure');
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'missing_field', day_count: 0 });
         return null;
       }
       if (!parsed.metadata || !parsed.metadata.duration) {
         setErrorMessage('❌ Missing metadata.duration field');
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'missing_field', day_count: 0 });
         return null;
       }
 
       const dailyMealsKeys = Object.keys(parsed.dailyMeals);
       if (dailyMealsKeys.length === 0) {
         setErrorMessage('❌ No meal days found in dailyMeals');
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'empty_plan', day_count: 0 });
         return null;
       }
 
@@ -107,6 +113,7 @@ export const useMealPlanImport = (
         setErrorMessage(
           `❌ Invalid date format in dailyMeals keys: ${invalidDates.join(', ')}. Expected YYYY-MM-DD format.`
         );
+        Analytics.track('meal_plan_imported', { valid: false, error_type: 'invalid_date_format', day_count: 0 });
         return null;
       }
 
@@ -145,6 +152,7 @@ export const useMealPlanImport = (
 
       detailedError += '📋 Technical error: ' + error.message;
       setErrorMessage(detailedError);
+      Analytics.track('meal_plan_imported', { valid: false, error_type: 'json_parse_error', day_count: 0 });
       return null;
     }
   };
@@ -247,6 +255,11 @@ export const useMealPlanImport = (
 
   const confirmImport = async () => {
     if (!parsedMealPlan) return;
+    Analytics.track('meal_plan_imported', {
+      valid: true,
+      error_type: null,
+      day_count: Object.keys(parsedMealPlan.dailyMeals).length,
+    });
     try {
       await saveMealPlan(parsedMealPlan);
 

@@ -31,6 +31,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutProgram, Exercise } from '../types/workout';
 import WorkoutGeneratorStep1New from '../components/WorkoutGeneratorStep1New';
 import { fetchShare } from '../services/shareService';
+import { Analytics } from '../services/analytics';
 
 type ImportScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ImportRoutine'>;
 type ImportScreenRouteProp = RouteProp<RootStackParamList, 'ImportRoutine'>;
@@ -725,6 +726,7 @@ export default function ImportRoutineScreen() {
       
       setErrorMessage(detailedError);
       console.log('[VALIDATE] rejected: JSON parse error');
+      Analytics.track('program_imported', { valid: false, error_type: 'json_parse_error', week_count: 0, day_count: 0 });
       return null;
     }
     
@@ -877,6 +879,7 @@ export default function ImportRoutineScreen() {
       
       setErrorMessage(detailedError);
       console.log('[VALIDATE] rejected: structural validation error -', error.message);
+      Analytics.track('program_imported', { valid: false, error_type: 'validation_error', week_count: 0, day_count: 0 });
       return null;
     }
   };
@@ -1021,6 +1024,18 @@ export default function ImportRoutineScreen() {
 
   const handleConfirmImport = async () => {
     if (parsedProgram) {
+      const weekCount = (parsedProgram.blocks ?? []).reduce((total: number, block: any) => {
+        const w = String(block.weeks ?? '');
+        if (w.includes('-')) {
+          const [start, end] = w.split('-');
+          return total + (parseInt(end, 10) - parseInt(start, 10) + 1);
+        }
+        return total + (parseInt(w, 10) || 1);
+      }, 0);
+      const dayCount = (parsedProgram.blocks ?? []).reduce(
+        (total: number, block: any) => total + (block.days?.length || 0), 0
+      );
+      Analytics.track('program_imported', { valid: true, error_type: null, week_count: weekCount, day_count: dayCount });
       try {
         // Check if this is append-block mode
         const { mode, targetWorkoutId } = route.params || {};
@@ -2117,12 +2132,20 @@ export default function ImportRoutineScreen() {
     );
   }
 
-  if (isLoading) {
+  // Render the loader (not the paste UI) as soon as we land here with a prefilled
+  // routine to auto-import. isLoading starts false on mount for shared/curated
+  // imports, so without this the full "Paste Your Plan" UI paints for one frame
+  // before the auto-import effect flips isLoading — that one-frame flash is the
+  // "old screen" users see on every shared/curated import. isLoading is left
+  // untouched so the auto-import effect (guarded by !isLoading) still runs.
+  const autoImporting =
+    !!route.params?.prefilledJson && !showConfirmation && !errorMessage && !prefilledCancelled;
+  if (isLoading || autoImporting) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={themeColor} />
         <Text style={styles.loadingText}>
-          {shareId ? "Loading shared workout..." : "Processing routine..."}
+          {(shareId || autoImporting) ? "Loading shared workout..." : "Processing routine..."}
         </Text>
       </View>
     );

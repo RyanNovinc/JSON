@@ -113,6 +113,7 @@ import {
   SlotSpec,
   Targets,
 } from '../../utils/mealFeasibility';
+import { Analytics } from '../../services/analytics';
 
 type NavProp = StackNavigationProp<any>;
 
@@ -1420,7 +1421,10 @@ export default function CuratedFavoritesScreen() {
                     themeColor={themeColor}
                     onPress={() => onCardPress(m)}
                     onWaysPress={() => setPlateSheetSlug(m.slug)}
-                    onInfoPress={() => navigation.navigate('MealDetail', { slug: m.slug })}
+                    onInfoPress={() => {
+                      Analytics.track('curated_meal_viewed', { meal_id: m.slug });
+                      navigation.navigate('MealDetail', { slug: m.slug });
+                    }}
                   />
                 ))}
                 {pair.length === 1 && <View style={{ width: CARD_WIDTH }} />}
