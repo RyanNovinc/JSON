@@ -39,6 +39,7 @@ import { useHasNutritionAccess } from '../contexts/RevenueCatContext';
 import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
 import { getProgramImage } from '../assets/programImages';
 import { SAMPLE_PLANS } from '../data/samplePlans';
+import { startWorkoutFlow } from '../utils/questionnaireRouting';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -973,8 +974,8 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     }
   };
 
-  const openCreateFlow = () => {
-    navigation.getParent()?.navigate('CreateFlow' as never);
+  const openCreateFlow = async () => {
+    await startWorkoutFlow(navigation);
   };
 
   const handleBulkingProgramPress = (plan: any) => {

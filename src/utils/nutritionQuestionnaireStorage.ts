@@ -32,6 +32,7 @@ export interface NutritionAnswers {
   mealsPerDay?: number;
   snackFrequency?: string;
   snackingStyle?: string;
+  mealVariety?: 'convenience' | 'balanced' | 'variety';
   dessertFrequency?: '0' | 'once_per_week' | 'few_per_week' | 'most_nights' | 'every_night' | 'ai_decide';
   country?: string;
   city?: string;

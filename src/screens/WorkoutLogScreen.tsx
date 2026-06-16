@@ -112,8 +112,8 @@ export interface Exercise {
   alternatives?: string[];
 }
 
-/** Last-session reference for a single set: { weight, reps } keyed by setNumber */
-type PreviousSets = Record<number, { weight: string; reps: string }>;
+/** Last-session reference for a single set: keyed by setNumber, includes stored unit */
+type PreviousSets = Record<number, { weight: string; reps: string; unit?: 'kg' | 'lbs' }>;
 
 export interface WorkoutLogScreenProps {
   exercises: Exercise[];
@@ -196,6 +196,22 @@ const defaultCalc1RM = (weight: number, reps: number): number => {
   if (reps === 1) return weight;
   return weight * (1 + reps / 30);
 };
+
+// ── Unit conversion helpers ─────────────────────────────────────────
+// Component receives globalUnit as a prop, so these live here rather than
+// pulling the full context hook a second time.
+function toKg(weight: number, unit: 'kg' | 'lbs'): number {
+  return unit === 'lbs' ? weight * 0.453592 : weight;
+}
+function fromKg(kg: number, unit: 'kg' | 'lbs'): number {
+  return unit === 'lbs' ? kg / 0.453592 : kg;
+}
+function convertWeight(weight: number, from: 'kg' | 'lbs', to: 'kg' | 'lbs'): number {
+  if (from === to) return weight;
+  return from === 'kg'
+    ? Math.round(weight * 2.20462 * 10) / 10
+    : Math.round(weight / 2.20462 * 10) / 10;
+}
 
 // ──────────────────────────────────────────────────────────────────
 // Component
@@ -585,7 +601,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             if (latest) {
               const setsMap: PreviousSets = {};
               latest.sets.forEach((s) => {
-                setsMap[s.setNumber] = { weight: s.weight, reps: s.reps };
+                setsMap[s.setNumber] = { weight: s.weight, reps: s.reps, unit: s.unit };
               });
               prevMap[name] = setsMap;
             }
@@ -1021,45 +1037,47 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       const name = names[selIdx] || ex.exercise || '';
       if (!name) return;
 
-      // Best estimated 1RM this session
-      let bestSession = 0;
+      // Best estimated 1RM this session — normalize to kg for cross-unit comparison.
+      // Current session sets are always typed in globalUnit.
+      let bestSessionKg = 0;
       let bestSet: { weight: number; reps: number } | null = null;
       sets.forEach((s) => {
         if (!s.completed) return;
         const w = parseFloat(s.weight);
         const r = parseInt(s.reps, 10);
         if (!isNaN(w) && !isNaN(r) && w > 0 && r > 0) {
-          const e = calculate1RM(w, r);
-          if (e > bestSession) {
-            bestSession = e;
-            bestSet = { weight: w, reps: r };
+          const e = calculate1RM(toKg(w, globalUnit), r);
+          if (e > bestSessionKg) {
+            bestSessionKg = e;
+            bestSet = { weight: w, reps: r }; // keep original for display
           }
         }
       });
-      if (bestSession <= 0 || !bestSet) return;
+      if (bestSessionKg <= 0 || !bestSet) return;
 
-      // Best estimated 1RM in history (all prior sessions)
-      let bestHist = 0;
+      // Best estimated 1RM in history — normalize each set to kg using its stored unit.
+      let bestHistKg = 0;
       (historyByExercise[name] || []).forEach((h) =>
         h.sets.forEach((s) => {
           const w = parseFloat(s.weight);
           const r = parseInt(s.reps, 10);
+          const u = s.unit ?? globalUnit;
           if (!isNaN(w) && !isNaN(r) && w > 0 && r > 0) {
-            const e = calculate1RM(w, r);
-            if (e > bestHist) bestHist = e;
+            const e = calculate1RM(toKg(w, u), r);
+            if (e > bestHistKg) bestHistKg = e;
           }
         }),
       );
 
-      if (bestSession > bestHist) {
-        const improvement = bestSession - bestHist;
-        if (!best || improvement > best.improvement) {
+      if (bestSessionKg > bestHistKg) {
+        const improvementKg = bestSessionKg - bestHistKg;
+        if (!best || improvementKg > best.improvement) {
           best = {
             exerciseName: name,
-            weight: bestSet.weight,
+            weight: bestSet.weight,           // original typed value, in globalUnit
             reps: bestSet.reps,
-            estimatedOneRM: bestSession,
-            improvement,
+            estimatedOneRM: fromKg(bestSessionKg, globalUnit), // convert back for display
+            improvement: improvementKg,
           };
         }
       }
@@ -1146,7 +1164,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                         {set.setNumber}
                       </Text>
                       <Text style={styles.historyDetails}>
-                        {set.weight}{globalUnit} × {set.reps}
+                        {convertWeight(parseFloat(set.weight) || 0, set.unit ?? globalUnit, globalUnit).toFixed(1)}{globalUnit} × {set.reps}
                       </Text>
                     </View>
                   ))}
@@ -1170,13 +1188,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         date: workout.date,
         workoutLabel: workout.dayName,
         sets: workout.sets.map(set => {
-          const weight = parseFloat(set.weight) || 0;
+          const rawW = parseFloat(set.weight) || 0;
           const reps = parseInt(set.reps) || 0;
-          const oneRM = weight > 0 && reps > 0 ? calculate1RM(weight, reps) : 0;
+          const setUnit = set.unit ?? globalUnit;
+          const weightKg = toKg(rawW, setUnit);
+          const oneRMkg = weightKg > 0 && reps > 0 ? calculate1RM(weightKg, reps) : 0;
           return {
-            weight: set.weight,
+            weight: convertWeight(rawW, setUnit, globalUnit).toFixed(1),
             reps: set.reps,
-            rir: oneRM > 0 ? (oneRM + 0.0).toFixed(1) : null, // Force 1 decimal place for all values
+            rir: oneRMkg > 0 ? fromKg(oneRMkg, globalUnit).toFixed(1) : null,
           };
         })
       })),
@@ -1860,7 +1880,7 @@ function parseTargetReps(repsString: string): string[] {
 interface SetsTableProps {
   exerciseIndex: number;
   sets: SetData[];
-  unit: string;
+  unit: 'kg' | 'lbs';
   themeColor: string;
   workoutStarted: boolean;
   exercise: Exercise; // For accessing weekly reps
@@ -1957,7 +1977,7 @@ interface SetRowProps {
   themeColor: string;
   workoutStarted: boolean;
   targetReps?: string; // Target reps for this specific set
-  previous?: { weight: string; reps: string }; // Last session's numbers for this set
+  previous?: { weight: string; reps: string; unit?: 'kg' | 'lbs' }; // Last session's numbers for this set
   isLastSet: boolean; // Whether this is the last set in the array
   onUpdate: (field: 'weight' | 'reps', val: string) => void;
   onComplete: () => void;
@@ -2029,7 +2049,7 @@ function SetRow({
               }
             }}
             keyboardType="decimal-pad"
-            placeholder={`${previous?.weight || '0'} ${globalUnit}`}
+            placeholder={`${previous ? convertWeight(parseFloat(previous.weight) || 0, previous.unit ?? globalUnit, globalUnit).toFixed(1) : '0'} ${globalUnit}`}
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
             {...accessoryProps}

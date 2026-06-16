@@ -27,6 +27,13 @@ const defaultCalc1RM = (weight: number, reps: number): number => {
   return weight * (1 + reps / 30);
 };
 
+function toKg(weight: number, unit?: 'kg' | 'lbs'): number {
+  return (unit ?? 'kg') === 'lbs' ? weight * 0.453592 : weight;
+}
+function fromKg(kg: number, unit: 'kg' | 'lbs'): number {
+  return unit === 'lbs' ? kg / 0.453592 : kg;
+}
+
 interface RouteParams {
   exerciseName: string;
 }
@@ -57,15 +64,17 @@ export default function OneRMProgressionScreen() {
         const history = await WorkoutStorage.getExerciseHistory(exerciseName);
         setExerciseHistory(history);
 
-        // Calculate progression data
+        // Calculate progression data. All 1RMs are stored in kg so cross-session
+        // comparisons are valid even when the user has logged sets in different units.
         const progression = history
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Oldest first for progression
           .map(workout => {
-            // Get the best 1RM from this workout
+            // Best 1RM from this workout, normalized to kg.
             const bestOneRM = workout.sets.reduce((best, set) => {
               const weight = parseFloat(set.weight) || 0;
               const reps = parseInt(set.reps) || 0;
-              const oneRM = weight > 0 && reps > 0 ? defaultCalc1RM(weight, reps) : 0;
+              const weightKg = toKg(weight, set.unit);
+              const oneRM = weightKg > 0 && reps > 0 ? defaultCalc1RM(weightKg, reps) : 0;
               return Math.max(best, oneRM);
             }, 0);
             
@@ -116,9 +125,12 @@ export default function OneRMProgressionScreen() {
     <View style={styles.progressionContainer}>
       {progressionData.map((session, index) => {
         const previousSession = index > 0 ? progressionData[index - 1] : null;
-        const change = previousSession ? session.oneRM! - previousSession.oneRM! : 0;
-        const percentChange = previousSession && previousSession.oneRM! > 0 ? 
-          ((change / previousSession.oneRM!) * 100) : 0;
+        // Comparisons in kg (stored unit); convert deltas and values to globalUnit for display.
+        const changeKg = previousSession ? session.oneRM! - previousSession.oneRM! : 0;
+        const percentChange = previousSession && previousSession.oneRM! > 0 ?
+          ((changeKg / previousSession.oneRM!) * 100) : 0;
+        const displayOneRM = fromKg(session.oneRM!, globalUnit);
+        const displayChange = fromKg(changeKg, globalUnit);
 
         return (
           <View key={`${session.date}-${index}`} style={styles.progressionEntry}>
@@ -132,28 +144,28 @@ export default function OneRMProgressionScreen() {
               </Text>
               <Text style={styles.progressionDayName}>{session.dayName}</Text>
             </View>
-            
+
             <View style={styles.progressionStats}>
               <View style={styles.progressionOneRM}>
                 <Text style={[styles.progressionValue, { color: themeColor }]}>
-                  {session.oneRM?.toFixed(1)} {globalUnit}
+                  {displayOneRM.toFixed(1)} {globalUnit}
                 </Text>
                 <Text style={styles.progressionLabel}>Best 1RM</Text>
               </View>
-              
+
               {index > 0 && (
                 <View style={styles.progressionChange}>
                   <Text style={[
                     styles.progressionChangeValue,
-                    { color: change >= 0 ? '#4ade80' : '#f87171' }
+                    { color: displayChange >= 0 ? '#4ade80' : '#f87171' }
                   ]}>
-                    {change >= 0 ? '+' : ''}{change.toFixed(1)} {globalUnit}
+                    {displayChange >= 0 ? '+' : ''}{displayChange.toFixed(1)} {globalUnit}
                   </Text>
                   <Text style={[
                     styles.progressionChangePercent,
-                    { color: change >= 0 ? '#4ade80' : '#f87171' }
+                    { color: displayChange >= 0 ? '#4ade80' : '#f87171' }
                   ]}>
-                    {change >= 0 ? '+' : ''}{percentChange.toFixed(1)}%
+                    {displayChange >= 0 ? '+' : ''}{percentChange.toFixed(1)}%
                   </Text>
                 </View>
               )}
@@ -162,10 +174,10 @@ export default function OneRMProgressionScreen() {
             {/* Progress indicator for trend */}
             {index > 0 && (
               <View style={styles.trendIndicator}>
-                <Ionicons 
-                  name={change >= 0 ? "trending-up" : "trending-down"} 
-                  size={16} 
-                  color={change >= 0 ? '#4ade80' : '#f87171'} 
+                <Ionicons
+                  name={displayChange >= 0 ? 'trending-up' : 'trending-down'}
+                  size={16}
+                  color={displayChange >= 0 ? '#4ade80' : '#f87171'}
                 />
               </View>
             )}

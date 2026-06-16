@@ -29,6 +29,7 @@ import { WorkoutStorage, NutritionCompletionStatus, MealPlan } from '../utils/st
 import { SimplifiedMealPlan } from '../types/nutrition';
 import { createShare, ShareError } from '../services/shareService';
 import ExamplePlanCard from '../onboarding/ExamplePlanCard';
+import { startNutritionFlow } from '../utils/questionnaireRouting';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { CuratedMeal } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
@@ -1025,8 +1026,8 @@ export default function NutritionHomeScreen({ route }: any) {
     }
   };
 
-  const openCreateFlow = () => {
-    navigation.getParent()?.navigate('CreateFlow' as never);
+  const openCreateFlow = async () => {
+    await startNutritionFlow(navigation);
   };
 
   // ============================================================================

@@ -10,6 +10,7 @@
 
 const MEAL_IMAGES: Record<string, any> = {
   'baked_oats.png': require('./meals/baked_oats.png'),
+  'baked_potato.png': require('./meals/baked_potato.png'),
   'banana_bulk.png': require('./meals/banana_bulk.png'),
   'banana_snack.png': require('./meals/banana_snack.png'),
   'beef_broccoli_stir_fry.png': require('./meals/beef_broccoli_stir_fry.png'),
@@ -19,6 +20,7 @@ const MEAL_IMAGES: Record<string, any> = {
   'beef_stew.png': require('./meals/beef_stew.png'),
   'beef_stew_bread.png': require('./meals/beef_stew_bread.png'),
   'beef_stew_mash.png': require('./meals/beef_stew_mash.png'),
+  'berries.png': require('./meals/berries.png'),
   'big_breakfast_plate.png': require('./meals/big_breakfast_plate.png'),
   'bolognese.png': require('./meals/bolognese.png'),
   'bolognese_baked_potato.png': require('./meals/bolognese_baked_potato.png'),
@@ -133,6 +135,8 @@ const MEAL_IMAGES: Record<string, any> = {
   'spicy_chipotle_chicken_burrito_bowl.png': require('./meals/spicy_chipotle_chicken_burrito_bowl.png'),
   'spicy_chipotle_chicken_burrito_standard.png': require('./meals/spicy_chipotle_chicken_burrito_standard.png'),
   'steak_and_eggs.png': require('./meals/steak_and_eggs.png'),
+  'steamed_mixed_veg.png': require('./meals/steamed_mixed_veg.png'),
+  'steamed_rice.png': require('./meals/steamed_rice.png'),
   'strawberry_stack.png': require('./meals/strawberry_stack.png'),
   'strawbrekkie_beast.png': require('./meals/strawbrekkie_beast.png'),
   'teriyaki_chicken_rice_bowl.png': require('./meals/teriyaki_chicken_rice_bowl.png'),

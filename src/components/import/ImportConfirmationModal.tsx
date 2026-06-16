@@ -19,6 +19,11 @@
 // This component is presentational: it owns no import logic. All state
 // and handlers come in as props from the hook. Keeping it self-contained
 // means it can be wired into PromptReady now and reused elsewhere later.
+//
+// Layout note: the scrollable content (badge / title / stats / block list)
+// and the action buttons are SEPARATE. The buttons live in a fixed footer
+// outside the ScrollView, so a very long routine_name can never push the
+// primary action off-screen — the title scrolls, the buttons stay put.
 
 import React from 'react';
 import {
@@ -160,193 +165,203 @@ export default function ImportConfirmationModal({
             // ----------------------------------------------------------------
             // VIEW 3 — Add another block
             // ----------------------------------------------------------------
-            <ScrollView
-              contentContainerStyle={styles.addMoreBody}
-              showsVerticalScrollIndicator={false}
-            >
-              <Text style={styles.eyebrow}>ADD ANOTHER BLOCK</Text>
-              <Text style={styles.programName}>
-                {parsedProgram?.routine_name || 'Your Workout Program'}
-              </Text>
-
-              {/* Blocks already added so far */}
-              <View style={styles.blockList}>
-                {parsedProgram?.blocks?.map((block: any, idx: number) => {
-                  const label = blockWeekLabel(block);
-                  return (
-                    <View key={idx} style={styles.blockRow}>
-                      <View
-                        style={[
-                          styles.blockNum,
-                          { backgroundColor: themeColor + '26' },
-                        ]}
-                      >
-                        <Text style={[styles.blockNumText, { color: themeColor }]}>
-                          {idx + 1}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.blockName} numberOfLines={1}>
-                          {block.block_name || `Block ${idx + 1}`}
-                        </Text>
-                        {label ? <Text style={styles.blockMeta}>{label}</Text> : null}
-                      </View>
-                      <Ionicons name="checkmark" size={16} color="#10b981" />
-                    </View>
-                  );
-                })}
-
-                {/* Dashed placeholder for the block about to be added */}
-                <View style={styles.nextBlockRow}>
-                  <View style={styles.nextBlockNum}>
-                    <Ionicons name="add" size={15} color="#71717a" />
-                  </View>
-                  <Text style={styles.nextBlockText}>Next block</Text>
-                </View>
-              </View>
-
-              {/* Primary: paste next block */}
-              <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: themeColor }]}
-                onPress={onPasteNext}
-                activeOpacity={0.9}
+            <>
+              <ScrollView
+                style={styles.scrollArea}
+                contentContainerStyle={styles.addMoreBody}
+                showsVerticalScrollIndicator
               >
-                <Ionicons name="clipboard-outline" size={17} color="#0a0a0b" />
-                <Text style={styles.primaryButtonText}>Paste next block</Text>
-              </TouchableOpacity>
-
-              {/* Secondary: import a file */}
-              <TouchableOpacity
-                style={[styles.outlineButton, { borderColor: themeColor }]}
-                onPress={onImportNextFile}
-                activeOpacity={0.9}
-              >
-                <Ionicons name="document-outline" size={17} color={themeColor} />
-                <Text style={[styles.outlineButtonText, { color: themeColor }]}>
-                  Import a file
+                <Text style={styles.eyebrow}>ADD ANOTHER BLOCK</Text>
+                <Text style={styles.programName}>
+                  {parsedProgram?.routine_name || 'Your Workout Program'}
                 </Text>
-              </TouchableOpacity>
-            </ScrollView>
+
+                {/* Blocks already added so far */}
+                <View style={styles.blockList}>
+                  {parsedProgram?.blocks?.map((block: any, idx: number) => {
+                    const label = blockWeekLabel(block);
+                    return (
+                      <View key={idx} style={styles.blockRow}>
+                        <View
+                          style={[
+                            styles.blockNum,
+                            { backgroundColor: themeColor + '26' },
+                          ]}
+                        >
+                          <Text style={[styles.blockNumText, { color: themeColor }]}>
+                            {idx + 1}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.blockName} numberOfLines={1}>
+                            {block.block_name || `Block ${idx + 1}`}
+                          </Text>
+                          {label ? <Text style={styles.blockMeta}>{label}</Text> : null}
+                        </View>
+                        <Ionicons name="checkmark" size={16} color="#10b981" />
+                      </View>
+                    );
+                  })}
+
+                  {/* Dashed placeholder for the block about to be added */}
+                  <View style={styles.nextBlockRow}>
+                    <View style={styles.nextBlockNum}>
+                      <Ionicons name="add" size={15} color="#71717a" />
+                    </View>
+                    <Text style={styles.nextBlockText}>Next block</Text>
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Fixed footer — always visible regardless of list length */}
+              <View style={styles.footer}>
+                {/* Primary: paste next block */}
+                <TouchableOpacity
+                  style={[styles.primaryButton, { backgroundColor: themeColor }]}
+                  onPress={onPasteNext}
+                  activeOpacity={0.9}
+                >
+                  <Ionicons name="clipboard-outline" size={17} color="#0a0a0b" />
+                  <Text style={styles.primaryButtonText}>Paste next block</Text>
+                </TouchableOpacity>
+
+                {/* Secondary: import a file */}
+                <TouchableOpacity
+                  style={[styles.outlineButton, { borderColor: themeColor }]}
+                  onPress={onImportNextFile}
+                  activeOpacity={0.9}
+                >
+                  <Ionicons name="document-outline" size={17} color={themeColor} />
+                  <Text style={[styles.outlineButtonText, { color: themeColor }]}>
+                    Import a file
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
           ) : (
             // ----------------------------------------------------------------
             // VIEW 1 & 2 — Confirmation (adaptive on block count)
             // ----------------------------------------------------------------
-            <ScrollView
-              contentContainerStyle={styles.confirmBody}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Badge row */}
-              <View style={styles.badgeRow}>
-                {combined ? (
-                  <View
-                    style={[
-                      styles.combinedBadge,
-                      {
-                        backgroundColor: '#10b981' + '1A',
-                        borderColor: '#10b981',
-                      },
-                    ]}
-                  >
-                    <Ionicons name="layers-outline" size={14} color="#10b981" />
-                    <Text
-                      style={[styles.combinedBadgeText, { color: '#10b981' }]}
-                    >
-                      {accumulatedPrograms.length} blocks combined
-                    </Text>
-                  </View>
-                ) : (
-                  generationTime != null && (
+            <>
+              <ScrollView
+                style={styles.scrollArea}
+                contentContainerStyle={styles.confirmBody}
+                showsVerticalScrollIndicator
+              >
+                {/* Badge row */}
+                <View style={styles.badgeRow}>
+                  {combined ? (
                     <View
                       style={[
-                        styles.timeBadge,
+                        styles.combinedBadge,
                         {
-                          backgroundColor: themeColor + '1A',
-                          borderColor: themeColor,
+                          backgroundColor: '#10b981' + '1A',
+                          borderColor: '#10b981',
                         },
                       ]}
                     >
-                      <Text style={[styles.timeBadgeText, { color: themeColor }]}>
-                        Generated in {generationTime.toFixed(2)}s
+                      <Ionicons name="layers-outline" size={14} color="#10b981" />
+                      <Text
+                        style={[styles.combinedBadgeText, { color: '#10b981' }]}
+                      >
+                        {accumulatedPrograms.length} blocks combined
                       </Text>
                     </View>
-                  )
-                )}
-              </View>
-
-              {/* Eyebrow + program name */}
-              <Text style={styles.eyebrow}>
-                {combined ? 'YOUR PROGRAM SO FAR' : 'WORKOUT READY'}
-              </Text>
-              <Text style={styles.programName}>
-                {parsedProgram?.routine_name || 'Your Workout Program'}
-              </Text>
-
-              {combined ? (
-                // VIEW 2 — block-aware list
-                <>
-                  <View style={styles.blockList}>
-                    {parsedProgram?.blocks?.map((block: any, idx: number) => {
-                      const label = blockWeekLabel(block);
-                      const meta = [label, days ? `${days} days/week` : '']
-                        .filter(Boolean)
-                        .join(' · ');
-                      return (
-                        <View key={idx} style={styles.blockRow}>
-                          <View
-                            style={[
-                              styles.blockNum,
-                              { backgroundColor: themeColor + '26' },
-                            ]}
-                          >
-                            <Text style={[styles.blockNumText, { color: themeColor }]}>
-                              {idx + 1}
-                            </Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.blockName} numberOfLines={1}>
-                              {block.block_name || `Block ${idx + 1}`}
-                            </Text>
-                            {meta ? (
-                              <Text style={styles.blockMeta}>{meta}</Text>
-                            ) : null}
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  <Text style={styles.totalsLine}>
-                    {weeks} weeks total · {movements} unique movements
-                  </Text>
-                </>
-              ) : (
-                // VIEW 1 — clean stat list
-                <View style={styles.statCard}>
-                  <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>Training days</Text>
-                    <Text style={[styles.statValue, { color: themeColor }]}>
-                      {days} per week
-                    </Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>Total duration</Text>
-                    <Text style={[styles.statValue, { color: themeColor }]}>
-                      {weeks} weeks
-                    </Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>Unique movements</Text>
-                    <Text style={[styles.statValue, { color: themeColor }]}>
-                      {movements} movements
-                    </Text>
-                  </View>
+                  ) : (
+                    generationTime != null && (
+                      <View
+                        style={[
+                          styles.timeBadge,
+                          {
+                            backgroundColor: themeColor + '1A',
+                            borderColor: themeColor,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.timeBadgeText, { color: themeColor }]}>
+                          Generated in {generationTime.toFixed(2)}s
+                        </Text>
+                      </View>
+                    )
+                  )}
                 </View>
-              )}
 
-              {/* Actions */}
-              <View style={styles.actions}>
+                {/* Eyebrow + program name */}
+                <Text style={styles.eyebrow}>
+                  {combined ? 'YOUR PROGRAM SO FAR' : 'WORKOUT READY'}
+                </Text>
+                <Text style={styles.programName}>
+                  {parsedProgram?.routine_name || 'Your Workout Program'}
+                </Text>
+
+                {combined ? (
+                  // VIEW 2 — block-aware list
+                  <>
+                    <View style={styles.blockList}>
+                      {parsedProgram?.blocks?.map((block: any, idx: number) => {
+                        const label = blockWeekLabel(block);
+                        const meta = [label, days ? `${days} days/week` : '']
+                          .filter(Boolean)
+                          .join(' · ');
+                        return (
+                          <View key={idx} style={styles.blockRow}>
+                            <View
+                              style={[
+                                styles.blockNum,
+                                { backgroundColor: themeColor + '26' },
+                              ]}
+                            >
+                              <Text style={[styles.blockNumText, { color: themeColor }]}>
+                                {idx + 1}
+                              </Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.blockName} numberOfLines={1}>
+                                {block.block_name || `Block ${idx + 1}`}
+                              </Text>
+                              {meta ? (
+                                <Text style={styles.blockMeta}>{meta}</Text>
+                              ) : null}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    <Text style={styles.totalsLine}>
+                      {weeks} weeks total · {movements} unique movements
+                    </Text>
+                  </>
+                ) : (
+                  // VIEW 1 — clean stat list
+                  <View style={styles.statCard}>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Training days</Text>
+                      <Text style={[styles.statValue, { color: themeColor }]}>
+                        {days} per week
+                      </Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Total duration</Text>
+                      <Text style={[styles.statValue, { color: themeColor }]}>
+                        {weeks} weeks
+                      </Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Unique movements</Text>
+                      <Text style={[styles.statValue, { color: themeColor }]}>
+                        {movements} movements
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Fixed footer — primary action always reachable, even when the
+                  routine name is long enough to fill the scroll area. */}
+              <View style={styles.footer}>
                 <TouchableOpacity
                   style={[styles.primaryButton, { backgroundColor: themeColor }]}
                   onPress={onConfirm}
@@ -364,7 +379,7 @@ export default function ImportConfirmationModal({
                   <Text style={styles.addAnotherText}>Add another block</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+            </>
           )}
         </Animated.View>
       </Animated.View>
@@ -394,6 +409,12 @@ const styles = StyleSheet.create({
     elevation: 28,
   },
 
+  // Scroll area — shrinks within the modal's maxHeight so the fixed footer
+  // below always has room. Content taller than the available space scrolls.
+  scrollArea: {
+    flexShrink: 1,
+  },
+
   // Nav button (top-left)
   navButtonWrapper: {
     position: 'absolute',
@@ -416,7 +437,7 @@ const styles = StyleSheet.create({
   confirmBody: {
     paddingTop: 24,
     paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingBottom: 12,
   },
   badgeRow: {
     minHeight: 32,
@@ -537,9 +558,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  // Actions (shared by view 1 & 2)
-  actions: {
-    width: '100%',
+  // Fixed footer (shared by all three views) — sits below the ScrollView so
+  // the buttons are always on screen. The top border separates it from the
+  // scrolling content above.
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(113, 113, 122, 0.15)',
+    backgroundColor: '#0a0a0b',
   },
   primaryButton: {
     flexDirection: 'row',
@@ -582,7 +610,7 @@ const styles = StyleSheet.create({
   addMoreBody: {
     paddingTop: 24,
     paddingHorizontal: 24,
-    paddingBottom: 28,
+    paddingBottom: 12,
   },
   nextBlockRow: {
     flexDirection: 'row',

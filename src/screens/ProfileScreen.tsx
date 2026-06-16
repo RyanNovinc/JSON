@@ -385,43 +385,39 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* ============================================================
-            DEVELOPER — only visible in __DEV__ builds
+            DATA
             ============================================================ */}
-        {__DEV__ && (
-          <>
-            <Text style={styles.sectionTitle}>Developer</Text>
+        <Text style={styles.sectionTitle}>Data</Text>
 
-            <TouchableOpacity
-              style={styles.row}
-              onPress={handleResetOnboarding}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowIcon}>
-                <Ionicons name="refresh-outline" size={20} color="#a1a1aa" />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>Reset onboarding</Text>
-                <Text style={styles.rowSub}>Clears data and shows the slideshow again</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={14} color="#71717a" />
-            </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={handleResetOnboarding}
+          activeOpacity={0.7}
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="refresh-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Reset onboarding</Text>
+            <Text style={styles.rowSub}>Clears data and shows the slideshow again</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color="#71717a" />
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.row}
-              onPress={handleClearAllData}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowIcon}>
-                <Ionicons name="trash-outline" size={20} color="#ef4444" />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={[styles.rowTitle, { color: '#ef4444' }]}>Clear all data</Text>
-                <Text style={styles.rowSub}>Deletes everything. Cannot be undone.</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={14} color="#71717a" />
-            </TouchableOpacity>
-          </>
-        )}
+        <TouchableOpacity
+          style={styles.row}
+          onPress={handleClearAllData}
+          activeOpacity={0.7}
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="trash-outline" size={20} color="#ef4444" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[styles.rowTitle, { color: '#ef4444' }]}>Clear all data</Text>
+            <Text style={styles.rowSub}>Deletes everything. Cannot be undone.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color="#71717a" />
+        </TouchableOpacity>
 
         {/* Version footer */}
         <Text style={styles.versionText}>JSON.fit v{APP_VERSION}</Text>

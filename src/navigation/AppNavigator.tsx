@@ -438,6 +438,26 @@ interface AppNavigatorProps {
 // Only the screens.Main.screens key changed from `Home` → `Workouts` to match
 // the new tab name.
 // ============================================================================
+
+// Normalise any json-app:// custom-scheme URL to its canonical https://json.fit/
+// form, so it flows through the SAME prefixes + getStateFromPath routing below
+// as a real universal link. iOS refuses to hand a universal link to the app when
+// it points at the same domain the page is already on (json.fit -> json.fit), so
+// the website's "Import this program" button opens the app via the json-app://
+// scheme instead — and we rewrite it back to https here so the routing below
+// handles it unchanged.
+//   json-app://p/program/<slug> -> https://json.fit/p/program/<slug>
+//   json-app://share/<id>       -> https://json.fit/p/<id>   (back-compat)
+//   json-app://p/<id>           -> https://json.fit/p/<id>
+function toCanonicalUrl(url: string | null): string | null {
+  if (!url || !url.startsWith('json-app://')) return url;
+  let rest = url.slice('json-app://'.length);
+  if (rest.startsWith('share/')) {
+    rest = 'p/' + rest.slice('share/'.length);
+  }
+  return 'https://json.fit/' + rest;
+}
+
 const linking = {
   prefixes: ['https://json.fit'],
   config: {
@@ -479,71 +499,21 @@ const linking = {
     }
     return getStateFromPathDefault(path, options);
   },
-  // Custom URL matcher to handle multiple patterns
+  // Custom URL matcher. Any json-app:// custom-scheme URL is normalised to its
+  // canonical https://json.fit/ form (see toCanonicalUrl above) so it flows
+  // through the prefixes + getStateFromPath routing above — this is what makes
+  // the website's json-app://p/program/<slug> button open the curated import.
   async getInitialURL() {
-    const url = await Linking.getInitialURL();
-    console.log('🔗 [DEEP LINK] getInitialURL called, url:', url);
-    console.log('🔗 [DEEP LINK] App launch scenario - checking if URL contains share pattern');
-
-    if (url) {
-      console.log('🔗 [DEEP LINK] URL found:', url);
-      console.log('🔗 [DEEP LINK] URL analysis:', {
-        isHttpsJsonFit: url.includes('https://json.fit'),
-        isJsonAppScheme: url.includes('json-app://'),
-        isSharePattern: url.includes('/share/'),
-        isPPattern: url.includes('/p/'),
-      });
-
-      // Handle json-app://share/xyz pattern
-      if (url.includes('json-app://share/')) {
-        const shareId = url.replace('json-app://share/', '');
-        const newUrl = `json-app://p/${shareId}`;
-        console.log('🔗 [DEEP LINK] Converting share URL:', url, '→', newUrl, 'shareId:', shareId);
-        return newUrl;
-      }
-
-      // Extract shareId for logging purposes
-      let extractedShareId = null;
-      if (url.includes('/p/')) {
-        extractedShareId = url.split('/p/')[1];
-        console.log('🔗 [DEEP LINK] Extracted shareId from URL:', extractedShareId);
-      }
-    } else {
-      console.log('🔗 [DEEP LINK] No initial URL found - app not launched via link');
-    }
-
-    console.log('🔗 [DEEP LINK] Returning URL:', url);
+    const raw = await Linking.getInitialURL();
+    const url = toCanonicalUrl(raw);
+    console.log('🔗 [DEEP LINK] getInitialURL raw:', raw, '→ canonical:', url);
     return url;
   },
   subscribe(listener) {
     const onReceiveURL = ({ url }: { url: string }) => {
-      console.log('🔗 [DEEP LINK] Runtime URL received:', url);
-      console.log('🔗 [DEEP LINK] Runtime URL analysis:', {
-        isHttpsJsonFit: url.includes('https://json.fit'),
-        isJsonAppScheme: url.includes('json-app://'),
-        isSharePattern: url.includes('/share/'),
-        isPPattern: url.includes('/p/'),
-      });
-
-      // Handle json-app://share/xyz pattern in runtime
-      if (url.includes('json-app://share/')) {
-        const shareId = url.replace('json-app://share/', '');
-        const newUrl = `json-app://p/${shareId}`;
-        console.log('🔗 [DEEP LINK] Converting share URL in runtime:', url, '→', newUrl, 'shareId:', shareId);
-        console.log('🔗 [DEEP LINK] About to call listener with converted URL');
-        listener(newUrl);
-        console.log('🔗 [DEEP LINK] Listener called successfully');
-      } else {
-        console.log('🔗 [DEEP LINK] Passing URL through without conversion');
-        // Extract shareId for logging if it's a /p/ pattern
-        if (url.includes('/p/')) {
-          const extractedShareId = url.split('/p/')[1];
-          console.log('🔗 [DEEP LINK] Runtime extracted shareId:', extractedShareId);
-        }
-        console.log('🔗 [DEEP LINK] About to call listener with original URL');
-        listener(url);
-        console.log('🔗 [DEEP LINK] Listener called successfully');
-      }
+      const canonical = toCanonicalUrl(url) as string;
+      console.log('🔗 [DEEP LINK] Runtime URL:', url, '→ canonical:', canonical);
+      listener(canonical);
     };
 
     const subscription = Linking.addEventListener('url', onReceiveURL);

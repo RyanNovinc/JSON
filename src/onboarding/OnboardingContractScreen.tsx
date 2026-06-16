@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { forceOnboardingShow } from './IntentForkModal';
 import { exampleMealPlan } from './exampleMealPlan';
 import { exampleWorkout } from './exampleWorkout';
+import { startWorkoutFlow, startNutritionFlow } from '../utils/questionnaireRouting';
 
 /**
  * OnboardingContractScreen — shown when a user chooses to BUILD (a meal plan or
@@ -103,11 +104,11 @@ export default function OnboardingContractScreen() {
   const flow: Flow = route.params?.flow === 'workout' ? 'workout' : 'meal';
   const cfg = FLOW[flow];
 
-  const onStart = () => {
+  const onStart = async () => {
     if (flow === 'workout') {
-      navigation.navigate('Q1PrimaryGoal', { fromOnboarding: true });
+      await startWorkoutFlow(navigation, { fromOnboarding: true });
     } else {
-      navigation.navigate('N1Goal', { fromOnboarding: true });
+      await startNutritionFlow(navigation, { fromOnboarding: true });
     }
   };
 

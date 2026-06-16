@@ -93,10 +93,10 @@ export default function WeightEntrySheet({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
-  const { globalUnit } = useWeightUnit();
+  const { globalUnit, setGlobalUnit, convertWeight } = useWeightUnit();
 
   const [weight, setWeight] = useState('');
-  const unit = globalUnit; // Use global unit preference instead of local state
+  const unit = globalUnit;
   const [notes, setNotes] = useState('');
   const [showNotes, setShowNotes] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -251,10 +251,16 @@ export default function WeightEntrySheet({
     }
   };
 
-  // Show a small "last entry" hint above the input, since prefilling the
-  // unit but not the number can otherwise feel disconnected.
+  // Show a small "last entry" hint above the input, converting to the
+  // currently selected unit if the stored unit differs.
   const lastWeightHint = latestEntry
-    ? `Last: ${latestEntry.weight} ${latestEntry.unit}`
+    ? (() => {
+        const displayWeight =
+          latestEntry.unit !== unit
+            ? convertWeight(latestEntry.weight, latestEntry.unit, unit)
+            : latestEntry.weight;
+        return `Last: ${displayWeight} ${unit}`;
+      })()
     : null;
 
   // Panel transform: entrance slide (sheetH → 0 as progress 0 → 1) minus
@@ -333,10 +339,16 @@ export default function WeightEntrySheet({
               />
             </View>
 
-            <View style={styles.unitDisplay}>
+            <TouchableOpacity
+              style={styles.unitDisplay}
+              onPress={() => setGlobalUnit(unit === 'kg' ? 'lbs' : 'kg')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Switch to ${unit === 'kg' ? 'pounds' : 'kilograms'}`}
+            >
               <Text style={styles.unitText}>{unit}</Text>
-              <Text style={styles.unitSubtext}>Change in Profile settings</Text>
-            </View>
+              <Text style={styles.unitSubtext}>Applies across the app</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Notes toggle — collapsed by default to keep the sheet short.
@@ -469,8 +481,8 @@ const styles = StyleSheet.create({
   unitDisplay: {
     backgroundColor: '#0a0a0b',
     borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
     paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: 'center',

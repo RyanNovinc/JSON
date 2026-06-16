@@ -2264,17 +2264,6 @@ export default function ImportRoutineScreen() {
               }
             ]}
           >
-            {/* Navigation Button */}
-            <View style={showAddMoreMode ? styles.backButtonWrapper : styles.closeButtonWrapper}>
-              <TouchableOpacity 
-                style={styles.closeButton} 
-                onPress={showAddMoreMode ? handleBackToConfirmation : handleModalCancel}
-                activeOpacity={0.8}
-              >
-                <Ionicons name={showAddMoreMode ? "arrow-back" : "close"} size={24} color="#71717a" />
-              </TouchableOpacity>
-            </View>
-
             {showAddMoreMode ? (
                 // Add More Files Interface
                 <>
@@ -2328,6 +2317,10 @@ export default function ImportRoutineScreen() {
               ) : (
                 // Confirmation Interface
                 <>
+                  <ScrollView
+                    style={styles.confirmScroll}
+                    showsVerticalScrollIndicator
+                  >
                   {/* Header Badge */}
                   <View style={styles.headerBadgeContainer}>
                     {generationTime && (
@@ -2414,7 +2407,9 @@ export default function ImportRoutineScreen() {
                     </View>
                   </View>
                   
-                  {/* Action Buttons */}
+                  </ScrollView>
+
+                  {/* Action Buttons (pinned footer — always visible) */}
                   <View style={styles.actionSection}>
                     <TouchableOpacity
                       style={[styles.createButton, { backgroundColor: themeColor }]}
@@ -2440,6 +2435,21 @@ export default function ImportRoutineScreen() {
                   </View>
                 </>
               )}
+
+            {/* Navigation Button — rendered last so it sits above the
+                ScrollView in both paint and touch order. An absolutely
+                positioned button *under* a ScrollView won't receive taps,
+                which is why the close (X) stopped working once the content
+                was wrapped in a ScrollView. */}
+            <View style={showAddMoreMode ? styles.backButtonWrapper : styles.closeButtonWrapper}>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={showAddMoreMode ? handleBackToConfirmation : handleModalCancel}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={showAddMoreMode ? "arrow-back" : "close"} size={24} color="#71717a" />
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </Animated.View>
       </Modal>
@@ -2702,6 +2712,13 @@ const styles = StyleSheet.create({
     color: '#a1a1aa',
     fontWeight: '400',
     lineHeight: 18,
+  },
+  // Scroll area for the confirmation view — shrinks within the fixed-height
+  // card so the pinned action footer below always stays on screen. A long
+  // routine name scrolls instead of pushing the button off the bottom.
+  confirmScroll: {
+    flexShrink: 1,
+    alignSelf: 'stretch',
   },
   headerBadgeContainer: {
     alignItems: 'center',

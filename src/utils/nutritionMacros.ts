@@ -158,10 +158,5 @@ export async function finalizeNutrition(
   await WorkoutStorage.saveNutritionResults(nutritionResults);
   await WorkoutStorage.saveBudgetCookingResults(budgetCookingResults);
 
-  // Clear the nutrition draft to prevent draft/final divergence
-  // Draft answers are no longer needed once final results are saved
-  const { clearNutritionAnswers } = await import('./nutritionQuestionnaireStorage');
-  await clearNutritionAnswers();
-
   return macros;
 }

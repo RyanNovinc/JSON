@@ -1,501 +1,159 @@
-// This is the inner SimplifiedMealPlan (curated-meal-picker shape): meals live
-// under dailyMeals, keyed by date. It is NOT what screens consume directly —
-// see the wrapped `exampleMealPlan` export at the bottom of this file.
+// Inner SimplifiedMealPlan (curated meal picker shape): meals live under
+// dailyMeals, keyed by date. This is NOT what screens consume directly. See
+// the wrapped `exampleMealPlan` export at the bottom of this file.
 const exampleMealPlanData = {
-  "id": "mealplan_20260613100000",
+  "id": "plan_1781600400",
   "name": "7-Day Lean Bulk",
-  "startDate": "2026-06-14",
-  "endDate": "2026-06-20",
+  "startDate": "2026-06-16",
+  "endDate": "2026-06-22",
   "dailyMeals": {
-    "2026-06-14": {
-      "date": "2026-06-14",
-      "dayName": "Sunday",
-      "meals": [
-        {
-          "id": "meal_20260614_breakfast",
-          "name": "Baked Oats",
-          "type": "breakfast",
-          "time": "8:00 AM",
-          "calories": 960,
-          "macros": {
-            "protein": 61.2,
-            "carbs": 124.8,
-            "fat": 22.8,
-            "fiber": 13.2
-          },
-          "curated_meal_slug": "baked_oats",
-          "plate_id": "standard",
-          "scale_factor": 1.2,
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260614_amshake",
-          "name": "Protein Shake",
-          "type": "morning_snack",
-          "time": "11:00 AM",
-          "calories": 120,
-          "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
-            "fiber": 0
-          },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260614_lunch",
-          "name": "Chilli Con Carne",
-          "type": "lunch",
-          "time": "1:45 PM",
-          "calories": 775,
-          "macros": {
-            "protein": 52.5,
-            "carbs": 47.5,
-            "fat": 40.0,
-            "fiber": 17.5
-          },
-          "curated_meal_slug": "chilli_con_carne",
-          "plate_id": "chilli_con_carne",
-          "scale_factor": 1.25,
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260614_riceside",
-          "name": "Steamed Rice",
-          "type": "second_lunch",
-          "time": "1:45 PM",
-          "calories": 130,
-          "macros": {
-            "protein": 2.7,
-            "carbs": 28,
-            "fat": 0.3,
-            "fiber": 0.4
-          },
-          "ingredients": [
-            {
-              "item": "Cooked jasmine rice",
-              "amount": "100",
-              "unit": "g",
-              "notes": "~1/3 cup cooked"
-            }
-          ],
-          "instructions": [
-            "Steam or microwave 100 g pre-cooked jasmine rice until hot"
-          ],
-          "tags": [
-            "adjuster",
-            "side"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260614_pmshake",
-          "name": "Protein Shake",
-          "type": "afternoon_snack",
-          "time": "4:00 PM",
-          "calories": 120,
-          "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
-            "fiber": 0
-          },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260614_dinner",
-          "name": "Salmon, Roast Potatoes & Greens",
-          "type": "dinner",
-          "time": "7:30 PM",
-          "calories": 858,
-          "macros": {
-            "protein": 50.6,
-            "carbs": 63.8,
-            "fat": 41.8,
-            "fiber": 7.7
-          },
-          "curated_meal_slug": "sheet_pan_salmon_potatoes",
-          "plate_id": "standard",
-          "scale_factor": 1.1,
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        }
-      ]
-    },
-    "2026-06-15": {
-      "date": "2026-06-15",
-      "dayName": "Monday",
-      "meals": [
-        {
-          "id": "meal_20260615_breakfast",
-          "name": "Baked Oats",
-          "type": "breakfast",
-          "time": "8:00 AM",
-          "calories": 1000,
-          "macros": {
-            "protein": 63.8,
-            "carbs": 130.0,
-            "fat": 23.8,
-            "fiber": 13.8
-          },
-          "curated_meal_slug": "baked_oats",
-          "plate_id": "standard",
-          "scale_factor": 1.25,
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260615_amshake",
-          "name": "Protein Shake",
-          "type": "morning_snack",
-          "time": "11:00 AM",
-          "calories": 120,
-          "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
-            "fiber": 0
-          },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260615_lunch",
-          "name": "Chilli Con Carne",
-          "type": "lunch",
-          "time": "1:45 PM",
-          "calories": 806,
-          "macros": {
-            "protein": 54.6,
-            "carbs": 49.4,
-            "fat": 41.6,
-            "fiber": 18.2
-          },
-          "curated_meal_slug": "chilli_con_carne",
-          "plate_id": "chilli_con_carne",
-          "scale_factor": 1.3,
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260615_riceside",
-          "name": "Steamed Rice",
-          "type": "second_lunch",
-          "time": "1:45 PM",
-          "calories": 130,
-          "macros": {
-            "protein": 2.7,
-            "carbs": 28,
-            "fat": 0.3,
-            "fiber": 0.4
-          },
-          "ingredients": [
-            {
-              "item": "Cooked jasmine rice",
-              "amount": "100",
-              "unit": "g",
-              "notes": "~1/3 cup cooked"
-            }
-          ],
-          "instructions": [
-            "Steam or microwave 100 g pre-cooked jasmine rice until hot"
-          ],
-          "tags": [
-            "adjuster",
-            "side"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260615_pmshake",
-          "name": "Protein Shake",
-          "type": "afternoon_snack",
-          "time": "4:00 PM",
-          "calories": 120,
-          "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
-            "fiber": 0
-          },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260615_dinner",
-          "name": "Salmon, Roast Potatoes & Greens",
-          "type": "dinner",
-          "time": "7:30 PM",
-          "calories": 897,
-          "macros": {
-            "protein": 52.9,
-            "carbs": 66.7,
-            "fat": 43.7,
-            "fiber": 8.0
-          },
-          "curated_meal_slug": "sheet_pan_salmon_potatoes",
-          "plate_id": "standard",
-          "scale_factor": 1.15,
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        }
-      ]
-    },
     "2026-06-16": {
       "date": "2026-06-16",
       "dayName": "Tuesday",
       "meals": [
         {
-          "id": "meal_20260616_breakfast",
+          "id": "meal_20260616_breakfast_baked_oats",
           "name": "Baked Oats",
           "type": "breakfast",
-          "time": "8:00 AM",
-          "calories": 960,
+          "time": "8:30 AM",
+          "calories": 1000,
           "macros": {
-            "protein": 61.2,
-            "carbs": 124.8,
-            "fat": 22.8,
-            "fiber": 13.2
+            "protein": 64,
+            "carbs": 130,
+            "fat": 24,
+            "fiber": 14
           },
           "curated_meal_slug": "baked_oats",
           "plate_id": "standard",
-          "scale_factor": 1.2,
+          "scale_factor": 1.25,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-16T08:30:00Z"
         },
         {
-          "id": "meal_20260616_amshake",
-          "name": "Protein Shake",
+          "id": "meal_20260616_morning_snack_banana_snack",
+          "name": "Banana",
           "type": "morning_snack",
-          "time": "11:00 AM",
-          "calories": 120,
+          "time": "10:45 AM",
+          "calories": 105,
           "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
-            "fiber": 0
+            "protein": 1,
+            "carbs": 27,
+            "fat": 0,
+            "fiber": 3
           },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260616_lunch",
-          "name": "Chilli Con Carne",
-          "type": "lunch",
-          "time": "1:45 PM",
-          "calories": 806,
-          "macros": {
-            "protein": 54.6,
-            "carbs": 49.4,
-            "fat": 41.6,
-            "fiber": 18.2
-          },
-          "curated_meal_slug": "chilli_con_carne",
-          "plate_id": "chilli_con_carne",
-          "scale_factor": 1.3,
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260616_riceside",
-          "name": "Steamed Rice",
-          "type": "second_lunch",
-          "time": "1:45 PM",
-          "calories": 130,
-          "macros": {
-            "protein": 2.7,
-            "carbs": 28,
-            "fat": 0.3,
-            "fiber": 0.4
-          },
-          "ingredients": [
-            {
-              "item": "Cooked jasmine rice",
-              "amount": "100",
-              "unit": "g",
-              "notes": "~1/3 cup cooked"
-            }
-          ],
-          "instructions": [
-            "Steam or microwave 100 g pre-cooked jasmine rice until hot"
-          ],
-          "tags": [
-            "adjuster",
-            "side"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260616_pmshake",
-          "name": "Protein Shake",
-          "type": "afternoon_snack",
-          "time": "4:00 PM",
-          "calories": 120,
-          "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
-            "fiber": 0
-          },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260616_dinner",
-          "name": "Salmon, Roast Potatoes & Greens",
-          "type": "dinner",
-          "time": "7:30 PM",
-          "calories": 858,
-          "macros": {
-            "protein": 50.6,
-            "carbs": 63.8,
-            "fat": 41.8,
-            "fiber": 7.7
-          },
-          "curated_meal_slug": "sheet_pan_salmon_potatoes",
+          "curated_meal_slug": "banana_snack",
           "plate_id": "standard",
-          "scale_factor": 1.1,
+          "scale_factor": 1.0,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-16T10:45:00Z"
+        },
+        {
+          "id": "meal_20260616_brunch_dirty_eden",
+          "name": "Dirty Eden",
+          "type": "brunch",
+          "time": "12:15 PM",
+          "calories": 699,
+          "macros": {
+            "protein": 34,
+            "carbs": 63,
+            "fat": 36,
+            "fiber": 11
+          },
+          "curated_meal_slug": "dirty_eden",
+          "plate_id": "standard",
+          "scale_factor": 0.6,
+          "isOriginal": true,
+          "addedAt": "2026-06-16T12:15:00Z"
+        },
+        {
+          "id": "meal_20260616_lunch_butter_chicken",
+          "name": "Butter Chicken",
+          "type": "lunch",
+          "time": "3:00 PM",
+          "calories": 343,
+          "macros": {
+            "protein": 34,
+            "carbs": 10,
+            "fat": 20,
+            "fiber": 2
+          },
+          "curated_meal_slug": "butter_chicken",
+          "plate_id": "butter_chicken",
+          "scale_factor": 0.7,
+          "isOriginal": true,
+          "addedAt": "2026-06-16T15:00:00Z"
+        },
+        {
+          "id": "meal_20260616_adj_tuna_pouch",
+          "name": "Tuna Pouch",
+          "type": "snack",
+          "time": "3:00 PM",
+          "calories": 110,
+          "macros": {
+            "protein": 25,
+            "carbs": 0,
+            "fat": 1,
+            "fiber": 0
+          },
+          "curated_meal_slug": "tuna_pouch",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-16T15:00:00Z"
+        },
+        {
+          "id": "meal_20260616_afternoon_snack_beef_jerky",
+          "name": "Beef Jerky",
+          "type": "afternoon_snack",
+          "time": "5:00 PM",
+          "calories": 104,
+          "macros": {
+            "protein": 13,
+            "carbs": 4,
+            "fat": 3,
+            "fiber": 0
+          },
+          "curated_meal_slug": "beef_jerky",
+          "plate_id": "standard",
+          "scale_factor": 0.9,
+          "isOriginal": true,
+          "addedAt": "2026-06-16T17:00:00Z"
+        },
+        {
+          "id": "meal_20260616_dinner_honey_chicken",
+          "name": "Honey Chicken over Jasmine Rice",
+          "type": "dinner",
+          "time": "6:30 PM",
+          "calories": 432,
+          "macros": {
+            "protein": 30,
+            "carbs": 57,
+            "fat": 8,
+            "fiber": 1
+          },
+          "curated_meal_slug": "honey_chicken",
+          "plate_id": "standard",
+          "scale_factor": 0.55,
+          "isOriginal": true,
+          "addedAt": "2026-06-16T18:30:00Z"
+        },
+        {
+          "id": "meal_20260616_evening_snack_chocolate_protein_mousse",
+          "name": "Chocolate Protein Mousse",
+          "type": "evening_snack",
+          "time": "7:15 PM",
+          "calories": 375,
+          "macros": {
+            "protein": 36,
+            "carbs": 34,
+            "fat": 13,
+            "fiber": 4
+          },
+          "curated_meal_slug": "chocolate_protein_mousse",
+          "plate_id": "standard",
+          "scale_factor": 0.95,
+          "isOriginal": true,
+          "addedAt": "2026-06-16T19:15:00Z"
         }
       ]
     },
@@ -504,126 +162,148 @@ const exampleMealPlanData = {
       "dayName": "Wednesday",
       "meals": [
         {
-          "id": "meal_20260617_breakfast",
-          "name": "Big Breakfast Plate",
+          "id": "meal_20260617_breakfast_baked_oats",
+          "name": "Baked Oats",
           "type": "breakfast",
-          "time": "8:00 AM",
-          "calories": 1017,
+          "time": "8:30 AM",
+          "calories": 600,
           "macros": {
-            "protein": 63.0,
-            "carbs": 70.2,
-            "fat": 53.1,
-            "fiber": 9.9
+            "protein": 38,
+            "carbs": 78,
+            "fat": 14,
+            "fiber": 8
           },
-          "curated_meal_slug": "big_breakfast_plate",
+          "curated_meal_slug": "baked_oats",
           "plate_id": "standard",
-          "scale_factor": 0.9,
+          "scale_factor": 0.75,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-17T08:30:00Z"
         },
         {
-          "id": "meal_20260617_amshake",
-          "name": "Protein Shake",
+          "id": "meal_20260617_morning_snack_beef_jerky",
+          "name": "Beef Jerky",
           "type": "morning_snack",
-          "time": "11:00 AM",
-          "calories": 120,
+          "time": "10:45 AM",
+          "calories": 115,
           "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
+            "protein": 14,
+            "carbs": 5,
+            "fat": 3,
             "fiber": 0
           },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
+          "curated_meal_slug": "beef_jerky",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-17T10:45:00Z"
         },
         {
-          "id": "meal_20260617_lunch",
-          "name": "Chilli Con Carne",
-          "type": "lunch",
-          "time": "1:45 PM",
-          "calories": 806,
+          "id": "meal_20260617_brunch_banana_bulk",
+          "name": "Banana Bulk",
+          "type": "brunch",
+          "time": "12:15 PM",
+          "calories": 976,
           "macros": {
-            "protein": 54.6,
-            "carbs": 49.4,
-            "fat": 41.6,
-            "fiber": 18.2
+            "protein": 48,
+            "carbs": 114,
+            "fat": 38,
+            "fiber": 9
           },
-          "curated_meal_slug": "chilli_con_carne",
-          "plate_id": "chilli_con_carne",
-          "scale_factor": 1.3,
+          "curated_meal_slug": "banana_bulk",
+          "plate_id": "standard",
+          "scale_factor": 0.75,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-17T12:15:00Z"
         },
         {
-          "id": "meal_20260617_dinner",
+          "id": "meal_20260617_lunch_butter_chicken",
+          "name": "Butter Chicken",
+          "type": "lunch",
+          "time": "3:00 PM",
+          "calories": 686,
+          "macros": {
+            "protein": 67,
+            "carbs": 20,
+            "fat": 39,
+            "fiber": 4
+          },
+          "curated_meal_slug": "butter_chicken",
+          "plate_id": "butter_chicken",
+          "scale_factor": 1.4,
+          "isOriginal": true,
+          "addedAt": "2026-06-17T15:00:00Z"
+        },
+        {
+          "id": "meal_20260617_adj_tuna_pouch",
+          "name": "Tuna Pouch",
+          "type": "snack",
+          "time": "3:00 PM",
+          "calories": 110,
+          "macros": {
+            "protein": 25,
+            "carbs": 0,
+            "fat": 1,
+            "fiber": 0
+          },
+          "curated_meal_slug": "tuna_pouch",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-17T15:00:00Z"
+        },
+        {
+          "id": "meal_20260617_afternoon_snack_dried_fruit",
+          "name": "Dried Fruit",
+          "type": "afternoon_snack",
+          "time": "5:00 PM",
+          "calories": 162,
+          "macros": {
+            "protein": 1,
+            "carbs": 39,
+            "fat": 0,
+            "fiber": 4
+          },
+          "curated_meal_slug": "dried_fruit",
+          "plate_id": "standard",
+          "scale_factor": 1.25,
+          "isOriginal": true,
+          "addedAt": "2026-06-17T17:00:00Z"
+        },
+        {
+          "id": "meal_20260617_dinner_honey_chicken",
           "name": "Honey Chicken over Jasmine Rice",
           "type": "dinner",
-          "time": "7:30 PM",
-          "calories": 1022,
+          "time": "6:30 PM",
+          "calories": 472,
           "macros": {
-            "protein": 70.2,
-            "carbs": 135.2,
-            "fat": 19.5,
-            "fiber": 2.6
+            "protein": 32,
+            "carbs": 62,
+            "fat": 9,
+            "fiber": 1
           },
           "curated_meal_slug": "honey_chicken",
           "plate_id": "standard",
-          "scale_factor": 1.3,
+          "scale_factor": 0.6,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-17T18:30:00Z"
         },
         {
-          "id": "meal_20260617_vegside",
+          "id": "meal_20260617_adj_steamed_mixed_veg",
           "name": "Steamed Mixed Veg",
-          "type": "evening_snack",
-          "time": "7:30 PM",
-          "calories": 60,
+          "type": "snack",
+          "time": "6:30 PM",
+          "calories": 130,
           "macros": {
-            "protein": 4,
-            "carbs": 8,
-            "fat": 1,
-            "fiber": 5
+            "protein": 8,
+            "carbs": 22,
+            "fat": 2,
+            "fiber": 10
           },
-          "ingredients": [
-            {
-              "item": "Frozen mixed vegetables",
-              "amount": "150",
-              "unit": "g",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Microwave 150 g frozen mixed vegetables for ~4 minutes until hot"
-          ],
-          "tags": [
-            "adjuster",
-            "side",
-            "vegetables"
-          ],
+          "curated_meal_slug": "steamed_mixed_veg",
+          "plate_id": "standard",
+          "scale_factor": 2.0,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-17T18:30:00Z"
         }
       ]
     },
@@ -632,126 +312,166 @@ const exampleMealPlanData = {
       "dayName": "Thursday",
       "meals": [
         {
-          "id": "meal_20260618_breakfast",
+          "id": "meal_20260618_breakfast_baked_oats",
           "name": "Baked Oats",
           "type": "breakfast",
-          "time": "8:00 AM",
-          "calories": 1160,
+          "time": "8:30 AM",
+          "calories": 920,
           "macros": {
-            "protein": 74.0,
-            "carbs": 150.8,
-            "fat": 27.6,
-            "fiber": 15.9
+            "protein": 59,
+            "carbs": 120,
+            "fat": 22,
+            "fiber": 13
           },
           "curated_meal_slug": "baked_oats",
           "plate_id": "standard",
-          "scale_factor": 1.45,
+          "scale_factor": 1.15,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-18T08:30:00Z"
         },
         {
-          "id": "meal_20260618_amshake",
-          "name": "Protein Shake",
+          "id": "meal_20260618_morning_snack_beef_jerky",
+          "name": "Beef Jerky",
           "type": "morning_snack",
-          "time": "11:00 AM",
-          "calories": 120,
+          "time": "10:45 AM",
+          "calories": 92,
           "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
+            "protein": 11,
+            "carbs": 4,
+            "fat": 2,
             "fiber": 0
           },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
+          "curated_meal_slug": "beef_jerky",
+          "plate_id": "standard",
+          "scale_factor": 0.8,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-18T10:45:00Z"
         },
         {
-          "id": "meal_20260618_lunch",
-          "name": "Ćevapi with Flatbread",
-          "type": "lunch",
-          "time": "1:45 PM",
-          "calories": 806,
+          "id": "meal_20260618_brunch_dirty_eden",
+          "name": "Dirty Eden",
+          "type": "brunch",
+          "time": "12:15 PM",
+          "calories": 699,
           "macros": {
-            "protein": 51.0,
-            "carbs": 71.0,
-            "fat": 35.0,
-            "fiber": 7.0
+            "protein": 34,
+            "carbs": 63,
+            "fat": 36,
+            "fiber": 11
           },
-          "curated_meal_slug": "cevapi",
-          "plate_id": "flatbread",
+          "curated_meal_slug": "dirty_eden",
+          "plate_id": "standard",
+          "scale_factor": 0.6,
+          "isOriginal": true,
+          "addedAt": "2026-06-18T12:15:00Z"
+        },
+        {
+          "id": "meal_20260618_lunch_butter_chicken",
+          "name": "Butter Chicken",
+          "type": "lunch",
+          "time": "3:00 PM",
+          "calories": 392,
+          "macros": {
+            "protein": 38,
+            "carbs": 11,
+            "fat": 22,
+            "fiber": 2
+          },
+          "curated_meal_slug": "butter_chicken",
+          "plate_id": "butter_chicken",
+          "scale_factor": 0.8,
+          "isOriginal": true,
+          "addedAt": "2026-06-18T15:00:00Z"
+        },
+        {
+          "id": "meal_20260618_adj_tuna_pouch",
+          "name": "Tuna Pouch",
+          "type": "snack",
+          "time": "3:00 PM",
+          "calories": 110,
+          "macros": {
+            "protein": 25,
+            "carbs": 0,
+            "fat": 1,
+            "fiber": 0
+          },
+          "curated_meal_slug": "tuna_pouch",
+          "plate_id": "standard",
           "scale_factor": 1.0,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-18T15:00:00Z"
         },
         {
-          "id": "meal_20260618_dinner",
+          "id": "meal_20260618_afternoon_snack_cheese_snack",
+          "name": "Cheese",
+          "type": "afternoon_snack",
+          "time": "5:00 PM",
+          "calories": 63,
+          "macros": {
+            "protein": 4,
+            "carbs": 1,
+            "fat": 5,
+            "fiber": 0
+          },
+          "curated_meal_slug": "cheese_snack",
+          "plate_id": "standard",
+          "scale_factor": 0.55,
+          "isOriginal": true,
+          "addedAt": "2026-06-18T17:00:00Z"
+        },
+        {
+          "id": "meal_20260618_dinner_honey_chicken",
           "name": "Honey Chicken over Jasmine Rice",
           "type": "dinner",
-          "time": "7:30 PM",
-          "calories": 943,
+          "time": "6:30 PM",
+          "calories": 432,
           "macros": {
-            "protein": 64.8,
-            "carbs": 124.8,
-            "fat": 18.0,
-            "fiber": 2.4
+            "protein": 30,
+            "carbs": 57,
+            "fat": 8,
+            "fiber": 1
           },
           "curated_meal_slug": "honey_chicken",
           "plate_id": "standard",
-          "scale_factor": 1.2,
+          "scale_factor": 0.55,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-18T18:30:00Z"
         },
         {
-          "id": "meal_20260618_vegside",
+          "id": "meal_20260618_adj_steamed_mixed_veg",
           "name": "Steamed Mixed Veg",
-          "type": "evening_snack",
-          "time": "7:30 PM",
-          "calories": 120,
+          "type": "snack",
+          "time": "6:30 PM",
+          "calories": 130,
           "macros": {
             "protein": 8,
-            "carbs": 16,
+            "carbs": 22,
             "fat": 2,
             "fiber": 10
           },
-          "ingredients": [
-            {
-              "item": "Frozen mixed vegetables",
-              "amount": "300",
-              "unit": "g",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Microwave 300 g frozen mixed vegetables for ~8 minutes until hot"
-          ],
-          "tags": [
-            "adjuster",
-            "side",
-            "vegetables"
-          ],
+          "curated_meal_slug": "steamed_mixed_veg",
+          "plate_id": "standard",
+          "scale_factor": 2.0,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-18T18:30:00Z"
+        },
+        {
+          "id": "meal_20260618_evening_snack_cottage_cheese_ice_cream",
+          "name": "Cottage Cheese Ice Cream",
+          "type": "evening_snack",
+          "time": "7:15 PM",
+          "calories": 351,
+          "macros": {
+            "protein": 26,
+            "carbs": 41,
+            "fat": 11,
+            "fiber": 3
+          },
+          "curated_meal_slug": "cottage_cheese_ice_cream",
+          "plate_id": "standard",
+          "scale_factor": 0.9,
+          "isOriginal": true,
+          "addedAt": "2026-06-18T19:15:00Z"
         }
       ]
     },
@@ -760,126 +480,166 @@ const exampleMealPlanData = {
       "dayName": "Friday",
       "meals": [
         {
-          "id": "meal_20260619_breakfast",
+          "id": "meal_20260619_breakfast_baked_oats",
           "name": "Baked Oats",
           "type": "breakfast",
-          "time": "8:00 AM",
-          "calories": 1160,
+          "time": "8:30 AM",
+          "calories": 680,
           "macros": {
-            "protein": 74.0,
-            "carbs": 150.8,
-            "fat": 27.6,
-            "fiber": 15.9
+            "protein": 43,
+            "carbs": 88,
+            "fat": 16,
+            "fiber": 9
           },
           "curated_meal_slug": "baked_oats",
           "plate_id": "standard",
-          "scale_factor": 1.45,
+          "scale_factor": 0.85,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-19T08:30:00Z"
         },
         {
-          "id": "meal_20260619_amshake",
-          "name": "Protein Shake",
-          "type": "morning_snack",
-          "time": "11:00 AM",
-          "calories": 120,
+          "id": "meal_20260619_adj_berries",
+          "name": "Berries",
+          "type": "snack",
+          "time": "8:30 AM",
+          "calories": 80,
           "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
-            "fiber": 0
+            "protein": 1,
+            "carbs": 18,
+            "fat": 0,
+            "fiber": 5
           },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260619_lunch",
-          "name": "Ćevapi with Flatbread",
-          "type": "lunch",
-          "time": "1:45 PM",
-          "calories": 806,
-          "macros": {
-            "protein": 51.0,
-            "carbs": 71.0,
-            "fat": 35.0,
-            "fiber": 7.0
-          },
-          "curated_meal_slug": "cevapi",
-          "plate_id": "flatbread",
+          "curated_meal_slug": "berries",
+          "plate_id": "standard",
           "scale_factor": 1.0,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-19T08:30:00Z"
         },
         {
-          "id": "meal_20260619_dinner",
+          "id": "meal_20260619_morning_snack_beef_jerky",
+          "name": "Beef Jerky",
+          "type": "morning_snack",
+          "time": "10:45 AM",
+          "calories": 207,
+          "macros": {
+            "protein": 25,
+            "carbs": 9,
+            "fat": 5,
+            "fiber": 0
+          },
+          "curated_meal_slug": "beef_jerky",
+          "plate_id": "standard",
+          "scale_factor": 1.8,
+          "isOriginal": true,
+          "addedAt": "2026-06-19T10:45:00Z"
+        },
+        {
+          "id": "meal_20260619_brunch_cookies_gains",
+          "name": "Cookies & Gains",
+          "type": "brunch",
+          "time": "12:15 PM",
+          "calories": 804,
+          "macros": {
+            "protein": 39,
+            "carbs": 90,
+            "fat": 33,
+            "fiber": 4
+          },
+          "curated_meal_slug": "cookies_gains",
+          "plate_id": "standard",
+          "scale_factor": 0.7,
+          "isOriginal": true,
+          "addedAt": "2026-06-19T12:15:00Z"
+        },
+        {
+          "id": "meal_20260619_lunch_butter_chicken",
+          "name": "Butter Chicken",
+          "type": "lunch",
+          "time": "3:00 PM",
+          "calories": 662,
+          "macros": {
+            "protein": 65,
+            "carbs": 19,
+            "fat": 38,
+            "fiber": 4
+          },
+          "curated_meal_slug": "butter_chicken",
+          "plate_id": "butter_chicken",
+          "scale_factor": 1.35,
+          "isOriginal": true,
+          "addedAt": "2026-06-19T15:00:00Z"
+        },
+        {
+          "id": "meal_20260619_adj_tuna_pouch",
+          "name": "Tuna Pouch",
+          "type": "snack",
+          "time": "3:00 PM",
+          "calories": 110,
+          "macros": {
+            "protein": 25,
+            "carbs": 0,
+            "fat": 1,
+            "fiber": 0
+          },
+          "curated_meal_slug": "tuna_pouch",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-19T15:00:00Z"
+        },
+        {
+          "id": "meal_20260619_afternoon_snack_banana_snack",
+          "name": "Banana",
+          "type": "afternoon_snack",
+          "time": "5:00 PM",
+          "calories": 226,
+          "macros": {
+            "protein": 2,
+            "carbs": 58,
+            "fat": 0,
+            "fiber": 6
+          },
+          "curated_meal_slug": "banana_snack",
+          "plate_id": "standard",
+          "scale_factor": 2.15,
+          "isOriginal": true,
+          "addedAt": "2026-06-19T17:00:00Z"
+        },
+        {
+          "id": "meal_20260619_dinner_honey_chicken",
           "name": "Honey Chicken over Jasmine Rice",
           "type": "dinner",
-          "time": "7:30 PM",
-          "calories": 943,
+          "time": "6:30 PM",
+          "calories": 432,
           "macros": {
-            "protein": 64.8,
-            "carbs": 124.8,
-            "fat": 18.0,
-            "fiber": 2.4
+            "protein": 30,
+            "carbs": 57,
+            "fat": 8,
+            "fiber": 1
           },
           "curated_meal_slug": "honey_chicken",
           "plate_id": "standard",
-          "scale_factor": 1.2,
+          "scale_factor": 0.55,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-19T18:30:00Z"
         },
         {
-          "id": "meal_20260619_vegside",
+          "id": "meal_20260619_adj_steamed_mixed_veg",
           "name": "Steamed Mixed Veg",
-          "type": "evening_snack",
-          "time": "7:30 PM",
-          "calories": 120,
+          "type": "snack",
+          "time": "6:30 PM",
+          "calories": 65,
           "macros": {
-            "protein": 8,
-            "carbs": 16,
-            "fat": 2,
-            "fiber": 10
+            "protein": 4,
+            "carbs": 11,
+            "fat": 1,
+            "fiber": 5
           },
-          "ingredients": [
-            {
-              "item": "Frozen mixed vegetables",
-              "amount": "300",
-              "unit": "g",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Microwave 300 g frozen mixed vegetables for ~8 minutes until hot"
-          ],
-          "tags": [
-            "adjuster",
-            "side",
-            "vegetables"
-          ],
+          "curated_meal_slug": "steamed_mixed_veg",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-19T18:30:00Z"
         }
       ]
     },
@@ -888,185 +648,732 @@ const exampleMealPlanData = {
       "dayName": "Saturday",
       "meals": [
         {
-          "id": "meal_20260620_breakfast",
-          "name": "Baked Oats",
+          "id": "meal_20260620_breakfast_egg_muffins",
+          "name": "Egg Muffins",
           "type": "breakfast",
-          "time": "8:00 AM",
-          "calories": 1160,
+          "time": "8:30 AM",
+          "calories": 592,
           "macros": {
-            "protein": 74.0,
-            "carbs": 150.8,
-            "fat": 27.6,
-            "fiber": 15.9
+            "protein": 33,
+            "carbs": 47,
+            "fat": 31,
+            "fiber": 6
           },
-          "curated_meal_slug": "baked_oats",
+          "curated_meal_slug": "egg_muffins",
           "plate_id": "standard",
-          "scale_factor": 1.45,
+          "scale_factor": 0.75,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-20T08:30:00Z"
         },
         {
-          "id": "meal_20260620_amshake",
-          "name": "Protein Shake",
+          "id": "meal_20260620_morning_snack_beef_jerky",
+          "name": "Beef Jerky",
           "type": "morning_snack",
-          "time": "11:00 AM",
-          "calories": 120,
+          "time": "10:45 AM",
+          "calories": 144,
           "macros": {
-            "protein": 24,
-            "carbs": 3,
-            "fat": 1.5,
+            "protein": 18,
+            "carbs": 6,
+            "fat": 4,
             "fiber": 0
           },
-          "ingredients": [
-            {
-              "item": "Whey protein powder",
-              "amount": "30",
-              "unit": "g",
-              "notes": "1 scoop"
-            },
-            {
-              "item": "Water",
-              "amount": "300",
-              "unit": "ml",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Add 30 g whey protein and 300 ml water to a shaker",
-            "Shake well and drink"
-          ],
-          "tags": [
-            "adjuster",
-            "high_protein"
-          ],
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260620_lunch",
-          "name": "Ćevapi with Flatbread",
-          "type": "lunch",
-          "time": "1:45 PM",
-          "calories": 806,
-          "macros": {
-            "protein": 51.0,
-            "carbs": 71.0,
-            "fat": 35.0,
-            "fiber": 7.0
-          },
-          "curated_meal_slug": "cevapi",
-          "plate_id": "flatbread",
-          "scale_factor": 1.0,
-          "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
-        },
-        {
-          "id": "meal_20260620_dinner",
-          "name": "Honey Chicken over Jasmine Rice",
-          "type": "dinner",
-          "time": "7:30 PM",
-          "calories": 982,
-          "macros": {
-            "protein": 67.5,
-            "carbs": 130.0,
-            "fat": 18.8,
-            "fiber": 2.5
-          },
-          "curated_meal_slug": "honey_chicken",
+          "curated_meal_slug": "beef_jerky",
           "plate_id": "standard",
           "scale_factor": 1.25,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-20T10:45:00Z"
         },
         {
-          "id": "meal_20260620_vegside",
-          "name": "Steamed Mixed Veg",
-          "type": "evening_snack",
-          "time": "7:30 PM",
-          "calories": 120,
+          "id": "meal_20260620_brunch_baked_oats",
+          "name": "Baked Oats",
+          "type": "brunch",
+          "time": "12:15 PM",
+          "calories": 600,
           "macros": {
-            "protein": 8,
-            "carbs": 16,
-            "fat": 2,
-            "fiber": 10
+            "protein": 38,
+            "carbs": 78,
+            "fat": 14,
+            "fiber": 8
           },
-          "ingredients": [
-            {
-              "item": "Frozen mixed vegetables",
-              "amount": "300",
-              "unit": "g",
-              "notes": ""
-            }
-          ],
-          "instructions": [
-            "Microwave 300 g frozen mixed vegetables for ~8 minutes until hot"
-          ],
-          "tags": [
-            "adjuster",
-            "side",
-            "vegetables"
-          ],
+          "curated_meal_slug": "baked_oats",
+          "plate_id": "standard",
+          "scale_factor": 0.75,
           "isOriginal": true,
-          "addedAt": "2026-06-13T10:00:00Z"
+          "addedAt": "2026-06-20T12:15:00Z"
+        },
+        {
+          "id": "meal_20260620_adj_protein_bar",
+          "name": "Protein Bar",
+          "type": "snack",
+          "time": "1:30 PM",
+          "calories": 220,
+          "macros": {
+            "protein": 20,
+            "carbs": 22,
+            "fat": 7,
+            "fiber": 5
+          },
+          "curated_meal_slug": "protein_bar",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-20T13:30:00Z"
+        },
+        {
+          "id": "meal_20260620_lunch_cevapi",
+          "name": "Ćevapi with Flatbread",
+          "type": "lunch",
+          "time": "3:00 PM",
+          "calories": 524,
+          "macros": {
+            "protein": 33,
+            "carbs": 46,
+            "fat": 23,
+            "fiber": 5
+          },
+          "curated_meal_slug": "cevapi",
+          "plate_id": "flatbread",
+          "scale_factor": 0.65,
+          "isOriginal": true,
+          "addedAt": "2026-06-20T15:00:00Z"
+        },
+        {
+          "id": "meal_20260620_adj_tuna_pouch",
+          "name": "Tuna Pouch",
+          "type": "snack",
+          "time": "3:00 PM",
+          "calories": 110,
+          "macros": {
+            "protein": 25,
+            "carbs": 0,
+            "fat": 1,
+            "fiber": 0
+          },
+          "curated_meal_slug": "tuna_pouch",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-20T15:00:00Z"
+        },
+        {
+          "id": "meal_20260620_afternoon_snack_banana_snack",
+          "name": "Banana",
+          "type": "afternoon_snack",
+          "time": "5:00 PM",
+          "calories": 284,
+          "macros": {
+            "protein": 3,
+            "carbs": 73,
+            "fat": 0,
+            "fiber": 8
+          },
+          "curated_meal_slug": "banana_snack",
+          "plate_id": "standard",
+          "scale_factor": 2.7,
+          "isOriginal": true,
+          "addedAt": "2026-06-20T17:00:00Z"
+        },
+        {
+          "id": "meal_20260620_dinner_honey_soy_salmon_noodles",
+          "name": "Honey Soy Salmon Noodle Bowl",
+          "type": "dinner",
+          "time": "6:30 PM",
+          "calories": 451,
+          "macros": {
+            "protein": 29,
+            "carbs": 41,
+            "fat": 18,
+            "fiber": 3
+          },
+          "curated_meal_slug": "honey_soy_salmon_noodles",
+          "plate_id": "standard",
+          "scale_factor": 0.55,
+          "isOriginal": true,
+          "addedAt": "2026-06-20T18:30:00Z"
+        },
+        {
+          "id": "meal_20260620_evening_snack_chocolate_protein_mug_cake",
+          "name": "Chocolate Protein Mug Cake",
+          "type": "evening_snack",
+          "time": "7:15 PM",
+          "calories": 358,
+          "macros": {
+            "protein": 37,
+            "carbs": 24,
+            "fat": 14,
+            "fiber": 3
+          },
+          "curated_meal_slug": "chocolate_protein_mug_cake",
+          "plate_id": "standard",
+          "scale_factor": 1.1,
+          "isOriginal": true,
+          "addedAt": "2026-06-20T19:15:00Z"
+        }
+      ]
+    },
+    "2026-06-21": {
+      "date": "2026-06-21",
+      "dayName": "Sunday",
+      "meals": [
+        {
+          "id": "meal_20260621_breakfast_egg_muffins",
+          "name": "Egg Muffins",
+          "type": "breakfast",
+          "time": "8:30 AM",
+          "calories": 553,
+          "macros": {
+            "protein": 31,
+            "carbs": 44,
+            "fat": 29,
+            "fiber": 6
+          },
+          "curated_meal_slug": "egg_muffins",
+          "plate_id": "standard",
+          "scale_factor": 0.7,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T08:30:00Z"
+        },
+        {
+          "id": "meal_20260621_morning_snack_dried_fruit",
+          "name": "Dried Fruit",
+          "type": "morning_snack",
+          "time": "10:45 AM",
+          "calories": 72,
+          "macros": {
+            "protein": 1,
+            "carbs": 17,
+            "fat": 0,
+            "fiber": 2
+          },
+          "curated_meal_slug": "dried_fruit",
+          "plate_id": "standard",
+          "scale_factor": 0.55,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T10:45:00Z"
+        },
+        {
+          "id": "meal_20260621_brunch_baked_oats",
+          "name": "Baked Oats",
+          "type": "brunch",
+          "time": "12:15 PM",
+          "calories": 1000,
+          "macros": {
+            "protein": 64,
+            "carbs": 130,
+            "fat": 24,
+            "fiber": 14
+          },
+          "curated_meal_slug": "baked_oats",
+          "plate_id": "standard",
+          "scale_factor": 1.25,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T12:15:00Z"
+        },
+        {
+          "id": "meal_20260621_adj_protein_bar",
+          "name": "Protein Bar",
+          "type": "snack",
+          "time": "1:30 PM",
+          "calories": 220,
+          "macros": {
+            "protein": 20,
+            "carbs": 22,
+            "fat": 7,
+            "fiber": 5
+          },
+          "curated_meal_slug": "protein_bar",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T13:30:00Z"
+        },
+        {
+          "id": "meal_20260621_lunch_cevapi",
+          "name": "Ćevapi with Flatbread",
+          "type": "lunch",
+          "time": "3:00 PM",
+          "calories": 564,
+          "macros": {
+            "protein": 36,
+            "carbs": 50,
+            "fat": 24,
+            "fiber": 5
+          },
+          "curated_meal_slug": "cevapi",
+          "plate_id": "flatbread",
+          "scale_factor": 0.7,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T15:00:00Z"
+        },
+        {
+          "id": "meal_20260621_adj_tuna_pouch",
+          "name": "Tuna Pouch",
+          "type": "snack",
+          "time": "3:00 PM",
+          "calories": 110,
+          "macros": {
+            "protein": 25,
+            "carbs": 0,
+            "fat": 1,
+            "fiber": 0
+          },
+          "curated_meal_slug": "tuna_pouch",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T15:00:00Z"
+        },
+        {
+          "id": "meal_20260621_afternoon_snack_beef_jerky",
+          "name": "Beef Jerky",
+          "type": "afternoon_snack",
+          "time": "5:00 PM",
+          "calories": 213,
+          "macros": {
+            "protein": 26,
+            "carbs": 9,
+            "fat": 6,
+            "fiber": 0
+          },
+          "curated_meal_slug": "beef_jerky",
+          "plate_id": "standard",
+          "scale_factor": 1.85,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T17:00:00Z"
+        },
+        {
+          "id": "meal_20260621_dinner_honey_soy_salmon_noodles",
+          "name": "Honey Soy Salmon Noodle Bowl",
+          "type": "dinner",
+          "time": "6:30 PM",
+          "calories": 492,
+          "macros": {
+            "protein": 32,
+            "carbs": 45,
+            "fat": 20,
+            "fiber": 3
+          },
+          "curated_meal_slug": "honey_soy_salmon_noodles",
+          "plate_id": "standard",
+          "scale_factor": 0.6,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T18:30:00Z"
+        },
+        {
+          "id": "meal_20260621_adj_steamed_mixed_veg",
+          "name": "Steamed Mixed Veg",
+          "type": "snack",
+          "time": "6:30 PM",
+          "calories": 65,
+          "macros": {
+            "protein": 4,
+            "carbs": 11,
+            "fat": 1,
+            "fiber": 5
+          },
+          "curated_meal_slug": "steamed_mixed_veg",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-21T18:30:00Z"
+        }
+      ]
+    },
+    "2026-06-22": {
+      "date": "2026-06-22",
+      "dayName": "Monday",
+      "meals": [
+        {
+          "id": "meal_20260622_breakfast_egg_muffins",
+          "name": "Egg Muffins",
+          "type": "breakfast",
+          "time": "8:30 AM",
+          "calories": 592,
+          "macros": {
+            "protein": 33,
+            "carbs": 47,
+            "fat": 31,
+            "fiber": 6
+          },
+          "curated_meal_slug": "egg_muffins",
+          "plate_id": "standard",
+          "scale_factor": 0.75,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T08:30:00Z"
+        },
+        {
+          "id": "meal_20260622_morning_snack_dried_fruit",
+          "name": "Dried Fruit",
+          "type": "morning_snack",
+          "time": "10:45 AM",
+          "calories": 91,
+          "macros": {
+            "protein": 1,
+            "carbs": 22,
+            "fat": 0,
+            "fiber": 2
+          },
+          "curated_meal_slug": "dried_fruit",
+          "plate_id": "standard",
+          "scale_factor": 0.7,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T10:45:00Z"
+        },
+        {
+          "id": "meal_20260622_brunch_baked_oats",
+          "name": "Baked Oats",
+          "type": "brunch",
+          "time": "12:15 PM",
+          "calories": 800,
+          "macros": {
+            "protein": 51,
+            "carbs": 104,
+            "fat": 19,
+            "fiber": 11
+          },
+          "curated_meal_slug": "baked_oats",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T12:15:00Z"
+        },
+        {
+          "id": "meal_20260622_adj_protein_bar",
+          "name": "Protein Bar",
+          "type": "snack",
+          "time": "1:30 PM",
+          "calories": 220,
+          "macros": {
+            "protein": 20,
+            "carbs": 22,
+            "fat": 7,
+            "fiber": 5
+          },
+          "curated_meal_slug": "protein_bar",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T13:30:00Z"
+        },
+        {
+          "id": "meal_20260622_lunch_cevapi",
+          "name": "Ćevapi with Flatbread",
+          "type": "lunch",
+          "time": "3:00 PM",
+          "calories": 484,
+          "macros": {
+            "protein": 31,
+            "carbs": 43,
+            "fat": 21,
+            "fiber": 4
+          },
+          "curated_meal_slug": "cevapi",
+          "plate_id": "flatbread",
+          "scale_factor": 0.6,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T15:00:00Z"
+        },
+        {
+          "id": "meal_20260622_adj_tuna_pouch",
+          "name": "Tuna Pouch",
+          "type": "snack",
+          "time": "3:00 PM",
+          "calories": 110,
+          "macros": {
+            "protein": 25,
+            "carbs": 0,
+            "fat": 1,
+            "fiber": 0
+          },
+          "curated_meal_slug": "tuna_pouch",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T15:00:00Z"
+        },
+        {
+          "id": "meal_20260622_adj_protein_shake",
+          "name": "Protein Shake",
+          "type": "snack",
+          "time": "3:00 PM",
+          "calories": 250,
+          "macros": {
+            "protein": 35,
+            "carbs": 16,
+            "fat": 5,
+            "fiber": 0
+          },
+          "curated_meal_slug": "protein_shake",
+          "plate_id": "standard",
+          "scale_factor": 1.0,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T15:00:00Z"
+        },
+        {
+          "id": "meal_20260622_afternoon_snack_banana_snack",
+          "name": "Banana",
+          "type": "afternoon_snack",
+          "time": "5:00 PM",
+          "calories": 284,
+          "macros": {
+            "protein": 3,
+            "carbs": 73,
+            "fat": 0,
+            "fiber": 8
+          },
+          "curated_meal_slug": "banana_snack",
+          "plate_id": "standard",
+          "scale_factor": 2.7,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T17:00:00Z"
+        },
+        {
+          "id": "meal_20260622_dinner_honey_soy_salmon_noodles",
+          "name": "Honey Soy Salmon Noodle Bowl",
+          "type": "dinner",
+          "time": "6:30 PM",
+          "calories": 492,
+          "macros": {
+            "protein": 32,
+            "carbs": 45,
+            "fat": 20,
+            "fiber": 3
+          },
+          "curated_meal_slug": "honey_soy_salmon_noodles",
+          "plate_id": "standard",
+          "scale_factor": 0.6,
+          "isOriginal": true,
+          "addedAt": "2026-06-22T18:30:00Z"
         }
       ]
     }
   },
   "grocery_list": {
-    "total_estimated_cost_low": 175.3,
-    "total_estimated_cost_high": 193,
+    "total_estimated_cost_low": 208.3,
+    "total_estimated_cost_high": 230,
     "currency": "AU$",
     "categories": [
       {
         "category_name": "Meat & Seafood",
         "items": [
           {
-            "item_name": "Beef mince",
-            "quantity": "1",
-            "unit": "kg",
-            "estimated_price": 13.0,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Beef/lamb mince (ćevapi)",
-            "quantity": "600",
-            "unit": "g",
-            "estimated_price": 9.0,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Chicken thigh",
+            "item_name": "Chicken breast fillet",
             "quantity": "700",
             "unit": "g",
-            "estimated_price": 9.0,
-            "notes": "",
+            "estimated_price": 9.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Chicken thigh fillet",
+            "quantity": "600",
+            "unit": "g",
+            "estimated_price": 8.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Beef/lamb mince",
+            "quantity": "500",
+            "unit": "g",
+            "estimated_price": 7.5,
             "is_purchased": false
           },
           {
             "item_name": "Salmon fillets",
-            "quantity": "700",
-            "unit": "g",
-            "estimated_price": 23.0,
-            "notes": "~4 fillets",
-            "is_purchased": false,
-            "alternatives": [
-              {
-                "item_name": "Frozen salmon portions",
-                "quantity": "700",
-                "unit": "g",
-                "estimated_price": 18.0,
-                "notes": "Thaw overnight before use"
-              }
-            ]
+            "quantity": "4",
+            "unit": "fillets",
+            "estimated_price": 22.0,
+            "is_purchased": false
           },
           {
-            "item_name": "Bacon",
+            "item_name": "Shaved ham",
+            "quantity": "100",
+            "unit": "g",
+            "estimated_price": 3.5,
+            "is_purchased": false
+          }
+        ]
+      },
+      {
+        "category_name": "Pantry & Dry Goods",
+        "items": [
+          {
+            "item_name": "Rolled oats",
+            "quantity": "1",
+            "unit": "kg",
+            "estimated_price": 1.8,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Jasmine rice",
+            "quantity": "1",
+            "unit": "kg",
+            "estimated_price": 3.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Egg/hokkien noodles",
+            "quantity": "440",
+            "unit": "g",
+            "estimated_price": 3.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Lebanese flatbread",
+            "quantity": "6",
+            "unit": "pack",
+            "estimated_price": 3.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Butter chicken simmer sauce",
+            "quantity": "2",
+            "unit": "jars (485g)",
+            "estimated_price": 7.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Honey",
+            "quantity": "500",
+            "unit": "g",
+            "estimated_price": 6.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Soy sauce",
+            "quantity": "250",
+            "unit": "ml",
+            "estimated_price": 2.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Cornflour",
+            "quantity": "200",
+            "unit": "g",
+            "estimated_price": 1.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Protein cookies",
+            "quantity": "1",
+            "unit": "pack",
+            "estimated_price": 5.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Smooth peanut butter",
+            "quantity": "375",
+            "unit": "g",
+            "estimated_price": 4.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Cocoa powder",
+            "quantity": "125",
+            "unit": "g",
+            "estimated_price": 3.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Baking powder",
+            "quantity": "1",
+            "unit": "tub",
+            "estimated_price": 2.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Mixed nuts/seeds",
+            "quantity": "200",
+            "unit": "g",
+            "estimated_price": 4.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Tuna pouches",
+            "quantity": "7",
+            "unit": "x 95g",
+            "estimated_price": 14.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Beef jerky",
+            "quantity": "250",
+            "unit": "g",
+            "estimated_price": 18.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Protein bars",
+            "quantity": "3",
+            "unit": "bars",
+            "estimated_price": 7.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Mixed dried fruit",
+            "quantity": "375",
+            "unit": "g",
+            "estimated_price": 5.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Dark chocolate block",
+            "quantity": "1",
+            "unit": "block",
+            "estimated_price": 4.0,
+            "is_purchased": false
+          }
+        ]
+      },
+      {
+        "category_name": "Dairy & Chilled",
+        "items": [
+          {
+            "item_name": "Eggs",
+            "quantity": "18",
+            "unit": "pack",
+            "estimated_price": 7.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Full-cream milk",
+            "quantity": "3",
+            "unit": "L",
+            "estimated_price": 4.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Cottage cheese",
+            "quantity": "500",
+            "unit": "g",
+            "estimated_price": 5.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Greek yoghurt",
+            "quantity": "1",
+            "unit": "kg",
+            "estimated_price": 6.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Tasty cheese block",
             "quantity": "250",
             "unit": "g",
             "estimated_price": 5.5,
-            "notes": "",
+            "is_purchased": false
+          },
+          {
+            "item_name": "Thickened cream",
+            "quantity": "300",
+            "unit": "ml",
+            "estimated_price": 2.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Choc chips",
+            "quantity": "200",
+            "unit": "g",
+            "estimated_price": 3.0,
             "is_purchased": false
           }
         ]
@@ -1075,11 +1382,31 @@ const exampleMealPlanData = {
         "category_name": "Produce",
         "items": [
           {
-            "item_name": "Brown onions",
+            "item_name": "Bananas",
+            "quantity": "2",
+            "unit": "kg",
+            "estimated_price": 5.5,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Frozen mixed berries",
+            "quantity": "500",
+            "unit": "g",
+            "estimated_price": 6.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Frozen mixed vegetables",
             "quantity": "1",
             "unit": "kg",
-            "estimated_price": 2.5,
-            "notes": "",
+            "estimated_price": 4.0,
+            "is_purchased": false
+          },
+          {
+            "item_name": "Brown onion",
+            "quantity": "3",
+            "unit": "each",
+            "estimated_price": 1.5,
             "is_purchased": false
           },
           {
@@ -1087,206 +1414,27 @@ const exampleMealPlanData = {
             "quantity": "1",
             "unit": "bulb",
             "estimated_price": 1.0,
-            "notes": "",
             "is_purchased": false
           },
           {
             "item_name": "Red capsicum",
-            "quantity": "1",
-            "unit": "each",
-            "estimated_price": 1.5,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Potatoes",
-            "quantity": "1",
-            "unit": "kg",
-            "estimated_price": 3.5,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Broccoli",
             "quantity": "2",
-            "unit": "heads",
-            "estimated_price": 5.0,
-            "notes": "",
+            "unit": "each",
+            "estimated_price": 4.0,
             "is_purchased": false
           },
           {
-            "item_name": "Mushrooms",
-            "quantity": "200",
+            "item_name": "Baby spinach",
+            "quantity": "120",
             "unit": "g",
-            "estimated_price": 2.5,
-            "notes": "",
+            "estimated_price": 3.5,
             "is_purchased": false
           },
           {
-            "item_name": "Tomatoes",
-            "quantity": "2",
-            "unit": "each",
-            "estimated_price": 2.0,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Bananas",
-            "quantity": "4",
-            "unit": "each",
-            "estimated_price": 2.0,
-            "notes": "",
-            "is_purchased": false
-          }
-        ]
-      },
-      {
-        "category_name": "Pantry",
-        "items": [
-          {
-            "item_name": "Rolled oats",
+            "item_name": "Fresh ginger",
             "quantity": "1",
-            "unit": "kg",
-            "estimated_price": 2.5,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Jasmine rice",
-            "quantity": "1",
-            "unit": "kg",
-            "estimated_price": 3.0,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Red kidney beans",
-            "quantity": "2",
-            "unit": "x 400g can",
-            "estimated_price": 2.2,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Diced tomatoes",
-            "quantity": "2",
-            "unit": "x 400g can",
-            "estimated_price": 2.2,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Tomato paste",
-            "quantity": "1",
-            "unit": "jar",
+            "unit": "small knob",
             "estimated_price": 1.0,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Baked beans",
-            "quantity": "1",
-            "unit": "can",
-            "estimated_price": 1.3,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Honey",
-            "quantity": "500",
-            "unit": "g",
-            "estimated_price": 5.0,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Soy sauce",
-            "quantity": "1",
-            "unit": "bottle",
-            "estimated_price": 2.5,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Cornflour",
-            "quantity": "1",
-            "unit": "pack",
-            "estimated_price": 1.5,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Pita/flatbread",
-            "quantity": "6",
-            "unit": "pack",
-            "estimated_price": 3.5,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Bread",
-            "quantity": "1",
-            "unit": "loaf",
-            "estimated_price": 3.5,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Olive oil",
-            "quantity": "500",
-            "unit": "ml",
-            "estimated_price": 7.0,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Spices (paprika, cumin, chilli powder, baking powder)",
-            "quantity": "1",
-            "unit": "set",
-            "estimated_price": 6.0,
-            "notes": "",
-            "is_purchased": false
-          }
-        ]
-      },
-      {
-        "category_name": "Dairy & Eggs",
-        "items": [
-          {
-            "item_name": "Full-cream milk",
-            "quantity": "2",
-            "unit": "L",
-            "estimated_price": 3.1,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Eggs",
-            "quantity": "12",
-            "unit": "each",
-            "estimated_price": 5.5,
-            "notes": "",
-            "is_purchased": false
-          }
-        ]
-      },
-      {
-        "category_name": "Frozen",
-        "items": [
-          {
-            "item_name": "Frozen mixed vegetables",
-            "quantity": "1.5",
-            "unit": "kg",
-            "estimated_price": 6.0,
-            "notes": "",
-            "is_purchased": false
-          },
-          {
-            "item_name": "Frozen berries",
-            "quantity": "500",
-            "unit": "g",
-            "estimated_price": 5.0,
-            "notes": "",
             "is_purchased": false
           }
         ]
@@ -1295,39 +1443,30 @@ const exampleMealPlanData = {
         "category_name": "Supplements",
         "items": [
           {
-            "item_name": "Whey protein",
-            "quantity": "1",
-            "unit": "kg tub",
-            "estimated_price": 35.0,
-            "notes": "Bought outside main store (chemist or supplement shop); ~10 scoops used",
+            "item_name": "Whey/protein powder",
+            "quantity": "~22",
+            "unit": "scoops",
+            "estimated_price": 0,
             "is_purchased": false,
-            "alternatives": [
-              {
-                "item_name": "Supermarket protein powder",
-                "quantity": "1",
-                "unit": "kg",
-                "estimated_price": 30.0,
-                "notes": "Health-food aisle at major supermarkets"
-              }
-            ]
+            "notes": "Bought from your supplement supplier, not Woolworths"
           }
         ]
       }
     ]
   },
   "metadata": {
-    "generatedAt": "2026-06-13T10:00:00Z",
-    "totalCost_low": 175.3,
-    "totalCost_high": 193,
+    "generatedAt": "2026-06-16T09:00:00Z",
+    "totalCost_low": 208.3,
+    "totalCost_high": 230,
     "duration": 7
   }
 };
 
-// MealPlanPreviewScreen (and the rest of the app) consume a *saved* MealPlan
-// whose `data` field holds the SimplifiedMealPlan above. This mirrors exactly
-// how a real curated plan is stored in NutritionHomeScreen.handleToggleSaveMealPlan:
+// MealPlanPreviewScreen and the rest of the app consume a *saved* MealPlan
+// whose `data` field holds the SimplifiedMealPlan above. This mirrors how a
+// real curated plan is stored in NutritionHomeScreen.handleToggleSaveMealPlan:
 //   { id, name, duration, meals, data: <SimplifiedMealPlan>, fingerprint, createdAt }
-// Without this wrapper the screen reads plan.data.dailyMeals → undefined and
+// Without this wrapper the screen reads plan.data.dailyMeals as undefined and
 // shows "This plan doesn't have detailed day data."
 export const exampleMealPlan = {
   id: exampleMealPlanData.id,

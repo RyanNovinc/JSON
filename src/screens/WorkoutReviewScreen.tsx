@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { WorkoutStorage, WorkoutHistory } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
+import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { navigate } from '../utils/navigationRef';
 
@@ -41,8 +42,16 @@ interface CompletionStats {
   date: string;
 }
 
+function convertWeight(weight: number, from: 'kg' | 'lbs', to: 'kg' | 'lbs'): number {
+  if (from === to) return weight;
+  return from === 'kg'
+    ? Math.round(weight * 2.20462 * 10) / 10
+    : Math.round(weight / 2.20462 * 10) / 10;
+}
+
 export default function WorkoutReviewScreen() {
   const { themeColor } = useTheme();
+  const { globalUnit } = useWeightUnit();
   const { activeWorkout } = useActiveWorkout();
   const navigation = useNavigation<WorkoutReviewScreenNavigationProp>();
   const route = useRoute<WorkoutReviewScreenRouteProp>();
@@ -268,7 +277,7 @@ export default function WorkoutReviewScreen() {
                   <View style={styles.setsTable}>
                     <View style={styles.setsTableHeader}>
                       <Text style={[styles.setsTableHeaderCell, { width: 36 }]}>SET</Text>
-                      <Text style={[styles.setsTableHeaderCell, { flex: 1 }]}>KG</Text>
+                      <Text style={[styles.setsTableHeaderCell, { flex: 1 }]}>{globalUnit.toUpperCase()}</Text>
                       <Text style={[styles.setsTableHeaderCell, { flex: 1 }]}>REPS</Text>
                     </View>
 
@@ -279,7 +288,7 @@ export default function WorkoutReviewScreen() {
                             {set.setNumber}
                           </Text>
                           <Text style={[styles.setValue, { flex: 1, color: themeColor }]}>
-                            {set.weight}
+                            {convertWeight(parseFloat(set.weight) || 0, set.unit ?? globalUnit, globalUnit).toFixed(1)}
                           </Text>
                           <Text style={[styles.setValue, { flex: 1 }]}>
                             {set.reps}
@@ -294,7 +303,7 @@ export default function WorkoutReviewScreen() {
                                   ↳
                                 </Text>
                                 <Text style={[styles.dropSetValue, { flex: 1, color: hexA(themeColor, 0.7) }]}>
-                                  {drop.weight}
+                                  {convertWeight(parseFloat(drop.weight) || 0, drop.unit ?? globalUnit, globalUnit).toFixed(1)}
                                 </Text>
                                 <Text style={[styles.dropSetValue, { flex: 1 }]}>
                                   {drop.reps}

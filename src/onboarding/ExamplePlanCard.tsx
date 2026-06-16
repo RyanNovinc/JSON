@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import { exampleMealPlan } from './exampleMealPlan';
+import { startNutritionFlow } from '../utils/questionnaireRouting';
 
 /**
  * ExamplePlanCard — the "Peek at a finished plan" card for the Nutrition tab's
@@ -39,10 +40,8 @@ export default function ExamplePlanCard() {
     });
   };
 
-  // Calibrated build flow. Swap 'N1Goal' for the onboarding contract screen
-  // once that's wired.
-  const buildOwn = () => {
-    navigation.navigate('N1Goal');
+  const buildOwn = async () => {
+    await startNutritionFlow(navigation);
   };
 
   return (

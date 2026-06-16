@@ -35,6 +35,13 @@ const defaultCalc1RM = (weight: number, reps: number): number => {
   return weight * (1 + reps / 30);
 };
 
+function toKg(weight: number, unit?: 'kg' | 'lbs'): number {
+  return (unit ?? 'kg') === 'lbs' ? weight * 0.453592 : weight;
+}
+function fromKg(kg: number, unit: string): number {
+  return unit === 'lbs' ? kg / 0.453592 : kg;
+}
+
 interface ProgressionData {
   date: string;
   dayName: string;
@@ -159,13 +166,15 @@ export default function OneRMProgressionModal({
         setLoading(true);
         const history = await WorkoutStorage.getExerciseHistory(exerciseName);
 
+        // All 1RMs stored in kg so progression comparisons are unit-stable.
         const progression: ProgressionData[] = history
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
           .map((workout) => {
             const bestOneRM = workout.sets.reduce((best, set) => {
               const weight = parseFloat(set.weight) || 0;
               const reps = parseInt(set.reps) || 0;
-              const oneRM = weight > 0 && reps > 0 ? defaultCalc1RM(weight, reps) : 0;
+              const weightKg = toKg(weight, set.unit);
+              const oneRM = weightKg > 0 && reps > 0 ? defaultCalc1RM(weightKg, reps) : 0;
               return Math.max(best, oneRM);
             }, 0);
 
@@ -214,20 +223,36 @@ export default function OneRMProgressionModal({
   }, [progressionData, activeRange]);
 
   // All-time stats
-  const allTimeBest = progressionData.length > 0
+  // All oneRM values in progressionData are stored in kg. Convert to globalUnit at display time.
+  const allTimeBestKg = progressionData.length > 0
     ? Math.max(...progressionData.map((s) => s.oneRM))
     : 0;
-  const current = progressionData.length > 0
+  const currentKg = progressionData.length > 0
     ? progressionData[progressionData.length - 1].oneRM
     : 0;
-  const first = progressionData.length > 0
+  const firstKg = progressionData.length > 0
     ? progressionData[0].oneRM
     : 0;
-  const totalGain = current - first;
-  const totalGainPercent = first > 0 ? (totalGain / first) * 100 : 0;
+  const totalGainKg = currentKg - firstKg;
+  const totalGainPercent = firstKg > 0 ? (totalGainKg / firstKg) * 100 : 0;
+
+  // Display-unit conversions (used throughout render functions below)
+  const allTimeBest = fromKg(allTimeBestKg, globalUnit);
+  const current = fromKg(currentKg, globalUnit);
+  const totalGain = fromKg(totalGainKg, globalUnit);
+
+  // Chart gets data converted to globalUnit so y-axis ticks show the right unit
+  const displayProgression = progressionData.map((d) => ({
+    ...d,
+    oneRM: fromKg(d.oneRM, globalUnit),
+  }));
+  const displayFiltered = filteredProgression.map((d) => ({
+    ...d,
+    oneRM: fromKg(d.oneRM, globalUnit),
+  }));
 
   // Sessions newest-first for the list tab (all sessions, not range-filtered)
-  const reversedProgression = [...progressionData].reverse();
+  const reversedProgression = [...displayProgression].reverse();
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -305,7 +330,7 @@ export default function OneRMProgressionModal({
   const renderChartTab = () => (
     <>
       <ProgressionChart
-        data={filteredProgression}
+        data={displayFiltered}
         themeColor={themeColor}
         globalUnit={globalUnit}
         activeRange={activeRange}
@@ -328,9 +353,10 @@ export default function OneRMProgressionModal({
       </View>
 
       {reversedProgression.map((session, displayIdx) => {
-        const chronologicalIdx = progressionData.length - 1 - displayIdx;
+        // reversedProgression is already converted to globalUnit via displayProgression
+        const chronologicalIdx = displayProgression.length - 1 - displayIdx;
         const previousSession = chronologicalIdx > 0
-          ? progressionData[chronologicalIdx - 1]
+          ? displayProgression[chronologicalIdx - 1]
           : null;
         const change = previousSession ? session.oneRM - previousSession.oneRM : 0;
         const percentChange = previousSession && previousSession.oneRM > 0

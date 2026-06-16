@@ -37,9 +37,12 @@ import {
 // generation prompt's adjuster table)
 // ---------------------------------------------------------------------------
 
-export const ADJ_KCAL_UP_CAP = 600; // max daily kcal addable from adjusters
-export const ADJ_PROTEIN_CAP = 55;  // ~2 whey scoops + 1 yoghurt pot
-export const ADJ_FIBER_CAP = 14;    // psyllium + frozen veg
+export const ADJ_KCAL_UP_CAP = 720; // max daily kcal addable from adjusters
+// derivation: protein_shake 250 + mixed_nuts 250 + protein_bar 220 = 720
+export const ADJ_PROTEIN_CAP = 80;  // max daily protein addable from adjusters  
+// derivation: protein_shake 35 + tuna_pouch 25 + protein_bar 20 = 80
+export const ADJ_FIBER_CAP = 15;    // max daily fiber addable from adjusters
+// derivation: steamed_mixed_veg 5 + berries 5 + protein_bar 5 = 15
 
 const KCAL_TOL = 0.05;   // daily ±5%
 const PROTEIN_TOL = 0.10; // daily ±10% (floor = 0.90 × target)

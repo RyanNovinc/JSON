@@ -152,10 +152,22 @@ const ROWS: RowConfig[] = [
           ? 'no snacks'
           : a.snackFrequency === '3+'
           ? '3+ snacks'
+          : a.snackFrequency === 'ai_decide'
+          ? 'AI picks snacks'
           : a.snackFrequency
           ? `${a.snackFrequency} snack${a.snackFrequency === '1' ? '' : 's'}`
           : '';
       return `${a.mealsPerDay} meals${snack ? ` · ${snack}` : ''}`;
+    },
+  },
+  {
+    label: 'Variety',
+    route: 'N6MealsSnacking',
+    format: (a) => {
+      const v = (a as any).mealVariety ?? 'balanced';
+      if (v === 'convenience') return 'Cook once, repeat';
+      if (v === 'variety') return 'Keep it varied';
+      return 'A bit of both';
     },
   },
   {
@@ -264,12 +276,11 @@ export default function NutritionSummaryScreen() {
   );
 
   const handleBack = () => {
-    navigation.navigate('CreateFlow' as never);
+    navigation.goBack();
   };
 
   const handleClose = () => {
-    // Navigate to the main tab navigator's Nutrition tab
-    navigation.navigate('Main', { screen: 'Nutrition' });
+    navigation.popToTop();
   };
 
   const handleOpenFavorites = () => {
@@ -362,7 +373,7 @@ export default function NutritionSummaryScreen() {
     );
   }
 
-  if (!answers) {
+  if (!answers || !answers.goal) {
     return (
       <View style={[styles.container, styles.center]}>
         <Text style={styles.emptyText}>

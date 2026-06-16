@@ -82,7 +82,9 @@ function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, me
   const p = Math.round((meal.macros?.protein || meal.nutritionInfo?.protein || 0));
   const c = Math.round((meal.macros?.carbs || meal.nutritionInfo?.carbs || meal.nutritionInfo?.carbohydrates || 0));
   const f = Math.round((meal.macros?.fat || meal.nutritionInfo?.fat || 0));
-  const typeLabel = (meal.type || 'snack').toUpperCase();
+  const typeLabel = meal.tags?.includes('adjuster') 
+    ? 'TOP-UP' 
+    : (meal.type || 'snack').replace(/_/g, ' ').toUpperCase();
   const metaText = meal.time ? `${meal.time} · ${typeLabel}` : typeLabel;
 
   return (
@@ -989,7 +991,9 @@ export default function MealPlanDayScreen() {
     progressPercentage
   });
 
-  const getMealIcon = (mealType: string) => {
+  const getMealIcon = (mealType: string, isAdjuster?: boolean) => {
+    if (isAdjuster) return 'add-circle-outline';
+    
     switch (mealType) {
       case 'breakfast': return 'sunny';
       case 'brunch': return 'partly-sunny';
@@ -1007,7 +1011,9 @@ export default function MealPlanDayScreen() {
     }
   };
 
-  const getMealColor = (mealType: string) => {
+  const getMealColor = (mealType: string, isAdjuster?: boolean) => {
+    if (isAdjuster) return '#6b7280'; // Neutral gray for adjusters
+    
     switch (mealType) {
       // Main meals - warm to cool progression through the day
       case 'breakfast': return '#f97316'; // Warm orange (morning energy)
@@ -1137,8 +1143,8 @@ export default function MealPlanDayScreen() {
                   onLongPress={() => handleMealLongPress(meal, index)}
                   onToggleComplete={() => quickToggleMealCompletion(meal, index)}
                   themeColor={themeColor}
-                  mealIcon={getMealIcon(meal.type)}
-                  mealColor={getMealColor(meal.type)}
+                  mealIcon={getMealIcon(meal.type, meal.tags?.includes('adjuster'))}
+                  mealColor={getMealColor(meal.type, meal.tags?.includes('adjuster'))}
                   isCompleted={isCompleted}
                   freshnessIndex={freshnessIndex}
                   currentDate={targetDate}
@@ -1163,8 +1169,8 @@ export default function MealPlanDayScreen() {
                   onLongPress={() => handleMealLongPress(meal, index)}
                   onToggleComplete={() => quickToggleMealCompletion(meal, index)}
                   themeColor={themeColor}
-                  mealIcon={getMealIcon(meal.type)}
-                  mealColor={getMealColor(meal.type)}
+                  mealIcon={getMealIcon(meal.type, meal.tags?.includes('adjuster'))}
+                  mealColor={getMealColor(meal.type, meal.tags?.includes('adjuster'))}
                   isCompleted={isCompleted}
                   freshnessIndex={freshnessIndex}
                   currentDate={targetDate}

@@ -19,11 +19,24 @@ import QuestionnaireHeader from '../../questionnaire/QuestionnaireHeader';
 import { updateNutritionField } from '../../../utils/nutritionQuestionnaireStorage';
 
 /**
- * N6 — Meals & snacking (first Budget & Cooking screen)
- * Step 6. Meals/day uses the Q3-style numeric grid. Snacking is a small
- * card row that sets `snackFrequency` ('0' | '1' | '2' | 'ai_decide') and
- * a matching `snackingStyle` string — both read by the meal-plan prompt
- * builder's getSnackingGuidance.
+ * N6 — Meals & snacking
+ * Step 8 of 12. Three controls:
+ *  - mealsPerDay (numeric grid)
+ *  - snackFrequency ('0' | '1' | '2' | '3+' | 'ai_decide') + snackingStyle
+ *  - mealVariety ('convenience' | 'balanced' | 'variety'), default 'balanced'
+ *
+ * snackFrequency is read by mealPlanPromptV2 -> snackOccurrences to size the
+ * snack slots; 'ai_decide' lets it pick the count from the calorie target.
+ *
+ * mealVariety governs how repetitive the week is. Convenience = batch hard
+ * and repeat; balanced = a couple of rotations + rotated adjusters; variety
+ * = rotate mains and adjusters day to day. The prompt builder turns this into
+ * a single directive (default balanced if unset).
+ *
+ * Snacks here are only the eating occasions the USER wants. Hitting the
+ * daily targets is a separate job: the plan may add small, removable
+ * top-ups (adjusters) regardless of this answer, which the note under the
+ * snack cards makes explicit.
  */
 
 const MEAL_OPTIONS = [2, 3, 4, 5, 6];
@@ -47,6 +60,40 @@ const SNACK_OPTIONS: SnackOption[] = [
   { freq: '1', style: 'Occasional snacker', label: '1 snack' },
   { freq: '2', style: 'Occasional snacker', label: '2 snacks' },
   { freq: '3+', style: 'Frequent snacker', label: '3+ snacks' },
+  { freq: 'ai_decide', style: 'Let the plan decide', label: 'Let AI decide' },
+];
+
+// Persistent note under the snack cards. Snacks are the eating occasions the
+// user chooses; top-ups (adjusters) are added by the plan to hit the daily
+// targets regardless of this answer, and are always removable.
+const SNACK_NOTE =
+  "Snacks you'd like built in. We'll add a small top-up if needed, always removable.";
+
+interface VarietyOption {
+  value: string;
+  label: string;
+  hint: string;
+}
+
+// Three point scale (no slider, matching the app's design language). The
+// middle option is the default and bridges the gap between heavy meal prep
+// and full variety.
+const VARIETY_OPTIONS: VarietyOption[] = [
+  {
+    value: 'convenience',
+    label: 'Cook once, repeat',
+    hint: 'Cook a few meals and repeat them through the week. Least effort, least shopping.',
+  },
+  {
+    value: 'balanced',
+    label: 'A bit of both',
+    hint: "Some repeats for easy prep, some variety so it doesn't get boring.",
+  },
+  {
+    value: 'variety',
+    label: 'Keep it varied',
+    hint: 'Different meals through the week. More cooking and shopping.',
+  },
 ];
 
 type ParamList = {
@@ -70,6 +117,11 @@ export default function N6MealsSnackingScreen() {
   const [snackFreq, setSnackFreq] = useState<string | null>(
     (answersSoFar.snackFrequency as string) ?? null
   );
+  // Variety defaults to 'balanced' so the screen never blocks on it and most
+  // users get the sensible middle without having to think about it.
+  const [variety, setVariety] = useState<string>(
+    (answersSoFar.mealVariety as string) ?? 'balanced'
+  );
 
   const valid = meals != null && snackFreq != null;
 
@@ -80,6 +132,7 @@ export default function N6MealsSnackingScreen() {
     await updateNutritionField('mealsPerDay', meals);
     await updateNutritionField('snackFrequency', snackFreq);
     await updateNutritionField('snackingStyle', snack.style);
+    await updateNutritionField('mealVariety', variety);
     
     if (editMode) {
       navigation.goBack();
@@ -93,6 +146,7 @@ export default function N6MealsSnackingScreen() {
           mealsPerDay: meals,
           snackFrequency: snackFreq,
           snackingStyle: snack.style,
+          mealVariety: variety,
         },
       } as never
     );
@@ -100,6 +154,8 @@ export default function N6MealsSnackingScreen() {
 
   const handleBack = () => navigation.goBack();
   const handleClose = () => navigation.popToTop();
+
+  const varietyHint = VARIETY_OPTIONS.find((v) => v.value === variety)?.hint;
 
   return (
     <View style={styles.container}>
@@ -116,7 +172,7 @@ export default function N6MealsSnackingScreen() {
       >
         <Text style={styles.question}>How do you like to eat?</Text>
         <Text style={styles.subtitle}>
-          Sets your meal structure. Pick what fits your day.
+          Sets the shape of your day. We'll handle hitting your targets.
         </Text>
 
         <Text style={styles.fieldLabel}>Meals per day</Text>
@@ -192,6 +248,58 @@ export default function N6MealsSnackingScreen() {
             );
           })}
         </View>
+
+        <View style={styles.hintBox}>
+          <Ionicons
+            name="information-circle"
+            size={15}
+            color={themeColor}
+            style={{ marginTop: 1 }}
+          />
+          <Text style={styles.hintText}>{SNACK_NOTE}</Text>
+        </View>
+
+        <Text style={[styles.fieldLabel, { marginTop: 28 }]}>Variety</Text>
+        <View style={styles.snackRow}>
+          {VARIETY_OPTIONS.map((opt) => {
+            const isSel = variety === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                activeOpacity={0.85}
+                onPress={() => setVariety(opt.value)}
+                style={[
+                  styles.snackCard,
+                  isSel && {
+                    borderColor: themeColor,
+                    backgroundColor: 'rgba(34, 211, 238, 0.07)',
+                    borderWidth: 1.5,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.snackText,
+                    isSel && { color: '#ffffff', fontWeight: '600' },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {varietyHint != null && (
+          <View style={styles.hintBox}>
+            <Ionicons
+              name="information-circle"
+              size={15}
+              color={themeColor}
+              style={{ marginTop: 1 }}
+            />
+            <Text style={styles.hintText}>{varietyHint}</Text>
+          </View>
+        )}
       </ScrollView>
 
       <View

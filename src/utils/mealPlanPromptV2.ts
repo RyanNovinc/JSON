@@ -118,18 +118,19 @@ interface Adjuster {
   curatedRef?: string; // slug to emit as curated reference
 }
 const ADJUSTERS: Adjuster[] = [
-  { id: 'whey_scoop',        unit: '30 g + water', kcal: 120, p: 24,  c: 3,  f: 1.5,  fib: 0, axis: 'protein',  maxPerDay: 2 },
-  { id: 'greek_yoghurt_pot', unit: '170 g',        kcal: 170, p: 17,  c: 9,  f: 6,  fib: 0, axis: 'protein',  maxPerDay: 1, curatedRef: 'greek_yogurt_snack' },
-  { id: 'tuna_pouch',        unit: '95 g',         kcal: 110, p: 25,  c: 0,  f: 1,  fib: 0, axis: 'protein',  maxPerDay: 1, curatedRef: 'tuna_pouch' },
-  { id: 'rice_cooked',       unit: '100 g',        kcal: 130, p: 2.7, c: 28, f: 0.3, fib: 0.4, axis: 'carb',  maxPerDay: 3 },
-  { id: 'oats_raw',          unit: '40 g',         kcal: 155, p: 5,   c: 27, f: 3,  fib: 4, axis: 'carb+fibre', maxPerDay: 2 },
-  { id: 'banana',            unit: '1',            kcal: 105, p: 1,   c: 27, f: 0,  fib: 3, axis: 'carb',     maxPerDay: 2, curatedRef: 'banana_snack' },
-  { id: 'bread_slice',       unit: '1 slice',      kcal: 90,  p: 3,   c: 17, f: 1,  fib: 2, axis: 'carb',     maxPerDay: 2 },
-  { id: 'olive_oil',         unit: '10 g',         kcal: 88,  p: 0,   c: 0,  f: 10, fib: 0, axis: 'fat',      maxPerDay: 2 },
-  { id: 'peanut_butter',     unit: '16 g',         kcal: 95,  p: 4,   c: 3,  f: 8,  fib: 1, axis: 'fat',      maxPerDay: 2 },
-  { id: 'milk_full',         unit: '250 ml',       kcal: 160, p: 8,   c: 12, f: 9,  fib: 0, axis: 'bulk',     maxPerDay: 2 },
-  { id: 'psyllium',          unit: '5 g',          kcal: 10,  p: 0,   c: 1,  f: 0,  fib: 4, axis: 'fibre',    maxPerDay: 2 },
-  { id: 'frozen_veg',        unit: '150 g',        kcal: 60,  p: 4,   c: 8,  f: 1,  fib: 5, axis: 'fibre',    maxPerDay: 2 },
+  { id: 'protein_shake',     unit: '1 serving',    kcal: 250, p: 35,  c: 16, f: 5,  fib: 0, axis: 'protein',     maxPerDay: 2, curatedRef: 'protein_shake' },
+  { id: 'greek_yogurt_snack', unit: '1 serving',   kcal: 170, p: 17,  c: 9,  f: 6,  fib: 0, axis: 'protein',     maxPerDay: 1, curatedRef: 'greek_yogurt_snack' },
+  { id: 'tuna_pouch',        unit: '1 serving',    kcal: 110, p: 25,  c: 0,  f: 1,  fib: 0, axis: 'protein',     maxPerDay: 1, curatedRef: 'tuna_pouch' },
+  { id: 'beef_jerky',        unit: '1 serving',    kcal: 115, p: 14,  c: 5,  f: 3,  fib: 0, axis: 'protein',     maxPerDay: 1, curatedRef: 'beef_jerky' },
+  { id: 'hard_boiled_eggs',  unit: '1 serving',    kcal: 140, p: 12,  c: 1,  f: 10, fib: 0, axis: 'protein',     maxPerDay: 1, curatedRef: 'hard_boiled_eggs' },
+  { id: 'protein_bar',       unit: '1 serving',    kcal: 220, p: 20,  c: 22, f: 7,  fib: 5, axis: 'protein',     maxPerDay: 1, curatedRef: 'protein_bar' },
+  { id: 'cheese_snack',      unit: '1 serving',    kcal: 115, p: 7,   c: 1,  f: 9,  fib: 0, axis: 'protein+fat', maxPerDay: 1, curatedRef: 'cheese_snack' },
+  { id: 'mixed_nuts',        unit: '1 serving',    kcal: 250, p: 9,   c: 9,  f: 22, fib: 3, axis: 'fat',         maxPerDay: 1, curatedRef: 'mixed_nuts' },
+  { id: 'banana_snack',      unit: '1 serving',    kcal: 105, p: 1,   c: 27, f: 0,  fib: 3, axis: 'carbs',       maxPerDay: 2, curatedRef: 'banana_snack' },
+  { id: 'steamed_rice',      unit: '1 serving',    kcal: 195, p: 4,   c: 42, f: 0,  fib: 1, axis: 'carbs',       maxPerDay: 2, curatedRef: 'steamed_rice' },
+  { id: 'steamed_mixed_veg', unit: '1 serving',    kcal: 65,  p: 4,   c: 11, f: 1,  fib: 5, axis: 'fibre',       maxPerDay: 2, curatedRef: 'steamed_mixed_veg' },
+  { id: 'baked_potato',      unit: '1 serving',    kcal: 140, p: 3,   c: 31, f: 0,  fib: 3, axis: 'carbs',       maxPerDay: 2, curatedRef: 'baked_potato' },
+  { id: 'berries',           unit: '1 serving',    kcal: 80,  p: 1,   c: 18, f: 0,  fib: 5, axis: 'fibre',       maxPerDay: 2, curatedRef: 'berries' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -596,8 +597,9 @@ function adjusterSection(): string {
     '|---|---|---|---|---|---|---|---|---|',
     ...rows,
     '',
-    `Routing: protein gap → whey/yoghurt/tuna; carb or kcal gap → rice/oats/banana/bread; fat gap → oil/PB; fibre gap → psyllium/veg/oats. Maximum ${MAX_ADJUSTERS_PER_DAY} adjuster items per day.`,
-    'Output format: where a curated slug is noted, emit the curated reference; otherwise emit a two-line invented entry — name, type, time, macros, ingredients: [one line], instructions: [one line].',
+    `Routing: protein gap → protein_shake/greek_yogurt_snack/tuna_pouch; carb gap → steamed_rice/baked_potato/banana_snack; fat gap → mixed_nuts/cheese_snack; fibre gap → steamed_mixed_veg/berries. Maximum ${MAX_ADJUSTERS_PER_DAY} adjuster items per day.`,
+    'Adjusters are independent of user snack preferences and always available to close daily gaps regardless of snack count.',
+    'Output format: all adjusters have curated references — emit the curated slug, never invent entries.',
   ].join('\n');
 }
 
@@ -661,6 +663,15 @@ export function buildMealPlanPrompt(
       '8. Curated options are output as references (slug + plate_id + scale_factor) — never rewrite them as recipes. Slugs and plate_ids are verbatim lookup keys; copy them exactly.',
     ].join('\n')
   );
+
+  const mealVariety: string = (a.mealVariety as string) ?? 'balanced';
+  const varietyDirective =
+    mealVariety === 'convenience'
+      ? 'VARIETY — Convenience. Repeat meals aggressively to minimise cooking and shopping. Reuse the same mains across multiple days via batching, and keep adjusters consistent day to day. Repetition is desired here, not a flaw.'
+      : mealVariety === 'variety'
+      ? 'VARIETY — High. Maximise day to day variety: rotate the main options across more days and vary the adjusters and produce daily. Accept more cooking and shopping to avoid repetition.'
+      : 'VARIETY — Balanced. Use roughly two to three distinct mains per slot across the week, and rotate the adjusters and produce so the same top-up doesn’t appear every single day. Still batch where it genuinely helps.';
+  parts.push(varietyDirective);
 
   const targetLines = [
     '## Your daily targets (absolute numbers — already computed)',
