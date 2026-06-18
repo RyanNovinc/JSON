@@ -1,9 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 
-import { startActivity, updateActivity, stopActivity } from 'expo-live-activity';
+// Mirror the guard pattern in src/utils/liveActivity.ts: conditional require so
+// the native module is never loaded on Android (named exports throw when called there).
+let startActivity: any = null;
+let updateActivity: any = null;
+let stopActivity: any = null;
+if (Platform.OS === 'ios') {
+  try {
+    const la = require('expo-live-activity');
+    startActivity = la.startActivity;
+    updateActivity = la.updateActivity;
+    stopActivity = la.stopActivity;
+  } catch (e) {
+    console.log('expo-live-activity not available');
+  }
+}
 import { DebugLogger } from '../components/DebugOverlay';
 
 export interface TimerState {
@@ -372,7 +386,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     DebugLogger.log(`🚀 startTimer called: targetSeconds=${targetSeconds}, exerciseIndex=${exerciseIndex}, setIndex=${setIndex}`, 'log');
     
     // Check if there's an existing Live Activity that needs to be stopped
-    if (timer?.liveActivityId) {
+    if (timer?.liveActivityId && stopActivity) {
       DebugLogger.log(`⚠️ Found existing Live Activity ${timer.liveActivityId} - attempting to stop before new timer`, 'warn');
       // Explicitly stop the old Live Activity, but handle "not found" errors gracefully
       try {
@@ -446,7 +460,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
 
   const stopTimer = async () => {
     // Explicitly stop Live Activity before clearing timer
-    if (timer?.liveActivityId) {
+    if (timer?.liveActivityId && stopActivity) {
       DebugLogger.log(`🛑 Explicitly stopping Live Activity in stopTimer: ${timer.liveActivityId}`, 'log');
       try {
         await stopActivity(timer.liveActivityId, { title: 'Timer Stopped' });
@@ -470,7 +484,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     if (!timer) return;
     
     // Explicitly stop Live Activity before resetting
-    if (timer?.liveActivityId) {
+    if (timer?.liveActivityId && stopActivity) {
       DebugLogger.log(`🔄 Explicitly stopping Live Activity in resetTimer: ${timer.liveActivityId}`, 'log');
       try {
         await stopActivity(timer.liveActivityId, { title: 'Timer Reset' });
@@ -620,6 +634,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const lastSyncTimeRef = useRef<number>(0);
 
   const syncLiveActivity = async () => {
+    if (Platform.OS !== 'ios') return;
     try {
       const syncStartTime = Date.now();
       const timeSinceLastSync = syncStartTime - lastSyncTimeRef.current;
