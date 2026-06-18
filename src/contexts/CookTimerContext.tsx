@@ -16,6 +16,7 @@ import React, {
   useCallback,
   ReactNode,
 } from 'react';
+import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
 
@@ -50,11 +51,14 @@ const CookTimerContext = createContext<CookTimerContextValue | null>(null);
 // One-time setup
 // ============================================================================
 
+const TIMER_CHANNEL_ID = 'timer-alerts';
+
 let notificationsConfigured = false;
 async function configureNotifications() {
   if (notificationsConfigured) return;
   notificationsConfigured = true;
 
+  // Controls foreground display on both platforms.
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
@@ -63,6 +67,17 @@ async function configureNotifications() {
       shouldSetBadge: false,
     } as any),
   });
+
+  // Android requires a channel before any notification can be posted (API 26+).
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync(TIMER_CHANNEL_ID, {
+      name: 'Timer Alerts',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+      enableVibrate: true,
+    });
+  }
 
   try {
     const { status } = await Notifications.getPermissionsAsync();
@@ -113,6 +128,7 @@ async function scheduleTimerNotification(
         title: `${label} — time's up`,
         body: 'Tap to return to Cook Mode',
         sound: 'default',
+        ...(Platform.OS === 'android' && { channelId: TIMER_CHANNEL_ID }),
       },
       trigger: {
         seconds,
