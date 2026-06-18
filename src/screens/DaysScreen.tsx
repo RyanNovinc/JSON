@@ -1055,16 +1055,6 @@ export default function DaysScreen() {
             refreshTrigger={refreshTrigger}
           />
         )}
-        ListFooterComponent={() => (
-          <TouchableOpacity
-            style={[styles.addDayButton, { borderColor: themeColor }]}
-            onPress={() => handleAddDay()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="add-circle-outline" size={18} color={themeColor} />
-            <Text style={[styles.addDayText, { color: themeColor }]}>Add Day</Text>
-          </TouchableOpacity>
-        )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />

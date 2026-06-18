@@ -32,6 +32,12 @@
  *  4. Header overflow replaced with a vertical dropdown menu (icon + label).
  *  5. Finish button now opens the existing FinishWorkoutModal (the summary),
  *     and a computed PR (best est. 1RM this session vs. history) is passed in.
+ *  6. Tapping an "Up Next" exercise now smooth-scrolls back to the top so the
+ *     sets table is in view (no more manual scroll-up after switching).
+ *  7. Empty weight/reps fields render blank instead of "0" so a fresh program
+ *     no longer reads as a prescribed 0kg.
+ *  8. Image-cycling fix: cycling teardown now lives only in the cleanup return,
+ *     so switching to an already-loaded exercise keeps the start/end animation.
  * ----------------------------------------------------------------------------
  */
 
@@ -58,7 +64,7 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
 import { useTimer } from '../contexts/TimerContext';
@@ -71,6 +77,7 @@ import ExerciseNotesModal, { NoteEntry } from '../components/ExerciseNotesModal'
 import WorkoutHeatmapModal from '../components/WorkoutHeatmapModal';
 import DeleteSetModal from '../components/DeleteSetModal';
 import OneRMProgressionModal from '../components/OneRMProgressionModal';
+import HowItWorksModal from '../components/HowItWorksModal';
 import { Analytics } from '../services/analytics';
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -250,6 +257,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     onSetTapWhenNotStarted,
   } = props;
 
+  const insets = useSafeAreaInsets();
+
   const currentExercise = exercises[currentIndex];
   const currentSets = allSetsData[currentIndex] || [];
 
@@ -264,7 +273,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // Helper function to get muscle groups for specific exercises
   const getExerciseMuscles = useCallback((exerciseName: string): { primary: string[], secondary: string[] } => {
     const name = exerciseName.toLowerCase();
-    
+
     // Common exercise muscle mappings
     if (name.includes('bench press')) {
       return { primary: ['Chest'], secondary: ['Triceps', 'Front Delts'] };
@@ -309,11 +318,11 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     } else if (name.includes('leg extension')) {
       return { primary: ['Quads'], secondary: [] };
     }
-    
+
     // Default fallback to original exercise muscles if no mapping found
-    return { 
-      primary: currentExercise?.primaryMuscles || [], 
-      secondary: currentExercise?.secondaryMuscles || [] 
+    return {
+      primary: currentExercise?.primaryMuscles || [],
+      secondary: currentExercise?.secondaryMuscles || []
     };
   }, [currentExercise]);
 
@@ -322,10 +331,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     if (selectedIndex === 0) {
       return currentExercise;
     }
-    
+
     // For alternatives, get specific muscle groups for the exercise
     const muscles = getExerciseMuscles(currentExerciseName);
-    
+
     return {
       ...currentExercise,
       exercise: currentExerciseName,
@@ -339,6 +348,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Cross-fade animation when swapping focused exercise (used for tap-to-swap)
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Ref to the main scroll view so tapping/swapping an exercise can snap back to the top
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Guards against the finish action firing twice (double tap / re-entry).
+  // On a real device a second fire can pop one screen too many; the simulator's
+  // timing usually hides it, which is why the two behave differently.
+  const finishingRef = useRef(false);
 
   // ── Swipe pager: finger-tracked translate + peeking neighbours ──
   // dragX follows the finger during a horizontal pan; peek offsets place the
@@ -357,6 +374,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     new Animated.Value(0), // Rep scheme
     new Animated.Value(0), // 1RM progress
     new Animated.Value(0), // Notes
+    new Animated.Value(0), // How it works
   ]).current;
 
   // Dropdown arrow rotation animation (for the exercise-alternatives selector)
@@ -369,7 +387,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // Image cache (in-memory; pair with AsyncStorage in production)
   const [imageCache, setImageCache] = useState<Record<string, string | null>>({});
   const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
-  
+
   // Image cycling for exercise animations (start/end positions)
   const [imagePairs, setImagePairs] = useState<Record<string, {start: any, end: any}>>({});
   const [currentImagePhase, setCurrentImagePhase] = useState<'start' | 'end'>('start');
@@ -378,7 +396,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Finish workout confirmation / summary modal
   const [showFinishModal, setShowFinishModal] = useState(false);
-  
+
   // Superset selection modal
   const [showSupersetModal, setShowSupersetModal] = useState(false);
   const [supersetSourceIndex, setSupersetSourceIndex] = useState<number | null>(null);
@@ -412,7 +430,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // Format timer display for rest timer badge
   const getRestTimerDisplay = (): string => {
     if (!timer) return '0:00';
-    
+
     if (timer.isCountUp) {
       // Count up mode - show elapsed time
       const elapsed = timer.timeElapsed;
@@ -420,7 +438,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       const seconds = elapsed % 60;
       return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     } else {
-      // Countdown mode - show remaining time  
+      // Countdown mode - show remaining time
       const remaining = Math.max(0, timer.targetTime - timer.timeElapsed);
       const minutes = Math.floor(remaining / 60);
       const seconds = remaining % 60;
@@ -435,20 +453,23 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [showExerciseNotes, setShowExerciseNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
   const [exerciseNotes, setExerciseNotes] = useState<{ [exerciseIndex: number]: NoteEntry[] }>({});
   const [exerciseInSettings, setExerciseInSettings] = useState<number | null>(null);
-  
+
   // Header dropdown menu open state
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  
+
   // Delete set modal state
   const [showDeleteSetModal, setShowDeleteSetModal] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
-  
+
   // Workout Heatmap Modal state
   const [showWorkoutHeatmap, setShowWorkoutHeatmap] = useState(false);
-  
+
+  // "How it works" education modal state
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+
   // Exercise selector dropdown state
   const [showExerciseSelector, setShowExerciseSelector] = useState<number | null>(null);
   const [isMultiLine, setIsMultiLine] = useState<Map<number, boolean>>(new Map());
-  
+
   // Header dropdown staggered animation effect
   useEffect(() => {
     if (headerMenuOpen) {
@@ -479,7 +500,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       }).start();
     }
   }, [headerMenuOpen]);
-  
+
   // Dropdown arrow rotation and alternatives animation effect
   useEffect(() => {
     if (showExerciseSelector !== null) {
@@ -527,19 +548,19 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       ]).start();
     }
   }, [showExerciseSelector]);
-  
+
   // Mini card images cache (separate from main exercise images) - using state to trigger re-renders when loaded
   const [miniCardImages, setMiniCardImages] = useState<Map<string, {start: any, end: any} | null>>(new Map());
-  
+
   // Pre-load all mini card images when component mounts or theme changes
   useEffect(() => {
     if (resolveExerciseImagePair && exercises.length > 0) {
       const loadAllImages = async () => {
         const newImagesMap = new Map<string, {start: any, end: any} | null>();
-        
+
         const promises = exercises.map(async (exercise) => {
           const exerciseKey = exercise.exercise || exercise.name || '';
-          
+
           // Load images for the primary exercise
           try {
             const images = await resolveExerciseImagePair(exercise);
@@ -547,7 +568,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           } catch (error) {
             newImagesMap.set(exerciseKey, null);
           }
-          
+
           // Also load images for all alternatives
           if (exercise.alternatives && exercise.alternatives.length > 0) {
             const alternativePromises = exercise.alternatives.map(async (alternative: string) => {
@@ -563,11 +584,11 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             await Promise.all(alternativePromises);
           }
         });
-        
+
         await Promise.all(promises);
         setMiniCardImages(newImagesMap);
       };
-      
+
       loadAllImages();
     }
   }, [exercises, resolveExerciseImagePair, themeColor]);
@@ -623,7 +644,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       cancelled = true;
     };
   }, [exercises]);
-  
+
   // Workout History Modal state
   const [showWorkoutHistory, setShowWorkoutHistory] = useState<{
     exerciseName: string;
@@ -636,9 +657,23 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     exerciseIndex: number;
   } | null>(null);
 
-  
+
   // Timer context
-  const { timer, startTimer, showModal: showTimerModal } = useTimer();
+  const { timer, startTimer, stopTimer, showModal: showTimerModal } = useTimer();
+
+  // Keep a ref to the latest stopTimer so the unmount cleanup always calls the
+  // current one (avoids a stale closure tearing down the wrong timer).
+  const stopTimerRef = useRef(stopTimer);
+  stopTimerRef.current = stopTimer;
+
+  // When this screen goes away (finish, back button, swipe-back, or hardware
+  // back), kill any running rest timer so it can't keep counting down and
+  // buzzing after the workout is over.
+  useEffect(() => {
+    return () => {
+      stopTimerRef.current?.();
+    };
+  }, []);
 
   // Calculate workout duration for display on finish button
   const [workoutDuration, setWorkoutDuration] = useState(0);
@@ -675,11 +710,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const handleFinishWorkoutPress = () => {
     Keyboard.dismiss();
     setFocusedSet(null);
+    finishingRef.current = false; // allow a fresh finish each time the modal opens
     setShowFinishModal(true);
   };
 
   // Confirm finish workout
   const confirmFinishWorkout = () => {
+    if (finishingRef.current) return; // ignore repeat taps / re-entry
+    finishingRef.current = true;
+    stopTimer(); // kill any running rest timer so it can't buzz after completion
     setShowFinishModal(false);
     onFinishWorkout();
   };
@@ -751,9 +790,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     if (!effectiveCurrentExercise) {
       return;
     }
-    
+
     const key = `${effectiveCurrentExercise.exercise || effectiveCurrentExercise.name || ''}-${themeColor}`;
-    
+
     // Don't try to reload if we already tried and failed (null means we tried and failed)
     if (key in imageCache) {
       // Even though images are cached, we need to restart cycling for the new color theme
@@ -762,19 +801,19 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         // Start cycling immediately (the startImageCycling function now prevents duplicates)
         startImageCycling(key, cachedImagePair);
       }
-      
+
       return; // already resolved (or null)
     }
-    
+
     if (effectiveCurrentExercise.imageUrl) {
       setImageCache((c) => ({ ...c, [key]: effectiveCurrentExercise.imageUrl! }));
       return;
     }
-    
+
     // Try the new image pair resolver first (for cycling animations)
     if (resolveExerciseImagePair) {
       setImageLoading((s) => ({ ...s, [key]: true }));
-      
+
       resolveExerciseImagePair(effectiveCurrentExercise)
         .then((imagePair) => {
           if (imagePair && imagePair.start && imagePair.end) {
@@ -796,15 +835,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         });
       return;
     }
-    
+
     // Fallback to single image resolver
     if (!resolveExerciseImage) {
       setImageCache((c) => ({ ...c, [key]: null }));
       return;
     }
-    
+
     setImageLoading((s) => ({ ...s, [key]: true }));
-    
+
     resolveExerciseImage(effectiveCurrentExercise)
       .then((url) => {
         setImageCache((c) => ({ ...c, [key]: url }));
@@ -823,20 +862,20 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     if (currentCyclingKeyRef.current === fullKey) {
       return; // Already cycling this exercise
     }
-    
+
     // Clear any existing interval
     if (cyclingIntervalRef.current) {
       clearInterval(cyclingIntervalRef.current);
       cyclingIntervalRef.current = null;
     }
-    
+
     // Set the new cycling key
     currentCyclingKeyRef.current = fullKey;
-    
+
     // Reset to start phase
     setCurrentImagePhase('start');
     setImageCache(prev => ({ ...prev, [fullKey]: imagePair.start }));
-    
+
     // Start the cycling interval
     cyclingIntervalRef.current = setInterval(() => {
       // Check if we're still supposed to be cycling this exercise
@@ -847,14 +886,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         }
         return;
       }
-      
+
       setCurrentImagePhase((prevPhase) => {
         const newPhase = prevPhase === 'start' ? 'end' : 'start';
         const newImage = newPhase === 'start' ? imagePair.start : imagePair.end;
-        
+
         // Batch the state updates
         setImageCache((prev) => ({ ...prev, [fullKey]: newImage }));
-        
+
         return newPhase;
       });
     }, 1000); // Cycle every 1 second
@@ -864,20 +903,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Cleanup cycling when component unmounts or exercise changes
   useEffect(() => {
-    // Clear cycling interval and reset cycling key when exercise changes
-    if (cyclingIntervalRef.current) {
-      clearInterval(cyclingIntervalRef.current);
-      cyclingIntervalRef.current = null;
-    }
-    currentCyclingKeyRef.current = null;
-    
-    // Reset cycling phase for new exercise
-    setCurrentImagePhase('start');
-
     // Reset keyboard focus tracking + weight input refs (set counts differ per exercise)
     weightInputRefs.current = {};
     setFocusedSet(null);
-    
+
+    // Cycling teardown lives ONLY in the cleanup return below. React runs every
+    // effect's cleanup before any effect body, so this stops the previous
+    // exercise's cycling *before* the image-resolve effect (declared earlier)
+    // starts the new one. Tearing it down in the body too would run *after* that
+    // effect and kill the cycling we just started, leaving a static image.
     return () => {
       if (cyclingIntervalRef.current) {
         clearInterval(cyclingIntervalRef.current);
@@ -1105,6 +1139,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         setShow1RMProgression({ exerciseName: effectiveCurrentExercise.exercise, exerciseIndex: currentIndex }),
     },
     { label: 'Notes', icon: 'document-text-outline', onPress: () => handleExerciseNotesPress(currentIndex) },
+    { label: 'How it works', icon: 'help-circle-outline', onPress: () => setShowHowItWorks(true) },
   ];
 
   // ── Render ────────────────────────────────────────────────────────
@@ -1128,8 +1163,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     return (
       <SafeAreaView style={styles.root}>
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.headerBtn} 
+          <TouchableOpacity
+            style={styles.headerBtn}
             onPress={() => setShowHistory(null)}
             activeOpacity={0.7}
           >
@@ -1138,7 +1173,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           <Text style={styles.headerTitle}>{showHistory} History</Text>
           <View style={styles.headerBtn} />
         </View>
-        
+
         <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
@@ -1146,7 +1181,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         >
           <View style={styles.historyContainer}>
             <Text style={styles.historyTitle}>Previous Workouts</Text>
-            
+
             {exerciseHistory.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyText}>No previous workouts</Text>
@@ -1218,6 +1253,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
       {/* ── SCROLLABLE CONTENT ──────────────────────────── */}
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -1338,7 +1374,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           </View>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.focusArea, { opacity: fadeAnim }]}
           onLongPress={() => handleExerciseLongPress(currentIndex)}
           activeOpacity={1}
@@ -1352,8 +1388,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 onPress={() => allExercises.length > 1 && setShowExerciseSelector(showExerciseSelector === currentIndex ? null : currentIndex)}
                 activeOpacity={allExercises.length > 1 ? 0.7 : 1}
               >
-                <Text 
-                  style={styles.title} 
+                <Text
+                  style={styles.title}
                   numberOfLines={2}
                   onTextLayout={(event) => {
                     const { lines } = event.nativeEvent;
@@ -1381,10 +1417,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                           ],
                         }}
                       >
-                        <Ionicons 
+                        <Ionicons
                           name="chevron-down"
-                          size={18} 
-                          color={themeColor} 
+                          size={18}
+                          color={themeColor}
                         />
                       </Animated.View>
                     </Text>
@@ -1404,10 +1440,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                       ],
                     }}
                   >
-                    <Ionicons 
+                    <Ionicons
                       name="chevron-down"
-                      size={18} 
-                      color={themeColor} 
+                      size={18}
+                      color={themeColor}
                     />
                   </Animated.View>
                 )}
@@ -1432,7 +1468,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
           {/* Exercise selector dropdown */}
           {showExerciseSelector === currentIndex && allExercises.length > 1 && (
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.exerciseSelector,
                 {
@@ -1452,7 +1488,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 const preferredExercise = exercisePreferences[currentExercise.exercise];
                 const isSelected = index === selectedIndex;
                 const isPrimary = index === 0;
-                
+
                 return (
                   <TouchableOpacity
                     key={index}
@@ -1467,7 +1503,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                       const alternativeNames = (currentExercise.alternatives || [])
                         .filter(alt => alt && typeof alt === 'string')
                         .map(alt => String(alt));
-                      
+
                       if (index === 0) {
                         // Going back to original exercise - clear the preference
                         onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, '');
@@ -1535,13 +1571,13 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           {exercises.map((ex, idx) => {
             const progress = exerciseProgress[idx];
             const isActive = idx === currentIndex;
-            
+
             // Get the effective exercise name (considering selected alternatives)
             // Use exercise name as key instead of index
             const primaryExerciseName = ex.exercise || ex.name || '';
             const selectedAlternative = exercisePreferences[primaryExerciseName];
             let effectiveExercise = ex;
-            
+
             if (selectedAlternative && ex.alternatives && ex.alternatives.includes(selectedAlternative)) {
               effectiveExercise = {
                 ...ex,
@@ -1549,20 +1585,20 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 name: selectedAlternative,
               };
             }
-            
+
             // Check if this exercise is part of a superset
             const isPartOfSuperset = ex.superset_group && ex.superset_group.trim() !== '';
             const nextExercise = exercises[idx + 1];
             const isLastInSuperset = !nextExercise || nextExercise.superset_group !== ex.superset_group;
             const hasNextExercise = idx < exercises.length - 1;
-            
+
             // Check if current and next exercise are linked
-            const isLinkedToNext = hasNextExercise && 
-              ex.superset_group && 
-              nextExercise && 
+            const isLinkedToNext = hasNextExercise &&
+              ex.superset_group &&
+              nextExercise &&
               ex.superset_group === nextExercise.superset_group &&
               ex.superset_group.trim() !== '';
-            
+
             return (
               <React.Fragment key={ex.id || `${ex.exercise}-${idx}`}>
                 <ExerciseMiniCard
@@ -1570,11 +1606,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                   progress={progress}
                   themeColor={themeColor}
                   isActive={isActive}
-                  onPress={() => swapFocus(idx)}
+                  onPress={() => {
+                    scrollRef.current?.scrollTo({ y: 0, animated: true });
+                    swapFocus(idx);
+                  }}
                   onLongPress={() => handleExerciseLongPress(idx)}
                   exerciseImages={miniCardImages.get(effectiveExercise.exercise || effectiveExercise.name || '') || null}
                 />
-                
+
                 {/* Show appropriate UI between exercises */}
                 {hasNextExercise && (
                   <>
@@ -1582,7 +1621,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                     {isLinkedToNext && (
                       <SupersetConnector themeColor={themeColor} />
                     )}
-                    
+
                   </>
                 )}
               </React.Fragment>
@@ -1639,7 +1678,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
       {/* ── BOTTOM BAR ─────────────────────────────────────────── */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.timerBadge}
           onPress={showTimerModal}
           activeOpacity={0.7}
@@ -1650,8 +1689,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
         <AnimatedTouchableOpacity
           style={[
-            styles.primaryBtn, 
-            { 
+            styles.primaryBtn,
+            {
               backgroundColor: themeColor,
               transform: [{ translateX: shakeAnimation || 0 }]
             }
@@ -1780,6 +1819,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       themeColor={themeColor}
     />
 
+    {/* "How it works" education modal */}
+    <HowItWorksModal
+      visible={showHowItWorks}
+      onClose={() => setShowHowItWorks(false)}
+      themeColor={themeColor}
+      topInset={insets.top}
+      bottomInset={insets.bottom}
+    />
+
     {/* Delete Set Modal */}
     {showDeleteSetModal && (
       <DeleteSetModal
@@ -1868,12 +1916,12 @@ function PrescriptionBanner({
 // Converts "6, 6, 5, 5" or "8-12" to array of rep targets
 function parseTargetReps(repsString: string): string[] {
   if (!repsString) return [];
-  
+
   // Handle comma-separated format like "6, 6, 5, 5"
   if (repsString.includes(',')) {
     return repsString.split(',').map(rep => rep.trim());
   }
-  
+
   // Handle single rep scheme like "8-12" or "10" - return empty array for now
   // since we don't know how many sets there will be
   return [];
@@ -1924,7 +1972,7 @@ function SetsTable({
   // Parse target reps for this week
   const weeklyReps = exercise.reps_weekly?.[String(currentWeek)] || exercise.reps;
   const targetRepsArray = weeklyReps ? parseTargetReps(String(weeklyReps)) : [];
-  
+
   return (
     <View style={styles.setsTable}>
       {/* Header row */}
@@ -2010,7 +2058,7 @@ function SetRow({
   const accessoryProps = Platform.OS === 'ios' ? { inputAccessoryViewID: ACCESSORY_ID } : {};
   return (
     <View style={[styles.setRow, completed && styles.setRowCompleted]}>
-        <Pressable 
+        <Pressable
           onLongPress={onLongPress}
           delayLongPress={500}
           style={{ width: 30, alignItems: 'center', justifyContent: 'center' }}
@@ -2018,11 +2066,11 @@ function SetRow({
           <View style={{ alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             <Text style={[styles.setNum]}>{index + 1}</Text>
             {isLastSet && (
-              <Text style={{ 
+              <Text style={{
                 position: 'absolute',
                 left: -16,
-                color: '#55555f', 
-                fontSize: 16, 
+                color: '#55555f',
+                fontSize: 16,
                 fontFamily: 'DMMono-Regular'
               }}>
                 ×
@@ -2051,7 +2099,7 @@ function SetRow({
               }
             }}
             keyboardType="decimal-pad"
-            placeholder={previous ? convertWeight(parseFloat(previous.weight) || 0, previous.unit ?? globalUnit, globalUnit).toFixed(1) : '0'}
+            placeholder={previous ? convertWeight(parseFloat(previous.weight) || 0, previous.unit ?? globalUnit, globalUnit).toFixed(1) : ''}
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
             {...accessoryProps}
@@ -2072,7 +2120,7 @@ function SetRow({
             }
           }}
           keyboardType="number-pad"
-          placeholder={previous?.reps || targetReps || '0'}
+          placeholder={previous?.reps || targetReps || ''}
           placeholderTextColor="#3a3a44"
           editable={workoutStarted && !completed}
           {...accessoryProps}
@@ -2120,7 +2168,7 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
   return (
     <TouchableOpacity
       style={[
-        styles.miniCard, 
+        styles.miniCard,
         allDone && styles.miniCardDone,
         isActive && styles.miniCardActive
       ]}
@@ -2158,7 +2206,7 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
       <View style={{ flex: 1 }}>
         <View style={styles.miniTitleRow}>
           <Text style={[
-            styles.miniTitle, 
+            styles.miniTitle,
             allDone && styles.miniTitleDone,
             isActive && styles.miniTitleActive
           ]}>
@@ -2337,8 +2385,8 @@ function PreviewSetsTable({
 
       {sets.map((s, i) => {
         const prev = previousSets[i + 1];
-        const wTxt = s.weight || prev?.weight || '0';
-        const rTxt = s.reps || prev?.reps || targetRepsArray[i] || '0';
+        const wTxt = s.weight || prev?.weight || '';
+        const rTxt = s.reps || prev?.reps || targetRepsArray[i] || '';
         return (
           <View key={i} style={[styles.setRow, s.completed && styles.setRowCompleted]}>
             <View style={{ width: 30, alignItems: 'center' }}>
@@ -2484,13 +2532,13 @@ function SupersetSelectionModal({
     const sourceSuperset = sourceExercise?.superset_group;
     const targetSuperset = exercises[targetIndex]?.superset_group;
     const areLinked = sourceSuperset && targetSuperset && sourceSuperset === targetSuperset;
-    
+
     // Add haptic feedback
     if (Platform.OS === 'ios') {
       const impactStyle = areLinked ? 'light' : 'medium';
       Haptics?.impactAsync?.(Haptics.ImpactFeedbackStyle?.[impactStyle.charAt(0).toUpperCase() + impactStyle.slice(1)]);
     }
-    
+
     onSuperset(
       sourceExerciseIndex,
       targetIndex,
@@ -2506,18 +2554,18 @@ function SupersetSelectionModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Animated.View 
+      <Animated.View
         style={[
           styles.modalBackdrop,
           { opacity: fadeAnim }
         ]}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={StyleSheet.absoluteFill}
-          activeOpacity={1} 
+          activeOpacity={1}
           onPress={onClose}
         />
-        
+
         <Animated.View
           style={[
             styles.supersetModal,
@@ -2541,7 +2589,7 @@ function SupersetSelectionModal({
               <Ionicons name="link" size={20} color={themeColor} />
             </View>
             <Text style={styles.supersetModalTitle}>SUPERSET</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={onClose}
               style={styles.supersetModalClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -2562,11 +2610,11 @@ function SupersetSelectionModal({
               const sourceSuperset = sourceExercise?.superset_group;
               const targetSuperset = option.exercise?.superset_group;
               const areLinked = sourceSuperset && targetSuperset && sourceSuperset === targetSuperset;
-              
+
               return (
                 <React.Fragment key={option.index}>
                   {index > 0 && <View style={styles.supersetDivider} />}
-                  
+
                   <TouchableOpacity
                     style={[
                       styles.supersetOption,
@@ -2581,13 +2629,13 @@ function SupersetSelectionModal({
                         styles.supersetOptionIcon,
                         { backgroundColor: areLinked ? themeColor + '20' : '#18181b' }
                       ]}>
-                        <Ionicons 
-                          name={option.icon} 
-                          size={16} 
-                          color={areLinked ? themeColor : '#55555f'} 
+                        <Ionicons
+                          name={option.icon}
+                          size={16}
+                          color={areLinked ? themeColor : '#55555f'}
                         />
                       </View>
-                      
+
                       <View style={styles.supersetOptionInfo}>
                         <Text style={[
                           styles.supersetOptionLabel,
@@ -2607,23 +2655,23 @@ function SupersetSelectionModal({
                     <TouchableOpacity
                       style={[
                         styles.supersetToggleBtn,
-                        areLinked ? 
-                          { backgroundColor: themeColor, borderColor: themeColor } : 
+                        areLinked ?
+                          { backgroundColor: themeColor, borderColor: themeColor } :
                           { backgroundColor: '#0a0a0f', borderColor: 'rgba(255,255,255,0.1)' }
                       ]}
                       onPress={() => handleSelection(option.index)}
                     >
-                      <Ionicons 
-                        name={areLinked ? "link" : "add"} 
-                        size={16} 
-                        color={areLinked ? '#000' : '#9898a4'} 
+                      <Ionicons
+                        name={areLinked ? "link" : "add"}
+                        size={16}
+                        color={areLinked ? '#000' : '#9898a4'}
                       />
                     </TouchableOpacity>
                   </TouchableOpacity>
                 </React.Fragment>
               );
             })}
-            
+
             {adjacentOptions.length === 0 && (
               <View style={styles.supersetEmptyState}>
                 <Ionicons name="information-circle-outline" size={32} color="#55555f" />
@@ -2723,7 +2771,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
-  
+
   // ── Focus area ─────────────────────────────────
   focusArea: {
     paddingHorizontal: 16,
@@ -3328,7 +3376,7 @@ const styles = StyleSheet.create({
   settingsOptionTextDanger: {
     color: '#ef4444',
   },
-  
+
   // Exercise alternatives
   titleButton: {
     flexDirection: 'row',

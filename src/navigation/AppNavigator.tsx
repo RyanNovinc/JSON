@@ -20,6 +20,7 @@ import SamplePlanDetailScreen from '../screens/SamplePlanDetailScreen';
 // the bottom tab bar. Import kept in case it's needed elsewhere.
 // import ModeTransitionContainer from '../components/ModeTransitionContainer';
 import ImportRoutineScreen from '../screens/ImportRoutineScreen';
+import AddBlockScreen from '../screens/AddBlockScreen';
 import ImportSharedContent from '../screens/ImportSharedContent';
 import ImportMealPlanScreen from '../screens/ImportMealPlanScreen';
 import ImportSharedMealPlan from '../screens/ImportSharedMealPlan';
@@ -140,6 +141,7 @@ export type RootStackParamList = {
   CreateFlow: undefined;
   SamplePlanDetail: { plan: any };
   ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean; isCurated?: boolean; curatedSlug?: string };
+  AddBlock: { targetWorkoutId: string; routineName?: string };
   ImportSharedContent: { shareId: string };
   ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
   ImportSharedMealPlan: { prefilledJson?: string };
@@ -616,6 +618,26 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                       },
                     };
                   },
+                }}
+              />
+              <RootStack.Screen
+                name="AddBlock"
+                component={AddBlockScreen}
+                options={{
+                  headerShown: false,
+                  gestureDirection: 'horizontal',
+                  cardStyleInterpolator: ({ current, layouts }) => ({
+                    cardStyle: {
+                      transform: [
+                        {
+                          translateX: current.progress.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [layouts.screen.width, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  }),
                 }}
               />
               <RootStack.Screen

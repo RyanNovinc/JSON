@@ -1431,9 +1431,9 @@ export default function BlocksScreen() {
             <TouchableOpacity
               style={[styles.addButton, { borderColor: themeColor }]}
               onPress={() => {
-                navigation.navigate('ImportRoutine', {
-                  mode: 'append-block',
-                  targetWorkoutId: routine.id
+                navigation.navigate('AddBlock', {
+                  targetWorkoutId: routine.id,
+                  routineName: routine.name,
                 });
               }}
               activeOpacity={0.7}
