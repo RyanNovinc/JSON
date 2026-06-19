@@ -417,6 +417,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 4,
+    elevation: 4,
   },
   plate: {
     width: 4,
