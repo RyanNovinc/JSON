@@ -1340,7 +1340,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           </View>
 
           {/* ── HEADER BUTTONS OVERLAID ON IMAGE ──────────────────────── */}
-          <View style={styles.overlayHeader}>
+          <View style={[styles.overlayHeader, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity
               onPress={onBack}
               style={styles.overlayBtn}
@@ -1677,7 +1677,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       )}
 
       {/* ── BOTTOM BAR ─────────────────────────────────────────── */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity
           style={styles.timerBadge}
           onPress={showTimerModal}

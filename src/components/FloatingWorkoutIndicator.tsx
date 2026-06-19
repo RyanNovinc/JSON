@@ -3,15 +3,16 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { navigate, getCurrentRoute } from '../utils/navigationRef';
 import { useTheme } from '../contexts/ThemeContext';
 
 export function FloatingWorkoutIndicator() {
+  const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
   const { activeWorkout } = useActiveWorkout();
   const [liveDuration, setLiveDuration] = useState(0);
@@ -86,9 +87,9 @@ export function FloatingWorkoutIndicator() {
   };
 
   return (
-    <SafeAreaView style={styles.container} pointerEvents="box-none">
+    <View style={styles.container} pointerEvents="box-none">
       <TouchableOpacity
-        style={styles.indicator}
+        style={[styles.indicator, { marginBottom: insets.bottom + 4 }]}
         onPress={handlePress}
         activeOpacity={0.8}
       >
@@ -105,7 +106,7 @@ export function FloatingWorkoutIndicator() {
           </View>
         </View>
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -124,7 +125,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27272a',
     marginHorizontal: 16,
-    marginBottom: 34,
+    marginBottom: 0,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

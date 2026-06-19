@@ -8,8 +8,8 @@ import {
   Animated,
   ActivityIndicator,
   Alert,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { REVENUECAT_CONFIG } from '../config/revenueCatConfig';

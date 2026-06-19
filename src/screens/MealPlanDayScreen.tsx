@@ -8,12 +8,12 @@ import {
   Modal,
   TextInput,
   Alert,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import {Picker} from '@react-native-picker/picker';
 import { TouchableOpacity } from 'react-native-gesture-handler';

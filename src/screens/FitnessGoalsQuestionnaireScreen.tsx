@@ -5,12 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WorkoutStorage } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -93,6 +93,7 @@ const primaryGoals: FitnessGoalOption[] = [
 
 
 export default function FitnessGoalsQuestionnaireScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp>();
   const { themeColor, themeColorLight } = useTheme();
   const [selectedPrimaryGoal, setSelectedPrimaryGoal] = useState<string>('');
@@ -2116,7 +2117,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
       {renderStep()}
 
       {/* Navigation Buttons */}
-      <View style={styles.navigationContainer}>
+      <View style={[styles.navigationContainer, { paddingBottom: insets.bottom + 16 }]}>
         <Animatable.View
           animation={isValid() ? 'pulse' : undefined}
           duration={1000}

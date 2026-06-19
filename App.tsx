@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppNavigator from './src/navigation/AppNavigator';
 import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActiveWorkoutProvider } from './src/contexts/ActiveWorkoutContext';
 import { RevenueCatProvider } from './src/contexts/RevenueCatContext';
 import { ThemeProvider } from './src/contexts/ThemeContext';
@@ -116,17 +117,19 @@ function AppContent() {
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <WeightUnitProvider>
-            <RevenueCatProvider autoInitialize={true}>
-              <ActiveWorkoutProvider>
-                <AppContent />
-              </ActiveWorkoutProvider>
-            </RevenueCatProvider>
-          </WeightUnitProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <WeightUnitProvider>
+              <RevenueCatProvider autoInitialize={true}>
+                <ActiveWorkoutProvider>
+                  <AppContent />
+                </ActiveWorkoutProvider>
+              </RevenueCatProvider>
+            </WeightUnitProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

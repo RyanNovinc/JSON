@@ -5,9 +5,9 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Platform,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -51,6 +51,7 @@ function exerciseMeta(ex: any): string {
 }
 
 export default function SamplePlanDetailScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { themeColor } = useTheme();
@@ -262,7 +263,7 @@ export default function SamplePlanDetailScreen() {
       </ScrollView>
 
       {/* Footer */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
         <TouchableOpacity
           style={[styles.importBtn, { backgroundColor: accent }]}
           onPress={handleImport}

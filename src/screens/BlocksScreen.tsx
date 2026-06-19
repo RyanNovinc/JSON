@@ -3,7 +3,6 @@ import {
   View,
   Text,
   FlatList,
-  SafeAreaView,
   Modal,
   Alert,
   Share,
@@ -11,6 +10,7 @@ import {
   TextInput,
   Button,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { styles } from './BlocksScreen.styles';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';

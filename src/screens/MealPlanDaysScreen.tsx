@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   Alert,
-  SafeAreaView,
   ScrollView,
   Platform,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -427,8 +427,9 @@ function DatePickerSheet({ value, themeColor, onChange, onCancel, onConfirm }: {
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.datePickerSheet}>
+    <View style={[styles.datePickerSheet, { paddingBottom: insets.bottom + 18 }]}>
       <Text style={styles.datePickerTitle}>When should day 1 begin?</Text>
       <DateTimePicker
         value={value}
