@@ -132,7 +132,7 @@ export default function ImportConfirmationModal({
   const days = parsedProgram?.days_per_week ?? 0;
 
   return (
-    <Modal visible={visible} transparent animationType="none">
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
       <Animated.View style={[styles.overlay, { opacity: modalOpacity }]}>
         <Animated.View
           style={[

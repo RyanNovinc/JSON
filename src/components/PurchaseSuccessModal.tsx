@@ -159,6 +159,7 @@ export default function PurchaseSuccessModal({ visible, onClose }: PurchaseSucce
       transparent
       animationType="none"
       statusBarTranslucent
+      onRequestClose={handleClose}
     >
       <Animated.View
         style={[

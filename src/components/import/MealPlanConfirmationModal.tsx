@@ -60,7 +60,7 @@ export default function MealPlanConfirmationModal({
   const meals = totalMeals(parsedMealPlan);
 
   return (
-    <Modal visible={visible} transparent animationType="none">
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
       <Animated.View style={[styles.overlay, { opacity: modalOpacity }]}>
         <Animated.View
           style={[
