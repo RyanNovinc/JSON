@@ -1038,7 +1038,21 @@ export default function MealPlanDayScreen() {
   };
 
   const handleMealPress = (meal: Meal) => {
-    // Navigate to the nutrition MealDetailScreen for all meals
+    const slug = (meal as any).curated_meal_slug || (meal as any).slug;
+    // Curated meals resolve to a real recipe → open the full RecipeDetail.
+    // Pass the plan's scale_factor so the screen shows THIS serving's macros
+    // and ingredient amounts (plate macros × scale_factor), matching the day
+    // card, instead of the unscaled base plate. plate_id pre-selects plating.
+    if (slug) {
+      navigation.navigate('RecipeDetail', {
+        mealSlug: slug,
+        plateId: (meal as any).plate_id,
+        scaleFactor: (meal as any).scale_factor, // undefined → RecipeDetail opens at base (×1)
+      } as any);
+      return;
+    }
+    // Manually-logged / off-plan meals have no curated recipe → keep them on the
+    // nutrition MealDetailScreen.
     navigation.navigate('MealDetail', { meal } as any);
   };
 

@@ -68,6 +68,42 @@ function getStepSummary(step: any): string {
   return step?.summary ?? step?.text ?? '';
 }
 
+/**
+ * Scale the mass/volume amounts (g, kg, ml, l) embedded in step text by `scale`,
+ * rounding grams/millilitres to whole numbers. Deliberately leaves everything
+ * else untouched: counts ("1 egg", "4 lamb shanks"), spoons (tsp/tbsp), cups,
+ * cloves, temperatures (180C / 200°C), times, and pan sizes (cm / inch). Those
+ * either don't scale cleanly in hand-written prose or must never scale. No-ops
+ * at scale 1, so un-scaled recipes render byte-for-byte unchanged.
+ *
+ * This only matches the macro-dominant mass/volume ingredients, which is the
+ * 90% that matters; the macro panel remains the exact source of truth.
+ */
+function scaleAmounts(text: string, scale: number): string {
+  if (!text || scale === 1) return text;
+  const parseNum = (s: string) => {
+    if (s.includes('/')) {
+      const [a, b] = s.split('/').map(Number);
+      return b ? a / b : NaN;
+    }
+    return Number(s);
+  };
+  const round = (n: number, unit: string) =>
+    unit === 'kg' || unit === 'l' ? Math.round(n * 100) / 100 : Math.round(n);
+  return text.replace(
+    /(\d+(?:\.\d+)?(?:\/\d+)?)\s*(?:-\s*(\d+(?:\.\d+)?(?:\/\d+)?)\s*)?(kg|g|ml|l)\b/g,
+    (m, a: string, b: string | undefined, unit: string) => {
+      const u = unit.toLowerCase();
+      const lo = parseNum(a);
+      if (!isFinite(lo)) return m;
+      if (b == null) return `${round(lo * scale, u)}${u}`;
+      const hi = parseNum(b);
+      if (!isFinite(hi)) return `${round(lo * scale, u)}${u}`;
+      return `${round(lo * scale, u)}-${round(hi * scale, u)}${u}`;
+    }
+  );
+}
+
 function getSubstepsOverride(
   mealSlug: string,
   methodOrPlateId: string,
@@ -332,6 +368,17 @@ export default function CookModeScreen() {
   useKeepAwake();
 
   const { mealSlug, plateIndex, methodIndex } = route.params;
+  // Plan scale + batch count handed over by RecipeDetail's "Start cooking".
+  // planScale is the plan's per-serving multiplier (1 for a base/favourite open);
+  // cookPortions is the integer batch count (1 unless a meal-prep deep link set it).
+  const planScale = (() => {
+    const s = Number((route.params as any).scaleFactor);
+    return Number.isFinite(s) && s > 0 ? s : 1;
+  })();
+  const cookPortions = (() => {
+    const n = Number((route.params as any).servings);
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  })();
   const meal: CuratedMeal | undefined = (CURATED_MEALS as any)[mealSlug];
   const plate: Plate | undefined = meal?.plates?.[plateIndex];
   const method: CookingMethod | undefined = meal?.methods?.[methodIndex];
@@ -380,7 +427,16 @@ export default function CookModeScreen() {
   const isLastStep = currentStepIdx === totalSteps - 1;
   const isFirstStep = currentStepIdx === 0;
 
-  const stepSummary = getStepSummary(currentStep.raw);
+  // Cook-step quantities scale ONLY for single-serve recipes: there, cooking =
+  // one (scaled) serving, so the amounts should match the plan. Batch recipes
+  // (produces_servings > 1) are cooked whole and portioned across the week
+  // regardless of how much of a serving the plan eats, so their authored amounts
+  // are left exactly as-is. The integer batch count multiplies on top.
+  const stepScale =
+    meal.produces_servings === 1 ? cookPortions * planScale : 1;
+
+  const rawSummary = getStepSummary(currentStep.raw);
+  const stepSummary = scaleAmounts(rawSummary, stepScale);
 
   const sectionId = currentStep.type === 'base' ? method.id : plate.id;
   const overrideSubsteps = getSubstepsOverride(meal.slug, sectionId, currentStep.index);
@@ -389,7 +445,7 @@ export default function CookModeScreen() {
     overrideSubsteps !== null &&
     (overrideSubsteps.length > 1 ||
       (overrideSubsteps.length === 1 &&
-        getSubstepText(overrideSubsteps[0]) !== stepSummary));
+        getSubstepText(overrideSubsteps[0]) !== rawSummary));
 
   const sectionLabel = currentStep.type === 'plate' ? 'PLATE IT UP' : null;
 
@@ -466,6 +522,11 @@ export default function CookModeScreen() {
       (method.time_total_minutes ?? 0) + (plate.assembly_time_minutes ?? 0);
 
     const macros = plate.plate_macros;
+    // Completion shows the serving you're about to eat → scale per-serving by
+    // planScale (not the batch count). Matches the RecipeDetail macro panel.
+    const dispKcal = Math.round(macros.kcal * planScale);
+    const dispProtein = Math.round(macros.protein_g * planScale);
+    const dispCarbs = Math.round(macros.carbs_g * planScale);
 
     return (
       <View style={styles.completionContainer}>
@@ -549,13 +610,13 @@ export default function CookModeScreen() {
             <View style={styles.completionMacroDivider} />
             <View style={styles.completionMacro}>
               <Text style={styles.completionMacroLabel}>CALS</Text>
-              <Text style={styles.completionMacroValue}>{macros.kcal}</Text>
+              <Text style={styles.completionMacroValue}>{dispKcal}</Text>
             </View>
             <View style={styles.completionMacroDivider} />
             <View style={styles.completionMacro}>
               <Text style={styles.completionMacroLabel}>PROTEIN</Text>
               <Text style={styles.completionMacroValue}>
-                {macros.protein_g}
+                {dispProtein}
                 <Text style={styles.completionMacroUnit}>g</Text>
               </Text>
             </View>
@@ -563,7 +624,7 @@ export default function CookModeScreen() {
             <View style={styles.completionMacro}>
               <Text style={styles.completionMacroLabel}>CARBS</Text>
               <Text style={styles.completionMacroValue}>
-                {macros.carbs_g}
+                {dispCarbs}
                 <Text style={styles.completionMacroUnit}>g</Text>
               </Text>
             </View>
@@ -659,7 +720,7 @@ export default function CookModeScreen() {
             {overrideSubsteps.map((substep, i) => {
               const key = `${currentStepIdx}-${i}`;
               const checked = checkedSubsteps.has(key);
-              const substepText = getSubstepText(substep);
+              const substepText = scaleAmounts(getSubstepText(substep), stepScale);
               const timer = getSubstepTimer(substep);
               const timerId = timer ? makeTimerId(i) : null;
               const timerActive = timerId ? isTimerActive(timerId) : false;

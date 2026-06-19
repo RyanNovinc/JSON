@@ -29,6 +29,7 @@ import {
 import { getMealImage } from '../assets/mealImages';
 import { RecipeFavorites } from '../utils/recipeFavorites';
 import { clampCookPortions } from '../utils/cookPortions';
+import { displayIngredient } from '../utils/ingredientScaling';
 
 type RecipeDetailRoute = RouteProp<RootStackParamList, 'RecipeDetail'>;
 type RecipeDetailNav = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
@@ -42,11 +43,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 function getIngredientName(ingredientId: string): string {
   const ing = (INGREDIENTS as any)[ingredientId];
   return ing?.display_name ?? ingredientId;
-}
-
-function formatIngredientAmount(amount: number, unit: string | undefined): string {
-  if (!unit || unit === 'unit' || unit === 'count') return String(amount);
-  return `${amount}${unit}`;
 }
 
 function formatTime(minutes: number): string {
@@ -105,6 +101,16 @@ export default function RecipeDetailScreen() {
 
   const { mealSlug } = route.params;
   const meal: CuratedMeal | undefined = (CURATED_MEALS as any)[mealSlug];
+
+  // Optional plan scale — when opened from a plan-day meal, that occurrence is
+  // "plate macros × scale_factor" (e.g. 0.85 → a 680 kcal serving of an 800
+  // kcal plate). We multiply the macro panel and ingredient amounts by this so
+  // the screen matches the day card. Absent / invalid → 1.0, so favourites,
+  // shared links, and meal-prep opens show the base recipe unchanged.
+  const planScale = (() => {
+    const s = Number((route.params as any).scaleFactor);
+    return Number.isFinite(s) && s > 0 ? s : 1;
+  })();
 
   // Optional plate to pre-select — e.g. when opened from a logged "Burger"
   // plating, land on that plate rather than the recipe's default.
@@ -175,6 +181,12 @@ export default function RecipeDetailScreen() {
 
 
   const macros = plate.plate_macros;
+  // Macro panel reflects the planned serving: base plate macros × planScale.
+  // planScale is 1 for un-scaled opens, so these equal the raw plate macros.
+  const dispProtein = Math.round(macros.protein_g * planScale);
+  const dispCarbs = Math.round(macros.carbs_g * planScale);
+  const dispFat = Math.round(macros.fat_g * planScale);
+  const dispKcal = Math.round(macros.kcal * planScale);
   const showPlateSwitcher = meal.plates.length > 1;
   const showMethodPicker = meal.methods.length > 1;
 
@@ -187,7 +199,12 @@ export default function RecipeDetailScreen() {
       mealSlug: meal.slug,
       plateIndex: selectedPlateIndex,
       methodIndex: selectedMethodIndex,
-    });
+      // Carry the cook amount through so CookMode's in-step quantities match
+      // this screen. CookMode must multiply ingredient amounts by
+      // (servings × scaleFactor), same as IngredientRow does here.
+      servings,
+      scaleFactor: planScale,
+    } as any);
   };
 
   // Optimistic toggle: flip the heart immediately, persist the *selected plate*
@@ -328,22 +345,22 @@ export default function RecipeDetailScreen() {
         {/* MACRO GRID */}
         <View style={styles.macroGrid}>
           <View style={styles.macroCell}>
-            <Text style={[styles.macroValue, { color: themeColor }]}>{macros.protein_g}g</Text>
+            <Text style={[styles.macroValue, { color: themeColor }]}>{dispProtein}g</Text>
             <Text style={styles.macroLabel}>PROTEIN</Text>
           </View>
           <View style={styles.macroDivider} />
           <View style={styles.macroCell}>
-            <Text style={styles.macroValueMuted}>{macros.carbs_g}g</Text>
+            <Text style={styles.macroValueMuted}>{dispCarbs}g</Text>
             <Text style={styles.macroLabel}>CARBS</Text>
           </View>
           <View style={styles.macroDivider} />
           <View style={styles.macroCell}>
-            <Text style={styles.macroValueMuted}>{macros.fat_g}g</Text>
+            <Text style={styles.macroValueMuted}>{dispFat}g</Text>
             <Text style={styles.macroLabel}>FAT</Text>
           </View>
           <View style={styles.macroDivider} />
           <View style={styles.macroCell}>
-            <Text style={styles.macroValueMuted}>{macros.kcal}</Text>
+            <Text style={styles.macroValueMuted}>{dispKcal}</Text>
             <Text style={styles.macroLabel}>KCAL</Text>
           </View>
         </View>
@@ -361,24 +378,31 @@ export default function RecipeDetailScreen() {
             <Text style={[styles.eyebrow, { color: themeColor }]}>
               {showMethodPicker ? 'METHOD' : 'TIME'}
             </Text>
-            <View style={styles.servingsControl}>
-              <Text style={styles.servingsLabel}>Portions</Text>
-              <TouchableOpacity
-                style={styles.servingsBtn}
-                onPress={() => setServings(clampCookPortions(servings - 1))}
-                activeOpacity={0.6}
-              >
-                <Ionicons name="remove" size={12} color="#a1a1aa" />
-              </TouchableOpacity>
-              <Text style={styles.servingsValue}>{servings}</Text>
-              <TouchableOpacity
-                style={styles.servingsBtn}
-                onPress={() => setServings(clampCookPortions(servings + 1))}
-                activeOpacity={0.6}
-              >
-                <Ionicons name="add" size={12} color="#a1a1aa" />
-              </TouchableOpacity>
-            </View>
+            {/* Portions is the integer batch-cook count. Hidden when the meal
+                is shown at a plan scale (≠ 1): "1 portion" would read as the
+                base serving, but the macros above are already the scaled
+                serving, so the count would mislead. Base / favourite / meal-prep
+                opens (scale == 1) keep it. */}
+            {planScale === 1 && (
+              <View style={styles.servingsControl}>
+                <Text style={styles.servingsLabel}>Portions</Text>
+                <TouchableOpacity
+                  style={styles.servingsBtn}
+                  onPress={() => setServings(clampCookPortions(servings - 1))}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons name="remove" size={12} color="#a1a1aa" />
+                </TouchableOpacity>
+                <Text style={styles.servingsValue}>{servings}</Text>
+                <TouchableOpacity
+                  style={styles.servingsBtn}
+                  onPress={() => setServings(clampCookPortions(servings + 1))}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons name="add" size={12} color="#a1a1aa" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {showMethodPicker ? (
@@ -466,8 +490,9 @@ export default function RecipeDetailScreen() {
                 <IngredientRow
                   key={`base-${ing.ingredient_id}-${i}`}
                   ingredient={ing}
-                  servings={servings}
-                  baseServings={meal.produces_servings}
+                  producesServings={meal.produces_servings}
+                  portions={servings}
+                  planScale={planScale}
                 />
               ))}
 
@@ -478,8 +503,9 @@ export default function RecipeDetailScreen() {
                     <IngredientRow
                       key={`plate-${ing.ingredient_id}-${i}`}
                       ingredient={ing}
-                      servings={servings}
-                      baseServings={1}
+                      producesServings={1}
+                      portions={servings}
+                      planScale={planScale}
                     />
                   ))}
                 </>
@@ -574,26 +600,32 @@ export default function RecipeDetailScreen() {
 // ============================================================================
 function IngredientRow({
   ingredient,
-  servings,
-  baseServings,
+  producesServings,
+  portions,
+  planScale,
 }: {
   ingredient: MealIngredient;
-  servings: number;
-  baseServings: number;
+  producesServings: number;
+  portions: number;
+  planScale: number;
 }) {
   const name = getIngredientName(ingredient.ingredient_id);
-  const scaledAmount = (ingredient.base_amount * servings) / Math.max(1, baseServings);
-  const displayAmount =
-    ingredient.unit === 'unit' || ingredient.unit === 'count'
-      ? Math.round(scaledAmount)
-      : Math.round(scaledAmount * 10) / 10;
+  // displayIngredient returns the QUANTITY string only (uniform scaling, unit-class
+  // rounding, plus pinch / batch-aromatic / fractional handling). The name is rendered
+  // separately, and the two-column layout keeps a "(for the batch)" tag in the amount
+  // column, so it never reads as "3 (for the batch) bay leaves".
+  const qty = displayIngredient({
+    baseAmount: ingredient.base_amount,
+    unit: ingredient.unit,
+    producesServings,
+    portions,
+    planScale,
+  });
 
   return (
     <View style={styles.ingredientRow}>
       <Text style={styles.ingredientName}>{name}</Text>
-      <Text style={styles.ingredientAmount}>
-        {formatIngredientAmount(displayAmount, ingredient.unit)}
-      </Text>
+      <Text style={styles.ingredientAmount}>{qty}</Text>
     </View>
   );
 }
