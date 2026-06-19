@@ -30,7 +30,7 @@ export default function KeyboardAwareScreen({
   return (
     <KeyboardAvoidingView
       style={[styles.keyboardContainer, style]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={keyboardVerticalOffset}
     >
       <ScrollView
