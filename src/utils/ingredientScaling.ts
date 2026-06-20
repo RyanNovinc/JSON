@@ -65,10 +65,10 @@
 
 export type MassVolumeUnit = 'g' | 'ml' | 'kg' | 'l';
 export type SeasoningUnit = 'tsp' | 'tbsp';
-export type DiscreteUnit = 'count' | 'cloves';
+export type DiscreteUnit = 'count' | 'cloves' | 'bulb';
 
 /**
- * Every unit observed in curated_meals.ts: g, ml, tsp, tbsp, count, cloves.
+ * Every unit observed in curated_meals.ts: g, ml, tsp, tbsp, count, cloves, bulb.
  * kg and l are included for forward-compatibility with the canonical unit enum
  * (src/types/ingredients.ts) but do not currently appear in the data.
  */
@@ -76,7 +76,7 @@ export type ScalableUnit = MassVolumeUnit | SeasoningUnit | DiscreteUnit;
 
 const MASS_VOLUME = new Set<string>(['g', 'ml', 'kg', 'l']);
 const SEASONING = new Set<string>(['tsp', 'tbsp']);
-const DISCRETE = new Set<string>(['count', 'cloves']);
+const DISCRETE = new Set<string>(['count', 'cloves', 'bulb']);
 
 export function isMassVolume(unit: string): boolean {
   return MASS_VOLUME.has(unit);
@@ -196,6 +196,9 @@ function formatDiscreteFraction(raw: number, unit: string): string {
   if (unit === 'cloves') {
     return `${qty} ${quarters <= 4 ? 'clove' : 'cloves'}`; // <= 1 -> singular
   }
+  if (unit === 'bulb') {
+    return `${qty} ${quarters <= 4 ? 'bulb' : 'bulbs'}`; // <= 1 -> singular
+  }
   return qty;
 }
 
@@ -203,6 +206,9 @@ function formatDiscreteFraction(raw: number, unit: string): string {
 function formatDiscrete(n: number, unit: string): string {
   if (unit === 'cloves') {
     return n === 1 ? '1 clove' : `${n} cloves`;
+  }
+  if (unit === 'bulb') {
+    return n === 1 ? '1 bulb' : `${n} bulbs`;
   }
   return `${n}`;
 }

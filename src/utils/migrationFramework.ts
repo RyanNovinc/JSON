@@ -239,9 +239,10 @@ async function migrateQuestionnaireShape(): Promise<void> {
   let migratedDomainsCount = 0;
   
   for (const domain of questionnaireDomains) {
+    let backupKey: string | undefined;
     try {
       // Create backup for each domain
-      const backupKey = await createBackup(domain, `Questionnaire shape migration - ${domain}`);
+      backupKey = await createBackup(domain, `Questionnaire shape migration - ${domain}`);
       
       console.log(`🔄 [MIGRATIONS] Processing ${domain}...`);
       const data = await RobustStorage.getItem(domain, true);
@@ -289,7 +290,7 @@ async function migrateQuestionnaireShape(): Promise<void> {
       
       // Restore from backup on failure
       try {
-        await restoreFromBackup(domain, backupKey);
+        if (backupKey) await restoreFromBackup(domain, backupKey);
       } catch (restoreError) {
         console.error(`💥 [MIGRATIONS] Failed to restore ${domain} from backup:`, restoreError);
       }
