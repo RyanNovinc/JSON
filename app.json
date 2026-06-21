@@ -39,8 +39,8 @@
       "package": "com.RyanNovinc.JSON",
       "versionCode": 94,
       "edgeToEdgeEnabled": true,
-      "compileSdkVersion": 34,
-      "targetSdkVersion": 34,
+      "compileSdkVersion": 36,
+      "targetSdkVersion": 36,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ],
