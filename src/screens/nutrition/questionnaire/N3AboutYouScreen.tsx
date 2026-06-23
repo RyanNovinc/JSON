@@ -16,6 +16,7 @@ import {
   useFocusEffect,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -69,7 +70,7 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 export default function N3AboutYouScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'N3AboutYou'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -147,7 +148,7 @@ export default function N3AboutYouScreen() {
       return;
     }
     navigation.navigate(
-      'N4Activity' as never,
+      'N4Activity',
       {
         answersSoFar: {
           ...answersSoFar,
@@ -156,7 +157,7 @@ export default function N3AboutYouScreen() {
           height: heightNum,
           weight,
         },
-      } as never
+      }
     );
   };
 

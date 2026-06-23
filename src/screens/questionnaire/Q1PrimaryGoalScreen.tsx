@@ -12,6 +12,7 @@ import {
   RouteProp,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -84,7 +85,7 @@ type ParamList = {
 };
 
 export default function Q1PrimaryGoalScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'Q1PrimaryGoal'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -106,8 +107,8 @@ export default function Q1PrimaryGoalScreen() {
       return;
     }
     navigation.navigate(
-      'Q2Experience' as never,
-      { answersSoFar: { ...answersSoFar, primaryGoal: selected } } as never,
+      'Q2Experience',
+      { answersSoFar: { ...answersSoFar, primaryGoal: selected } },
     );
   };
 

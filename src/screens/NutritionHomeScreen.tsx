@@ -34,7 +34,7 @@ import { CURATED_MEALS } from '../data/curated_meals';
 import { CuratedMeal } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
 
-type NutritionNavigationProp = StackNavigationProp<RootStackParamList, 'NutritionHome'>;
+type NutritionNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

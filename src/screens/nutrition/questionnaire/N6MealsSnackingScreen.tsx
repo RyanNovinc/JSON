@@ -12,6 +12,7 @@ import {
   RouteProp,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -70,7 +71,7 @@ const SNACK_NOTE =
   "Snacks you'd like built in. We'll add a small top-up if needed, always removable.";
 
 interface VarietyOption {
-  value: string;
+  value: 'balanced' | 'convenience' | 'variety';
   label: string;
   hint: string;
 }
@@ -103,7 +104,7 @@ type ParamList = {
 };
 
 export default function N6MealsSnackingScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'N6MealsSnacking'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -119,8 +120,8 @@ export default function N6MealsSnackingScreen() {
   );
   // Variety defaults to 'balanced' so the screen never blocks on it and most
   // users get the sensible middle without having to think about it.
-  const [variety, setVariety] = useState<string>(
-    (answersSoFar.mealVariety as string) ?? 'balanced'
+  const [variety, setVariety] = useState<'balanced' | 'convenience' | 'variety'>(
+    (answersSoFar.mealVariety as 'balanced' | 'convenience' | 'variety') ?? 'balanced'
   );
 
   const valid = meals != null && snackFreq != null;
@@ -139,7 +140,7 @@ export default function N6MealsSnackingScreen() {
       return;
     }
     navigation.navigate(
-      'N6aDessert' as never,
+      'N6aDessert',
       {
         answersSoFar: {
           ...answersSoFar,
@@ -148,7 +149,7 @@ export default function N6MealsSnackingScreen() {
           snackingStyle: snack.style,
           mealVariety: variety,
         },
-      } as never
+      }
     );
   };
 

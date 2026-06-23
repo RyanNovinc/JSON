@@ -1,15 +1,33 @@
 export interface UserNutritionProfile {
   id: string;
-  goals: NutritionGoals;
-  macros: MacroTargets;
-  schedule: MealSchedule;
-  budget: FoodBudget;
-  preferences: FoodPreferences;
-  location: UserLocation;
-  inventory: FoodInventory[];
-  weightTracking: WeightEntry[];
+  goals?: NutritionGoals;
+  macros?: MacroTargets;
+  schedule?: MealSchedule;
+  budget?: FoodBudget;
+  preferences?: FoodPreferences;
+  location?: UserLocation;
+  inventory?: FoodInventory[];
+  weightTracking?: WeightEntry[];
   createdAt: string;
   updatedAt: string;
+  // Flat questionnaire fields (optional — written by NutritionQuestionnaireScreen)
+  goal?: 'lose_weight' | 'gain_weight' | 'maintain';
+  targetRatePercentage?: number;
+  targetRate?: number;
+  age?: number;
+  gender?: 'male' | 'female' | 'prefer_not_to_say';
+  height?: number;
+  currentWeight?: number;
+  weight?: number;
+  activityLevel?: 'sedentary' | 'light' | 'moderate' | 'heavy' | 'extreme';
+  workoutFrequency?: number;
+  dietType?: 'balanced' | 'high_protein' | 'low_carb' | 'keto' | 'custom';
+  mealsPerDay?: number;
+  dietaryRestrictions?: string[];
+  supplements?: string[];
+  nutrientVariety?: 'high' | 'moderate' | 'low';
+  macroTargets?: MacroTargets;
+  targets?: MacroTargets;
 }
 
 export interface NutritionGoals {
@@ -115,6 +133,15 @@ export interface MealPlan {
   groceryList: GroceryList;
   totalCost: number;
   generatedAt: string;
+  macroSplit?: string;
+  // Legacy API response wrapper — the server wraps plan content in a `data`
+  // envelope with weeks/days/deletedMeals sub-keys.
+  data?: {
+    weeks?: any[];
+    days?: any[];
+    deletedMeals?: any[];
+    [key: string]: any;
+  };
 }
 
 // NEW SIMPLIFIED ARCHITECTURE
@@ -123,7 +150,10 @@ export interface SimplifiedMealPlan {
   name: string;
   startDate: string;
   endDate: string;
+  fingerprint?: string;
   dailyMeals: Record<string, SimplifiedMealPlanDay>; // key: "2024-02-20"
+  days?: any[]; // Legacy root-level days array used by import screen
+  data?: { days?: any[]; weeks?: any[]; deletedMeals?: any[] }; // Legacy import format
   metadata: {
     generatedAt: string;
     totalCost?: number;       // Legacy
@@ -317,6 +347,7 @@ export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'morning_sna
 export interface Ingredient {
   id: string;
   name: string;
+  item?: string; // Legacy field name used in older data formats
   amount: number;
   unit: string;
   category: FoodCategory;
@@ -431,6 +462,7 @@ export const NUTRITION_STORAGE_KEYS = {
   CURRENT_PLAN_ID: '@nutrition_current_plan_id',
   // Legacy single plan support
   SIMPLIFIED_MEAL_PLAN: '@nutrition_simplified_plan',
+  RESULTS: 'nutrition_questionnaire_results',
 } as const;
 
 // Utility Types

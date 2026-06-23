@@ -2,7 +2,7 @@
   "expo": {
     "name": "JSON.fit",
     "slug": "json",
-    "version": "1.0.20",
+    "version": "1.0.22",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "94",
+      "buildNumber": "119",
       "associatedDomains": [
         "applinks:json.fit"
       ],
@@ -37,7 +37,7 @@
         "backgroundColor": "#0f0f0f"
       },
       "package": "com.RyanNovinc.JSON",
-      "versionCode": 94,
+      "versionCode": 95,
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,

@@ -773,12 +773,12 @@ export const assembleDynamicMealPlanReviewPrompt = async (): Promise<string> => 
     const sleepResults = await WorkoutStorage.loadSleepOptimizationResults();
     const budgetCookingResults = await WorkoutStorage.loadBudgetCookingResults();
     
-    const macroResults = nutritionResults?.macroResults || {};
+    const macroResults = nutritionResults?.macroResults;
     const sleepData = sleepResults?.formData;
     const equipmentData = budgetCookingResults?.formData?.cookingEquipment || [];
-    
-    const proteinTarget = macroResults.protein || 150;
-    const fiberTarget = macroResults.calories 
+
+    const proteinTarget = macroResults?.protein ?? 150;
+    const fiberTarget = macroResults?.calories
       ? Math.min(45, Math.max(25, Math.round((macroResults.calories / 1000) * 14)))
       : 30;
     const fiberMinimum = Math.round(fiberTarget * 0.8);

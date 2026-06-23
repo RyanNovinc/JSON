@@ -231,6 +231,11 @@ export default function GroceryListScreen() {
 
   const showLoadingState = passedGroceryList && isLoadingPurchaseStates && !localGroceryState;
 
+  // Generate a unique key for this grocery list (hoisted before the useEffect that depends on it)
+  const groceryListKey = passedGroceryList ?
+    `grocery_purchases_${passedGroceryList.total_estimated_cost}_${passedGroceryList.categories?.length || 0}` :
+    'grocery_purchases_context';
+
   // Load purchase states from storage
   useEffect(() => {
     const loadPurchaseStates = async () => {
@@ -387,11 +392,6 @@ export default function GroceryListScreen() {
       : null;
 
   const pct = totalItems > 0 ? Math.round((purchasedItems / totalItems) * 100) : 0;
-
-  // Generate a unique key for this grocery list
-  const groceryListKey = passedGroceryList ?
-    `grocery_purchases_${passedGroceryList.total_estimated_cost}_${passedGroceryList.categories?.length || 0}` :
-    'grocery_purchases_context';
 
   const toggleItemPurchased = async (item: GroceryItem) => {
     try {

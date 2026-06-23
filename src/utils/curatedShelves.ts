@@ -15,7 +15,16 @@ import { MealSlot, EquipmentType, CuratedMeal, Plate, CookingMethod } from '../t
 // Re-export types needed by the screen
 export { MealSlot, EquipmentType };
 
-export type MealLike = Pick<CuratedMeal, 'slug'> & Partial<Omit<CuratedMeal, 'slug'>>;
+type PartialPlate = Omit<Partial<CuratedMeal['plates'][number]>, 'plate_macros'> & {
+  plate_macros?: Partial<CuratedMeal['plates'][number]['plate_macros']>;
+};
+export type MealLike = {
+  slug: string;
+  display_name?: string;
+  eligible_slots?: CuratedMeal['eligible_slots'];
+  methods?: Array<Partial<CuratedMeal['methods'][number]>>;
+  plates?: PartialPlate[];
+} & Partial<Omit<CuratedMeal, 'slug' | 'display_name' | 'eligible_slots' | 'methods' | 'plates'>>;
 
 // Order tuned for the bulker audience: no/low-effort kit first.
 export const EQUIPMENT_ORDER: EquipmentType[] = [

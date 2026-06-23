@@ -18,7 +18,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 export interface Exercise {
   exercise?: string;
   name?: string;
-  reps?: string;
+  reps?: string | number;
   sets?: number;
   reps_weekly?: { [week: string]: string };
   rir_weekly?: { [week: string]: string };

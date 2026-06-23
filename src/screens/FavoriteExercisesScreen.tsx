@@ -9,6 +9,7 @@ import {
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -36,7 +37,7 @@ interface FavoriteExercise {
 
 export default function FavoriteExercisesScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const route = useRoute();
+  const route = useRoute<RouteProp<RootStackParamList, 'FavoriteExercises'>>();
   const { themeColor } = useTheme();
   const [favoriteExercises, setFavoriteExercises] = useState<FavoriteExercise[]>([]);
   

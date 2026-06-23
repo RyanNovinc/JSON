@@ -109,7 +109,7 @@ export default function AddMealScreen() {
         prepTime: mealData.prepTime || 0,
         cookTime: mealData.cookTime || 0,
         servings: 1,
-        tags: ['imported'] as const,
+        tags: [],
         isFavorite: false,
       };
 
@@ -267,7 +267,7 @@ export default function AddMealScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.jsonImportButton, { backgroundColor: themeColor }]}
-                onPress={processJsonImport}
+                onPress={() => processJsonImport(jsonInput)}
                 disabled={!jsonInput.trim()}
               >
                 <Text style={styles.jsonImportText}>Import Meal</Text>

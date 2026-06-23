@@ -35,6 +35,7 @@ export interface MealPlan {
   data?: any; // the full JSON structure
   fingerprint?: string; // content fingerprint for duplicate detection
   createdAt?: number; // timestamp for sorting/organization
+  macroSplit?: string;
 }
 
 export interface WorkoutHistory {
@@ -82,10 +83,11 @@ export interface NutritionQuestionnaireResults {
     age: string;
     height: string;
     weight: string;
-    heightUnit: string;
-    weightUnit: string;
+    heightUnit?: string;
+    weightUnit?: string;
     activityLevel: string;
     jobType: string;
+    dietType?: string;
   };
   macroResults: {
     protein: number;
@@ -94,7 +96,7 @@ export interface NutritionQuestionnaireResults {
     calories: number;
     bmr: number;
     tdee: number;
-    weeklyWeightChange: number;
+    weeklyWeightChange?: number;
   };
   completedAt: string;
 }

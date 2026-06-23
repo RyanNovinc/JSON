@@ -119,23 +119,23 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           >
             <Section title="1. Data Collection Overview">
               <Text style={styles.sectionText}>
-                JSON is a comprehensive fitness and nutrition app that prioritizes your privacy by storing all personal data locally on your device. We do NOT collect, store, or transmit your workout routines, meal plans, health data, or personal information to external servers.
+                JSON.fit keeps your personal fitness and nutrition data on your device. Your workouts, meal plans, health information and other personal data are not uploaded to our servers. To understand how the app is used and to make it better, we collect anonymous, non-identifying usage analytics.
               </Text>
               
               <InfoBox>
                 <Text style={[styles.infoBoxText, { color: '#ffffff' }]}>
-                  <Text style={[styles.emphasis, { color: themeColor }]}>Local Storage Only:</Text> All your workouts, nutrition plans, health information, and personal data remain on your device and never leave it.
+                  <Text style={[styles.emphasis, { color: themeColor }]}>On your device:</Text> Your workouts, meal plans, health info, weight and other personal data stay on your device. We don't show ads and we never sell your data.
                 </Text>
               </InfoBox>
 
               <Text style={styles.sectionText}>
-                This includes sensitive health information such as dietary restrictions, medical conditions, weight tracking, and nutritional goals - all stored securely on your device only.
+                Sensitive information such as dietary restrictions, medical conditions, weight tracking and nutritional goals is stored only on your device.
               </Text>
             </Section>
 
-            <Section title="2. What Data We Store Locally">
+            <Section title="2. What Stays On Your Device">
               <Text style={styles.sectionText}>
-                The following information is stored exclusively on your device:
+                The following is stored only on your device and is never collected by us:
               </Text>
               
               <Text style={[styles.sectionSubheading, { color: themeColor, marginTop: 16, marginBottom: 8 }]}>
@@ -157,7 +157,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
                 <Text style={styles.bulletText}>• Weight tracking history and measurements</Text>
                 <Text style={styles.bulletText}>• Meal plans, recipes, and cooking instructions</Text>
                 <Text style={styles.bulletText}>• Food inventory and grocery shopping lists</Text>
-                <Text style={styles.bulletText}>• Budget information and location for pricing</Text>
+                <Text style={styles.bulletText}>• Budget and location info you enter for pricing</Text>
                 <Text style={styles.bulletText}>• Supplement intake and nutrient deficiency tracking</Text>
                 <Text style={styles.bulletText}>• Meal timing schedules and food preferences</Text>
                 <Text style={styles.bulletText}>• Meal prep sessions and cooking instructions</Text>
@@ -168,26 +168,31 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               </Text>
               <View style={styles.bulletContainer}>
                 <Text style={styles.bulletText}>• App preferences and settings</Text>
-                <Text style={styles.bulletText}>• Purchase history for Pro Access features</Text>
               </View>
             </Section>
 
-            <Section title="3. What We Don't Collect">
+            <Section title="3. Anonymous Analytics We Collect">
               <Text style={styles.sectionText}>
-                We do not collect, process, or store:
+                To see how the app is used and to fix problems, we collect anonymous, non-identifying analytics. This typically includes app interactions and events (such as which features are used or when a plan is imported), general device information (device type, operating system, app version), an approximate region derived from your IP address, and diagnostic/crash data.
               </Text>
+              <Text style={styles.sectionText}>
+                This data is not linked to your identity and never includes your on-device workout or nutrition data. We use the following analytics providers, who process this data on our behalf: Google Analytics (Google), Microsoft Clarity (Microsoft), and our own analytics hosted on Amazon Web Services (AWS).
+              </Text>
+            </Section>
+
+            <Section title="4. What We Don't Do">
               <View style={styles.bulletContainer}>
-                <Text style={styles.bulletText}>• Personal identifying information</Text>
-                <Text style={styles.bulletText}>• Workout performance data</Text>
-                <Text style={styles.bulletText}>• Device location data</Text>
-                <Text style={styles.bulletText}>• Usage analytics or tracking</Text>
-                <Text style={styles.bulletText}>• Social media or contact information</Text>
+                <Text style={styles.bulletText}>• We don't show ads</Text>
+                <Text style={styles.bulletText}>• We don't sell, rent or trade your data</Text>
+                <Text style={styles.bulletText}>• We don't build advertising profiles or track you across other companies' apps</Text>
+                <Text style={styles.bulletText}>• We don't put personal information into our analytics</Text>
+                <Text style={styles.bulletText}>• We don't require an account</Text>
               </View>
             </Section>
 
-            <Section title="4. Health Data and Nutrition Information">
+            <Section title="5. Health Data and Nutrition Information">
               <Text style={styles.sectionText}>
-                Our app collects and processes sensitive health and nutrition information to provide personalized meal planning and dietary guidance. This includes:
+                The app processes sensitive health and nutrition information on your device to provide personalized meal planning and dietary guidance. This includes:
               </Text>
               
               <InfoBox>
@@ -209,44 +214,53 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               </Text>
             </Section>
 
-            <Section title="5. App Store Purchases">
+            <Section title="6. The App Is Free">
               <Text style={styles.sectionText}>
-                When you purchase Pro Access through the App Store, Apple handles all payment processing. We receive only basic purchase confirmation to unlock premium features. No payment details are stored by our app.
+                JSON.fit is free. There are no subscriptions and no in-app purchases, so we do not process or store any payment information.
               </Text>
             </Section>
 
-            <Section title="5. Data Security">
+            <Section title="7. Data Security">
               <Text style={styles.sectionText}>
-                Since all data is stored locally on your device, your information security depends on your device's security measures:
+                Your on-device data is protected by your device's own security, so keeping your device secured protects that data:
               </Text>
               <View style={styles.bulletContainer}>
                 <Text style={styles.bulletText}>• Use device passcode/biometric locks</Text>
                 <Text style={styles.bulletText}>• Keep your device's OS updated</Text>
                 <Text style={styles.bulletText}>• Regular device backups protect your data</Text>
               </View>
+              <Text style={styles.sectionText}>
+                Analytics we collect is transmitted over encrypted (HTTPS/TLS) connections.
+              </Text>
             </Section>
 
-            <Section title="6. Data Backup and Sync">
+            <Section title="8. Data Backup and Sync">
               <Text style={styles.sectionText}>
                 Your workout data may be included in iOS device backups (iCloud or iTunes). This backup process is managed entirely by Apple according to their privacy policies. We do not have access to your backup data.
               </Text>
             </Section>
 
-            <Section title="7. Children's Privacy">
+            <Section title="9. Your Choices">
               <Text style={styles.sectionText}>
-                Our app is suitable for users 13 and older. We do not knowingly collect information from children under 13. Since all data is stored locally, parental supervision of device usage is recommended for younger users.
+                You can limit analytics at any time by resetting or limiting your device's advertising identifier in your device settings. You can ask us to access or delete any personal information we hold — in practice, only an email address if you subscribed to our newsletter on the website — by contacting support@json.fit. Your on-device data is under your control and can be deleted in the app at any time.
               </Text>
             </Section>
 
-            <Section title="8. Changes to Privacy Policy">
+            <Section title="10. Children's Privacy">
               <Text style={styles.sectionText}>
-                Any updates to this privacy policy will be communicated through app updates. Since we don't collect personal data, policy changes typically involve clarifications rather than new data practices.
+                Our app is suitable for users 13 and older. We do not knowingly collect information from children under 13. Since your personal data is stored locally, parental supervision of device usage is recommended for younger users.
               </Text>
             </Section>
 
-            <Section title="9. Contact Information">
+            <Section title="11. Changes to Privacy Policy">
               <Text style={styles.sectionText}>
-                Questions about our privacy practices? Contact us through the app's feedback feature or via the App Store. Since we don't store personal data, most privacy concerns can be resolved through local device management.
+                Any updates to this privacy policy will be communicated through app updates and reflected by an updated date.
+              </Text>
+            </Section>
+
+            <Section title="12. Contact Information">
+              <Text style={styles.sectionText}>
+                Questions about our privacy practices? Contact us at support@json.fit or via the App Store. The full policy is also available at json.fit/privacy-policy.html.
               </Text>
             </Section>
 
@@ -255,7 +269,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
                 Last Updated: {new Date().toLocaleDateString()}
               </Text>
               <Text style={[styles.footerSubtext, { color: themeColor }]}>
-                Your data stays on your device. Always.
+                Your workouts and nutrition stay on your device.
               </Text>
             </View>
           </ScrollView>

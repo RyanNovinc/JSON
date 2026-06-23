@@ -143,10 +143,6 @@ export default function NutritionDashboardScreen() {
     navigation.navigate('ImportMealPlan', { showStep1New: true });
   };
 
-  const handlePurchase = () => {
-    navigation.navigate('Payment' as any, { forceShowPaywall: true });
-  };
-
   const renderGroupCard = (group: GroupCard) => {
     const isRequired = group.type === 'required';
     const isCompleted = isRequired && allQuestionnairesCompleted;
@@ -282,27 +278,15 @@ export default function NutritionDashboardScreen() {
         {/* Action buttons when all complete */}
         {allQuestionnairesCompleted && (
           <View style={styles.actionsContainer}>
-            {!shouldShowLocked ? (
-              <TouchableOpacity
-                style={[styles.generatePromptButton, { backgroundColor: themeColor }]}
-                onPress={handleGeneratePrompt}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="sparkles" size={18} color="#000" />
-                <Text style={styles.generatePromptText}>Generate meal plan</Text>
-                <Ionicons name="arrow-forward" size={18} color="#000" />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.generatePromptButton, { backgroundColor: themeColor }]}
-                onPress={handlePurchase}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="lock-closed" size={18} color="#000" />
-                <Text style={styles.generatePromptText}>Generate meal plan</Text>
-                <Ionicons name="arrow-forward" size={18} color="#000" />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={[styles.generatePromptButton, { backgroundColor: themeColor }]}
+              onPress={handleGeneratePrompt}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="sparkles" size={18} color="#000" />
+              <Text style={styles.generatePromptText}>Generate meal plan</Text>
+              <Ionicons name="arrow-forward" size={18} color="#000" />
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.myMealPlansButton}

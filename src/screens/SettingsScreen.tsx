@@ -1,24 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
-  Modal,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useJSONPro } from '../hooks/useJSONPro';
-import { CustomerCenter } from '../components/CustomerCenter';
-import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function SettingsScreen() {
   const { themeColor } = useTheme();
-  const { hasAccess } = useJSONPro();
-  const navigation = useNavigation();
-  const [showCustomerCenter, setShowCustomerCenter] = useState(false);
 
   return (
     <ScrollView style={styles.container}>
@@ -26,48 +18,9 @@ export default function SettingsScreen() {
         <Text style={styles.title}>Settings</Text>
       </View>
 
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Subscription</Text>
-        
-        <TouchableOpacity style={styles.row} onPress={() => setShowCustomerCenter(true)}>
-          <View style={styles.rowLeft}>
-            <Ionicons 
-              name={hasAccess ? "checkmark-circle" : "star-outline"} 
-              size={24} 
-              color={hasAccess ? themeColor : "#FFD700"} 
-            />
-            <View>
-              <Text style={styles.rowText}>
-                {hasAccess ? "Pro Access" : "Free Plan"}
-              </Text>
-              {hasAccess && (
-                <Text style={styles.rowSubtext}>
-                  Manage your subscription
-                </Text>
-              )}
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#666" />
-        </TouchableOpacity>
-
-        {!hasAccess && (
-          <TouchableOpacity 
-            style={styles.upgradeRow} 
-            onPress={() => navigation.navigate('Payment' as any)}
-          >
-            <View style={styles.rowLeft}>
-              <Ionicons name="rocket" size={24} color="#a855f7" />
-              <Text style={styles.upgradeText}>Upgrade to Pro</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#a855f7" />
-          </TouchableOpacity>
-        )}
-      </View>
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
-        
+
         <TouchableOpacity style={styles.row}>
           <View style={styles.rowLeft}>
             <Ionicons name="information-circle-outline" size={24} color="#007AFF" />
@@ -84,19 +37,9 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
-
       <View style={styles.footer}>
         <Text style={styles.footerText}>Made with ❤️ using React Native</Text>
       </View>
-
-      {/* Customer Center Modal */}
-      <Modal
-        visible={showCustomerCenter}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <CustomerCenter onClose={() => setShowCustomerCenter(false)} />
-      </Modal>
     </ScrollView>
   );
 }
@@ -144,39 +87,6 @@ const styles = StyleSheet.create({
   },
   rowText: {
     fontSize: 16,
-    color: '#fff',
-  },
-  rowSubtext: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
-  },
-  upgradeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#a855f7',
-  },
-  upgradeText: {
-    fontSize: 16,
-    color: '#a855f7',
-    fontWeight: '600',
-  },
-  logoutButton: {
-    marginHorizontal: 20,
-    backgroundColor: '#ff3b30',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#fff',
   },
   footer: {

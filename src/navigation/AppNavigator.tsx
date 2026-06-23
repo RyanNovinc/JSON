@@ -128,16 +128,23 @@ import { CustomTabBar, CREATE_ROUTE } from './CustomTabBar';
 
 // Clean meal plan navigation types
 interface CleanMealPlanNavigationParams {
-  targetDate: string; // Always YYYY-MM-DD format
-  planId: string;
-  planName: string;
-  // Optional display helpers (derived from targetDate)
+  targetDate?: string;
+  planId?: string;
+  planName?: string;
   dayName?: string;
   displayDate?: string;
+  // New meal-prep navigation params
+  day?: any;
+  weekNumber?: number;
+  mealPlanName?: string;
+  dayIndex?: number;
+  calculatedDayName?: string;
+  calculatedDateString?: string;
 }
 
 export type RootStackParamList = {
   Main: undefined;
+  Home: undefined;
   CreateFlow: undefined;
   SamplePlanDetail: { plan: any };
   ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean; isCurated?: boolean; curatedSlug?: string };
@@ -221,8 +228,13 @@ export type RootStackParamList = {
     };
   };
   MealPlanDays: {
-    planId: string;
-    planName: string;
+    planId?: string;
+    planName?: string;
+    week?: any;
+    mealPlanName?: string;
+    mealPrepSession?: any;
+    allMealPrepSessions?: any;
+    groceryList?: any;
   };
   // New clean meal plan day navigation
   MealPlanDay: CleanMealPlanNavigationParams;
@@ -269,7 +281,8 @@ export type RootStackParamList = {
   NutritionQuestionnaire: undefined;
   BudgetCookingQuestionnaire: undefined;
   FridgePantryQuestionnaire: undefined;
-  SleepOptimizationScreen: undefined;
+  SleepOptimizationScreen: { showResults?: boolean } | undefined;
+  NutritionHome: undefined;
   NutritionDashboard: undefined;
   WorkoutDashboard: undefined;
   WorkoutCalendar: undefined;
@@ -289,15 +302,15 @@ export type RootStackParamList = {
   MealRatings: undefined;
   FavoriteMeals: undefined;
   AddMeal: undefined;
-  ManualMealEntry: undefined;
+  ManualMealEntry: { editMeal?: any; isEditing?: boolean } | undefined;
   MealPlanHelp: undefined;
   MealPlanTest: undefined;
-  FavoriteExercises: undefined;
+  FavoriteExercises: { selectionMode?: boolean; onExerciseSelect?: (exercise: any) => void } | undefined;
   ExerciseDetail: {
     exercise: any;
   };
   AddExercise: undefined;
-  ManualExerciseEntry: undefined;
+  ManualExerciseEntry: { editExercise?: any; isEditing?: boolean; day?: any; blockName?: string } | undefined;
   ExerciseHelp: undefined;
   Methodology: undefined;
   WeightTracker: undefined;
@@ -665,9 +678,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="ImportMealPlan"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <ImportMealPlanScreen {...props} />
+                    <ImportMealPlanScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -692,9 +705,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="ImportSharedMealPlan"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <ImportSharedMealPlan {...props} />
+                    <ImportSharedMealPlan />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -727,9 +740,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MyMealPlans"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MyMealPlansScreen {...props} />
+                    <MyMealPlansScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -739,9 +752,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="SampleMealPlans"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <SampleMealPlansScreen {...props} />
+                    <SampleMealPlansScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -787,9 +800,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               {/* MealPlanPreview — summary + import screen for saved meal plans */}
               <RootStack.Screen
                 name="MealPlanPreview"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPlanPreviewScreen {...props} />
+                    <MealPlanPreviewScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -805,9 +818,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPlanWeeks"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPlanWeeksScreen {...props} />
+                    <MealPlanWeeksScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -816,9 +829,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPlanDays"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPlanDaysScreen {...props} />
+                    <MealPlanDaysScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -827,9 +840,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPlanDay"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPlanDayScreen {...props} />
+                    <MealPlanDayScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -838,9 +851,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPlanMealDetail"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPlanMealDetailScreen {...props} />
+                    <MealPlanMealDetailScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -849,9 +862,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPrepSession"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPrepSessionScreen {...props} />
+                    <MealPrepSessionScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -860,9 +873,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPrepDetail"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPrepDetailScreen {...props} />
+                    <MealPrepDetailScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -924,9 +937,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="FridgePantryQuestionnaire"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <FridgePantryQuestionnaireScreen {...props} />
+                    <FridgePantryQuestionnaireScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -944,9 +957,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="NutritionDashboard"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <NutritionDashboardScreen {...props} />
+                    <NutritionDashboardScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1041,9 +1054,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="NutritionRequiredSetup"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <NutritionRequiredSetupScreen {...props} />
+                    <NutritionRequiredSetupScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1057,9 +1070,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="NutritionOptionalTools"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <NutritionOptionalToolsScreen {...props} />
+                    <NutritionOptionalToolsScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1089,9 +1102,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealCalendar"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealCalendarScreen {...props} />
+                    <MealCalendarScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1100,9 +1113,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="GroceryList"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <GroceryListScreen {...props} />
+                    <GroceryListScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1111,9 +1124,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealRatings"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealRatingsScreen {...props} />
+                    <MealRatingsScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1122,9 +1135,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="FavoriteMeals"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <FavoriteMealsScreen {...props} />
+                    <FavoriteMealsScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1133,9 +1146,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="AddMeal"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <AddMealScreen {...props} />
+                    <AddMealScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1144,9 +1157,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="ManualMealEntry"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <ManualMealEntryScreen {...props} />
+                    <ManualMealEntryScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1155,9 +1168,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPlanHelp"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPlanHelpScreen {...props} />
+                    <MealPlanHelpScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1166,9 +1179,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="MealPlanTest"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealPlanTestScreen {...props} />
+                    <MealPlanTestScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1258,18 +1271,18 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="RecipeDetail"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <RecipeDetailScreen {...props} />
+                    <RecipeDetailScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ headerShown: false }}
               />
               <RootStack.Screen
                 name="MealsLibrary"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealsLibraryScreen {...props} />
+                    <MealsLibraryScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ headerShown: false }}
@@ -1281,9 +1294,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="CookMode"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <CookModeScreen {...props} />
+                    <CookModeScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{
@@ -1392,9 +1405,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               {/* Nutrition questionnaire screens */}
               <RootStack.Screen 
                 name="N1Goal" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N1GoalScreen {...props} />
+                    <N1GoalScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1408,9 +1421,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N2Rate" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N2RateScreen {...props} />
+                    <N2RateScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1424,9 +1437,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N3AboutYou" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N3AboutYouScreen {...props} />
+                    <N3AboutYouScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1440,9 +1453,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N4Activity" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N4ActivityScreen {...props} />
+                    <N4ActivityScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1456,9 +1469,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N5DietType" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N5DietTypeScreen {...props} />
+                    <N5DietTypeScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1472,9 +1485,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N5bAllergies" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N5bAllergiesScreen {...props} />
+                    <N5bAllergiesScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1488,9 +1501,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N5cSleep" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N5cSleepScreen {...props} />
+                    <N5cSleepScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1504,9 +1517,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N6MealsSnacking" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N6MealsSnackingScreen {...props} />
+                    <N6MealsSnackingScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1520,17 +1533,17 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen
                 name="N6aDessert"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N6aDessertScreen {...props} />
+                    <N6aDessertScreen />
                   </NutritionThemeProvider>
                 )}
               />
               <RootStack.Screen 
                 name="N7Location" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N7LocationScreen {...props} />
+                    <N7LocationScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1544,9 +1557,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N8Budget" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N8BudgetScreen {...props} />
+                    <N8BudgetScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1560,9 +1573,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="N9PlanLength" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <N9PlanLengthScreen {...props} />
+                    <N9PlanLengthScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1576,9 +1589,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="NutritionRefinements" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <NutritionRefinementsScreen {...props} />
+                    <NutritionRefinementsScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1592,9 +1605,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="NutritionSummary" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <NutritionSummaryScreen {...props} />
+                    <NutritionSummaryScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1608,9 +1621,9 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="NutritionPromptReady" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <NutritionPromptReadyScreen {...props} />
+                    <NutritionPromptReadyScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 
@@ -1624,27 +1637,27 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               />
               <RootStack.Screen 
                 name="CuratedFavorites" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <CuratedFavoritesScreen {...props} />
+                    <CuratedFavoritesScreen />
                   </NutritionThemeProvider>
                 )} 
                 options={{ headerShown: false }} 
               />
               <RootStack.Screen 
                 name="FridgePantry" 
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <FridgePantryScreen {...props} />
+                    <FridgePantryScreen />
                   </NutritionThemeProvider>
                 )} 
                 options={{ headerShown: false, presentation: 'modal' }} 
               />
               <RootStack.Screen
                 name="MealDetail"
-                children={(props) => (
+                children={() => (
                   <NutritionThemeProvider>
-                    <MealDetailScreen {...props} />
+                    <MealDetailScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{

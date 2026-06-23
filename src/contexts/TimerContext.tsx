@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState, Platform } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 
 // Mirror the guard pattern in src/utils/liveActivity.ts: conditional require so
@@ -258,7 +258,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const handleAppStateChange = (nextAppState: string) => {
+  const handleAppStateChange = (nextAppState: AppStateStatus) => {
     if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
       // App came to foreground, update timer if running
       if (timer?.isRunning && !timer.isPaused && timer.startTime) {

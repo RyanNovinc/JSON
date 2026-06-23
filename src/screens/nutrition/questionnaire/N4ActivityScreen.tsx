@@ -12,6 +12,7 @@ import {
   RouteProp,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -72,7 +73,7 @@ type ParamList = {
 };
 
 export default function N4ActivityScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'N4Activity'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -94,8 +95,8 @@ export default function N4ActivityScreen() {
       return;
     }
     navigation.navigate(
-      'N5DietType' as never,
-      { answersSoFar: { ...answersSoFar, activityLevel: selected } } as never
+      'N5DietType',
+      { answersSoFar: { ...answersSoFar, activityLevel: selected } }
     );
   };
 

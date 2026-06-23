@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WorkoutLogScreen from './WorkoutLogScreen';
@@ -17,7 +19,7 @@ import { Analytics } from '../services/analytics';
 
 export default function WorkoutLogScreenAdapter() {
   const navigation = useNavigation();
-  const route = useRoute();
+  const route = useRoute<RouteProp<RootStackParamList, 'WorkoutLog'>>();
   const { themeColor, isPinkTheme } = useTheme();
   const { globalUnit } = useWeightUnit();
   const { startTimer } = useTimer();
@@ -425,9 +427,7 @@ export default function WorkoutLogScreenAdapter() {
       // Only update if selection actually changed
       if (currentSelection !== selectedExerciseIndex) {
         const exercise = exercises[exerciseIndex];
-        const alternativeNames = (exercise.alternatives || [])
-          .filter(alt => alt && (typeof alt === 'string' || (typeof alt === 'object' && alt.exercise)))
-          .map(alt => typeof alt === 'string' ? alt : alt.exercise);
+        const alternativeNames = (exercise.alternatives || []).filter(Boolean);
         const allExercises = [exercise.exercise, ...alternativeNames];
         const newExerciseName = allExercises[selectedExerciseIndex] || exercise.exercise;
         

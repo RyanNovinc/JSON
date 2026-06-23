@@ -9,7 +9,6 @@
  */
 
 import { WorkoutStorage } from '../storage';
-import { convertWeight } from '../../contexts/WeightUnitContext';
 
 // Mock convertWeight function to match actual implementation
 const mockConvertWeight = (weight: number, fromUnit: 'kg' | 'lbs', toUnit: 'kg' | 'lbs'): number => {

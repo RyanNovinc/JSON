@@ -12,6 +12,7 @@ import {
   RouteProp,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -85,7 +86,7 @@ type ParamList = {
 };
 
 export default function N6aDessertScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'N6aDessert'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -108,13 +109,13 @@ export default function N6aDessertScreen() {
       return;
     }
     navigation.navigate(
-      'N7Location' as never,
+      'N7Location',
       {
         answersSoFar: {
           ...answersSoFar,
           dessertFrequency: selected,
         },
-      } as never
+      }
     );
   };
 

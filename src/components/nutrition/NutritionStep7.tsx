@@ -76,19 +76,19 @@ export const NutritionStep7: React.FC<Props> = ({
     'Acid Reflux/GERD', 'Frequent Bloating', 'Other Food Sensitivities'
   ];
 
-  const handleSelection = (field: string, value: any) => {
-    updateFormData({ [field]: value });
+  const handleSelection = (field: keyof NutritionFormData, value: string) => {
+    updateFormData(Object.fromEntries([[field, value]]) as Partial<NutritionFormData>);
   };
 
-  const toggleArrayItem = (field: string, item: string) => {
-    const current = formData[field as keyof NutritionFormData] as string[] || [];
-    
+  const toggleArrayItem = (field: keyof NutritionFormData, item: string) => {
+    const current = (formData[field] as string[] | undefined) ?? [];
+
     // Special handling for medical conditions with 'None' option
     if (field === 'medicalConditions') {
       if (item === 'None') {
         // If selecting 'None', clear all other selections
         const updated = current.includes('None') ? [] : ['None'];
-        updateFormData({ [field]: updated });
+        updateFormData(Object.fromEntries([[field, updated]]) as Partial<NutritionFormData>);
         return;
       } else {
         // If selecting any other condition, remove 'None' and toggle the item
@@ -96,16 +96,16 @@ export const NutritionStep7: React.FC<Props> = ({
         const updated = withoutNone.includes(item)
           ? withoutNone.filter(i => i !== item)
           : [...withoutNone, item];
-        updateFormData({ [field]: updated });
+        updateFormData(Object.fromEntries([[field, updated]]) as Partial<NutritionFormData>);
         return;
       }
     }
-    
+
     // Standard toggle for other fields
     const updated = current.includes(item)
       ? current.filter(i => i !== item)
       : [...current, item];
-    updateFormData({ [field]: updated });
+    updateFormData(Object.fromEntries([[field, updated]]) as Partial<NutritionFormData>);
   };
 
   const isFormValid = () => {

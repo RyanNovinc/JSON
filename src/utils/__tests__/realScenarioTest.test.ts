@@ -6,6 +6,7 @@
  */
 
 import { WorkoutStorage } from '../storage';
+import type { WorkoutHistory } from '../storage';
 
 // Real convertWeight implementation
 const convertWeight = (weight: number, fromUnit: 'kg' | 'lbs', toUnit: 'kg' | 'lbs'): number => {
@@ -38,18 +39,18 @@ describe('Real Scenario: User Bug Reproduction', () => {
     console.log('- But app ACTUALLY logs: 1 lbs × 2 reps');
     
     // Step 1: Save set with user's active unit (simulating WorkoutLogScreenAdapter logic)
-    const setAsLogged = {
+    const setAsLogged: WorkoutHistory['sets'][0] = {
       setNumber: 1,
       weight: '1', // User types "1"
       reps: '2',   // User types "2"
       completed: true,
       unit: userActiveUnit // App stamps user's active unit
     };
-    
-    const historyEntry = {
+
+    const historyEntry: WorkoutHistory = {
       id: 'scenario-test',
       routineName: 'Test Routine',
-      dayName: 'Test Day', 
+      dayName: 'Test Day',
       exerciseName: 'Bench Press',
       date: '2026-06-12',
       sets: [setAsLogged]
@@ -116,7 +117,7 @@ describe('Real Scenario: User Bug Reproduction', () => {
 
   test('VERIFY: Fixed display shows consistent units', () => {
     // Test that after our fixes, display is consistent
-    const testScenarios = [
+    const testScenarios: Array<{ userUnit: 'kg' | 'lbs'; displayUnit: 'kg' | 'lbs'; weight: number; reps: number; expectedVolume: number }> = [
       { userUnit: 'kg', displayUnit: 'kg', weight: 1, reps: 2, expectedVolume: 2 },
       { userUnit: 'lbs', displayUnit: 'lbs', weight: 1, reps: 2, expectedVolume: 2 },
       { userUnit: 'lbs', displayUnit: 'kg', weight: 1, reps: 2, expectedVolume: 0.9 },

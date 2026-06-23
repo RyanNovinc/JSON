@@ -118,7 +118,7 @@ export default function FitnessGoalsQuestionnaireScreen() {
   const [showCustomFrequency, setShowCustomFrequency] = useState<boolean>(false);
   const [customGoals, setCustomGoals] = useState<string>('');
   const [trainingExperience, setTrainingExperience] = useState<string>('');
-  const [volumePreference, setVolumePreference] = useState<'8-12' | '12-16' | '16-20' | 'not_sure'>('12-16');
+  const [volumePreference, setVolumePreference] = useState<'8-12' | '12-16' | '16-20' | 'not_sure' | ''>('12-16');
   const [showMiniQuestionnaire, setShowMiniQuestionnaire] = useState<boolean>(false);
   const [recoveryAnswer, setRecoveryAnswer] = useState<string>('');
   const [frequencyAnswer, setFrequencyAnswer] = useState<string>('');

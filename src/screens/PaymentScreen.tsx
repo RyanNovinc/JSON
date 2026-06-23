@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import NutritionPaywallScreen from '../components/NutritionPaywallScreenSimple';
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
@@ -15,7 +17,7 @@ import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function PaymentScreen({ route }: any) {
-  const navigation = useNavigation();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { themeColor } = useTheme();
   const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
@@ -30,7 +32,7 @@ export default function PaymentScreen({ route }: any) {
 
   const handleRestoreSuccess = () => {
     // Handle successful restore - navigate to nutrition home screen
-    navigation.navigate('NutritionHome' as any);
+    navigation.navigate('NutritionHome');
   };
 
   return (

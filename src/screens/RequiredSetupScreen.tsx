@@ -21,7 +21,7 @@ interface SetupItem {
   title: string;
   description: string;
   icon: string;
-  navigationTarget: keyof RootStackParamList;
+  navigationTarget: 'FitnessGoalsQuestionnaire' | 'EquipmentPreferencesQuestionnaire';
   storageKey: string;
 }
 

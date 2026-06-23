@@ -15,6 +15,7 @@ import {
   RouteProp,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -60,7 +61,7 @@ type ParamList = {
 };
 
 export default function N5bAllergiesScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'N5bAllergies'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -105,13 +106,13 @@ export default function N5bAllergiesScreen() {
       return;
     }
     navigation.navigate(
-      'N5cSleep' as never,
+      'N5cSleep',
       {
         answersSoFar: {
           ...answersSoFar,
           allergies,
         },
-      } as never
+      }
     );
   };
 

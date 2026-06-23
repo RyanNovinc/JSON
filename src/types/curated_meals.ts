@@ -86,7 +86,8 @@ export type MealSlug =
   | 'chicken_schnitzel'
   | 'beef_ragu_gnocchi'
   | 'cevapi'
-  | 'palacinke';
+  | 'palacinke'
+  | (string & {}); // Allow test fixtures and future slugs without breaking existing literals
 
 export type CuisineType = 'australian' | 'mediterranean' | 'asian' | 'indian' | 'mexican' | 'breakfast' | 'italian' | 'smoothie' | 'thai' | 'dessert' | 'snack';
 
@@ -304,7 +305,7 @@ export interface Plate {
 export interface CookingMethod {
   id: string;
   display_name: string;
-  equipment_required: EquipmentType[];
+  equipment_required?: EquipmentType[];
   time_active_minutes: number;
   time_total_minutes: number;
   skill_min: SkillLevel;

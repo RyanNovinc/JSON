@@ -13,7 +13,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -36,7 +36,7 @@ interface Instruction {
 
 export default function ManualMealEntryScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const route = useRoute();
+  const route = useRoute<RouteProp<RootStackParamList, 'ManualMealEntry'>>();
   const { themeColor } = useTheme();
   const { addToFavorites, removeFromFavorites, getFavoriteMeals, refreshData } = useMealPlanning();
   const { updateMeal, currentPlan } = useSimplifiedMealPlanning();
@@ -958,5 +958,32 @@ const styles = StyleSheet.create({
   timePicker: {
     backgroundColor: '#18181b',
     marginTop: 20,
+  },
+  mealTypeContainer: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#71717a',
+    marginBottom: 12,
+  },
+  mealTypeButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mealTypeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+  },
+  mealTypeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#ffffff',
   },
 });

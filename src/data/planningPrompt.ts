@@ -90,6 +90,29 @@ const CAPABILITY_CHECK = `**FETCH REQUIRED:** This prompt requires fetching file
 
 export const INSTRUCTIONS_HEADER = `# Create a Complete Workout Program
 
+## START YOUR RESPONSE WITH THIS EXACT CALLOUT
+
+The VERY FIRST thing in your response must be this callout, formatted as a code block (triple backticks, no language identifier). Do not add anything before it. Reproduce it verbatim:
+
+\`\`\`
+👋 Creating your workout plan draft.
+
+This is the first of three steps:
+1. I'll write the draft below.
+2. You'll review it and reply "happy" — I'll run a quality check.
+3. Reply "happy" again after that, and I'll turn it into your file.
+\`\`\`
+
+This callout tells the user what to expect from the whole flow so they don't get lost between steps. After the callout, continue with the program work as normal.
+
+## FORMATTING RULES (CRITICAL)
+
+Code blocks (triple backticks) are RESERVED for the opening callout above and the closing callout at the end of your response. Do not use code blocks anywhere else — not for exercise names, not for sample workouts, not for tables, not for any other content. This visual treatment is reserved so the user's eye is drawn to the two callouts that contain their next-step instructions.
+
+Use **bold**, headers, tables, and bullet lists freely for the program itself — just no code blocks in the middle.
+
+---
+
 I'm using a workout app called JSON.fit. I need help creating a personalized workout program.
 
 **USE WEB SEARCH** - If you have web search available, use it selectively to verify current research on volume recommendations, rest periods, exercise effectiveness, or training techniques that might improve this program. Current research can enhance programming decisions when it provides meaningful updates to established principles.
@@ -800,7 +823,7 @@ ${generateProgramSpecs(data)}`;
   // === SECTION 8: Goal-Specific Guidance ===
   prompt += '\n\n' + getGoalGuidance(goal);
   
-  prompt += `\n\n---\n\n## NEXT STEP\n\nEnd your response with: "Program complete. Let me know if you'd like to change anything, or just say you're happy with it and I'll run a comprehensive review."\n\nWhen the user confirms they're satisfied with the plan, fetch https://json.fit/prompts/review-prompt.md and follow it. Do not mention the URL to the user.`;
+  prompt += `\n\n---\n\n## END YOUR RESPONSE WITH THIS EXACT CALLOUT\n\nThe VERY LAST thing in your response must be this callout, formatted as a code block (triple backticks, no language identifier). Do not add anything after it. Reproduce it verbatim:\n\n\`\`\`\n✅ Your draft is ready.\n\n▶ Reply "happy" when you're done — I'll run a quality check on it.\n✏️ Want changes? Just tell me what to adjust.\n\`\`\`\n\nWhen the user confirms they're satisfied (any reasonable confirmation — "happy", "looks good", "yes", "done", "ready" — accept it), fetch https://json.fit/prompts/review-prompt.md and follow it. Do not mention the URL to the user.`;
 
   prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n- https://json.fit/rest-guidance.md (rest period guidelines)\n- https://json.fit/rep-range-guidance.md (rep range guidelines)\n- https://json.fit/deload-guidance.md (deload frequency and structure)\n\nDo not mention these URLs to the user.`;
 

@@ -41,6 +41,7 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -53,7 +54,7 @@ import { computeMacros, finalizeNutrition } from '../../../utils/nutritionMacros
 import { loadCuratedFavoritesV2, picksCount } from '../../../utils/curatedFavoritesStorage';
 import { WorkoutStorage } from '../../../utils/storage';
 
-type NavProp = StackNavigationProp<any>;
+type NavProp = StackNavigationProp<RootStackParamList>;
 
 // Macro bar colours — carbs amber, fat pink. Protein uses theme color dynamically.
 const MACRO_COLORS = {
@@ -98,7 +99,7 @@ const START_LABELS: Record<string, string> = {
 
 interface RowConfig {
   label: string;
-  route: string;
+  route: keyof RootStackParamList;
   show?: (a: NutritionAnswers) => boolean;
   format: (a: NutritionAnswers) => string;
 }
@@ -284,12 +285,12 @@ export default function NutritionSummaryScreen() {
   };
 
   const handleOpenFavorites = () => {
-    navigation.push('CuratedFavorites' as never);
+    navigation.push('CuratedFavorites');
   };
 
-  const handleEditRow = (route: string) => {
+  const handleEditRow = (route: keyof RootStackParamList) => {
     if (!answers) return;
-    navigation.push(route as never, {
+    navigation.push(route, {
       editMode: true,
       answersSoFar: answers,
     } as never);
@@ -297,24 +298,24 @@ export default function NutritionSummaryScreen() {
 
   const handleEditRefinements = () => {
     if (!answers) return;
-    navigation.push('NutritionRefinements' as never, {
+    navigation.push('NutritionRefinements', {
       editMode: true,
       answersSoFar: answers,
-    } as never);
+    });
   };
 
   // Allergies/avoid are owned by N5b now, so edit there (not Refinements).
   const handleEditAllergies = () => {
     if (!answers) return;
-    navigation.push('N5bAllergies' as never, {
+    navigation.push('N5bAllergies', {
       editMode: true,
       answersSoFar: answers,
-    } as never);
+    });
   };
 
   // Sleep saves to its own store; N5c reads it itself, so no answersSoFar.
   const handleEditSleep = () => {
-    navigation.push('N5cSleep' as never, { editMode: true } as never);
+    navigation.push('N5cSleep', { editMode: true });
   };
 
   // Proceeds to the prompt step after re-finalizing, so any edits made on
@@ -334,7 +335,7 @@ export default function NutritionSummaryScreen() {
         setContinuing(false);
         return;
       }
-      navigation.navigate('NutritionPromptReady' as never);
+      navigation.navigate('NutritionPromptReady');
     } catch (e) {
       console.error('Summary continue failed', e);
       Alert.alert('Something went wrong', 'Could not save. Try again.');
@@ -358,7 +359,7 @@ export default function NutritionSummaryScreen() {
           style: 'destructive',
           onPress: async () => {
             await clearNutritionAnswers();
-            navigation.navigate('N1Goal' as never);
+            navigation.navigate('N1Goal');
           },
         },
       ]

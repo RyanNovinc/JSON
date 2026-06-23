@@ -49,12 +49,10 @@ describe('Import Deduplication (Fix 4)', () => {
 
     const duplicateProgram: WorkoutProgram = {
       id: 'new456',
-      name: 'Same Program',
-      days: 4,
-      blocks: 2,
+      routine_name: 'Same Program',
+      days_per_week: 4,
+      blocks: [],
       fingerprint: 'generated:abc123', // Same fingerprint
-      created: '2024-01-01',
-      duration: '4 weeks',
       description: 'Test program'
     };
 
@@ -96,11 +94,9 @@ describe('Import Deduplication (Fix 4)', () => {
 
     const curatedProgram: WorkoutProgram = {
       id: 'new789',
-      name: 'Beginner Full Body',
-      days: 3,
-      blocks: 1,
-      created: '2024-01-01',
-      duration: '8 weeks',
+      routine_name: 'Beginner Full Body',
+      days_per_week: 3,
+      blocks: [],
       description: 'Curated program'
     };
 
@@ -114,12 +110,10 @@ describe('Import Deduplication (Fix 4)', () => {
   it('3. NO FINGERPRINT: program without fingerprint is imported normally', async () => {
     const programWithoutFingerprint: WorkoutProgram = {
       id: 'nofingerprint',
-      name: 'Custom Program',
-      days: 5,
-      blocks: 3,
+      routine_name: 'Custom Program',
+      days_per_week: 5,
+      blocks: [],
       // No fingerprint property
-      created: '2024-01-01',
-      duration: '12 weeks',
       description: 'User created program'
     };
 
@@ -144,12 +138,10 @@ describe('Import Deduplication (Fix 4)', () => {
 
     const uniqueProgram: WorkoutProgram = {
       id: 'unique123',
-      name: 'Unique Program',
-      days: 4,
-      blocks: 2,
+      routine_name: 'Unique Program',
+      days_per_week: 4,
+      blocks: [],
       fingerprint: 'generated:unique456', // Different from existing
-      created: '2024-01-01',
-      duration: '6 weeks',
       description: 'Unique program'
     };
 

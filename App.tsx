@@ -121,7 +121,7 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
             <WeightUnitProvider>
-              <RevenueCatProvider autoInitialize={true}>
+              <RevenueCatProvider autoInitialize={false}>
                 <ActiveWorkoutProvider>
                   <AppContent />
                 </ActiveWorkoutProvider>

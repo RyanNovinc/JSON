@@ -574,7 +574,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             const alternativePromises = exercise.alternatives.map(async (alternative: string) => {
               if (alternative && typeof alternative === 'string') {
                 try {
-                  const altImages = await resolveExerciseImagePair({ exercise: alternative, name: alternative });
+                  const altImages = await resolveExerciseImagePair({ exercise: alternative, name: alternative, sets: 0, reps: 0 });
                   newImagesMap.set(alternative, altImages);
                 } catch (error) {
                   newImagesMap.set(alternative, null);

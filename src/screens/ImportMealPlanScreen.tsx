@@ -706,52 +706,6 @@ export default function ImportMealPlanScreen() {
     );
   }
 
-  if (false) { // Disabled old slide mode
-    const handleSlideBack = () => {
-      if (currentSlide === 1) {
-        setShowSlideMode(false);
-      } else {
-        setCurrentSlide(currentSlide - 1);
-      }
-    };
-
-    const handleSlideNext = () => {
-      if (currentSlide < 4) {
-        setCurrentSlide(currentSlide + 1);
-      }
-    };
-
-    const handleExitSlideMode = () => {
-      setShowSlideMode(false);
-      setCurrentSlide(1);
-    };
-
-    const handleImportSuccess = async (mealPlan: SimplifiedMealPlan) => {
-      // Don't immediately exit slide mode - let confirmation modal handle it
-      await importMealPlanDirectly(mealPlan);
-    };
-
-    switch (currentSlide) {
-      case 1:
-        return (
-          <NutritionGeneratorStep1
-            onNext={handleSlideNext}
-            onBack={handleSlideBack}
-          />
-        );
-      case 2:
-        return (
-          <NutritionGeneratorStep4
-            onBack={handleSlideBack}
-            onImportSuccess={handleImportSuccess}
-            onExitSlideMode={handleExitSlideMode}
-          />
-        );
-      default:
-        return null;
-    }
-  }
-
   if (false) { // Disabled old instructions screen
     return (
       <SafeAreaView style={styles.container}>

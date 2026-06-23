@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableOpacity as GestureHandlerTouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -39,7 +40,7 @@ interface FavoriteExercise {
 
 export default function ExerciseDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const route = useRoute();
+  const route = useRoute<RouteProp<RootStackParamList, 'ExerciseDetail'>>();
   const { themeColor } = useTheme();
   const [isFavorite, setIsFavorite] = useState(true);
   const [currentExercise, setCurrentExercise] = useState<FavoriteExercise | null>(null);

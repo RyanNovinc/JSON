@@ -12,6 +12,7 @@ import {
   RouteProp,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -71,7 +72,7 @@ type ParamList = {
 };
 
 export default function Q2ExperienceScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'Q2Experience'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -93,10 +94,10 @@ export default function Q2ExperienceScreen() {
       return;
     }
     navigation.navigate(
-      'Q3DaysPerWeek' as never,
+      'Q3DaysPerWeek',
       {
         answersSoFar: { ...answersSoFar, trainingExperience: selected },
-      } as never,
+      },
     );
   };
 

@@ -45,6 +45,16 @@ export interface NutritionFormData {
   restrictions: string[];
   supplements: string[];
   nutrientVariety: 'high' | 'moderate' | 'low' | null;
+
+  // Step 7: Health Context (micronutrient profiling)
+  smokingStatus: 'never' | 'former' | 'current' | null;
+  sunExposure: 'minimal' | 'moderate' | 'high' | null;
+  stressLevel: 'low' | 'moderate' | 'high' | null;
+  sleepQuality: 'poor' | 'fair' | 'good' | 'excellent' | null;
+  geographicRegion: 'north_america' | 'europe' | 'asia' | 'other' | null;
+  pregnantBreastfeeding: 'none' | 'pregnant' | 'breastfeeding' | null;
+  medicalConditions: string[];
+  digestiveIssues: string[];
 }
 
 export interface MacroResults {
@@ -91,6 +101,14 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
     restrictions: [],
     supplements: [],
     nutrientVariety: null,
+    smokingStatus: null,
+    sunExposure: null,
+    stressLevel: null,
+    sleepQuality: null,
+    geographicRegion: null,
+    pregnantBreastfeeding: null,
+    medicalConditions: [],
+    digestiveIssues: [],
   });
   
   const [macroResults, setMacroResults] = useState<MacroResults | null>(null);
@@ -114,7 +132,7 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
     
     // Map the user profile back to form data format
     const savedData: Partial<NutritionFormData> = {
-      goal: userProfile.goals?.primaryGoal || userProfile.goal,
+      goal: userProfile.goal ?? null,
       targetRatePercentage: userProfile.targetRatePercentage || 0.5, // Restore the percentage value
       targetRate: userProfile.targetRate || 0.5, // Restore the kg value
       age: userProfile.age,
@@ -511,9 +529,6 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
           carbs: macroResults.macros.carbs,
           fat: macroResults.macros.fat,
           autoAdjust: false,
-        },
-        goals: {
-          primaryGoal: formData.goal,
         },
         // Add other required fields with defaults
         createdAt: userProfile?.createdAt || new Date().toISOString(),

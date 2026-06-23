@@ -50,13 +50,13 @@ export const RevenueCatProvider = ({
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOffering[]>([]);
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(autoInitialize);
   const [isConfigured, setIsConfigured] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Computed values
-  const hasJSONPro = customerInfo ? hasJSONProAccess(customerInfo) : false;
-  const hasNutrition = customerInfo ? hasJSONProAccess(customerInfo) : false;
+  // RevenueCat disabled — grant full access to everyone
+  const hasJSONPro = true;
+  const hasNutrition = true;
 
   /**
    * Initialize RevenueCat SDK

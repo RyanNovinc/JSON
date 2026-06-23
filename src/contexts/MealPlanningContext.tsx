@@ -12,6 +12,7 @@ import {
   NUTRITION_STORAGE_KEYS,
   Meal,
   GroceryList,
+  GroceryItem,
   MealPlanRequest,
   SimplifiedMealPlan,
   SimplifiedMealPlanDay,
@@ -113,7 +114,8 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
         loadCompletedMeals(),
       ]);
 
-      setState({
+      setState(prev => ({
+        ...prev,
         userProfile,
         currentMealPlan,
         favoriteMeals,
@@ -122,7 +124,7 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
         completedMeals: completedMeals || {},
         isLoading: false,
         hasCompletedQuestionnaire: !!userProfile,
-      });
+      }));
     } catch (error) {
       console.error('Failed to load nutrition data:', error);
       setState(prev => ({ ...prev, isLoading: false }));
@@ -535,7 +537,7 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
       }));
 
       // Auto-adjust macros if enabled
-      if (state.userProfile?.macros.autoAdjust) {
+      if (state.userProfile?.macros?.autoAdjust) {
         await updateMacrosBasedOnWeight();
       }
     } catch (error) {
@@ -559,9 +561,9 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
       // Adjust calories based on weight change
       let calorieAdjustment = 0;
       if (Math.abs(weightChange) > 0.5) { // Significant change
-        if (state.userProfile.goals.primaryGoal === 'weight_loss' && weightChange > 0) {
+        if (state.userProfile.goals?.primaryGoal === 'weight_loss' && weightChange > 0) {
           calorieAdjustment = -100; // Reduce calories
-        } else if (state.userProfile.goals.primaryGoal === 'weight_gain' && weightChange < 0) {
+        } else if (state.userProfile.goals?.primaryGoal === 'weight_gain' && weightChange < 0) {
           calorieAdjustment = 100; // Increase calories
         }
       }
@@ -569,7 +571,7 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
       if (calorieAdjustment !== 0) {
         const updatedMacros = {
           ...state.userProfile.macros,
-          calories: state.userProfile.macros.calories + calorieAdjustment,
+          calories: (state.userProfile.macros?.calories ?? 0) + calorieAdjustment,
         };
 
         await updateUserProfile({ macros: updatedMacros });
@@ -705,6 +707,7 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
         completedMeals: {},
         isLoading: false,
         hasCompletedQuestionnaire: false,
+        simplifiedMealPlan: null,
       });
     } catch (error) {
       console.error('Failed to clear all data:', error);

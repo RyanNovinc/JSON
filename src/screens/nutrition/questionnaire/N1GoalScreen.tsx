@@ -12,6 +12,7 @@ import {
   RouteProp,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -64,7 +65,7 @@ type ParamList = {
 };
 
 export default function N1GoalScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'N1Goal'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -86,11 +87,12 @@ export default function N1GoalScreen() {
       return;
     }
     // maintain has no rate step → jump to N3
-    const next = selected === 'maintain' ? 'N3AboutYou' : 'N2Rate';
-    navigation.navigate(
-      next as never,
-      { answersSoFar: { ...answersSoFar, goal: selected } } as never
-    );
+    const params = { answersSoFar: { ...answersSoFar, goal: selected } };
+    if (selected === 'maintain') {
+      navigation.navigate('N3AboutYou', params);
+    } else {
+      navigation.navigate('N2Rate', params);
+    }
   };
 
   const handleClose = () => navigation.popToTop();

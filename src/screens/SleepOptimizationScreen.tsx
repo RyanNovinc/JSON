@@ -14,6 +14,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Animatable from 'react-native-animatable';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
@@ -31,7 +32,7 @@ interface FormData {
 
 export default function SleepOptimizationScreen() {
   const navigation = useNavigation<SleepOptimizationNavigationProp>();
-  const route = useRoute();
+  const route = useRoute<RouteProp<RootStackParamList, 'SleepOptimizationScreen'>>();
   const { themeColor } = useTheme();
   const scrollViewRef = useRef<ScrollView>(null);
 

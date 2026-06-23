@@ -646,6 +646,34 @@ export function buildMealPlanPrompt(
     `**FETCH CHECK:** Fetch ${INSTRUCTIONS_URL} now and follow it alongside this prompt. If the fetch fails for any reason, stop and reply only:\n"${FETCH_FAIL_MESSAGE}"`
   );
 
+  // Opener callout — fires after the fetch check passes. Sets expectations
+  // for the whole three-step flow so users don't bounce thinking the AI's
+  // first response is the final deliverable.
+  parts.push(
+    [
+      '## START YOUR RESPONSE WITH THIS EXACT CALLOUT',
+      '',
+      'The VERY FIRST thing in your response must be this callout, formatted as a code block (triple backticks, no language identifier). Do not add anything before it. Reproduce it verbatim:',
+      '',
+      '```',
+      '🍽️ Creating your meal plan draft.',
+      '',
+      'This is the first of three steps:',
+      '1. I\u2019ll write the draft below.',
+      '2. You\u2019ll review it and reply "happy" \u2014 I\u2019ll run a quality check.',
+      '3. Reply "happy" again after that, and I\u2019ll turn it into your file.',
+      '```',
+      '',
+      'This callout tells the user what to expect from the whole flow so they don\u2019t get lost between steps. After the callout, continue with the meal plan work as normal.',
+      '',
+      '## FORMATTING RULES (CRITICAL)',
+      '',
+      'Code blocks (triple backticks) in YOUR CHAT RESPONSE are RESERVED for the opening callout above and the closing callout at the end. Do not use code blocks elsewhere in your visible response \u2014 not for meal names, not for example output, not for ingredient lists. Use **bold**, headers, tables, and bullet lists for the plan itself.',
+      '',
+      'Note: this rule applies to what you write in chat. Anything you fetch (such as the instructions file) is your own reference material and is not part of your visible response \u2014 the user never sees it.',
+    ].join('\n')
+  );
+
   parts.push(
     `I'm using JSON.fit. Build my ${duration}-day meal plan by SELECTING and SCALING from the options below. Do not search past chats; everything you need is here.`
   );
@@ -653,14 +681,14 @@ export function buildMealPlanPrompt(
   parts.push(
     [
       '## How this works (binding rules)',
-      '1. Each option below is an OPTION for its slot, not a promise of appearance. Fill every occurrence of a slot by choosing ONE option and a scale factor. Options may repeat across the week. If a slot has more options than occurrences, leave some out — that is correct, not an error.',
+      '1. Each option below is an OPTION for its slot, not a promise of appearance. Fill every occurrence of a slot by choosing ONE option and a scale factor. Options may repeat across the week. If a slot has more options than occurrences, leave some out \u2014 that is correct, not an error.',
       '2. scale_factor multiplies that plate\u2019s macros uniformly. Use steps of 0.05 within the stated [min\u2013max]. Macros for a serving = plate macros \u00d7 scale_factor.',
       '3. Serve options in their listed slot by default. Lunch and dinner options MAY be swapped between those two slots when it helps reuse a batch or hit a day\u2019s targets. All other slots use only their own options.',
       '4. Batch meals (serves > 1): if you schedule one, schedule its full batch within the week, or state "freeze N portions" in the prep notes. Place fridge-eaten servings on consecutive days starting at the cook; any serving more than 4 days after the cook must be a frozen portion with a thaw note ("freeze N portions; thaw overnight before day X"). Rotate its plates.',
-      `5. Maximum ${STUNT_CAP} stunt plate this week. Dessert appears exactly ${dessertOcc} time(s) — never more, never as "optional".`,
+      `5. Maximum ${STUNT_CAP} stunt plate this week. Dessert appears exactly ${dessertOcc} time(s) \u2014 never more, never as "optional".`,
       `6. Adjusters (table below) are standalone items used to close a day\u2019s gaps. Maximum ${MAX_ADJUSTERS_PER_DAY} per day.`,
       '7. Fallback order when a day misses target: rescale \u2192 adjusters \u2192 swap option within the slot \u2192 universal fillers (marked UF) for uncovered occurrences \u2192 only if all else fails, invent a simple meal and say so in the plan notes.',
-      '8. Curated options are output as references (slug + plate_id + scale_factor) — never rewrite them as recipes. Slugs and plate_ids are verbatim lookup keys; copy them exactly.',
+      '8. Curated options are output as references (slug + plate_id + scale_factor) \u2014 never rewrite them as recipes. Slugs and plate_ids are verbatim lookup keys; copy them exactly.',
     ].join('\n')
   );
 
@@ -688,7 +716,7 @@ export function buildMealPlanPrompt(
     );
   if (shortfall.length)
     targetLines.push(
-      `- The user has already accepted that their picks alone run short on: ${shortfall.join(', ')}. Close those gaps with adjusters and fillers as a matter of routine — do not flag it or ask about it.`
+      `- The user has already accepted that their picks alone run short on: ${shortfall.join(', ')}. Close those gaps with adjusters and fillers as a matter of routine \u2014 do not flag it or ask about it.`
     );
   parts.push(targetLines.join('\n'));
 
@@ -699,9 +727,9 @@ export function buildMealPlanPrompt(
   parts.push(
     [
       '## Build procedure',
-      'Work one day at a time. For each day: place batch servings first, fill the remaining occurrences, then write the arithmetic line before moving on (compute with a code tool if available — never sum in your head):',
+      'Work one day at a time. For each day: place batch servings first, fill the remaining occurrences, then write the arithmetic line before moving on (compute with a code tool if available \u2014 never sum in your head):',
       '  Mon: baked_oats:standard 1.0 (520/38) + protein_shake:standard 1.0 (250/30) + butter_chicken:standard 0.9 (648/47) + pulled_pork:bowl 0.85 (1131/52) = 2549 kcal / 167 P',
-      '(Illustrative format only — your options and numbers are in the tables above.)',
+      '(Illustrative format only \u2014 your options and numbers are in the tables above.)',
       'If a day lands outside its calorie or protein band, fix it per rule 7 and re-write the line. Do not present any day that fails its band.',
     ].join('\n')
   );
@@ -710,7 +738,7 @@ export function buildMealPlanPrompt(
     [
       '## Constraints — apply to UF rows and invented food only',
       `Allergies: ${allergies.length ? allergies.join(', ') : 'none'}. Avoid: ${avoid.length ? avoid.join(', ') : 'none'}.${challenges.length ? ` Eating challenges to accommodate: ${challenges.join(', ')}.` : ''}`,
-      'Assume a standard kitchen; prefer no-cook or one-pan inventions, \u226420 min hands-on. The curated options above were chosen by the user — do not second-guess, equipment-check, or substitute them.',
+      'Assume a standard kitchen; prefer no-cook or one-pan inventions, \u226420 min hands-on. The curated options above were chosen by the user \u2014 do not second-guess, equipment-check, or substitute them.',
     ].join('\n')
   );
 
@@ -722,15 +750,8 @@ export function buildMealPlanPrompt(
     ].join('\n')
   );
 
-  parts.push(
-    [
-      '## Output',
-      'Present the full plan in chat: each day with dates and times, the per-day arithmetic line, prep notes, then the grocery list. Present only the final clean version — no working, no drafts.',
-      'End with: "Meal plan complete. Let me know what to change, or say you\u2019re happy and I\u2019ll run a quality review."',
-      `When the user says they\u2019re happy, fetch ${REVIEW_URL} and follow it. Don\u2019t mention URLs to the user.`,
-    ].join('\n')
-  );
-
+  // Soft taste-context lives BEFORE the closing instruction so the closer
+  // is always the dead-last thing the prompt tells the AI.
   if (cuisines.length || likedDishes.length) {
     parts.push(
       [
@@ -739,6 +760,28 @@ export function buildMealPlanPrompt(
       ].join('\n')
     );
   }
+
+  // Closing callout — must be the dead-last instruction in the prompt so
+  // the AI puts it dead-last in its response.
+  parts.push(
+    [
+      '## Output',
+      'Present the full plan in chat: each day with dates and times, the per-day arithmetic line, prep notes, then the grocery list. Present only the final clean version \u2014 no working, no drafts.',
+      '',
+      '## END YOUR RESPONSE WITH THIS EXACT CALLOUT',
+      '',
+      'The VERY LAST thing in your response must be this callout, formatted as a code block (triple backticks, no language identifier). Do not add anything after it. Reproduce it verbatim:',
+      '',
+      '```',
+      '\u2705 Your meal plan draft is ready.',
+      '',
+      '\u25b6 Reply "happy" when you\u2019re done \u2014 I\u2019ll run a quality check on it.',
+      '\u270f\ufe0f Want changes? Just tell me what to adjust.',
+      '```',
+      '',
+      `When the user confirms they\u2019re satisfied (any reasonable confirmation \u2014 "happy", "looks good", "yes", "done", "ready" \u2014 accept it), fetch ${REVIEW_URL} and follow it. Don\u2019t mention URLs to the user.`,
+    ].join('\n')
+  );
 
   return parts.join('\n\n');
 }
@@ -751,7 +794,7 @@ export function buildMealPlanPrompt(
 export function buildReviewLauncher(t: PromptTargets): string {
   return `Review the meal plan above as a quality gate.
 Fetch ${REVIEW_URL} and follow it exactly.
-Verify against these targets (authoritative — use these, not numbers recalled from earlier):
+Verify against these targets (authoritative \u2014 use these, not numbers recalled from earlier):
 - Calories: ${t.kcalLo}\u2013${t.kcalHi} kcal every day
 - Protein: ${t.pLo}\u2013${t.pHi} g every day (each main meal \u2265 ${t.pFloor} g)
 - Fibre: \u2265 ${t.fibMin} g every day

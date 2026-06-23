@@ -78,6 +78,8 @@ const CUISINE_LABELS: Record<CuisineType, string> = {
   italian: 'Italian',
   smoothie: 'Smoothie',
   thai: 'Thai',
+  snack: 'Snack',
+  dessert: 'Dessert',
 };
 
 type SortMode = 'name' | 'calories' | 'protein' | 'active_time';

@@ -12,6 +12,7 @@ import {
   RouteProp,
 } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -86,7 +87,7 @@ type ParamList = {
 };
 
 export default function Q4ProgramDurationScreen() {
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ParamList, 'Q4ProgramDuration'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
@@ -108,10 +109,10 @@ export default function Q4ProgramDurationScreen() {
       return;
     }
     navigation.navigate(
-      'Q5Equipment' as never,
+      'Q5Equipment',
       {
         answersSoFar: { ...answersSoFar, programDuration: selected },
-      } as never,
+      },
     );
   };
 

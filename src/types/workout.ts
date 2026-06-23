@@ -73,6 +73,7 @@ export interface WorkoutProgram {
   id?: string;                        // Optional ID for linking to mesocycle programs
   programId?: string;                 // Optional link to mesocycle Program
   mesocycleNumber?: number;           // Which mesocycle this routine belongs to
+  fingerprint?: string;
   routine_name: string;
   description?: string;
   days_per_week: number;
