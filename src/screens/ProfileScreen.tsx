@@ -130,7 +130,7 @@ export default function ProfileScreen() {
   const handleRateApp = () => {
     const url = Platform.OS === 'ios'
       ? `${APP_STORE_URL_IOS}?action=write-review`
-      : 'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_ID';
+      : 'https://play.google.com/store/apps/details?id=com.RyanNovinc.JSON';
     openExternalUrl(url);
   };
 

@@ -110,7 +110,7 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
     if (rating === 5) {
       const appStoreUrl = Platform.OS === 'ios'
         ? 'https://apps.apple.com/au/app/json-09d4ce/id6758357834?action=write-review'
-        : 'https://play.google.com/store/apps/details?id=YOUR_PACKAGE_ID';
+        : 'https://play.google.com/store/apps/details?id=com.RyanNovinc.JSON';
 
       Linking.openURL(appStoreUrl).catch(err =>
         console.error('Failed to open app store:', err)

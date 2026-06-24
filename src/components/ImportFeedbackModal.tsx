@@ -39,7 +39,9 @@ export default function ImportFeedbackModal({
   };
 
   const handleAppStoreRate = async () => {
-    const appStoreUrl = 'https://apps.apple.com/au/app/json-09d4ce/id6758357834?action=write-review';
+    const appStoreUrl = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/au/app/json-09d4ce/id6758357834?action=write-review'
+      : 'https://play.google.com/store/apps/details?id=com.RyanNovinc.JSON';
     try {
       await Linking.openURL(appStoreUrl);
     } catch (error) {
