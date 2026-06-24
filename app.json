@@ -52,7 +52,7 @@
             {
               "scheme": "https",
               "host": "json.fit",
-              "pathPrefix": "/p/"
+              "pathPrefix": "/p/program/"
             }
           ],
           "category": [
