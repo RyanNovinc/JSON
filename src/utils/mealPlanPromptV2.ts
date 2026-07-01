@@ -53,8 +53,11 @@ import {
   NutritionAnswers,
   loadNutritionAnswers,
 } from './nutritionQuestionnaireStorage';
-import { computeMacros } from './nutritionMacros';
+import { computeMacros, computeMacrosPhaseAware } from './nutritionMacros';
 import { WorkoutStorage } from './storage';
+import { loadGoalsProfile } from './goalsProfileStorage';
+import { derivePhase } from './goalsProfile';
+import type { DerivedPhase } from './goalsProfile';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -226,6 +229,10 @@ interface SlotFrame {
 export interface BuildOpts {
   /** Axes the user accepted as short at Save time (e.g. ['protein']). */
   acceptedShortfall?: string[];
+  /** Derived phase from GoalsProfile — injected by assembleMealPlanPromptV2. */
+  derivedPhase?: DerivedPhase;
+  /** GoalsProfile weight (kg) — preferred over answers.weight for tolerances. */
+  profileWeightKg?: number;
 }
 
 interface SleepDataLike {
@@ -604,6 +611,70 @@ function adjusterSection(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Phase context block (injected into the prompt when GoalsProfile is present)
+// ---------------------------------------------------------------------------
+
+function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number): string {
+  const PHASE_LABELS: Record<DerivedPhase, string> = {
+    cut:       'Cut (fat loss)',
+    recomp:    'Recomp (simultaneous fat loss + muscle gain)',
+    lean_bulk: 'Lean bulk (controlled muscle gain)',
+    bulk:      'Bulk (muscle gain)',
+    maintain:  'Maintain (weight maintenance)',
+  };
+
+  const tdee: number = macros?.tdee ?? macros?.bmr ?? 0;
+  const cal: number  = macros?.calories ?? macros?.kcal ?? 0;
+  const delta = cal - tdee;
+
+  let rationale: string;
+  switch (phase) {
+    case 'cut':
+      rationale =
+        `Calorie deficit: ${Math.abs(delta)} kcal/day below maintenance (${tdee} kcal). ` +
+        `Deficit is capped at 500 kcal to protect lean mass. ` +
+        `Protein is set at the upper research range (2.2 g/kg) to counter muscle loss.`;
+      break;
+    case 'recomp':
+      rationale =
+        `Near-maintenance calories (${Math.abs(delta)} kcal below ${tdee} kcal maintenance). ` +
+        `Goal: simultaneous fat loss and muscle retention via high protein and consistent training. ` +
+        `Protein target (2.0 g/kg) is the primary lever.`;
+      break;
+    case 'lean_bulk':
+      rationale =
+        `5% calorie surplus above maintenance (${tdee} kcal → ${cal} kcal). ` +
+        `Controlled gain to support hypertrophy while limiting fat accumulation.`;
+      break;
+    case 'bulk':
+      rationale =
+        `10% calorie surplus above maintenance (${tdee} kcal → ${cal} kcal). ` +
+        `Aggressive surplus to maximise muscle-building stimulus.`;
+      break;
+    case 'maintain':
+      rationale =
+        `Calories set to maintenance (${cal} kcal). ` +
+        `Goal: sustain current body weight while optimising composition through training.`;
+      break;
+  }
+
+  const lines = [
+    '## Phase context (context for the macro targets below — do not output this section in the plan)',
+    `**Phase:** ${PHASE_LABELS[phase]}`,
+    rationale,
+  ];
+
+  if (phase === 'cut' && planDays > 56) {
+    lines.push(
+      '',
+      '> **Diet-break reminder:** This is a plan longer than 8 weeks on a deficit. After every 8–12 continuous weeks of a calorie deficit, schedule a 1–2 week maintenance break before resuming. This preserves metabolic rate and hormone balance. Mention this in the plan notes.'
+    );
+  }
+
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // The prompt
 // ---------------------------------------------------------------------------
 
@@ -615,7 +686,7 @@ export function buildMealPlanPrompt(
   opts?: BuildOpts
 ): string {
   const a: any = answers;
-  const targets = deriveTargets(macros, a.weight);
+  const targets = deriveTargets(macros, opts?.profileWeightKg ?? a.weight);
   if (!targets) {
     throw new Error('Macro targets are missing — complete the nutrition questionnaire first.');
   }
@@ -700,6 +771,10 @@ export function buildMealPlanPrompt(
       ? 'VARIETY — High. Maximise day to day variety: rotate the main options across more days and vary the adjusters and produce daily. Accept more cooking and shopping to avoid repetition.'
       : 'VARIETY — Balanced. Use roughly two to three distinct mains per slot across the week, and rotate the adjusters and produce so the same top-up doesn’t appear every single day. Still batch where it genuinely helps.';
   parts.push(varietyDirective);
+
+  if (opts?.derivedPhase) {
+    parts.push(phaseContextBlock(opts.derivedPhase, macros, duration));
+  }
 
   const targetLines = [
     '## Your daily targets (absolute numbers — already computed)',
@@ -811,23 +886,40 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
   if (!answers) {
     throw new Error('Please complete the nutrition questionnaire first.');
   }
-  
-  // Try to get macros from computeMacros(answers) first
-  let macros = computeMacros(answers as NutritionAnswers);
-  
-  // If computeMacros returns null, try legacy fallback
+
+  // Phase-aware path: load GoalsProfile and use research-based macro targets
+  // when available. Falls back to questionnaire-derived macros for users who
+  // haven't completed GoalsIntake (backwards compatible).
+  let macros: any = null;
+  let derivedPhase: DerivedPhase | undefined;
+  let profileWeightKg: number | undefined;
+
+  const profile = await loadGoalsProfile();
+  if (profile) {
+    macros = computeMacrosPhaseAware(answers as NutritionAnswers, profile);
+    if (macros) {
+      derivedPhase = derivePhase(profile);
+      profileWeightKg = profile.currentWeightKg;
+    }
+  }
+
+  // Fallback 1: questionnaire-derived macros (N1/N2 self-diagnosis path)
+  if (!macros) {
+    macros = computeMacros(answers as NutritionAnswers);
+  }
+
+  // Fallback 2: legacy finalized results (pre-V2 questionnaire completions)
   if (!macros) {
     const legacyResults = await WorkoutStorage.loadNutritionResults();
     if (legacyResults?.macroResults) {
       macros = legacyResults.macroResults;
     }
   }
-  
-  // If both sources fail, throw
+
   if (!macros) {
     throw new Error('Macro targets are missing — complete the nutrition questionnaire first.');
   }
-  
+
   const favorites = await loadCuratedFavoritesV2();
   let sleep: SleepDataLike | null = null;
   try {
@@ -842,25 +934,33 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
   } catch {
     sleep = null;
   }
-  return buildMealPlanPrompt(answers as NutritionAnswers, macros, favorites, sleep, opts);
+
+  return buildMealPlanPrompt(answers as NutritionAnswers, macros, favorites, sleep, {
+    ...opts,
+    derivedPhase,
+    profileWeightKg,
+  });
 }
 
 export async function buildReviewLauncherFromStorage(): Promise<string> {
   const answers = await loadNutritionAnswers();
   if (!answers) throw new Error('Please complete the nutrition questionnaire first.');
-  
-  // Try to get macros from computeMacros(answers) first
-  let macros = computeMacros(answers as NutritionAnswers);
-  
-  // If computeMacros returns null, try legacy fallback
+
+  let macros: any = null;
+  let profileWeightKg: number | undefined;
+
+  const profile = await loadGoalsProfile();
+  if (profile) {
+    macros = computeMacrosPhaseAware(answers as NutritionAnswers, profile);
+    if (macros) profileWeightKg = profile.currentWeightKg;
+  }
+  if (!macros) macros = computeMacros(answers as NutritionAnswers);
   if (!macros) {
     const legacyResults = await WorkoutStorage.loadNutritionResults();
-    if (legacyResults?.macroResults) {
-      macros = legacyResults.macroResults;
-    }
+    if (legacyResults?.macroResults) macros = legacyResults.macroResults;
   }
-  
-  const targets = deriveTargets(macros, (answers as any).weight);
+
+  const targets = deriveTargets(macros, profileWeightKg ?? (answers as any).weight);
   if (!targets) throw new Error('Macro targets are missing.');
   return buildReviewLauncher(targets);
 }

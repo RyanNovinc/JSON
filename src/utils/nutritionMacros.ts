@@ -18,6 +18,8 @@
 import { WorkoutStorage } from './storage';
 import { clearNutritionAnswers } from './nutritionQuestionnaireStorage';
 import type { NutritionAnswers } from './nutritionQuestionnaireStorage';
+import { derivePhase } from './goalsProfile';
+import type { GoalsProfile, DerivedPhase } from './goalsProfile';
 
 export interface MacroResults {
   bmr: number;
@@ -164,4 +166,101 @@ export async function finalizeNutrition(
   try { await clearNutritionAnswers(); } catch { /* intentionally swallowed */ }
 
   return macros;
+}
+
+// ---------------------------------------------------------------------------
+// Phase-aware macro computation (Phase 2 — phase-aware nutrition)
+// ---------------------------------------------------------------------------
+
+// Daily calorie target derived from the research-based rates in the build plan.
+// Used by computeMacrosPhaseAware; exported for unit tests.
+export function phaseCaloricTarget(
+  tdee: number,
+  phase: DerivedPhase,
+  weightKg: number,
+  bodyFatPct?: number
+): number {
+  switch (phase) {
+    case 'bulk':
+      return Math.round(tdee * 1.10);
+    case 'lean_bulk':
+      return Math.round(tdee * 1.05);
+    case 'cut': {
+      // Leaner-means-slower ceiling: scale max deficit to available fat mass.
+      // Prevents aggressive deficits when little fat remains to lose.
+      const maxWeeklyLossPct =
+        bodyFatPct == null ? 0.5
+        : bodyFatPct < 15  ? 0.35
+        : bodyFatPct < 20  ? 0.5
+        : 0.75;
+      const maxWeeklyLossKg = (weightKg * maxWeeklyLossPct) / 100;
+      const ceilingDeficit = Math.round((maxWeeklyLossKg * 7700) / 7);
+      const deficit = Math.min(500, ceilingDeficit);
+      return Math.round(tdee - deficit);
+    }
+    case 'recomp':
+      // Small deficit (8% or 300 kcal, whichever is smaller) — maintenance-adjacent.
+      return Math.round(tdee - Math.min(300, Math.round(tdee * 0.08)));
+    case 'maintain':
+    default:
+      return tdee;
+  }
+}
+
+// Research-based protein targets (g/kg), biased high on cut to protect muscle.
+function phaseProteinPerKg(phase: DerivedPhase): number {
+  switch (phase) {
+    case 'cut':      return 2.2;
+    case 'recomp':   return 2.0;
+    case 'lean_bulk':
+    case 'maintain': return 1.8;
+    case 'bulk':     return 1.6;
+  }
+}
+
+// Phase-aware macro computation. Uses GoalsProfile weight (authoritative) and
+// derives calorie/protein targets from the derived phase. Falls back gracefully
+// when questionnaire fields required for BMR are not yet collected.
+export function computeMacrosPhaseAware(
+  answers: NutritionAnswers,
+  profile: GoalsProfile
+): MacroResults | null {
+  const { gender, age, height, activityLevel } = answers;
+  const weight = profile.currentWeightKg;
+  if (!gender || !age || !height || !activityLevel || !weight) return null;
+
+  // Mifflin-St Jeor BMR (mirrors computeMacros — keep in lockstep)
+  let bmr: number;
+  if (gender === 'male') {
+    bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+  } else if (gender === 'female') {
+    bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+  } else {
+    const male   = 10 * weight + 6.25 * height - 5 * age + 5;
+    const female = 10 * weight + 6.25 * height - 5 * age - 161;
+    bmr = (male + female) / 2;
+  }
+
+  const tdee = Math.round(bmr * (ACTIVITY_MULTIPLIERS[activityLevel] ?? 1.55));
+  const phase = derivePhase(profile);
+  const calories = phaseCaloricTarget(tdee, phase, weight, profile.currentBodyFatPct);
+
+  // Protein: research-based floor; bumped above the split-derived amount if needed.
+  const pFloor = Math.round(weight * phaseProteinPerKg(phase));
+  const split =
+    answers.dietType === 'custom' && answers.customMacros
+      ? { p: answers.customMacros.protein, c: answers.customMacros.carbs, f: answers.customMacros.fat }
+      : DIET_SPLITS[answers.dietType ?? 'balanced'] ?? DIET_SPLITS.balanced;
+
+  const splitProtein = Math.round((calories * split.p) / 100 / 4);
+  const protein = Math.max(splitProtein, pFloor);
+
+  // Remaining calories split fat:carb at the user's chosen ratio.
+  const proteinKcal = protein * 4;
+  const remaining = Math.max(0, calories - proteinKcal);
+  const fatRatio = split.f / (split.f + split.c);
+  const fat = Math.round((remaining * fatRatio) / 9);
+  const carbs = Math.round((calories - proteinKcal - fat * 9) / 4);
+
+  return { bmr: Math.round(bmr), tdee, calories, protein, carbs, fat };
 }
