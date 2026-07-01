@@ -10,7 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import * as Clipboard from 'expo-clipboard';
-import { assemblePlanningPrompt } from '../data/planningPrompt';
+import { assemblePlanningPromptAsync } from '../data/planningPrompt';
 import { QuestionnaireData } from '../data/workoutPrompt';
 import { WorkoutStorage } from '../utils/storage';
 
@@ -91,7 +91,7 @@ export default function WorkoutGeneratorStep1New({ onNext, onBack }: WorkoutGene
   const handleCopyPrompt = async () => {
     try {
       const questionnaireData = await loadQuestionnaireData();
-      const planningPrompt = assemblePlanningPrompt(questionnaireData);
+      const planningPrompt = await assemblePlanningPromptAsync(questionnaireData);
       await Clipboard.setStringAsync(planningPrompt);
       setPromptCopied(true);
       setTimeout(() => setPromptCopied(false), 2000);

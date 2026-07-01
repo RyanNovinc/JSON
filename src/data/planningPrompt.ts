@@ -1,6 +1,9 @@
 import { QuestionnaireData, generateProgramSpecs } from './workoutPrompt';
 import { CompletedMesocycleSummary } from './programStorage';
-import { ExperienceTier, VolumeTier } from './volumeRanges';
+import { ExperienceTier, VolumeTier, VOLUME_TIER_LABELS } from './volumeRanges';
+import { loadGoalsProfile } from '../utils/goalsProfileStorage';
+import { derivePhase, phaseToVolumeTier } from '../utils/goalsProfile';
+import type { GoalsProfile, DerivedPhase, VolumeTierInfo } from '../utils/goalsProfile';
 
 export interface ProgramContext {
   totalMesocycles: number;
@@ -702,7 +705,8 @@ function getProgramDocumentFormat(): string {
 
 export function assemblePlanningPrompt(
   data: QuestionnaireData,
-  mesocycleContext?: ProgramContext
+  mesocycleContext?: ProgramContext,
+  phaseContext?: string
 ): string {
   // Derive trigger values
   const goal = data.primaryGoal || 'build_muscle';
@@ -767,6 +771,11 @@ ${generateProgramSpecs(data)}`;
     }
   }
 
+  // === SECTION 3.4: Phase context (injected by assemblePlanningPromptWithProfile) ===
+  if (phaseContext) {
+    prompt += '\n\n' + phaseContext;
+  }
+
   // === SECTION 3.5: Constraint Layer ===
   prompt += '\n\n' + generateConstraintLayer(data);
   
@@ -828,4 +837,110 @@ ${generateProgramSpecs(data)}`;
   prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n- https://json.fit/rest-guidance.md (rest period guidelines)\n- https://json.fit/rep-range-guidance.md (rep range guidelines)\n- https://json.fit/deload-guidance.md (deload frequency and structure)\n\nDo not mention these URLs to the user.`;
 
   return prompt;
+}
+
+// ---------------------------------------------------------------------------
+// Phase-aware training helpers (Phase 3 — phase-aware training)
+// ---------------------------------------------------------------------------
+
+// Maps VolumeTierInfo.tier → the volumePreference string used by getVolumeTargets.
+const TIER_TO_PREF: Record<'low' | 'moderate' | 'high', VolumeTier> = {
+  low:      '8-12',
+  moderate: '12-16',
+  high:     '16-20',
+};
+
+// Builds the ## Phase Context block injected into the training prompt.
+// volumeTierInfo: from phaseToVolumeTier(phase)
+// userVolumePref: data.volumePreference (may be undefined / 'not_sure')
+export function buildTrainingPhaseContext(
+  phase: DerivedPhase,
+  volumeTierInfo: VolumeTierInfo,
+  userVolumePref?: string
+): string {
+  const phasePref = TIER_TO_PREF[volumeTierInfo.tier];
+  const prefLabel = VOLUME_TIER_LABELS[phasePref];
+  const userOverrode =
+    userVolumePref && userVolumePref !== 'not_sure' && userVolumePref !== phasePref;
+
+  const lines: string[] = [];
+  lines.push('## PHASE CONTEXT');
+  lines.push('');
+  lines.push(`**Derived training phase:** ${phase}`);
+  lines.push(`**Phase rationale:** ${volumeTierInfo.rationale}`);
+  lines.push('');
+
+  // Volume guidance per phase
+  switch (phase) {
+    case 'cut':
+      lines.push('**Volume:** Target the MEV (minimum effective volume) end of the prescribed tier. Avoid pushing into MRV — recovery is compromised in a deficit.');
+      lines.push('**RIR:** Add +1 RIR relative to your defaults (i.e., stop 1 rep further from failure than usual) to limit CNS fatigue and protect recovery.');
+      lines.push('**Goal:** Muscle retention. Maintain strength and movement quality; do not chase hypertrophy volume under a calorie deficit.');
+      break;
+    case 'recomp':
+      lines.push('**Volume:** Target the mid-MAV range within the prescribed tier. Consistent stimulus without excess fatigue is the priority.');
+      lines.push('**RIR:** Standard defaults. No modification needed.');
+      lines.push('**Goal:** Body recomposition. Simultaneous muscle retention (or modest gain) and fat loss. Prioritise compound movements and protein delivery.');
+      break;
+    case 'lean_bulk':
+      lines.push('**Volume:** Target the MAV-to-MRV range within the prescribed tier. A small surplus supports hypertrophy; capitalise on it with progressive volume.');
+      lines.push('**RIR:** Standard defaults, or 1 RIR fewer on isolation work when recovery allows.');
+      lines.push('**Goal:** Hypertrophy. Lean surplus supports muscle gain; apply progressive overload across the mesocycle.');
+      break;
+    case 'bulk':
+      lines.push('**Volume:** Bias toward MRV within the prescribed tier. A surplus supports recovery from higher volumes — use it.');
+      lines.push('**RIR:** Standard defaults, or 1 RIR fewer on accessories and isolation work when recovery is strong.');
+      lines.push('**Goal:** Hypertrophy, maximise stimulus. The surplus is there to fuel adaptation — apply meaningful overload each block.');
+      break;
+    case 'maintain':
+    default:
+      lines.push('**Volume:** Target the MEV end of the prescribed tier. Minimum effective dose to maintain muscle mass without unnecessary fatigue.');
+      lines.push('**RIR:** Standard defaults.');
+      lines.push('**Goal:** Maintenance stimulus. Preserve strength and muscle; avoid accumulating fatigue that would disrupt other life priorities.');
+      break;
+  }
+
+  lines.push('');
+  lines.push(`**Recommended volume tier:** ${prefLabel} (${phasePref} sets/muscle/week)`);
+
+  if (userOverrode) {
+    lines.push('');
+    lines.push(`> **Note:** The user has explicitly selected the ${VOLUME_TIER_LABELS[userVolumePref as VolumeTier] ?? userVolumePref} volume tier, which differs from the phase recommendation (${prefLabel}). Honour the user's selection but apply the phase-specific RIR and goal guidance above.`);
+  }
+
+  return lines.join('\n');
+}
+
+// Pure, synchronous: same as assemblePlanningPrompt but accepts a GoalsProfile
+// and injects the phase context block automatically.
+export function assemblePlanningPromptWithProfile(
+  data: QuestionnaireData,
+  profile: GoalsProfile,
+  mesocycleContext?: ProgramContext
+): string {
+  const phase = derivePhase(profile);
+  const volumeTierInfo = phaseToVolumeTier(phase);
+
+  // Only override volumePreference when the user hasn't made an explicit choice.
+  const resolvedData =
+    !data.volumePreference || data.volumePreference === 'not_sure'
+      ? { ...data, volumePreference: TIER_TO_PREF[volumeTierInfo.tier] }
+      : data;
+
+  const phaseCtx = buildTrainingPhaseContext(phase, volumeTierInfo, data.volumePreference);
+  return assemblePlanningPrompt(resolvedData, mesocycleContext, phaseCtx);
+}
+
+// Async wrapper: loads the GoalsProfile from storage; if found, delegates to
+// assemblePlanningPromptWithProfile; otherwise falls back to the sync function
+// (preserves existing behaviour for users without a GoalsProfile).
+export async function assemblePlanningPromptAsync(
+  data: QuestionnaireData,
+  mesocycleContext?: ProgramContext
+): Promise<string> {
+  const profile = await loadGoalsProfile();
+  if (profile) {
+    return assemblePlanningPromptWithProfile(data, profile, mesocycleContext);
+  }
+  return assemblePlanningPrompt(data, mesocycleContext);
 }

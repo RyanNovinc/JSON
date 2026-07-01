@@ -67,7 +67,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ImportConfirmationModal from '../../components/import/ImportConfirmationModal';
 import { useTheme } from '../../contexts/ThemeContext';
 import { WorkoutStorage } from '../../utils/storage';
-import { assemblePlanningPrompt } from '../../data/planningPrompt';
+import { assemblePlanningPromptAsync } from '../../data/planningPrompt';
 import { AIProvider } from '../../components/questionnaire/AILaunchSheet';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useWorkoutImport } from '../../hooks/useWorkoutImport';
@@ -187,7 +187,7 @@ export default function PromptReadyScreen() {
         // which left both the preview AND the copied prompt empty. Mirror
         // NutritionPromptReadyScreen: pass the raw loaded data straight through.
         const merged = { ...(fitnessGoals ?? {}), ...(equipment ?? {}) };
-        const assembled = assemblePlanningPrompt(merged);
+        const assembled = await assemblePlanningPromptAsync(merged);
 
         setPrompt(assembled);
         setPromptPreview(buildWorkoutPreview(merged));
