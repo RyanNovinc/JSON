@@ -16,6 +16,7 @@
 // WorkoutStorage also flip the matching NutritionCompletionStatus flags.
 
 import { WorkoutStorage } from './storage';
+import { clearNutritionAnswers } from './nutritionQuestionnaireStorage';
 import type { NutritionAnswers } from './nutritionQuestionnaireStorage';
 
 export interface MacroResults {
@@ -157,6 +158,10 @@ export async function finalizeNutrition(
 
   await WorkoutStorage.saveNutritionResults(nutritionResults);
   await WorkoutStorage.saveBudgetCookingResults(budgetCookingResults);
+
+  // Clear the nutrition draft to prevent draft/final divergence once results are saved.
+  // Best-effort: a failure here must not break finalization (results are already saved).
+  try { await clearNutritionAnswers(); } catch { /* intentionally swallowed */ }
 
   return macros;
 }
