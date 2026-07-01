@@ -1,7 +1,14 @@
 import { hasCompleteQuestionnaire, loadQuestionnaireAnswers } from './questionnaireStorage';
 import { hasCompleteNutritionAnswers, loadNutritionAnswers } from './nutritionQuestionnaireStorage';
+import { hasGoalsProfile } from './goalsProfileStorage';
 
-export async function startWorkoutFlow(
+// ── Continuation helpers ───────────────────────────────────────────────────
+//
+// Called by GoalsIntakeScreen after the profile is saved, and also used
+// internally by startWorkoutFlow / startNutritionFlow when the profile
+// already exists. Split out so the gate logic stays in one place.
+
+export async function continueWorkoutFlow(
   navigation: any,
   extraParams: Record<string, any> = {}
 ): Promise<void> {
@@ -13,7 +20,7 @@ export async function startWorkoutFlow(
   }
 }
 
-export async function startNutritionFlow(
+export async function continueNutritionFlow(
   navigation: any,
   extraParams: Record<string, any> = {}
 ): Promise<void> {
@@ -23,4 +30,32 @@ export async function startNutritionFlow(
     const saved = await loadNutritionAnswers();
     navigation.navigate('N1Goal', { answersSoFar: saved || {}, ...extraParams });
   }
+}
+
+// ── Public entry points ────────────────────────────────────────────────────
+//
+// These are the only callers that know about the GoalsIntake gate.
+// All paths that start a planning flow (CreateChooserScreen, HomeScreen,
+// NutritionHomeScreen, OnboardingContractScreen) go through one of these.
+
+export async function startWorkoutFlow(
+  navigation: any,
+  extraParams: Record<string, any> = {}
+): Promise<void> {
+  if (!await hasGoalsProfile()) {
+    navigation.navigate('GoalsIntake', { nextFlow: 'workout' });
+    return;
+  }
+  await continueWorkoutFlow(navigation, extraParams);
+}
+
+export async function startNutritionFlow(
+  navigation: any,
+  extraParams: Record<string, any> = {}
+): Promise<void> {
+  if (!await hasGoalsProfile()) {
+    navigation.navigate('GoalsIntake', { nextFlow: 'nutrition' });
+    return;
+  }
+  await continueNutritionFlow(navigation, extraParams);
 }

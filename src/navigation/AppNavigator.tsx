@@ -90,6 +90,9 @@ import WeightTrackerScreen from '../screens/WeightTrackerScreen';
 import WeekVolumeScreen from '../screens/WeekVolumeScreen';
 import CreateChooserScreen from '../screens/CreateChooserScreen';
 
+// Shared goals intake — runs once before either planning flow
+import GoalsIntakeScreen from '../screens/GoalsIntakeScreen';
+
 // Import questionnaire screens
 import Q1PrimaryGoalScreen from '../screens/questionnaire/Q1PrimaryGoalScreen';
 import Q2ExperienceScreen from '../screens/questionnaire/Q2ExperienceScreen';
@@ -324,6 +327,8 @@ export type RootStackParamList = {
   CookMode: { mealSlug: string; plateIndex: number; methodIndex: number };
   MealsLibrary: { cuisine?: string; title?: string } | undefined;
   SmoothiesLibrary: undefined;
+  // Shared goals intake (gates both planning flows — runs once)
+  GoalsIntake: { nextFlow: 'workout' | 'nutrition' } | undefined;
   // Questionnaire screens
   Q1PrimaryGoal: { answersSoFar?: Record<string, any>; editMode?: boolean; fromOnboarding?: boolean } | undefined;
   Q2Experience: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
@@ -1320,8 +1325,19 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
+              {/* Shared goals intake — gates both planning flows, runs once */}
+              <RootStack.Screen
+                name="GoalsIntake"
+                component={GoalsIntakeScreen}
+                options={{
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: { opacity: current.progress },
+                  }),
+                }}
+              />
               {/* Questionnaire screens */}
-              <RootStack.Screen name="Q1PrimaryGoal" component={Q1PrimaryGoalScreen} options={{ 
+              <RootStack.Screen name="Q1PrimaryGoal" component={Q1PrimaryGoalScreen} options={{
                 headerShown: false,
                 cardStyleInterpolator: ({ current }) => ({
                   cardStyle: {
