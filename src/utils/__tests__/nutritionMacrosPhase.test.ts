@@ -22,12 +22,42 @@ describe('phaseCaloricTarget', () => {
   const tdee = 2600;
   const weight = 80;
 
-  it('bulk → +10% surplus', () => {
-    expect(phaseCaloricTarget(tdee, 'bulk', weight)).toBe(Math.round(tdee * 1.1));
+  // ── Bulk: surplus scales with trainingState ─────────────────────────────
+  it('bulk, new trainee → +10% surplus', () => {
+    expect(phaseCaloricTarget(tdee, 'bulk', weight, undefined, 'new')).toBe(Math.round(tdee * 1.10));
   });
 
-  it('lean_bulk → +5% surplus', () => {
-    expect(phaseCaloricTarget(tdee, 'lean_bulk', weight)).toBe(Math.round(tdee * 1.05));
+  it('bulk, consistent trainee → +7% surplus', () => {
+    expect(phaseCaloricTarget(tdee, 'bulk', weight, undefined, 'consistent')).toBe(Math.round(tdee * 1.07));
+  });
+
+  it('bulk, returning trainee → +7% surplus (grouped with consistent)', () => {
+    expect(phaseCaloricTarget(tdee, 'bulk', weight, undefined, 'returning')).toBe(Math.round(tdee * 1.07));
+  });
+
+  it('bulk, advanced trainee → +5% surplus', () => {
+    expect(phaseCaloricTarget(tdee, 'bulk', weight, undefined, 'advanced')).toBe(Math.round(tdee * 1.05));
+  });
+
+  it('bulk, no trainingState → +7% default (consistent fallback)', () => {
+    expect(phaseCaloricTarget(tdee, 'bulk', weight)).toBe(Math.round(tdee * 1.07));
+  });
+
+  // ── Lean bulk: same scaling, smaller magnitudes ─────────────────────────
+  it('lean_bulk, new trainee → +7% surplus', () => {
+    expect(phaseCaloricTarget(tdee, 'lean_bulk', weight, undefined, 'new')).toBe(Math.round(tdee * 1.07));
+  });
+
+  it('lean_bulk, consistent trainee → +5% surplus', () => {
+    expect(phaseCaloricTarget(tdee, 'lean_bulk', weight, undefined, 'consistent')).toBe(Math.round(tdee * 1.05));
+  });
+
+  it('lean_bulk, returning trainee → +5% surplus (grouped with consistent)', () => {
+    expect(phaseCaloricTarget(tdee, 'lean_bulk', weight, undefined, 'returning')).toBe(Math.round(tdee * 1.05));
+  });
+
+  it('lean_bulk, advanced trainee → +3% surplus', () => {
+    expect(phaseCaloricTarget(tdee, 'lean_bulk', weight, undefined, 'advanced')).toBe(Math.round(tdee * 1.03));
   });
 
   it('maintain → TDEE unchanged', () => {
@@ -182,6 +212,50 @@ describe('Archetype 3 — returner-recomp: recomp phase', () => {
     // Both should be near-maintenance: deficit within 350 kcal for both
     expect(leanCutResult.tdee - leanCutResult.calories).toBeLessThanOrEqual(350);
     expect(recompResult.tdee  - recompResult.calories).toBeLessThanOrEqual(300);
+  });
+});
+
+// ── trainingState-scaled surplus (end-to-end via computeMacrosPhaseAware) ──
+
+describe('trainingState-scaled surplus', () => {
+  const sharedAnswers: NutritionAnswers = {
+    gender: 'male',
+    age: 30,
+    height: 178,
+    activityLevel: 'moderate',
+    dietType: 'balanced',
+  };
+
+  // Both profiles have no BF data and gaining direction → 'bulk' phase.
+  const newProfile: GoalsProfile    = { currentWeightKg: 80, goalWeightKg: 87, trainingState: 'new' };
+  const advProfile: GoalsProfile    = { currentWeightKg: 80, goalWeightKg: 87, trainingState: 'advanced' };
+  const retProfile: GoalsProfile    = { currentWeightKg: 80, goalWeightKg: 87, trainingState: 'returning' };
+  const conProfile: GoalsProfile    = { currentWeightKg: 80, goalWeightKg: 87, trainingState: 'consistent' };
+
+  it('new lifter gets more bulk calories than advanced lifter at identical stats', () => {
+    const newResult = computeMacrosPhaseAware(sharedAnswers, newProfile)!;
+    const advResult = computeMacrosPhaseAware(sharedAnswers, advProfile)!;
+    expect(newResult.calories).toBeGreaterThan(advResult.calories);
+  });
+
+  it('returning lifter gets same bulk calories as consistent (not new)', () => {
+    const retResult = computeMacrosPhaseAware(sharedAnswers, retProfile)!;
+    const conResult = computeMacrosPhaseAware(sharedAnswers, conProfile)!;
+    expect(retResult.calories).toBe(conResult.calories);
+  });
+
+  it('returning bulk calories are strictly less than new bulk calories', () => {
+    const retResult = computeMacrosPhaseAware(sharedAnswers, retProfile)!;
+    const newResult = computeMacrosPhaseAware(sharedAnswers, newProfile)!;
+    expect(retResult.calories).toBeLessThan(newResult.calories);
+  });
+
+  it('new bulk is exactly +10% TDEE, advanced bulk is exactly +5% TDEE', () => {
+    const newResult = computeMacrosPhaseAware(sharedAnswers, newProfile)!;
+    const advResult = computeMacrosPhaseAware(sharedAnswers, advProfile)!;
+    const tdee = newResult.tdee; // same TDEE for same stats
+    expect(newResult.calories).toBe(Math.round(tdee * 1.10));
+    expect(advResult.calories).toBe(Math.round(tdee * 1.05));
   });
 });
 

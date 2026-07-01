@@ -643,13 +643,15 @@ function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number): 
       break;
     case 'lean_bulk':
       rationale =
-        `5% calorie surplus above maintenance (${tdee} kcal → ${cal} kcal). ` +
-        `Controlled gain to support hypertrophy while limiting fat accumulation.`;
+        `${Math.abs(delta)} kcal/day surplus above maintenance (${tdee} kcal → ${cal} kcal). ` +
+        `Controlled gain to support hypertrophy while limiting fat accumulation. ` +
+        `Note: a surplus this small can fall within TDEE estimation error (±10–15%); accurate calorie tracking is required for it to function as a true surplus.`;
       break;
     case 'bulk':
       rationale =
-        `10% calorie surplus above maintenance (${tdee} kcal → ${cal} kcal). ` +
-        `Aggressive surplus to maximise muscle-building stimulus.`;
+        `${Math.abs(delta)} kcal/day surplus above maintenance (${tdee} kcal → ${cal} kcal). ` +
+        `Surplus is scaled to training experience — larger for new lifters, smaller for advanced, reflecting their respective muscle-gain rate ceilings. ` +
+        `Note: a small surplus (especially at advanced level) can fall within TDEE estimation error (±10–15%); accurate calorie tracking is required for it to function as a true surplus.`;
       break;
     case 'maintain':
       rationale =

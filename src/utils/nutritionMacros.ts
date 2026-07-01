@@ -19,7 +19,7 @@ import { WorkoutStorage } from './storage';
 import { clearNutritionAnswers } from './nutritionQuestionnaireStorage';
 import type { NutritionAnswers } from './nutritionQuestionnaireStorage';
 import { derivePhase } from './goalsProfile';
-import type { GoalsProfile, DerivedPhase } from './goalsProfile';
+import type { GoalsProfile, DerivedPhase, TrainingState } from './goalsProfile';
 
 export interface MacroResults {
   bmr: number;
@@ -178,13 +178,27 @@ export function phaseCaloricTarget(
   tdee: number,
   phase: DerivedPhase,
   weightKg: number,
-  bodyFatPct?: number
+  bodyFatPct?: number,
+  trainingState?: TrainingState
 ): number {
   switch (phase) {
-    case 'bulk':
-      return Math.round(tdee * 1.10);
-    case 'lean_bulk':
-      return Math.round(tdee * 1.05);
+    case 'bulk': {
+      // Surplus scales with adaptation rate: new gains fast, advanced gains slow.
+      // "returning" groups with "consistent" — muscle-memory regain needs a modest
+      // surplus, and elevated-BF returners are already routed to recomp.
+      const surplusPct =
+        trainingState === 'new'      ? 1.10
+        : trainingState === 'advanced' ? 1.05
+        : 1.07; // consistent + returning (and default when unknown)
+      return Math.round(tdee * surplusPct);
+    }
+    case 'lean_bulk': {
+      const surplusPct =
+        trainingState === 'new'      ? 1.07
+        : trainingState === 'advanced' ? 1.03
+        : 1.05; // consistent + returning
+      return Math.round(tdee * surplusPct);
+    }
     case 'cut': {
       // Leaner-means-slower ceiling: scale max deficit to available fat mass.
       // Prevents aggressive deficits when little fat remains to lose.
@@ -243,7 +257,7 @@ export function computeMacrosPhaseAware(
 
   const tdee = Math.round(bmr * (ACTIVITY_MULTIPLIERS[activityLevel] ?? 1.55));
   const phase = derivePhase(profile);
-  const calories = phaseCaloricTarget(tdee, phase, weight, profile.currentBodyFatPct);
+  const calories = phaseCaloricTarget(tdee, phase, weight, profile.currentBodyFatPct, profile.trainingState);
 
   // Protein: research-based floor; bumped above the split-derived amount if needed.
   const pFloor = Math.round(weight * phaseProteinPerKg(phase));
