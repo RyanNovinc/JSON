@@ -2,7 +2,7 @@
   "expo": {
     "name": "JSON.fit",
     "slug": "json",
-    "version": "1.0.22",
+    "version": "1.0.23",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -16,13 +16,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "119",
+      "buildNumber": "120",
       "associatedDomains": [
         "applinks:json.fit"
       ],
       "entitlements": {
         "aps-environment": "development",
-        "com.apple.developer.associated-domains": ["applinks:json.fit"]
+        "com.apple.developer.associated-domains": [
+          "applinks:json.fit"
+        ]
       },
       "infoPlist": {
         "CFBundleDisplayName": "JSON.fit",
@@ -37,7 +39,7 @@
         "backgroundColor": "#0f0f0f"
       },
       "package": "com.RyanNovinc.JSON",
-      "versionCode": 95,
+      "versionCode": 96,
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,
@@ -75,7 +77,8 @@
       "@react-native-community/datetimepicker",
       "expo-live-activity",
       "expo-asset",
-      "expo-notifications"
+      "expo-notifications",
+      "./plugins/withAdiRegistration"
     ]
   }
 }
