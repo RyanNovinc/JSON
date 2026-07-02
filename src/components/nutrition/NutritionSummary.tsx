@@ -5,8 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
@@ -111,7 +111,7 @@ export const NutritionSummary: React.FC<Props> = ({
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar style="light" />
       
       <ScrollView style={styles.fullScrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}

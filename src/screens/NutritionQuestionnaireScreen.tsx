@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, StyleSheet, StatusBar, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { WorkoutStorage } from '../utils/storage';
@@ -640,7 +641,7 @@ export const NutritionQuestionnaireScreen: React.FC<Props> = ({ navigation, rout
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar style="light" />
       {renderStep()}
     </View>
   );

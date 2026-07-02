@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-   
-  ScrollView, 
-  StatusBar,
+import {
+  View,
+  Text,
+
+  ScrollView,
   Animated,
   TextInput,
   KeyboardAvoidingView,
   Platform,
   StyleSheet
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -2944,7 +2944,7 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar style="light" />
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
@@ -2954,8 +2954,8 @@ const BudgetCookingQuestionnaireScreen: React.FC<BudgetCookingQuestionnaireProps
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
+      <StatusBar style="light" />
+
       {renderStep()}
       
       {renderFooter()}
