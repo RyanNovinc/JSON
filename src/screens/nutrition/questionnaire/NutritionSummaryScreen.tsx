@@ -53,6 +53,7 @@ import {
 import { computeMacros, finalizeNutrition } from '../../../utils/nutritionMacros';
 import { loadCuratedFavoritesV2, picksCount } from '../../../utils/curatedFavoritesStorage';
 import { WorkoutStorage } from '../../../utils/storage';
+import GoalsProfileSummaryCard from '../../../components/GoalsProfileSummaryCard';
 
 type NavProp = StackNavigationProp<RootStackParamList>;
 
@@ -432,6 +433,10 @@ export default function NutritionSummaryScreen() {
         <Text style={styles.subtitle}>
           Everything your plan is built from. Tap any row to change it.
         </Text>
+
+        {/* Goals & stats — surfaced here so current stats, goal, and
+            derived phase are visible where the plan is reviewed. */}
+        <GoalsProfileSummaryCard />
 
         {/* Macro recap */}
         {macros && (

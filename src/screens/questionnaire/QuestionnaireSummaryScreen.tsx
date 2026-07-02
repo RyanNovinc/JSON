@@ -42,6 +42,7 @@ import {
   clearQuestionnaireAnswers,
   QuestionnaireAnswers,
 } from '../../utils/questionnaireStorage';
+import GoalsProfileSummaryCard from '../../components/GoalsProfileSummaryCard';
 
 type NavProp = StackNavigationProp<any>;
 
@@ -300,6 +301,10 @@ export default function QuestionnaireSummaryScreen() {
         <Text style={styles.subtitle}>
           Tap any answer to change it, or continue to the next step.
         </Text>
+
+        {/* Goals & stats — surfaced here so current stats, goal, and
+            derived phase are visible where the plan is reviewed. */}
+        <GoalsProfileSummaryCard />
 
         {/* Main rows */}
         <View style={styles.section}>
