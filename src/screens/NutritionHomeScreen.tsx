@@ -7,7 +7,6 @@ import {
   Share,
   Modal,
   Animated,
-  Dimensions,
   TextInput,
   ScrollView,
   Pressable,
@@ -35,8 +34,6 @@ import { CuratedMeal } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
 
 type NutritionNavigationProp = StackNavigationProp<RootStackParamList>;
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Base label for the "mains" shelf (the savoury main dishes — australian,
 // indian, mexican, italian, thai). Change this in one place if you'd rather

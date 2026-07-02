@@ -6,7 +6,6 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  Dimensions,
   Share,
   Platform,
 } from 'react-native';
@@ -33,8 +32,6 @@ import { displayIngredient } from '../utils/ingredientScaling';
 
 type RecipeDetailRoute = RouteProp<RootStackParamList, 'RecipeDetail'>;
 type RecipeDetailNav = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============================================================================
 // Helpers

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,8 +14,6 @@ import { WorkoutStorage } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
 import AddItemModal from '../components/AddItemModal';
 import FridgePantryPreferencesModal from '../components/FridgePantryPreferencesModal';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 
 interface IngredientItem {

@@ -65,7 +65,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
   Animated,
   Easing,
@@ -160,13 +160,12 @@ type ParamList = {
     | undefined;
 };
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
+// Content width is capped so cards don't stretch to unreasonable sizes on
+// tablets/resized windows — see cardWidth in the component below.
 const GRID_H_PADDING = 18;
 const GRID_GAP = 12;
-const CARD_WIDTH = (SCREEN_WIDTH - GRID_H_PADDING * 2 - GRID_GAP) / 2;
+const MAX_GRID_CONTENT_WIDTH = 700;
 const FOOTER_HEIGHT = 34;
-const CARD_HEIGHT = Math.round((CARD_WIDTH * 4) / 3);
 
 const TITLE_BLOCK_HEIGHT = 78; // serif title + one-line subtitle
 const TAB_BAR_HEIGHT = 46;
@@ -536,6 +535,7 @@ const MealCard = React.memo(function MealCard({
 }: MealCardProps) {
   const imageSource = getMealImage(meal.image_filename ?? meal.plates?.[0]?.image_filename);
   const multi = isMultiPlate(meal);
+  const height = Math.round((width * 4) / 3);
 
   let picks = 0;
   const prefix = meal.slug + ':';
@@ -546,7 +546,7 @@ const MealCard = React.memo(function MealCard({
   const isSel = picks > 0;
 
   return (
-    <View style={[styles.card, { width }]}>
+    <View style={[styles.card, { width, height }]}>
       <TouchableOpacity
         style={styles.cardTapArea}
         activeOpacity={0.88}
@@ -565,7 +565,7 @@ const MealCard = React.memo(function MealCard({
         <View
           style={[
             styles.cardImageWrap,
-            { height: CARD_HEIGHT - (multi ? FOOTER_HEIGHT : 0) },
+            { height: height - (multi ? FOOTER_HEIGHT : 0) },
           ]}
         >
           {imageSource ? (
@@ -842,6 +842,11 @@ export default function CuratedFavoritesScreen() {
   const route = useRoute<RouteProp<ParamList, 'CuratedFavorites'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = useMemo(() => {
+    const contentWidth = Math.min(windowWidth, MAX_GRID_CONTENT_WIDTH);
+    return (contentWidth - GRID_H_PADDING * 2 - GRID_GAP) / 2;
+  }, [windowWidth]);
 
   const allMeals = useMemo(() => Object.values(CURATED_MEALS) as CuratedMeal[], []);
 
@@ -1416,7 +1421,7 @@ export default function CuratedFavoritesScreen() {
                   <MealCard
                     key={m.slug}
                     meal={m}
-                    width={CARD_WIDTH}
+                    width={cardWidth}
                     selected={viewSelected}
                     themeColor={themeColor}
                     onPress={() => onCardPress(m)}
@@ -1427,7 +1432,7 @@ export default function CuratedFavoritesScreen() {
                     }}
                   />
                 ))}
-                {pair.length === 1 && <View style={{ width: CARD_WIDTH }} />}
+                {pair.length === 1 && <View style={{ width: cardWidth }} />}
               </View>
             ))}
           </View>
@@ -1703,7 +1708,6 @@ const styles = StyleSheet.create({
   gridRow: { flexDirection: 'row', gap: GRID_GAP, marginBottom: GRID_GAP },
 
   card: {
-    height: CARD_HEIGHT,
     borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: '#16161a',

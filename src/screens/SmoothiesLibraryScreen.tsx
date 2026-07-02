@@ -6,7 +6,7 @@ import {
   Image,
   FlatList,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,11 +24,11 @@ type SmoothiesLibraryNavigationProp = StackNavigationProp<
   'SmoothiesLibrary'
 >;
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
+// Content width is capped so cards don't stretch to unreasonable sizes on
+// tablets/resized windows — see cardWidth in the component below.
 const GRID_HORIZONTAL_PADDING = 16;
 const GRID_GAP = 10;
-const CARD_WIDTH = (SCREEN_WIDTH - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP) / 2;
+const MAX_GRID_CONTENT_WIDTH = 700;
 
 // ============================================================================
 // HELPERS
@@ -54,6 +54,11 @@ export default function SmoothiesLibraryScreen() {
   const navigation = useNavigation<SmoothiesLibraryNavigationProp>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = useMemo(() => {
+    const contentWidth = Math.min(windowWidth, MAX_GRID_CONTENT_WIDTH);
+    return (contentWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP) / 2;
+  }, [windowWidth]);
 
   const allSmoothies = useMemo(
     () => Object.values(CURATED_MEALS).filter(m => m.cuisine === 'smoothie'),
@@ -82,7 +87,7 @@ export default function SmoothiesLibraryScreen() {
 
       return (
         <TouchableOpacity
-          style={[styles.card, { width: CARD_WIDTH }]}
+          style={[styles.card, { width: cardWidth }]}
           activeOpacity={0.85}
           onPress={() => handleSmoothiePress(smoothie)}
         >
@@ -128,7 +133,7 @@ export default function SmoothiesLibraryScreen() {
         </TouchableOpacity>
       );
     },
-    [handleSmoothiePress, themeColor]
+    [handleSmoothiePress, themeColor, cardWidth]
   );
 
   // ============================================================================

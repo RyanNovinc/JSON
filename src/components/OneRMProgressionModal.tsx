@@ -16,7 +16,7 @@ import {
   Modal,
   ActivityIndicator,
   Animated,
-  Dimensions,
+  useWindowDimensions,
   Easing,
   Platform,
   KeyboardAvoidingView,
@@ -26,8 +26,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { WorkoutStorage } from '../utils/storage';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const SCREEN_WIDTH = Dimensions.get('window').width;
+// Chart width is capped so it doesn't stretch to an unreasonable size on
+// tablets/resized windows — see chartWidth in ProgressionChart below.
+const MAX_CHART_WIDTH = 500;
 
 // Epley formula: 1RM = weight × (1 + reps/30)
 const defaultCalc1RM = (weight: number, reps: number): number => {
@@ -108,7 +109,8 @@ export default function OneRMProgressionModal({
   themeColor,
   globalUnit,
 }: OneRMProgressionModalProps) {
-  const slideY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const { height: windowHeight } = useWindowDimensions();
+  const slideY = useRef(new Animated.Value(windowHeight)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const [internalVisible, setInternalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -141,7 +143,7 @@ export default function OneRMProgressionModal({
   const handleClose = () => {
     Animated.parallel([
       Animated.timing(slideY, {
-        toValue: SCREEN_HEIGHT,
+        toValue: windowHeight,
         duration: 240,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
@@ -589,9 +591,10 @@ function ProgressionChart({
   allTimeBest,
 }: ChartProps) {
   // Chart dimensions — bigger now that tab is dedicated to chart
+  const { width: windowWidth } = useWindowDimensions();
   const horizontalPadding = 16;
   const chartCardPadding = 14;
-  const chartWidth = SCREEN_WIDTH - (horizontalPadding * 2) - (chartCardPadding * 2);
+  const chartWidth = Math.min(windowWidth, MAX_CHART_WIDTH) - (horizontalPadding * 2) - (chartCardPadding * 2);
   const chartHeight = 260;
   const chartLeftPad = 38;
   const chartRightPad = 6;

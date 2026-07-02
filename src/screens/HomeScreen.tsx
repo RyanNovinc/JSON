@@ -10,7 +10,6 @@ import {
   Modal,
   Animated,
   Image,
-  Dimensions,
   TextInput,
   ScrollView,
   Pressable,
@@ -43,8 +42,6 @@ import { startWorkoutFlow } from '../utils/questionnaireRouting';
 import { Analytics } from '../services/analytics';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============================================================================
 // Bulking programs — gradient fallback colors (used when no image is found).

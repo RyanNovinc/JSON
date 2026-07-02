@@ -6,7 +6,7 @@ import {
   Image,
   FlatList,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,16 +22,16 @@ import { getMealImage } from '../assets/mealImages';
 type MealsLibraryNavigationProp = StackNavigationProp<RootStackParamList, 'MealsLibrary'>;
 type MealsLibraryRouteProp = RouteProp<RootStackParamList, 'MealsLibrary'>;
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 // ============================================================================
 // LAYOUT MATH
 // ============================================================================
 // 2-column grid. scrollContent padding 16 each side = 32. Inter-card gap = 10.
-// Available width: SCREEN_WIDTH - 32 - 10 = card pair width. Each card = half.
+// Available width: contentWidth - 32 - 10 = card pair width. Each card = half.
+// Content width is capped so cards don't stretch to unreasonable sizes on
+// tablets/resized windows — see cardWidth in the component below.
 const GRID_HORIZONTAL_PADDING = 16;
 const GRID_GAP = 10;
-const CARD_WIDTH = (SCREEN_WIDTH - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP) / 2;
+const MAX_GRID_CONTENT_WIDTH = 700;
 
 // ============================================================================
 // HELPERS
@@ -102,7 +102,12 @@ export default function MealsLibraryScreen() {
   const route = useRoute<MealsLibraryRouteProp>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
-  
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = useMemo(() => {
+    const contentWidth = Math.min(windowWidth, MAX_GRID_CONTENT_WIDTH);
+    return (contentWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP) / 2;
+  }, [windowWidth]);
+
   // Get filtering parameters from route
   const { cuisine: routeCuisine, title: routeTitle } = route.params || {};
   
@@ -221,7 +226,7 @@ export default function MealsLibraryScreen() {
 
       return (
         <TouchableOpacity
-          style={[styles.card, { width: CARD_WIDTH }]}
+          style={[styles.card, { width: cardWidth }]}
           activeOpacity={0.85}
           onPress={() => handleMealPress(meal)}
         >
@@ -269,7 +274,7 @@ export default function MealsLibraryScreen() {
         </TouchableOpacity>
       );
     },
-    [handleMealPress, themeColor]
+    [handleMealPress, themeColor, cardWidth]
   );
 
   // ============================================================================

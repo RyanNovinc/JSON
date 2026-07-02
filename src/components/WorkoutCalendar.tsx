@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Modal,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,10 +15,9 @@ import { useWeightUnit } from '../contexts/WeightUnitContext';
 
 import { useNavigation } from '@react-navigation/native';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-// Calendar inner width = screen width - (16 horizontal margin × 2) - (6 horizontal padding × 2) = 12px buffer
-const CALENDAR_INNER_WIDTH = SCREEN_WIDTH - 32 - 12;
-const DAY_CELL_WIDTH = Math.floor(CALENDAR_INNER_WIDTH / 7);
+// Calendar width is capped so day cells don't stretch to unreasonable
+// sizes on tablets/resized windows — see dayCellWidth in the component below.
+const MAX_CALENDAR_WIDTH = 500;
 
 interface WorkoutCalendarProps {
   visible?: boolean;
@@ -29,6 +28,12 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
   const navigation = useNavigation();
   const { themeColor } = useTheme();
   const { convertWeight, globalUnit } = useWeightUnit();
+  const { width: windowWidth } = useWindowDimensions();
+  const dayCellWidth = useMemo(() => {
+    // Calendar inner width = calendar width - (16 horizontal margin × 2) - (6 horizontal padding × 2) = 12px buffer
+    const calendarInnerWidth = Math.min(windowWidth, MAX_CALENDAR_WIDTH) - 32 - 12;
+    return Math.floor(calendarInnerWidth / 7);
+  }, [windowWidth]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [workoutDays, setWorkoutDays] = useState<Map<string, any[]>>(new Map());
@@ -247,7 +252,7 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
 
     // Empty leading cells
     for (let i = 0; i < startingDayOfWeek; i++) {
-      cells.push(<View key={`empty-${i}`} style={styles.dayCell} />);
+      cells.push(<View key={`empty-${i}`} style={[styles.dayCell, { width: dayCellWidth }]} />);
     }
 
     // Day cells
@@ -257,7 +262,7 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
       const hasWorkout = workoutDays.has(dateKey);
       const isToday = dateKey === new Date().toDateString();
 
-      const cellStyle: any[] = [styles.dayCell];
+      const cellStyle: any[] = [styles.dayCell, { width: dayCellWidth }];
       const textStyle: any[] = [styles.dayText];
 
       if (hasWorkout) {
@@ -385,7 +390,7 @@ export default function WorkoutCalendar({ visible = true, onClose }: WorkoutCale
           {/* Day names */}
           <View style={styles.dayNamesRow}>
             {dayNames.map((day, idx) => (
-              <View key={idx} style={styles.dayNameCell}>
+              <View key={idx} style={[styles.dayNameCell, { width: dayCellWidth }]}>
                 <Text style={styles.dayName}>{day}</Text>
               </View>
             ))}
@@ -709,7 +714,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   dayNameCell: {
-    width: DAY_CELL_WIDTH,
     alignItems: 'center',
   },
   dayName: {
@@ -735,7 +739,6 @@ const styles = StyleSheet.create({
   },
   // Day cell — explicit pixel width, fixed height
   dayCell: {
-    width: DAY_CELL_WIDTH,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
