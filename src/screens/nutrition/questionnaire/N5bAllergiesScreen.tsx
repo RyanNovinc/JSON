@@ -57,7 +57,7 @@ const COMMON_ALLERGENS = [
 
 
 type ParamList = {
-  N5bAllergies: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N5bAllergies: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function N5bAllergiesScreen() {
@@ -68,6 +68,7 @@ export default function N5bAllergiesScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const [allergies, setAllergies] = useState<string[]>(
     Array.isArray(answersSoFar.allergies) ? answersSoFar.allergies : []
@@ -112,6 +113,7 @@ export default function N5bAllergiesScreen() {
           ...answersSoFar,
           allergies,
         },
+        flowStepOffset: stepOffset,
       }
     );
   };
@@ -146,8 +148,8 @@ export default function N5bAllergiesScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={6}
-        totalSteps={12}
+        currentStep={stepOffset + 6}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

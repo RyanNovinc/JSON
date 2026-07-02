@@ -16,13 +16,11 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { TrainingState } from '../utils/goalsProfile';
+import { TrainingState, derivePhase } from '../utils/goalsProfile';
 import { saveGoalsProfile } from '../utils/goalsProfileStorage';
 import { WorkoutStorage } from '../utils/storage';
-import {
-  continueWorkoutFlow,
-  continueNutritionFlow,
-} from '../utils/questionnaireRouting';
+import { saveNutritionAnswers } from '../utils/nutritionQuestionnaireStorage';
+import { deriveSyntheticNutritionAnswers } from '../utils/questionnaireRouting';
 import QuestionCard from './questionnaire/QuestionCard';
 import QuestionnaireHeader from './questionnaire/QuestionnaireHeader';
 import WeightEntrySheet from '../components/nutrition/WeightEntrySheet';
@@ -119,6 +117,17 @@ export default function GoalsIntakeScreen() {
   const [goalWeightInput, setGoalWeightInput] = useState('');
   const [selectedLeannessIdx, setSelectedLeannessIdx] = useState<number | null>(null);
 
+  // These are the numbered opening steps of the questionnaire — the
+  // progress bar spans profile setup AND the plan-specific questions that
+  // follow, so the user never sees a step count reset or a separate gate.
+  // Nutrition's count reacts to the target-weight input: a filled-in goal
+  // weight means N1/N2 will be skipped (see handleComplete), so the total
+  // is 2 shorter — computed here so the bar never jumps once N3 appears.
+  const willSkipNutritionGoalRate = nextFlow === 'nutrition' && goalWeightInput.trim().length > 0;
+  const PLAN_STEP_COUNT =
+    nextFlow === 'workout' ? 6 : willSkipNutritionGoalRate ? 10 : 12;
+  const totalFlowSteps = 3 + PLAN_STEP_COUNT;
+
   // ── Save state ─────────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
 
@@ -182,10 +191,38 @@ export default function GoalsIntakeScreen() {
         trainingState,
       });
 
+      // First-run always flows straight into the plan-specific questions —
+      // no completeness check here. Checking hasCompleteQuestionnaire (or
+      // its nutrition equivalent) at this point is exactly what caused the
+      // old teleport-to-summary bug for users with stale/legacy answers.
       if (nextFlow === 'workout') {
-        await continueWorkoutFlow(navigation);
+        navigation.navigate('Q1PrimaryGoal', {
+          answersSoFar: {},
+          flowStepOffset: 3,
+        });
+      } else if (goalWeightKg != null) {
+        // A goal weight was just set, so the profile can supply a direction
+        // — skip N1 (goal) and N2 (rate), mirroring continueNutritionFlow's
+        // returning-user logic. flowStepOffset drops by 2 (N1+N2 removed)
+        // so N3 onward still number continuously against the reduced total.
+        const phase = derivePhase({
+          currentWeightKg,
+          currentBodyFatPct: currentBFPct,
+          goalWeightKg,
+          goalBodyFatPct: goalBFPct,
+          trainingState,
+        });
+        const synth = deriveSyntheticNutritionAnswers(phase);
+        await saveNutritionAnswers(synth);
+        navigation.navigate('N3AboutYou', {
+          answersSoFar: synth,
+          flowStepOffset: 1,
+        });
       } else {
-        await continueNutritionFlow(navigation);
+        navigation.navigate('N1Goal', {
+          answersSoFar: {},
+          flowStepOffset: 3,
+        });
       }
     } catch {
       setSaving(false);
@@ -208,7 +245,7 @@ export default function GoalsIntakeScreen() {
     <View style={styles.container}>
       <QuestionnaireHeader
         currentStep={step}
-        totalSteps={3}
+        totalSteps={totalFlowSteps}
         onBack={handleBack}
         onClose={handleClose}
       />

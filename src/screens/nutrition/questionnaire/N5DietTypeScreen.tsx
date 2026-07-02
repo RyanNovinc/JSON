@@ -79,7 +79,7 @@ const OPTIONS: DietOption[] = [
 ];
 
 type ParamList = {
-  N5DietType: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N5DietType: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function N5DietTypeScreen() {
@@ -90,6 +90,7 @@ export default function N5DietTypeScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const [selected, setSelected] = useState<DietValue | null>(
     (answersSoFar.dietType as DietValue) ?? null
@@ -150,6 +151,7 @@ export default function N5DietTypeScreen() {
           dietType: selected,
           ...(customMacros ? { customMacros } : {}),
         },
+        flowStepOffset: stepOffset,
       }
     );
   };
@@ -160,8 +162,8 @@ export default function N5DietTypeScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={5}
-        totalSteps={12}
+        currentStep={stepOffset + 5}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

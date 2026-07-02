@@ -22,13 +22,16 @@ export async function saveGoalsProfile(profile: GoalsProfile): Promise<void> {
   }
 }
 
+// Falls back to a minimal default profile when none exists yet, so this
+// also works as the create path for a user editing Goals & Stats before
+// ever completing the onboarding gate.
 export async function updateGoalsProfileField<K extends keyof GoalsProfile>(
   field: K,
   value: GoalsProfile[K]
 ): Promise<void> {
   const current = await loadGoalsProfile();
-  if (!current) return;
-  await saveGoalsProfile({ ...current, [field]: value });
+  const base: GoalsProfile = current ?? { currentWeightKg: 0, trainingState: 'new' };
+  await saveGoalsProfile({ ...base, [field]: value });
 }
 
 export async function clearGoalsProfile(): Promise<void> {

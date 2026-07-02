@@ -34,11 +34,12 @@ describe('Questionnaire Integration - Bug Fix Verification', () => {
     // Save the complete answers
     await saveQuestionnaireAnswers(completeAnswers);
 
-    // Verify both storage keys were written
+    // Verify the draft key and both legacy storage keys were written
     const setCalls = (AsyncStorage.setItem as jest.Mock).mock.calls;
-    expect(setCalls.length).toBe(2);
-    expect(setCalls[0][0]).toBe('fitness_goals_questionnaire_results');
-    expect(setCalls[1][0]).toBe('equipment_preferences_questionnaire_results');
+    expect(setCalls.length).toBe(3);
+    expect(setCalls[0][0]).toBe('@workout_questionnaire_answers');
+    expect(setCalls[1][0]).toBe('fitness_goals_questionnaire_results');
+    expect(setCalls[2][0]).toBe('equipment_preferences_questionnaire_results');
 
     // Verify volumePreference is in the saved data
     const savedData = JSON.parse(setCalls[0][1]);

@@ -2,7 +2,7 @@ import { QuestionnaireData, generateProgramSpecs } from './workoutPrompt';
 import { CompletedMesocycleSummary } from './programStorage';
 import { ExperienceTier, VolumeTier, VOLUME_TIER_LABELS } from './volumeRanges';
 import { loadGoalsProfile } from '../utils/goalsProfileStorage';
-import { derivePhase, phaseToVolumeTier } from '../utils/goalsProfile';
+import { derivePhase, phaseToVolumeTier, deriveExperienceTier } from '../utils/goalsProfile';
 import type { GoalsProfile, DerivedPhase, VolumeTierInfo } from '../utils/goalsProfile';
 
 export interface ProgramContext {
@@ -927,10 +927,16 @@ export function assemblePlanningPromptWithProfile(
   const volumeTierInfo = phaseToVolumeTier(phase);
 
   // Only override volumePreference when the user hasn't made an explicit choice.
-  const resolvedData =
-    !data.volumePreference || data.volumePreference === 'not_sure'
-      ? { ...data, volumePreference: TIER_TO_PREF[volumeTierInfo.tier] }
-      : data;
+  // trainingExperience is always sourced from the profile — Q2 (training
+  // experience) no longer exists in the visible flow, so trainingState is
+  // the only place this can come from (see deriveExperienceTier).
+  const resolvedData = {
+    ...data,
+    ...(!data.volumePreference || data.volumePreference === 'not_sure'
+      ? { volumePreference: TIER_TO_PREF[volumeTierInfo.tier] }
+      : {}),
+    trainingExperience: deriveExperienceTier(profile.trainingState),
+  };
 
   const phaseCtx = buildTrainingPhaseContext(phase, volumeTierInfo, data.volumePreference);
   return assemblePlanningPrompt(resolvedData, mesocycleContext, phaseCtx);

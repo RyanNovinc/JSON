@@ -121,6 +121,10 @@ export default function ProfileScreen() {
     navigation.navigate('WeightTracker' as never);
   };
 
+  const openGoalsStats = () => {
+    navigation.navigate('GoalsStats' as never);
+  };
+
   const openExternalUrl = (url: string) => {
     Linking.openURL(url).catch(err =>
       console.error('Failed to open URL:', err)
@@ -248,6 +252,27 @@ export default function ProfileScreen() {
             <Text style={styles.heroLinkSub}>Log your weight and see progress over time</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color="#71717a" />
+        </TouchableOpacity>
+
+        {/* ============================================================
+            GOALS & STATS — standalone, always-reachable view of
+            GoalsProfile (training state, current/goal weight & body fat).
+            ============================================================ */}
+        <TouchableOpacity
+          style={styles.row}
+          onPress={openGoalsStats}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="View goals and stats"
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="trophy-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Goals &amp; stats</Text>
+            <Text style={styles.rowSub}>Training state, weight, and goals</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color="#71717a" />
         </TouchableOpacity>
 
         {/* ============================================================

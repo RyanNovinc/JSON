@@ -81,7 +81,7 @@ const OPTIONS: GoalOption[] = [
 ];
 
 type ParamList = {
-  Q1PrimaryGoal: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q1PrimaryGoal: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function Q1PrimaryGoalScreen() {
@@ -92,23 +92,29 @@ export default function Q1PrimaryGoalScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<PrimaryGoalValue | null>(
     (answersSoFar.primaryGoal as PrimaryGoalValue) ?? null,
   );
 
   const handleNext = async () => {
     if (!selected) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateQuestionnaireField('primaryGoal', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
     }
+    // Q2 (training experience) is gone from the visible flow — trainingState
+    // on GoalsProfile is the source of truth now. Straight to Q3.
     navigation.navigate(
-      'Q2Experience',
-      { answersSoFar: { ...answersSoFar, primaryGoal: selected } },
+      'Q3DaysPerWeek',
+      {
+        answersSoFar: { ...answersSoFar, primaryGoal: selected },
+        flowStepOffset: stepOffset,
+      },
     );
   };
 
@@ -121,8 +127,8 @@ export default function Q1PrimaryGoalScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={1}
-        totalSteps={7}
+        currentStep={stepOffset + 1}
+        totalSteps={stepOffset + 6}
         showBack={true}
         onBack={handleBack}
         onClose={handleClose}

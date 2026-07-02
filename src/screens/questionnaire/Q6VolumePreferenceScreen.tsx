@@ -61,7 +61,7 @@ const OPTIONS: VolumeOption[] = [
 ];
 
 type ParamList = {
-  Q6Volume: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q6Volume: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function Q6VolumePreferenceScreen() {
@@ -72,16 +72,17 @@ export default function Q6VolumePreferenceScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<VolumePreferenceValue | null>(
     (answersSoFar.volumePreference as VolumePreferenceValue) ?? null,
   );
 
   const handleNext = async () => {
     if (!selected) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateQuestionnaireField('volumePreference', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
@@ -90,6 +91,7 @@ export default function Q6VolumePreferenceScreen() {
       'Q7RestStyle',
       {
         answersSoFar: { ...answersSoFar, volumePreference: selected },
+        flowStepOffset: stepOffset,
       },
     );
   };
@@ -100,8 +102,8 @@ export default function Q6VolumePreferenceScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={6}
-        totalSteps={7}
+        currentStep={stepOffset + 5}
+        totalSteps={stepOffset + 6}
         onBack={handleBack}
         onClose={handleClose}
       />

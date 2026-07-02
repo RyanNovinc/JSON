@@ -68,7 +68,7 @@ const OPTIONS: ExperienceOption[] = [
 ];
 
 type ParamList = {
-  Q2Experience: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q2Experience: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function Q2ExperienceScreen() {
@@ -79,16 +79,17 @@ export default function Q2ExperienceScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<ExperienceValue | null>(
     (answersSoFar.trainingExperience as ExperienceValue) ?? null,
   );
 
   const handleNext = async () => {
     if (!selected) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateQuestionnaireField('trainingExperience', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
@@ -97,6 +98,7 @@ export default function Q2ExperienceScreen() {
       'Q3DaysPerWeek',
       {
         answersSoFar: { ...answersSoFar, trainingExperience: selected },
+        flowStepOffset: stepOffset,
       },
     );
   };
@@ -107,8 +109,8 @@ export default function Q2ExperienceScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={2}
-        totalSteps={7}
+        currentStep={stepOffset + 2}
+        totalSteps={stepOffset + 7}
         onBack={handleBack}
         onClose={handleClose}
       />

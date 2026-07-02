@@ -905,9 +905,16 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
   let derivedPhase: DerivedPhase | undefined;
   let profileWeightKg: number | undefined;
 
+  // Phase-aware macros only apply when the profile can actually supply a
+  // direction (a goal weight — see derivePhase). Without one, N1/N2 were
+  // shown to the user as the fallback (see continueNutritionFlow), and
+  // computeMacrosPhaseAware would silently derive 'maintain' regardless of
+  // what they answered — the shown-but-ignored bug. In that case fall
+  // through to computeMacros, which reads answers.goal/targetRatePercentage
+  // directly and actually honors them.
   const profile = await loadGoalsProfile();
   let hasLeanMassTargets: boolean | undefined;
-  if (profile) {
+  if (profile && profile.goalWeightKg != null) {
     macros = computeMacrosPhaseAware(answers as NutritionAnswers, profile);
     if (macros) {
       derivedPhase = derivePhase(profile);
@@ -916,7 +923,8 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
     }
   }
 
-  // Fallback 1: questionnaire-derived macros (N1/N2 self-diagnosis path)
+  // Fallback 1: questionnaire-derived macros (N1/N2 self-diagnosis path) —
+  // also the path for a profile with no goal weight.
   if (!macros) {
     macros = computeMacros(answers as NutritionAnswers);
   }
@@ -963,8 +971,10 @@ export async function buildReviewLauncherFromStorage(): Promise<string> {
   let macros: any = null;
   let profileWeightKg: number | undefined;
 
+  // Same gate as assembleMealPlanPromptV2 — only phase-aware when the
+  // profile can supply a direction; otherwise honor the N1/N2 fallback.
   const profile = await loadGoalsProfile();
-  if (profile) {
+  if (profile && profile.goalWeightKg != null) {
     macros = computeMacrosPhaseAware(answers as NutritionAnswers, profile);
     if (macros) profileWeightKg = profile.currentWeightKg;
   }

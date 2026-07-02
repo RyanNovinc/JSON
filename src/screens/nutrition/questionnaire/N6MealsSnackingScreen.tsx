@@ -99,7 +99,7 @@ const VARIETY_OPTIONS: VarietyOption[] = [
 
 type ParamList = {
   N6MealsSnacking:
-    | { answersSoFar?: Record<string, any>; editMode?: boolean }
+    | { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number }
     | undefined;
 };
 
@@ -111,6 +111,7 @@ export default function N6MealsSnackingScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const [meals, setMeals] = useState<number | null>(
     (answersSoFar.mealsPerDay as number) ?? null
@@ -149,6 +150,7 @@ export default function N6MealsSnackingScreen() {
           snackingStyle: snack.style,
           mealVariety: variety,
         },
+        flowStepOffset: stepOffset,
       }
     );
   };
@@ -161,8 +163,8 @@ export default function N6MealsSnackingScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={8}
-        totalSteps={12}
+        currentStep={stepOffset + 8}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

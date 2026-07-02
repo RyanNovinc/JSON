@@ -23,11 +23,20 @@ const PHASE_SYNTH: Record<
   maintain:  { goal: 'maintain' },
 };
 
+// Shared with GoalsIntakeScreen's first-run skip path, so both places that
+// bypass N1/N2 derive the same synthetic answers from a single mapping.
+export function deriveSyntheticNutritionAnswers(
+  phase: DerivedPhase
+): { goal: NutritionAnswers['goal']; targetRatePercentage?: number } {
+  return PHASE_SYNTH[phase];
+}
+
 // ── Continuation helpers ───────────────────────────────────────────────────
 //
-// Called by GoalsIntakeScreen after the profile is saved, and also used
-// internally by startWorkoutFlow / startNutritionFlow when the profile
-// already exists. Split out so the gate logic stays in one place.
+// Called by ConfirmStatsScreen once a returning user's stats are
+// confirmed. Not used on the first-run path — GoalsIntakeScreen navigates
+// straight into Q1PrimaryGoal/N1Goal itself, since a first-run user has by
+// definition never completed these questions before.
 
 export async function continueWorkoutFlow(
   navigation: any,
@@ -60,10 +69,19 @@ export async function continueNutritionFlow(
     const profile = await loadGoalsProfile();
     if (profile?.goalWeightKg) {
       const phase = derivePhase(profile);
-      const synth = PHASE_SYNTH[phase];
+      const synth = deriveSyntheticNutritionAnswers(phase);
       const merged = { ...saved, ...synth };
       await saveNutritionAnswers(merged);
-      navigation.navigate('N3AboutYou', { answersSoFar: merged, ...extraParams });
+      // N1 and N2 are being skipped — shift the step count down by 2 so
+      // N3 onward still number continuously (see the flowStepOffset
+      // convention: the same shift is applied uniformly to every
+      // downstream screen's hardcoded currentStep/totalSteps literals).
+      const baseOffset = (extraParams as any).flowStepOffset ?? 0;
+      navigation.navigate('N3AboutYou', {
+        answersSoFar: merged,
+        ...extraParams,
+        flowStepOffset: baseOffset - 2,
+      });
       return;
     }
   }
@@ -73,9 +91,21 @@ export async function continueNutritionFlow(
 
 // ── Public entry points ────────────────────────────────────────────────────
 //
-// These are the only callers that know about the GoalsIntake gate.
-// All paths that start a planning flow (CreateChooserScreen, HomeScreen,
-// NutritionHomeScreen, OnboardingContractScreen) go through one of these.
+// These are the only callers that know about the GoalsIntake / ConfirmStats
+// split. All paths that start a planning flow (CreateChooserScreen,
+// HomeScreen, NutritionHomeScreen, OnboardingContractScreen) go through
+// one of these.
+//
+// No GoalsProfile yet (or one with an unset current weight — see
+// hasGoalsProfile, which already treats currentWeightKg <= 0 as unset):
+// first-run, straight into GoalsIntake, which flows directly into the
+// plan-specific questions with no completeness check and no teleport.
+//
+// GoalsProfile already usable: returning user. One lightweight "still
+// accurate?" stats confirmation, THEN the same complete-vs-fresh routing
+// continueWorkoutFlow/continueNutritionFlow always had — now safe because
+// hasCompleteQuestionnaire reads the workout draft key instead of the
+// legacy/shared one.
 
 export async function startWorkoutFlow(
   navigation: any,
@@ -85,7 +115,7 @@ export async function startWorkoutFlow(
     navigation.navigate('GoalsIntake', { nextFlow: 'workout' });
     return;
   }
-  await continueWorkoutFlow(navigation, extraParams);
+  navigation.navigate('ConfirmStats', { nextFlow: 'workout', extraParams });
 }
 
 export async function startNutritionFlow(
@@ -96,5 +126,5 @@ export async function startNutritionFlow(
     navigation.navigate('GoalsIntake', { nextFlow: 'nutrition' });
     return;
   }
-  await continueNutritionFlow(navigation, extraParams);
+  navigation.navigate('ConfirmStats', { nextFlow: 'nutrition', extraParams });
 }

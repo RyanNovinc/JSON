@@ -69,7 +69,7 @@ const OPTIONS: ActivityOption[] = [
 ];
 
 type ParamList = {
-  N4Activity: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N4Activity: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function N4ActivityScreen() {
@@ -80,23 +80,24 @@ export default function N4ActivityScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<ActivityValue | null>(
     (answersSoFar.activityLevel as ActivityValue) ?? null
   );
 
   const handleNext = async () => {
     if (!selected) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateNutritionField('activityLevel', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
     }
     navigation.navigate(
       'N5DietType',
-      { answersSoFar: { ...answersSoFar, activityLevel: selected } }
+      { answersSoFar: { ...answersSoFar, activityLevel: selected }, flowStepOffset: stepOffset }
     );
   };
 
@@ -106,8 +107,8 @@ export default function N4ActivityScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={4}
-        totalSteps={12}
+        currentStep={stepOffset + 4}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

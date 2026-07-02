@@ -22,7 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import QuestionnaireHeader from '../../questionnaire/QuestionnaireHeader';
 import WeightEntrySheet from '../../../components/nutrition/WeightEntrySheet';
-import { WorkoutStorage } from '../../../utils/storage';
+import { useWeightUnit } from '../../../contexts/WeightUnitContext';
+import { loadGoalsProfile, updateGoalsProfileField } from '../../../utils/goalsProfileStorage';
 import { updateNutritionField } from '../../../utils/nutritionQuestionnaireStorage';
 
 /**
@@ -39,8 +40,17 @@ import { updateNutritionField } from '../../../utils/nutritionQuestionnaireStora
  * button + "AI info banner", and had to come back. Now we open the
  * shared WeightEntrySheet inline — same component the Profile tracker
  * uses, but kept light. KeyboardAvoidingView in the sheet handles the
- * keyboard hiding the input. The sheet refreshes the local weight
- * value via onSaved, which then propagates into answersSoFar on Next.
+ * keyboard hiding the input.
+ *
+ * v3 — GoalsProfile as the single source of truth for current weight.
+ * This screen used to pre-fill from the weight-history log and capture
+ * an independent NutritionAnswers.weight. It now pre-fills from
+ * GoalsProfile.currentWeightKg and writes edits back via
+ * updateGoalsProfileField, so weight has exactly one editable home
+ * (also reachable from Goals & Stats and the returning-user confirm
+ * step). NutritionAnswers.weight is still populated on Next, but purely
+ * as a mirror of the profile value for computeMacros/legacy readers —
+ * not a separate capture point.
  *
  * Theme tints (the rgba background for selected cards) are now derived
  * from themeColor with low alpha rather than the hardcoded cyan rgba
@@ -56,7 +66,7 @@ const GENDER_OPTIONS: { value: GenderValue; label: string }[] = [
 ];
 
 type ParamList = {
-  N3AboutYou: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N3AboutYou: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 // hex (#rrggbb) → rgba(r, g, b, a). Used so the selection tint follows
@@ -74,9 +84,11 @@ export default function N3AboutYouScreen() {
   const route = useRoute<RouteProp<ParamList, 'N3AboutYou'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
+  const { globalUnit } = useWeightUnit();
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const [gender, setGender] = useState<GenderValue | null>(
     (answersSoFar.gender as GenderValue) ?? null
@@ -87,7 +99,13 @@ export default function N3AboutYouScreen() {
   const [height, setHeight] = useState<string>(
     answersSoFar.height != null ? String(answersSoFar.height) : ''
   );
-  const [weight, setWeight] = useState<number | null>(
+  // currentWeightKg is the true kg value — the same one stored on
+  // GoalsProfile. weightDisplayValue is that number converted into the
+  // user's preferred display unit; weightUnit is that unit's label.
+  const [currentWeightKg, setCurrentWeightKg] = useState<number | null>(
+    (answersSoFar.weight as number) ?? null
+  );
+  const [weightDisplayValue, setWeightDisplayValue] = useState<number | null>(
     (answersSoFar.weight as number) ?? null
   );
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
@@ -96,26 +114,24 @@ export default function N3AboutYouScreen() {
 
   const selectionTint = hexToRgba(themeColor, 0.08);
 
-  // Pull the latest weight from WeightTracker. Used on mount and
-  // whenever we focus back to this screen (covers the case where the
-  // user navigated to the Profile WeightTracker somehow and updated
-  // their weight from there).
+  // Pull current weight from GoalsProfile — the single source of truth.
+  // Used on mount and whenever we focus back to this screen (covers the
+  // case where the user edited it from Goals & Stats or the weight
+  // tracker in the meantime).
   const loadCurrentWeight = useCallback(async () => {
     try {
-      const history = await WorkoutStorage.loadWeightHistory();
-      if (history && history.length > 0) {
-        const latest = [...history].sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-        )[0];
-        setWeight(latest.weight);
-        if (latest.unit === 'kg' || latest.unit === 'lbs') {
-          setWeightUnit(latest.unit);
-        }
+      const profile = await loadGoalsProfile();
+      if (profile?.currentWeightKg) {
+        setCurrentWeightKg(profile.currentWeightKg);
+        const displayVal =
+          globalUnit === 'lbs' ? profile.currentWeightKg / 0.453592 : profile.currentWeightKg;
+        setWeightDisplayValue(Math.round(displayVal * 10) / 10);
+        setWeightUnit(globalUnit);
       }
     } catch (e) {
       console.error('N3 loadCurrentWeight failed', e);
     }
-  }, []);
+  }, [globalUnit]);
 
   useFocusEffect(
     useCallback(() => {
@@ -131,18 +147,20 @@ export default function N3AboutYouScreen() {
     ageNum > 0 &&
     Number.isFinite(heightNum) &&
     heightNum > 0 &&
-    weight != null &&
-    weight > 0;
+    currentWeightKg != null &&
+    currentWeightKg > 0;
 
   const handleNext = async () => {
     if (!valid) return;
-    
-    // Always save the answers to storage, whether in edit mode or not
+
+    // Always save the answers to storage, whether in edit mode or not.
+    // weight mirrors GoalsProfile.currentWeightKg (always kg) — it's no
+    // longer an independently-captured value.
     await updateNutritionField('gender', gender!);
     await updateNutritionField('age', ageNum);
     await updateNutritionField('height', heightNum);
-    await updateNutritionField('weight', weight!);
-    
+    await updateNutritionField('weight', currentWeightKg!);
+
     if (editMode) {
       navigation.goBack();
       return;
@@ -155,8 +173,9 @@ export default function N3AboutYouScreen() {
           gender,
           age: ageNum,
           height: heightNum,
-          weight,
+          weight: currentWeightKg,
         },
+        flowStepOffset: stepOffset,
       }
     );
   };
@@ -167,8 +186,8 @@ export default function N3AboutYouScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={3}
-        totalSteps={12}
+        currentStep={stepOffset + 3}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />
@@ -266,10 +285,10 @@ export default function N3AboutYouScreen() {
           {/* Weight — opens the inline WeightEntrySheet instead of
               navigating to the full WeightTracker screen. */}
           <Text style={styles.fieldLabel}>Current weight</Text>
-          {weight != null ? (
+          {currentWeightKg != null ? (
             <View style={styles.weightRow}>
               <View style={styles.weightValueWrap}>
-                <Text style={styles.weightValue}>{weight}</Text>
+                <Text style={styles.weightValue}>{weightDisplayValue}</Text>
                 <Text style={styles.weightUnit}>{weightUnit}</Text>
               </View>
               <TouchableOpacity
@@ -296,7 +315,7 @@ export default function N3AboutYouScreen() {
             </TouchableOpacity>
           )}
           <Text style={styles.weightHint}>
-            Stays in sync with your Weight Tracker.
+            Stays in sync with your Weight Tracker and Goals &amp; Stats.
           </Text>
         </ScrollView>
 
@@ -326,15 +345,18 @@ export default function N3AboutYouScreen() {
 
       <WeightEntrySheet
         visible={sheetVisible}
-        title={weight != null ? 'Update weight' : 'Add weight'}
+        title={currentWeightKg != null ? 'Update weight' : 'Add weight'}
         onClose={() => setSheetVisible(false)}
         onSaved={(entry) => {
-          // Immediately reflect the new weight locally — the sheet has
-          // already persisted to WorkoutStorage and run macro recalc.
-          setWeight(entry.weight);
-          if (entry.unit === 'kg' || entry.unit === 'lbs') {
-            setWeightUnit(entry.unit);
-          }
+          // The sheet has already persisted to the weight-history log and
+          // run macro recalc. Reflect it locally, and write back to
+          // GoalsProfile — the single source of truth for current weight.
+          const unit: 'kg' | 'lbs' = entry.unit === 'lbs' ? 'lbs' : 'kg';
+          const kg = unit === 'lbs' ? entry.weight * 0.453592 : entry.weight;
+          setCurrentWeightKg(kg);
+          setWeightDisplayValue(entry.weight);
+          setWeightUnit(unit);
+          updateGoalsProfileField('currentWeightKg', kg);
         }}
       />
     </View>

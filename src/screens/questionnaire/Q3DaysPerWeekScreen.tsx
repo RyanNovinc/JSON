@@ -60,7 +60,7 @@ const DAY_HINTS: Record<number, string> = {
 };
 
 type ParamList = {
-  Q3DaysPerWeek: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q3DaysPerWeek: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function Q3DaysPerWeekScreen() {
@@ -71,16 +71,17 @@ export default function Q3DaysPerWeekScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<number | null>(
     (answersSoFar.totalTrainingDays as number) ?? null,
   );
 
   const handleNext = async () => {
     if (!selected) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateQuestionnaireField('totalTrainingDays', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
@@ -89,6 +90,7 @@ export default function Q3DaysPerWeekScreen() {
       'Q4ProgramDuration',
       {
         answersSoFar: { ...answersSoFar, totalTrainingDays: selected },
+        flowStepOffset: stepOffset,
       },
     );
   };
@@ -101,8 +103,8 @@ export default function Q3DaysPerWeekScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={3}
-        totalSteps={7}
+        currentStep={stepOffset + 2}
+        totalSteps={stepOffset + 6}
         onBack={handleBack}
         onClose={handleClose}
       />

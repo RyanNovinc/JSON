@@ -44,7 +44,7 @@ const START_OPTIONS = [
 ];
 
 type ParamList = {
-  N9PlanLength: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N9PlanLength: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function N9PlanLengthScreen() {
@@ -55,6 +55,7 @@ export default function N9PlanLengthScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   // Default to 1 week. Migrate any existing 14-day value to 7.
   const [duration, setDuration] = useState<number | null>(7);
@@ -126,8 +127,8 @@ export default function N9PlanLengthScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={12}
-        totalSteps={12}
+        currentStep={stepOffset + 12}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

@@ -1,31 +1,46 @@
 // src/utils/questionnaireStorage.ts
 //
-// Thin wrapper around WorkoutStorage that treats the two legacy
-// questionnaire data keys (fitness_goals_questionnaire_results and
-// equipment_preferences_questionnaire_results) as a single logical
-// store.
+// Draft/final split — the nutrition-side pattern (see
+// nutritionQuestionnaireStorage.ts) mirrored for workout.
 //
-// Refinements writes the full merged answers object into BOTH keys
-// (which is why this duplication exists — it's load-bearing, since
-// other code reads from either key). Centralising the two-key write
-// here means screens just call saveQuestionnaireAnswers() and the
-// duplication stays correct.
+// fitness_goals_questionnaire_results predates GoalsProfile and is also
+// written directly by an old, now-unreachable questionnaire screen
+// (FitnessGoalsQuestionnaireScreen) with a different field shape. Reading
+// it for "has the user completed Q1–Q7" let stale/legacy data satisfy the
+// completeness check for users who'd never touched the current flow,
+// which is what caused GoalsIntake to teleport straight to
+// QuestionnaireSummary after a fresh intake. @workout_questionnaire_answers
+// below is a dedicated key that ONLY this module's writers ever touch, so
+// completeness here always reflects genuine Q1–Q7 answers.
+//
+// The legacy fitness_goals_questionnaire_results / equipment_preferences
+// keys are still dual-written on every save so PromptReadyScreen,
+// WorkoutGeneratorStep1New, and the (unreachable) legacy questionnaire
+// chain keep reading exactly what they did before — this module is
+// additive on top of them, not a replacement.
 //
 // Anything that touches questionnaire answers (Q1–Q7, Refinements,
 // Summary, CreateChooser, PromptReady) should go through this module
 // rather than calling WorkoutStorage directly.
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutStorage } from './storage';
 
+const DRAFT_KEY = '@workout_questionnaire_answers';
+
 export interface QuestionnaireAnswers {
-  // Required (set in Q1–Q7)
+  // Required (set in Q1, Q3–Q7)
   primaryGoal?: string;
-  trainingExperience?: string;
   totalTrainingDays?: number;
   programDuration?: string;
   selectedEquipment?: string[];
   volumePreference?: string;
   sessionStyle?: string;
+  // No longer collected — training experience now lives on GoalsProfile
+  // (trainingState) and is derived via deriveExperienceTier. Kept optional
+  // here only for backward compatibility with old saved answers and the
+  // now-unreachable Q2 screen; not required and not read by prompt assembly.
+  trainingExperience?: string;
 
   // Refinements (all optional)
   priorityMuscleGroups?: string[];
@@ -39,27 +54,35 @@ export interface QuestionnaireAnswers {
 }
 
 /**
- * Load the persisted questionnaire answers, or null if none have been
- * saved (or all keys are empty).
+ * Load the persisted questionnaire answers from the draft key, or null
+ * if none have been saved (or the draft is empty).
  */
 export async function loadQuestionnaireAnswers(): Promise<QuestionnaireAnswers | null> {
-  const data = await WorkoutStorage.loadFitnessGoalsResults();
-  if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+  try {
+    const raw = await AsyncStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+      return null;
+    }
+    return data as QuestionnaireAnswers;
+  } catch (e) {
+    console.error('loadQuestionnaireAnswers failed', e);
     return null;
   }
-  return data as QuestionnaireAnswers;
 }
 
 /**
- * True only if every required Q1–Q7 field is set. Refinements don't
- * count — they're optional.
+ * True only if every required Q1, Q3–Q7 field is set. Refinements don't
+ * count — they're optional. trainingExperience is intentionally excluded:
+ * Q2 no longer appears in the flow, so it's never populated for a new
+ * questionnaire (see GoalsProfile.trainingState / deriveExperienceTier).
  */
 export async function hasCompleteQuestionnaire(): Promise<boolean> {
   const a = await loadQuestionnaireAnswers();
   if (!a) return false;
   return Boolean(
     a.primaryGoal &&
-      a.trainingExperience &&
       a.totalTrainingDays &&
       a.programDuration &&
       a.selectedEquipment &&
@@ -70,8 +93,10 @@ export async function hasCompleteQuestionnaire(): Promise<boolean> {
 }
 
 /**
- * Save the full answers object. Writes to BOTH legacy keys to keep
- * downstream readers happy. Stamps lastUpdatedAt.
+ * Save the full answers object to the draft key, and dual-write to the
+ * two legacy keys so existing readers (PromptReadyScreen,
+ * WorkoutGeneratorStep1New, the legacy questionnaire chain) keep working
+ * unchanged. Stamps lastUpdatedAt.
  */
 export async function saveQuestionnaireAnswers(
   answers: QuestionnaireAnswers,
@@ -80,6 +105,7 @@ export async function saveQuestionnaireAnswers(
     ...answers,
     lastUpdatedAt: new Date().toISOString(),
   };
+  await AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(stamped));
   await WorkoutStorage.saveFitnessGoalsResults(stamped);
   await WorkoutStorage.saveEquipmentPreferencesResults(stamped);
 }
@@ -96,11 +122,12 @@ export async function updateQuestionnaireField<
 }
 
 /**
- * Wipe all questionnaire data. We don't have a low-level delete on
- * WorkoutStorage so we write empty objects — loadQuestionnaireAnswers
- * treats those as null.
+ * Wipe all questionnaire data — the draft key and both legacy keys
+ * (written as empty objects, since WorkoutStorage has no low-level
+ * delete; loadQuestionnaireAnswers treats those as null too).
  */
 export async function clearQuestionnaireAnswers(): Promise<void> {
+  await AsyncStorage.removeItem(DRAFT_KEY);
   await WorkoutStorage.saveFitnessGoalsResults({});
   await WorkoutStorage.saveEquipmentPreferencesResults({});
 }

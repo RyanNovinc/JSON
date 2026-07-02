@@ -153,8 +153,8 @@ describe('questionnaireStorage', () => {
     });
   });
 
-  describe('two-key consistency', () => {
-    it('6. should write to BOTH storage keys when saving', async () => {
+  describe('draft/final key consistency', () => {
+    it('6. should write to the draft key AND both legacy keys when saving', async () => {
       const testData: QuestionnaireAnswers = {
         primaryGoal: 'build_muscle',
         trainingExperience: 'intermediate',
@@ -167,22 +167,29 @@ describe('questionnaireStorage', () => {
 
       await saveQuestionnaireAnswers(testData);
 
-      // Check that setItem was called twice (once for each key)
+      // Draft key (used for routing/completeness) + both legacy keys
+      // (used by PromptReadyScreen, WorkoutGeneratorStep1New, etc.)
       const setCalls = (AsyncStorage.setItem as jest.Mock).mock.calls;
-      expect(setCalls.length).toBe(2);
-      
-      // Check that both keys were written with the same data
-      const key1 = setCalls[0][0];
-      const key2 = setCalls[1][0];
-      const data1 = JSON.parse(setCalls[0][1]);
-      const data2 = JSON.parse(setCalls[1][1]);
-      
+      expect(setCalls.length).toBe(3);
+
+      const key0 = setCalls[0][0];
+      const key1 = setCalls[1][0];
+      const key2 = setCalls[2][0];
+      const data0 = JSON.parse(setCalls[0][1]);
+      const data1 = JSON.parse(setCalls[1][1]);
+      const data2 = JSON.parse(setCalls[2][1]);
+
+      expect(key0).toBe('@workout_questionnaire_answers');
       expect(key1).toBe('fitness_goals_questionnaire_results');
       expect(key2).toBe('equipment_preferences_questionnaire_results');
-      
-      // Both should have the same data (except for timestamps which might differ slightly)
+
+      // All three should carry the same data (aside from timestamps, which
+      // might differ slightly across the underlying save calls).
+      expect(data0.primaryGoal).toBe(data1.primaryGoal);
       expect(data1.primaryGoal).toBe(data2.primaryGoal);
+      expect(data0.volumePreference).toBe(data1.volumePreference);
       expect(data1.volumePreference).toBe(data2.volumePreference);
+      expect(data0.sessionStyle).toBe(data1.sessionStyle);
       expect(data1.sessionStyle).toBe(data2.sessionStyle);
     });
   });

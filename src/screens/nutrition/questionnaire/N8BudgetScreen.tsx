@@ -62,7 +62,7 @@ const OPTIONS: AttitudeOption[] = [
 ];
 
 type ParamList = {
-  N8Budget: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N8Budget: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function N8BudgetScreen() {
@@ -73,6 +73,7 @@ export default function N8BudgetScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const [attitude, setAttitude] = useState<Attitude | null>(
     (answersSoFar.weeklyBudget as Attitude) ?? null
@@ -120,7 +121,7 @@ export default function N8BudgetScreen() {
     }
     navigation.navigate(
       'N9PlanLength',
-      { answersSoFar: { ...answersSoFar, ...payload } }
+      { answersSoFar: { ...answersSoFar, ...payload }, flowStepOffset: stepOffset }
     );
   };
 
@@ -130,8 +131,8 @@ export default function N8BudgetScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={11}
-        totalSteps={12}
+        currentStep={stepOffset + 11}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

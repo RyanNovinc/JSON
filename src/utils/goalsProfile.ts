@@ -1,5 +1,6 @@
 export type TrainingState = 'new' | 'consistent' | 'returning' | 'advanced';
 export type DerivedPhase = 'cut' | 'recomp' | 'lean_bulk' | 'bulk' | 'maintain';
+export type DerivedExperienceTier = 'beginner' | 'intermediate' | 'advanced';
 
 export interface GoalsProfile {
   currentWeightKg: number;
@@ -111,6 +112,32 @@ export function computeTargetLeanMass(profile: GoalsProfile): number | undefined
  * - maintain        → MEV→MAV   (maintenance stimulus; keep flexibility)
  * - cut             → MEV→MAV   (recovery compromised; bias toward MEV)
  */
+/**
+ * Maps GoalsProfile.trainingState to the legacy experience-tier vocabulary
+ * that workoutPrompt.ts / planningPrompt.ts key experience-dependent output
+ * off (exercise-selection guidance, block-structure rules, RIR format tier).
+ *
+ * trainingState remains the single source of truth (captured once, edited
+ * via Goals & Stats) — this is a pure compatibility shim so that output
+ * survives workout Q2 (training experience) being removed from the visible
+ * flow, without touching the downstream prompt-assembly code itself.
+ *
+ * 'returning' maps to 'intermediate', not 'beginner': a returning lifter
+ * has prior training history and muscle memory, so treating them as a true
+ * beginner would understate their capability.
+ */
+export function deriveExperienceTier(trainingState: TrainingState): DerivedExperienceTier {
+  switch (trainingState) {
+    case 'new':
+      return 'beginner';
+    case 'returning':
+    case 'consistent':
+      return 'intermediate';
+    case 'advanced':
+      return 'advanced';
+  }
+}
+
 export function phaseToVolumeTier(phase: DerivedPhase): VolumeTierInfo {
   switch (phase) {
     case 'bulk':

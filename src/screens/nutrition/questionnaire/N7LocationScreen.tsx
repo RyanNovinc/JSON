@@ -53,7 +53,7 @@ function deriveCountryCode(country: string): string | undefined {
 }
 
 type ParamList = {
-  N7Location: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N7Location: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function N7LocationScreen() {
@@ -64,6 +64,7 @@ export default function N7LocationScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const [country, setCountry] = useState<string>(answersSoFar.country ?? '');
   const [city, setCity] = useState<string>(answersSoFar.city ?? '');
@@ -120,7 +121,7 @@ export default function N7LocationScreen() {
     }
     navigation.navigate(
       'N8Budget',
-      { answersSoFar: { ...answersSoFar, ...payload } }
+      { answersSoFar: { ...answersSoFar, ...payload }, flowStepOffset: stepOffset }
     );
   };
 
@@ -130,8 +131,8 @@ export default function N7LocationScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={10}
-        totalSteps={12}
+        currentStep={stepOffset + 10}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

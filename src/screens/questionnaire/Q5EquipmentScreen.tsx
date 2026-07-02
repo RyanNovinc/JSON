@@ -78,7 +78,7 @@ const OPTIONS: EquipmentOption[] = [
 ];
 
 type ParamList = {
-  Q5Equipment: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q5Equipment: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function Q5EquipmentScreen() {
@@ -89,6 +89,7 @@ export default function Q5EquipmentScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<EquipmentValue[]>(
     (answersSoFar.selectedEquipment as EquipmentValue[]) ?? [],
   );
@@ -121,6 +122,7 @@ export default function Q5EquipmentScreen() {
       'Q6Volume',
       {
         answersSoFar: { ...answersSoFar, selectedEquipment: selected },
+        flowStepOffset: stepOffset,
       },
     );
   };
@@ -133,8 +135,8 @@ export default function Q5EquipmentScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={5}
-        totalSteps={7}
+        currentStep={stepOffset + 4}
+        totalSteps={stepOffset + 6}
         onBack={handleBack}
         onClose={handleClose}
       />

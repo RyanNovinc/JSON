@@ -88,7 +88,7 @@ const STRICT_OPTIONS: StrictOption[] = [
 ];
 
 type ParamList = {
-  N5cSleep: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N5cSleep: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 // LayoutAnimation needs explicit opt-in on Android.
@@ -107,6 +107,7 @@ export default function N5cSleepScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const [bedtime, setBedtime] = useState<string>('');
   const [wakeTime, setWakeTime] = useState<string>('');
@@ -173,7 +174,7 @@ export default function N5cSleepScreen() {
     }
     navigation.navigate(
       'N6MealsSnacking',
-      { answersSoFar }
+      { answersSoFar, flowStepOffset: stepOffset }
     );
   };
 
@@ -183,7 +184,7 @@ export default function N5cSleepScreen() {
       navigation.goBack();
       return;
     }
-    navigation.navigate('N6MealsSnacking', { answersSoFar });
+    navigation.navigate('N6MealsSnacking', { answersSoFar, flowStepOffset: stepOffset });
   };
 
   const handleBack = () => navigation.goBack();
@@ -222,8 +223,8 @@ export default function N5cSleepScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={7}
-        totalSteps={12}
+        currentStep={stepOffset + 7}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

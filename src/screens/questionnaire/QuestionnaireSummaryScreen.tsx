@@ -57,13 +57,6 @@ const GOAL_LABELS: Record<string, string> = {
   general_fitness: 'General fitness',
 };
 
-const EXPERIENCE_LABELS: Record<string, string> = {
-  complete_beginner: 'Complete beginner',
-  beginner: 'Beginner',
-  intermediate: 'Intermediate',
-  advanced: 'Advanced',
-};
-
 const DURATION_LABELS: Record<string, string> = {
   '4_weeks': '4 weeks',
   '8_weeks': '8 weeks',
@@ -124,14 +117,6 @@ const ROWS: RowConfig[] = [
     route: 'Q1PrimaryGoal',
     format: (a) =>
       a.primaryGoal ? GOAL_LABELS[a.primaryGoal] ?? a.primaryGoal : '—',
-  },
-  {
-    label: 'Experience',
-    route: 'Q2Experience',
-    format: (a) =>
-      a.trainingExperience
-        ? EXPERIENCE_LABELS[a.trainingExperience] ?? a.trainingExperience
-        : '—',
   },
   {
     label: 'Days per week',

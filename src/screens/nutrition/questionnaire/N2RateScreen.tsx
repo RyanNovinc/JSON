@@ -52,7 +52,7 @@ const GAIN_OPTIONS: RateOption[] = [
 ];
 
 type ParamList = {
-  N2Rate: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N2Rate: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function N2RateScreen() {
@@ -63,6 +63,7 @@ export default function N2RateScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const isLoss = answersSoFar.goal === 'lose_weight';
   const OPTIONS = isLoss ? LOSS_OPTIONS : GAIN_OPTIONS;
@@ -73,10 +74,10 @@ export default function N2RateScreen() {
 
   const handleNext = async () => {
     if (selected == null) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateNutritionField('targetRatePercentage', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
@@ -85,6 +86,7 @@ export default function N2RateScreen() {
       'N3AboutYou',
       {
         answersSoFar: { ...answersSoFar, targetRatePercentage: selected },
+        flowStepOffset: stepOffset,
       }
     );
   };
@@ -95,8 +97,8 @@ export default function N2RateScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={2}
-        totalSteps={12}
+        currentStep={stepOffset + 2}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

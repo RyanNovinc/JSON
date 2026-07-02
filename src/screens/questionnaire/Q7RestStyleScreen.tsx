@@ -59,7 +59,7 @@ const OPTIONS: RestOption[] = [
 ];
 
 type ParamList = {
-  Q7RestStyle: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q7RestStyle: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function Q7RestStyleScreen() {
@@ -70,6 +70,7 @@ export default function Q7RestStyleScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<SessionStyleValue | null>(
     (answersSoFar.sessionStyle as SessionStyleValue) ?? null,
   );
@@ -98,8 +99,8 @@ export default function Q7RestStyleScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={7}
-        totalSteps={7}
+        currentStep={stepOffset + 6}
+        totalSteps={stepOffset + 6}
         onBack={handleBack}
         onClose={handleClose}
       />

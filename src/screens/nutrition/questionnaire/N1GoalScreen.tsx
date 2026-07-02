@@ -61,7 +61,7 @@ const OPTIONS: GoalOption[] = [
 ];
 
 type ParamList = {
-  N1Goal: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  N1Goal: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function N1GoalScreen() {
@@ -72,22 +72,26 @@ export default function N1GoalScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<GoalValue | null>(
     (answersSoFar.goal as GoalValue) ?? null
   );
 
   const handleNext = async () => {
     if (!selected) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateNutritionField('goal', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
     }
     // maintain has no rate step → jump to N3
-    const params = { answersSoFar: { ...answersSoFar, goal: selected } };
+    const params = {
+      answersSoFar: { ...answersSoFar, goal: selected },
+      flowStepOffset: stepOffset,
+    };
     if (selected === 'maintain') {
       navigation.navigate('N3AboutYou', params);
     } else {
@@ -102,8 +106,8 @@ export default function N1GoalScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={1}
-        totalSteps={12}
+        currentStep={stepOffset + 1}
+        totalSteps={stepOffset + 12}
         showBack={true}
         onBack={handleBack}
         onClose={handleClose}

@@ -81,7 +81,7 @@ const OPTIONS: DessertOption[] = [
 
 type ParamList = {
   N6aDessert:
-    | { answersSoFar?: Record<string, any>; editMode?: boolean }
+    | { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number }
     | undefined;
 };
 
@@ -93,6 +93,7 @@ export default function N6aDessertScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
 
   const [selected, setSelected] = useState<DessertValue | null>(
     (answersSoFar.dessertFrequency as DessertValue) ?? null
@@ -100,10 +101,10 @@ export default function N6aDessertScreen() {
 
   const handleNext = async () => {
     if (!selected) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateNutritionField('dessertFrequency', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
@@ -115,6 +116,7 @@ export default function N6aDessertScreen() {
           ...answersSoFar,
           dessertFrequency: selected,
         },
+        flowStepOffset: stepOffset,
       }
     );
   };
@@ -125,8 +127,8 @@ export default function N6aDessertScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={9}
-        totalSteps={12}
+        currentStep={stepOffset + 9}
+        totalSteps={stepOffset + 12}
         onBack={handleBack}
         onClose={handleClose}
       />

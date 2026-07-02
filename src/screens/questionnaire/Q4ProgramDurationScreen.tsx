@@ -83,7 +83,7 @@ const OPTIONS: DurationOption[] = [
 const LONG_DURATIONS: DurationValue[] = ['6_months', '1_year'];
 
 type ParamList = {
-  Q4ProgramDuration: { answersSoFar?: Record<string, any>; editMode?: boolean } | undefined;
+  Q4ProgramDuration: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
 };
 
 export default function Q4ProgramDurationScreen() {
@@ -94,16 +94,17 @@ export default function Q4ProgramDurationScreen() {
 
   const answersSoFar = route.params?.answersSoFar ?? {};
   const editMode = route.params?.editMode ?? false;
+  const stepOffset = route.params?.flowStepOffset ?? 0;
   const [selected, setSelected] = useState<DurationValue | null>(
     (answersSoFar.programDuration as DurationValue) ?? null,
   );
 
   const handleNext = async () => {
     if (!selected) return;
-    
+
     // Always save the answer to storage, whether in edit mode or not
     await updateQuestionnaireField('programDuration', selected);
-    
+
     if (editMode) {
       navigation.goBack();
       return;
@@ -112,6 +113,7 @@ export default function Q4ProgramDurationScreen() {
       'Q5Equipment',
       {
         answersSoFar: { ...answersSoFar, programDuration: selected },
+        flowStepOffset: stepOffset,
       },
     );
   };
@@ -124,8 +126,8 @@ export default function Q4ProgramDurationScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={4}
-        totalSteps={7}
+        currentStep={stepOffset + 3}
+        totalSteps={stepOffset + 6}
         onBack={handleBack}
         onClose={handleClose}
       />
