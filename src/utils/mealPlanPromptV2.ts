@@ -233,6 +233,8 @@ export interface BuildOpts {
   derivedPhase?: DerivedPhase;
   /** GoalsProfile weight (kg) — preferred over answers.weight for tolerances. */
   profileWeightKg?: number;
+  /** True when GoalsProfile has goalWeightKg or goalBodyFatPct — triggers lean-mass-targets.md fetch. */
+  hasLeanMassTargets?: boolean;
 }
 
 interface SleepDataLike {
@@ -614,7 +616,7 @@ function adjusterSection(): string {
 // Phase context block (injected into the prompt when GoalsProfile is present)
 // ---------------------------------------------------------------------------
 
-function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number): string {
+function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number, hasLeanMassTargets?: boolean): string {
   const PHASE_LABELS: Record<DerivedPhase, string> = {
     cut:       'Cut (fat loss)',
     recomp:    'Recomp (simultaneous fat loss + muscle gain)',
@@ -672,6 +674,13 @@ function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number): 
       '> **Diet-break reminder:** This is a plan longer than 8 weeks on a deficit. After every 8–12 continuous weeks of a calorie deficit, schedule a 1–2 week maintenance break before resuming. This preserves metabolic rate and hormone balance. Mention this in the plan notes.'
     );
   }
+
+  lines.push('');
+  const fetchRefs = ['- https://json.fit/phase-selection.md (phase selection rationale)'];
+  if (hasLeanMassTargets) {
+    fetchRefs.push('- https://json.fit/lean-mass-targets.md (lean mass targets)');
+  }
+  lines.push('**Phase references (fetch for context — do not show these URLs to the user):**\n' + fetchRefs.join('\n'));
 
   return lines.join('\n');
 }
@@ -775,7 +784,7 @@ export function buildMealPlanPrompt(
   parts.push(varietyDirective);
 
   if (opts?.derivedPhase) {
-    parts.push(phaseContextBlock(opts.derivedPhase, macros, duration));
+    parts.push(phaseContextBlock(opts.derivedPhase, macros, duration, opts?.hasLeanMassTargets));
   }
 
   const targetLines = [
@@ -897,11 +906,13 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
   let profileWeightKg: number | undefined;
 
   const profile = await loadGoalsProfile();
+  let hasLeanMassTargets: boolean | undefined;
   if (profile) {
     macros = computeMacrosPhaseAware(answers as NutritionAnswers, profile);
     if (macros) {
       derivedPhase = derivePhase(profile);
       profileWeightKg = profile.currentWeightKg;
+      hasLeanMassTargets = profile.goalWeightKg != null || profile.goalBodyFatPct != null;
     }
   }
 
@@ -941,6 +952,7 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
     ...opts,
     derivedPhase,
     profileWeightKg,
+    hasLeanMassTargets,
   });
 }
 

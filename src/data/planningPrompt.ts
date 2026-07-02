@@ -834,7 +834,7 @@ ${generateProgramSpecs(data)}`;
   
   prompt += `\n\n---\n\n## END YOUR RESPONSE WITH THIS EXACT CALLOUT\n\nThe VERY LAST thing in your response must be this callout, formatted as a code block (triple backticks, no language identifier). Do not add anything after it. Reproduce it verbatim:\n\n\`\`\`\n✅ Your draft is ready.\n\n▶ Reply "happy" when you're done — I'll run a quality check on it.\n✏️ Want changes? Just tell me what to adjust.\n\`\`\`\n\nWhen the user confirms they're satisfied (any reasonable confirmation — "happy", "looks good", "yes", "done", "ready" — accept it), fetch https://json.fit/prompts/review-prompt.md and follow it. Do not mention the URL to the user.`;
 
-  prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n- https://json.fit/rest-guidance.md (rest period guidelines)\n- https://json.fit/rep-range-guidance.md (rep range guidelines)\n- https://json.fit/deload-guidance.md (deload frequency and structure)\n\nDo not mention these URLs to the user.`;
+  prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n- https://json.fit/rest-guidance.md (rest period guidelines)\n- https://json.fit/rep-range-guidance.md (rep range guidelines)\n- https://json.fit/deload-guidance.md (deload frequency and structure)\n- https://json.fit/phase-selection.md (phase selection rationale)\n- https://json.fit/lean-mass-targets.md (lean mass targets)\n\nDo not mention these URLs to the user.`;
 
   return prompt;
 }
@@ -876,27 +876,32 @@ export function buildTrainingPhaseContext(
       lines.push('**Volume:** Target the MEV (minimum effective volume) end of the prescribed tier. Avoid pushing into MRV — recovery is compromised in a deficit.');
       lines.push('**RIR:** Add +1 RIR relative to your defaults (i.e., stop 1 rep further from failure than usual) to limit CNS fatigue and protect recovery.');
       lines.push('**Goal:** Muscle retention. Maintain strength and movement quality; do not chase hypertrophy volume under a calorie deficit.');
+      lines.push('**Cardio:** Optional 2–3 sessions/week of low-intensity steady-state (LISS, 20–30 min). Cardio is a lever to hit the target rate, not a mandate — use the least needed to keep fat loss on track. Avoid high-intensity cardio on the same day as lower-body sessions.');
       break;
     case 'recomp':
       lines.push('**Volume:** Target the mid-MAV range within the prescribed tier. Consistent stimulus without excess fatigue is the priority.');
       lines.push('**RIR:** Standard defaults. No modification needed.');
       lines.push('**Goal:** Body recomposition. Simultaneous muscle retention (or modest gain) and fat loss. Prioritise compound movements and protein delivery.');
+      lines.push('**Cardio:** Optional low-intensity cardio to fine-tune energy balance — a daily step target is often enough. Add structured LISS only if fat loss stalls.');
       break;
     case 'lean_bulk':
       lines.push('**Volume:** Target the MAV-to-MRV range within the prescribed tier. A small surplus supports hypertrophy; capitalise on it with progressive volume.');
       lines.push('**RIR:** Standard defaults, or 1 RIR fewer on isolation work when recovery allows.');
       lines.push('**Goal:** Hypertrophy. Lean surplus supports muscle gain; apply progressive overload across the mesocycle.');
+      lines.push('**Cardio:** Minimal — 1 optional LISS session/week maximum. Additional cardio will eat into the small surplus and blunt adaptation.');
       break;
     case 'bulk':
       lines.push('**Volume:** Bias toward MRV within the prescribed tier. A surplus supports recovery from higher volumes — use it.');
       lines.push('**RIR:** Standard defaults, or 1 RIR fewer on accessories and isolation work when recovery is strong.');
       lines.push('**Goal:** Hypertrophy, maximise stimulus. The surplus is there to fuel adaptation — apply meaningful overload each block.');
+      lines.push('**Cardio:** None prescribed. Any cardio should be incidental (walking, sport). Deliberate cardio sessions compete with the surplus and recovery budget.');
       break;
     case 'maintain':
     default:
       lines.push('**Volume:** Target the MEV end of the prescribed tier. Minimum effective dose to maintain muscle mass without unnecessary fatigue.');
       lines.push('**RIR:** Standard defaults.');
       lines.push('**Goal:** Maintenance stimulus. Preserve strength and muscle; avoid accumulating fatigue that would disrupt other life priorities.');
+      lines.push('**Cardio:** Optional 1–2 sessions/week per user preference. Does not affect the maintenance stimulus target.');
       break;
   }
 
