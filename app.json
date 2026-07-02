@@ -78,7 +78,8 @@
       "expo-live-activity",
       "expo-asset",
       "expo-notifications",
-      "./plugins/withAdiRegistration"
+      "./plugins/withAdiRegistration",
+      "react-native-edge-to-edge"
     ]
   }
 }
