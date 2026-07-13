@@ -1399,39 +1399,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             <View style={styles.imageOverlay} />
           </View>
 
-          {/* ── HEADER BUTTONS OVERLAID ON IMAGE ──────────────────────── */}
-          <View style={[styles.overlayHeader, { paddingTop: insets.top + 12 }]}>
-            <TouchableOpacity
-              onPress={onBack}
-              style={styles.overlayBtn}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <Ionicons name="chevron-back" size={22} color="#fff" />
-            </TouchableOpacity>
-
-            <View style={styles.overlayHeaderActions}>
-              {/* History promoted to top-level (most-used action) */}
-              <TouchableOpacity
-                onPress={openHistoryForCurrent}
-                style={[
-                  styles.overlayBtn,
-                  { backgroundColor: hexA(themeColor, 0.18), borderWidth: 1, borderColor: hexA(themeColor, 0.4) },
-                ]}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="time-outline" size={20} color={themeColor} />
-              </TouchableOpacity>
-
-              {/* More menu (vertical dropdown) */}
-              <TouchableOpacity
-                onPress={() => setHeaderMenuOpen((o) => !o)}
-                style={styles.overlayBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
+          {/* Header controls are NOT here — they belong to the screen, not the exercise,
+              so they are pinned in pagerStage below and hold still during a swipe. */}
         </View>
 
         <TouchableOpacity
@@ -1626,7 +1595,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           {/* Workout progress — the ONE bar in the tree.
               It describes the workout, not the exercise, so it is a sibling of the
               animated card rather than a child of it: the cards slide underneath while
-              this holds still. Last child of pagerStage, so it paints above every pager
+              this holds still. Declared after the card, so it paints above every pager
               layer; the box mirrors imageContainer's 16:9 so the ticks land on exactly
               the same pixels they did when they lived inside the image. */}
           <View style={styles.pinnedTicksLayer} pointerEvents="none">
@@ -1635,6 +1604,52 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
               currentIndex={currentIndex}
               themeColor={themeColor}
             />
+          </View>
+
+          {/* ── HEADER BUTTONS — pinned, the ONE header in the tree ─────────────
+              These belong to the screen, not the exercise, so like the ticks they are a
+              sibling of the animated card and dragX never touches them.
+
+              box-none, not none: the buttons must stay tappable, but the bar spans the
+              full width of the image, so an `auto` container would eat every horizontal
+              pan that began in the empty space between the buttons and kill the swipe in
+              a strip across the top of the image. box-none lets touches through except
+              where they land on an actual button. overlayHeaderActions needs it too — its
+              8px gap is part of its box. */}
+          <View
+            style={[styles.overlayHeader, { paddingTop: insets.top + 12 }]}
+            pointerEvents="box-none"
+          >
+            <TouchableOpacity
+              onPress={onBack}
+              style={styles.overlayBtn}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Ionicons name="chevron-back" size={22} color="#fff" />
+            </TouchableOpacity>
+
+            <View style={styles.overlayHeaderActions} pointerEvents="box-none">
+              {/* History promoted to top-level (most-used action) */}
+              <TouchableOpacity
+                onPress={openHistoryForCurrent}
+                style={[
+                  styles.overlayBtn,
+                  { backgroundColor: hexA(themeColor, 0.18), borderWidth: 1, borderColor: hexA(themeColor, 0.4) },
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="time-outline" size={20} color={themeColor} />
+              </TouchableOpacity>
+
+              {/* More menu (vertical dropdown) */}
+              <TouchableOpacity
+                onPress={() => setHeaderMenuOpen((o) => !o)}
+                style={styles.overlayBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
         {/* end paged exercise stage */}
@@ -2480,27 +2495,11 @@ function ExercisePagePreview({
           <View style={styles.imageOverlay} />
         </View>
 
-        {/* No progress ticks here. The bar is pinned once in pagerStage, outside every
-            animated layer, so it holds still while these peek cards slide beneath it. */}
-
-        <View style={styles.overlayHeader}>
-          <View style={styles.overlayBtn}>
-            <Ionicons name="chevron-back" size={22} color="#fff" />
-          </View>
-          <View style={styles.overlayHeaderActions}>
-            <View
-              style={[
-                styles.overlayBtn,
-                { backgroundColor: hexA(themeColor, 0.18), borderWidth: 1, borderColor: hexA(themeColor, 0.4) },
-              ]}
-            >
-              <Ionicons name="time-outline" size={20} color={themeColor} />
-            </View>
-            <View style={styles.overlayBtn}>
-              <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
-            </View>
-          </View>
-        </View>
+        {/* Neither the progress ticks nor the header controls live here. Both are pinned
+            once in pagerStage, outside every animated layer, and hold still while these
+            peek cards slide beneath them. The fake header this used to render existed
+            only to mask the real one sliding away — with the real one pinned, a duplicate
+            would now show through as a double image. */}
       </View>
 
       {/* Focus area */}
