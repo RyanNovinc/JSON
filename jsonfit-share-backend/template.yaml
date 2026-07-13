@@ -1,6 +1,45 @@
+# ============================================================================
+# ⚠️  THIS TEMPLATE HAS NEVER BEEN DEPLOYED. DO NOT `sam deploy` IT CASUALLY.
+# ============================================================================
+#
+# It is used for `sam build` ONLY — to produce correct Lambda bundles, which are
+# then shipped by ZIP UPLOAD (see README.md). Nothing here has ever been applied
+# to the live `jsonfit-shares` stack.
+#
+# The live stack was created from cloudformation-template.yaml (raw CFN, inline
+# code), NOT from this file. The two describe the same infrastructure with
+# different resource decompositions, so `sam deploy` against the existing stack
+# is NOT a no-op:
+#
+#   SAFE   ShareTable  - same logical ID, same type, TableName: jsonfit-shares,
+#                        same key schema. In-place update. The DynamoDB table
+#                        would NOT be replaced or deleted; share links survive.
+#   SAFE   ShareApi    - same logical ID; API id eb6x42gp3h and the $default
+#                        stage are preserved, so the endpoint URL does not change.
+#
+#   RISK   Everything else. The live stack declares the stage, routes,
+#          integrations, Lambda permissions and a shared IAM role as EXPLICIT
+#          resources (ApiStage, CreateShareRoute, CreateShareIntegration,
+#          CreateSharePermission, the GetShare* equivalents, LambdaExecutionRole).
+#          SAM generates its own with DIFFERENT logical IDs — routes and
+#          integrations move inside the API's DefinitionBody, and the shared role
+#          is replaced by per-function roles. CloudFormation would delete those 8
+#          resources and create replacements.
+#
+#          It would most likely FAIL: CloudFormation creates before deleting, so
+#          it would try to stand up a second `$default` stage on the same API
+#          while the existing one still exists — a name collision — and roll back.
+#          Even on success there is a window where live API routes are torn down
+#          and rebuilt, i.e. real 404s for users mid-deploy.
+#
+# Verify with a change set (`--no-execute-changeset`) before ever running this.
+# Migrating the stack is separate work and must not ride along with a behaviour
+# change.
+# ============================================================================
+
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: JSON.fit share backend - QR code + universal link sharing
+Description: JSON.fit share backend - build-only template (never deployed - see header)
 
 Globals:
   Function:

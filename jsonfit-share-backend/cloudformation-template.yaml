@@ -1,5 +1,41 @@
+# ============================================================================
+# ⛔ DO NOT DEPLOY THIS TEMPLATE. IT WILL CLOBBER PRODUCTION.
+# ============================================================================
+#
+# This template created the live `jsonfit-shares` stack on 2026-05-04, and the
+# stack has not been updated since. It is therefore the template CloudFormation
+# still believes is authoritative — but it is STALE, and re-applying it would
+# overwrite the running Lambdas with the wrong code.
+#
+# Why: this template embeds the Lambda source INLINE, as CloudFormation
+# parameters (`Code: ZipFile: !Ref FunctionCode1` / `FunctionCode2`, see the
+# Parameters block below). The live stack still holds the original May-2026 code
+# in those parameter values. The live Lambdas DO NOT run that code any more —
+# they have been updated out of band by zip upload.
+#
+# Concretely, the inline FunctionCode1 below has:
+#     EXPIRY_DAYS  -> 30 days   (the live function runs 7; the app UI says 7)
+#     size limit   -> 200 * 1024 bytes, uncompressed
+#     compression  -> none
+#
+# So `aws cloudformation deploy --template-file cloudformation-template.yaml`
+# would:
+#   - revert createShare to a 30-day TTL and the 200KB limit, re-breaking
+#     "too big to share" for large programs, and
+#   - revert getShare to the pre-decompression version, which CANNOT READ any
+#     share written after the compression change — every new share link would
+#     fail to import.
+#
+# The real deploy mechanism is zip upload. See README.md ("Deploy (zip upload)").
+# The artifact currently live is preserved in deployed/ with an explanation.
+#
+# If you ever want CloudFormation to own the code again, the inline parameters
+# must first be replaced with the current source (or, better, with an S3
+# CodeUri) — otherwise the stack and reality stay divergent.
+# ============================================================================
+
 AWSTemplateFormatVersion: '2010-09-09'
-Description: JSON.fit share backend - QR code + universal link sharing
+Description: JSON.fit share backend - QR code + universal link sharing (STALE - see header, do not deploy)
 
 Parameters:
   FunctionCode1:

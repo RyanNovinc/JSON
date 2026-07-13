@@ -98,15 +98,57 @@ curl -X GET \
 - AWS CLI configured with appropriate permissions
 - Region: ap-southeast-2
 
-### Deploy
+### ⛔ DO NOT RUN THE CLOUDFORMATION DEPLOY
+
+This README used to document `aws cloudformation deploy --template-file
+cloudformation-template.yaml`. **Running that command today breaks production.**
+
+`cloudformation-template.yaml` carries the Lambda source *inline*, as CloudFormation
+parameters (`Code: ZipFile: !Ref FunctionCode1`). The live stack still holds the ORIGINAL
+inline code in those parameters. The live Lambdas do not run that code any more — they
+were updated out of band by zip upload.
+
+Re-running the CloudFormation deploy re-applies those stale parameters and silently
+reverts `createShare` to the **30-day TTL, 200KB limit, no compression** version, undoing
+the large-program share fix. It reverts `getShare` to the pre-decompression version, which
+cannot read any share written after the compression change.
+
+`sam deploy` is also **not** the deploy path. `template.yaml` has never been deployed; see
+the header comment in that file.
+
+**The deploy mechanism is zip upload.** See below.
+
+### Deploy (zip upload — the real procedure)
+
+Both Lambdas are configured with `Handler: index.handler`, so the zip must expose a
+`handler` export from `index.js` at the **root** of the archive.
+
 ```bash
 cd jsonfit-share-backend
-aws cloudformation deploy \
-  --template-file cloudformation-template.yaml \
-  --stack-name jsonfit-shares \
-  --capabilities CAPABILITY_IAM \
+sam build                      # produces .aws-sam/build/{CreateShareFunction,GetShareFunction}
+                               # each with node_modules/ and shared/shareLimits.js
+
+# Package each function (see scripts/package.sh — it adds the root index.js shim
+# that keeps Handler: index.handler valid with the nested bundle layout).
+./scripts/package.sh
+
+aws lambda update-function-code \
+  --function-name jsonfit-createShare \
+  --zip-file fileb://dist/jsonfit-createShare.zip \
+  --region ap-southeast-2
+
+aws lambda update-function-code \
+  --function-name jsonfit-getShare \
+  --zip-file fileb://dist/jsonfit-getShare.zip \
   --region ap-southeast-2
 ```
+
+No function *configuration* change is required — the shim keeps `index.handler` valid, so
+there is no window where the handler and the code disagree.
+
+After deploying, CloudFormation drifts further from reality. That is already true today and
+is tracked in `deployed/README.md`. Reconciling the stack is a separate piece of work and
+must not be bundled with a behaviour change.
 
 ### Get API URL
 ```bash
