@@ -1106,14 +1106,11 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     }));
   };
 
-  // Compute progress per exercise (used in mini cards)
-  const exerciseProgress = useMemo(() => {
-    return exercises.map((_, idx) => {
-      const sets = allSetsData[idx] || [];
-      const completed = sets.filter((s) => s.completed).length;
-      return { completed, total: sets.length };
-    });
-  }, [exercises, allSetsData]);
+  // Compute progress per exercise (used in mini cards and the image progress ticks)
+  const exerciseProgress = useMemo(
+    () => computeExerciseProgress(exercises, allSetsData),
+    [exercises, allSetsData],
+  );
 
   // ── PR detection for the finish summary ──────────────────────────
   // For each exercise, compare the best estimated 1RM this session against
@@ -1401,6 +1398,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             {/* Dark overlay for text legibility */}
             <View style={styles.imageOverlay} />
           </View>
+
+          {/* Workout progress — sits above the scrim so it isn't dimmed */}
+          <ExerciseProgressTicks progress={exerciseProgress} themeColor={themeColor} />
 
           {/* ── HEADER BUTTONS OVERLAID ON IMAGE ──────────────────────── */}
           <View style={[styles.overlayHeader, { paddingTop: insets.top + 12 }]}>
@@ -2365,6 +2365,51 @@ interface ExercisePagePreviewProps {
   calculate1RM: (w: number, r: number) => number;
 }
 
+/** One { completed, total } per exercise index. Single source of the done-state rule. */
+function computeExerciseProgress(
+  exercises: Exercise[],
+  allSetsData: SetData[][],
+): { completed: number; total: number }[] {
+  return exercises.map((_, idx) => {
+    const sets = allSetsData[idx] || [];
+    const completed = sets.filter((s) => s.completed).length;
+    return { completed, total: sets.length };
+  });
+}
+
+interface ExerciseProgressTicksProps {
+  progress: { completed: number; total: number }[];
+  themeColor: string;
+}
+
+/**
+ * One tick per exercise along the bottom edge of the image — workout progress at a
+ * glance, without scrolling to "Up Next".
+ *
+ * Two states only. A tick lights up when every set of that exercise is done; a
+ * half-finished exercise looks exactly like an untouched one. Proportional fill would
+ * turn a glanceable row into something you have to read, and the current exercise is
+ * left undistinguished because the image above it already says where you are.
+ */
+function ExerciseProgressTicks({ progress, themeColor }: ExerciseProgressTicksProps) {
+  if (progress.length === 0) return null;
+
+  return (
+    // pointerEvents none — the image's swipe gesture must pass straight through.
+    <View style={styles.progressTicks} pointerEvents="none">
+      {progress.map((p, i) => {
+        const done = p.total > 0 && p.completed === p.total;
+        return (
+          <View
+            key={i}
+            style={[styles.progressTick, done && { backgroundColor: themeColor }]}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 function ExercisePagePreview({
   index,
   exercises,
@@ -2407,6 +2452,13 @@ function ExercisePagePreview({
           )}
           <View style={styles.imageOverlay} />
         </View>
+
+        {/* Same ticks on the peek layers, so a card sliding in doesn't visibly lack them */}
+        <ExerciseProgressTicks
+          progress={computeExerciseProgress(exercises, allSetsData)}
+          themeColor={themeColor}
+        />
+
         <View style={styles.overlayHeader}>
           <View style={styles.overlayBtn}>
             <Ionicons name="chevron-back" size={22} color="#fff" />
@@ -3431,6 +3483,22 @@ const styles = StyleSheet.create({
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.4)', // Dark overlay for text legibility
+  },
+  progressTicks: {
+    position: 'absolute',
+    bottom: 9,
+    // Inset so the row clears the container's 20px bottom corner radius
+    left: 14,
+    right: 14,
+    flexDirection: 'row',
+    gap: 5,
+    zIndex: 10, // above imageOverlay (undimmed), below overlayHeader's zIndex 100
+  },
+  progressTick: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#2a2a32',
   },
   overlayHeader: {
     position: 'absolute',
