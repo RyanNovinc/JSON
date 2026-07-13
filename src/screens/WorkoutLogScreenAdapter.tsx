@@ -90,6 +90,12 @@ export default function WorkoutLogScreenAdapter() {
   // Local exercises state for superset modifications
   const [exercises, setExercises] = useState<Exercise[]>([]);
 
+  // exercisePreferences is a SECOND async read, independent of the sets data, and it drives
+  // which alternative Up Next and the dropdown show — while the card's own selectedIndex reads
+  // allSetsData. Two sources of truth for "which alternative is selected", landing at different
+  // times, so without its own ready flag Up Next can flip a beat after (or before) the card.
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+
   // Load exercise preferences on mount
   useEffect(() => {
     const loadPreferences = async () => {
@@ -100,6 +106,8 @@ export default function WorkoutLogScreenAdapter() {
         }
       } catch (error) {
         console.log('Could not load exercise preferences:', error);
+      } finally {
+        setPreferencesLoaded(true);
       }
     };
     loadPreferences();
@@ -984,6 +992,9 @@ export default function WorkoutLogScreenAdapter() {
     <>
       <WorkoutLogScreen
       exercises={exercises}
+      // Both async reads must have landed before the card paints anything. dataLoaded alone is
+      // not enough: preferences arrive separately and drive Up Next's alternatives.
+      contentReady={dataLoaded && preferencesLoaded}
       currentIndex={currentIndex}
       onIndexChange={setCurrentIndex}
       allSetsData={allSetsData}

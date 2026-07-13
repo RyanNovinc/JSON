@@ -124,6 +124,14 @@ type PreviousSets = Record<number, { weight: string; reps: string; unit?: 'kg' |
 
 export interface WorkoutLogScreenProps {
   exercises: Exercise[];
+  /**
+   * False until BOTH of the parent's async reads have landed (sets data and exercise
+   * preferences). Until then the card must paint nothing: allSetsData carries the saved
+   * alternative, so rendering early shows the PRIMARY exercise's title, image, muscles and a
+   * missing 1RM badge, then flips the lot when storage answers. Defaults true so any other
+   * caller is unaffected.
+   */
+  contentReady?: boolean;
   /** Index of the currently focused exercise */
   currentIndex: number;
   onIndexChange: (index: number) => void;
@@ -257,6 +265,7 @@ function convertWeight(weight: number, from: 'kg' | 'lbs', to: 'kg' | 'lbs'): nu
 export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const {
     exercises,
+    contentReady = true,
     currentIndex,
     onIndexChange,
     allSetsData,
@@ -1462,6 +1471,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   ];
 
   // ── Render ────────────────────────────────────────────────────────
+  // Everything below here is a render-time early return, so it MUST stay beneath every hook —
+  // the hooks above run unconditionally on every render, including the ones where we bail.
 
   if (!effectiveCurrentExercise) {
     return (
@@ -1471,6 +1482,18 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         </View>
       </SafeAreaView>
     );
+  }
+
+  // The parent's sets data and preferences are separate async reads. allSetsData is what
+  // carries the saved alternative (via selectedExerciseIndex), so painting before it lands
+  // shows the PRIMARY exercise — wrong title, wrong image, wrong muscles, no 1RM badge — and
+  // then flips all of it when storage answers. On a real device that is 100ms+ of wrong
+  // content; the simulator only hides it because AsyncStorage is fast there.
+  //
+  // Hold on an empty frame instead. A blank frame beats a wrong one, and unlike a spinner it
+  // does not announce a wait that is usually imperceptible.
+  if (!contentReady) {
+    return <SafeAreaView style={styles.root} />;
   }
 
   const exName = effectiveCurrentExercise.exercise || effectiveCurrentExercise.name || '';
@@ -1490,7 +1513,16 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const liveImage = imageCache[exKey];
   const warmImage = miniCardImages.get(exName)?.start ?? null;
   const exImage = liveImage ?? warmImage;
-  const exImageLoading = imageLoading[exKey];
+
+  // "Not resolved yet" and "resolved, and there is nothing" are different states, and only the
+  // second one has earned the barbell placeholder. They used to be indistinguishable: on a cold
+  // open imageCache had no entry, imageLoading had no flag either (the effect that sets it has
+  // not run), and miniCardImages was still an empty Map — so the render fell straight through to
+  // "No preview", then a spinner, then the picture. Three states for one image.
+  //
+  // The resolve effect always writes SOMETHING under exKey — the image, or null on failure — so
+  // the key's presence is exactly the "we tried" signal.
+  const imageResolved = exKey in imageCache;
 
   // History view for a specific exercise
   if (showHistory) {
@@ -1679,19 +1711,21 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                     onError={(error) => {}}
                   />
                 );
-              } else if (exImageLoading) {
-                return (
-                  <View style={styles.fullScreenPlaceholder}>
-                    <ActivityIndicator color={themeColor} size="large" />
-                  </View>
-                );
-              } else {
+              } else if (imageResolved) {
+                // Resolved, and there is genuinely no picture for this exercise. The only case
+                // that has earned the placeholder.
                 return (
                   <View style={styles.fullScreenPlaceholder}>
                     <Ionicons name="barbell-outline" size={60} color="#3a3a44" />
                     <Text style={styles.mediaPlaceholderText}>No preview</Text>
                   </View>
                 );
+              } else {
+                // Not resolved yet. Hold on an empty frame — no barbell claiming there is no
+                // image, and no spinner announcing a wait that is over in a frame or two. The
+                // container already carries the surface colour, so this reads as the image
+                // simply not having arrived, which is the truth.
+                return null;
               }
             })()}
             {/* Dark overlay for text legibility */}
