@@ -354,12 +354,14 @@ export default function WorkoutLogScreenAdapter() {
     
     setAllSetsData(newData);
     
-    // Handle history based on completion state
-    if (!wasCompleted && newData[exerciseIndex][setIndex].weight && newData[exerciseIndex][setIndex].reps) {
-      // Save to history when set is completed
-      await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
-      
-      // Handle superset transitions and rest timers only when completing a set
+    if (!wasCompleted) {
+      // The rest timer and the superset switch depend only on "did the set happen",
+      // never on what was recorded. Weight is legitimately optional — a bodyweight
+      // movement has no added load — and gating on it meant a blank-weight set showed
+      // its ✓ while silently starting no timer and skipping the superset transition.
+      //
+      // This also runs BEFORE the history write, so a slow or rejecting storage call
+      // cannot delay or prevent the timer (same side-channel principle as 206a192).
       const currentExercise = exercises[exerciseIndex];
       const nextExercise = exercises[exerciseIndex + 1];
       
@@ -395,11 +397,19 @@ export default function WorkoutLogScreenAdapter() {
       } else {
         // Regular rest timer for non-superset exercises
         const exercise = exercises[exerciseIndex];
-        
+
         const restSeconds = parseRestSeconds(exercise?.rest);
         if (restSeconds && restSeconds > 0) {
           startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
         }
+      }
+
+      // History still needs reps to mean anything — "3 sets of nothing" is not a
+      // record. Weight may be an empty string; downstream 1RM, PR detection and
+      // volume all skip a set whose weight does not parse, rather than counting it
+      // as 0kg.
+      if (newData[exerciseIndex][setIndex].reps) {
+        await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
       }
     } else if (wasCompleted) {
       // Un-completing a set retracts everything that completing it produced —
