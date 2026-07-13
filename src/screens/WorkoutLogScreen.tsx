@@ -1803,7 +1803,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             </TouchableOpacity>
           ) : (
             <Text style={styles.accessoryHint} numberOfLines={1}>
-              {accessoryPrev ? `last: ${accessoryPrev.weight} × ${accessoryPrev.reps}` : ''}
+              {accessoryPrev ? `last: ${formatPrevWeight(accessoryPrev, globalUnit)} × ${accessoryPrev.reps}` : ''}
             </Text>
           )}
 
@@ -1992,20 +1992,27 @@ function PrescriptionBanner({
 
 // Helper function to parse target reps from weekly format
 // Converts "6, 6, 5, 5" or "8-12" to array of rep targets
+/** Shown under PREV when last session's set carried no weight at all. */
+const PREV_NO_WEIGHT = '—';
+
 /**
  * PREV shows last session's load, which is stored in whatever unit it was logged
  * in — convert it to the unit on screen. Trailing zeros are dropped so a clean
  * 60kg reads as "60", not "60.0", in a 60px-wide cell.
+ *
+ * Weight is optional: bodyweight work is logged with reps and no load, and stores
+ * as ''. That must render blank, not as a fabricated 0 — "0 × 10" reads as a real
+ * measurement the user never took. Note this is "did not parse", not "is falsy":
+ * a 0 the user actually typed is a genuine reading and still renders as 0.
  */
 function formatPrevWeight(
   previous: { weight: string; unit?: 'kg' | 'lbs' },
   globalUnit: 'kg' | 'lbs',
 ): string {
-  const converted = convertWeight(
-    parseFloat(previous.weight) || 0,
-    previous.unit ?? globalUnit,
-    globalUnit,
-  );
+  const raw = parseFloat(previous.weight);
+  if (!Number.isFinite(raw)) return PREV_NO_WEIGHT;
+
+  const converted = convertWeight(raw, previous.unit ?? globalUnit, globalUnit);
   return String(Number(converted.toFixed(1)));
 }
 
