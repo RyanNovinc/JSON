@@ -752,13 +752,26 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         // Start new Live Activity - set once and let iOS handle native countdown
         console.log('🚀 Starting new Live Activity', { state, config });
         DebugLogger.log(`🆕 Starting new Live Activity with endTime: ${new Date(endTime).toISOString()} - will use native iOS countdown`);
-        
-        const activityId = await startActivity(state, config);
-        console.log('✅ Live Activity started with ID:', activityId);
-        DebugLogger.log(`✅ Live Activity started successfully with ID: ${activityId}`);
-        
-        if (activityId) {
-          setTimer(prev => prev ? { ...prev, liveActivityId: activityId } : null);
+
+        // The truthiness check covers Android (binding is null there); the try/catch
+        // covers iOS binaries where expo-live-activity's JS is present but its native
+        // module is not — requireOptionalNativeModule returns null and the package
+        // dereferences it, so the call itself throws. Live Activities are a
+        // side-channel: failing here must never stop the rest timer.
+        if (startActivity) {
+          try {
+            const activityId = await startActivity(state, config);
+            console.log('✅ Live Activity started with ID:', activityId);
+            DebugLogger.log(`✅ Live Activity started successfully with ID: ${activityId}`);
+
+            if (activityId) {
+              setTimer(prev => prev ? { ...prev, liveActivityId: activityId } : null);
+            }
+          } catch (error) {
+            DebugLogger.log(`⚠️ [LIVE-ACTIVITY] startActivity unavailable, continuing without it: ${error?.message ?? error}`, 'warn');
+          }
+        } else {
+          DebugLogger.log('⏭️ [LIVE-ACTIVITY] startActivity binding unavailable - skipping', 'warn');
         }
       } else {
         // Don't update every second - let iOS handle native countdown for accuracy
@@ -769,10 +782,20 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         if (hasSignificantChange) {
           console.log('🔄 Updating Live Activity for significant change', timer.liveActivityId, { state });
           DebugLogger.log(`🔄 Updating Live Activity for significant change: remaining=${remaining}, lastSent=${timer.lastSentRemaining}`);
-          
-          await updateActivity(timer.liveActivityId, state);
-          setTimer(prev => prev ? { ...prev, lastSentRemaining: remaining } : null);
-          DebugLogger.log('✅ Live Activity updated successfully');
+
+          // Same two-layer guard as startActivity above. lastSentRemaining is only
+          // advanced on a successful send, so a failed update retries next sync.
+          if (updateActivity) {
+            try {
+              await updateActivity(timer.liveActivityId, state);
+              setTimer(prev => prev ? { ...prev, lastSentRemaining: remaining } : null);
+              DebugLogger.log('✅ Live Activity updated successfully');
+            } catch (error) {
+              DebugLogger.log(`⚠️ [LIVE-ACTIVITY] updateActivity unavailable, continuing without it: ${error?.message ?? error}`, 'warn');
+            }
+          } else {
+            DebugLogger.log('⏭️ [LIVE-ACTIVITY] updateActivity binding unavailable - skipping', 'warn');
+          }
         } else {
           DebugLogger.log(`⏭️ Skipping Live Activity update - no significant change (remaining=${remaining})`);
         }
