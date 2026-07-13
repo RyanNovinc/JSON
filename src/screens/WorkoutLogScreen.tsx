@@ -206,6 +206,17 @@ const CARD_FOCUS_PB = 8;                      // styles.focusArea.paddingBottom 
 const TICKS_ROW_INSET = 14; // styles.progressTicks left/right
 const TICK_GAP = 5;         // styles.progressTicks gap
 
+// Width the title must leave for the alternatives chevron: the 18px icon + its 8px margin.
+//
+// In ROW mode the chevron is a sibling, so it takes this space out of the title's width
+// automatically. In COLUMN mode it is inline INSIDE the Text, so nothing reserved it — the
+// title got the full column. That difference was a feedback loop: a name that fits in `col`
+// but not in `col - 26` measured as 2 lines in row mode, which switched it to column mode,
+// where it fit on 1 line, which switched it back to row... forever. Reserving the same width
+// in both modes makes the wrap a pure function of the string, so it cannot depend on the
+// mode it produces.
+const TITLE_CHEVRON_RESERVE = 18 + 8;
+
 const COMPOUND_HINTS = [
   'bench', 'squat', 'deadlift', 'press', 'row', 'pull-up', 'pullup',
   'chin-up', 'chinup', 'clean', 'snatch', 'lunge', 'rdl',
@@ -1639,7 +1650,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           <View style={styles.titleRow}>
             <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
               <TouchableOpacity
-                style={[styles.titleButton, isMultiLine.get(currentIndex) && styles.titleButtonMultiline]}
+                style={[
+                  styles.titleButton,
+                  isMultiLine.get(currentIndex) && styles.titleButtonMultiline,
+                  // Column mode puts the chevron inline, so reserve its width here to match
+                  // what row mode's sibling chevron takes. See TITLE_CHEVRON_RESERVE.
+                  isMultiLine.get(currentIndex) &&
+                    allExercises.length > 1 && { paddingRight: TITLE_CHEVRON_RESERVE },
+                ]}
                 onPress={() => allExercises.length > 1 && setShowExerciseSelector(showExerciseSelector === currentIndex ? null : currentIndex)}
                 activeOpacity={allExercises.length > 1 ? 0.7 : 1}
               >
@@ -2841,7 +2859,13 @@ function ExercisePagePreview({
                 is what made the chevron jump lines the moment a long title committed, and it
                 also gave the two different text widths (col vs col - 26), so they could wrap
                 in different places. */}
-            <View style={[styles.titleButton, isMultiLine && styles.titleButtonMultiline]}>
+            <View
+              style={[
+                styles.titleButton,
+                isMultiLine && styles.titleButtonMultiline,
+                isMultiLine && hasAlternatives && { paddingRight: TITLE_CHEVRON_RESERVE },
+              ]}
+            >
               <Text
                 style={styles.title}
                 numberOfLines={2}
