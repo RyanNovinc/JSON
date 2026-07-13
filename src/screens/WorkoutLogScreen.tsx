@@ -2213,30 +2213,28 @@ function SetRow({
           </Text>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <TextInput
-            ref={(r) => registerWeightRef(r)}
-            style={[styles.setInput, { flex: 1 }]}
-            value={set.weight}
-            onChangeText={(v) => onUpdate('weight', v)}
-            onFocus={() => onFocusField('weight')}
-            onPressIn={() => {
-              if (!workoutStarted && onSetTapWhenNotStarted) {
-                onSetTapWhenNotStarted();
-              }
-            }}
-            keyboardType="decimal-pad"
-            // No ghost weight — last session's load is already one column left,
-            // under PREV. The plan prescribes reps, not load, so there is no
-            // target to suggest here.
-            placeholder=""
-            placeholderTextColor="#3a3a44"
-            editable={workoutStarted && !completed}
-          />
-          <Text style={{ color: '#9898a4', fontSize: 11, marginLeft: 4, fontFamily: 'DMMono-Medium' }}>
-            {globalUnit.toUpperCase()}
-          </Text>
-        </View>
+        {/* No per-row unit label — the column header already states kg/lbs, and it
+            tracks the toggle. Repeating it on every row cost the weight input width
+            for nothing, leaving it narrower than REPS. */}
+        <TextInput
+          ref={(r) => registerWeightRef(r)}
+          style={[styles.setInput, { flex: 1 }]}
+          value={set.weight}
+          onChangeText={(v) => onUpdate('weight', v)}
+          onFocus={() => onFocusField('weight')}
+          onPressIn={() => {
+            if (!workoutStarted && onSetTapWhenNotStarted) {
+              onSetTapWhenNotStarted();
+            }
+          }}
+          keyboardType="decimal-pad"
+          // No ghost weight — last session's load is already one column left,
+          // under PREV. The plan prescribes reps, not load, so there is no
+          // target to suggest here.
+          placeholder=""
+          placeholderTextColor="#3a3a44"
+          editable={workoutStarted && !completed}
+        />
 
         <TextInput
           style={[styles.setInput, { flex: 1 }]}
