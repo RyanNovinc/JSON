@@ -1526,6 +1526,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 currentWeek={currentWeek}
                 calculate1RM={calculate1RM}
                 onTitleMeasured={handleTitleMeasured}
+                isMultiLine={!!isMultiLine.get(currentIndex - 1)}
               />
             </Animated.View>
           )}
@@ -1548,6 +1549,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 currentWeek={currentWeek}
                 calculate1RM={calculate1RM}
                 onTitleMeasured={handleTitleMeasured}
+                isMultiLine={!!isMultiLine.get(currentIndex + 1)}
               />
             </Animated.View>
           )}
@@ -2553,6 +2555,8 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
 interface ExercisePagePreviewProps {
   /** Reports whether this exercise's title wraps, so its card height is known before it lands. */
   onTitleMeasured?: (index: number, multi: boolean) => void;
+  /** Whether this exercise's title wraps. Drives the same two-mode layout as the live card. */
+  isMultiLine?: boolean;
   index: number;
   exercises: Exercise[];
   allSetsData: SetData[][];
@@ -2657,6 +2661,7 @@ function ExercisePagePreview({
   currentWeek,
   calculate1RM,
   onTitleMeasured,
+  isMultiLine,
 }: ExercisePagePreviewProps) {
   const ex = exercises[index];
   if (!ex) return null;
@@ -2707,16 +2712,30 @@ function ExercisePagePreview({
       <View style={styles.focusArea}>
         <View style={styles.titleRow}>
           <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
-            {/* Same row + chevron as the live title, but a View: nothing here is tappable */}
-            <View style={styles.titleButton}>
+            {/* Mirrors the live title EXACTLY, but with Views: nothing here is tappable.
+                The live card has two modes — a single-line title lays out as a row with the
+                chevron beside it, while a wrapping title switches to a column and moves the
+                chevron INLINE, to the end of the second line. Implementing only the row mode
+                is what made the chevron jump lines the moment a long title committed, and it
+                also gave the two different text widths (col vs col - 26), so they could wrap
+                in different places. */}
+            <View style={[styles.titleButton, isMultiLine && styles.titleButtonMultiline]}>
               <Text
                 style={styles.title}
                 numberOfLines={2}
                 onTextLayout={(e) => onTitleMeasured?.(index, e.nativeEvent.lines.length > 1)}
               >
                 {name}
+                {hasAlternatives && isMultiLine && (
+                  <Text style={styles.inlineArrow}>
+                    {' '}
+                    <View>
+                      <Ionicons name="chevron-down" size={18} color={themeColor} />
+                    </View>
+                  </Text>
+                )}
               </Text>
-              {hasAlternatives && (
+              {hasAlternatives && !isMultiLine && (
                 <View style={{ marginLeft: 8 }}>
                   <Ionicons name="chevron-down" size={18} color={themeColor} />
                 </View>
