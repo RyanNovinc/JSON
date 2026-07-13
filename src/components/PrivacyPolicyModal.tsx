@@ -9,7 +9,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+import { TouchableOpacity, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -88,7 +88,8 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
       animationType="none"
       onRequestClose={onClose}
     >
-      <Animated.View 
+      <GestureHandlerRootView style={{ flex: 1 }}>
+      <Animated.View
         style={[
           styles.overlay,
           { opacity: fadeAnim }
@@ -275,6 +276,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           </ScrollView>
         </Animated.View>
       </Animated.View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };

@@ -86,6 +86,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppModal from '../../components/AppModal';
 import { useTheme } from '../../contexts/ThemeContext';
 import { CURATED_MEALS } from '../../data/curated_meals';
 import { CuratedMeal } from '../../types/curated_meals';
@@ -671,7 +672,7 @@ function BottomSheet({
   }, [open, anim]);
 
   return (
-    <Modal visible={rendered} transparent animationType="none" onRequestClose={onClose}>
+    <AppModal visible={rendered} transparent animationType="none" onRequestClose={onClose}>
       <Animated.View style={[styles.sheetBackdrop, { opacity: anim }]}>
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
@@ -697,7 +698,7 @@ function BottomSheet({
           {children}
         </View>
       </Animated.View>
-    </Modal>
+    </AppModal>
   );
 }
 
