@@ -8,7 +8,14 @@
 import { WorkoutStorage } from '../storage';
 import type { WorkoutHistory } from '../storage';
 
-// Real convertWeight implementation
+// FIXME: this is a hand-copied duplicate of the real convertWeight (which lives in
+// src/contexts/WeightUnitContext.tsx), not an import of it. The same goes for the volume
+// arithmetic below, which re-derives what src/components/WorkoutCalendar.tsx does rather
+// than calling it. So this suite exercises NO production conversion code — it can only
+// ever confirm that a copy of the logic behaves like the copy of the logic, and it will
+// not notice if production drifts away from it. It should be rewritten to import the real
+// conversion and drive the real calendar volume calculation. Left as-is for now: it is a
+// characterisation test, and rewriting it is a separate piece of work.
 const convertWeight = (weight: number, fromUnit: 'kg' | 'lbs', toUnit: 'kg' | 'lbs'): number => {
   if (fromUnit === toUnit) return weight;
   
@@ -95,8 +102,15 @@ describe('Real Scenario: User Bug Reproduction', () => {
     
     // Test assertions
     expect(savedSet.unit).toBe('lbs'); // Set is saved with lbs unit
-    expect(volumeOldWay).toBe(0.9); // 1 lbs = 0.5 kg × 2 = 1.0 kg (rounded to 0.9)
-    expect(volumeNewWay).toBe(0.9); // 2 lbs = 0.9 kg (more accurate)
+
+    // Old way rounds per-set BEFORE multiplying: 1 lbs -> 0.5 kg (1 d.p.), x2 reps = 1.0 kg.
+    // This previously asserted 0.9, which contradicted both this test's own comment and its
+    // own `if (volumeOldWay === 1)` bug-reproduction branch below. The arithmetic gives 1.
+    expect(volumeOldWay).toBe(1);
+
+    // New way multiplies first, then converts once: 2 lbs -> 0.9 kg. More accurate, because
+    // rounding once at the end does not amplify the per-set rounding error by the rep count.
+    expect(volumeNewWay).toBe(0.9);
     
     // The bug is that user expects 2 kg but sees ~1 kg because they logged in lbs unknowingly
   });

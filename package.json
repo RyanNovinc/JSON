@@ -12,7 +12,8 @@
     "eas-build-pre-install": "npm install --legacy-peer-deps && echo 'Dependencies installed via pre-install script'",
     "eas-build-post-install": "find . -name '._*' -delete && echo 'Cleaned up ._ files'",
     "postinstall": "patch-package",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "check": "tsx src/utils/buildPrepSession.check.ts && tsx src/utils/__tests__/curatedShelves.check.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -87,6 +88,7 @@
     "postinstall-postinstall": "^2.1.0",
     "sharp-cli": "^5.2.0",
     "ts-jest": "^29.4.11",
+    "tsx": "^4.23.1",
     "typescript": "~5.9.2"
   },
   "private": true,

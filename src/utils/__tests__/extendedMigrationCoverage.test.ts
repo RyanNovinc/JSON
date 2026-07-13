@@ -3,16 +3,24 @@
  * Ensures all questionnaire keys with nested data are migrated
  */
 
-import { runMigrations } from '../migrationFramework';
+import { runMigrations, resetMigrationState } from '../migrationFramework';
 import RobustStorage from '../robustStorage';
 
 jest.mock('../robustStorage');
 const mockRobustStorage = RobustStorage as jest.Mocked<typeof RobustStorage>;
 
 describe('Extended Migration Coverage (Fix 6)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockRobustStorage.setItem.mockResolvedValue(true);
+
+    // runMigrations() is guarded by a module-level `migrationsCompleted` flag, so it
+    // runs at most once per process. That is correct in production — one app launch is
+    // one process — but every test in this file shares the module, so without this
+    // reset the first test would migrate and all the rest would hit the early return
+    // and observe zero storage writes. jest.clearAllMocks() only clears the recorded
+    // calls; it cannot reach the module's own state.
+    await resetMigrationState();
   });
 
   it('1. WORKOUT KEYS INCLUDED: fitness_goals_questionnaire_results migrated from nested format', async () => {
@@ -172,11 +180,19 @@ describe('Extended Migration Coverage (Fix 6)', () => {
 
     await runMigrations();
 
-    // Verify backup was created (backup keys start with 'backup_')
+    // Backup keys are `${domain}_backup_${timestamp}` (see createBackup in
+    // migrationFramework), NOT `backup_${domain}`. This assertion used to look for a
+    // `backup_` prefix, which production has never produced, so it failed even though
+    // backups were being written correctly.
     const backupCalls = mockRobustStorage.setItem.mock.calls.filter(
-      call => call[0].startsWith('backup_')
+      call => /_backup_\d+$/.test(call[0])
     );
-    
+
     expect(backupCalls.length).toBeGreaterThan(0);
+
+    // And they back up the questionnaire domains, not just anything.
+    expect(
+      backupCalls.some(call => call[0].startsWith('fitness_goals_questionnaire_results_backup_'))
+    ).toBe(true);
   });
 });

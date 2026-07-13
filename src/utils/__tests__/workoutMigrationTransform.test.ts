@@ -111,10 +111,14 @@ describe('Workout Migration Transform Verification', () => {
     expect(transformedData.priorityMuscleGroups).toEqual(['chest', 'back']);
     expect(transformedData.trainingExperience).toBe('intermediate');
     
-    // Verify special fields preserved (NOTE: Migration only preserves completedAt/macroResults)
+    // Verify sibling fields outside formData survive the flatten.
+    //
+    // This assertion used to be `expect(transformedData.someOtherField).toBeUndefined()`,
+    // i.e. it asserted that arbitrary user fields SHOULD be dropped. Production was since
+    // fixed to preserve them (the `...rest` spread in migrateQuestionnaireShape), so the
+    // migration no longer discards data — and the test had been demanding that it did.
     expect(transformedData.completedAt).toBe('2024-01-15T10:30:00Z');
-    // LIMITATION: Migration doesn't preserve arbitrary fields like someOtherField
-    expect(transformedData.someOtherField).toBeUndefined();
+    expect(transformedData.someOtherField).toBe('preserve_this');
     
     // Verify migration markers added
     expect(transformedData._migrationVersion).toBe(2);

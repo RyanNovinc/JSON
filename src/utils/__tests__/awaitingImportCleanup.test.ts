@@ -26,6 +26,15 @@ jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn(),
 }));
 
+// useWorkoutImport also pulls in expo-document-picker. Without this mock the REAL expo
+// module loads, and it reaches for Platform.select — but the react-native mock above
+// replaces the whole module with just { Alert, Animated }, so Platform is undefined and
+// the suite dies on import with "Cannot read properties of undefined (reading 'select')".
+// That presented as a suite failure but was only a missing mock.
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn(),
+}));
+
 describe('Awaiting Import Cleanup (Fix 5)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
