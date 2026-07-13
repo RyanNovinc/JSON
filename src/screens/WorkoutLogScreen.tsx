@@ -2585,15 +2585,14 @@ function PreviewSetsTable({
                 {prev ? `${formatPrevWeight(prev, unit)} × ${prev.reps}` : '—'}
               </Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <View style={[styles.setInput, { flex: 1 }]}>
-                <Text style={[styles.previewCellText, { color: s.weight ? '#f0f0f2' : '#3a3a44' }]}>{wTxt}</Text>
-              </View>
+            {/* Direct children of the row, exactly like the live TextInputs. The extra
+                wrapper these used to sit in was a second box in the flex chain that the
+                live row does not have. */}
+            <View style={[styles.setInput, { flex: 1 }]}>
+              <Text style={[styles.previewCellText, { color: s.weight ? '#f0f0f2' : '#3a3a44' }]}>{wTxt}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <View style={[styles.setInput, { flex: 1 }]}>
-                <Text style={[styles.previewCellText, { color: s.reps ? '#f0f0f2' : '#3a3a44' }]}>{rTxt}</Text>
-              </View>
+            <View style={[styles.setInput, { flex: 1 }]}>
+              <Text style={[styles.previewCellText, { color: s.reps ? '#f0f0f2' : '#3a3a44' }]}>{rTxt}</Text>
             </View>
             <View style={styles.setCheckCell}>
               <Ionicons
@@ -3043,6 +3042,7 @@ const styles = StyleSheet.create({
   muscles: {
     color: '#55555f',
     fontSize: 12,
+    lineHeight: 16,
     marginTop: 4,
     fontFamily: 'DMMono-Regular',
     letterSpacing: 0.2,
@@ -3082,6 +3082,7 @@ const styles = StyleSheet.create({
   },
   prescriptionLabel: {
     fontSize: 10,
+    lineHeight: 14,
     letterSpacing: 1.2,
     fontFamily: 'DMMono-Medium',
     marginRight: 10,
@@ -3089,6 +3090,7 @@ const styles = StyleSheet.create({
   prescriptionText: {
     color: '#9898a4',
     fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'DMMono-Regular',
     flex: 1,
   },
@@ -3109,6 +3111,7 @@ const styles = StyleSheet.create({
   setsHeaderCell: {
     color: '#55555f',
     fontSize: 10,
+    lineHeight: 14,
     letterSpacing: 1.4,
     fontFamily: 'DMMono-Regular',
   },
@@ -3141,6 +3144,7 @@ const styles = StyleSheet.create({
     left: -16,
     color: '#55555f',
     fontSize: 16,
+    lineHeight: 20,
     fontFamily: 'DMMono-Regular',
   },
   prevCellBox: {
@@ -3155,11 +3159,13 @@ const styles = StyleSheet.create({
   setNum: {
     color: '#9898a4',
     fontSize: 16,
+    lineHeight: 20,
     fontFamily: 'DMMono-Medium',
   },
   prevCell: {
     color: '#55555f',
     fontSize: 12,
+    lineHeight: 16,
     fontFamily: 'DMMono-Regular',
   },
   setInput: {
@@ -3173,10 +3179,16 @@ const styles = StyleSheet.create({
     fontFamily: 'DMMono-Medium',
     textAlign: 'center',
     minHeight: 44,
+    // A TextInput centres its own text in the box; a Text inside a View does not — it
+    // sits against the top padding. PreviewSetsTable reuses this style on a View, so
+    // without this its numbers rendered a few px higher than the live ones and visibly
+    // jumped on commit. No-op on the TextInput itself (it has no flex children).
+    justifyContent: 'center',
   },
   previewCellText: {
     fontFamily: 'DMMono-Medium',
     fontSize: 16,
+    lineHeight: 20,
     textAlign: 'center',
   },
   addSetBtn: {
@@ -3189,6 +3201,7 @@ const styles = StyleSheet.create({
   addSetText: {
     color: '#9898a4',
     fontSize: 13,
+    lineHeight: 18,
     marginLeft: 6,
     fontFamily: 'DMMono-Regular',
     letterSpacing: 0.4,
