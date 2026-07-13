@@ -1444,8 +1444,23 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     );
   }
 
-  const exKey = `${effectiveCurrentExercise.exercise || effectiveCurrentExercise.name || ''}-${themeColor}`;
-  const exImage = imageCache[exKey];
+  const exName = effectiveCurrentExercise.exercise || effectiveCurrentExercise.name || '';
+  const exKey = `${exName}-${themeColor}`;
+
+  // Two caches feed this image, and the handover between them was the blink.
+  //
+  // imageCache is keyed by name+theme and filled LAZILY, by an effect that only runs after
+  // currentIndex has already changed. So the first frame of a newly-committed exercise found
+  // no entry, no loading flag either, and fell all the way through to the "No preview"
+  // placeholder — then a spinner — then the image. Meanwhile the peek layer that had just
+  // slid in was showing the picture perfectly well the whole time, because it reads
+  // miniCardImages, which is pre-loaded on mount for every exercise AND every alternative.
+  //
+  // So: show miniCardImages' frame while imageCache is still catching up. Same picture, no
+  // gap; the live (cycling) image swaps in silently once resolved.
+  const liveImage = imageCache[exKey];
+  const warmImage = miniCardImages.get(exName)?.start ?? null;
+  const exImage = liveImage ?? warmImage;
   const exImageLoading = imageLoading[exKey];
 
   // History view for a specific exercise
@@ -1608,8 +1623,12 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             {(() => {
               if (exImage) {
                 return (
+                  // No key. It used to be exKey (name + theme), which changes on every
+                  // exercise change — forcing React to unmount the old Image and mount a new
+                  // one, blanking it for a frame even when the picture was already cached.
+                  // Swapping `source` on the SAME instance is enough, and is exactly what the
+                  // start/end cycling already relies on (exKey never changed mid-cycle).
                   <Image
-                    key={exKey}
                     source={typeof exImage === 'string' ? { uri: exImage } : exImage}
                     style={styles.fullScreenImage}
                     resizeMode="contain"
