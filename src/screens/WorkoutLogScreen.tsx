@@ -2470,6 +2470,35 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
   exerciseImages,
 }: ExerciseMiniCardProps) {
   const allDone = progress.total > 0 && progress.completed === progress.total;
+
+  // The CURRENT badge used to blink in and out the instant currentIndex changed. Fade and
+  // scale it instead, so it arrives with the rest of the gesture.
+  //
+  // The animated value lives INSIDE the card, keyed off the isActive prop, so no new prop
+  // is threaded down and React.memo still holds: a commit re-renders only the two cards
+  // whose isActive actually flipped, not all N.
+  //
+  // Native-driven — opacity and transform both qualify, and the JS thread is already
+  // carrying the stage height.
+  const badgeAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+  // Keep the badge mounted through its exit, or there is nothing left to fade. Mounting it
+  // permanently is not an option: currentBadge has real width, and an invisible one would
+  // squeeze every inactive card's title.
+  const [badgeMounted, setBadgeMounted] = useState(isActive);
+
+  useEffect(() => {
+    if (isActive) setBadgeMounted(true);
+
+    Animated.timing(badgeAnim, {
+      toValue: isActive ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished && !isActive) setBadgeMounted(false);
+    });
+  }, [isActive, badgeAnim]);
+
   return (
     <TouchableOpacity
       style={[
@@ -2517,10 +2546,26 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
           ]}>
             {exercise.exercise || exercise.name || 'Exercise'}
           </Text>
-          {isActive && (
-            <View style={[styles.currentBadge, { backgroundColor: themeColor }]}>
+          {badgeMounted && (
+            <Animated.View
+              style={[
+                styles.currentBadge,
+                {
+                  backgroundColor: themeColor,
+                  opacity: badgeAnim,
+                  transform: [
+                    {
+                      scale: badgeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.8, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
               <Text style={styles.currentBadgeText}>CURRENT</Text>
-            </View>
+            </Animated.View>
           )}
         </View>
         <Text style={styles.miniMeta}>
