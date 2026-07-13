@@ -6,13 +6,18 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
-  Modal,
   Animated,
   Linking,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+// Every TouchableOpacity in this file comes from react-native-gesture-handler (above), and
+// on Android a raw <Modal> is a detached native window that does not inherit the app's
+// GestureHandlerRootView — so RNGH touchables inside it receive NO touches, silently. That
+// is what made "Start Training" unpressable on Android, blocking every workout import.
+// AppModal re-roots the gesture handler (and safe-area) contexts inside the modal.
+import AppModal from '../components/AppModal';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -2261,12 +2266,12 @@ export default function ImportRoutineScreen() {
 
       </View>
 
-      <Modal
+      <AppModal
         visible={showConfirmation}
         transparent
         animationType="none"
       >
-        <Animated.View 
+        <Animated.View
           style={[
             styles.modalOverlay,
             { opacity: modalOpacity }
@@ -2475,10 +2480,11 @@ export default function ImportRoutineScreen() {
             </View>
           </Animated.View>
         </Animated.View>
-      </Modal>
+      </AppModal>
 
-      {/* Error Logs Modal */}
-      <Modal
+      {/* Error Logs Modal — also AppModal: its close button is an RNGH TouchableOpacity too,
+          so on Android this modal could be opened but never dismissed. */}
+      <AppModal
         animationType="slide"
         transparent={true}
         visible={showErrorModal}
@@ -2523,7 +2529,7 @@ export default function ImportRoutineScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </AppModal>
     </>
   );
 }

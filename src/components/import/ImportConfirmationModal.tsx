@@ -30,11 +30,16 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   Animated,
   ScrollView,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+// Every TouchableOpacity here comes from react-native-gesture-handler (above). On Android a
+// raw <Modal> is a detached native window that does not inherit the app's
+// GestureHandlerRootView, so RNGH touchables inside it receive NO touches — the confirm and
+// cancel buttons were silently dead, blocking the questionnaire -> prompt -> import flow.
+// AppModal re-roots the gesture handler (and safe-area) contexts inside the modal.
+import AppModal from '../AppModal';
 import { Ionicons } from '@expo/vector-icons';
 import { WorkoutProgram } from '../../types/workout';
 
@@ -132,7 +137,7 @@ export default function ImportConfirmationModal({
   const days = parsedProgram?.days_per_week ?? 0;
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
+    <AppModal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
       <Animated.View style={[styles.overlay, { opacity: modalOpacity }]}>
         <Animated.View
           style={[
@@ -383,7 +388,7 @@ export default function ImportConfirmationModal({
           )}
         </Animated.View>
       </Animated.View>
-    </Modal>
+    </AppModal>
   );
 }
 
