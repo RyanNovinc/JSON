@@ -1645,12 +1645,26 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             {(() => {
               if (exImage) {
                 return (
-                  // No key. It used to be exKey (name + theme), which changes on every
-                  // exercise change — forcing React to unmount the old Image and mount a new
-                  // one, blanking it for a frame even when the picture was already cached.
-                  // Swapping `source` on the SAME instance is enough, and is exactly what the
-                  // start/end cycling already relies on (exKey never changed mid-cycle).
+                  // Keyed by the exercise's IDENTITY — not by exKey, and not unkeyed.
+                  //
+                  // Unkeyed, React reuses the same native Image view and only swaps `source`,
+                  // and RN's Image goes on painting its last decoded bitmap until the new one
+                  // loads. That showed the PREVIOUS exercise's picture for a beat — most
+                  // visibly on load, where allSetsData restores asynchronously, so the first
+                  // frames render the primary exercise and then flip to the saved alternative.
+                  // The data was never wrong; only the view was stale. A new key forces a
+                  // fresh view, so a stale bitmap cannot survive an exercise change.
+                  //
+                  // exName, not exKey: exKey also carries themeColor, which does not change
+                  // the picture — remounting on a theme toggle would be pointless. And exName
+                  // is stable across the start/end cycle, so cycling still swaps `source` on
+                  // one view and animates rather than remounting every second.
+                  //
+                  // This does not bring the swipe-commit blink back: the miniCardImages
+                  // fallback below already hands the fresh view a warm source, so there is
+                  // nothing to wait for.
                   <Image
+                    key={exName}
                     source={typeof exImage === 'string' ? { uri: exImage } : exImage}
                     style={styles.fullScreenImage}
                     resizeMode="contain"
