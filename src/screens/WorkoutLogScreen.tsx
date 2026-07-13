@@ -878,10 +878,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     onFinishWorkout();
   };
 
-  const handleExerciseLongPress = (exerciseIndex: number) => {
+  const handleExerciseLongPress = useCallback((exerciseIndex: number) => {
     setSupersetSourceIndex(exerciseIndex);
     setShowSupersetModal(true);
-  };
+  }, []);
 
   // Open full history for the current exercise (top-level header icon)
   const openHistoryForCurrent = () => {
@@ -1295,6 +1295,40 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const exerciseProgress = useMemo(
     () => computeExerciseProgress(exercises, allSetsData),
     [exercises, allSetsData],
+  );
+
+  // ── Up Next list: keep every ExerciseMiniCard prop identity-stable ──
+  // The cards are React.memo'd, but the memo only pays off if none of their props are
+  // rebuilt on each render. Two things were doing exactly that: the inline onPress/
+  // onLongPress lambdas, and this object — `{...ex, exercise: alt}` is a fresh literal
+  // every render for any exercise with a selected alternative. Both meant all N cards
+  // re-rendered on every parent render, including every frame of a drag, while the JS
+  // thread is already carrying the stage-height animation.
+  const effectiveExercises = useMemo(
+    () =>
+      exercises.map((ex) => {
+        const primaryName = ex.exercise || ex.name || '';
+        const selectedAlternative = exercisePreferences[primaryName];
+        if (
+          selectedAlternative &&
+          ex.alternatives &&
+          ex.alternatives.includes(selectedAlternative)
+        ) {
+          return { ...ex, exercise: selectedAlternative, name: selectedAlternative };
+        }
+        return ex;
+      }),
+    [exercises, exercisePreferences],
+  );
+
+  // The row index travels as an argument rather than baked into a closure, so one stable
+  // handler serves every card instead of a fresh lambda per row per render.
+  const handleMiniCardPress = useCallback(
+    (idx: number) => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      swapFocus(idx);
+    },
+    [swapFocus],
   );
 
   // ── PR detection for the finish summary ──────────────────────────
@@ -1847,19 +1881,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             const progress = exerciseProgress[idx];
             const isActive = idx === currentIndex;
 
-            // Get the effective exercise name (considering selected alternatives)
-            // Use exercise name as key instead of index
-            const primaryExerciseName = ex.exercise || ex.name || '';
-            const selectedAlternative = exercisePreferences[primaryExerciseName];
-            let effectiveExercise = ex;
-
-            if (selectedAlternative && ex.alternatives && ex.alternatives.includes(selectedAlternative)) {
-              effectiveExercise = {
-                ...ex,
-                exercise: selectedAlternative,
-                name: selectedAlternative,
-              };
-            }
+            // Resolved once in a memo, not rebuilt here: a fresh {...ex} literal per render
+            // would give ExerciseMiniCard a new `exercise` prop every time and defeat its memo.
+            const effectiveExercise = effectiveExercises[idx] ?? ex;
 
             // Check if this exercise is part of a superset
             const isPartOfSuperset = ex.superset_group && ex.superset_group.trim() !== '';
@@ -1877,15 +1901,13 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             return (
               <React.Fragment key={ex.id || `${ex.exercise}-${idx}`}>
                 <ExerciseMiniCard
+                  index={idx}
                   exercise={effectiveExercise}
                   progress={progress}
                   themeColor={themeColor}
                   isActive={isActive}
-                  onPress={() => {
-                    scrollRef.current?.scrollTo({ y: 0, animated: true });
-                    swapFocus(idx);
-                  }}
-                  onLongPress={() => handleExerciseLongPress(idx)}
+                  onPress={handleMiniCardPress}
+                  onLongPress={handleExerciseLongPress}
                   exerciseImages={miniCardImages.get(effectiveExercise.exercise || effectiveExercise.name || '') || null}
                 />
 
@@ -2451,16 +2473,19 @@ function SetRow({
 }
 
 interface ExerciseMiniCardProps {
+  /** This card's row index. Passed back to the handlers so they can stay identity-stable. */
+  index: number;
   exercise: Exercise;
   progress: { completed: number; total: number };
   themeColor: string;
   isActive?: boolean;
-  onPress: () => void;
-  onLongPress?: () => void;
+  onPress: (index: number) => void;
+  onLongPress?: (index: number) => void;
   exerciseImages?: {start: any, end: any} | null;
 }
 
 const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
+  index,
   exercise,
   progress,
   themeColor,
@@ -2535,8 +2560,8 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
           }),
         },
       ]}
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={() => onPress(index)}
+      onLongPress={onLongPress ? () => onLongPress(index) : undefined}
       delayLongPress={600}
       activeOpacity={0.75}
     >
@@ -2628,7 +2653,21 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
       </View>
     </AnimatedTouchableOpacity>
   );
-});
+}, (prev, next) =>
+  // Compare `progress` BY VALUE. computeExerciseProgress rebuilds a {completed, total}
+  // object for every exercise whenever allSetsData changes, so a shallow compare fails for
+  // all N cards the moment any set is edited — even the ones that did not change. Every
+  // other prop is compared by identity, which is why they are all kept stable upstream.
+  prev.index === next.index &&
+  prev.exercise === next.exercise &&
+  prev.themeColor === next.themeColor &&
+  prev.isActive === next.isActive &&
+  prev.onPress === next.onPress &&
+  prev.onLongPress === next.onLongPress &&
+  prev.exerciseImages === next.exerciseImages &&
+  prev.progress.completed === next.progress.completed &&
+  prev.progress.total === next.progress.total,
+);
 
 // ── Exercise Page Preview (read-only, used by the swipe peek layers) ──
 // A lightweight, non-interactive copy of the image header + focus area for a
