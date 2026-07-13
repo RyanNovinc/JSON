@@ -201,6 +201,11 @@ const CARD_SET_ROW_H = 44 + 4 * 2;            // setInput.minHeight (== setCheck
 const CARD_ADD_SET_H = 42 + 4;                // styles.addSetBtn height + marginTop
 const CARD_FOCUS_PB = 8;                      // styles.focusArea.paddingBottom (there is no paddingTop)
 
+// Progress-tick geometry. Must match styles.progressTicks — the highlight's position is
+// computed from these rather than measured, so it can move on the drag's first frame.
+const TICKS_ROW_INSET = 14; // styles.progressTicks left/right
+const TICK_GAP = 5;         // styles.progressTicks gap
+
 const COMPOUND_HINTS = [
   'bench', 'squat', 'deadlift', 'press', 'row', 'pull-up', 'pullup',
   'chin-up', 'chinup', 'clean', 'snatch', 'lunge', 'rdl',
@@ -376,6 +381,16 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const dragX = useRef(new Animated.Value(0)).current;
   const peekLeftX = useRef(Animated.subtract(dragX, SCREEN_WIDTH)).current;
   const peekRightX = useRef(Animated.add(dragX, SCREEN_WIDTH)).current;
+
+  // The progress bar's sliding highlight, in TICK UNITS (0 = first tick, fractional while
+  // dragging). It is a value of its own rather than an interpolation of dragX for two
+  // reasons. First, dragX can never be native-driven — it feeds the stage's `height`
+  // (cd2049c), which the native driver cannot animate, and one value cannot be both. A
+  // translateX, though, IS a native-driver property, and the JS thread is already carrying
+  // the height. Second, holding an ABSOLUTE position means the interpolation never depends
+  // on currentIndex, so committing a swipe needs no rebase — and therefore cannot paint a
+  // frame at the old tick while the new config crosses the bridge.
+  const indicatorPage = useRef(new Animated.Value(0)).current;
   // True only while an active horizontal drag is in progress, so neighbour
   // previews are mounted only during a swipe (idle render stays unchanged).
   const [isPaging, setIsPaging] = useState(false);
@@ -570,6 +585,25 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       useNativeDriver: false, // height is not a native-driver prop
     }).start();
   }, [currentCardH, stageBaseH]);
+
+  // Keep the highlight on the current exercise when the index changes WITHOUT a swipe —
+  // tapping an Up Next card, or a superset auto-advance. After a committed swipe this is a
+  // no-op: the gesture already animated it to exactly this value.
+  const indicatorReady = useRef(false);
+  useEffect(() => {
+    if (!indicatorReady.current) {
+      // Restoring a workout can start on a later exercise; land there, don't fly there.
+      indicatorReady.current = true;
+      indicatorPage.setValue(currentIndex);
+      return;
+    }
+    Animated.timing(indicatorPage, {
+      toValue: currentIndex,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true, // translateX — unlike height, this can leave the JS thread
+    }).start();
+  }, [currentIndex, indicatorPage]);
 
   // Grow/shrink the stage in step with the finger, so a taller neighbour is never clipped
   // by pagerStage's overflow:'hidden' as it slides in. At the ends of the list there is no
@@ -1143,6 +1177,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         tx *= 0.35;
       }
       dragX.setValue(tx);
+
+      // Drift the progress highlight with the finger. One screen-width of travel moves it
+      // exactly one tick. Clamped to the neighbours that actually exist, so at either end
+      // of the list there is nowhere to go and the indicator holds still through the
+      // rubber-band.
+      const lo = Math.max(0, currentIndex - 1);
+      const hi = Math.min(exercises.length - 1, currentIndex + 1);
+      const page = currentIndex - tx / SCREEN_WIDTH;
+      indicatorPage.setValue(Math.min(hi, Math.max(lo, page)));
     })
     .onEnd((event) => {
       const W = SCREEN_WIDTH;
@@ -1155,6 +1198,18 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
       if (goNext || goPrev) {
         const target = goNext ? currentIndex + 1 : currentIndex - 1;
+
+        // Carry the highlight the rest of the way, in step with the card. Native-driven:
+        // translateX is a native-driver property, and the JS thread is already busy with
+        // the stage height. It holds an absolute tick position, so when currentIndex swaps
+        // below there is nothing to rebase — it is already exactly where it belongs.
+        Animated.timing(indicatorPage, {
+          toValue: target,
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+
         // Finish sliding the card off, then swap content under it and reset.
         Animated.timing(dragX, {
           toValue: goNext ? -W : W,
@@ -1174,7 +1229,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           Analytics.track('exercise_swiped', { direction: goNext ? 'next' : 'prev' });
         });
       } else {
-        // Didn't pass the threshold — spring back to centre.
+        // Didn't pass the threshold — spring back to centre. The highlight springs home on
+        // the same curve, so it returns in step with the card rather than lagging it.
+        Animated.spring(indicatorPage, {
+          toValue: currentIndex,
+          friction: 9,
+          tension: 70,
+          useNativeDriver: true,
+        }).start();
+
         Animated.spring(dragX, {
           toValue: 0,
           friction: 9,
@@ -1722,7 +1785,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           <View style={styles.pinnedTicksLayer} pointerEvents="none">
             <ExerciseProgressTicks
               progress={exerciseProgress}
-              currentIndex={currentIndex}
+              indicatorPage={indicatorPage}
               themeColor={themeColor}
             />
           </View>
@@ -2519,8 +2582,11 @@ const TICK_COMPLETE_OPACITY = 0.45;
 
 interface ExerciseProgressTicksProps {
   progress: { completed: number; total: number }[];
-  /** Which tick reads as "you are here". Snaps when the swipe commits; never interpolated. */
-  currentIndex: number;
+  /**
+   * The highlight's position in TICK UNITS — 0 is the first tick, 2.5 is halfway between
+   * the third and fourth. Fractional while the finger is down, so the indicator drifts.
+   */
+  indicatorPage: Animated.Value;
   themeColor: string;
 }
 
@@ -2531,34 +2597,50 @@ interface ExerciseProgressTicksProps {
  * Rendered ONCE, pinned in pagerStage outside the animated layers. The bar describes the
  * workout rather than any one exercise, so it holds still while the cards slide beneath it.
  *
- * Three states, tested in this order:
- *   current   themeColor, full opacity
- *   complete  themeColor, faded — done, but no longer where your attention is
- *   neither   grey
+ * The ticks themselves are only ever two states — complete (faded accent) or grey. "You
+ * are here" is NOT one of them: it is a separate bright bar layered on top, which slides
+ * between tick positions with the drag. A completed exercise keeps its dimmed accent
+ * underneath; the indicator simply passes over it.
  *
- * Current is checked FIRST and wins: stepping back to an exercise you already finished
- * shows it as current, not complete. A half-finished exercise still looks untouched —
- * proportional fill would turn a glanceable row into something you have to read.
+ * Positions are computed, not measured: the ticks are flex:1 with a fixed gap, so tick i
+ * begins at i × (tickWidth + gap) and tickWidth falls out of the row's width and the
+ * exercise count.
  */
-function ExerciseProgressTicks({ progress, currentIndex, themeColor }: ExerciseProgressTicksProps) {
-  if (progress.length === 0) return null;
+function ExerciseProgressTicks({ progress, indicatorPage, themeColor }: ExerciseProgressTicksProps) {
+  const count = progress.length;
+  if (count === 0) return null;
+
+  const rowWidth = SCREEN_WIDTH - TICKS_ROW_INSET * 2;
+  const tickWidth = (rowWidth - (count - 1) * TICK_GAP) / count;
+  const tickStride = tickWidth + TICK_GAP; // centre-to-centre distance between ticks
 
   return (
     // pointerEvents none — the image's swipe gesture must pass straight through.
     <View style={styles.progressTicks} pointerEvents="none">
       {progress.map((p, i) => {
-        const isCurrent = i === currentIndex;
         const isComplete = p.total > 0 && p.completed === p.total;
-
-        // Order matters: current beats complete.
-        const tickStyle = isCurrent
-          ? { backgroundColor: themeColor }
-          : isComplete
-            ? { backgroundColor: themeColor, opacity: TICK_COMPLETE_OPACITY }
-            : null;
-
-        return <View key={i} style={[styles.progressTick, tickStyle]} />;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.progressTick,
+              isComplete && { backgroundColor: themeColor, opacity: TICK_COMPLETE_OPACITY },
+            ]}
+          />
+        );
       })}
+
+      {/* The travelling highlight. Absolute, so it takes no part in the row's flex layout. */}
+      <Animated.View
+        style={[
+          styles.progressIndicator,
+          {
+            width: tickWidth,
+            backgroundColor: themeColor,
+            transform: [{ translateX: Animated.multiply(indicatorPage, tickStride) }],
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -3733,6 +3815,15 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 2,
     backgroundColor: '#2a2a32',
+  },
+  // The travelling "you are here" highlight, layered over the ticks. Absolute, so it is
+  // outside the row's flex layout and its gap; width and translateX are set at runtime.
+  progressIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    height: 3,
+    borderRadius: 2,
   },
   overlayHeader: {
     position: 'absolute',
