@@ -72,3 +72,18 @@ web-build/
 .env.production.local
 *.p8
 eas.json.backup*
+
+# Compiled app binaries (never commit — these are hundreds of MB each)
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Lambda deployment bundles built at the repo root
+/*.zip
+
+# Python virtualenv
+venv/
+
+# Local scratch
+simulator_screenshot_*.png
