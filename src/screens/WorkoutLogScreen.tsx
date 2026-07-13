@@ -1399,13 +1399,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             <View style={styles.imageOverlay} />
           </View>
 
-          {/* Workout progress — sits above the scrim so it isn't dimmed */}
-          <ExerciseProgressTicks
-            progress={exerciseProgress}
-            currentIndex={currentIndex}
-            themeColor={themeColor}
-          />
-
           {/* ── HEADER BUTTONS OVERLAID ON IMAGE ──────────────────────── */}
           <View style={[styles.overlayHeader, { paddingTop: insets.top + 12 }]}>
             <TouchableOpacity
@@ -1629,6 +1622,20 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           />
         </TouchableOpacity>
           </Animated.View>
+
+          {/* Workout progress — the ONE bar in the tree.
+              It describes the workout, not the exercise, so it is a sibling of the
+              animated card rather than a child of it: the cards slide underneath while
+              this holds still. Last child of pagerStage, so it paints above every pager
+              layer; the box mirrors imageContainer's 16:9 so the ticks land on exactly
+              the same pixels they did when they lived inside the image. */}
+          <View style={styles.pinnedTicksLayer} pointerEvents="none">
+            <ExerciseProgressTicks
+              progress={exerciseProgress}
+              currentIndex={currentIndex}
+              themeColor={themeColor}
+            />
+          </View>
         </View>
         {/* end paged exercise stage */}
 
@@ -2386,11 +2393,7 @@ const TICK_COMPLETE_OPACITY = 0.45;
 
 interface ExerciseProgressTicksProps {
   progress: { completed: number; total: number }[];
-  /**
-   * Which tick reads as "you are here". On the live screen this is the screen's
-   * currentIndex; on a swipe-peek layer it is that card's OWN index, so the highlight
-   * travels with the card as it slides in.
-   */
+  /** Which tick reads as "you are here". Snaps when the swipe commits; never interpolated. */
   currentIndex: number;
   themeColor: string;
 }
@@ -2398,6 +2401,9 @@ interface ExerciseProgressTicksProps {
 /**
  * One tick per exercise along the bottom edge of the image — where you are and what
  * is done, at a glance, without scrolling to "Up Next".
+ *
+ * Rendered ONCE, pinned in pagerStage outside the animated layers. The bar describes the
+ * workout rather than any one exercise, so it holds still while the cards slide beneath it.
  *
  * Three states, tested in this order:
  *   current   themeColor, full opacity
@@ -2474,14 +2480,8 @@ function ExercisePagePreview({
           <View style={styles.imageOverlay} />
         </View>
 
-        {/* Same ticks on the peek layers, so a card sliding in doesn't visibly lack them.
-            "Current" here is THIS card's own index, not the screen's — so the highlight
-            travels with the card during a swipe instead of lagging behind on the old one. */}
-        <ExerciseProgressTicks
-          progress={computeExerciseProgress(exercises, allSetsData)}
-          currentIndex={index}
-          themeColor={themeColor}
-        />
+        {/* No progress ticks here. The bar is pinned once in pagerStage, outside every
+            animated layer, so it holds still while these peek cards slide beneath it. */}
 
         <View style={styles.overlayHeader}>
           <View style={styles.overlayBtn}>
@@ -2945,6 +2945,18 @@ const styles = StyleSheet.create({
   pagerStage: {
     width: '100%',
     overflow: 'hidden', // clips the peeking neighbours to the screen edge
+  },
+  // Pinned progress bar: a sibling of the animated card, so the swipe's dragX never
+  // touches it. Mirrors imageContainer's box (top of the stage, 16:9) so the ticks
+  // inside it land at the same screen position they did when they lived in the image.
+  // Sits inside pagerStage's bounds, so overflow: 'hidden' does not clip it.
+  pinnedTicksLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    aspectRatio: 16 / 9,
+    zIndex: 20,
   },
   pagerPeek: {
     position: 'absolute',
