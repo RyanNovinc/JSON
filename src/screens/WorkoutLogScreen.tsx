@@ -1435,16 +1435,21 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     };
   }, [exercises, allSetsData, historyByExercise, calculate1RM]);
 
+  // One path to the 1RM progression modal, shared by the header menu item and the badge.
+  // effectiveCurrentExercise, so a selected alternative opens ITS progression rather than
+  // the primary exercise's.
+  const openOneRMProgression = useCallback(() => {
+    setShow1RMProgression({
+      exerciseName: effectiveCurrentExercise.exercise,
+      exerciseIndex: currentIndex,
+    });
+  }, [effectiveCurrentExercise.exercise, currentIndex]);
+
   // Header dropdown menu items (History lives top-level now, so it's not here)
   const headerMenuItems: { label: string; icon: any; onPress: () => void }[] = [
     { label: 'Muscle map', icon: 'body-outline', onPress: () => setShowWorkoutHeatmap(true) },
     { label: 'Rep scheme', icon: 'repeat-outline', onPress: () => handleNotesPress(currentIndex) },
-    {
-      label: '1RM progress',
-      icon: 'trending-up-outline',
-      onPress: () =>
-        setShow1RMProgression({ exerciseName: effectiveCurrentExercise.exercise, exerciseIndex: currentIndex }),
-    },
+    { label: '1RM progress', icon: 'trending-up-outline', onPress: openOneRMProgression },
     { label: 'Notes', icon: 'document-text-outline', onPress: () => handleExerciseNotesPress(currentIndex) },
     { label: 'How it works', icon: 'help-circle-outline', onPress: () => setShowHowItWorks(true) },
   ];
@@ -1766,6 +1771,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
               themeColor={themeColor}
               calculate1RM={calculate1RM}
               unit={globalUnit}
+              onPress={openOneRMProgression}
             />
           </View>
 
@@ -2232,9 +2238,15 @@ interface OneRMBadgeProps {
   themeColor: string;
   unit: string;
   calculate1RM: (w: number, r: number) => number;
+  /**
+   * Opens the progression modal. OPTIONAL, and deliberately so: the swipe-peek layers render
+   * their own badge, and cards sliding past mid-drag must not carry live tap targets. Omit it
+   * and the badge is inert, exactly as before.
+   */
+  onPress?: () => void;
 }
 
-function OneRMBadge({ sets, themeColor, unit, calculate1RM }: OneRMBadgeProps) {
+function OneRMBadge({ sets, themeColor, unit, calculate1RM, onPress }: OneRMBadgeProps) {
   // Use the heaviest completed set's 1RM
   const oneRM = useMemo(() => {
     let best = 0;
@@ -2249,14 +2261,33 @@ function OneRMBadge({ sets, themeColor, unit, calculate1RM }: OneRMBadgeProps) {
     return best;
   }, [sets, calculate1RM]);
 
+  // Never renders without a completed set carrying a usable weight and reps, so a visible
+  // badge always has a progression to open — there is no empty-tap case to guard.
   if (oneRM <= 0) return null;
-  return (
-    <View style={styles.oneRMBadge}>
+
+  const content = (
+    <>
       <Text style={styles.oneRMLabel}>1RM</Text>
       <Text style={[styles.oneRMValue, { color: themeColor }]}>
         {oneRM.toFixed(1)} {unit}
       </Text>
-    </View>
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.oneRMBadge}>{content}</View>;
+  }
+
+  return (
+    // No chevron or arrow: the affordance is the press feedback, nothing more.
+    <TouchableOpacity
+      style={styles.oneRMBadge}
+      onPress={onPress}
+      activeOpacity={0.6}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      {content}
+    </TouchableOpacity>
   );
 }
 
