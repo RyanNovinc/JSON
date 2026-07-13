@@ -7,7 +7,7 @@ import {
   mealTimeBucket, mealEquipment, passesFilter,
   mealsForCoreShelf, mealsForSlots,
   trailingCardState, equipmentChipCounts,
-  SHELF_CARD_CAP,
+  SHELF_CARD_CAP, EQUIPMENT_ORDER,
 } from '../curatedShelves';
 
 let pass = 0, fail = 0;
@@ -160,9 +160,13 @@ const fQuickMicro: FilterState = { equipment: new Set(['microwave']), time: 'qui
 check('intersection: micro AND quick passes tuna', passesFilter(tunaRice, fQuickMicro));
 check('intersection: micro AND quick rejects pulled pork (slow + set&forget)', !passesFilter(pulledPork, fQuickMicro));
 
-console.log('\n=== Equipment chip counts (stable 8, zeros muted) ===');
+console.log('\n=== Equipment chip counts (one chip per equipment type, zeros muted) ===');
 const chips = equipmentChipCounts(ALL, emptyFilter());
-eq('always 11 chips', chips.length, 11);
+// equipmentChipCounts maps over EQUIPMENT_ORDER, so the chip count IS EQUIPMENT_ORDER.length
+// by construction. Derive it — do not hardcode. This assertion has already drifted twice
+// (its heading said 8, it asserted 11, production has had 12 since food_processor/freezer
+// were added), and a hardcoded number will silently rot again the next time the list grows.
+eq('one chip per equipment type', chips.length, EQUIPMENT_ORDER.length);
 const byVal = Object.fromEntries(chips.map(c => [c.value, c.count]));
 eq('slow_cooker count', byVal['slow_cooker'], 3); // pp, bc, lamb
 eq('blender count', byVal['blender'], 1);          // banana

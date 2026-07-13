@@ -1,8 +1,19 @@
 /**
  * Test for Fix 4: Import deduplication by fingerprint
  * Prevents duplicate library entries on re-import
+ *
+ * @jest-environment jsdom
+ *
+ * useWorkoutImport is a real React hook. These tests used to call it directly in the test
+ * body, which throws "Cannot read properties of null (reading 'useState')" on React 19 —
+ * there is no dispatcher outside a render. They now drive it through renderHook, which
+ * needs a DOM, hence the jsdom environment above.
+ *
+ * importFromText (processWorkoutData) defers its work into a setTimeout(..., 800), so
+ * awaiting it is not enough; assertions go through waitFor.
  */
 
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useWorkoutImport } from '../../hooks/useWorkoutImport';
 import { WorkoutStorage } from '../storage';
 import { WorkoutProgram } from '../../types/workout';
@@ -60,15 +71,20 @@ describe('Import Deduplication (Fix 4)', () => {
     mockWorkoutStorage.loadRoutines.mockResolvedValue([existingRoutine]);
 
     const mockOnImportComplete = jest.fn();
-    const { importFromText } = useWorkoutImport({ 
-      onImportComplete: mockOnImportComplete 
+    const { result } = renderHook(() =>
+      useWorkoutImport({ onImportComplete: mockOnImportComplete })
+    );
+
+    await act(async () => {
+      result.current.importFromText(JSON.stringify(duplicateProgram));
     });
 
-    await importFromText(JSON.stringify(duplicateProgram));
-
     // Should find existing and call completion with existing data
-    expect(mockOnImportComplete).toHaveBeenCalledWith(existingRoutine.data);
-    
+    await waitFor(
+      () => expect(mockOnImportComplete).toHaveBeenCalledWith(existingRoutine.data),
+      { timeout: 3000 }
+    );
+
     // Should NOT save a new routine
     expect(mockWorkoutStorage.saveRoutines).not.toHaveBeenCalled();
   });
@@ -86,11 +102,13 @@ describe('Import Deduplication (Fix 4)', () => {
     mockWorkoutStorage.loadRoutines.mockResolvedValue([existingCuratedRoutine]);
 
     const mockOnImportComplete = jest.fn();
-    const { importFromText } = useWorkoutImport({ 
-      onImportComplete: mockOnImportComplete,
-      isCurated: true,
-      curatedSlug: 'beginnerFullBody'
-    });
+    const { result } = renderHook(() =>
+      useWorkoutImport({
+        onImportComplete: mockOnImportComplete,
+        isCurated: true,
+        curatedSlug: 'beginnerFullBody',
+      })
+    );
 
     const curatedProgram: WorkoutProgram = {
       id: 'new789',
@@ -100,10 +118,15 @@ describe('Import Deduplication (Fix 4)', () => {
       description: 'Curated program'
     };
 
-    await importFromText(JSON.stringify(curatedProgram));
+    await act(async () => {
+      result.current.importFromText(JSON.stringify(curatedProgram));
+    });
 
     // Should find existing curated routine
-    expect(mockOnImportComplete).toHaveBeenCalledWith(existingCuratedRoutine.data);
+    await waitFor(
+      () => expect(mockOnImportComplete).toHaveBeenCalledWith(existingCuratedRoutine.data),
+      { timeout: 3000 }
+    );
     expect(mockWorkoutStorage.saveRoutines).not.toHaveBeenCalled();
   });
 
@@ -121,14 +144,19 @@ describe('Import Deduplication (Fix 4)', () => {
     mockWorkoutStorage.saveRoutines.mockResolvedValue();
 
     const mockOnImportComplete = jest.fn();
-    const { importFromText } = useWorkoutImport({ 
-      onImportComplete: mockOnImportComplete 
+    const { result } = renderHook(() =>
+      useWorkoutImport({ onImportComplete: mockOnImportComplete })
+    );
+
+    await act(async () => {
+      result.current.importFromText(JSON.stringify(programWithoutFingerprint));
     });
 
-    await importFromText(JSON.stringify(programWithoutFingerprint));
-
     // Should proceed with normal import since no fingerprint to dedupe
-    expect(mockWorkoutStorage.saveRoutines).toHaveBeenCalled();
+    await waitFor(
+      () => expect(mockWorkoutStorage.saveRoutines).toHaveBeenCalled(),
+      { timeout: 3000 }
+    );
   });
 
   it('4. UNIQUE FINGERPRINT: program with unique fingerprint imports normally', async () => {
@@ -148,13 +176,18 @@ describe('Import Deduplication (Fix 4)', () => {
     mockWorkoutStorage.loadRoutines.mockResolvedValue(existingRoutines);
     mockWorkoutStorage.saveRoutines.mockResolvedValue();
 
-    const { importFromText } = useWorkoutImport({});
+    const { result } = renderHook(() => useWorkoutImport({}));
 
-    await importFromText(JSON.stringify(uniqueProgram));
+    await act(async () => {
+      result.current.importFromText(JSON.stringify(uniqueProgram));
+    });
 
     // Should save since fingerprint is unique
-    expect(mockWorkoutStorage.saveRoutines).toHaveBeenCalled();
-    
+    await waitFor(
+      () => expect(mockWorkoutStorage.saveRoutines).toHaveBeenCalled(),
+      { timeout: 3000 }
+    );
+
     // Check that new routine was added to existing array
     const saveCall = mockWorkoutStorage.saveRoutines.mock.calls[0][0];
     expect(saveCall).toHaveLength(2); // existing + new

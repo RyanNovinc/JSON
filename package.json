@@ -78,6 +78,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.1.10",
     "babel-preset-expo": "~54.0.10",
@@ -86,6 +88,7 @@
     "jest-expo": "~54.0.17",
     "patch-package": "^8.0.1",
     "postinstall-postinstall": "^2.1.0",
+    "react-dom": "^19.1.0",
     "sharp-cli": "^5.2.0",
     "ts-jest": "^29.4.11",
     "tsx": "^4.23.1",
