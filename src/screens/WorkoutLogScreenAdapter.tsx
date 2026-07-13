@@ -17,6 +17,51 @@ import { Analytics } from '../services/analytics';
 
 // This adapter connects the new beautiful WorkoutLogScreen with your existing app navigation and data structures
 
+/** Rest fallback for a value that exists but cannot be read as a duration. */
+const DEFAULT_REST_SECONDS = 90;
+
+/**
+ * `rest` comes from user-imported JSON and is typed `number | string`, so it is
+ * whatever the model wrote. A bare parseInt turns "2 min" into a 2-second rest —
+ * worse than useless. Read the unit, and when the value is unintelligible fall back
+ * to a sane default rather than a nonsense one.
+ *
+ * Accepts: 90 · "90" · "90s" · "90 sec" · "2 min" · "1:30"
+ * Returns null only when there is nothing to parse at all, in which case the caller
+ * starts no timer (unchanged behaviour for an exercise with no prescribed rest).
+ */
+const parseRestSeconds = (rest: number | string | undefined | null): number | null => {
+  if (rest === undefined || rest === null || rest === '') return null;
+
+  if (typeof rest === 'number') {
+    return Number.isFinite(rest) && rest > 0 ? Math.round(rest) : DEFAULT_REST_SECONDS;
+  }
+
+  const value = String(rest).trim().toLowerCase();
+  if (!value) return null;
+
+  // "1:30" → 90
+  const clock = value.match(/^(\d+):([0-5]\d)$/);
+  if (clock) return parseInt(clock[1], 10) * 60 + parseInt(clock[2], 10);
+
+  // "2 min", "2m", "1.5 minutes"
+  const minutes = value.match(/^(\d+(?:\.\d+)?)\s*(m|min|mins|minute|minutes)$/);
+  if (minutes) {
+    const seconds = Math.round(parseFloat(minutes[1]) * 60);
+    return seconds > 0 ? seconds : DEFAULT_REST_SECONDS;
+  }
+
+  // "90", "90s", "90 sec"
+  const seconds = value.match(/^(\d+(?:\.\d+)?)\s*(s|sec|secs|second|seconds)?$/);
+  if (seconds) {
+    const parsed = Math.round(parseFloat(seconds[1]));
+    return parsed > 0 ? parsed : DEFAULT_REST_SECONDS;
+  }
+
+  console.log(`⏱️ [REST] Unparseable rest value ${JSON.stringify(rest)} — falling back to ${DEFAULT_REST_SECONDS}s`);
+  return DEFAULT_REST_SECONDS;
+};
+
 export default function WorkoutLogScreenAdapter() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'WorkoutLog'>>();
@@ -351,11 +396,9 @@ export default function WorkoutLogScreenAdapter() {
         // Regular rest timer for non-superset exercises
         const exercise = exercises[exerciseIndex];
         
-        if (exercise?.rest) {
-          const restSeconds = typeof exercise.rest === 'string' ? parseInt(exercise.rest) : exercise.rest;
-          if (restSeconds && restSeconds > 0) {
-            startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
-          }
+        const restSeconds = parseRestSeconds(exercise?.rest);
+        if (restSeconds && restSeconds > 0) {
+          startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
         }
       }
     } else if (wasCompleted) {

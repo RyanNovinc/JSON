@@ -432,18 +432,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [previousByExercise, setPreviousByExercise] = useState<Record<string, PreviousSets>>({});
   const [historyByExercise, setHistoryByExercise] = useState<Record<string, WorkoutHistory[]>>({});
 
-  // Rest timer logic
-  const startRestTimer = (exerciseIndex: number, setIndex: number) => {
-    const exercise = exercises[exerciseIndex];
-    if (exercise?.rest) {
-      const restSeconds = typeof exercise.rest === 'string' ? parseInt(exercise.rest) : exercise.rest;
-      if (restSeconds && restSeconds > 0) {
-        // Start countdown timer for rest period
-        startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
-      }
-    }
-  };
-
   // Format timer display for rest timer badge
   const getRestTimerDisplay = (): string => {
     if (!timer) return '0:00';
@@ -676,7 +664,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
 
   // Timer context
-  const { timer, startTimer, stopTimer, showModal: showTimerModal } = useTimer();
+  const { timer, stopTimer, showModal: showTimerModal } = useTimer();
 
   // Keep a ref to the latest stopTimer so the unmount cleanup always calls the
   // current one (avoids a stale closure tearing down the wrong timer).
