@@ -1684,26 +1684,26 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             {(() => {
               if (exImage) {
                 return (
-                  // Keyed by the exercise's IDENTITY — not by exKey, and not unkeyed.
+                  // Deliberately UNKEYED. This view must be retained across an exercise change
+                  // and have its `source` swapped, never remounted.
                   //
-                  // Unkeyed, React reuses the same native Image view and only swaps `source`,
-                  // and RN's Image goes on painting its last decoded bitmap until the new one
-                  // loads. That showed the PREVIOUS exercise's picture for a beat — most
-                  // visibly on load, where allSetsData restores asynchronously, so the first
-                  // frames render the primary exercise and then flip to the saved alternative.
-                  // The data was never wrong; only the view was stale. A new key forces a
-                  // fresh view, so a stale bitmap cannot survive an exercise change.
+                  // A changing key unmounts the native image view and mounts a fresh one, and a
+                  // fresh view has no decoded bitmap — so it paints empty, decodes, then shows.
+                  // The miniCardImages fallback cannot rescue that: handing a warm source to a
+                  // brand-new view still leaves it with nothing decoded. That was a visible
+                  // flash on every swipe on a real device (instant in the simulator, where the
+                  // decode is free).
                   //
-                  // exName, not exKey: exKey also carries themeColor, which does not change
-                  // the picture — remounting on a theme toggle would be pointless. And exName
-                  // is stable across the start/end cycle, so cycling still swaps `source` on
-                  // one view and animates rather than remounting every second.
+                  // The cycling animation is the proof: it swaps `source` on this same view
+                  // every second and never flashes. A source swap on a retained view is smooth;
+                  // the remount was the entire problem.
                   //
-                  // This does not bring the swipe-commit blink back: the miniCardImages
-                  // fallback below already hands the fresh view a warm source, so there is
-                  // nothing to wait for.
+                  // 27f8acb added a key to stop a retained view painting a STALE bitmap — but
+                  // that only ever showed a wrong exercise because of the load-time
+                  // primary -> alternative flip, and 3d3a955 gated that behind contentReady, so
+                  // the card no longer renders an exercise it is about to change its mind
+                  // about. The disease is gone; this was still taking the medicine.
                   <Image
-                    key={exName}
                     source={typeof exImage === 'string' ? { uri: exImage } : exImage}
                     style={styles.fullScreenImage}
                     resizeMode="contain"
