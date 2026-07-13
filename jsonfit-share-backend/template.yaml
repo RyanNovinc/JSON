@@ -53,8 +53,11 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: jsonfit-createShare
-      CodeUri: src/createShare/
-      Handler: index.handler
+      # CodeUri is the whole of src/ (not src/createShare/) so that both handlers
+      # ship with src/shared/shareLimits.js — the single source of truth for the
+      # payload limits. Handler is therefore path-qualified.
+      CodeUri: src/
+      Handler: createShare/index.handler
       Timeout: 10
       MemorySize: 256
       Environment:
@@ -76,8 +79,9 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: jsonfit-getShare
-      CodeUri: src/getShare/
-      Handler: index.handler
+      # See CreateShareFunction — CodeUri is src/ so src/shared/ is bundled.
+      CodeUri: src/
+      Handler: getShare/index.handler
       Timeout: 10
       MemorySize: 256
       Environment:

@@ -349,8 +349,6 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       }
 
       const manualBlocks = [];
-      const completionStatus = {};
-      const workoutHistory = [];
 
       if (programData && programData.totalMesocycles > 1) {
         for (let mesocycleNum = 1; mesocycleNum <= programData.totalMesocycles; mesocycleNum++) {
@@ -380,20 +378,15 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         }
       }
 
-      try {
-        const statusData = await AsyncStorage.getItem('workout_completion_status');
-        if (statusData) {
-          Object.assign(completionStatus, JSON.parse(statusData));
-        }
-      } catch (error) {
-        console.log('Could not load completion status');
-      }
-
+      // NOTE: `completionStatus` and `workoutHistory` used to be gathered and sent
+      // here. Both were dead weight: nothing in the app ever writes the
+      // 'workout_completion_status' key, and workoutHistory was hardcoded to [].
+      // They were always empty, and ImportSharedContent discards everything except
+      // workoutData anyway. Removing them changes no behaviour — old clients
+      // already ignore the fields.
       const completeExport = {
         workoutData: exportData,
         manualBlocks: manualBlocks,
-        completionStatus: completionStatus,
-        workoutHistory: workoutHistory,
         exportMetadata: {
           routineName: routine.name,
           routineId: routine.id,
