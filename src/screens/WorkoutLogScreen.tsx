@@ -1400,7 +1400,11 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           </View>
 
           {/* Workout progress — sits above the scrim so it isn't dimmed */}
-          <ExerciseProgressTicks progress={exerciseProgress} themeColor={themeColor} />
+          <ExerciseProgressTicks
+            progress={exerciseProgress}
+            currentIndex={currentIndex}
+            themeColor={themeColor}
+          />
 
           {/* ── HEADER BUTTONS OVERLAID ON IMAGE ──────────────────────── */}
           <View style={[styles.overlayHeader, { paddingTop: insets.top + 12 }]}>
@@ -2377,34 +2381,51 @@ function computeExerciseProgress(
   });
 }
 
+/** Completed exercises are present but recede; the current one is the focal point. */
+const TICK_COMPLETE_OPACITY = 0.45;
+
 interface ExerciseProgressTicksProps {
   progress: { completed: number; total: number }[];
+  /**
+   * Which tick reads as "you are here". On the live screen this is the screen's
+   * currentIndex; on a swipe-peek layer it is that card's OWN index, so the highlight
+   * travels with the card as it slides in.
+   */
+  currentIndex: number;
   themeColor: string;
 }
 
 /**
- * One tick per exercise along the bottom edge of the image — workout progress at a
- * glance, without scrolling to "Up Next".
+ * One tick per exercise along the bottom edge of the image — where you are and what
+ * is done, at a glance, without scrolling to "Up Next".
  *
- * Two states only. A tick lights up when every set of that exercise is done; a
- * half-finished exercise looks exactly like an untouched one. Proportional fill would
- * turn a glanceable row into something you have to read, and the current exercise is
- * left undistinguished because the image above it already says where you are.
+ * Three states, tested in this order:
+ *   current   themeColor, full opacity
+ *   complete  themeColor, faded — done, but no longer where your attention is
+ *   neither   grey
+ *
+ * Current is checked FIRST and wins: stepping back to an exercise you already finished
+ * shows it as current, not complete. A half-finished exercise still looks untouched —
+ * proportional fill would turn a glanceable row into something you have to read.
  */
-function ExerciseProgressTicks({ progress, themeColor }: ExerciseProgressTicksProps) {
+function ExerciseProgressTicks({ progress, currentIndex, themeColor }: ExerciseProgressTicksProps) {
   if (progress.length === 0) return null;
 
   return (
     // pointerEvents none — the image's swipe gesture must pass straight through.
     <View style={styles.progressTicks} pointerEvents="none">
       {progress.map((p, i) => {
-        const done = p.total > 0 && p.completed === p.total;
-        return (
-          <View
-            key={i}
-            style={[styles.progressTick, done && { backgroundColor: themeColor }]}
-          />
-        );
+        const isCurrent = i === currentIndex;
+        const isComplete = p.total > 0 && p.completed === p.total;
+
+        // Order matters: current beats complete.
+        const tickStyle = isCurrent
+          ? { backgroundColor: themeColor }
+          : isComplete
+            ? { backgroundColor: themeColor, opacity: TICK_COMPLETE_OPACITY }
+            : null;
+
+        return <View key={i} style={[styles.progressTick, tickStyle]} />;
       })}
     </View>
   );
@@ -2453,9 +2474,12 @@ function ExercisePagePreview({
           <View style={styles.imageOverlay} />
         </View>
 
-        {/* Same ticks on the peek layers, so a card sliding in doesn't visibly lack them */}
+        {/* Same ticks on the peek layers, so a card sliding in doesn't visibly lack them.
+            "Current" here is THIS card's own index, not the screen's — so the highlight
+            travels with the card during a swipe instead of lagging behind on the old one. */}
         <ExerciseProgressTicks
           progress={computeExerciseProgress(exercises, allSetsData)}
+          currentIndex={index}
           themeColor={themeColor}
         />
 
