@@ -2188,26 +2188,16 @@ function SetRow({
         <Pressable
           onLongPress={onLongPress}
           delayLongPress={500}
-          style={{ width: 30, alignItems: 'center', justifyContent: 'center' }}
+          style={styles.setNumCell}
         >
-          <View style={{ alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+          <View style={styles.setNumInner}>
             <Text style={[styles.setNum]}>{index + 1}</Text>
-            {isLastSet && (
-              <Text style={{
-                position: 'absolute',
-                left: -16,
-                color: '#55555f',
-                fontSize: 16,
-                fontFamily: 'DMMono-Regular'
-              }}>
-                ×
-              </Text>
-            )}
+            {isLastSet && <Text style={styles.setRowLastMark}>×</Text>}
           </View>
         </Pressable>
 
         {/* PREV — last session's reference */}
-        <View style={{ width: 60, paddingLeft: 2 }}>
+        <View style={styles.prevCellBox}>
           <Text style={styles.prevCell} numberOfLines={1}>
             {previous ? `${formatPrevWeight(previous, globalUnit)} × ${previous.reps}` : '—'}
           </Text>
@@ -2262,7 +2252,7 @@ function SetRow({
               onSetTapWhenNotStarted();
             }
           }}
-          style={{ width: 34, alignItems: 'center', paddingVertical: 8 }}
+          style={styles.setCheckCell}
         >
           {completed ? (
             <Ionicons name="checkmark-circle" size={26} color={themeColor} />
@@ -2477,6 +2467,13 @@ function ExercisePagePreview({
   const previousSets = previousByExercise[name] || {};
   const img = miniCardImages.get(name)?.start || null;
 
+  // The live card shows a chevron beside the title when the exercise has alternatives
+  // (its `allExercises.length > 1`). Mirror that, or it pops in on commit — and because
+  // the chevron shares the title's row, its absence also let the title claim ~26px more
+  // width, so a long name could reflow the instant the card settled.
+  const hasAlternatives =
+    (ex.alternatives || []).filter((a) => a && typeof a === 'string').length > 0;
+
   return (
     <View>
       {/* Image header */}
@@ -2504,9 +2501,17 @@ function ExercisePagePreview({
       <View style={styles.focusArea}>
         <View style={styles.titleRow}>
           <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
-            <Text style={styles.title} numberOfLines={2}>
-              {name}
-            </Text>
+            {/* Same row + chevron as the live title, but a View: nothing here is tappable */}
+            <View style={styles.titleButton}>
+              <Text style={styles.title} numberOfLines={2}>
+                {name}
+              </Text>
+              {hasAlternatives && (
+                <View style={{ marginLeft: 8 }}>
+                  <Ionicons name="chevron-down" size={18} color={themeColor} />
+                </View>
+              )}
+            </View>
             {!!(eff.primaryMuscles?.length || eff.secondaryMuscles?.length) && (
               <Text style={styles.muscles}>
                 {[...(eff.primaryMuscles || []), ...(eff.secondaryMuscles || [])].join(' · ')}
@@ -2565,12 +2570,17 @@ function PreviewSetsTable({
         const prev = previousSets[i + 1];
         const wTxt = s.weight || '';
         const rTxt = s.reps || targetRepsArray[i] || '';
+        const isLastSet = i === sets.length - 1;
         return (
           <View key={i} style={[styles.setRow, s.completed && styles.setRowCompleted]}>
-            <View style={{ width: 30, alignItems: 'center' }}>
-              <Text style={styles.setNum}>{i + 1}</Text>
+            <View style={styles.setNumCell}>
+              <View style={styles.setNumInner}>
+                <Text style={styles.setNum}>{i + 1}</Text>
+                {/* The live row draws this on the last set; without it, it popped in on commit */}
+                {isLastSet && <Text style={styles.setRowLastMark}>×</Text>}
+              </View>
             </View>
-            <View style={{ width: 60, paddingLeft: 2 }}>
+            <View style={styles.prevCellBox}>
               <Text style={styles.prevCell} numberOfLines={1}>
                 {prev ? `${formatPrevWeight(prev, unit)} × ${prev.reps}` : '—'}
               </Text>
@@ -2585,7 +2595,7 @@ function PreviewSetsTable({
                 <Text style={[styles.previewCellText, { color: s.reps ? '#f0f0f2' : '#3a3a44' }]}>{rTxt}</Text>
               </View>
             </View>
-            <View style={{ width: 34, alignItems: 'center', paddingVertical: 8 }}>
+            <View style={styles.setCheckCell}>
               <Ionicons
                 name={s.completed ? 'checkmark-circle' : 'ellipse-outline'}
                 size={26}
@@ -2595,6 +2605,15 @@ function PreviewSetsTable({
           </View>
         );
       })}
+
+      {/* "Add set" — a plain View, not a TouchableOpacity: the peek layer is read-only.
+          Its absence was the loudest pop, and the costliest: the button occupies real
+          height, so the whole preview card was short and everything below it jumped on
+          commit. Same styles as the live button, so the geometry is identical. */}
+      <View style={styles.addSetBtn}>
+        <Ionicons name="add" size={18} color="#9898a4" />
+        <Text style={styles.addSetText}>Add set</Text>
+      </View>
     </View>
   );
 }
@@ -3101,6 +3120,37 @@ const styles = StyleSheet.create({
   },
   setRowCompleted: {
     opacity: 0.55,
+  },
+  // ── Shared set-row cell geometry ───────────────────────────────
+  // SetRow (live) and PreviewSetsTable (swipe peek) MUST lay out identically, or the
+  // card visibly shifts the instant a swipe commits. These live in one place so the
+  // two cannot drift apart again.
+  setNumCell: {
+    width: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setNumInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  /** The "×" delete affordance drawn beside the last set's number. Absolute: no reflow. */
+  setRowLastMark: {
+    position: 'absolute',
+    left: -16,
+    color: '#55555f',
+    fontSize: 16,
+    fontFamily: 'DMMono-Regular',
+  },
+  prevCellBox: {
+    width: 60,
+    paddingLeft: 2,
+  },
+  setCheckCell: {
+    width: 34,
+    alignItems: 'center',
+    paddingVertical: 8,
   },
   setNum: {
     color: '#9898a4',
