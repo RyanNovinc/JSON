@@ -67,6 +67,8 @@ interface TimerContextType {
   pauseTimer: () => void;
   resumeTimer: () => void;
   stopTimer: () => Promise<void>;
+  /** Stops the timer only if it was started by this exact (exerciseIndex, setIndex). */
+  stopTimerForSet: (exerciseIndex: number, setIndex: number) => void;
   resetTimer: () => Promise<void>;
   addTime: (seconds: number) => void;
   subtractTime: (seconds: number) => void;
@@ -105,6 +107,10 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const getExerciseContextRef = useRef<((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null>(null);
   const backgroundLiveActivityId = useRef<string | null>(null); // Store Live Activity ID when going to background
   const prevTimerRef = useRef<TimerState | null>(null); // Track previous timer state to avoid excessive Live Activity updates
+  // Always-current timer, so control functions never read a stale render closure.
+  // startTimer/stopTimer previously read `timer` from the closure, which meant two
+  // rapid calls saw the same liveActivityId and could leak or double-stop an activity.
+  const timerRef = useRef<TimerState | null>(null);
 
   // Load persisted state on mount
   useEffect(() => {
@@ -166,6 +172,11 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     
     return () => stopInterval();
   }, [timer?.isRunning, timer?.isPaused]);
+
+  // Keep the always-current mirror in sync with committed state
+  useEffect(() => {
+    timerRef.current = timer;
+  }, [timer]);
 
   // Persist state changes
   useEffect(() => {
@@ -381,32 +392,33 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const startTimer = async (targetSeconds = 0, exerciseIndex?: number, setIndex?: number, themeColor?: string) => {
-    // Debug logging for new timer start
-    DebugLogger.log(`🚀 startTimer called: targetSeconds=${targetSeconds}, exerciseIndex=${exerciseIndex}, setIndex=${setIndex}`, 'log');
-    
-    // Check if there's an existing Live Activity that needs to be stopped
-    if (timer?.liveActivityId && stopActivity) {
-      DebugLogger.log(`⚠️ Found existing Live Activity ${timer.liveActivityId} - attempting to stop before new timer`, 'warn');
-      // Explicitly stop the old Live Activity, but handle "not found" errors gracefully
-      try {
-        await stopActivity(timer.liveActivityId, { title: 'Timer Stopped' });
-        DebugLogger.log(`✅ Successfully stopped old Live Activity ${timer.liveActivityId}`, 'log');
-      } catch (error) {
-        // If Activity not found, that's fine - just clear the stale ID
-        if (error.message?.includes('not found') || error.message?.includes('ActivityNotFoundException')) {
-          DebugLogger.log(`🧹 Old Live Activity ${timer.liveActivityId} not found (likely expired) - clearing stale ID`, 'warn');
+  // Tear down a Live Activity without blocking anything. The widget is a cosmetic
+  // side-channel; it must never delay, gate or strand timer state.
+  const disposeLiveActivity = (activityId?: string, title = 'Timer Stopped') => {
+    if (!activityId || !stopActivity) return;
+    Promise.resolve()
+      .then(() => stopActivity(activityId, { title }))
+      .then(() => DebugLogger.log(`✅ Live Activity ${activityId} stopped`, 'log'))
+      .catch((error: any) => {
+        const message = error?.message ?? String(error);
+        if (message.includes('not found') || message.includes('ActivityNotFoundException')) {
+          DebugLogger.log(`🧹 Live Activity ${activityId} not found (likely expired)`, 'warn');
         } else {
-          DebugLogger.log(`❌ Failed to stop old Live Activity ${timer.liveActivityId}: ${error}`, 'error');
+          DebugLogger.log(`⚠️ [LIVE-ACTIVITY] Failed to stop ${activityId}, continuing: ${message}`, 'warn');
         }
-      }
-    } else {
-      DebugLogger.log(`✅ No existing Live Activity to stop`, 'log');
-    }
-    
+      });
+  };
+
+  const startTimer = (targetSeconds = 0, exerciseIndex?: number, setIndex?: number, themeColor?: string) => {
+    DebugLogger.log(`🚀 startTimer called: targetSeconds=${targetSeconds}, exerciseIndex=${exerciseIndex}, setIndex=${setIndex}`, 'log');
+
+    // Read the outgoing activity id from the ref, not the render closure, and claim
+    // it immediately so a second rapid startTimer cannot tear down the same id twice.
+    const previousActivityId = timerRef.current?.liveActivityId;
+
     const now = new Date();
     const fixedEndTime = now.getTime() + (targetSeconds * 1000); // Calculate stable end time once
-    const newTimer = {
+    const newTimer: TimerState = {
       isRunning: true,
       isPaused: false,
       timeElapsed: 0,
@@ -422,10 +434,14 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       themeColor, // Store theme color for Live Activity
       fixedEndTime, // Store stable end time to prevent Live Activity jumping
     };
-    
+
+    // Commit the timer FIRST and synchronously. Nothing cosmetic runs before this.
     DebugLogger.log(`📊 New timer created: targetTime=${targetSeconds}s, countUp=${timerSettings.countUp}`, 'log');
     setTimer(newTimer);
-    
+    timerRef.current = newTimer;
+
+    // ...then dispose the old widget in the background.
+    disposeLiveActivity(previousActivityId);
   };
 
   const pauseTimer = () => {
@@ -459,25 +475,40 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const stopTimer = async () => {
-    // Explicitly stop Live Activity before clearing timer
-    if (timer?.liveActivityId && stopActivity) {
-      DebugLogger.log(`🛑 Explicitly stopping Live Activity in stopTimer: ${timer.liveActivityId}`, 'log');
-      try {
-        await stopActivity(timer.liveActivityId, { title: 'Timer Stopped' });
-        DebugLogger.log(`✅ Live Activity stopped successfully in stopTimer`, 'log');
-      } catch (error) {
-        // Handle "not found" errors gracefully - activity may have already expired
-        if (error.message?.includes('not found') || error.message?.includes('ActivityNotFoundException')) {
-          DebugLogger.log(`🧹 Live Activity ${timer.liveActivityId} not found (likely expired) in stopTimer`, 'warn');
-        } else {
-          DebugLogger.log(`❌ Failed to stop Live Activity in stopTimer: ${error}`, 'error');
-        }
-      }
-    }
-    
-    // Clear timer state and storage
+    // Read from the ref, not the render closure, so a rapid stop/start pair cannot
+    // tear down the wrong activity.
+    const activityId = timerRef.current?.liveActivityId;
+
+    // Clear timer state and storage FIRST — the widget teardown must not gate it.
     setTimer(null);
+    timerRef.current = null;
     AsyncStorage.removeItem(STORAGE_KEY);
+
+    disposeLiveActivity(activityId);
+  };
+
+  /**
+   * Stop the rest timer only if it belongs to this exact set.
+   *
+   * `exerciseIndex`/`setIndex` have always been written by startTimer but never
+   * read — so nothing could tell which set owned the running timer. Un-completing
+   * set 2 must not kill a timer started by set 3, and it must not kill the 5s
+   * superset transition timer (which is owned by the *next* exercise, index+1).
+   */
+  const stopTimerForSet = (exerciseIndex: number, setIndex: number) => {
+    const current = timerRef.current;
+    if (!current) return;
+
+    if (current.exerciseIndex !== exerciseIndex || current.setIndex !== setIndex) {
+      DebugLogger.log(
+        `⏭️ stopTimerForSet(${exerciseIndex},${setIndex}) ignored - timer is owned by (${current.exerciseIndex},${current.setIndex})`,
+        'log',
+      );
+      return;
+    }
+
+    DebugLogger.log(`🛑 stopTimerForSet(${exerciseIndex},${setIndex}) - stopping owned timer`, 'log');
+    stopTimer();
   };
 
   const resetTimer = async () => {
@@ -774,11 +805,12 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
           DebugLogger.log('⏭️ [LIVE-ACTIVITY] startActivity binding unavailable - skipping', 'warn');
         }
       } else {
-        // Don't update every second - let iOS handle native countdown for accuracy
-        // Only update if there are significant state changes (pause/resume/time adjustments)
-        const hasSignificantChange = timer.isPaused !== (timer.isPaused || false) ||
-                                   Math.abs(remaining - (timer.lastSentRemaining || remaining)) > 5;
-        
+        // Don't update every second - let iOS handle native countdown for accuracy.
+        // Only push when the remaining time has drifted from what iOS last received.
+        const hasSignificantChange =
+          Math.abs(remaining - (timer.lastSentRemaining || remaining)) > 5;
+
+
         if (hasSignificantChange) {
           console.log('🔄 Updating Live Activity for significant change', timer.liveActivityId, { state });
           DebugLogger.log(`🔄 Updating Live Activity for significant change: remaining=${remaining}, lastSent=${timer.lastSentRemaining}`);
@@ -822,6 +854,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     pauseTimer,
     resumeTimer,
     stopTimer,
+    stopTimerForSet,
     resetTimer,
     addTime,
     subtractTime,
