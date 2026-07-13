@@ -22,7 +22,7 @@ export default function WorkoutLogScreenAdapter() {
   const route = useRoute<RouteProp<RootStackParamList, 'WorkoutLog'>>();
   const { themeColor, isPinkTheme } = useTheme();
   const { globalUnit } = useWeightUnit();
-  const { startTimer } = useTimer();
+  const { startTimer, stopTimerForSet } = useTimer();
   const { activeWorkout, setActiveWorkout } = useActiveWorkout();
   
   // Extract data from your existing route params
@@ -359,6 +359,12 @@ export default function WorkoutLogScreenAdapter() {
         }
       }
     } else if (wasCompleted) {
+      // Un-completing a set retracts everything that completing it produced —
+      // including its rest timer. Scoped to the owning set, so un-completing set 2
+      // cannot kill a timer started by set 3 (or the superset transition timer,
+      // which is owned by the next exercise).
+      stopTimerForSet(exerciseIndex, setIndex);
+
       // Remove from history when set is uncompleted
       await removeSetFromHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
     }
