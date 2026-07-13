@@ -1745,9 +1745,24 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             <Text style={styles.accessoryDone}>Done</Text>
           </TouchableOpacity>
 
-          <Text style={styles.accessoryHint} numberOfLines={1}>
-            {accessoryPrev ? `last: ${accessoryPrev.weight} × ${accessoryPrev.reps}` : ''}
-          </Text>
+          {/* A finished countdown leaves `timer` non-null with isRunning/isPaused
+              both false, so truthiness alone would strand a dead 0:00 here. */}
+          {timer && (timer.isRunning || timer.isPaused) ? (
+            <TouchableOpacity
+              style={styles.accessoryTimer}
+              onPress={showTimerModal}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="time-outline" size={15} color={themeColor} />
+              <Text style={[styles.accessoryTimerText, { color: themeColor }]}>
+                {getRestTimerDisplay()}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.accessoryHint} numberOfLines={1}>
+              {accessoryPrev ? `last: ${accessoryPrev.weight} × ${accessoryPrev.reps}` : ''}
+            </Text>
+          )}
 
           <TouchableOpacity
             style={[styles.accessoryLogBtn, { backgroundColor: themeColor }]}
@@ -3022,6 +3037,18 @@ const styles = StyleSheet.create({
     color: '#55555f',
     fontSize: 12,
     fontFamily: 'DMMono-Regular',
+  },
+  accessoryTimer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  accessoryTimerText: {
+    fontSize: 13,
+    fontFamily: 'DMMono-Medium',
+    letterSpacing: 0.2,
   },
   accessoryLogBtn: {
     flexDirection: 'row',
