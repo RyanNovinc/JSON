@@ -2486,6 +2486,17 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
   // squeeze every inactive card's title.
   const [badgeMounted, setBadgeMounted] = useState(isActive);
 
+  // The active card's background, border and title colour used to flip instantly. Cross-fade
+  // them instead, so the outgoing card relaxes out of its active state as the incoming one
+  // settles into it.
+  //
+  // JS-driven, and it has to be: backgroundColor, borderColor and colour are NOT
+  // native-driver properties. That is acceptable here because this runs only on COMMIT, not
+  // during the drag — by the time it starts the finger is up — and only the two cards whose
+  // isActive flipped animate, not all N. That is also why this keys off isActive rather than
+  // interpolating dragX: doing the latter would drive every row in the list on every frame.
+  const activeAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+
   useEffect(() => {
     if (isActive) setBadgeMounted(true);
 
@@ -2497,14 +2508,32 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
     }).start(({ finished }) => {
       if (finished && !isActive) setBadgeMounted(false);
     });
-  }, [isActive, badgeAnim]);
+
+    Animated.timing(activeAnim, {
+      toValue: isActive ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false, // colour properties cannot leave the JS thread
+    }).start();
+  }, [isActive, badgeAnim, activeAnim]);
 
   return (
-    <TouchableOpacity
+    <AnimatedTouchableOpacity
       style={[
         styles.miniCard,
         allDone && styles.miniCardDone,
-        isActive && styles.miniCardActive
+        {
+          // Interpolated rather than swapped, so the state cross-fades. End values match
+          // styles.miniCard and styles.miniCardActive exactly.
+          borderColor: activeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.08)'],
+          }),
+          backgroundColor: activeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['#0a0a0f', 'rgba(255,255,255,0.02)'],
+          }),
+        },
       ]}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -2539,13 +2568,22 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
 
       <View style={{ flex: 1 }}>
         <View style={styles.miniTitleRow}>
-          <Text style={[
-            styles.miniTitle,
-            allDone && styles.miniTitleDone,
-            isActive && styles.miniTitleActive
-          ]}>
+          <Animated.Text
+            style={[
+              styles.miniTitle,
+              allDone && styles.miniTitleDone,
+              {
+                color: activeAnim.interpolate({
+                  inputRange: [0, 1],
+                  // Resting colour depends on whether the exercise is finished; the active
+                  // colour is the same either way.
+                  outputRange: [allDone ? '#9898a4' : '#f0f0f2', '#ffffff'],
+                }),
+              },
+            ]}
+          >
             {exercise.exercise || exercise.name || 'Exercise'}
-          </Text>
+          </Animated.Text>
           {badgeMounted && (
             <Animated.View
               style={[
@@ -2588,7 +2626,7 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
           ]}
         />
       </View>
-    </TouchableOpacity>
+    </AnimatedTouchableOpacity>
   );
 });
 
