@@ -987,10 +987,27 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     }, 60);
   };
 
-  // Previous-session reference for whatever set currently owns the keyboard
-  const accessoryPrev = focusedSet
-    ? (previousByExercise[effectiveCurrentExercise.exercise] || {})[focusedSet.setIndex + 1]
-    : null;
+  // Estimated 1RM for the set being typed RIGHT NOW, so the number is there before the set
+  // is logged. Distinct from OneRMBadge, which reports the best COMPLETED set of the session.
+  //
+  // Null unless both fields hold a positive number: the moment the user types the first digit
+  // of a weight the reps are still blank, and a "0.0" flickering into the bar and out again
+  // would be worse than nothing. parseFloat('') is NaN, so the isFinite guards cover it.
+  //
+  // Weight is typed in globalUnit and calculate1RM is unit-agnostic (it just scales its
+  // input), so the result is already in globalUnit — the same thing OneRMBadge does.
+  const liveOneRM = useMemo(() => {
+    if (!focusedSet) return null;
+
+    const set = allSetsData[currentIndex]?.[focusedSet.setIndex];
+    if (!set) return null;
+
+    const weight = parseFloat(set.weight);
+    const reps = parseInt(set.reps, 10);
+    if (!isFinite(weight) || !isFinite(reps) || weight <= 0 || reps <= 0) return null;
+
+    return calculate1RM(weight, reps);
+  }, [focusedSet, allSetsData, currentIndex, calculate1RM]);
 
   const accessoryVisible = focusedSet !== null && keyboardHeight > 0;
   const accessoryBottom = Platform.OS === 'ios' ? keyboardHeight : 0;
@@ -2059,24 +2076,35 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             <Text style={styles.accessoryDone}>Done</Text>
           </TouchableOpacity>
 
-          {/* A finished countdown leaves `timer` non-null with isRunning/isPaused
-              both false, so truthiness alone would strand a dead 0:00 here. */}
-          {timer && (timer.isRunning || timer.isPaused) ? (
-            <TouchableOpacity
-              style={styles.accessoryTimer}
-              onPress={showTimerModal}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="time-outline" size={15} color={themeColor} />
-              <Text style={[styles.accessoryTimerText, { color: themeColor }]}>
-                {getRestTimerDisplay()}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <Text style={styles.accessoryHint} numberOfLines={1}>
-              {accessoryPrev ? `last: ${formatPrevWeight(accessoryPrev, globalUnit)} × ${accessoryPrev.reps}` : ''}
-            </Text>
-          )}
+          {/* Centre slot. The "last: 60 × 10" hint used to live here and is gone: the PREV
+              column already says that, in the very row being typed into. The space now
+              carries the rest timer and the live 1RM, which can both show at once — you are
+              usually typing the next set while the previous set's rest counts down. */}
+          <View style={styles.accessoryCenter}>
+            {/* A finished countdown leaves `timer` non-null with isRunning/isPaused
+                both false, so truthiness alone would strand a dead 0:00 here. */}
+            {timer && (timer.isRunning || timer.isPaused) && (
+              <TouchableOpacity
+                style={styles.accessoryTimer}
+                onPress={showTimerModal}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="time-outline" size={15} color={themeColor} />
+                <Text style={[styles.accessoryTimerText, { color: themeColor }]}>
+                  {getRestTimerDisplay()}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {liveOneRM !== null && (
+              <View style={styles.accessoryOneRM}>
+                <Text style={styles.accessoryOneRMLabel}>1RM</Text>
+                <Text style={[styles.accessoryOneRMValue, { color: themeColor }]} numberOfLines={1}>
+                  {liveOneRM.toFixed(1)} {globalUnit}
+                </Text>
+              </View>
+            )}
+          </View>
 
           <TouchableOpacity
             style={[styles.accessoryLogBtn, { backgroundColor: themeColor }]}
@@ -3633,12 +3661,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Outfit-Medium',
   },
-  accessoryHint: {
+  // Centre slot: holds the rest timer and the live 1RM, either, both, or neither. flex:1 so
+  // Done stays pinned left and Log set right however much is in here.
+  accessoryCenter: {
     flex: 1,
-    textAlign: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  accessoryOneRM: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  accessoryOneRMLabel: {
     color: '#55555f',
-    fontSize: 12,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 1.2,
     fontFamily: 'DMMono-Regular',
+  },
+  accessoryOneRMValue: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'DMMono-Medium',
+    letterSpacing: 0.2,
   },
   accessoryTimer: {
     flexDirection: 'row',
