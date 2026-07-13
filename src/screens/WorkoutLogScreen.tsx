@@ -1914,17 +1914,34 @@ function PrescriptionBanner({
 
 // Helper function to parse target reps from weekly format
 // Converts "6, 6, 5, 5" or "8-12" to array of rep targets
-function parseTargetReps(repsString: string): string[] {
+/**
+ * PREV shows last session's load, which is stored in whatever unit it was logged
+ * in — convert it to the unit on screen. Trailing zeros are dropped so a clean
+ * 60kg reads as "60", not "60.0", in a 60px-wide cell.
+ */
+function formatPrevWeight(
+  previous: { weight: string; unit?: 'kg' | 'lbs' },
+  globalUnit: 'kg' | 'lbs',
+): string {
+  const converted = convertWeight(
+    parseFloat(previous.weight) || 0,
+    previous.unit ?? globalUnit,
+    globalUnit,
+  );
+  return String(Number(converted.toFixed(1)));
+}
+
+function parseTargetReps(repsString: string, setCount: number): string[] {
   if (!repsString) return [];
 
-  // Handle comma-separated format like "6, 6, 5, 5"
+  // Handle comma-separated format like "6, 6, 5, 5" — one target per set
   if (repsString.includes(',')) {
     return repsString.split(',').map(rep => rep.trim());
   }
 
-  // Handle single rep scheme like "8-12" or "10" - return empty array for now
-  // since we don't know how many sets there will be
-  return [];
+  // A single scheme like "8-12" or "10" is prescribed for every set
+  const scheme = repsString.trim();
+  return scheme ? Array(setCount).fill(scheme) : [];
 }
 
 interface SetsTableProps {
@@ -1971,7 +1988,7 @@ function SetsTable({
 }: SetsTableProps) {
   // Parse target reps for this week
   const weeklyReps = exercise.reps_weekly?.[String(currentWeek)] || exercise.reps;
-  const targetRepsArray = weeklyReps ? parseTargetReps(String(weeklyReps)) : [];
+  const targetRepsArray = weeklyReps ? parseTargetReps(String(weeklyReps), sets.length) : [];
 
   return (
     <View style={styles.setsTable}>
@@ -2082,7 +2099,7 @@ function SetRow({
         {/* PREV — last session's reference */}
         <View style={{ width: 60, paddingLeft: 2 }}>
           <Text style={styles.prevCell} numberOfLines={1}>
-            {previous ? `${previous.weight} × ${previous.reps}` : '—'}
+            {previous ? `${formatPrevWeight(previous, globalUnit)} × ${previous.reps}` : '—'}
           </Text>
         </View>
 
@@ -2099,7 +2116,10 @@ function SetRow({
               }
             }}
             keyboardType="decimal-pad"
-            placeholder={previous ? convertWeight(parseFloat(previous.weight) || 0, previous.unit ?? globalUnit, globalUnit).toFixed(1) : ''}
+            // No ghost weight — last session's load is already one column left,
+            // under PREV. The plan prescribes reps, not load, so there is no
+            // target to suggest here.
+            placeholder=""
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
             {...accessoryProps}
@@ -2120,7 +2140,10 @@ function SetRow({
             }
           }}
           keyboardType="number-pad"
-          placeholder={previous?.reps || targetReps || ''}
+          // The rep target is the prescription for this week — the ghost text
+          // should say what to hit, not what was hit last time. Last session's
+          // reps are still one column to the left, under PREV.
+          placeholder={targetReps || previous?.reps || ''}
           placeholderTextColor="#3a3a44"
           editable={workoutStarted && !completed}
           {...accessoryProps}
@@ -2357,7 +2380,7 @@ interface PreviewSetsTableProps {
   sets: SetData[];
   exercise: Exercise;
   currentWeek: number;
-  unit: string;
+  unit: 'kg' | 'lbs';
   themeColor: string;
   previousSets: PreviousSets;
 }
@@ -2371,7 +2394,7 @@ function PreviewSetsTable({
   previousSets,
 }: PreviewSetsTableProps) {
   const weeklyReps = exercise.reps_weekly?.[String(currentWeek)] || exercise.reps;
-  const targetRepsArray = weeklyReps ? parseTargetReps(String(weeklyReps)) : [];
+  const targetRepsArray = weeklyReps ? parseTargetReps(String(weeklyReps), sets.length) : [];
 
   return (
     <View style={styles.setsTable}>
@@ -2385,8 +2408,8 @@ function PreviewSetsTable({
 
       {sets.map((s, i) => {
         const prev = previousSets[i + 1];
-        const wTxt = s.weight || prev?.weight || '';
-        const rTxt = s.reps || prev?.reps || targetRepsArray[i] || '';
+        const wTxt = s.weight || '';
+        const rTxt = s.reps || targetRepsArray[i] || '';
         return (
           <View key={i} style={[styles.setRow, s.completed && styles.setRowCompleted]}>
             <View style={{ width: 30, alignItems: 'center' }}>
@@ -2394,7 +2417,7 @@ function PreviewSetsTable({
             </View>
             <View style={{ width: 60, paddingLeft: 2 }}>
               <Text style={styles.prevCell} numberOfLines={1}>
-                {prev ? `${prev.weight} × ${prev.reps}` : '—'}
+                {prev ? `${formatPrevWeight(prev, unit)} × ${prev.reps}` : '—'}
               </Text>
             </View>
             <View style={{ flex: 1 }}>

@@ -360,7 +360,7 @@ export default function WorkoutLogScreenAdapter() {
       }
     } else if (wasCompleted) {
       // Remove from history when set is uncompleted
-      await removeSetFromHistory(exerciseIndex, setIndex);
+      await removeSetFromHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
     }
   };
 
@@ -795,17 +795,36 @@ export default function WorkoutLogScreenAdapter() {
   };
 
 
+  // Resolve the name a set was actually logged under. selectedExerciseIndex is
+  // 0 for the primary exercise and 1+ for an entry in `alternatives` — the same
+  // source the log screen's title and sets table read, so history is filed under
+  // the variant the user actually performed.
+  const getLoggedExerciseName = (exerciseIndex: number, setData?: SetData): string => {
+    const exercise = exercises[exerciseIndex];
+    const primaryName = exercise?.exercise || exercise?.name || 'Unknown Exercise';
+
+    const selectedIndex = setData?.selectedExerciseIndex || 0;
+    if (selectedIndex === 0) return primaryName;
+
+    const alternatives = (exercise?.alternatives || [])
+      .filter((alt) => alt && typeof alt === 'string')
+      .map((alt) => String(alt));
+
+    return alternatives[selectedIndex - 1] || primaryName;
+  };
+
   // Save set to workout history
   const saveSetToHistory = async (exerciseIndex: number, setIndex: number, setData: SetData) => {
     // Use local date instead of UTC to match user's timezone
     const now = new Date();
     const currentDate = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
-    
+
     // Get the exercise name
-    const exercise = exercises[exerciseIndex];
-    const exerciseName = exercise?.exercise || exercise?.name || 'Unknown Exercise';
-    
-    
+    const exerciseName = getLoggedExerciseName(exerciseIndex, setData);
+
+    console.log(`📝 [HISTORY] Saving set under "${exerciseName}"`);
+
+
     // Load existing history
     const history = await WorkoutStorage.loadWorkoutHistory();
     
@@ -855,15 +874,14 @@ export default function WorkoutLogScreenAdapter() {
   };
 
   // Remove set from workout history when uncompleted
-  const removeSetFromHistory = async (exerciseIndex: number, setIndex: number) => {
+  const removeSetFromHistory = async (exerciseIndex: number, setIndex: number, setData?: SetData) => {
     // Use local date instead of UTC to match user's timezone
     const now = new Date();
     const currentDate = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
-    
+
     // Get the exercise name
-    const exercise = exercises[exerciseIndex];
-    const exerciseName = exercise?.exercise || exercise?.name || 'Unknown Exercise';
-    
+    const exerciseName = getLoggedExerciseName(exerciseIndex, setData);
+
     // Load existing history
     const history = await WorkoutStorage.loadWorkoutHistory();
     
