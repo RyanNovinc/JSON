@@ -69,19 +69,19 @@ const LEANNESS_OPTIONS: Array<{
   {
     pct: 10,
     icon: 'flash-outline',
-    title: 'Very lean',
+    title: 'Very lean (around 10%, an athletic floor)',
     subtitle: 'Competition-ready. Visible abs and definition.',
   },
   {
     pct: 13,
     icon: 'fitness-outline',
-    title: 'Athletic',
+    title: 'Athletic (around 12 to 15%)',
     subtitle: 'Lean and defined. Visible abs in good lighting.',
   },
   {
     pct: 17,
     icon: 'heart-outline',
-    title: 'Fit and healthy',
+    title: 'Fit and healthy (around 16 to 19%)',
     subtitle: 'Active, healthy look. Light definition.',
   },
   {

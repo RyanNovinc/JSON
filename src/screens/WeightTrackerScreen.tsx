@@ -11,7 +11,15 @@ import {
   Image,
   Modal,
 } from 'react-native';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Line, Circle } from 'react-native-svg';
+import Svg, {
+  Path,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+  Line,
+  Circle,
+  Text as SvgText,
+} from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -19,14 +27,35 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { WorkoutStorage } from '../utils/storage';
+import { loadGoalsProfile } from '../utils/goalsProfileStorage';
+import type { GoalsProfile } from '../utils/goalsProfile';
 import WeightEntrySheet from '../components/nutrition/WeightEntrySheet';
+import GoalEntrySheet from '../components/nutrition/GoalEntrySheet';
 
 /**
- * WeightTrackerScreen — v2.
+ * WeightTrackerScreen — v3.
  *
- * Goal: a proper progress dashboard, not a hero-number screensaver.
+ * v3: goal-centric hero.
+ *   1. Goal moved into the hero card. Current + goal read as a pair, with
+ *      a start → goal progress track between them: % complete rides the
+ *      marker, remaining distance sits on the right (reuses goalGap).
+ *   2. Pace / ETA / 7-day avg folded into the hero as a mini-stat row.
+ *      The standalone stats row is gone. Entries count only shows in the
+ *      no-goal state (the Recent list already communicates it).
+ *   3. The goal block (and the "Set a goal" pill) opens GoalEntrySheet:
+ *      goal weight + BF% get edited in place — no bounce out to the
+ *      questionnaire. The sheet writes GoalsProfile, the same store the
+ *      questionnaire reads, so the two stay in sync with zero extra
+ *      plumbing.
+ *   4. The track's start anchor prefers goalProfile.startWeightKg, which
+ *      GoalEntrySheet snapshots whenever the goal weight is set or
+ *      changed. Falls back to the oldest logged entry for goals that
+ *      predate the snapshot.
+ *   5. Recomp-style targets (start ≈ goal) get the gap pill instead of a
+ *      meaningless track.
+ *   6. Sparkline gained a small "GOAL <x>" label on the dashed line.
  *
- * What changed vs. v1:
+ * What changed vs. v1 (the v2 pass):
  *   1. Hero number replaced with current weight + delta + sparkline chart
  *      and three stat cards (7-day avg / weekly pace / change since start).
  *   2. Entry flow extracted into WeightEntrySheet — same component used
@@ -70,6 +99,13 @@ interface WeightEntry {
   photos?: ProgressPhoto[];
 }
 
+// GoalsProfile doesn't declare startWeightKg yet (add it to the type when
+// convenient). GoalEntrySheet snapshots it whenever the goal weight is
+// set or changed; the questionnaire should do the same where it writes
+// goalWeightKg. This screen reads the field defensively and falls back
+// to the oldest logged entry for goals that predate the snapshot.
+type GoalsProfileMaybeStart = GoalsProfile & { startWeightKg?: number | null };
+
 // ---------- Helpers ----------
 
 // Convert any weight to kg for cross-unit math. Storage allows users
@@ -77,6 +113,10 @@ interface WeightEntry {
 function toKg(weight: number, unit: 'kg' | 'lbs'): number {
   return unit === 'lbs' ? weight * 0.453592 : weight;
 }
+
+// Within this margin, "current" and "goal" read as the same weight —
+// avoids showing "0.1 kg to go" as if it were a meaningful gap.
+const AT_GOAL_THRESHOLD_KG = 0.5;
 
 function formatDate(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date;
@@ -106,6 +146,13 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// RN's DimensionValue is a `${number}%` template-literal type, which a
+// computed template string doesn't satisfy on its own. Keeps call sites
+// tidy for the progress track's percentage positioning.
+function pctString(n: number): `${number}%` {
+  return `${n}%` as `${number}%`;
+}
+
 // ---------- Range selector ----------
 
 type Range = '1M' | '3M' | '6M' | 'ALL';
@@ -124,6 +171,13 @@ interface SparklineProps {
   color: string;
   width: number;
   height: number;
+  /** Goal weight in kg, if GoalsProfile has one set. Extends the chart's
+   * y-range so the dashed goal line is always visible, even when the
+   * goal sits outside the plotted data's min/max. */
+  goalWeightKg?: number | null;
+  /** Display-unit goal value (already converted), rendered as a small
+   * label on the dashed goal line so the line reads as the goal. */
+  goalLabel?: string | null;
 }
 
 /**
@@ -131,7 +185,7 @@ interface SparklineProps {
  * Uses linear interpolation between points — entries are typically
  * weekly-ish so a smooth curve would over-promise on precision.
  */
-function Sparkline({ entries, color, width, height }: SparklineProps) {
+function Sparkline({ entries, color, width, height, goalWeightKg, goalLabel }: SparklineProps) {
   if (entries.length < 2) return null;
 
   // Sort oldest-first for chronological plotting
@@ -140,8 +194,12 @@ function Sparkline({ entries, color, width, height }: SparklineProps) {
   );
 
   const values = sorted.map((e) => toKg(e.weight, e.unit));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (goalWeightKg != null) {
+    min = Math.min(min, goalWeightKg);
+    max = Math.max(max, goalWeightKg);
+  }
   const range = max - min || 1;
 
   const padX = 4;
@@ -165,6 +223,11 @@ function Sparkline({ entries, color, width, height }: SparklineProps) {
 
   const last = points[points.length - 1];
 
+  // Goal reference line — y is derived the same way as data points, off
+  // the (possibly goal-extended) min/max, so it's always on-chart.
+  const goalY =
+    goalWeightKg != null ? padY + ((max - goalWeightKg) / range) * chartH : null;
+
   return (
     <Svg width={width} height={height}>
       <Defs>
@@ -187,6 +250,35 @@ function Sparkline({ entries, color, width, height }: SparklineProps) {
           strokeDasharray="2 3"
         />
       ))}
+
+      {/* Goal reference line */}
+      {goalY != null && (
+        <Line
+          x1={0}
+          y1={goalY}
+          x2={width}
+          y2={goalY}
+          stroke={color}
+          strokeWidth={1.5}
+          strokeOpacity={0.55}
+          strokeDasharray="5 4"
+        />
+      )}
+
+      {/* Goal label — flips below the line when the line hugs the top edge */}
+      {goalY != null && goalLabel != null && (
+        <SvgText
+          x={width - 4}
+          y={goalY < 16 ? goalY + 11 : goalY - 4}
+          textAnchor="end"
+          fontSize={8}
+          fontWeight="600"
+          fill={color}
+          fillOpacity={0.8}
+        >
+          {`GOAL ${goalLabel}`}
+        </SvgText>
+      )}
 
       <Path d={areaPath} fill="url(#weightGrad)" />
       <Path
@@ -291,6 +383,8 @@ export default function WeightTrackerScreen() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<Range>('1M');
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [goalSheetVisible, setGoalSheetVisible] = useState(false);
+  const [goalProfile, setGoalProfile] = useState<GoalsProfile | null>(null);
 
   // History detail view (replaces the old standalone history screen)
   const [detailEntry, setDetailEntry] = useState<WeightEntry | null>(null);
@@ -316,16 +410,89 @@ export default function WeightTrackerScreen() {
     }
   }, []);
 
+  // GoalsProfile is the single source of truth for the goal. This screen
+  // reads it for display; edits go through GoalEntrySheet below, which
+  // writes the same store the questionnaire reads — that IS the sync.
+  const loadGoal = useCallback(async () => {
+    try {
+      const profile = await loadGoalsProfile();
+      setGoalProfile(profile);
+    } catch (e) {
+      console.error('WeightTracker loadGoal failed', e);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadHistory();
-    }, [loadHistory])
+      loadGoal();
+    }, [loadHistory, loadGoal])
   );
 
   // ---------- Derived stats ----------
 
   const latest = history[0];
   const displayUnit: 'kg' | 'lbs' = latest?.unit ?? 'kg';
+
+  // A missing or zero goalWeightKg means "no goal set", not a real target.
+  const goalWeightKg =
+    goalProfile?.goalWeightKg != null && goalProfile.goalWeightKg > 0
+      ? goalProfile.goalWeightKg
+      : null;
+  const hasGoal = goalWeightKg != null;
+
+  const goalDisplay = useMemo(() => {
+    if (goalWeightKg == null) return null;
+    return displayUnit === 'lbs' ? goalWeightKg / 0.453592 : goalWeightKg;
+  }, [goalWeightKg, displayUnit]);
+
+  // Start anchor for the progress track. Prefers the snapshot that
+  // GoalEntrySheet writes when a goal is set/changed; falls back to the
+  // first-ever entry for goals that predate the snapshot.
+  const startWeightKg = useMemo(() => {
+    const snap = (goalProfile as GoalsProfileMaybeStart | null)?.startWeightKg;
+    if (snap != null && snap > 0) return snap;
+    if (history.length > 0) {
+      const first = history[history.length - 1];
+      return toKg(first.weight, first.unit);
+    }
+    return null;
+  }, [goalProfile, history]);
+
+  const startDisplay = useMemo(() => {
+    if (startWeightKg == null) return null;
+    return displayUnit === 'lbs' ? startWeightKg / 0.453592 : startWeightKg;
+  }, [startWeightKg, displayUnit]);
+
+  // 0..1 progress along start → goal, clamped so overshoot and pre-start
+  // noise don't break the bar. Null when there's no goal, no start, or
+  // start ≈ goal (recomp-style targets render the gap pill instead of a
+  // meaningless track).
+  const goalProgress = useMemo(() => {
+    if (!latest || goalWeightKg == null || startWeightKg == null) return null;
+    const total = goalWeightKg - startWeightKg;
+    if (Math.abs(total) < 0.25) return null;
+    const done = toKg(latest.weight, latest.unit) - startWeightKg;
+    return Math.max(0, Math.min(1, done / total));
+  }, [latest, goalWeightKg, startWeightKg]);
+
+  // Direction-aware gap to goal — mirrors totalDelta's unit-conversion
+  // pattern. "At goal" within a small threshold rather than a precise
+  // zero, since scale noise makes exact matches unrealistic. Doubles as
+  // the progress track's right-hand label.
+  const goalGap = useMemo(() => {
+    if (!latest || goalWeightKg == null) return null;
+    const currentKg = toKg(latest.weight, latest.unit);
+    const diffKg = currentKg - goalWeightKg; // > 0 above goal, < 0 below goal
+    if (Math.abs(diffKg) <= AT_GOAL_THRESHOLD_KG) {
+      return { text: 'At goal', direction: 'at' as const };
+    }
+    const absDisplay =
+      displayUnit === 'lbs' ? Math.abs(diffKg) / 0.453592 : Math.abs(diffKg);
+    return diffKg > 0
+      ? { text: `${absDisplay.toFixed(1)} ${displayUnit} above goal`, direction: 'above' as const }
+      : { text: `${absDisplay.toFixed(1)} ${displayUnit} to go`, direction: 'below' as const };
+  }, [latest, goalWeightKg, displayUnit]);
 
   // Difference since the very first entry (in whichever unit the latest
   // entry is in)
@@ -339,6 +506,25 @@ export default function WeightTrackerScreen() {
       displayUnit === 'lbs' ? diffKg / 0.453592 : diffKg;
     return { value, positive: diffKg > 0 };
   }, [history, displayUnit, latest]);
+
+  // Short-horizon delta for the hero pill: change across entries in the
+  // last 7 days. The track already communicates change-since-start, so
+  // the pill carries the fresher signal; falls back to totalDelta when
+  // there isn't enough recent data.
+  const weekDelta = useMemo(() => {
+    if (!latest || history.length < 2) return null;
+    const latestMs = new Date(latest.date).getTime();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const recent7 = history.filter(
+      (e) => latestMs - new Date(e.date).getTime() <= weekMs
+    );
+    if (recent7.length < 2) return null;
+    const oldest = recent7[recent7.length - 1];
+    const diffKg =
+      toKg(latest.weight, latest.unit) - toKg(oldest.weight, oldest.unit);
+    const value = displayUnit === 'lbs' ? diffKg / 0.453592 : diffKg;
+    return { value, positive: diffKg > 0 };
+  }, [history, latest, displayUnit]);
 
   // 7-day rolling average and weekly pace (kg/week, displayed in user's unit)
   const stats = useMemo(() => {
@@ -387,13 +573,31 @@ export default function WeightTrackerScreen() {
     return {
       avg7: inDisplay(avg7),
       pace: inDisplay(pace),
+      paceKg: pace,
     };
   }, [history, displayUnit]);
+
+  // Reframe pace as "N weeks to goal" only when it's honest: pace must be
+  // nonzero AND moving in the direction the goal actually requires. A
+  // zero pace, or progress moving away from goal, keeps the raw pace
+  // stat instead of inventing an ETA.
+  const goalEtaWeeks = useMemo(() => {
+    if (!latest || goalWeightKg == null || !stats?.paceKg) return null;
+    const currentKg = toKg(latest.weight, latest.unit);
+    const remainingKg = goalWeightKg - currentKg; // > 0 need to gain, < 0 need to lose
+    if (Math.abs(remainingKg) <= AT_GOAL_THRESHOLD_KG) return null;
+    const sameDirection = Math.sign(stats.paceKg) === Math.sign(remainingKg);
+    if (!sameDirection) return null;
+    return Math.max(1, Math.round(Math.abs(remainingKg / stats.paceKg)));
+  }, [latest, goalWeightKg, stats]);
 
   const rangedEntries = useMemo(
     () => filterByRange(history, range),
     [history, range]
   );
+
+  // The hero pill prefers the 7-day delta; falls back to since-start.
+  const heroPill = weekDelta ?? totalDelta;
 
   // ---------- Handlers ----------
 
@@ -617,35 +821,235 @@ export default function WeightTrackerScreen() {
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
           >
-            {/* Current weight + delta */}
-            <View style={styles.heroBlock}>
-              <Text style={styles.heroLabel}>Current</Text>
-              <View style={styles.heroRow}>
-                <Text style={styles.heroValue}>
-                  {latest.weight.toFixed(1)}
-                </Text>
-                <Text style={styles.heroUnit}>{latest.unit}</Text>
+            {/* Hero card: current + goal + progress track + goal stats */}
+            <View style={styles.heroCard}>
+              <View style={styles.heroTop}>
+                <View style={styles.heroLeft}>
+                  <Text style={styles.heroLabel}>Current</Text>
+                  <View style={styles.heroRow}>
+                    <Text style={styles.heroValue}>
+                      {latest.weight.toFixed(1)}
+                    </Text>
+                    <Text style={styles.heroUnit}>{latest.unit}</Text>
+                  </View>
+                  <View style={styles.heroMeta}>
+                    {heroPill && (
+                      <View
+                        style={[
+                          styles.deltaPill,
+                          { backgroundColor: hexToRgba(themeColor, 0.1) },
+                        ]}
+                      >
+                        <Ionicons
+                          name={heroPill.positive ? 'trending-up' : 'trending-down'}
+                          size={12}
+                          color={themeColor}
+                        />
+                        <Text style={[styles.deltaText, { color: themeColor }]}>
+                          {heroPill.positive ? '+' : ''}
+                          {heroPill.value.toFixed(1)}
+                          {weekDelta ? ' this wk' : ` ${displayUnit}`}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={styles.heroSub}>{formatRelative(latest.date)}</Text>
+                  </View>
+                </View>
+
+                {/* Goal — tap to edit in place via GoalEntrySheet. */}
+                {hasGoal && (
+                  <TouchableOpacity
+                    style={styles.goalSide}
+                    onPress={() => setGoalSheetVisible(true)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit goal"
+                  >
+                    <View style={styles.goalLabelRow}>
+                      <Ionicons name="flag-outline" size={12} color="#71717a" />
+                      <Text style={styles.microLabel}>Goal</Text>
+                      <Ionicons name="chevron-forward" size={12} color="#52525b" />
+                    </View>
+                    <View style={styles.goalNumRow}>
+                      <Text style={[styles.goalValue, { color: themeColor }]}>
+                        {goalDisplay!.toFixed(1)}
+                      </Text>
+                      <Text style={styles.goalUnit}>{displayUnit}</Text>
+                    </View>
+                    {goalProfile?.goalBodyFatPct != null && (
+                      <View
+                        style={[
+                          styles.bfChip,
+                          { borderColor: hexToRgba(themeColor, 0.3) },
+                        ]}
+                      >
+                        <Text style={[styles.bfChipText, { color: themeColor }]}>
+                          {goalProfile.goalBodyFatPct}% BF target
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
-              <View style={styles.heroMeta}>
-                {totalDelta && (
-                  <View
+
+              {hasGoal && goalProgress != null ? (
+                // Progress track: start → goal, % on the marker,
+                // remaining on the right (goalGap doubles as the label).
+                <View style={styles.trackArea}>
+                  <Text
                     style={[
-                      styles.deltaPill,
-                      { backgroundColor: hexToRgba(themeColor, 0.1) },
+                      styles.trackPct,
+                      {
+                        color: themeColor,
+                        left: pctString(
+                          Math.min(Math.max(goalProgress, 0.07), 0.93) * 100
+                        ),
+                      },
                     ]}
                   >
-                    <Ionicons
-                      name={totalDelta.positive ? 'trending-up' : 'trending-down'}
-                      size={12}
-                      color={themeColor}
+                    {Math.round(goalProgress * 100)}%
+                  </Text>
+                  <View style={styles.track}>
+                    <View
+                      style={[
+                        styles.trackFill,
+                        {
+                          width: pctString(goalProgress * 100),
+                          backgroundColor: themeColor,
+                        },
+                      ]}
                     />
-                    <Text style={[styles.deltaText, { color: themeColor }]}>
-                      {totalDelta.positive ? '+' : ''}
-                      {totalDelta.value.toFixed(1)} {displayUnit}
+                    <View
+                      style={[
+                        styles.trackMarker,
+                        {
+                          left: pctString(goalProgress * 100),
+                          backgroundColor: themeColor,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.trackLabels}>
+                    <Text style={styles.trackStart}>
+                      {startDisplay != null
+                        ? `${startDisplay.toFixed(1)} start`
+                        : ''}
+                    </Text>
+                    {goalGap && (
+                      <Text
+                        style={[
+                          styles.trackToGo,
+                          goalGap.direction === 'at' && { color: '#34d399' },
+                        ]}
+                      >
+                        {goalGap.text}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ) : hasGoal && goalGap ? (
+                // Start ≈ goal (recomp-style target): a track would be
+                // meaningless, so keep the gap pill.
+                <View
+                  style={[
+                    styles.goalGapPill,
+                    {
+                      backgroundColor:
+                        goalGap.direction === 'at'
+                          ? 'rgba(52, 211, 153, 0.12)'
+                          : hexToRgba(themeColor, 0.1),
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      goalGap.direction === 'at'
+                        ? 'checkmark-circle'
+                        : 'navigate-outline'
+                    }
+                    size={12}
+                    color={goalGap.direction === 'at' ? '#34d399' : themeColor}
+                  />
+                  <Text
+                    style={[
+                      styles.goalGapText,
+                      {
+                        color:
+                          goalGap.direction === 'at' ? '#34d399' : themeColor,
+                      },
+                    ]}
+                  >
+                    {goalGap.text}
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.setGoalPill}
+                  onPress={() => setGoalSheetVisible(true)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Set a goal"
+                >
+                  <Ionicons name="flag-outline" size={12} color={themeColor} />
+                  <Text style={[styles.setGoalText, { color: themeColor }]}>Set a goal</Text>
+                  <Ionicons name="chevron-forward" size={12} color={themeColor} />
+                </TouchableOpacity>
+              )}
+
+              <View style={styles.heroDivider} />
+
+              {/* Mini stats — replaces the old standalone stats row */}
+              <View style={styles.msRow}>
+                <View style={styles.msCell}>
+                  <Text style={styles.msLabel}>Pace</Text>
+                  <Text style={styles.msValue}>
+                    {stats?.pace != null
+                      ? `${stats.pace > 0 ? '+' : ''}${stats.pace.toFixed(2)}`
+                      : '—'}
+                    <Text style={styles.msUnit}>/wk</Text>
+                  </Text>
+                </View>
+                {hasGoal ? (
+                  <View style={[styles.msCell, styles.msCellCenter]}>
+                    <Text style={styles.msLabel}>To goal</Text>
+                    <Text
+                      style={styles.msValue}
+                      accessibilityLabel={
+                        goalEtaWeeks != null
+                          ? `About ${goalEtaWeeks} ${goalEtaWeeks === 1 ? 'week' : 'weeks'} to goal at current pace`
+                          : undefined
+                      }
+                    >
+                      {goalEtaWeeks != null ? `~${goalEtaWeeks}` : '—'}
+                      {goalEtaWeeks != null && (
+                        <Text style={styles.msUnit}>
+                          {' '}
+                          {goalEtaWeeks === 1 ? 'wk' : 'wks'}
+                        </Text>
+                      )}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.msCell, styles.msCellCenter]}>
+                    <Text style={styles.msLabel}>7-day avg</Text>
+                    <Text style={styles.msValue}>
+                      {stats?.avg7 != null ? stats.avg7.toFixed(1) : '—'}
                     </Text>
                   </View>
                 )}
-                <Text style={styles.heroSub}>{formatRelative(latest.date)}</Text>
+                {hasGoal ? (
+                  <View style={[styles.msCell, styles.msCellRight]}>
+                    <Text style={styles.msLabel}>7-day avg</Text>
+                    <Text style={styles.msValue}>
+                      {stats?.avg7 != null ? stats.avg7.toFixed(1) : '—'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.msCell, styles.msCellRight]}>
+                    <Text style={styles.msLabel}>Entries</Text>
+                    <Text style={styles.msValue}>{history.length}</Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -683,6 +1087,8 @@ export default function WeightTrackerScreen() {
                     color={themeColor}
                     width={290}
                     height={110}
+                    goalWeightKg={goalWeightKg}
+                    goalLabel={goalDisplay != null ? goalDisplay.toFixed(1) : null}
                   />
                 ) : (
                   <View style={styles.chartEmpty}>
@@ -691,29 +1097,6 @@ export default function WeightTrackerScreen() {
                     </Text>
                   </View>
                 )}
-              </View>
-            </View>
-
-            {/* Stats row */}
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>7-day avg</Text>
-                <Text style={styles.statValue}>
-                  {stats?.avg7 != null ? stats.avg7.toFixed(1) : '—'}
-                </Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Pace</Text>
-                <Text style={styles.statValue}>
-                  {stats?.pace != null
-                    ? `${stats.pace > 0 ? '+' : ''}${stats.pace.toFixed(2)}`
-                    : '—'}
-                  <Text style={styles.statUnit}>/wk</Text>
-                </Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statLabel}>Entries</Text>
-                <Text style={styles.statValue}>{history.length}</Text>
               </View>
             </View>
 
@@ -818,6 +1201,14 @@ export default function WeightTrackerScreen() {
         onClose={() => setSheetVisible(false)}
         onSaved={() => loadHistory()}
       />
+
+      <GoalEntrySheet
+        visible={goalSheetVisible}
+        onClose={() => setGoalSheetVisible(false)}
+        onSaved={() => loadGoal()}
+        unit={displayUnit}
+        currentWeightKg={latest ? toKg(latest.weight, latest.unit) : null}
+      />
     </View>
   );
 }
@@ -847,13 +1238,29 @@ const styles = StyleSheet.create({
   // Scroll
   scroll: {
     paddingHorizontal: 16,
-    paddingTop: 18,
+    paddingTop: 16,
     paddingBottom: 100,
   },
 
-  // Hero block
-  heroBlock: {
-    marginBottom: 18,
+  // Hero card (current + goal + track + mini stats)
+  heroCard: {
+    backgroundColor: '#131316',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
+    marginBottom: 14,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  heroLeft: {
+    flex: 1,
+    paddingRight: 12,
   },
   heroLabel: {
     fontSize: 11,
@@ -863,6 +1270,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontWeight: '500',
   },
+  microLabel: {
+    fontSize: 10,
+    color: '#71717a',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    fontWeight: '600',
+  },
   heroRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -870,14 +1284,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   heroValue: {
-    fontSize: 44,
+    fontSize: 38,
     fontWeight: '600',
     color: '#ffffff',
     letterSpacing: -1,
-    lineHeight: 46,
+    lineHeight: 40,
   },
   heroUnit: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
     color: '#71717a',
   },
@@ -901,6 +1315,163 @@ const styles = StyleSheet.create({
   heroSub: {
     fontSize: 11,
     color: '#71717a',
+  },
+
+  // Goal side of the hero — display only, taps through to Goals & Stats
+  goalSide: {
+    alignItems: 'flex-end',
+  },
+  goalLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginBottom: 5,
+  },
+  goalNumRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  goalValue: {
+    fontSize: 22,
+    fontWeight: '600',
+    letterSpacing: -0.4,
+  },
+  goalUnit: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#71717a',
+  },
+  bfChip: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  bfChipText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+
+  // Progress track
+  trackArea: {
+    marginTop: 24,
+  },
+  trackPct: {
+    position: 'absolute',
+    top: -18,
+    width: 48,
+    marginLeft: -24,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  track: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#26262b',
+  },
+  trackFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 999,
+  },
+  trackMarker: {
+    position: 'absolute',
+    top: -4,
+    marginLeft: -7,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 3,
+    borderColor: '#0a0a0b',
+  },
+  trackLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 7,
+  },
+  trackStart: {
+    fontSize: 11,
+    color: '#71717a',
+  },
+  trackToGo: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#d4d4d8',
+  },
+
+  // Recomp fallback + no-goal pill
+  goalGapPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  goalGapText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  setGoalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+  },
+  setGoalText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Hero divider + mini stats row
+  heroDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#27272a',
+    marginTop: 14,
+    marginBottom: 11,
+  },
+  msRow: {
+    flexDirection: 'row',
+  },
+  msCell: {
+    flex: 1,
+  },
+  msCellCenter: {
+    alignItems: 'center',
+  },
+  msCellRight: {
+    alignItems: 'flex-end',
+  },
+  msLabel: {
+    fontSize: 10,
+    color: '#71717a',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  msValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  msUnit: {
+    fontSize: 10,
+    color: '#71717a',
+    fontWeight: '500',
   },
 
   // Chart card
@@ -939,40 +1510,6 @@ const styles = StyleSheet.create({
   chartEmptyText: {
     fontSize: 12,
     color: '#52525b',
-  },
-
-  // Stats
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 22,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#131316',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  statLabel: {
-    fontSize: 10,
-    color: '#71717a',
-    letterSpacing: 0.3,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    fontWeight: '500',
-  },
-  statValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  statUnit: {
-    fontSize: 10,
-    color: '#71717a',
-    fontWeight: '500',
   },
 
   // Recent
