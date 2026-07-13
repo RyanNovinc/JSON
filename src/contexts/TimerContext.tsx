@@ -20,9 +20,24 @@ if (Platform.OS === 'ios') {
 }
 import { DebugLogger } from '../components/DebugOverlay';
 
+/**
+ * A timer is in exactly one of four states. Read them from the flags; never infer
+ * "finished" from `targetTime <= 0`, which cannot tell a completed countdown apart
+ * from one that never started.
+ *
+ *   no timer   timer === null
+ *   active     isRunning (or isPaused), isFinished === false
+ *   finished   !isRunning && !isPaused && isFinished, timeElapsed === targetTime
+ *              (targetTime is PRESERVED, so the finished duration is still known;
+ *               remaining = targetTime - timeElapsed = 0, so it displays "0:00")
+ *   idle       !isRunning && !isPaused && !isFinished, timeElapsed === 0
+ *              (never started, or reset)
+ */
 export interface TimerState {
   isRunning: boolean;
   isPaused: boolean;
+  /** The countdown ran all the way out. Distinguishes "finished" from "never started". */
+  isFinished?: boolean;
   timeElapsed: number; // seconds elapsed
   targetTime: number; // target time in seconds (for countdown mode)
   startTime: Date | null;
@@ -227,13 +242,29 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
           parsed.pausedAt = new Date(parsed.pausedAt);
         }
         
+        // Timers persisted before isFinished existed have no such field. Default it to
+        // false: a legacy "zombie" (targetTime 0, elapsed 0) rehydrates as an idle timer
+        // and still displays 0:00, exactly as it did before.
+        parsed.isFinished = !!parsed.isFinished;
+
         // If timer was running, calculate elapsed time from background
         if (parsed.isRunning && !parsed.isPaused && parsed.startTime) {
           const now = new Date();
           const backgroundElapsed = Math.floor((now.getTime() - new Date(parsed.startTime).getTime()) / 1000);
-          parsed.timeElapsed = backgroundElapsed;
+
+          // A countdown that ran out while backgrounded comes back FINISHED, not running
+          // past its target. Without this it would rehydrate as running with an elapsed
+          // beyond targetTime, and the interval would have to re-discover the finish.
+          if (!parsed.isCountUp && parsed.targetTime > 0 && backgroundElapsed >= parsed.targetTime) {
+            parsed.timeElapsed = parsed.targetTime;
+            parsed.isRunning = false;
+            parsed.isPaused = false;
+            parsed.isFinished = true;
+          } else {
+            parsed.timeElapsed = backgroundElapsed;
+          }
         }
-        
+
         setTimer(parsed);
       }
     } catch (error) {
@@ -367,14 +398,18 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
           // Stop timer when countdown reaches 0
           if (remaining <= 0) {
             console.log('Countdown finished! Stopping timer.');
-            
-            // Keep Live Activity ID for proper cleanup by syncLiveActivity
-            return { 
-              ...prev, 
-              timeElapsed: 0, // Reset to 0
-              targetTime: 0,  // Reset to 0 so timer shows 0:00 cleanly
+
+            // The finished shape: targetTime is PRESERVED (so we still know what rest
+            // just elapsed, and TimerModal's restart button has a duration to reuse),
+            // and timeElapsed is driven to targetTime so every consumer's
+            // `max(0, targetTime - timeElapsed)` still renders a clean "0:00".
+            // Keep Live Activity ID for proper cleanup by syncLiveActivity.
+            return {
+              ...prev,
+              timeElapsed: prev.targetTime,
               isRunning: false,
               isPaused: false,
+              isFinished: true,
               // Don't clear liveActivityId here - let syncLiveActivity handle cleanup
             };
           }
@@ -421,6 +456,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     const newTimer: TimerState = {
       isRunning: true,
       isPaused: false,
+      isFinished: false,
       timeElapsed: 0,
       targetTime: targetSeconds,
       startTime: now,
@@ -445,29 +481,37 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const pauseTimer = () => {
-    setTimer(prev => prev ? {
-      ...prev,
-      isRunning: false,
-      isPaused: true,
-      pausedAt: new Date(),
-    } : null);
+    setTimer(prev => {
+      // Only a running timer can be paused. Without this, pausing a finished timer
+      // would set isPaused while isFinished stayed true — a contradictory state that
+      // reads as "active" to every isRunning||isPaused consumer.
+      if (!prev || !prev.isRunning) return prev;
+
+      return {
+        ...prev,
+        isRunning: false,
+        isPaused: true,
+        pausedAt: new Date(),
+      };
+    });
   };
 
   const resumeTimer = () => {
     setTimer(prev => {
       if (!prev || !prev.isPaused || !prev.pausedAt || !prev.startTime) return prev;
-      
+
       // Calculate how long we were paused
       const now = new Date();
       const pauseDuration = now.getTime() - prev.pausedAt.getTime();
-      
+
       // Adjust the start time to account for the pause duration
       const newStartTime = new Date(prev.startTime.getTime() + pauseDuration);
-      
+
       return {
         ...prev,
         isRunning: true,
         isPaused: false,
+        isFinished: false, // running again — cannot be finished
         startTime: newStartTime,
         pausedAt: null,
       };
@@ -531,6 +575,8 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     }
     
     const now = new Date();
+    // The idle shape: not running, not paused, NOT finished, elapsed back to 0.
+    // targetTime is kept so the timer can simply be started again.
     setTimer(prev => prev ? {
       ...prev,
       timeElapsed: 0,
@@ -538,6 +584,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       pausedAt: null,
       isRunning: false,
       isPaused: false,
+      isFinished: false, // reset clears "finished" — this is idle, not completed
       countdownSoundPlayed: false, // Reset countdown sound flag
       liveActivityId: undefined, // Clear Live Activity ID
     } : null);
@@ -552,6 +599,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       setTimer({
         isRunning: false,
         isPaused: false,
+        isFinished: false,
         timeElapsed: 0,
         targetTime: timerSettings.countUp ? 0 : seconds,
         startTime: null,
@@ -562,27 +610,38 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       });
       return;
     }
-    
+
     console.log(`Timer mode: ${timerSettings.countUp ? 'Count Up' : 'Countdown'}, Target: ${timer.targetTime}`);
-    
+
     if (timerSettings.countUp) {
       // In count up mode, adjust the start time to appear as if more time has elapsed
       setTimer(prev => prev ? {
         ...prev,
+        isFinished: false,
         startTime: prev.startTime ? new Date(prev.startTime.getTime() - seconds * 1000) : prev.startTime,
         timeElapsed: Math.min(3600, prev.timeElapsed + seconds), // Max 1 hour
       } : null);
     } else {
-      // In countdown mode, add to target time AND reset countdown sound flag
-      const newTargetTime = timer.targetTime + seconds;
-      
-      // If timer is stopped (not running, not paused), reset elapsed time so it starts fresh
-      const shouldResetElapsed = !timer.isRunning && !timer.isPaused;
-      
+      // Read the state explicitly. "finished" and "idle" both satisfy
+      // !isRunning && !isPaused, but they are different states and want different maths.
+      const isFinished = !!timer.isFinished;
+      const isIdle = !timer.isRunning && !timer.isPaused && !isFinished;
+
+      // Adding time to a FINISHED rest means "give me `seconds` more", not
+      // targetTime + seconds — that rest is over. So the new countdown is exactly
+      // `seconds` long. (The old code did this by accident: finishing zeroed
+      // targetTime, so 0 + 30 = 30. Preserving targetTime would have silently turned
+      // a +30s tap on a finished 90s rest into a 120s countdown.)
+      const newTargetTime = isFinished ? seconds : timer.targetTime + seconds;
+
+      // Finished and idle both start their countdown from zero elapsed.
+      const shouldResetElapsed = isFinished || isIdle;
+
       setTimer(prev => prev ? {
         ...prev,
         targetTime: newTargetTime,
         timeElapsed: shouldResetElapsed ? 0 : prev.timeElapsed,
+        isFinished: false, // there is time on the clock again
         countdownSoundPlayed: false, // Reset so sound can play again if we go back under 3s
       } : null);
     }
@@ -595,6 +654,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       setTimer({
         isRunning: false,
         isPaused: false,
+        isFinished: false,
         timeElapsed: 0,
         targetTime: 0,
         startTime: null,
@@ -605,30 +665,40 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       });
       return;
     }
-    
+
     if (timerSettings.countUp) {
       // In count up mode, adjust the start time to appear as if less time has elapsed
       setTimer(prev => prev ? {
         ...prev,
+        isFinished: false,
         startTime: prev.startTime ? new Date(prev.startTime.getTime() + seconds * 1000) : prev.startTime,
         timeElapsed: Math.max(0, prev.timeElapsed - seconds),
       } : null);
     } else {
+      // A finished countdown has nothing left to take away. Check the flag rather than
+      // inferring it from the arithmetic, which is what timeElapsed === targetTime
+      // would amount to.
+      if (timer.isFinished) {
+        console.log('Timer already finished, cannot subtract more time');
+        return;
+      }
+
       // In countdown mode, check current remaining time first
       const currentRemaining = timer.targetTime - timer.timeElapsed;
-      
+
       // If already at or below 0, don't allow further reduction
       if (currentRemaining <= 0) {
         console.log('Timer already at 0:00, cannot subtract more time');
         return;
       }
-      
+
       // Calculate new target time, but don't let it go below current elapsed time
       const newTargetTime = Math.max(timer.timeElapsed, timer.targetTime - seconds);
-      
+
       setTimer(prev => prev ? {
         ...prev,
         targetTime: newTargetTime,
+        isFinished: false,
         countdownSoundPlayed: false, // Reset so sound can play again
       } : null);
     }
@@ -689,10 +759,13 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       }
       lastSyncTimeRef.current = syncStartTime;
 
-      // Only sync Live Activity for running countdown timers
-      if (!timer || timer.isCountUp || !timer.isRunning || timer.isPaused || !timer.startTime || timer.targetTime <= 0) {
-        const reason = !timer ? 'no timer' : 
+      // Only sync Live Activity for running countdown timers. `isFinished` is now the
+      // explicit signal — `targetTime <= 0` is kept only to catch a zero-length target,
+      // no longer to infer completion (a finished timer preserves its targetTime).
+      if (!timer || timer.isCountUp || timer.isFinished || !timer.isRunning || timer.isPaused || !timer.startTime || timer.targetTime <= 0) {
+        const reason = !timer ? 'no timer' :
                      timer.isCountUp ? 'count up mode' :
+                     timer.isFinished ? 'countdown finished' :
                      !timer.isRunning ? 'timer not running' :
                      timer.isPaused ? 'timer paused' :
                      !timer.startTime ? 'no start time' :
