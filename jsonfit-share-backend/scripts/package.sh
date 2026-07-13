@@ -5,6 +5,27 @@
 # Run `sam build` first. This does NOT deploy anything — it only writes dist/.
 #
 # ---------------------------------------------------------------------------
+# Slim zips: node_modules is deliberately EXCLUDED
+# ---------------------------------------------------------------------------
+# The handlers require @aws-sdk/client-dynamodb and @aws-sdk/lib-dynamodb, but we
+# do not ship them. The Lambda Node.js runtime provides AWS SDK v3 on the module
+# path (/var/runtime/node_modules), and that is what the live functions already
+# resolve against today — they are deployed as 2,168 and 1,072 byte zips with no
+# node_modules at all, and they work.
+#
+# So this is not a new bet: it is the existing, proven dependency model. Bundling
+# the SDK would add ~2.8MB and a slower cold start, and would be a change to the
+# dependency model riding along with a behaviour change. Kept separate on purpose.
+#
+# sam build still installs node_modules into .aws-sam/build (it needs the manifest
+# to resolve the tree); we simply don't ship it.
+#
+# CAVEAT: if the runtime is ever bumped, re-confirm the target runtime still ships
+# the AWS SDK before deploying a slim zip. nodejs18/20/22 do. Do not assume for
+# anything newer — AWS has signalled dropping the bundled SDK from future runtimes.
+# If it is ever absent, the fix is to stop excluding node_modules below.
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Why the shim
 # ---------------------------------------------------------------------------
 # Both live functions are configured with `Handler: index.handler` — they were
@@ -66,6 +87,10 @@ package() {
   # this function doesn't use, plus the vestigial per-function manifests.
   rm -rf "${stage:?}/$other"
   rm -f "$stage/$entry/package.json"
+
+  # Ship slim: the AWS SDK comes from the runtime, not from us. See header.
+  rm -rf "${stage:?}/node_modules"
+  rm -f "$stage/package.json"
 
   # The shim that keeps `Handler: index.handler` valid — see header.
   cat > "$stage/index.js" <<EOF

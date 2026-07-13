@@ -123,28 +123,46 @@ the header comment in that file.
 Both Lambdas are configured with `Handler: index.handler`, so the zip must expose a
 `handler` export from `index.js` at the **root** of the archive.
 
+The zips are **slim** (~8 KB): `node_modules` is not shipped. The AWS SDK comes from the
+Lambda runtime, which is how the live functions already run today. See `scripts/package.sh`.
+
+**Deploy `getShare` FIRST.** Order is not optional. The new `getShare` reads both the old
+plaintext `data` items and the new gzip `blob` items; the new `createShare` writes `blob`.
+If `createShare` goes first it immediately starts writing blobs the live `getShare` cannot
+read, and every new share link fails to import until `getShare` catches up.
+
 ```bash
 cd jsonfit-share-backend
-sam build                      # produces .aws-sam/build/{CreateShareFunction,GetShareFunction}
-                               # each with node_modules/ and shared/shareLimits.js
+sam build                # -> .aws-sam/build/{CreateShareFunction,GetShareFunction}
+./scripts/package.sh     # -> dist/*.zip  (slim, with the root index.js shim)
 
-# Package each function (see scripts/package.sh — it adds the root index.js shim
-# that keeps Handler: index.handler valid with the nested bundle layout).
-./scripts/package.sh
-
-aws lambda update-function-code \
-  --function-name jsonfit-createShare \
-  --zip-file fileb://dist/jsonfit-createShare.zip \
-  --region ap-southeast-2
-
+# 1. getShare FIRST — backward compatible, reads old AND new items
 aws lambda update-function-code \
   --function-name jsonfit-getShare \
   --zip-file fileb://dist/jsonfit-getShare.zip \
   --region ap-southeast-2
+
+# 2. then createShare — starts writing compressed blobs
+aws lambda update-function-code \
+  --function-name jsonfit-createShare \
+  --zip-file fileb://dist/jsonfit-createShare.zip \
+  --region ap-southeast-2
 ```
 
-No function *configuration* change is required — the shim keeps `index.handler` valid, so
-there is no window where the handler and the code disagree.
+Then ship the app. Both Lambda steps are safe against the currently-released app, which
+still POSTs uncompressed JSON — the new `createShare` accepts unmarked bodies. Do **not**
+ship the app before step 2: the old `createShare` would store the `{enc, payload}` envelope
+verbatim as the share data and corrupt every share.
+
+No function *configuration* change is required — the shim keeps `Handler: index.handler`
+valid, so a single `update-function-code` call swaps each function atomically and there is
+never a window where the handler and the code disagree.
+
+> **Runtime note:** both functions run `nodejs20.x`, which AWS deprecated on 2026-04-30 and
+> blocked for updates from 2026-07-01. `update-function-code` may be rejected outright. It
+> fails cleanly (nothing is applied), so it is safe to try. If it is rejected, bump the
+> runtime first — and re-confirm the target runtime still provides the AWS SDK before
+> deploying a slim zip.
 
 After deploying, CloudFormation drifts further from reality. That is already true today and
 is tracked in `deployed/README.md`. Reconciling the stack is a separate piece of work and
