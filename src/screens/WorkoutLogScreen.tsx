@@ -754,21 +754,76 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     });
   };
 
+  // ── Prescribed reps for the current exercise ─────────────────────
+  // Same derivation SetsTable uses for the greyed placeholder, lifted here so
+  // both completion paths can commit it. Reuses parseTargetReps (hoisted below).
+  const currentTargetReps = useMemo(() => {
+    const weeklyReps =
+      effectiveCurrentExercise?.reps_weekly?.[String(currentWeek)] ?? effectiveCurrentExercise?.reps;
+    return weeklyReps ? parseTargetReps(String(weeklyReps), currentSets.length) : [];
+  }, [effectiveCurrentExercise, currentWeek, currentSets.length]);
+
+  // A set completed with blank reps is marked done but silently skips history,
+  // the rest timer and the superset transition (the adapter gates all three on
+  // `weight && reps`). The user saw the prescription as a placeholder and assumed
+  // it was logged, so commit it for them — but only when it is unambiguous.
+  const [pendingCompletion, setPendingCompletion] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
+
+  const completeSet = useCallback((exerciseIndex: number, setIndex: number) => {
+    const set = allSetsData[exerciseIndex]?.[setIndex];
+
+    // Un-completing, no set, or reps the user actually typed: never autofill.
+    if (!set || set.completed || set.reps?.trim()) {
+      onSetComplete(exerciseIndex, setIndex);
+      return;
+    }
+
+    // Only the focused exercise has a target array in scope.
+    const target = exerciseIndex === currentIndex ? currentTargetReps[setIndex]?.trim() : undefined;
+
+    // Defensive: a user-imported program can prescribe a range ("8-12"). We will
+    // not guess which end the user hit — leave reps blank rather than invent one.
+    if (!target || !/^\d+$/.test(target) || parseInt(target, 10) <= 0) {
+      onSetComplete(exerciseIndex, setIndex);
+      return;
+    }
+
+    // Write the reps, then defer completion — see the effect below for why.
+    onSetUpdate(exerciseIndex, setIndex, 'reps', target);
+    setPendingCompletion({ exerciseIndex, setIndex });
+  }, [allSetsData, currentIndex, currentTargetReps, onSetUpdate, onSetComplete]);
+
+  // The adapter's handleSetComplete reads `allSetsData` from its render closure
+  // rather than via a functional update, so completing in the same tick as the
+  // reps write would read reps:'' — skipping history/timer/superset — and its
+  // own setAllSetsData would then clobber the value we just wrote. Waiting for
+  // the updated `allSetsData` prop to arrive means the onSetComplete we call is
+  // the one closing over the state that already contains the reps.
+  useEffect(() => {
+    if (!pendingCompletion) return;
+    const { exerciseIndex, setIndex } = pendingCompletion;
+    const set = allSetsData[exerciseIndex]?.[setIndex];
+
+    if (!set || set.completed) {
+      setPendingCompletion(null);
+      return;
+    }
+    if (!set.reps) return; // autofill not visible yet — wait for the next render
+
+    setPendingCompletion(null);
+    onSetComplete(exerciseIndex, setIndex);
+  }, [pendingCompletion, allSetsData, onSetComplete]);
+
   // ── "Log set" from the keyboard accessory ────────────────────────
   // Completes the focused set (same as tapping the circle) and advances
   // focus to the next set's weight field; dismisses on the last set.
-  //
-  // NOTE: this mirrors tapping the ✓ circle exactly (onSetComplete only).
-  // If your parent does NOT already start the rest timer on completion,
-  // uncomment the startRestTimer line below.
   const handleLogFocusedSet = () => {
     if (!focusedSet) {
       Keyboard.dismiss();
       return;
     }
     const { setIndex } = focusedSet;
-    onSetComplete(currentIndex, setIndex);
-    // startRestTimer(currentIndex, setIndex);
+    completeSet(currentIndex, setIndex);
 
     const nextIndex = setIndex + 1;
     setTimeout(() => {
@@ -1570,7 +1625,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             currentWeek={currentWeek}
             previousSets={currentPreviousSets}
             onUpdate={onSetUpdate}
-            onComplete={onSetComplete}
+            onComplete={completeSet}
             onAdd={onSetAdd}
             onRemove={onSetRemove}
             onSetTapWhenNotStarted={onSetTapWhenNotStarted}
