@@ -1,0 +1,11 @@
+{
+  "name": "jsonfit-share-api",
+  "version": "1.0.0",
+  "description": "Lambda functions for JSON.fit share links (createShare, getShare)",
+  "private": true,
+  "comment": "SAM reads the manifest from the CodeUri root, which is this directory (both functions build from src/ so they can share shared/shareLimits.js). Without this file 'sam build' prints 'package.json file not found' and installs nothing, leaving the bundle dependent on whatever AWS SDK the runtime happens to provide. The per-function package.json files are now vestigial.",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.658.0",
+    "@aws-sdk/lib-dynamodb": "^3.658.0"
+  }
+}
