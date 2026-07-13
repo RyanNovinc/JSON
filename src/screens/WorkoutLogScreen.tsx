@@ -55,11 +55,19 @@ import {
   Dimensions,
   Pressable,
   Alert,
-  Image,
   Modal,
   Platform,
   Keyboard,
 } from 'react-native';
+// expo-image, not RN's Image. RN's offers exactly two behaviours when `source` changes and
+// both are broken for a pager: keyed, it remounts the native view, which has no decoded bitmap
+// and paints BLANK; unkeyed, it retains the view and keeps painting the PREVIOUS source's
+// bitmap until the new one decodes. There is no third option, which is why 2e2514b / 27f8acb /
+// 8aa3c66 just oscillated between the two flashes. expo-image's recyclingKey is the third
+// option: it resets the view to blank the moment the identity changes, so it can never show a
+// stale frame, and prefetching means there is nothing to wait for.
+import { Image } from 'expo-image';
+import { Asset } from 'expo-asset';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -762,6 +770,35 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
         await Promise.all(promises);
         setMiniCardImages(newImagesMap);
+
+        // Warm every frame now, while the user is reading the first exercise — both the start
+        // AND end frames, since the cycling animation swaps between them, and every alternative,
+        // since one can be selected at any time.
+        //
+        // This is what makes recyclingKey free: it blanks the view on an exercise change, so
+        // without a warm cache that blank would be visible for exactly as long as the load
+        // takes. Piggybacks on the resolve pass above rather than walking the list a second time.
+        //
+        // Asset.loadAsync, NOT Image.prefetch. expo-image's prefetch takes URL strings; these
+        // frames are require()'d bundled modules (see exerciseImages.ts), so prefetch would
+        // silently do nothing with them. Asset.loadAsync is the API for bundled assets — it is
+        // also what src/utils/imagePreloader.ts uses. Any frame that IS a string URI still goes
+        // through prefetch.
+        const frames = Array.from(newImagesMap.values())
+          .filter((pair): pair is { start: any; end: any } => !!pair)
+          .flatMap((pair) => [pair.start, pair.end])
+          .filter(Boolean);
+
+        const bundled = frames.filter((f) => typeof f !== 'string');
+        const remote = frames.filter((f): f is string => typeof f === 'string');
+
+        await Promise.allSettled([
+          bundled.length ? Asset.loadAsync(bundled) : Promise.resolve(),
+          remote.length ? Image.prefetch(remote, 'memory-disk') : Promise.resolve(),
+        ]);
+        console.log(
+          `🖼️ [WORKOUT] Warmed ${bundled.length} bundled + ${remote.length} remote exercise frames`,
+        );
       };
 
       loadAllImages();
@@ -1704,11 +1741,21 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                   // the card no longer renders an exercise it is about to change its mind
                   // about. The disease is gone; this was still taking the medicine.
                   <Image
+                    // THE fix. recyclingKey resets this view to blank the instant the exercise
+                    // identity changes, so the previous exercise's bitmap can never survive a
+                    // swipe — and it does NOT reset on a mere source swap, so the 1s start/end
+                    // cycling still animates on a retained, already-decoded view.
+                    recyclingKey={exName}
                     source={typeof exImage === 'string' ? { uri: exImage } : exImage}
                     style={styles.fullScreenImage}
-                    resizeMode="contain"
-                    onLoad={() => {}}
-                    onError={(error) => {}}
+                    contentFit="contain"
+                    cachePolicy="memory-disk"
+                    // transition 0, deliberately. This one prop governs BOTH source changes, and
+                    // the cycling swaps every second: a crossfade there would dissolve the two
+                    // frames into each other and turn a crisp two-frame motion demo into a
+                    // mush. The swipe does not need it either — every frame is prefetched, so
+                    // the new image is already decoded in memory when recyclingKey flips.
+                    transition={0}
                   />
                 );
               } else if (imageResolved) {
@@ -2719,9 +2766,15 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
       <View style={styles.miniIcon}>
         {exerciseImages?.start ? (
           <Image
+            // The row is memo'd and its exercise never changes, so this never recycles — the
+            // key is here so the view can never be reused across two different exercises if
+            // the list is ever reordered.
+            recyclingKey={exercise.exercise || exercise.name || ''}
             source={exerciseImages.start}
             style={styles.miniExerciseImage}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={0}
           />
         ) : (
           <Ionicons
@@ -2964,7 +3017,14 @@ function ExercisePagePreview({
       <View style={styles.imageContainer}>
         <View style={styles.fullScreenMediaContainer}>
           {img ? (
-            <Image source={img} style={styles.fullScreenImage} resizeMode="contain" />
+            <Image
+              recyclingKey={name}
+              source={img}
+              style={styles.fullScreenImage}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={0}
+            />
           ) : (
             <View style={styles.fullScreenPlaceholder}>
               <Ionicons name="barbell-outline" size={60} color="#3a3a44" />
