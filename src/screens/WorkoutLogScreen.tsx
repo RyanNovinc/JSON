@@ -1438,12 +1438,19 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // One path to the 1RM progression modal, shared by the header menu item and the badge.
   // effectiveCurrentExercise, so a selected alternative opens ITS progression rather than
   // the primary exercise's.
+  //
+  // Optional-chained, and it MUST be. The adapter starts `exercises` as [] and fills it in an
+  // effect, so on the very first render exercises[currentIndex] is undefined and so is
+  // effectiveCurrentExercise. The component's `if (!effectiveCurrentExercise) return` guard is
+  // below the hooks — it has to be, or it would break the rules of hooks — so a dependency
+  // array is evaluated BEFORE the guard ever runs. Dereferencing .exercise there threw on the
+  // first render of every workout.
   const openOneRMProgression = useCallback(() => {
-    setShow1RMProgression({
-      exerciseName: effectiveCurrentExercise.exercise,
-      exerciseIndex: currentIndex,
-    });
-  }, [effectiveCurrentExercise.exercise, currentIndex]);
+    const exerciseName = effectiveCurrentExercise?.exercise;
+    if (!exerciseName) return;
+
+    setShow1RMProgression({ exerciseName, exerciseIndex: currentIndex });
+  }, [effectiveCurrentExercise?.exercise, currentIndex]);
 
   // Header dropdown menu items (History lives top-level now, so it's not here)
   const headerMenuItems: { label: string; icon: any; onPress: () => void }[] = [
