@@ -23,7 +23,7 @@
  *   - DM Mono for numbers, Outfit for text
  *
  * --- Changes in this version -------------------------------------------------
- *  1. Keyboard "Log set" accessory bar (InputAccessoryView, iOS):
+ *  1. Keyboard "Log set" accessory bar (self-rendered, iOS + Android):
  *     completes the focused set and auto-advances to the next set's weight
  *     field so users can blast through sets without dismissing the keyboard.
  *  2. PREV column + prefilled (greyed) inputs showing last session's numbers,
@@ -58,7 +58,6 @@ import {
   Image,
   Modal,
   Platform,
-  InputAccessoryView,
   Keyboard,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -184,9 +183,6 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 
 const DEFAULT_THEME = '#22d3ee';
 const SCREEN_WIDTH = Dimensions.get('window').width;
-
-/** Single shared id for the keyboard accessory bar (only one keyboard at a time) */
-const ACCESSORY_ID = 'jsonfit-set-log-accessory';
 
 const COMPOUND_HINTS = [
   'bench', 'squat', 'deadlift', 'press', 'row', 'pull-up', 'pullup',
@@ -409,6 +405,27 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const weightInputRefs = useRef<Record<number, TextInput | null>>({});
   const registerWeightRef = useCallback((setIndex: number, ref: TextInput | null) => {
     weightInputRefs.current[setIndex] = ref;
+  }, []);
+
+  // Keyboard height drives the floating accessory bar's position.
+  // iOS: the keyboard overlays the app, so the bar sits at bottom = keyboardHeight.
+  // Android: softwareKeyboardLayoutMode "resize" (the Expo default) shrinks the
+  // root view already, so bottom = 0 is exactly on top of the keyboard.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e: any) => {
+      setKeyboardHeight(e?.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
   // ── Previous-session reference + full history (for PREV column + PRs) ──
@@ -770,6 +787,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const accessoryPrev = focusedSet
     ? (previousByExercise[effectiveCurrentExercise.exercise] || {})[focusedSet.setIndex + 1]
     : null;
+
+  const accessoryVisible = focusedSet !== null && keyboardHeight > 0;
+  const accessoryBottom = Platform.OS === 'ios' ? keyboardHeight : 0;
 
   // Load history data when showWorkoutHistory changes
   useEffect(() => {
@@ -1677,45 +1697,44 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       )}
 
       {/* ── BOTTOM BAR ─────────────────────────────────────────── */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
-        <TouchableOpacity
-          style={styles.timerBadge}
-          onPress={showTimerModal}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="time-outline" size={16} color="#9898a4" />
-          <Text style={styles.timerText}>{getRestTimerDisplay()}</Text>
-        </TouchableOpacity>
+      {!accessoryVisible && (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
+          <TouchableOpacity
+            style={styles.timerBadge}
+            onPress={showTimerModal}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={16} color="#9898a4" />
+            <Text style={styles.timerText}>{getRestTimerDisplay()}</Text>
+          </TouchableOpacity>
 
-        <AnimatedTouchableOpacity
-          style={[
-            styles.primaryBtn,
-            {
-              backgroundColor: themeColor,
-              transform: [{ translateX: shakeAnimation || 0 }]
-            }
-          ]}
-          onPress={workoutStarted ? handleFinishWorkoutPress : onStartWorkout}
-        >
-          <View style={styles.primaryBtnContent}>
-            <Text style={styles.primaryBtnText}>
-              {workoutStarted ? 'Finish Workout' : 'Start Workout'}
-            </Text>
-            {workoutStarted && workoutStartTime && (
-              <Text style={styles.workoutDurationText}>
-                {formatWorkoutDuration(workoutDuration)}
+          <AnimatedTouchableOpacity
+            style={[
+              styles.primaryBtn,
+              {
+                backgroundColor: themeColor,
+                transform: [{ translateX: shakeAnimation || 0 }]
+              }
+            ]}
+            onPress={workoutStarted ? handleFinishWorkoutPress : onStartWorkout}
+          >
+            <View style={styles.primaryBtnContent}>
+              <Text style={styles.primaryBtnText}>
+                {workoutStarted ? 'Finish Workout' : 'Start Workout'}
               </Text>
-            )}
-          </View>
-        </AnimatedTouchableOpacity>
-      </View>
-    </View>
-    </GestureDetector>
+              {workoutStarted && workoutStartTime && (
+                <Text style={styles.workoutDurationText}>
+                  {formatWorkoutDuration(workoutDuration)}
+                </Text>
+              )}
+            </View>
+          </AnimatedTouchableOpacity>
+        </View>
+      )}
 
-    {/* ── Keyboard accessory: "Log set" bar (iOS) ─────────────────── */}
-    {Platform.OS === 'ios' && (
-      <InputAccessoryView nativeID={ACCESSORY_ID}>
-        <View style={styles.accessoryBar}>
+      {/* ── Keyboard accessory: "Log set" bar (iOS + Android) ────── */}
+      {accessoryVisible && (
+        <View style={[styles.accessoryBar, { bottom: accessoryBottom }]}>
           <TouchableOpacity
             onPress={() => {
               Keyboard.dismiss();
@@ -1739,8 +1758,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             <Ionicons name="checkmark" size={16} color="#000" />
           </TouchableOpacity>
         </View>
-      </InputAccessoryView>
-    )}
+      )}
+    </View>
+    </GestureDetector>
 
     {/* Existing Timer Modal */}
     <TimerModal />
@@ -2072,7 +2092,6 @@ function SetRow({
   globalUnit,
 }: SetRowProps) {
   const completed = set.completed;
-  const accessoryProps = Platform.OS === 'ios' ? { inputAccessoryViewID: ACCESSORY_ID } : {};
   return (
     <View style={[styles.setRow, completed && styles.setRowCompleted]}>
         <Pressable
@@ -2122,7 +2141,6 @@ function SetRow({
             placeholder=""
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
-            {...accessoryProps}
           />
           <Text style={{ color: '#9898a4', fontSize: 11, marginLeft: 4, fontFamily: 'DMMono-Medium' }}>
             {globalUnit.toUpperCase()}
@@ -2146,7 +2164,6 @@ function SetRow({
           placeholder={targetReps || previous?.reps || ''}
           placeholderTextColor="#3a3a44"
           editable={workoutStarted && !completed}
-          {...accessoryProps}
         />
 
         <TouchableOpacity
@@ -2979,6 +2996,11 @@ const styles = StyleSheet.create({
 
   // ── Keyboard accessory bar ─────────────────────
   accessoryBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 400,
+    elevation: 400,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
