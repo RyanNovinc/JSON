@@ -184,6 +184,23 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 const DEFAULT_THEME = '#22d3ee';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+// ── Card height arithmetic ──────────────────────────────────────────
+// The pager stage is only as tall as the current card, so its height changes by up to
+// four set rows between exercises. We animate it, which means we need each card's height
+// BEFORE it renders — a measured height (onLayout) would be a frame behind and visibly
+// lag the drag. So it is computed, and every term below is a pinned style constant.
+// If any of these drift from styles.*, the stage will glide and then jump at the end.
+const CARD_IMAGE_H = (SCREEN_WIDTH * 9) / 16; // styles.imageContainer aspectRatio 16/9
+const CARD_TITLE_LINE_H = 26;                 // styles.title.lineHeight
+const CARD_MUSCLES_H = 4 + 16;                // styles.muscles marginTop + lineHeight
+const CARD_ONE_RM_H = 14 + 2 + 20;            // oneRMLabel.lineHeight + oneRMValue marginTop + lineHeight
+const CARD_TITLE_ROW_MB = 6;                  // styles.titleRow.marginBottom
+const CARD_PRESCRIPTION_H = 8 + 1 + 8 + 16 + 8 + 1 + 12; // mt + border + pt + text + pb + border + mb
+const CARD_SETS_HEADER_H = 14 + 6 + 1 + 4;    // text lineHeight + paddingBottom + border + marginBottom
+const CARD_SET_ROW_H = 44 + 4 * 2;            // setInput.minHeight (== setCheckCell.height) + setRow paddingVertical
+const CARD_ADD_SET_H = 42 + 4;                // styles.addSetBtn height + marginTop
+const CARD_FOCUS_PB = 8;                      // styles.focusArea.paddingBottom (there is no paddingTop)
+
 const COMPOUND_HINTS = [
   'bench', 'squat', 'deadlift', 'press', 'row', 'pull-up', 'pullup',
   'chin-up', 'chinup', 'clean', 'snatch', 'lunge', 'rdl',
@@ -474,6 +491,105 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // Exercise selector dropdown state
   const [showExerciseSelector, setShowExerciseSelector] = useState<number | null>(null);
   const [isMultiLine, setIsMultiLine] = useState<Map<number, boolean>>(new Map());
+
+  // Record whether an exercise's title wraps. The live card and the peek previews both
+  // report it, so a neighbour's height is known BEFORE it slides in rather than only
+  // once it becomes current. No-ops when unchanged, so it cannot churn renders mid-drag.
+  const handleTitleMeasured = useCallback((idx: number, multi: boolean) => {
+    setIsMultiLine((prev) => {
+      if (prev.get(idx) === multi) return prev;
+      const next = new Map(prev);
+      next.set(idx, multi);
+      return next;
+    });
+  }, []);
+
+  // ── Pager stage height ───────────────────────────────────────────
+  // Every exercise's card height, computed (not measured) so the stage can start
+  // resizing on the first frame of a drag. See the CARD_* constants.
+  const cardHeights = useMemo(
+    () =>
+      exercises.map((ex, idx) => {
+        const sets = allSetsData[idx] || [];
+
+        const hasMuscles = !!(ex.primaryMuscles?.length || ex.secondaryMuscles?.length);
+
+        // PrescriptionBanner renders null when there is neither a rep scheme nor an RIR
+        const reps = ex.reps_weekly?.[String(currentWeek)] ?? ex.reps;
+        const rir = ex.rir_weekly?.[String(currentWeek)];
+        const hasPrescription = !!(reps || rir);
+
+        // OneRMBadge renders null unless a completed set has a usable weight AND reps,
+        // so it can appear mid-workout and change the card's height on its own.
+        const hasOneRM = sets.some((s) => {
+          if (!s.completed) return false;
+          const w = parseFloat(s.weight);
+          const r = parseInt(s.reps, 10);
+          return !isNaN(w) && !isNaN(r) && w > 0 && r > 0;
+        });
+
+        const titleH = CARD_TITLE_LINE_H * (isMultiLine.get(idx) ? 2 : 1);
+        const leftColH = titleH + (hasMuscles ? CARD_MUSCLES_H : 0);
+        // titleRow is alignItems:'flex-start', so it is as tall as its tallest child —
+        // and the 1RM badge is taller than a single-line title.
+        const titleRowH = Math.max(leftColH, hasOneRM ? CARD_ONE_RM_H : 0) + CARD_TITLE_ROW_MB;
+
+        const tableH =
+          CARD_SETS_HEADER_H + sets.length * CARD_SET_ROW_H + CARD_ADD_SET_H;
+
+        return (
+          CARD_IMAGE_H +
+          titleRowH +
+          (hasPrescription ? CARD_PRESCRIPTION_H : 0) +
+          tableH +
+          CARD_FOCUS_PB
+        );
+      }),
+    [exercises, allSetsData, currentWeek, isMultiLine],
+  );
+
+  const currentCardH = cardHeights[currentIndex] ?? 0;
+
+  // The stage's height at rest. Animated on its own only when the CURRENT card changes
+  // shape (a set added or removed); during a drag the delta below does the work.
+  const stageBaseH = useRef(new Animated.Value(currentCardH)).current;
+  const stageHeightReady = useRef(false);
+
+  useEffect(() => {
+    if (!currentCardH) return;
+    if (!stageHeightReady.current) {
+      // First real measurement — snap, don't animate, or the card unfolds on mount.
+      stageHeightReady.current = true;
+      stageBaseH.setValue(currentCardH);
+      return;
+    }
+    Animated.timing(stageBaseH, {
+      toValue: currentCardH,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false, // height is not a native-driver prop
+    }).start();
+  }, [currentCardH, stageBaseH]);
+
+  // Grow/shrink the stage in step with the finger, so a taller neighbour is never clipped
+  // by pagerStage's overflow:'hidden' as it slides in. At the ends of the list there is no
+  // neighbour, so the delta is 0 and the height holds still through the rubber-band.
+  const stageHeight = useMemo(() => {
+    const prevH = cardHeights[currentIndex - 1];
+    const nextH = cardHeights[currentIndex + 1];
+    return Animated.add(
+      stageBaseH,
+      dragX.interpolate({
+        inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+        outputRange: [
+          (nextH ?? currentCardH) - currentCardH, // dragging left: next slides in
+          0,
+          (prevH ?? currentCardH) - currentCardH, // dragging right: prev slides in
+        ],
+        extrapolate: 'clamp',
+      }),
+    );
+  }, [cardHeights, currentIndex, currentCardH, stageBaseH, dragX]);
 
   // Header dropdown staggered animation effect
   useEffect(() => {
@@ -1046,8 +1162,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           easing: Easing.out(Easing.cubic),
           useNativeDriver: false,
         }).start(() => {
-          onIndexChange(target);
+          // The 180ms ease-out above already carried the stage height all the way to the
+          // target card's height (dragX hit ±W, so the interpolation is at its end stop).
+          // Hand it over synchronously: zero the drag first so the delta collapses, then
+          // rebase. Both land in the same tick, so no intermediate height is ever painted
+          // and there is nothing left to animate.
           dragX.setValue(0);
+          stageBaseH.setValue(cardHeights[target] ?? currentCardH);
+          onIndexChange(target);
           setIsPaging(false);
           Analytics.track('exercise_swiped', { direction: goNext ? 'next' : 'prev' });
         });
@@ -1318,8 +1440,11 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── PAGED EXERCISE STAGE (image + focus area travel together) ── */}
-        <View style={styles.pagerStage}>
+        {/* ── PAGED EXERCISE STAGE (image + focus area travel together) ──
+            Height is animated: it tracks the drag so a taller neighbour grows the stage
+            as it slides in (no clipping), and everything below — the Up Next list —
+            glides instead of snapping when the swipe commits. */}
+        <Animated.View style={[styles.pagerStage, { height: stageHeight }]}>
           {/* Previous-exercise peek (slides in from the left edge) */}
           {isPaging && currentIndex > 0 && (
             <Animated.View
@@ -1337,6 +1462,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 globalUnit={globalUnit}
                 currentWeek={currentWeek}
                 calculate1RM={calculate1RM}
+                onTitleMeasured={handleTitleMeasured}
               />
             </Animated.View>
           )}
@@ -1358,6 +1484,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 globalUnit={globalUnit}
                 currentWeek={currentWeek}
                 calculate1RM={calculate1RM}
+                onTitleMeasured={handleTitleMeasured}
               />
             </Animated.View>
           )}
@@ -1420,15 +1547,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                 <Text
                   style={styles.title}
                   numberOfLines={2}
-                  onTextLayout={(event) => {
-                    const { lines } = event.nativeEvent;
-                    const isMultiLineText = lines.length > 1;
-                    setIsMultiLine(prev => {
-                      const newMap = new Map(prev);
-                      newMap.set(currentIndex, isMultiLineText);
-                      return newMap;
-                    });
-                  }}
+                  onTextLayout={(event) =>
+                    handleTitleMeasured(currentIndex, event.nativeEvent.lines.length > 1)
+                  }
                 >
                   {currentExerciseName}
                   {allExercises.length > 1 && isMultiLine.get(currentIndex) && (
@@ -1651,7 +1772,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </Animated.View>
         {/* end paged exercise stage */}
 
         {/* ── UPCOMING LIST ──────────────────────────────── */}
@@ -2367,6 +2488,8 @@ const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
 // Only the live centre card runs image cycling / inputs; this never does.
 
 interface ExercisePagePreviewProps {
+  /** Reports whether this exercise's title wraps, so its card height is known before it lands. */
+  onTitleMeasured?: (index: number, multi: boolean) => void;
   index: number;
   exercises: Exercise[];
   allSetsData: SetData[][];
@@ -2451,6 +2574,7 @@ function ExercisePagePreview({
   globalUnit,
   currentWeek,
   calculate1RM,
+  onTitleMeasured,
 }: ExercisePagePreviewProps) {
   const ex = exercises[index];
   if (!ex) return null;
@@ -2503,7 +2627,11 @@ function ExercisePagePreview({
           <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
             {/* Same row + chevron as the live title, but a View: nothing here is tappable */}
             <View style={styles.titleButton}>
-              <Text style={styles.title} numberOfLines={2}>
+              <Text
+                style={styles.title}
+                numberOfLines={2}
+                onTextLayout={(e) => onTitleMeasured?.(index, e.nativeEvent.lines.length > 1)}
+              >
                 {name}
               </Text>
               {hasAlternatives && (
@@ -3057,11 +3185,13 @@ const styles = StyleSheet.create({
   oneRMLabel: {
     color: '#55555f',
     fontSize: 10,
+    lineHeight: 14,
     letterSpacing: 1.5,
     fontFamily: 'DMMono-Regular',
   },
   oneRMValue: {
     fontSize: 16,
+    lineHeight: 20,
     fontWeight: '500',
     fontFamily: 'DMMono-Medium',
     letterSpacing: -0.2,
@@ -3153,7 +3283,12 @@ const styles = StyleSheet.create({
   },
   setCheckCell: {
     width: 34,
+    // Pinned to match setInput.minHeight. The cell holds a 26px Ionicon, whose line-box
+    // height depends on the icon font's metrics — leaving it implicit would make the set
+    // row 52px or 54px depending on platform, and the pager height maths must be exact.
+    height: 44,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 8,
   },
   setNum: {
@@ -3195,6 +3330,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    // Pinned for the same reason as setCheckCell: an implicit height here depends on the
+    // Ionicon's glyph metrics.
+    height: 42,
     paddingVertical: 10,
     marginTop: 4,
   },
