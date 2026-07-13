@@ -122,6 +122,18 @@ src/
 9. **Platform branches:** ~89 `Platform.OS` checks. iOS-only: Live Activities. Claude has no
    registered URL scheme, so the deep-link opens Safari — hence the "re-copy clipboard before
    launching" defense in `PromptReadyScreen`.
+10. **`importFromText` resolves before it has done anything.** `processWorkoutData` in
+    `useWorkoutImport.ts` is `async`, but defers *all* its real work (validate, parse, set
+    state) into an unawaited `setTimeout(…, 800)` — a cosmetic "processing" delay. So
+    `await importFromText(json)` resolves ~800ms **before validation has even run**, and
+    tells you nothing about whether the import succeeded. Await the resulting *state*
+    (`showConfirmation` / `errorMessage`), never the call. Known production API defect, not
+    yet fixed; `src/utils/__tests__/awaitingImportCleanup.test.ts` shows the workaround.
+11. **Deduplication is covered by no test.** `src/utils/__tests__/importDeduplication.test.ts`
+    is `describe.skip`ped: its fixtures never survive validation, and the fingerprint dedupe
+    it claims to test lives behind `_metadata.exportType === 'unified_mesocycle_structure'`
+    in `handleUnifiedMesocycleImport`, reachable only via `confirmImport` — which that suite
+    never calls. Read its header before writing the real suite.
 
 ## Root is not the project
 

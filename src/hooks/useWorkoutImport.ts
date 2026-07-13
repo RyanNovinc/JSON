@@ -928,6 +928,27 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
   };
 
   // 14. processWorkoutData (verbatim copy)
+  /**
+   * ⚠️ THIS FUNCTION MISREPORTS COMPLETION.
+   *
+   * It is `async`, and it is exposed as `importFromText`, so callers reasonably write
+   * `await importFromText(json)` and assume the import has been processed. It has not.
+   * Every piece of real work — validateAndParseJSON, setParsedProgram, setShowConfirmation —
+   * happens inside an unawaited `setTimeout(..., 800)` below. The returned promise resolves
+   * almost immediately, ~800ms BEFORE validation has even started.
+   *
+   * So `await importFromText(...)` tells you nothing about whether the import succeeded,
+   * failed, or ran at all. Callers must await the resulting STATE (e.g. showConfirmation /
+   * errorMessage), not the call.
+   *
+   * The 800ms is described below as "Simulate processing time for better UX" — it is a
+   * deliberate cosmetic delay, not real work being scheduled.
+   *
+   * This is a production API defect, not a test artefact: it silently defeats any caller
+   * that sequences off the promise. It is left as-is for now (fixing it means changing the
+   * contract of a 1600-line hook), but do not rediscover it the hard way — see
+   * src/utils/__tests__/awaitingImportCleanup.test.ts for how tests work around it.
+   */
   const processWorkoutData = async (text: string) => {
     console.log('⚙️ [PROCESS WORKOUT] Starting processWorkoutData');
     console.log('⚙️ [PROCESS WORKOUT] Text length:', text.length);
@@ -1273,6 +1294,13 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
       const detailedError = `⚠️ Validation Error:\n\n${error.message}\n\n💡 This means your JSON was parsed successfully, but the workout program structure has issues. Please check that all required fields are present and correctly formatted.`;
       
       setErrorMessage(detailedError);
+      // Clear awaiting_import flag on validation failure, exactly as the JSON parse catch
+      // above does. Without this the "Continue your setup" banner stays wedged on — and
+      // structural validation failure is the COMMON failure mode here, because the input is
+      // JSON an LLM produced: it parses fine and gets the shape wrong.
+      WorkoutStorage.setAwaitingImport(false).catch(e =>
+        console.error('Failed to clear awaiting import flag on validation error:', e)
+      );
       console.log('[VALIDATE] rejected: structural validation error -', error.message);
       return null;
     }

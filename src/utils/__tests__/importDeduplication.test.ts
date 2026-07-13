@@ -4,13 +4,55 @@
  *
  * @jest-environment jsdom
  *
- * useWorkoutImport is a real React hook. These tests used to call it directly in the test
- * body, which throws "Cannot read properties of null (reading 'useState')" on React 19 —
- * there is no dispatcher outside a render. They now drive it through renderHook, which
- * needs a DOM, hence the jsdom environment above.
+ * ===========================================================================
+ * SKIPPED — THIS SUITE HAS NEVER TESTED DEDUPLICATION. NOTHING HAS.
+ * ===========================================================================
  *
- * importFromText (processWorkoutData) defers its work into a setTimeout(..., 800), so
- * awaiting it is not enough; assertions go through waitFor.
+ * It is skipped deliberately, so that it is honestly red-flagged rather than quietly
+ * failing or quietly bent into passing. Do not "fix" it by tweaking the fixtures; the
+ * fixtures are not the only problem. A real dedupe suite is commissioned as its own work.
+ *
+ * These tests never ran (jest.config.js was misconfigured from the day it was authored on
+ * 2026-05-25 until 2026-07-13). When finally executed, all four fail — and they fail before
+ * reaching a single line of deduplication logic. Two independent reasons:
+ *
+ * 1. THE FIXTURES ARE NOT VALID PROGRAMS.
+ *    All four use `blocks: []`. Production rejects that outright in validateAndParseJSON:
+ *
+ *        if (!Array.isArray(parsed.blocks) || parsed.blocks.length === 0) {
+ *          throw new Error('No training blocks found');      // useWorkoutImport.ts:1137
+ *        }
+ *
+ *    Every test dies with "[VALIDATE] rejected: structural validation error - No training
+ *    blocks found". The import never proceeds, so saveRoutines/onImportComplete are never
+ *    called and every assertion fails on "Number of calls: 0".
+ *
+ * 2. EVEN WITH VALID FIXTURES, THESE TESTS WOULD NOT REACH THE DEDUPE CODE.
+ *    The fingerprint dedupe lives in handleUnifiedMesocycleImport
+ *    (useWorkoutImport.ts:393-449). That is reached only from restoreCompleteState, and
+ *    only when the program carries `_metadata.exportType === 'unified_mesocycle_structure'`.
+ *    None of these fixtures have `_metadata` at all.
+ *
+ *    It is also reached only via confirmImport (handleConfirmImport), which performs the
+ *    save. These tests only ever call importFromText — which parses and raises the
+ *    confirmation modal. It does not save, and it does not dedupe.
+ *
+ * So a genuine dedupe suite needs: valid multi-block programs, carrying a
+ * `_metadata.exportType === 'unified_mesocycle_structure'` envelope, driven through
+ * importFromText AND THEN confirmImport. That is a new test, not a repair of this one.
+ *
+ * ---------------------------------------------------------------------------
+ * Harness notes, for whoever writes the real suite:
+ *
+ * - useWorkoutImport is a React hook. Calling it in a test body throws "Cannot read
+ *   properties of null (reading 'useState')" on React 19 — there is no dispatcher outside a
+ *   render. Drive it through renderHook (@testing-library/react), which needs a DOM, hence
+ *   the @jest-environment jsdom above.
+ * - importFromText (processWorkoutData) defers ALL of its real work into an unawaited
+ *   setTimeout(..., 800). `await importFromText(...)` therefore resolves BEFORE validation
+ *   has run. Await the resulting state (e.g. waitFor showConfirmation) before asserting or
+ *   before calling confirmImport. See awaitingImportCleanup.test.ts for a worked example.
+ * ---------------------------------------------------------------------------
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react';
@@ -43,7 +85,12 @@ jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn(),
 }));
 
-describe('Import Deduplication (Fix 4)', () => {
+// SKIPPED ON PURPOSE — see the header. These four tests do not reach the dedupe logic:
+// their fixtures use `blocks: []` (rejected by validation), and the dedupe lives behind
+// _metadata.exportType === 'unified_mesocycle_structure' via confirmImport, which this
+// suite never calls. Deduplication is currently covered by NO test. Do not un-skip this
+// without rewriting it — un-skipping as-is just restores four failures that prove nothing.
+describe.skip('Import Deduplication (Fix 4) — NEVER TESTED DEDUPE; needs a real suite', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

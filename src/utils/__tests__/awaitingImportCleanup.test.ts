@@ -93,14 +93,37 @@ describe('Awaiting Import Cleanup (Fix 5)', () => {
   });
 
   it('4. SUCCESS STILL CLEARS: successful import still clears flag as before', async () => {
+    // This fixture used to be a WorkoutRoutine shape ({ name, days, blocks: 1 }), not a
+    // WorkoutProgram. Production rejected it with "Invalid routine name", so the test named
+    // "successful import" was never performing a successful import at all — it was silently
+    // exercising the failure path. This is a real, minimally-valid WorkoutProgram:
+    // routine_name / days_per_week / a populated blocks array.
     const validProgram = {
-      id: 'test123',
-      name: 'Test Program',
-      days: 3,
-      blocks: 1,
-      created: '2024-01-01',
-      duration: '4 weeks',
-      description: 'Test program'
+      routine_name: 'Test Program',
+      days_per_week: 3,
+      description: 'Test program',
+      blocks: [
+        {
+          block_name: 'Block 1',
+          weeks: '1-4',
+          days: [
+            {
+              day_name: 'Push',
+              exercises: [
+                {
+                  type: 'strength',
+                  exercise: 'Barbell Bench Press',
+                  sets: 4,
+                  reps: '8-12',
+                  rest: 120,
+                  primaryMuscles: ['Chest'],
+                  secondaryMuscles: ['Triceps'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     mockWorkoutStorage.loadRoutines.mockResolvedValue([]);
@@ -111,6 +134,12 @@ describe('Awaiting Import Cleanup (Fix 5)', () => {
     await act(async () => {
       result.current.importFromText(JSON.stringify(validProgram));
     });
+
+    // importFromText defers validation into a setTimeout(..., 800) and does not await it,
+    // so it resolves before parsedProgram exists. Calling confirmImport straight away would
+    // find nothing to confirm. Wait for the confirmation state to actually appear.
+    await waitFor(() => expect(result.current.showConfirmation).toBe(true), { timeout: 3000 });
+
     await act(async () => {
       await result.current.confirmImport();
     });
