@@ -12,11 +12,15 @@ import {
   Platform,
   Dimensions,
   Pressable,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import {Picker} from '@react-native-picker/picker';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+// TouchableOpacity comes from react-native, NOT react-native-gesture-handler. Nothing in this
+// file uses an RNGH gesture, and an RNGH touchable inside a <Modal> is dead on Android: a
+// Modal is a detached native window that doesn't inherit the app's GestureHandlerRootView,
+// so RNGH touchables inside it silently receive no touches.
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';

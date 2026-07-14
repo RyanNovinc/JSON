@@ -6,8 +6,12 @@ import {
   ScrollView,
   Modal,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+// TouchableOpacity comes from react-native, NOT react-native-gesture-handler. Nothing in this
+// file uses an RNGH gesture, and an RNGH touchable inside a <Modal> is dead on Android: a
+// Modal is a detached native window that doesn't inherit the app's GestureHandlerRootView,
+// so RNGH touchables inside it silently receive no touches.
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';

@@ -2270,6 +2270,11 @@ export default function ImportRoutineScreen() {
         visible={showConfirmation}
         transparent
         animationType="none"
+        // Android hardware back. Without this, back does NOTHING while this modal is open —
+        // and before the RNGH/AppModal touch fix its buttons were dead too, so an Android
+        // user who reached "Workout Ready" was hard-trapped: no buttons, no back, force-quit
+        // the only way out. Mirrors the modal's own cancel control (:2475).
+        onRequestClose={showAddMoreMode ? handleBackToConfirmation : handleModalCancel}
       >
         <Animated.View
           style={[

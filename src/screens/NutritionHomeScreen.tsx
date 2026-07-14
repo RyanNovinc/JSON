@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Alert,
   Share,
-  Modal,
   Animated,
   TextInput,
   ScrollView,
@@ -21,6 +20,11 @@ import QRCode from 'react-native-qrcode-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// This screen keeps its RNGH TouchableOpacity: unlike the other swept files, it sits INSIDE
+// ModeTransitionContainer's PanGestureHandler (the Workout<->Nutrition swipe), where RNGH
+// touchables have a plausible tap-vs-swipe rationale. So it gets AppModal (which re-roots the
+// GestureHandlerRootView inside the modal) rather than an import swap — mirroring HomeScreen.
+import AppModal from '../components/AppModal';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
@@ -1535,7 +1539,7 @@ export default function NutritionHomeScreen({ route }: any) {
       {/* ============================================================ */}
 
       {/* Action Sheet — option-3 header-card layout */}
-      <Modal
+      <AppModal
         visible={deleteModal.visible}
         transparent={true}
         animationType="fade"
@@ -1650,10 +1654,10 @@ export default function NutritionHomeScreen({ route }: any) {
             })()}
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
       {/* Share Modal — QR code + send link */}
-      <Modal
+      <AppModal
         visible={shareModal.visible}
         transparent={true}
         animationType="fade"
@@ -1728,10 +1732,10 @@ export default function NutritionHomeScreen({ route }: any) {
             </View>
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
       {/* Rename Modal */}
-      <Modal
+      <AppModal
         visible={renameModal.visible}
         transparent={true}
         animationType="fade"
@@ -1777,10 +1781,10 @@ export default function NutritionHomeScreen({ route }: any) {
             </View>
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
       {/* Success Modal */}
-      <Modal
+      <AppModal
         visible={successModal}
         transparent={true}
         animationType="fade"
@@ -1800,7 +1804,7 @@ export default function NutritionHomeScreen({ route }: any) {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </AppModal>
     </View>
   );
 

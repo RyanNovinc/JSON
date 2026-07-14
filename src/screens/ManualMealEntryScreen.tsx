@@ -9,9 +9,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  TouchableOpacity,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+// TouchableOpacity comes from react-native, NOT react-native-gesture-handler. Nothing in this
+// file uses an RNGH gesture, and an RNGH touchable inside a <Modal> is dead on Android: a
+// Modal is a detached native window that doesn't inherit the app's GestureHandlerRootView,
+// so RNGH touchables inside it silently receive no touches.
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -661,7 +665,13 @@ export default function ManualMealEntryScreen() {
 
       {/* Time Picker Modal */}
       {showTimePicker && (
-        <Modal transparent animationType="fade" visible={showTimePicker}>
+        <Modal
+          transparent
+          animationType="fade"
+          visible={showTimePicker}
+          // Android hardware back: without this, back does nothing while the modal is open.
+          onRequestClose={() => setShowTimePicker(false)}
+        >
           <View style={styles.timePickerModalOverlay}>
             <View style={styles.timePickerModal}>
               <View style={styles.timePickerHeader}>

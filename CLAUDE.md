@@ -129,7 +129,23 @@ src/
     tells you nothing about whether the import succeeded. Await the resulting *state*
     (`showConfirmation` / `errorMessage`), never the call. Known production API defect, not
     yet fixed; `src/utils/__tests__/awaitingImportCleanup.test.ts` shows the workaround.
-11. **Deduplication is covered by no test.** `src/utils/__tests__/importDeduplication.test.ts`
+11. **Modals: use `AppModal`, never a raw RN `<Modal>`.** On Android a `<Modal>` is a detached
+    native window — it does NOT inherit the `GestureHandlerRootView` or `SafeAreaProvider` from
+    `App.tsx`. So a `react-native-gesture-handler` touchable inside a raw `<Modal>` **silently
+    receives no touches on Android** (iOS is fine — RNGH attaches recognizers directly to
+    views). This made every workout/meal-plan import uncompletable on Android. Two valid fixes:
+    import `TouchableOpacity` from `react-native` (preferred — nothing in this app needs RNGH
+    touchables), or wrap in `src/components/AppModal.tsx`. Also **always pass `onRequestClose`**
+    — without it the Android hardware back button does nothing and the modal is a trap.
+12. **The Workout↔Nutrition swipe relies on gesture coordination that does not exist.**
+    `ModeTransitionContainer` wraps `HomeScreen` + `NutritionHomeScreen` in an RNGH
+    `PanGestureHandler` and threads a `panGestureRef` down to both. **Neither screen ever uses
+    it**, and there is no `simultaneousHandlers` / `waitFor` anywhere in the app — so the
+    tap-vs-swipe arbitration those screens appear to depend on is not actually wired up. It
+    works today by luck of RNGH's defaults. Both screens keep RNGH touchables (and use
+    `AppModal`) for that reason. Someone should look at this deliberately; do not casually
+    swap their touchables to `react-native` without understanding the gesture interaction.
+13. **Deduplication is covered by no test.** `src/utils/__tests__/importDeduplication.test.ts`
     is `describe.skip`ped: its fixtures never survive validation, and the fingerprint dedupe
     it claims to test lives behind `_metadata.exportType === 'unified_mesocycle_structure'`
     in `handleUnifiedMesocycleImport`, reachable only via `confirmImport` — which that suite

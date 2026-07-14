@@ -1002,6 +1002,9 @@ export default function ImportMealPlanScreen() {
         visible={showConfirmation}
         transparent
         animationType="none"
+        // Android hardware back. Without this, back does NOTHING while this modal is open.
+        // Mirrors the modal's own cancel button (:1027).
+        onRequestClose={handleModalCancel}
       >
         <Animated.View
           style={[

@@ -1,15 +1,17 @@
 import React, { useRef, useEffect } from 'react';
 import {
-  Modal,
   View,
   Text,
-  
   ScrollView,
   StyleSheet,
   Animated,
   Dimensions,
 } from 'react-native';
-import { TouchableOpacity, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { TouchableOpacity } from 'react-native-gesture-handler';
+// Collapsed onto AppModal: this file previously hand-rolled an inline GestureHandlerRootView
+// inside its <Modal>, which fixed touch but NOT the safe-area re-root. AppModal does both, and
+// keeps every modal in the app on one mechanism instead of two divergent ones.
+import AppModal from './AppModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -82,13 +84,12 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
   );
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       transparent={true}
       animationType="none"
       onRequestClose={onClose}
     >
-      <GestureHandlerRootView style={{ flex: 1 }}>
       <Animated.View
         style={[
           styles.overlay,
@@ -276,8 +277,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           </ScrollView>
         </Animated.View>
       </Animated.View>
-      </GestureHandlerRootView>
-    </Modal>
+    </AppModal>
   );
 };
 
