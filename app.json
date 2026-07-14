@@ -30,7 +30,42 @@
         "CFBundleDisplayName": "JSON.fit",
         "CFBundleName": "JSON.fit",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSSupportsLiveActivities": true
+        "NSSupportsLiveActivities": true,
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "JSON.fit Program",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Owner",
+            "LSItemContentTypes": [
+              "fit.json.program"
+            ]
+          },
+          {
+            "CFBundleTypeName": "JSON Document",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": [
+              "public.json"
+            ]
+          }
+        ],
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "fit.json.program",
+            "UTTypeDescription": "JSON.fit Program",
+            "UTTypeConformsTo": [
+              "public.json"
+            ],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "jsonfit"
+              ],
+              "public.mime-type": [
+                "application/vnd.jsonfit+json"
+              ]
+            }
+          }
+        ]
       }
     },
     "android": {
@@ -46,6 +81,10 @@
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -54,11 +93,27 @@
             {
               "scheme": "https",
               "host": "json.fit",
-              "pathPrefix": "/p/program/"
+              "pathPrefix": "/p/"
             }
           ],
           "category": [
             "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "content",
+              "mimeType": "application/json"
+            },
+            {
+              "scheme": "file",
+              "mimeType": "application/json"
+            }
+          ],
+          "category": [
             "DEFAULT"
           ]
         }

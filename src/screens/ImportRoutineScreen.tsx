@@ -24,6 +24,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
+// SDK 54 moved readAsStringAsync to the /legacy subpath; the root entry no longer exports it.
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import { getAIPrompt, MUSCLE_GROUPS, QuestionnaireData, generateProgramSpecs } from '../data/workoutPrompt';
 import { assemblePlanningPrompt, ProgramContext } from '../data/planningPrompt';
 import { ProgramStorage, Program, MesocyclePhase } from '../data/programStorage';
@@ -48,7 +50,7 @@ export default function ImportRoutineScreen() {
   const route = useRoute<ImportScreenRouteProp>();
   const { themeColor } = useTheme();
   // Check if we have shareId and should show loading immediately
-  const { shareId, isCurated, curatedSlug } = route.params || {};
+  const { shareId, isCurated, curatedSlug, fileUri } = route.params || {};
   console.log('🔧 [ROUTE DEBUG] shareId:', shareId, 'isCurated:', isCurated, 'curatedSlug:', curatedSlug);
   console.log('🔧 [ROUTE DEBUG] isLoading calculation: !!shareId && !isCurated =', !!shareId, '&&', !isCurated, '=', !!shareId && !isCurated);
   const [isLoading, setIsLoading] = useState(!!shareId && !isCurated); // Start loading if we have shareId but not for curated imports
@@ -163,6 +165,29 @@ export default function ImportRoutineScreen() {
       });
     }
   }, [route.params?.prefilledJson, isLoading, parsedProgram, prefilledCancelled]);
+
+  // KEEP IN SYNC: inbound file import
+  // Same shape as the prefilledJson auto-import above, but the payload arrives as a
+  // file:// / content:// URI from the share sheet or Open-with (routed here by
+  // toCanonicalUrl in AppNavigator), so we read it to a string first. Guards mirror
+  // the effect above; processWorkoutData is fire-and-forget — its promise resolves
+  // ~800ms BEFORE validation runs, so never await or sequence on it. The confirm UI
+  // is driven by the showConfirmation / errorMessage state it eventually sets.
+  useEffect(() => {
+    if (fileUri && !isLoading && !parsedProgram && !prefilledCancelled) {
+      (async () => {
+        try {
+          const text = await readAsStringAsync(decodeURI(fileUri));
+          console.log('📂 [FILE IMPORT] Read', text.length, 'chars');
+          processWorkoutData(text);
+        } catch (e) {
+          console.error('📂 [FILE IMPORT] Read failed:', e);
+          Alert.alert('Import failed',
+            "Couldn't read that file. Try Import from the menu instead.");
+        }
+      })();
+    }
+  }, [fileUri, isLoading, parsedProgram, prefilledCancelled]);
 
   // Handle share import by fetching and processing
   const handleShareImport = async (shareId: string) => {

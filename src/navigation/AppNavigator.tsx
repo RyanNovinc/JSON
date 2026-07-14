@@ -152,7 +152,7 @@ export type RootStackParamList = {
   Home: undefined;
   CreateFlow: undefined;
   SamplePlanDetail: { plan: any };
-  ImportRoutine: { prefilledJson?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean; isCurated?: boolean; curatedSlug?: string };
+  ImportRoutine: { prefilledJson?: string; fileUri?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean; isCurated?: boolean; curatedSlug?: string };
   AddBlock: { targetWorkoutId: string; routineName?: string };
   ImportSharedContent: { shareId: string };
   ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
@@ -481,7 +481,16 @@ interface AppNavigatorProps {
 //   json-app://share/<id>       -> https://json.fit/p/<id>   (back-compat)
 //   json-app://p/<id>           -> https://json.fit/p/<id>
 function toCanonicalUrl(url: string | null): string | null {
-  if (!url || !url.startsWith('json-app://')) return url;
+  if (!url) return url;
+  // Inbound file import (share sheet / Open-with). The OS hands us a file:// or
+  // content:// URI, which matches no prefix and no route on its own. Fold it into
+  // the same canonical https form as everything else, carrying the URI as a query
+  // param, so it routes through getStateFromPath → ImportRoutine like a normal link.
+  // ImportRoutineScreen reads params.fileUri and does the actual read.
+  if (url.startsWith('file://') || url.startsWith('content://')) {
+    return 'https://json.fit/import-file?fileUri=' + encodeURIComponent(url);
+  }
+  if (!url.startsWith('json-app://')) return url;
   let rest = url.slice('json-app://'.length);
   if (rest.startsWith('share/')) {
     rest = 'p/' + rest.slice('share/'.length);
@@ -502,6 +511,14 @@ const linking = {
         path: 'p/:shareId',
         parse: {
           shareId: (shareId: string) => shareId,
+        },
+      },
+      // Inbound file import — synthesised by toCanonicalUrl from a file:// or
+      // content:// URI handed to us by the share sheet / Open-with.
+      ImportRoutine: {
+        path: 'import-file',
+        parse: {
+          fileUri: (u: string) => decodeURIComponent(u),
         },
       },
       RecipeDetail: {

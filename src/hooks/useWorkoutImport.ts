@@ -1525,7 +1525,11 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
     processWorkoutData(text);
   };
 
-  // 24. handleFileUpload (verbatim copy) 
+  // 24. handleFileUpload (verbatim copy)
+  // This is the user-initiated picker only. The INBOUND file path (share sheet / Open-with,
+  // where the OS hands us a file:// or content:// URI) lives in ImportRoutineScreen.tsx —
+  // see its "KEEP IN SYNC: inbound file import" effect. Changes to file-read behaviour here
+  // likely need to be mirrored there.
   const handleFileUpload = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
