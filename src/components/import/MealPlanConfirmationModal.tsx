@@ -10,8 +10,13 @@
 // useMealPlanImport, exactly like the workout modal pairs with useWorkoutImport.
 
 import React from 'react';
-import { View, Text, StyleSheet, Modal, Animated, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Animated, ScrollView } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+// Both TouchableOpacity buttons here come from react-native-gesture-handler (above). On
+// Android a raw <Modal> is a detached native window that does not inherit the app's
+// GestureHandlerRootView, so RNGH touchables inside it receive NO touches — confirm and
+// cancel were silently dead. AppModal re-roots the gesture handler (and safe-area) contexts.
+import AppModal from '../AppModal';
 import { Ionicons } from '@expo/vector-icons';
 import type { SimplifiedMealPlan } from '../../types/nutrition';
 
@@ -60,7 +65,7 @@ export default function MealPlanConfirmationModal({
   const meals = totalMeals(parsedMealPlan);
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
+    <AppModal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
       <Animated.View style={[styles.overlay, { opacity: modalOpacity }]}>
         <Animated.View
           style={[
@@ -145,7 +150,7 @@ export default function MealPlanConfirmationModal({
           </ScrollView>
         </Animated.View>
       </Animated.View>
-    </Modal>
+    </AppModal>
   );
 }
 

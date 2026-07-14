@@ -6,12 +6,16 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
-  Modal,
   Linking,
   Animated,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+// Every TouchableOpacity here comes from react-native-gesture-handler. On Android a raw
+// <Modal> is a detached native window that does not inherit the app's GestureHandlerRootView,
+// so RNGH touchables inside it receive NO touches — the meal-plan import confirm/cancel
+// buttons were silently dead. AppModal re-roots the gesture handler (and safe-area) contexts.
+import AppModal from '../components/AppModal';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -994,7 +998,7 @@ export default function ImportMealPlanScreen() {
       </View>
 
       {/* Confirmation Modal */}
-      <Modal
+      <AppModal
         visible={showConfirmation}
         transparent
         animationType="none"
@@ -1078,7 +1082,7 @@ export default function ImportMealPlanScreen() {
             )}
           </Animated.View>
         </Animated.View>
-      </Modal>
+      </AppModal>
     </>
   );
 }

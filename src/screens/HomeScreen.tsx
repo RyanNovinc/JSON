@@ -7,7 +7,6 @@ import {
   Alert,
   Share,
   Platform,
-  Modal,
   Animated,
   Image,
   TextInput,
@@ -17,6 +16,13 @@ import {
   Linking,
  TouchableOpacity as RNTouchable } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+// Every TouchableOpacity in this file comes from react-native-gesture-handler (above). On
+// Android a raw <Modal> is a detached native window that does not inherit the app's
+// GestureHandlerRootView, so RNGH touchables inside it receive NO touches, silently. All five
+// modals here were affected — including the action sheet whose "Share plan" button OPENS the
+// share modal, and the share modal's own "SEND LINK" / "TRY AGAIN" buttons.
+// AppModal re-roots the gesture handler (and safe-area) contexts inside the modal.
+import AppModal from '../components/AppModal';
 import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -1376,7 +1382,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         </TouchableOpacity>
       )}
 
-      <Modal
+      <AppModal
         visible={shareModal.visible}
         transparent={true}
         animationType="none"
@@ -1473,9 +1479,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             </View>
           </View>
         </Animated.View>
-      </Modal>
+      </AppModal>
 
-      <Modal
+      <AppModal
         visible={successModal}
         transparent={true}
         animationType="fade"
@@ -1495,9 +1501,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
-      <Modal
+      <AppModal
         visible={deleteModal.visible}
         transparent={true}
         animationType="fade"
@@ -1616,7 +1622,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             })()}
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
       <WorkoutCalendar
         visible={calendarModal}
@@ -1629,7 +1635,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         onSkip={skipFeedback}
       />
 
-      <Modal
+      <AppModal
         visible={renameModal.visible}
         transparent={true}
         animationType="fade"
@@ -1675,9 +1681,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             </View>
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
-      <Modal
+      <AppModal
         animationType="slide"
         transparent={false}
         visible={debugModal}
@@ -1746,7 +1752,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </AppModal>
 
     </View>
   );
