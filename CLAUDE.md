@@ -150,6 +150,15 @@ src/
     it claims to test lives behind `_metadata.exportType === 'unified_mesocycle_structure'`
     in `handleUnifiedMesocycleImport`, reachable only via `confirmImport` — which that suite
     never calls. Read its header before writing the real suite.
+14. **`expo prebuild` is DESTRUCTIVE on `ios/`.** The `expo-live-activity` plugin calls
+    `addTarget` non-idempotently, so prebuilding over the existing `ios/` duplicates
+    targets/build-phases and corrupts `project.pbxproj` (`pod install` then fails with
+    `[Xcodeproj] Consistency issue: no parent for object`). Never run bare prebuild over
+    tracked `ios/`. EAS is unaffected (`.easignore` strips `ios/`, so it does a clean
+    prebuild). `ios/JSONfit/Info.plist` is intentionally **hand-maintained** for the
+    file-association keys (`CFBundleDocumentTypes`, `UTExportedTypeDeclarations`);
+    `app.json`'s `ios.infoPlist` remains the EAS source of truth — keep both updated
+    together.
 
 ## Root is not the project
 
