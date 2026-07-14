@@ -152,7 +152,7 @@ export type RootStackParamList = {
   Home: undefined;
   CreateFlow: undefined;
   SamplePlanDetail: { plan: any };
-  ImportRoutine: { prefilledJson?: string; fileUri?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean; isCurated?: boolean; curatedSlug?: string };
+  ImportRoutine: { prefilledJson?: string; fileUri?: string; receivedAt?: string; showStep1New?: boolean; shareId?: string; mode?: string; targetWorkoutId?: string; fromNewFlow?: boolean; isCurated?: boolean; curatedSlug?: string };
   AddBlock: { targetWorkoutId: string; routineName?: string };
   ImportSharedContent: { shareId: string };
   ImportMealPlan: { showStep1New?: boolean; prefilledJson?: string };
@@ -487,8 +487,15 @@ function toCanonicalUrl(url: string | null): string | null {
   // the same canonical https form as everything else, carrying the URI as a query
   // param, so it routes through getStateFromPath → ImportRoutine like a normal link.
   // ImportRoutineScreen reads params.fileUri and does the actual read.
+  //
+  // receivedAt stamps each delivery. Without it, re-opening the SAME file while
+  // ImportRoutine is already focused produces identical params — React Navigation
+  // sees no state change, never re-renders, and the import effect never re-runs, so
+  // the second tap is silently a no-op (e.g. open a file, cancel, tap it again).
+  // The stamp makes every delivery distinct, so one tap always == one import attempt.
   if (url.startsWith('file://') || url.startsWith('content://')) {
-    return 'https://json.fit/import-file?fileUri=' + encodeURIComponent(url);
+    return 'https://json.fit/import-file?fileUri=' + encodeURIComponent(url) +
+      '&receivedAt=' + Date.now();
   }
   if (!url.startsWith('json-app://')) return url;
   let rest = url.slice('json-app://'.length);
@@ -515,11 +522,13 @@ const linking = {
       },
       // Inbound file import — synthesised by toCanonicalUrl from a file:// or
       // content:// URI handed to us by the share sheet / Open-with.
+      // NO custom `parse` here: React Navigation already decodes query params
+      // once, which exactly undoes toCanonicalUrl's single encodeURIComponent.
+      // A decodeURIComponent here would decode a SECOND time and corrupt any
+      // document id containing %3A / %2F — which every Downloads-provider
+      // content:// URI does (e.g. .../document/raw%3A%2Fstorage%2F...).
       ImportRoutine: {
         path: 'import-file',
-        parse: {
-          fileUri: (u: string) => decodeURIComponent(u),
-        },
       },
       RecipeDetail: {
         path: 'r',

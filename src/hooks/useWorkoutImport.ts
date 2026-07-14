@@ -1530,6 +1530,12 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
   // where the OS hands us a file:// or content:// URI) lives in ImportRoutineScreen.tsx —
   // see its "KEEP IN SYNC: inbound file import" effect. Changes to file-read behaviour here
   // likely need to be mirrored there.
+  //
+  // Note the inbound effects there carry a one-shot ref latch. That is REQUIRED, not
+  // defensive: processWorkoutData resolves ~800ms before validation runs (see its warning),
+  // so an effect guarded only on !isLoading && !parsedProgram reopens after every validation
+  // failure and re-imports forever. This picker path is safe only because it is user-driven
+  // rather than effect-driven. Any new auto-import effect needs the same latch.
   const handleFileUpload = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({

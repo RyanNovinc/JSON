@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,8 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
-// SDK 54 moved readAsStringAsync to the /legacy subpath; the root entry no longer exports it.
-import { readAsStringAsync } from 'expo-file-system/legacy';
+import { File } from 'expo-file-system';
 import { getAIPrompt, MUSCLE_GROUPS, QuestionnaireData, generateProgramSpecs } from '../data/workoutPrompt';
 import { assemblePlanningPrompt, ProgramContext } from '../data/planningPrompt';
 import { ProgramStorage, Program, MesocyclePhase } from '../data/programStorage';
@@ -50,7 +49,7 @@ export default function ImportRoutineScreen() {
   const route = useRoute<ImportScreenRouteProp>();
   const { themeColor } = useTheme();
   // Check if we have shareId and should show loading immediately
-  const { shareId, isCurated, curatedSlug, fileUri } = route.params || {};
+  const { shareId, isCurated, curatedSlug, fileUri, receivedAt } = route.params || {};
   console.log('🔧 [ROUTE DEBUG] shareId:', shareId, 'isCurated:', isCurated, 'curatedSlug:', curatedSlug);
   console.log('🔧 [ROUTE DEBUG] isLoading calculation: !!shareId && !isCurated =', !!shareId, '&&', !isCurated, '=', !!shareId && !isCurated);
   const [isLoading, setIsLoading] = useState(!!shareId && !isCurated); // Start loading if we have shareId but not for curated imports
@@ -90,6 +89,12 @@ export default function ImportRoutineScreen() {
 
   // Track if user cancelled prefilledJson import to prevent re-processing
   const [prefilledCancelled, setPrefilledCancelled] = useState(false);
+
+  // One-shot latch: processWorkoutData resolves before validation
+  // runs (see its warning); without this, a validation failure
+  // reopens the guard every ~800ms and loops forever.
+  const consumedPrefilledJson = useRef<string | null>(null);
+  const consumedFileUri = useRef<string | null>(null);
 
 
   // Handle schema version migration on component mount
@@ -150,7 +155,13 @@ export default function ImportRoutineScreen() {
       console.log('🏋️ [IMPORT ROUTINE] prefilledJson sample:', prefilledJson.substring(0, 100) + '...');
     }
     
-    if (prefilledJson && !isLoading && !parsedProgram && !prefilledCancelled) {
+    // KEEP IN SYNC: this latch and the fileUri latch below must stay identical in shape.
+    // One-shot latch: processWorkoutData resolves before validation
+    // runs (see its warning); without this, a validation failure
+    // reopens the guard every ~800ms and loops forever.
+    if (prefilledJson && consumedPrefilledJson.current !== prefilledJson &&
+        !isLoading && !parsedProgram && !prefilledCancelled) {
+      consumedPrefilledJson.current = prefilledJson;
       console.log('🔄 [AUTO-IMPORT] All conditions met - starting auto-import');
       console.log('🔄 [AUTO-IMPORT] JSON length:', prefilledJson.length);
       console.log('🔄 [AUTO-IMPORT] About to call processWorkoutData');
@@ -170,14 +181,30 @@ export default function ImportRoutineScreen() {
   // Same shape as the prefilledJson auto-import above, but the payload arrives as a
   // file:// / content:// URI from the share sheet or Open-with (routed here by
   // toCanonicalUrl in AppNavigator), so we read it to a string first. Guards mirror
-  // the effect above; processWorkoutData is fire-and-forget — its promise resolves
-  // ~800ms BEFORE validation runs, so never await or sequence on it. The confirm UI
-  // is driven by the showConfirmation / errorMessage state it eventually sets.
+  // the effect above — INCLUDING the one-shot latch, which is load-bearing, not
+  // defensive: without it an invalid file loops forever. processWorkoutData is
+  // fire-and-forget — its promise resolves ~800ms BEFORE validation runs, so never
+  // await or sequence on it. The confirm UI is driven by the showConfirmation /
+  // errorMessage state it eventually sets.
   useEffect(() => {
-    if (fileUri && !isLoading && !parsedProgram && !prefilledCancelled) {
+    // One-shot latch, keyed on the DELIVERY (fileUri + receivedAt), not the file:
+    // one tap == one import attempt. processWorkoutData resolves before validation
+    // runs (see its warning); without this latch, a validation failure reopens the
+    // guard every ~800ms and loops forever. Keying on fileUri alone would fix the
+    // loop but wedge the opposite way — re-opening the same file would stay latched
+    // shut for the life of the screen. receivedAt (stamped per delivery in
+    // toCanonicalUrl) makes each tap a distinct key, so cancel-then-reopen works.
+    // Latched synchronously here, BEFORE the await, or a re-render during the
+    // read would re-enter the guard and double-read.
+    const deliveryKey = fileUri + ':' + receivedAt;
+    if (fileUri && consumedFileUri.current !== deliveryKey &&
+        !isLoading && !parsedProgram && !prefilledCancelled) {
+      consumedFileUri.current = deliveryKey;
       (async () => {
         try {
-          const text = await readAsStringAsync(decodeURI(fileUri));
+          // fileUri arrives already decoded exactly once (by React Navigation's
+          // query parsing, undoing toCanonicalUrl's encode). Do NOT decode again.
+          const text = await new File(fileUri).text();
           console.log('📂 [FILE IMPORT] Read', text.length, 'chars');
           processWorkoutData(text);
         } catch (e) {
@@ -187,7 +214,7 @@ export default function ImportRoutineScreen() {
         }
       })();
     }
-  }, [fileUri, isLoading, parsedProgram, prefilledCancelled]);
+  }, [fileUri, receivedAt, isLoading, parsedProgram, prefilledCancelled]);
 
   // Handle share import by fetching and processing
   const handleShareImport = async (shareId: string) => {
