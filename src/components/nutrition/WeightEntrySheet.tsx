@@ -18,7 +18,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useWeightUnit } from '../../contexts/WeightUnitContext';
 import { WorkoutStorage } from '../../utils/storage';
 import {
-  loadNutritionAnswers,
+  resolveNutritionAnswers,
   updateNutritionField,
 } from '../../utils/nutritionQuestionnaireStorage';
 import { finalizeNutrition } from '../../utils/nutritionMacros';
@@ -225,8 +225,9 @@ export default function WeightEntrySheet({
       // weight through finalizeNutrition() so calories/macros stay in
       // sync. This replaces the old inline BMR recalc in WeightTracker.
       try {
-        const answers = await loadNutritionAnswers();
+        const answers = await resolveNutritionAnswers();
         const hasQuestionnaire =
+          !!answers &&
           !!answers.gender &&
           answers.age != null &&
           answers.height != null &&

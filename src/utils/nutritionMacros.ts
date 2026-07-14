@@ -117,6 +117,13 @@ export async function finalizeNutrition(
       weightUnit: 'kg', // default unit
       activityLevel: String(a.activityLevel || ''),
       jobType: 'desk_job', // not collected in this flow; builder default
+      // These three used to be dropped here. The draft is cleared below, so
+      // whatever isn't written here is gone for good — and the summary needs
+      // all three to render (Diet, Rate) and to recompute macros for a
+      // 'custom' split. See resolveNutritionAnswers().
+      dietType: a.dietType,
+      targetRatePercentage: a.targetRatePercentage,
+      customMacros: a.customMacros,
     },
     macroResults: {
       calories: macros.calories,
@@ -154,6 +161,7 @@ export async function finalizeNutrition(
       eatingChallenges: a.eatingChallenges ?? [],
       allergies: a.allergies ?? [],
       avoidFoods: a.avoidFoods ?? [],
+      mealVariety: a.mealVariety,
     },
     completedAt: now,
   };

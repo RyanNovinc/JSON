@@ -88,6 +88,10 @@ export interface NutritionQuestionnaireResults {
     activityLevel: string;
     jobType: string;
     dietType?: string;
+    // The draft is cleared at finalize, so anything the reader needs later has
+    // to survive here. `rate` is kg/week (derived); this is the raw answer.
+    targetRatePercentage?: number;
+    customMacros?: { protein: number; carbs: number; fat: number };
   };
   macroResults: {
     protein: number;
@@ -133,6 +137,9 @@ export interface BudgetCookingQuestionnaireResults {
     eatingChallenges: string[];
     allergies: string[];
     avoidFoods: string[];
+    // See NutritionQuestionnaireResults.targetRatePercentage — same reason.
+    // `varietySeeking` is a hardcoded default, not this.
+    mealVariety?: 'convenience' | 'balanced' | 'variety';
   };
   completedAt: string;
 }

@@ -46,7 +46,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import {
-  loadNutritionAnswers,
+  resolveNutritionAnswers,
   clearNutritionAnswers,
   NutritionAnswers,
 } from '../../../utils/nutritionQuestionnaireStorage';
@@ -244,7 +244,10 @@ export default function NutritionSummaryScreen() {
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
 
       (async () => {
-        const data = await loadNutritionAnswers();
+        // Not loadNutritionAnswers(): finalizeNutrition() has already cleared
+        // the draft by the time anyone lands here. resolveNutritionAnswers()
+        // reads the finalized results and overlays any edits since.
+        const data = await resolveNutritionAnswers();
         const favs = await loadCuratedFavoritesV2();
         let sleepText: string | null = null;
         try {

@@ -98,7 +98,7 @@ import {
   SlotPick,
   PlanSlot,
 } from '../../utils/curatedFavoritesStorage';
-import { loadNutritionAnswers } from '../../utils/nutritionQuestionnaireStorage';
+import { resolveNutritionAnswers } from '../../utils/nutritionQuestionnaireStorage';
 import { computeMacros } from '../../utils/nutritionMacros';
 import {
   CoreShelf,
@@ -864,7 +864,7 @@ export default function CuratedFavoritesScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const saved = await loadNutritionAnswers();
+        const saved = await resolveNutritionAnswers();
         if (!cancelled && saved) setLoadedAnswers(saved);
       } catch (err) {
         console.warn('[CuratedFavorites] Failed to load saved answers:', err);

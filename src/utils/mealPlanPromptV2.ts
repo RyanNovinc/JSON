@@ -51,7 +51,7 @@ import {
 } from './curatedFavoritesStorage';
 import {
   NutritionAnswers,
-  loadNutritionAnswers,
+  resolveNutritionAnswers,
 } from './nutritionQuestionnaireStorage';
 import { computeMacros, computeMacrosPhaseAware } from './nutritionMacros';
 import { WorkoutStorage } from './storage';
@@ -893,7 +893,7 @@ Verify against these targets (authoritative \u2014 use these, not numbers recall
 // ---------------------------------------------------------------------------
 
 export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string> {
-  const answers = await loadNutritionAnswers();
+  const answers = await resolveNutritionAnswers();
   if (!answers) {
     throw new Error('Please complete the nutrition questionnaire first.');
   }
@@ -965,7 +965,7 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
 }
 
 export async function buildReviewLauncherFromStorage(): Promise<string> {
-  const answers = await loadNutritionAnswers();
+  const answers = await resolveNutritionAnswers();
   if (!answers) throw new Error('Please complete the nutrition questionnaire first.');
 
   let macros: any = null;
