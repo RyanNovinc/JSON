@@ -6956,7 +6956,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     eligible_slots: ['snack', 'post_workout'],
     min_scale: 0.5,
     max_scale: 2.0,
-    flex_ingredient_id: 'greek_yoghurt_plain',
+    flex_ingredient_id: 'greek_yoghurt_plain_full_fat',
     contains_allergens: ['Dairy'],
     image_filename: 'greek_yogurt_snack.png',
     photo_url: undefined,
@@ -6970,7 +6970,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 170, protein_g: 17, carbs_g: 9, fat_g: 6, fiber_g: 0 },
+        plate_macros: { kcal: 194, protein_g: 18, carbs_g: 7.8, fat_g: 10, fiber_g: 0 },
       },
     ],
     methods: [
@@ -6982,7 +6982,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         skill_min: 1,
         shortcut_level: 'scratch',
         ingredients: [
-          { ingredient_id: 'greek_yoghurt_plain', base_amount: 200, unit: 'g', scaling: 'flex', notes: 'Full-fat for more calories; high-protein/skyr style for more protein.' },
+          { ingredient_id: 'greek_yoghurt_plain_full_fat', base_amount: 200, unit: 'g', scaling: 'flex', notes: 'Full-fat for more calories; high-protein/skyr style for more protein.' },
         ],
         instructions: [
           { summary: 'Spoon a serving of Greek yogurt into a bowl and eat — add honey or berries if you like.', substeps: ['Spoon a serving of Greek yogurt into a bowl and eat — add honey or berries if you like.'] },
@@ -7575,7 +7575,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 195, protein_g: 4, carbs_g: 42, fat_g: 0, fiber_g: 1 },
+        plate_macros: { kcal: 274, protein_g: 5.3, carbs_g: 60, fat_g: 0.5, fiber_g: 1 },
       },
     ],
     methods: [
