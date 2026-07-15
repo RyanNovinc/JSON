@@ -7990,8 +7990,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         base_serving_multiplier: 1.0,
         equipment_required: ['stovetop'],
         additional_ingredients: [
-          { ingredient_id: 'egg_whole', base_amount: 4, unit: 'count', scaling: 'scales', notes: 'One fried egg per serve.' },
-          { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'To fry the eggs.' },
+          { ingredient_id: 'egg_whole', base_amount: 1, unit: 'count', scaling: 'scales', notes: 'One fried egg per serve.' },
+          { ingredient_id: 'olive_oil', base_amount: 3.5, unit: 'g', scaling: 'scales', notes: 'To fry the eggs.' },
         ],
         additional_instructions: [
           { summary: 'Fry an egg per serve and set on top.', substeps: ['Fry an egg per serve in a little hot oil until the edges are crispy and the yolk still runs.', 'Set on top of the basil chicken and rice.'] },
@@ -8314,7 +8314,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         is_stunt_plate: false,
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'tortilla_large', base_amount: 4, unit: 'count', scaling: 'scales' },
+          { ingredient_id: 'tortilla_large', base_amount: 1, unit: 'count', scaling: 'scales' },
         ],
         additional_instructions: [
           { summary: 'Wrap the burrito.', substeps: ['Pile chicken, rice, beans, cheese, and salsa onto each warmed tortilla.', 'Fold in the sides and roll up tightly; sear seam-down in a dry pan if you like.'] },
@@ -8331,8 +8331,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         is_stunt_plate: false,
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'tortilla_large', base_amount: 4, unit: 'count', scaling: 'scales' },
-          { ingredient_id: 'chipotle_in_adobo', base_amount: 60, unit: 'g', scaling: 'scales', notes: 'Negligible macros; the heat upgrade.' },
+          { ingredient_id: 'tortilla_large', base_amount: 1, unit: 'count', scaling: 'scales' },
+          { ingredient_id: 'chipotle_in_adobo', base_amount: 15, unit: 'g', scaling: 'scales', notes: 'Negligible macros; the heat upgrade.' },
         ],
         additional_instructions: [
           { summary: 'Add the chipotle, then wrap.', substeps: ['Stir the chipotle in adobo through the chicken before filling.', 'Wrap as for the standard burrito.'] },
@@ -8420,7 +8420,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         description: 'Marinated chicken with salad and yogurt sauce in a large tortilla',
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'tortilla_large', base_amount: 6, unit: 'count', scaling: 'scales' },
+          { ingredient_id: 'tortilla_large', base_amount: 1.5, unit: 'count', scaling: 'scales' },
         ],
         additional_instructions: [],
         assembly_time_minutes: 0,
@@ -8433,7 +8433,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         description: 'Marinated chicken with salad and yogurt sauce over jasmine rice',
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'jasmine_rice', base_amount: 400, unit: 'g', scaling: 'scales' },
+          { ingredient_id: 'jasmine_rice', base_amount: 100, unit: 'g', scaling: 'scales' },
         ],
         additional_instructions: [],
         assembly_time_minutes: 0,
@@ -8833,7 +8833,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         is_stunt_plate: false,
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'jasmine_rice', base_amount: 340, unit: 'g', scaling: 'scales', notes: '85g dry/serve; basmati fine.' },
+          { ingredient_id: 'jasmine_rice', base_amount: 85, unit: 'g', scaling: 'scales', notes: '85g dry/serve; basmati fine.' },
         ],
         additional_instructions: [
           { summary: 'Build the bowl.', substeps: ['Serve the koftas over rice with the garlic-yoghurt sauce and salad.'] },
@@ -8850,7 +8850,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         is_stunt_plate: false,
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'tortilla_large', base_amount: 6, unit: 'count', scaling: 'scales', notes: '~1.5 large (or 2 pita) per serve.' },
+          { ingredient_id: 'tortilla_large', base_amount: 1.5, unit: 'count', scaling: 'scales', notes: '~1.5 large (or 2 pita) per serve.' },
         ],
         additional_instructions: [
           { summary: 'Build the wrap.', substeps: ['Warm the flatbread.', 'Fill with koftas, garlic-yoghurt sauce, and salad; roll up.'] },
@@ -9123,8 +9123,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         base_serving_multiplier: 1.0,
         equipment_required: ['oven'],
         additional_ingredients: [
-          { ingredient_id: 'baking_potato', base_amount: 600, unit: 'g', scaling: 'scales', notes: 'Roast; or swap a fresh salad (no oven).' },
-          { ingredient_id: 'lemon', base_amount: 1, unit: 'count', scaling: 'scales' },
+          { ingredient_id: 'baking_potato', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Roast; or swap a fresh salad (no oven).' },
+          { ingredient_id: 'lemon', base_amount: 0.25, unit: 'count', scaling: 'scales' },
         ],
         additional_instructions: [
           { summary: 'Serve the schnitzel with roast potatoes or salad and a wedge of lemon.', substeps: ['Roast the potatoes alongside, or plate with a fresh salad.', 'Add a lemon wedge.'] },
@@ -9140,11 +9140,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         description: 'Schnitzel in a buttered bun with cheese, lettuce, and sweet chilli sauce — the nostalgic hero.',
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'bread_roll', base_amount: 4, unit: 'count', scaling: 'scales' },
-          { ingredient_id: 'butter_salted', base_amount: 40, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'cheese_tasty_grated', base_amount: 80, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'lettuce', base_amount: 60, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'sweet_chilli_sauce', base_amount: 60, unit: 'ml', scaling: 'scales' },
+          { ingredient_id: 'bread_roll', base_amount: 1, unit: 'count', scaling: 'scales' },
+          { ingredient_id: 'butter_salted', base_amount: 10, unit: 'g', scaling: 'scales' },
+          { ingredient_id: 'cheese_tasty_grated', base_amount: 20, unit: 'g', scaling: 'scales' },
+          { ingredient_id: 'lettuce', base_amount: 15, unit: 'g', scaling: 'scales' },
+          { ingredient_id: 'sweet_chilli_sauce', base_amount: 15, unit: 'ml', scaling: 'scales' },
         ],
         additional_instructions: [
           { summary: 'Build the roll.', substeps: ['Butter the buns.', 'Add a schnitzel, cheese, lettuce, and a drizzle of sweet chilli sauce.'] },
@@ -9161,10 +9161,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         base_serving_multiplier: 1.0,
         equipment_required: ['oven'],
         additional_ingredients: [
-          { ingredient_id: 'tomato_paste', base_amount: 120, unit: 'g', scaling: 'scales', notes: 'Or pasta sauce.' },
-          { ingredient_id: 'cheese_tasty_grated', base_amount: 120, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'jalapenos_pickled', base_amount: 40, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'baking_potato', base_amount: 500, unit: 'g', scaling: 'scales', notes: 'Or salad/rice base.' },
+          { ingredient_id: 'tomato_paste', base_amount: 30, unit: 'g', scaling: 'scales', notes: 'Or pasta sauce.' },
+          { ingredient_id: 'cheese_tasty_grated', base_amount: 30, unit: 'g', scaling: 'scales' },
+          { ingredient_id: 'jalapenos_pickled', base_amount: 10, unit: 'g', scaling: 'scales' },
+          { ingredient_id: 'baking_potato', base_amount: 125, unit: 'g', scaling: 'scales', notes: 'Or salad/rice base.' },
         ],
         additional_instructions: [
           { summary: 'Top and melt.', substeps: ['Top each schnitzel with tomato sauce, cheese, and jalapenos.', 'Grill or bake until the cheese melts and bubbles.', 'Serve with potato or salad.'] },
@@ -9335,7 +9335,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         is_stunt_plate: false,
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'tortilla_large', base_amount: 6, unit: 'count', scaling: 'scales', notes: 'Flatbread/pita; ~1.5 large per serve.' },
+          { ingredient_id: 'tortilla_large', base_amount: 1.5, unit: 'count', scaling: 'scales', notes: 'Flatbread/pita; ~1.5 large per serve.' },
         ],
         additional_instructions: [
           { summary: 'Serve in flatbread.', substeps: ['Warm the flatbread.', 'Fill with cevapi, plenty of raw onion, and a spoon of ajvar (and kajmak/yoghurt if using).'] },
@@ -9352,7 +9352,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         is_stunt_plate: false,
         base_serving_multiplier: 1.0,
         additional_ingredients: [
-          { ingredient_id: 'jasmine_rice', base_amount: 340, unit: 'g', scaling: 'scales', notes: '85g dry/serve.' },
+          { ingredient_id: 'jasmine_rice', base_amount: 85, unit: 'g', scaling: 'scales', notes: '85g dry/serve.' },
         ],
         additional_instructions: [
           { summary: 'Build the rice plate.', substeps: ['Serve the cevapi over rice with raw onion, ajvar, and the salad.'] },
