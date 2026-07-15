@@ -2337,7 +2337,7 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     dietary_flags: ["vegetarian", "vegan", "dairy_free", "gluten_free", "nut_free"],
     allergens: ["Soy"],
     typical_pack_size: 500,
-    notes: "Amounts are POD weight (what you weigh at the bench); pods are ~50% edible beans, and macros here are per 100g of pods so the maths lands on what is eaten.",
+    notes: "Amounts are POD weight. ~50% edible: 300g pods ≈ 150g shelled beans (121 kcal, 11.9g protein per 100g shelled, USDA).",
     state: "as_sold",
     macros_per_100g: { kcal: 61, protein_g: 6, carbs_g: 4.5, fat_g: 2.6, fiber_g: 2.6 },
     grams_per_canonical_unit: 1,

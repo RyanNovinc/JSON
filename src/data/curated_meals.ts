@@ -7071,7 +7071,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         skill_min: 1,
         shortcut_level: 'scratch',
         ingredients: [
-          { ingredient_id: 'edamame', base_amount: 150, unit: 'g', scaling: 'flex', notes: 'Frozen pods.' },
+          { ingredient_id: 'edamame', base_amount: 300, unit: 'g', scaling: 'flex', notes: 'Frozen pods; ~300g pods yields ~150g beans.' },
           { ingredient_id: 'salt', base_amount: 0.25, unit: 'tsp', scaling: 'fixed', notes: 'Flaky, to finish.' },
         ],
         instructions: [
