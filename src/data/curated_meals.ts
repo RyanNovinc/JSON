@@ -1918,7 +1918,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         display_name: 'BBQ Pulled Pork',
         description: 'Slow-cooked pork shoulder shredded and tossed in tangy BBQ sauce.',
         image_filename: undefined,
-        plate_macros: { kcal: 610, protein_g: 48, carbs_g: 28, fat_g: 32, fiber_g: 1 },
+        plate_macros: { kcal: 767, protein_g: 48.1, carbs_g: 30.7, fat_g: 49.9, fiber_g: 0.3 },
         assembly_time_minutes: 0,
         additional_instructions: [],
         additional_ingredients: [],
@@ -5482,7 +5482,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 700, protein_g: 42, carbs_g: 38, fat_g: 42, fiber_g: 6 },
+        plate_macros: { kcal: 933, protein_g: 47.6, carbs_g: 60.6, fat_g: 55.6, fiber_g: 7.6 },
       },
     ],
     methods: [
@@ -6206,7 +6206,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 1130, protein_g: 70, carbs_g: 78, fat_g: 59, fiber_g: 11 },
+        plate_macros: { kcal: 1296, protein_g: 65.2, carbs_g: 80.7, fat_g: 78.6, fiber_g: 10.3 },
       },
     ],
     methods: [
@@ -6332,7 +6332,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 320, protein_g: 40, carbs_g: 32, fat_g: 4, fiber_g: 0 },
+        plate_macros: { kcal: 415, protein_g: 39.9, carbs_g: 31, fat_g: 14.4, fiber_g: 0 },
       },
     ],
     methods: [
@@ -7105,7 +7105,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 250, protein_g: 35, carbs_g: 16, fat_g: 5, fiber_g: 0 },
+        plate_macros: { kcal: 364, protein_g: 39.5, carbs_g: 19.4, fat_g: 14, fiber_g: 0 },
       },
     ],
     methods: [
