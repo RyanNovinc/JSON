@@ -85,6 +85,27 @@ src/
 - `src/hooks/useWorkoutImport.ts` (1662 lines) — the JSON import + validation pipeline.
 - `src/utils/premiumFeatures.ts` — `PremiumFeature` enum + free-tier limits. Gate via `useJSONPro()`.
 
+## Nutrition macro model (ingredient DB rebuild)
+
+The ingredient database (`src/data/ingredients.ts`) now carries macros. Three rules govern it —
+keep them exact; they are load-bearing for macro computation:
+
+- **`macros_per_100g` is per 100 GRAMS for every row**, regardless of `canonical_unit`. Convert the
+  authored amount to grams via `grams_per_canonical_unit` FIRST, then apply. Never apply macros per
+  ml, per count, or per tsp directly.
+  - `grams = amount × grams_per_canonical_unit`; `macros = grams × macros_per_100g / 100`
+  - `'g'` rows: `grams_per_canonical_unit = 1`. `'ml'` rows: it is the density.
+    `count`/`tsp`/`tbsp`/`cloves` rows: grams per that unit.
+- **`is_pantry_negligible` hides an ingredient from shopping lists and macro totals only.** Always
+  render its amount in method / cook-mode steps.
+- **`atwater_exempt` marks rows whose kcal cannot be reconstructed from P/C/F** (alcohol, acetic
+  acid, or non-standard USDA energy factors). Any Atwater validation must skip these rows, and should
+  compute available carbs as `(carbs − fiber)` with fiber at 2 kcal/g.
+
+Two legacy rows (`chipotle_in_adobo`, `sweetcorn`) were not supplied by the rebuild and carry no
+macro fields yet — the macro fields on `Ingredient` are optional for that reason. Do not fabricate
+their macros.
+
 ## Conventions
 
 - **Naming:** `PascalCase.tsx` for screens/components (routes are always `*Screen.tsx`);

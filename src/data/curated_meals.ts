@@ -10,7 +10,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     eligible_slots: ['lunch', 'dinner', 'second_lunch', 'early_dinner'],
     min_scale: 0.7,
     max_scale: 1.5,
-    flex_ingredient_id: 'basmati_rice_cooked',
+    flex_ingredient_id: 'basmati_rice_dry',
     contains_allergens: ['Dairy'],
     image_filename: 'butter_chicken_with_rice.png',
     meal_prep: {
@@ -144,15 +144,15 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             scaling: 'fixed'
           },
           {
-            ingredient_id: 'basmati_rice_cooked',
-            base_amount: 180,
+            ingredient_id: 'basmati_rice_dry',
+            base_amount: 60,
             unit: 'g',
             scaling: 'flex'
           },
           {
-            ingredient_id: 'coriander_leaves_fresh',
-            base_amount: 1,
-            unit: 'tbsp',
+            ingredient_id: 'coriander_fresh',
+            base_amount: 4,
+            unit: 'g',
             scaling: 'fixed',
             notes: 'for garnish'
           }
@@ -235,15 +235,15 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             scaling: 'scales'
           },
           {
-            ingredient_id: 'basmati_rice_cooked',
-            base_amount: 180,
+            ingredient_id: 'basmati_rice_dry',
+            base_amount: 60,
             unit: 'g',
             scaling: 'flex'
           },
           {
-            ingredient_id: 'coriander_leaves_fresh',
-            base_amount: 1,
-            unit: 'tbsp',
+            ingredient_id: 'coriander_fresh',
+            base_amount: 4,
+            unit: 'g',
             scaling: 'fixed',
             notes: 'for garnish'
           }
@@ -300,15 +300,15 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             scaling: 'scales'
           },
           {
-            ingredient_id: 'basmati_rice_cooked',
-            base_amount: 180,
+            ingredient_id: 'basmati_rice_dry',
+            base_amount: 60,
             unit: 'g',
             scaling: 'flex'
           },
           {
-            ingredient_id: 'coriander_leaves_fresh',
-            base_amount: 1,
-            unit: 'tbsp',
+            ingredient_id: 'coriander_fresh',
+            base_amount: 4,
+            unit: 'g',
             scaling: 'fixed',
             notes: 'for garnish'
           }
@@ -1985,8 +1985,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         image_filename: 'Pulled Pork Rice Bowl (bowl).png',
         additional_ingredients: [
           {
-            ingredient_id: 'basmati_rice_cooked',
-            base_amount: 280,
+            ingredient_id: 'basmati_rice_dry',
+            base_amount: 95,
             unit: 'g',
             scaling: 'fixed'
           },
@@ -2145,9 +2145,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             scaling: 'fixed'
           },
           {
-            ingredient_id: 'coriander_leaves_fresh',
-            base_amount: 1.5,
-            unit: 'tbsp',
+            ingredient_id: 'coriander_fresh',
+            base_amount: 6,
+            unit: 'g',
             scaling: 'fixed'
           },
           {
@@ -2699,7 +2699,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         base_serving_multiplier: 1.0,
       },
       {
-        id: 'spaghetti',
+        id: 'spaghetti_dry',
         display_name: 'Spaghetti Bolognese',
         description: 'Classic spag bol — al dente pasta, sauce tossed through, parmesan blizzard, drizzle of good oil.',
         base_serving_multiplier: 1.0,
@@ -3388,8 +3388,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         image_filename: 'massaman_rice.png',
         additional_ingredients: [
           {
-            ingredient_id: 'basmati_rice_cooked',
-            base_amount: 300,
+            ingredient_id: 'basmati_rice_dry',
+            base_amount: 100,
             unit: 'g',
             scaling: 'fixed',
             notes: 'Approximately 100g dry rice. Cook per packet directions or in a rice cooker.'
@@ -3402,9 +3402,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             notes: 'Roughly crushed.'
           },
           {
-            ingredient_id: 'coriander_leaves_fresh',
-            base_amount: 1,
-            unit: 'tbsp',
+            ingredient_id: 'coriander_fresh',
+            base_amount: 4,
+            unit: 'g',
             scaling: 'fixed'
           },
           {
@@ -3527,7 +3527,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             notes: 'Approximately 3 tbsp. Squid brand.'
           },
           {
-            ingredient_id: 'sugar_brown_palm_substitute',
+            ingredient_id: 'brown_sugar',
             base_amount: 30,
             unit: 'g',
             scaling: 'fixed',
@@ -3680,7 +3680,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             scaling: 'scales'
           },
           {
-            ingredient_id: 'sugar_brown_palm_substitute',
+            ingredient_id: 'brown_sugar',
             base_amount: 30,
             unit: 'g',
             scaling: 'fixed'
@@ -3802,8 +3802,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         image_filename: 'chilli_con_carne_bowl.png',
         additional_ingredients: [
           {
-            ingredient_id: 'basmati_rice_cooked',
-            base_amount: 250,
+            ingredient_id: 'basmati_rice_dry',
+            base_amount: 85,
             unit: 'g',
             scaling: 'fixed',
             notes: 'Approximately 85g dry rice. Cook per packet directions or in a rice cooker.'
@@ -3828,9 +3828,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             notes: 'Approximately half a small avocado.'
           },
           {
-            ingredient_id: 'coriander_leaves_fresh',
-            base_amount: 1,
-            unit: 'tbsp',
+            ingredient_id: 'coriander_fresh',
+            base_amount: 4,
+            unit: 'g',
             scaling: 'fixed'
           },
           {
@@ -3928,9 +3928,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             notes: 'Finely sliced.'
           },
           {
-            ingredient_id: 'coriander_leaves_fresh',
-            base_amount: 1,
-            unit: 'tbsp',
+            ingredient_id: 'coriander_fresh',
+            base_amount: 4,
+            unit: 'g',
             scaling: 'fixed'
           },
           {
@@ -4051,17 +4051,17 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           },
           {
             ingredient_id: 'kidney_beans_canned',
-            base_amount: 400,
+            base_amount: 250,
             unit: 'g',
             scaling: 'scales',
-            notes: 'One 420g tin, drained weight approximately 250g — the recipe scales to 400g drained-equivalent. Drain and rinse before adding.'
+            notes: 'One 420g tin, drained to ~250g. Drain and rinse before adding.'
           },
           {
             ingredient_id: 'black_beans_canned',
-            base_amount: 400,
+            base_amount: 250,
             unit: 'g',
             scaling: 'scales',
-            notes: 'One 420g tin, drained weight approximately 250g. Drain and rinse before adding.'
+            notes: 'One 420g tin, drained to ~250g. Drain and rinse before adding.'
           },
           {
             ingredient_id: 'beef_stock_cube',
@@ -4215,17 +4215,17 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           },
           {
             ingredient_id: 'kidney_beans_canned',
-            base_amount: 400,
+            base_amount: 250,
             unit: 'g',
             scaling: 'scales',
-            notes: 'Drained weight. One 420g tin. Drain and rinse before adding.'
+            notes: 'One 420g tin, drained to ~250g. Drain and rinse before adding.'
           },
           {
             ingredient_id: 'black_beans_canned',
-            base_amount: 400,
+            base_amount: 250,
             unit: 'g',
             scaling: 'scales',
-            notes: 'Drained weight. One 420g tin. Drain and rinse before adding.'
+            notes: 'One 420g tin, drained to ~250g. Drain and rinse before adding.'
           },
           {
             ingredient_id: 'beef_stock_cube',
@@ -6752,7 +6752,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         skill_min: 2,
         shortcut_level: 'scratch',
         ingredients: [
-          { ingredient_id: 'cream_cheese', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Light block-style; soften at room temp.' },
+          { ingredient_id: 'cream_cheese', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Full-fat block-style; soften at room temp.' },
           { ingredient_id: 'cottage_cheese', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Blended smooth.' },
           { ingredient_id: 'greek_yoghurt_plain', base_amount: 100, unit: 'g', scaling: 'scales' },
           { ingredient_id: 'whey_protein_vanilla', base_amount: 30, unit: 'g', scaling: 'flex', notes: 'Vanilla; also helps it set firm.' },
@@ -7180,7 +7180,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     eligible_slots: ['snack', 'post_workout'],
     min_scale: 0.5,
     max_scale: 2.0,
-    flex_ingredient_id: 'cheese_block',
+    flex_ingredient_id: 'cheese_tasty_grated',
     contains_allergens: ['Dairy'],
     image_filename: 'cheese_snack.png',
     photo_url: undefined,
@@ -7206,7 +7206,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         skill_min: 1,
         shortcut_level: 'scratch',
         ingredients: [
-          { ingredient_id: 'cheese_block', base_amount: 30, unit: 'g', scaling: 'flex', notes: 'About one slice, one string cheese, or one Babybel.' },
+          { ingredient_id: 'cheese_tasty_grated', base_amount: 30, unit: 'g', scaling: 'flex', notes: 'About one slice, one string cheese, or one Babybel.' },
         ],
         instructions: [
           { summary: 'Grab a portion of cheese — a slice, a string cheese, or an individual round — and eat.', substeps: ['Grab a portion of cheese — a slice, a string cheese, or an individual round — and eat.'] },
@@ -7350,7 +7350,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         skill_min: 1,
         shortcut_level: 'scratch',
         ingredients: [
-          { ingredient_id: 'chickpeas', base_amount: 400, unit: 'g', scaling: 'flex', notes: 'One drained can. Or skip cooking and buy a bag of ready-roasted chickpeas.' },
+          { ingredient_id: 'chickpeas', base_amount: 250, unit: 'g', scaling: 'flex', notes: 'One drained can. Or skip cooking and buy a bag of ready-roasted chickpeas.' },
           { ingredient_id: 'olive_oil', base_amount: 15, unit: 'g', scaling: 'scales', notes: 'About 1 tbsp.' },
           { ingredient_id: 'salt', base_amount: 0.5, unit: 'tsp', scaling: 'fixed', notes: 'Plus any spices you like — paprika, cumin.' },
         ],
@@ -7587,7 +7587,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         skill_min: 1,
         shortcut_level: 'scratch',
         ingredients: [
-          { ingredient_id: 'jasmine_rice', base_amount: 150, unit: 'g', scaling: 'flex', notes: 'Cooked weight. About 75g raw rice.' },
+          { ingredient_id: 'jasmine_rice', base_amount: 75, unit: 'g', scaling: 'flex', notes: 'Dry weight; makes ~190g cooked.' },
         ],
         instructions: [
           { summary: 'Boil the rice in salted water until tender, about 15-18 minutes, then drain.', substeps: ['Boil the rice in salted water until tender, about 15-18 minutes, then drain.'] },
@@ -8139,10 +8139,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         skill_min: 3,
         shortcut_level: 'scratch',
         ingredients: [
-          { ingredient_id: 'spaghetti', base_amount: 125, unit: 'g', scaling: 'scales', notes: 'Dry. Generous single portion.' },
+          { ingredient_id: 'spaghetti_dry', base_amount: 125, unit: 'g', scaling: 'scales', notes: 'Dry. Generous single portion.' },
           { ingredient_id: 'bacon', base_amount: 80, unit: 'g', scaling: 'flex', notes: 'Streaky bacon or pancetta, cut into batons. Guanciale is the authentic upgrade.' },
           { ingredient_id: 'egg_whole', base_amount: 2, unit: 'count', scaling: 'scales', notes: '1 whole egg + 1 extra yolk per serving for richness — treat as ~2 eggs in macros.' },
-          { ingredient_id: 'parmesan', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Finely grated. Pecorino Romano is the authentic upgrade. Some reserved for topping.' },
+          { ingredient_id: 'parmesan_grated', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Finely grated. Pecorino Romano is the authentic upgrade. Some reserved for topping.' },
           { ingredient_id: 'black_pepper_ground', base_amount: 0.75, unit: 'tsp', scaling: 'scales', notes: 'Freshly ground, generous.' },
           { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'scales', notes: 'For the pasta water.' },
         ],
@@ -8204,7 +8204,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { ingredient_id: 'butter_salted', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'For the lemon-garlic butter.' },
           { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced; some with potatoes, most in the butter.' },
           { ingredient_id: 'lemon', base_amount: 1, unit: 'count', scaling: 'scales', notes: 'Juice in the butter + wedges to finish.' },
-          { ingredient_id: 'parsley', base_amount: 10, unit: 'g', scaling: 'scales', notes: 'Chopped, into the butter.' },
+          { ingredient_id: 'parsley_flat_leaf', base_amount: 10, unit: 'g', scaling: 'scales', notes: 'Chopped, into the butter.' },
           { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
           { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
         ],
@@ -8263,7 +8263,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { ingredient_id: 'jasmine_rice', base_amount: 320, unit: 'g', scaling: 'scales', notes: 'Uncooked, about 1.5 cups.' },
           { ingredient_id: 'capsicum_red', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Sliced into strips.' },
           { ingredient_id: 'brown_onion', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Sliced.' },
-          { ingredient_id: 'black_beans', base_amount: 400, unit: 'g', scaling: 'scales', notes: '1 can, drained and rinsed.' },
+          { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: '1 can, drained and rinsed.' },
           { ingredient_id: 'olive_oil', base_amount: 42, unit: 'g', scaling: 'scales', notes: 'For cooking.' },
           { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
           { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'fixed' },
@@ -8370,7 +8370,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         ingredients: [
           { ingredient_id: 'chicken_thigh_skinless', base_amount: 800, unit: 'g', scaling: 'flex', notes: '200g/serve; breast swaps in leaner.' },
           { ingredient_id: 'jasmine_rice', base_amount: 260, unit: 'g', scaling: 'scales', notes: '65g dry/serve.' },
-          { ingredient_id: 'black_beans', base_amount: 240, unit: 'g', scaling: 'scales', notes: 'One drained can.' },
+          { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: 'One drained can.' },
           { ingredient_id: 'cheese_tasty_grated', base_amount: 80, unit: 'g', scaling: 'scales' },
           { ingredient_id: 'cherry_tomatoes', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Salsa.' },
           { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Red onion for salsa.' },
@@ -8485,7 +8485,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     eligible_slots: ['lunch', 'dinner'],
     min_scale: 0.5,
     max_scale: 2.0,
-    flex_ingredient_id: 'chicken_thigh',
+    flex_ingredient_id: 'chicken_thigh_skinless',
     contains_allergens: ['Nuts', 'Soy', 'Gluten/Wheat'],
     image_filename: 'satay_chicken.png',
     photo_url: undefined,
@@ -8516,7 +8516,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         skill_min: 2,
         shortcut_level: 'scratch',
         ingredients: [
-          { ingredient_id: 'chicken_thigh', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Default cut (juicier). Swap chicken_breast for leaner/lower-fat. 200g per serving. Sliced.' },
+          { ingredient_id: 'chicken_thigh_skinless', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Default cut (juicier). Swap chicken_breast for leaner/lower-fat. 200g per serving. Sliced.' },
           { ingredient_id: 'jasmine_rice', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'About 75g dry per serve.' },
           { ingredient_id: 'peanut_butter_natural', base_amount: 80, unit: 'g', scaling: 'scales', notes: 'Smooth natural; base of the sauce. Fat-dense — counts a lot.' },
           { ingredient_id: 'coconut_milk', base_amount: 150, unit: 'ml', scaling: 'scales', notes: 'Full-fat canned; about a third of a 400ml can. Fat-dense.' },
@@ -8645,7 +8645,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         shortcut_level: 'scratch',
         ingredients: [
           { ingredient_id: 'chicken_breast', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Breast or thigh; rotisserie/pre-cooked shredded is a valid shortcut. 200g per serving.' },
-          { ingredient_id: 'macaroni', base_amount: 340, unit: 'g', scaling: 'scales', notes: '85g dry per serve; high-protein pasta swaps in.' },
+          { ingredient_id: 'macaroni_dry', base_amount: 340, unit: 'g', scaling: 'scales', notes: '85g dry per serve; high-protein pasta swaps in.' },
           { ingredient_id: 'cottage_cheese', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Blended into the sauce — the high-protein trick.' },
           { ingredient_id: 'full_cream_milk', base_amount: 300, unit: 'ml', scaling: 'scales', notes: 'Full-cream for richness, or protein/skim.' },
           { ingredient_id: 'cheese_tasty_grated', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Grated cheddar/tasty (mix with mozzarella if you like); sauce + topping.' },
@@ -8678,7 +8678,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     eligible_slots: ['lunch', 'dinner'],
     min_scale: 0.5,
     max_scale: 2.0,
-    flex_ingredient_id: 'spaghetti',
+    flex_ingredient_id: 'spaghetti_dry',
     contains_allergens: ['Dairy', 'Eggs', 'Gluten/Wheat'],
     image_filename: 'turkey_meatballs_spaghetti.png',
     photo_url: undefined,
@@ -8712,7 +8712,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         shortcut_level: 'scratch',
         ingredients: [
           { ingredient_id: 'turkey_mince', base_amount: 600, unit: 'g', scaling: 'flex', notes: 'Lean ground turkey (93/7). Can substitute chicken mince. 150g per serve.' },
-          { ingredient_id: 'spaghetti', base_amount: 320, unit: 'g', scaling: 'scales', notes: '80g dry per serve. Cook fresh for each meal.' },
+          { ingredient_id: 'spaghetti_dry', base_amount: 320, unit: 'g', scaling: 'scales', notes: '80g dry per serve. Cook fresh for each meal.' },
           { ingredient_id: 'breadcrumbs', base_amount: 50, unit: 'g', scaling: 'scales', notes: 'For binding meatballs. Panko preferred.' },
           { ingredient_id: 'full_cream_milk', base_amount: 60, unit: 'ml', scaling: 'scales', notes: 'Soaks breadcrumbs for tender meatballs.' },
           { ingredient_id: 'egg_whole', base_amount: 1, unit: 'count', scaling: 'fixed', notes: 'Binds the meatballs.' },
@@ -8722,7 +8722,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Diced for sauce. 1 medium onion.' },
           { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Fresh garlic preferred.' },
           { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'For browning and sauce.' },
-          { ingredient_id: 'dried_oregano', base_amount: 2, unit: 'tsp', scaling: 'fixed', notes: 'Essential Italian herb.' },
+          { ingredient_id: 'oregano_dried', base_amount: 2, unit: 'tsp', scaling: 'fixed', notes: 'Essential Italian herb.' },
           { ingredient_id: 'dried_basil', base_amount: 2, unit: 'tsp', scaling: 'fixed', notes: 'Complements oregano.' },
           { ingredient_id: 'salt', base_amount: 1.5, unit: 'tsp', scaling: 'fixed' },
           { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
@@ -8780,7 +8780,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         shortcut_level: 'scratch',
         ingredients: [
           { ingredient_id: 'tuna', base_amount: 370, unit: 'g', scaling: 'flex', notes: 'About 2 large cans, drained. ~90g drained per serving.' },
-          { ingredient_id: 'macaroni', base_amount: 320, unit: 'g', scaling: 'scales', notes: '80g dry per serve; penne/spiral/macaroni — any short shape.' },
+          { ingredient_id: 'macaroni_dry', base_amount: 320, unit: 'g', scaling: 'scales', notes: '80g dry per serve; penne/spiral/macaroni — any short shape.' },
           { ingredient_id: 'cottage_cheese', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Blended into the sauce — the protein-rich base.' },
           { ingredient_id: 'full_cream_milk', base_amount: 250, unit: 'ml', scaling: 'scales' },
           { ingredient_id: 'cheese_tasty_grated', base_amount: 130, unit: 'g', scaling: 'scales', notes: 'Grated cheddar/tasty; sauce + top.' },
@@ -8790,7 +8790,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { ingredient_id: 'sweetcorn', base_amount: 150, unit: 'g', scaling: 'scales' },
           { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: '1 tbsp for softening aromatics.' },
           { ingredient_id: 'breadcrumbs', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Optional crunchy top.' },
-          { ingredient_id: 'dried_oregano', base_amount: 1, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'oregano_dried', base_amount: 1, unit: 'tsp', scaling: 'scales' },
           { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
           { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
         ],
@@ -8945,7 +8945,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { ingredient_id: 'capsicum_red', base_amount: 400, unit: 'g', scaling: 'scales', notes: 'Bell peppers, chunked. ~2 large peppers.' },
           { ingredient_id: 'broccoli', base_amount: 400, unit: 'g', scaling: 'scales', notes: 'Or green beans; added partway through.' },
           { ingredient_id: 'olive_oil', base_amount: 32, unit: 'g', scaling: 'scales', notes: '~2.5 tbsp across the tray.' },
-          { ingredient_id: 'dried_oregano', base_amount: 2, unit: 'tsp', scaling: 'scales', notes: 'Italian/mixed dried herbs.' },
+          { ingredient_id: 'oregano_dried', base_amount: 2, unit: 'tsp', scaling: 'scales', notes: 'Italian/mixed dried herbs.' },
           { ingredient_id: 'paprika_sweet', base_amount: 1, unit: 'tsp', scaling: 'scales' },
           { ingredient_id: 'garlic_powder', base_amount: 1, unit: 'tsp', scaling: 'scales' },
           { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
@@ -9067,7 +9067,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         ingredients: [
           { ingredient_id: 'sirloin_steak', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Lean sirloin (default/accessible) or flank/skirt (authentic, fattier). 200g per serving.' },
           { ingredient_id: 'jasmine_rice', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Cilantro-lime style; ~75g dry/serve.' },
-          { ingredient_id: 'black_beans_canned', base_amount: 240, unit: 'g', scaling: 'scales', notes: 'One drained can.' },
+          { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: 'One drained can.' },
           { ingredient_id: 'sweetcorn', base_amount: 200, unit: 'g', scaling: 'scales' },
           { ingredient_id: 'cherry_tomatoes', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Pico; or any tomato.' },
           { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Red onion for the pico. ~1 medium onion.' },

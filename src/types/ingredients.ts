@@ -14,7 +14,7 @@ export type IngredientId =
   | 'baking_potato'
   | 'baking_powder'
   | 'banana'
-  | 'basmati_rice_cooked'
+  | 'basmati_rice_dry'
   | 'bay_leaves_dried'
   | 'beef_chuck'
   | 'beef_mince_regular'
@@ -45,7 +45,6 @@ export type IngredientId =
   | 'coconut_cream'
   | 'coconut_water'
   | 'coleslaw_mayo'
-  | 'coriander_leaves_fresh'
   | 'corn_chips'
   | 'cottage_cheese'
   | 'cream_cheese'
@@ -127,7 +126,6 @@ export type IngredientId =
   | 'spring_onion'
   | 'star_anise'
   | 'strawberries_frozen'
-  | 'sugar_brown_palm_substitute'
   | 'sugar_white'
   | 'tamarind_paste'
   | 'thickened_cream'
@@ -147,7 +145,6 @@ export type IngredientId =
   | 'beef_jerky'
   | 'edamame'
   | 'protein_bar'
-  | 'cheese_block'
   | 'tuna'
   | 'chickpeas'
   | 'mixed_nuts'
@@ -164,25 +161,16 @@ export type IngredientId =
   | 'oyster_sauce'
   | 'chinese_cooking_wine'
   | 'chicken_mince'
-  | 'basil_fresh'
-  | 'red_chilli'
   | 'pear'
-  | 'spaghetti'
-  | 'parmesan'
   | 'salmon_fillet'
   | 'lemon'
-  | 'parsley'
-  | 'black_beans'
   | 'chilli_powder'
   | 'coriander_fresh'
   | 'chipotle_in_adobo'
-  | 'chicken_thigh'
   | 'coconut_milk'
   | 'curry_powder'
-  | 'macaroni'
   | 'turkey_mince'
   | 'breadcrumbs'
-  | 'dried_oregano'
   | 'dried_basil'
   | 'peas'
   | 'sweetcorn'
@@ -229,6 +217,24 @@ export type CanonicalUnit = 'g' | 'ml' | 'count' | 'tsp' | 'tbsp' | 'cloves';
 export type DietaryFlag = 'vegan' | 'vegetarian' | 'gluten_free' | 'dairy_free' | 'nut_free';
 
 /**
+ * What the authored gram amount refers to — what you weigh at the bench:
+ * raw meat, dry rice, drained beans, or the product as purchased.
+ */
+export type IngredientState = 'raw' | 'dry' | 'cooked' | 'canned_drained' | 'as_sold';
+
+/**
+ * Macro panel, ALWAYS per 100 GRAMS of `state` (not per canonical unit).
+ * Resolve grams first via grams_per_canonical_unit, then apply.
+ */
+export interface Macros {
+  kcal: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+}
+
+/**
  * Central ingredient definition with all metadata needed for meal planning,
  * grocery aggregation, and dietary filtering
  */
@@ -242,4 +248,17 @@ export interface Ingredient {
   typical_pack_size?: number;
   typical_pack_unit?: string;
   notes?: string;
+
+  // --- macro model (added by the DB rebuild) ---
+  // Required: every ingredient row carries sourced/estimated macros.
+  state: IngredientState;
+  macros_per_100g: Macros;           // per 100g of `state`
+  grams_per_canonical_unit: number;  // 1 for 'g'; density for 'ml'; g per item for count/tsp/tbsp/cloves
+  macro_source: string;
+  macro_confidence: 'sourced' | 'estimated';
+  drained_grams_per_pack?: number;   // canned goods only
+  is_pantry_negligible?: boolean;    // hide from shopping list + macro totals; still render in steps
+  user_overridable?: boolean;
+  brand_reference?: string;
+  atwater_exempt?: boolean;          // kcal not reconstructable from P/C/F; skip Atwater check
 }
