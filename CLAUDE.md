@@ -23,6 +23,29 @@ So `src/data/*Prompt*.ts` is **prompt text assembly**, and `useWorkoutImport` / 
 - Before ending a session, and before any branch operation, commit all
   work-in-progress (including new untracked source files) with a descriptive
   message. Never leave work uncommitted or stashed at the end of a session.
+- **Multiple agents share this repo via git worktrees. Never operate in a
+  worktree checked out by another agent.** Before ANY write (edit, commit,
+  cherry-pick, merge, rebase, ref update), run `git worktree list` and
+  `git status`. If a change belongs to a branch that is checked out in another
+  worktree, do NOT touch that worktree — do the work on your own throwaway branch
+  (`git worktree add ../<name> -b <branch> <tip>`) and verify it there.
+- **Landing a commit onto a branch checked out in another worktree: move the ref
+  from OUTSIDE, never fast-forward inside their tree.** Never `merge`/`--ff-only`
+  into a worktree with uncommitted changes (it runs in their tree). Instead move
+  the ref with a compare-and-swap, from the main repo dir or any other worktree:
+  `git update-ref refs/heads/<branch> <new-sha> <expected-old-sha>`. It updates the
+  ref only if it still points at `<expected-old-sha>` (fails safely if the tip
+  moved — re-check and retry) and never reads or writes any working tree, so the
+  other agent's uncommitted files are untouched. Confirm first that `<new-sha>` is
+  a descendant of `<expected-old-sha>` (a real fast-forward, no history rewrite).
+  **Caveat — it desyncs the other worktree:** its HEAD now sits ahead of its index,
+  so that agent's `git status` shows the landed file(s) as a pending change, and a
+  blanket `git commit -a` there would revert what you landed. That agent must
+  re-sync with `git checkout HEAD -- <file>` (preserves its other uncommitted work)
+  before its next commit. Always route the ref move through the human so they can
+  have the other agent re-sync.
+- One branch per agent; branches meet through the human, never by two agents
+  committing to the same branch.
 
 ## Tech stack
 
