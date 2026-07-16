@@ -1,6 +1,7 @@
 import { INGREDIENTS } from '../data/ingredients';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { AllergenType } from '../types/curated_meals';
+import { validateMealTemplate } from './validateMealTemplate';
 
 /**
  * Validates the integrity of the ingredients table at runtime.
@@ -285,6 +286,17 @@ export function validateCuratedMeals(): void {
           );
         }
       }
+    }
+
+    // Validate sauce-axis template invariants (no-op for legacy meals).
+    // These meals carry their ingredients on base_ingredients + sauce_variants
+    // and MUST leave method.ingredients/instructions empty — the guard enforces
+    // that, plus the additive base∩variant disjointness and default-variant rules.
+    const templateErrors = validateMealTemplate(meal);
+    if (templateErrors.length > 0) {
+      throw new Error(
+        `Template validation failed for meal "${meal.slug}": ${templateErrors.join('; ')}`
+      );
     }
   }
 }

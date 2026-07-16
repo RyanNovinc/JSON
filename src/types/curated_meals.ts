@@ -139,6 +139,62 @@ export interface MealIngredient {
   notes?: string;
 }
 
+// ============================================================================
+// NEW (sauce axis) — SauceVariant
+// ----------------------------------------------------------------------------
+// The difficulty axis, decoupled from cooking method. A variant is ADDITIVE and
+// SELF-CONTAINED: base_ingredients + variant.ingredients + plate additions is
+// the complete recipe. A variant never subtracts from base (validator-enforced:
+// base ∩ variant must be empty by ingredient_id).
+//
+// Product rule this encodes: the DEFAULT variant is the jar/shortcut version.
+// Scratch is an optional toggle, never the default. Methods carry zero
+// ingredients, so switching stovetop ↔ slow cooker never moves macros;
+// switching jar ↔ scratch always does (macros are computed from ingredients).
+// ============================================================================
+export interface SauceVariant {
+  /** Stable id unique within the meal (e.g. 'jar', 'scratch'). */
+  id: string;
+
+  /** Shown on the variant toggle (e.g. "Jar Sauce", "From Scratch"). */
+  display_name: string;
+
+  /** 'shortcut' for jar/pre-made; 'scratch' for the optional from-scratch build. */
+  shortcut_level: ShortcutLevel;
+
+  /**
+   * Exactly one variant per meal is the default, and it must be the shortcut.
+   * Validator-enforced.
+   */
+  is_default?: boolean;
+
+  /** Hands-on minutes ADDED to the chosen method's time_active_minutes. 0 for the default. */
+  extra_active_minutes: number;
+
+  /** Wall-clock minutes ADDED to the method's time_total_minutes (marinades, longer simmers). */
+  extra_total_minutes?: number;
+
+  /** Optional skill floor for this variant. The default variant defines the meal's advertised skill. */
+  skill_min?: SkillLevel;
+
+  /**
+   * Everything this version needs beyond base_ingredients. Self-contained:
+   * e.g. the jar variant carries its cream, the scratch variant carries its
+   * own (larger) cream. Disjoint from base by validator guard.
+   */
+  ingredients: MealIngredient[];
+
+  /**
+   * Cook steps keyed by CookingMethod.id. Methods are metadata (equipment,
+   * timing, skill); the actual steps for (method × variant) live here. A
+   * method id ABSENT from this map means the variant is not offered on that
+   * method. The default variant must cover every method (validator-enforced).
+   */
+  instructions: Record<string, RecipeStep[]>;
+
+  notes?: string;
+}
+
 /**
  * Prep-ahead classification consumed by the Meal-Prep Session feature.
  * `buildPrepSession` reads this to project a weekly plan into a prep session.
@@ -311,14 +367,19 @@ export interface CookingMethod {
   skill_min: SkillLevel;
   shortcut_level: ShortcutLevel;
   /**
-   * Ingredients used in the base recipe cook session only. For single-plate meals
-   * (smoothies, current butter chicken), this includes everything. For multi-plate
-   * meals (future pulled pork), this excludes accompaniments which live on the plates.
+   * LEGACY MEALS: base recipe ingredients, as before. For single-plate meals
+   * (smoothies, legacy butter chicken) this includes everything; for multi-plate
+   * meals accompaniments live on the plates.
+   * TEMPLATE MEALS (base_ingredients + sauce_variants present): MUST be []
+   * (validator-enforced). Methods change steps and timing, never ingredients,
+   * never macros. resolveMealIngredients() is the single read path.
    */
   ingredients: MealIngredient[];
   /**
-   * Step-by-step cooking instructions for the base recipe only. Assembly
-   * instructions for serving specific plates are separate (Plate.additional_instructions).
+   * LEGACY MEALS: base recipe steps only. Assembly instructions for serving
+   * specific plates are separate (Plate.additional_instructions).
+   * TEMPLATE MEALS: MUST be []. Steps live on SauceVariant.instructions keyed
+   * by this method's id — read them via resolveMealInstructions().
    */
   instructions: RecipeStep[];
   /**
@@ -372,6 +433,22 @@ export interface CuratedMeal {
    * classify each meal.
    */
   meal_prep?: MealPrep;
+
+  // ==========================================================================
+  // NEW (sauce axis) — template fields. Present together or not at all
+  // (validator-enforced). Absent = legacy meal, resolver falls back to
+  // method.ingredients so nothing breaks during the 70-meal migration.
+  // ==========================================================================
+
+  /**
+   * Ingredients common to EVERY variant and EVERY method: typically the
+   * protein + garnish. NO sauce, NO starch. Starch (rice, pasta, bread) lives
+   * on the plates that carry it, so a curry-only plate is genuinely starch-free.
+   */
+  base_ingredients?: MealIngredient[];
+
+  /** The additive difficulty axis. Exactly one is_default (the shortcut). */
+  sauce_variants?: SauceVariant[];
 }
 
 /**
