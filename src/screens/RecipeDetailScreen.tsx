@@ -29,6 +29,7 @@ import { getMealImage } from '../assets/mealImages';
 import { RecipeFavorites } from '../utils/recipeFavorites';
 import { clampCookPortions } from '../utils/cookPortions';
 import { displayIngredient } from '../utils/ingredientScaling';
+import { resolveBaseIngredients, resolveMealInstructions } from '../utils/resolveMealIngredients';
 
 type RecipeDetailRoute = RouteProp<RootStackParamList, 'RecipeDetail'>;
 type RecipeDetailNav = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
@@ -175,6 +176,11 @@ export default function RecipeDetailScreen() {
 
   const plate: Plate = meal.plates[selectedPlateIndex];
   const method: CookingMethod = meal.methods[selectedMethodIndex];
+  // Base recipe read through the single resolver path: legacy meals return
+  // method.ingredients/instructions unchanged; template meals (butter_chicken)
+  // surface base + default sauce variant, since their methods carry [].
+  const baseIngredients = resolveBaseIngredients(meal, { methodId: method.id });
+  const baseInstructions = resolveMealInstructions(meal, method.id);
 
 
   const macros = plate.plate_macros;
@@ -187,7 +193,7 @@ export default function RecipeDetailScreen() {
   const showPlateSwitcher = meal.plates.length > 1;
   const showMethodPicker = meal.methods.length > 1;
 
-  const baseSteps = method.instructions.length;
+  const baseSteps = baseInstructions.length;
   const plateSteps = plate.additional_instructions.length;
   const totalSteps = baseSteps + plateSteps;
 
@@ -483,7 +489,7 @@ export default function RecipeDetailScreen() {
               {plate.additional_ingredients.length > 0 && (
                 <Text style={styles.subEyebrow}>FOR THE BASE</Text>
               )}
-              {method.ingredients.map((ing, i) => (
+              {baseIngredients.map((ing, i) => (
                 <IngredientRow
                   key={`base-${ing.ingredient_id}-${i}`}
                   ingredient={ing}
@@ -548,7 +554,7 @@ export default function RecipeDetailScreen() {
               {plate.additional_instructions.length > 0 && (
                 <Text style={styles.subEyebrow}>COOK THE BASE</Text>
               )}
-              {method.instructions.map((step, i) => (
+              {baseInstructions.map((step, i) => (
                 <View key={`base-step-${i}`} style={styles.stepRow}>
                   <View style={[styles.stepNumber, { borderColor: themeColor + '4D', backgroundColor: themeColor + '1A' }]}>
                     <Text style={[styles.stepNumberText, { color: themeColor }]}>{i + 1}</Text>

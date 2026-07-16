@@ -33,6 +33,7 @@ import type {
   EquipmentType,
 } from '../types/curated_meals';
 import { CURATED_MEALS } from '../data/curated_meals';
+import { resolveMealInstructions } from './resolveMealIngredients';
 
 export type PrepStrategy = MealPrepStrategy; // 'full' | 'partial' | 'none'
 
@@ -198,7 +199,10 @@ interface Acc {
 
 function toPrepGroup(key: string, acc: Acc): PrepGroup {
   const { meal, plate, method, strategy, mp, occurrences, scaleSum } = acc;
-  const baseSteps = Array.isArray(method.instructions) ? method.instructions : [];
+  // Base steps via the single resolver path: legacy → method.instructions;
+  // template meals → the default variant's steps for this method.
+  const resolvedBase = resolveMealInstructions(meal, method.id);
+  const baseSteps = Array.isArray(resolvedBase) ? resolvedBase : [];
   const plateSteps = Array.isArray(plate.additional_instructions) ? plate.additional_instructions : [];
 
   let prepAheadSteps: RecipeStep[];

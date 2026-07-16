@@ -29,6 +29,7 @@ import {
   ActiveCookTimer,
 } from '../contexts/CookTimerContext';
 import { CURATED_MEALS } from '../data/curated_meals';
+import { resolveMealInstructions } from '../utils/resolveMealIngredients';
 import { MEAL_SUBSTEPS } from '../data/meal_substeps';
 import {
   CuratedMeal,
@@ -383,9 +384,14 @@ export default function CookModeScreen() {
   const plate: Plate | undefined = meal?.plates?.[plateIndex];
   const method: CookingMethod | undefined = meal?.methods?.[methodIndex];
 
+  // Base steps via the single resolver path: legacy → method.instructions;
+  // template (butter_chicken) → the selected variant's steps for this method.
+  const baseInstructions: (RecipeStep | string)[] =
+    meal && method ? resolveMealInstructions(meal, method.id) : [];
+
   const steps: CookStep[] = useMemo(() => {
     if (!method || !plate) return [];
-    const baseSteps: CookStep[] = method.instructions.map((raw, i) => ({
+    const baseSteps: CookStep[] = baseInstructions.map((raw, i) => ({
       type: 'base' as const,
       index: i,
       raw,
@@ -396,7 +402,7 @@ export default function CookModeScreen() {
       raw,
     }));
     return [...baseSteps, ...plateSteps];
-  }, [method, plate]);
+  }, [method, plate, baseInstructions]);
 
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [checkedSubsteps, setCheckedSubsteps] = useState<Set<string>>(new Set());
@@ -452,7 +458,7 @@ export default function CookModeScreen() {
   const showReserveNoteOnThisStep =
     !!plate.reserve_before_finishing_note &&
     currentStep.type === 'base' &&
-    currentStep.index === method.instructions.length - 1;
+    currentStep.index === baseInstructions.length - 1;
 
   const makeTimerId = (substepIndex: number) =>
     `${meal.slug}-${sectionId}-${currentStepIdx}-${substepIndex}`;

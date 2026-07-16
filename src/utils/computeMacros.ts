@@ -6,6 +6,7 @@ import {
   MealIngredient,
   BaseMacros,
 } from '../types/curated_meals';
+import { resolveBaseIngredients } from './resolveMealIngredients';
 
 const ZERO = (): BaseMacros => ({ kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 });
 
@@ -64,19 +65,29 @@ function accumulate(lines: MealIngredient[] | undefined): BaseMacros {
  *     accompaniments  = Σ plate.additional_ingredients   (absolute, per plate)
  *
  * The cooking METHOD contributes zero as a *process*: no evaporation, reduction,
- * or oil-absorption modelling — only ingredient masses count. The `method` arg
- * is read solely as the carrier of the base-recipe ingredient list, so for the
- * 83/85 meals whose methods share one ingredient list the result is identical
- * across methods. (butter_chicken and beef_ragu_gnocchi are the two meals whose
- * methods carry *different* ingredient lists, so their numbers move by method —
- * that is a property of the data, not of this function.)
+ * or oil-absorption modelling — only ingredient masses count.
+ *
+ * The base-recipe ingredient list is resolved through resolveBaseIngredients():
+ *   - LEGACY meals: it returns method.ingredients (byte-identical to the old
+ *     direct read — so every legacy plate's macros are unchanged).
+ *   - TEMPLATE meals (sauce axis): method.ingredients is [] and the real base is
+ *     base_ingredients + the selected sauce variant (jar default, or `variantId`).
+ *     Method choice moves nothing; the jar↔scratch toggle does.
+ *
+ * REPO SEMANTICS PRESERVED: the plate share multiplies the ACCUMULATED base
+ * (`(Σ base) × share`), and plate additions are added unscaled — exactly as
+ * before. We do NOT scale each base line individually (as resolveMealIngredients'
+ * scaleShare would), because `Σ(mᵢ × share)` reorders the float sum vs
+ * `(Σ mᵢ) × share` and would perturb the ~64 meals with produces_servings > 1.
+ * Fixed rows therefore scale with the plate share here just as they always have.
  */
 export function computePlateMacros(
   meal: CuratedMeal,
   plate: Plate,
   method: CookingMethod,
+  variantId?: string,
 ): BaseMacros {
-  const base = accumulate(method.ingredients);
+  const base = accumulate(resolveBaseIngredients(meal, { methodId: method.id, variantId }));
   const share = plate.base_serving_multiplier / (meal.produces_servings || 1);
   const add = accumulate(plate.additional_ingredients);
   return {

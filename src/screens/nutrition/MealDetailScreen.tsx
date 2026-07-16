@@ -47,6 +47,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { CURATED_MEALS } from '../../data/curated_meals';
 import { INGREDIENTS } from '../../data/ingredients';
 import { CuratedMeal, Plate, CookingMethod } from '../../types/curated_meals';
+import { resolveBaseIngredients } from '../../utils/resolveMealIngredients';
 import { getMealImage } from '../../assets/mealImages';
 import {
   loadCuratedFavorites,
@@ -147,7 +148,9 @@ export default function MealDetailScreen() {
       const key = name.toLowerCase();
       if (!seen.has(key)) { seen.add(key); out.push(name); }
     };
-    m.ingredients.forEach((ing) => push(ing.ingredient_id));
+    // Base recipe via the single resolver path: legacy → method.ingredients;
+    // template (butter_chicken) → base + default variant (methods carry []).
+    resolveBaseIngredients(meal, { methodId: m.id }).forEach((ing) => push(ing.ingredient_id));
     p?.additional_ingredients.forEach((ing) => push(ing.ingredient_id));
     return out;
   }, [meal, plateIndex]);
