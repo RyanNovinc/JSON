@@ -3,7 +3,7 @@ import * as path from 'path';
 import { CURATED_MEALS } from '../../data/curated_meals';
 import { computePlateMacros } from '../computeMacros';
 import { isTemplateMeal, resolveMealIngredients } from '../resolveMealIngredients';
-import { BaseMacros } from '../../types/curated_meals';
+import { BaseMacros, CuratedMeal } from '../../types/curated_meals';
 
 // Phase 2 deliverable: compute every plate's TRUE macros from ingredients and
 // compare to its hand-authored plate_macros literal. This test DOES NOT assert
@@ -91,17 +91,15 @@ describe('Phase 2 — plate macro divergence', () => {
 
   // FINDING: computePlateMacros models no cooking process, so a meal's computed
   // macros can only move by method if its methods were authored with different
-  // ingredient LISTS or AMOUNTS. Three meals do: beef_ragu_gnocchi (different
-  // id-sets: mince vs scratch) and bolognese + massaman (same ids, different
-  // amounts). This guardrail pins that set so new drift is caught.
-  //
-  // butter_chicken USED to be in this set (its 3 legacy methods carried different
-  // ingredient lists). It is now a SAUCE-AXIS TEMPLATE MEAL: its methods carry
-  // ingredients: [], the recipe lives on base_ingredients + sauce_variants, and
-  // computePlateMacros resolves the base via resolveBaseIngredients — so method
-  // choice moves nothing (the jar↔scratch variant toggle is what moves macros).
-  // It therefore drops out of the divergent set. See the template block below.
-  it('method is macro-invariant except for the three meals with method-specific ingredients', () => {
+  // ingredient LISTS or AMOUNTS. One meal still does: beef_ragu_gnocchi
+  // (different id-sets: mince vs chuck scratch) — its restructure is a pending
+  // product decision. bolognese and massaman were in this set until Batch 1
+  // moved them (with chilli_con_carne and pulled_pork) onto the sauce-axis
+  // template: methods now carry ingredients: [], the recipe lives on
+  // base_ingredients + sauce_variants, and method choice moves nothing — the
+  // variant toggle is what moves macros. butter_chicken left the set the same
+  // way in Task 1. This guardrail pins the remaining set so new drift is caught.
+  it('method is macro-invariant except for beef_ragu_gnocchi', () => {
     // Group computed kcal by (slug, plate) across methods; a meal is "method-divergent"
     // if any plate's computed kcal moves by method.
     const byMeal: Record<string, number[][]> = {};
@@ -117,7 +115,7 @@ describe('Phase 2 — plate macro divergence', () => {
       )
       .map(([slug]) => slug)
       .sort();
-    expect(divergent).toEqual(['beef_ragu_gnocchi', 'bolognese', 'massaman']);
+    expect(divergent).toEqual(['beef_ragu_gnocchi']);
   });
 
   it('emits the divergence report', () => {
@@ -176,5 +174,89 @@ describe('sauce-axis template routing (butter_chicken)', () => {
     const stdRice = resolveMealIngredients(meal, { plateId: 'standard' }).ingredients.filter(i => i.ingredient_id === 'basmati_rice_dry');
     expect(stdRice).toHaveLength(1);
     expect(stdRice[0].base_amount).toBe(60);
+  });
+});
+
+// Batch 1: bolognese, massaman, chilli_con_carne and pulled_pork joined the
+// sauce axis. Each meal's plate_macros are FROZEN to its computed shortcut
+// default (jar / paste / sachet / bottled) — computed == authored on BOTH
+// methods, and the variant toggle is what moves macros. The literal maps below
+// pin the frozen contract; regenerate them only when a deliberate recipe change
+// lands, never to silence a drift.
+describe('sauce-axis template routing (batch 1)', () => {
+  const MEALS = CURATED_MEALS as Record<string, CuratedMeal>;
+  const at = (m: BaseMacros) => ({
+    kcal: Math.round(m.kcal),
+    protein_g: Math.round(m.protein_g * 10) / 10,
+    carbs_g: Math.round(m.carbs_g * 10) / 10,
+    fat_g: Math.round(m.fat_g * 10) / 10,
+    fiber_g: Math.round(m.fiber_g * 10) / 10,
+  });
+
+  // Frozen shortcut-default contract, per (meal, plate).
+  const FROZEN: Record<string, Record<string, BaseMacros>> = {
+    bolognese: {
+      bolognese: { kcal: 378, protein_g: 23.4, carbs_g: 11.9, fat_g: 25.6, fiber_g: 1.5 },
+      spaghetti_dry: { kcal: 879, protein_g: 44.1, carbs_g: 87.4, fat_g: 37.8, fiber_g: 4.7 },
+      baked_potato: { kcal: 872, protein_g: 38.6, carbs_g: 74.9, fat_g: 46.7, fiber_g: 9.2 },
+      garlic_bread: { kcal: 862, protein_g: 38.2, carbs_g: 60.5, fat_g: 50.9, fiber_g: 4.5 },
+      lasagne: { kcal: 1041, protein_g: 59.0, carbs_g: 67.7, fat_g: 58.2, fiber_g: 3.6 },
+    },
+    massaman: {
+      massaman: { kcal: 836, protein_g: 43.7, carbs_g: 31.8, fat_g: 60.0, fiber_g: 3.4 },
+      rice: { kcal: 1322, protein_g: 55.7, carbs_g: 117.0, fat_g: 70.7, fiber_g: 6.6 },
+    },
+    chilli_con_carne: {
+      chilli_con_carne: { kcal: 505, protein_g: 31.3, carbs_g: 38.1, fat_g: 26.4, fiber_g: 10.0 },
+      bowl: { kcal: 1127, protein_g: 47.3, carbs_g: 115.6, fat_g: 54.5, fiber_g: 16.7 },
+      nachos: { kcal: 1231, protein_g: 49.3, carbs_g: 100.2, fat_g: 73.2, fiber_g: 18.7 },
+    },
+    pulled_pork: {
+      pulled_pork: { kcal: 772, protein_g: 47.9, carbs_g: 29.5, fat_g: 50.0, fiber_g: 0.5 },
+      sandwich: { kcal: 1307, protein_g: 63.7, carbs_g: 73.9, fat_g: 82.4, fiber_g: 3.6 },
+      bowl: { kcal: 1405, protein_g: 63.8, carbs_g: 118.0, fat_g: 73.1, fiber_g: 3.3 },
+      baked_potato: { kcal: 1269, protein_g: 63.3, carbs_g: 93.3, fat_g: 71.1, fiber_g: 8.5 },
+      tacos: { kcal: 1343, protein_g: 65.2, carbs_g: 86.7, fat_g: 81.4, fiber_g: 11.2 },
+      mac_cheese: { kcal: 2054, protein_g: 107.1, carbs_g: 128.5, fat_g: 120.9, fiber_g: 3.8 },
+    },
+  };
+
+  // The non-default variant, asserted on each meal's base plate.
+  const ALT: Record<string, { variant: string; plate: string; macros: BaseMacros }> = {
+    bolognese: { variant: 'scratch', plate: 'bolognese', macros: { kcal: 533, protein_g: 28.1, carbs_g: 25.2, fat_g: 34.2, fiber_g: 5.4 } },
+    massaman: { variant: 'aromatic', plate: 'massaman', macros: { kcal: 879, protein_g: 43.9, carbs_g: 34.1, fat_g: 63.8, fiber_g: 3.6 } },
+    chilli_con_carne: { variant: 'scratch', plate: 'chilli_con_carne', macros: { kcal: 548, protein_g: 32.0, carbs_g: 40.1, fat_g: 30.2, fiber_g: 10.5 } },
+    pulled_pork: { variant: 'scratch', plate: 'pulled_pork', macros: { kcal: 767, protein_g: 48.1, carbs_g: 30.7, fat_g: 49.9, fiber_g: 0.3 } },
+  };
+
+  const SLUGS = Object.keys(FROZEN);
+
+  it.each(SLUGS)('%s is a template meal with empty method ingredient/instruction lists', slug => {
+    const meal = MEALS[slug];
+    expect(isTemplateMeal(meal)).toBe(true);
+    for (const m of meal.methods) {
+      expect(m.ingredients).toEqual([]);
+      expect(m.instructions).toEqual([]);
+    }
+  });
+
+  it.each(SLUGS)('%s: authored plate_macros == FROZEN == at(computed) on every plate and method', slug => {
+    const meal = MEALS[slug];
+    expect(meal.plates.map(p => p.id).sort()).toEqual(Object.keys(FROZEN[slug]).sort());
+    for (const plate of meal.plates) {
+      expect(plate.plate_macros).toEqual(FROZEN[slug][plate.id]);
+      for (const method of meal.methods) {
+        expect(at(computePlateMacros(meal, plate, method))).toEqual(FROZEN[slug][plate.id]);
+      }
+    }
+  });
+
+  it.each(SLUGS)('%s: the variant toggle moves macros away from the default', slug => {
+    const meal = MEALS[slug];
+    const { variant, plate: plateId, macros } = ALT[slug];
+    const plate = meal.plates.find(p => p.id === plateId)!;
+    const alt = at(computePlateMacros(meal, plate, meal.methods[0], variant));
+    expect(alt).toEqual(macros);
+    expect(alt).not.toEqual(FROZEN[slug][plateId]);
   });
 });

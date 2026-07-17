@@ -186,7 +186,10 @@ export type IngredientId =
   | 'red_chilli_fresh'
   | 'green_beans'
   | 'bicarb_soda'
-  | 'ajvar';
+  | 'ajvar'
+  | 'pasta_sauce_tomato_jar'
+  | 'chilli_seasoning_mix'
+  | 'bbq_sauce_bottled';
 
 /**
  * Grocery store categories for organizing shopping lists

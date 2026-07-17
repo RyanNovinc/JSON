@@ -1,6 +1,6 @@
 import { INGREDIENTS } from '../data/ingredients';
 import { CURATED_MEALS } from '../data/curated_meals';
-import { AllergenType } from '../types/curated_meals';
+import { AllergenType, MealIngredient } from '../types/curated_meals';
 import { validateMealTemplate } from './validateMealTemplate';
 
 /**
@@ -54,6 +54,8 @@ export function validateIngredientsTable(): void {
  * - Flex ingredient is used and exists (methods or plates)
  * - Unique method IDs
  * - Allergens properly declared (from methods and plates)
+ * - Template meals: base_ingredients and every sauce variant's lines validated
+ *   the same way (existence, canonical units, flex usage, allergen coverage)
  * - Valid scale ranges
  * - Valid plate fields
  * 
@@ -211,10 +213,51 @@ export function validateCuratedMeals(): void {
       }
     }
     
+    // Validate template-meal ingredient lines (base + all sauce variants).
+    // Template meals carry their recipe on base_ingredients / sauce_variants —
+    // the method and plate scans above never see those lines, so existence,
+    // canonical-unit, flex usage and allergen coverage are enforced here with
+    // the same rules. Allergens are collected as the UNION across base + ALL
+    // variants: a user can pick any variant, so the meal-level declaration
+    // must cover every one of them.
+    const templateLines: { line: MealIngredient; where: string }[] = [];
+    for (const line of meal.base_ingredients ?? []) {
+      templateLines.push({ line, where: 'base_ingredients' });
+    }
+    for (const variant of meal.sauce_variants ?? []) {
+      for (const line of variant.ingredients) {
+        templateLines.push({ line, where: `sauce variant "${variant.id}"` });
+      }
+    }
+    for (const { line, where } of templateLines) {
+      const ingredient = INGREDIENTS[line.ingredient_id];
+      
+      if (!ingredient) {
+        throw new Error(
+          `Ingredient "${line.ingredient_id}" in ${where} of meal "${meal.slug}" does not exist in ingredients table`
+        );
+      }
+      
+      if (line.unit !== ingredient.canonical_unit) {
+        throw new Error(
+          `Unit mismatch for ingredient "${line.ingredient_id}" in ${where} of meal "${meal.slug}": ` +
+          `expected "${ingredient.canonical_unit}" but got "${line.unit}"`
+        );
+      }
+      
+      if (line.ingredient_id === meal.flex_ingredient_id) {
+        flexIngredientUsed = true;
+      }
+      
+      for (const allergen of ingredient.allergens) {
+        allAllergens.add(allergen);
+      }
+    }
+    
     // Check flex ingredient is actually used in at least one method or plate
     if (!flexIngredientUsed) {
       throw new Error(
-        `Flex ingredient "${meal.flex_ingredient_id}" is not used in any method or plate of meal "${meal.slug}"`
+        `Flex ingredient "${meal.flex_ingredient_id}" is not used in any method, plate, base_ingredients or sauce variant of meal "${meal.slug}"`
       );
     }
     

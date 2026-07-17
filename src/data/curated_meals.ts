@@ -90,20 +90,20 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           slow_cooker: [
             {
               summary:
-                'Cut chicken thigh into 3 cm cubes. Place in slow cooker with the jar sauce. Stir to coat.',
+                'Place the chicken thighs in the slow cooker whole — no cutting needed — and pour over the jar sauce. Turn to coat.',
               substeps: [
-                'Cut chicken thigh into 3 cm cubes. Place in slow cooker with the jar sauce. Stir to coat.',
+                'Place the chicken thighs in the slow cooker whole — no cutting needed — and pour over the jar sauce. Turn to coat.',
               ],
             },
             {
-              summary: 'Cook on high for 4 hours or low for 6-8 hours.',
-              substeps: ['Cook on high for 4 hours or low for 6-8 hours.'],
+              summary: 'Cook on LOW for 6 hours or HIGH for 4. Thighs are forgiving either way; LOW holds them in the tender zone longer, so prefer it if you\'re out all day.',
+              substeps: ['Cook on LOW for 6 hours or HIGH for 4. Thighs are forgiving either way; LOW holds them in the tender zone longer, so prefer it if you\'re out all day.'],
             },
             {
               summary:
-                'Stir through the thickened cream during the last 10 minutes of cooking.',
+                'Shred the chicken into chunky pieces with two forks right in the pot, then stir through the thickened cream for the last 10 minutes.',
               substeps: [
-                'Stir through the thickened cream during the last 10 minutes of cooking.',
+                'Shred the chicken into chunky pieces with two forks right in the pot, then stir through the thickened cream for the last 10 minutes.',
               ],
             },
             {
@@ -208,9 +208,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             },
             {
               summary:
-                'Transfer everything to the slow cooker with the tomato passata and salt. Cook on high for 4 hours or low for 6-8 hours.',
+                'Transfer everything to the slow cooker with the tomato passata and salt. Cook on LOW for 6 hours or HIGH for 4 — LOW gives the sauce longer to deepen.',
               substeps: [
-                'Transfer everything to the slow cooker with the tomato passata and salt. Cook on high for 4 hours or low for 6-8 hours.',
+                'Transfer everything to the slow cooker with the tomato passata and salt. Cook on LOW for 6 hours or HIGH for 4 — LOW gives the sauce longer to deepen.',
               ],
             },
             {
@@ -1879,16 +1879,412 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     image_filename: 'pulled_pork.png',
     meal_prep: {
       strategy: 'full',
-      prep_note: 'Slow-cook the whole shoulder, make the sauce and shred ahead; the sauced pork reheats whole. Bun, rice, baked potato, tacos and mac are all assembled per plate day-of.',
+      prep_note: 'Slow-cook the whole shoulder, shred and toss with sauce ahead; the sauced pork reheats whole. Bun, rice, baked potato, tacos and mac are all assembled per plate day-of.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // Common to every variant and both methods. NO sauce, NO rub.
+    base_ingredients: [
+      {
+        ingredient_id: 'pork_shoulder_boneless',
+        base_amount: 2200,
+        unit: 'g',
+        scaling: 'scales'
+      },
+      {
+        ingredient_id: 'apple_juice_cloudy',
+        base_amount: 180,
+        unit: 'ml',
+        scaling: 'scales',
+        notes: 'Pour around the pork in the slow cooker, not over the rub.'
+      },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'bottled',
+        display_name: 'Bottled BBQ Sauce',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default. One bottle of smoky BBQ sauce replaces the rub and the hour-simmered homemade sauce.',
+        ingredients: [
+          {
+            ingredient_id: 'bbq_sauce_bottled',
+            base_amount: 500,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'One 500ml bottle is about 575g — use most of it. Any smoky BBQ sauce.',
+          },
+          {
+            ingredient_id: 'salt',
+            base_amount: 1,
+            unit: 'tsp',
+            scaling: 'fixed',
+          },
+          {
+            ingredient_id: 'black_pepper_ground',
+            base_amount: 0.5,
+            unit: 'tsp',
+            scaling: 'fixed',
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary:
+                'Pat the pork dry and season all over with the salt and pepper.',
+              substeps: [
+                'Pat the pork dry and season all over with the salt and pepper.',
+              ],
+            },
+            {
+              summary:
+                'Place in the slow cooker, fat cap up. Pour the apple juice around the pork — not over it.',
+              substeps: [
+                'Place in the slow cooker, fat cap up. Pour the apple juice around the pork — not over it.',
+              ],
+            },
+            {
+              summary:
+                'Cook on LOW for 8 hours or HIGH for 4-5, until it shreds easily under light fork pressure. LOW is worth it for shoulder — the collagen melts out completely and the shreds come out silky; HIGH works but slightly firmer.',
+              substeps: [
+                'Cook on LOW for 8 hours or HIGH for 4-5, until it shreds easily under light fork pressure. LOW is worth it for shoulder — the collagen melts out completely and the shreds come out silky; HIGH works but slightly firmer.',
+              ],
+            },
+            {
+              summary:
+                'Lift the pork out. Skim the fat off the cooking liquid and keep a few tablespoons; discard the rest. Shred with two forks, discarding any large pieces of gristle, and moisten with the reserved liquid if the pork looks dry. If you are making the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve before saucing.',
+              substeps: [
+                'Lift the pork out. Skim the fat off the cooking liquid and keep a few tablespoons; discard the rest. Shred with two forks, discarding any large pieces of gristle, and moisten with the reserved liquid if the pork looks dry. If you are making the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve before saucing.',
+              ],
+            },
+            {
+              summary:
+                'Pour the bottled BBQ sauce over the shredded pork and toss until coated. Warm through — a few minutes back in the cooker on HIGH — so the sauce clings.',
+              substeps: [
+                'Pour the bottled BBQ sauce over the shredded pork and toss until coated. Warm through — a few minutes back in the cooker on HIGH — so the sauce clings.',
+              ],
+            },
+          ],
+          oven: [
+            {
+              summary:
+                'Preheat the oven to 140°C (120°C fan-forced). Pat the pork dry and season all over with the salt and pepper.',
+              substeps: [
+                'Preheat the oven to 140°C (120°C fan-forced). Pat the pork dry and season all over with the salt and pepper.',
+              ],
+            },
+            {
+              summary:
+                'Place in a deep roasting pan or Dutch oven, fat cap up. Pour the apple juice around the pork, then cover tightly with a lid or two layers of foil.',
+              substeps: [
+                'Place in a deep roasting pan or Dutch oven, fat cap up. Pour the apple juice around the pork, then cover tightly with a lid or two layers of foil.',
+              ],
+            },
+            {
+              summary:
+                'Cook for 5 hours, checking at 4 — the pork should be starting to give way when pressed.',
+              substeps: [
+                'Cook for 5 hours, checking at 4 — the pork should be starting to give way when pressed.',
+              ],
+            },
+            {
+              summary:
+                'Optional: uncover, turn the oven to 200°C, and roast for 20 minutes for a caramelised crust.',
+              substeps: [
+                'Optional: uncover, turn the oven to 200°C, and roast for 20 minutes for a caramelised crust.',
+              ],
+            },
+            {
+              summary:
+                'Skim the fat off the pan juices and keep a few tablespoons to moisten the shredded pork. Shred with two forks, discarding any large pieces of gristle. If you are making the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve before saucing.',
+              substeps: [
+                'Skim the fat off the pan juices and keep a few tablespoons to moisten the shredded pork. Shred with two forks, discarding any large pieces of gristle. If you are making the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve before saucing.',
+              ],
+            },
+            {
+              summary:
+                'Pour the bottled BBQ sauce over the shredded pork and toss until coated. Warm through in the low oven so the sauce clings.',
+              substeps: [
+                'Pour the bottled BBQ sauce over the shredded pork and toss until coated. Warm through in the low oven so the sauce clings.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 15,
+        skill_min: 3,
+        notes:
+          'The original build — spice rub and an hour-simmered homemade BBQ sauce. The sauce simmers while the pork cooks, so total time is unchanged.',
+        ingredients: [
+          {
+            ingredient_id: 'brown_sugar',
+            base_amount: 24,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'For the rub. Approximately 2 tbsp.'
+          },
+          {
+            ingredient_id: 'paprika_sweet',
+            base_amount: 2,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the rub.'
+          },
+          {
+            ingredient_id: 'onion_powder',
+            base_amount: 1,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the rub.'
+          },
+          {
+            ingredient_id: 'garlic_powder',
+            base_amount: 1,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the rub.'
+          },
+          {
+            ingredient_id: 'ground_cumin',
+            base_amount: 0.5,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the rub.'
+          },
+          {
+            ingredient_id: 'mustard_powder',
+            base_amount: 0.75,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the rub.'
+          },
+          {
+            ingredient_id: 'salt',
+            base_amount: 1,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the rub. Approximately 6 g.'
+          },
+          {
+            ingredient_id: 'black_pepper_ground',
+            base_amount: 0.5,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the rub.'
+          },
+          {
+            ingredient_id: 'ketchup_tomato',
+            base_amount: 625,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'For the BBQ sauce. Approximately 2½ cups.'
+          },
+          {
+            ingredient_id: 'brown_sugar',
+            base_amount: 24,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'For the BBQ sauce. Approximately 2 tbsp.'
+          },
+          {
+            ingredient_id: 'worcestershire_sauce',
+            base_amount: 17,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'For the BBQ sauce. Approximately 1 tbsp.'
+          },
+          {
+            ingredient_id: 'apple_cider_vinegar',
+            base_amount: 120,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'For the BBQ sauce. Approximately ½ cup.'
+          },
+          {
+            ingredient_id: 'lemon_juice',
+            base_amount: 15,
+            unit: 'ml',
+            scaling: 'fixed',
+            notes: 'For the BBQ sauce. Approximately 1 tbsp.'
+          },
+          {
+            ingredient_id: 'black_pepper_ground',
+            base_amount: 1.5,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the BBQ sauce.'
+          },
+          {
+            ingredient_id: 'onion_powder',
+            base_amount: 1.5,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the BBQ sauce.'
+          },
+          {
+            ingredient_id: 'mustard_powder',
+            base_amount: 1.5,
+            unit: 'tsp',
+            scaling: 'fixed',
+            notes: 'For the BBQ sauce.'
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary: 'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 2.',
+              substeps: [
+                'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 2.'
+              ]
+            },
+            {
+              summary: 'Place pork in the slow cooker, fat cap facing up. Pour the apple juice around the pork — not over the rub.',
+              substeps: [
+                'Place pork in the slow cooker, fat cap facing up. Pour the apple juice around the pork — not over the rub.'
+              ]
+            },
+            {
+              summary: 'Cook on low for 8 hours, or high for 4-5 hours. Pork is done when it shreds easily under light fork pressure.',
+              substeps: [
+                'Cook on low for 8 hours, or high for 4-5 hours. Pork is done when it shreds easily under light fork pressure.'
+              ]
+            },
+            {
+              summary: 'Lift the pork carefully into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.',
+              substeps: [
+                'Lift the pork carefully into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.'
+              ]
+            },
+            {
+              summary: '(Optional crisp step.) Preheat oven to 180°C. Roast the lifted pork for 20 minutes for surface caramelisation. Worth it for texture; skip if rushed.',
+              substeps: [
+                '(Optional crisp step.) Preheat oven to 180°C. Roast the lifted pork for 20 minutes for surface caramelisation. Worth it for texture; skip if rushed.'
+              ]
+            },
+            {
+              summary: 'Make the BBQ sauce (can be done during the slow cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.',
+              substeps: [
+                'Make the BBQ sauce (can be done during the slow cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.'
+              ]
+            },
+            {
+              summary: 'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.',
+              substeps: [
+                'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.'
+              ]
+            },
+            {
+              summary: 'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.',
+              substeps: [
+                'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.'
+              ]
+            }
+          ],
+          oven: [
+            {
+              summary: 'Preheat the oven to 140°C (fan-forced 120°C).',
+              substeps: ['Preheat the oven to 140°C (fan-forced 120°C).']
+            },
+            {
+              summary: 'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 3.',
+              substeps: [
+                'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 3.'
+              ]
+            },
+            {
+              summary: 'Place pork in a deep roasting pan or Dutch oven, fat cap facing up. Pour the apple juice around the pork — not over the rub.',
+              substeps: [
+                'Place pork in a deep roasting pan or Dutch oven, fat cap facing up. Pour the apple juice around the pork — not over the rub.'
+              ]
+            },
+            {
+              summary: 'Cover tightly with two layers of foil (or the Dutch oven lid) to trap moisture. The pork needs to braise, not roast.',
+              substeps: [
+                'Cover tightly with two layers of foil (or the Dutch oven lid) to trap moisture. The pork needs to braise, not roast.'
+              ]
+            },
+            {
+              summary: 'Cook for 5 hours. Check at 4 hours: the pork should be starting to give way when pressed; if not, cover and continue.',
+              substeps: [
+                'Cook for 5 hours. Check at 4 hours: the pork should be starting to give way when pressed; if not, cover and continue.'
+              ]
+            },
+            {
+              summary: 'Remove from the oven. Carefully lift the pork into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.',
+              substeps: [
+                'Remove from the oven. Carefully lift the pork into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.'
+              ]
+            },
+            {
+              summary: 'Optional crisp step (recommended): turn the oven up to 200°C. Return the pork uncovered for 20 minutes for surface caramelisation. Worth it for textural contrast.',
+              substeps: [
+                'Optional crisp step (recommended): turn the oven up to 200°C. Return the pork uncovered for 20 minutes for surface caramelisation. Worth it for textural contrast.'
+              ]
+            },
+            {
+              summary: 'Make the BBQ sauce (can be done during the oven cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.',
+              substeps: [
+                'Make the BBQ sauce (can be done during the oven cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.'
+              ]
+            },
+            {
+              summary: 'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.',
+              substeps: [
+                'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.'
+              ]
+            },
+            {
+              summary: 'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.',
+              substeps: [
+                'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.'
+              ]
+            }
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'slow_cooker',
+        display_name: 'Slow Cooker',
+        equipment_required: ['slow_cooker'],
+        time_active_minutes: 15,
+        time_total_minutes: 495,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+      {
+        id: 'oven',
+        display_name: 'Oven',
+        equipment_required: ['oven', 'stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 340,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'pulled_pork',
         display_name: 'BBQ Pulled Pork',
         description: 'Slow-cooked pork shoulder shredded and tossed in tangy BBQ sauce.',
         image_filename: undefined,
-        plate_macros: { kcal: 767, protein_g: 48.1, carbs_g: 30.7, fat_g: 49.9, fiber_g: 0.3 },
+        plate_macros: { kcal: 772, protein_g: 47.9, carbs_g: 29.5, fat_g: 50.0, fiber_g: 0.5 },
         assembly_time_minutes: 0,
         additional_instructions: [],
         additional_ingredients: [],
@@ -1939,13 +2335,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 3,
-        plate_macros: {
-          kcal: 1210,
-          protein_g: 61,
-          carbs_g: 76,
-          fat_g: 72,
-          fiber_g: 4
-        }
+        plate_macros: { kcal: 1307, protein_g: 63.7, carbs_g: 73.9, fat_g: 82.4, fiber_g: 3.6 }
       },
       {
         id: 'bowl',
@@ -1999,13 +2389,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 15,
-        plate_macros: {
-          kcal: 1330,
-          protein_g: 61,
-          carbs_g: 118,
-          fat_g: 66,
-          fiber_g: 4
-        }
+        plate_macros: { kcal: 1405, protein_g: 63.8, carbs_g: 118.0, fat_g: 73.1, fiber_g: 3.3 }
       },
       {
         id: 'baked_potato',
@@ -2079,13 +2463,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 65,
-        plate_macros: {
-          kcal: 1177,
-          protein_g: 60,
-          carbs_g: 90,
-          fat_g: 63,
-          fiber_g: 8
-        }
+        plate_macros: { kcal: 1269, protein_g: 63.3, carbs_g: 93.3, fat_g: 71.1, fiber_g: 8.5 }
       },
       {
         id: 'tacos',
@@ -2156,13 +2534,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 8,
-        plate_macros: {
-          kcal: 1155,
-          protein_g: 61,
-          carbs_g: 55,
-          fat_g: 74,
-          fiber_g: 10
-        }
+        plate_macros: { kcal: 1343, protein_g: 65.2, carbs_g: 86.7, fat_g: 81.4, fiber_g: 11.2 }
       },
       {
         id: 'mac_cheese',
@@ -2245,399 +2617,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 20,
-        plate_macros: {
-          kcal: 1907,
-          protein_g: 102,
-          carbs_g: 124,
-          fat_g: 109,
-          fiber_g: 3
-        }
+        plate_macros: { kcal: 2054, protein_g: 107.1, carbs_g: 128.5, fat_g: 120.9, fiber_g: 3.8 }
       }
     ],
-    methods: [
-      {
-        id: 'slow_cooker',
-        display_name: 'Slow Cooker',
-        equipment_required: ['slow_cooker'],
-        time_active_minutes: 30,
-        time_total_minutes: 510,
-        skill_min: 1,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'pork_shoulder_boneless',
-            base_amount: 2200,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'apple_juice_cloudy',
-            base_amount: 180,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Pour around the pork in the slow cooker, not over the rub.'
-          },
-          {
-            ingredient_id: 'brown_sugar',
-            base_amount: 24,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'For the rub. Approximately 2 tbsp.'
-          },
-          {
-            ingredient_id: 'paprika_sweet',
-            base_amount: 2,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'onion_powder',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'garlic_powder',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'ground_cumin',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'mustard_powder',
-            base_amount: 0.75,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'salt',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub. Approximately 6 g.'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'ketchup_tomato',
-            base_amount: 625,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'For the BBQ sauce. Approximately 2½ cups.'
-          },
-          {
-            ingredient_id: 'brown_sugar',
-            base_amount: 24,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce. Approximately 2 tbsp.'
-          },
-          {
-            ingredient_id: 'worcestershire_sauce',
-            base_amount: 17,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'For the BBQ sauce. Approximately 1 tbsp.'
-          },
-          {
-            ingredient_id: 'apple_cider_vinegar',
-            base_amount: 120,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'For the BBQ sauce. Approximately ½ cup.'
-          },
-          {
-            ingredient_id: 'lemon_juice',
-            base_amount: 15,
-            unit: 'ml',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce. Approximately 1 tbsp.'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 1.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce.'
-          },
-          {
-            ingredient_id: 'onion_powder',
-            base_amount: 1.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce.'
-          },
-          {
-            ingredient_id: 'mustard_powder',
-            base_amount: 1.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce.'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 2.',
-            substeps: [
-              'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 2.'
-            ]
-          },
-          {
-            summary: 'Place pork in the slow cooker, fat cap facing up. Pour the apple juice around the pork — not over the rub.',
-            substeps: [
-              'Place pork in the slow cooker, fat cap facing up. Pour the apple juice around the pork — not over the rub.'
-            ]
-          },
-          {
-            summary: 'Cook on low for 8 hours, or high for 4-5 hours. Pork is done when it shreds easily under light fork pressure.',
-            substeps: [
-              'Cook on low for 8 hours, or high for 4-5 hours. Pork is done when it shreds easily under light fork pressure.'
-            ]
-          },
-          {
-            summary: 'Lift the pork carefully into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.',
-            substeps: [
-              'Lift the pork carefully into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.'
-            ]
-          },
-          {
-            summary: '(Optional crisp step.) Preheat oven to 180°C. Roast the lifted pork for 20 minutes for surface caramelisation. Worth it for texture; skip if rushed.',
-            substeps: [
-              '(Optional crisp step.) Preheat oven to 180°C. Roast the lifted pork for 20 minutes for surface caramelisation. Worth it for texture; skip if rushed.'
-            ]
-          },
-          {
-            summary: 'Make the BBQ sauce (can be done during the slow cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.',
-            substeps: [
-              'Make the BBQ sauce (can be done during the slow cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.'
-            ]
-          },
-          {
-            summary: 'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.',
-            substeps: [
-              'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.'
-            ]
-          },
-          {
-            summary: 'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.',
-            substeps: [
-              'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.'
-            ]
-          }
-        ]
-      },
-      {
-        id: 'oven',
-        display_name: 'Oven',
-        equipment_required: ['oven', 'stovetop'],
-        time_active_minutes: 30,
-        time_total_minutes: 360,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'pork_shoulder_boneless',
-            base_amount: 2200,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'apple_juice_cloudy',
-            base_amount: 180,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Pour around the pork in the slow cooker, not over the rub.'
-          },
-          {
-            ingredient_id: 'brown_sugar',
-            base_amount: 24,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'For the rub. Approximately 2 tbsp.'
-          },
-          {
-            ingredient_id: 'paprika_sweet',
-            base_amount: 2,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'onion_powder',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'garlic_powder',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'ground_cumin',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'mustard_powder',
-            base_amount: 0.75,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'salt',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub. Approximately 6 g.'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the rub.'
-          },
-          {
-            ingredient_id: 'ketchup_tomato',
-            base_amount: 625,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'For the BBQ sauce. Approximately 2½ cups.'
-          },
-          {
-            ingredient_id: 'brown_sugar',
-            base_amount: 24,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce. Approximately 2 tbsp.'
-          },
-          {
-            ingredient_id: 'worcestershire_sauce',
-            base_amount: 17,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'For the BBQ sauce. Approximately 1 tbsp.'
-          },
-          {
-            ingredient_id: 'apple_cider_vinegar',
-            base_amount: 120,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'For the BBQ sauce. Approximately ½ cup.'
-          },
-          {
-            ingredient_id: 'lemon_juice',
-            base_amount: 15,
-            unit: 'ml',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce. Approximately 1 tbsp.'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 1.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce.'
-          },
-          {
-            ingredient_id: 'onion_powder',
-            base_amount: 1.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce.'
-          },
-          {
-            ingredient_id: 'mustard_powder',
-            base_amount: 1.5,
-            unit: 'tsp',
-            scaling: 'fixed',
-            notes: 'For the BBQ sauce.'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Preheat the oven to 140°C (fan-forced 120°C).',
-            substeps: ['Preheat the oven to 140°C (fan-forced 120°C).']
-          },
-          {
-            summary: 'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 3.',
-            substeps: [
-              'Mix the rub ingredients (24g brown sugar, paprika, onion powder, garlic powder, cumin, mustard powder, salt, black pepper) in a small bowl. Rub generously all over the pork shoulder, including the fat cap. If time permits, marinate in the fridge for an hour; otherwise straight to step 3.'
-            ]
-          },
-          {
-            summary: 'Place pork in a deep roasting pan or Dutch oven, fat cap facing up. Pour the apple juice around the pork — not over the rub.',
-            substeps: [
-              'Place pork in a deep roasting pan or Dutch oven, fat cap facing up. Pour the apple juice around the pork — not over the rub.'
-            ]
-          },
-          {
-            summary: 'Cover tightly with two layers of foil (or the Dutch oven lid) to trap moisture. The pork needs to braise, not roast.',
-            substeps: [
-              'Cover tightly with two layers of foil (or the Dutch oven lid) to trap moisture. The pork needs to braise, not roast.'
-            ]
-          },
-          {
-            summary: 'Cook for 5 hours. Check at 4 hours: the pork should be starting to give way when pressed; if not, cover and continue.',
-            substeps: [
-              'Cook for 5 hours. Check at 4 hours: the pork should be starting to give way when pressed; if not, cover and continue.'
-            ]
-          },
-          {
-            summary: 'Remove from the oven. Carefully lift the pork into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.',
-            substeps: [
-              'Remove from the oven. Carefully lift the pork into a roasting pan or large bowl. Pour the cooking liquid into a measuring jug. Skim and reserve 1 cup (240ml) of the juices for the BBQ sauce. The rest can be discarded or frozen for stock.'
-            ]
-          },
-          {
-            summary: 'Optional crisp step (recommended): turn the oven up to 200°C. Return the pork uncovered for 20 minutes for surface caramelisation. Worth it for textural contrast.',
-            substeps: [
-              'Optional crisp step (recommended): turn the oven up to 200°C. Return the pork uncovered for 20 minutes for surface caramelisation. Worth it for textural contrast.'
-            ]
-          },
-          {
-            summary: 'Make the BBQ sauce (can be done during the oven cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.',
-            substeps: [
-              'Make the BBQ sauce (can be done during the oven cook): combine ketchup, the second 24g brown sugar, Worcestershire, apple cider vinegar, reserved pork juices (240ml), lemon juice, and the sauce spices (1.5 tsp each of black pepper, onion powder, mustard powder) in a saucepan. Bring to a simmer over medium heat. Simmer gently for 1 hour, stirring occasionally, until thickened to coating consistency.'
-            ]
-          },
-          {
-            summary: 'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.',
-            substeps: [
-              'Shred the pork with two forks, discarding any large gristle pieces. If you\'re planning the Pulled Pork Tacos plate this week, reserve approximately 151g of plain shredded pork per planned tacos serve in a separate container before continuing.'
-            ]
-          },
-          {
-            summary: 'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.',
-            substeps: [
-              'Pour BBQ sauce over the remaining shredded pork and toss to coat generously. You\'ll have extra sauce — bottle and use it for serving.'
-            ]
-          }
-        ]
-      }
-    ]
   },
   bolognese: {
     slug: 'bolognese',
@@ -2656,13 +2638,334 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Simmer the ragu ahead; it reheats whole and improves overnight. Pasta, garlic bread, baked potato and the lasagne bake are all done per plate day-of.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // Common to every variant and both methods. NO sauce, NO pasta.
+    base_ingredients: [
+      {
+        ingredient_id: 'beef_mince_regular',
+        base_amount: 1000,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Don\'t use lean — fat is doing real work here.'
+      },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'jar',
+        display_name: 'Jar Sauce',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default. Any tomato or bolognese pasta sauce jar — the row carries a representative macro profile and is user_overridable.',
+        ingredients: [
+          {
+            ingredient_id: 'pasta_sauce_tomato_jar',
+            base_amount: 1000,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two 500g jars — any tomato or bolognese pasta sauce.',
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary:
+                'Brown the beef mince in a large frying pan over high heat, breaking it up with a wooden spoon — about 5-6 minutes. The mince renders its own fat; drain the excess only if it pools.',
+              substeps: [
+                'Brown the beef mince in a large frying pan over high heat, breaking it up with a wooden spoon — about 5-6 minutes. The mince renders its own fat; drain the excess only if it pools.',
+              ],
+            },
+            {
+              summary:
+                'Transfer the mince to the slow cooker and pour in the jar sauce. Swirl a splash of water in each jar to get the last of it out, and add. Stir well.',
+              substeps: [
+                'Transfer the mince to the slow cooker and pour in the jar sauce. Swirl a splash of water in each jar to get the last of it out, and add. Stir well.',
+              ],
+            },
+            {
+              summary:
+                'Cook on LOW for 4-6 hours or HIGH for 3. With mince either setting works — this stage is about melding flavour, not tenderising.',
+              substeps: [
+                'Cook on LOW for 4-6 hours or HIGH for 3. With mince either setting works — this stage is about melding flavour, not tenderising.',
+              ],
+            },
+            {
+              summary:
+                'Taste and season with salt and pepper. If the sauce looks too liquid, prop the lid open with a wooden spoon handle and cook on HIGH for a final 20 minutes.',
+              substeps: [
+                'Taste and season with salt and pepper. If the sauce looks too liquid, prop the lid open with a wooden spoon handle and cook on HIGH for a final 20 minutes.',
+              ],
+            },
+          ],
+          stovetop: [
+            {
+              summary:
+                'Brown the beef mince in a large pot over high heat, breaking it up with a wooden spoon — about 5-6 minutes. The mince renders its own fat; drain the excess only if it pools.',
+              substeps: [
+                'Brown the beef mince in a large pot over high heat, breaking it up with a wooden spoon — about 5-6 minutes. The mince renders its own fat; drain the excess only if it pools.',
+              ],
+            },
+            {
+              summary:
+                'Pour in the jar sauce. Swirl a splash of water in each jar to get the last of it out, and add. Bring to a simmer.',
+              substeps: [
+                'Pour in the jar sauce. Swirl a splash of water in each jar to get the last of it out, and add. Bring to a simmer.',
+              ],
+            },
+            {
+              summary:
+                'Simmer gently for 10-15 minutes, stirring occasionally, until thick and rich.',
+              substeps: [
+                'Simmer gently for 10-15 minutes, stirring occasionally, until thick and rich.',
+              ],
+            },
+            {
+              summary:
+                'Taste and season with salt and pepper.',
+              substeps: [
+                'Taste and season with salt and pepper.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 10,
+        extra_total_minutes: 115,
+        skill_min: 3,
+        notes:
+          'The full soffritto-and-red-wine ragù. Amounts follow the slow-cooker build for both methods; on the stovetop, simmer uncovered at the end to reduce.',
+        ingredients: [
+          {
+            ingredient_id: 'olive_oil',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Split: 15g for sautéing the soffritto, 15g for browning the mince.'
+          },
+          {
+            ingredient_id: 'pancetta_diced',
+            base_amount: 100,
+            unit: 'g',
+            scaling: 'scales'
+          },
+          {
+            ingredient_id: 'brown_onion',
+            base_amount: 300,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Approximately 2 medium onions, finely diced.'
+          },
+          {
+            ingredient_id: 'garlic_clove',
+            base_amount: 4,
+            unit: 'cloves',
+            scaling: 'scales',
+            notes: 'Minced.'
+          },
+          {
+            ingredient_id: 'carrot',
+            base_amount: 120,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Approximately 1 medium, finely diced.'
+          },
+          {
+            ingredient_id: 'celery',
+            base_amount: 100,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Approximately 2 stalks, finely diced.'
+          },
+          {
+            ingredient_id: 'red_wine_cooking',
+            base_amount: 250,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'Cabernet sauvignon or merlot. Any cleanskin works.'
+          },
+          {
+            ingredient_id: 'crushed_tomatoes_canned',
+            base_amount: 1600,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two 800g tins.'
+          },
+          {
+            ingredient_id: 'tomato_paste',
+            base_amount: 60,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Approximately 4 tbsp.'
+          },
+          {
+            ingredient_id: 'beef_stock_cube',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Three cubes.'
+          },
+          {
+            ingredient_id: 'worcestershire_sauce',
+            base_amount: 20,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'Approximately 1 tbsp.'
+          },
+          {
+            ingredient_id: 'sugar_white',
+            base_amount: 8,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'Approximately 2 tsp. Balances tomato acidity.'
+          },
+          {
+            ingredient_id: 'oregano_dried',
+            base_amount: 2,
+            unit: 'tsp',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'thyme_dried',
+            base_amount: 2,
+            unit: 'tsp',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'bay_leaves_dried',
+            base_amount: 3,
+            unit: 'count',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'salt',
+            base_amount: 1,
+            unit: 'tsp',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'black_pepper_ground',
+            base_amount: 0.5,
+            unit: 'tsp',
+            scaling: 'fixed'
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary: 'Heat 15g of the olive oil in a large skillet over medium-high heat. Add the diced onion, carrot, and celery. Cook for 7 minutes until soft and the onion is translucent. Add the garlic and pancetta; cook 2 more minutes. Transfer everything to the slow cooker.',
+              substeps: [
+                'Heat 15g of the olive oil in a large skillet over medium-high heat. Add the diced onion, carrot, and celery. Cook for 7 minutes until soft and the onion is translucent. Add the garlic and pancetta; cook 2 more minutes. Transfer everything to the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Add the remaining 15g oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — don\'t overcrowd the pan. Break up the mince with a wooden spoon as it cooks. Transfer to the slow cooker.',
+              substeps: [
+                'Add the remaining 15g oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — don\'t overcrowd the pan. Break up the mince with a wooden spoon as it cooks. Transfer to the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Return the skillet to medium heat. Pour in the red wine and scrape all the browned bits from the bottom of the pan — this fond is where the flavour lives. Simmer for 2 minutes, then pour into the slow cooker.',
+              substeps: [
+                'Return the skillet to medium heat. Pour in the red wine and scrape all the browned bits from the bottom of the pan — this fond is where the flavour lives. Simmer for 2 minutes, then pour into the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire sauce, sugar, oregano, thyme, bay leaves, salt, and pepper to the slow cooker. Stir well.',
+              substeps: [
+                'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire sauce, sugar, oregano, thyme, bay leaves, salt, and pepper to the slow cooker. Stir well.'
+              ]
+            },
+            {
+              summary: 'Cook on LOW for 6 hours (or HIGH for 4 hours).',
+              substeps: ['Cook on LOW for 6 hours (or HIGH for 4 hours).']
+            },
+            {
+              summary: 'After cooking, taste and adjust salt. Remove the bay leaves. If the sauce looks too liquid (common in slow cookers — they don\'t reduce much), prop the lid open with a wooden spoon and cook on HIGH for 30 more minutes.',
+              substeps: [
+                'After cooking, taste and adjust salt. Remove the bay leaves. If the sauce looks too liquid (common in slow cookers — they don\'t reduce much), prop the lid open with a wooden spoon and cook on HIGH for 30 more minutes.'
+              ]
+            }
+          ],
+          stovetop: [
+            {
+              summary: 'Heat 15g olive oil in a large heavy-based pot or Dutch oven over medium heat. Add the onion, carrot, and celery. Cook for 7 minutes until softened. Add the garlic and pancetta; cook 2 more minutes.',
+              substeps: [
+                'Heat 15g olive oil in a large heavy-based pot or Dutch oven over medium heat. Add the onion, carrot, and celery. Cook for 7 minutes until softened. Add the garlic and pancetta; cook 2 more minutes.'
+              ]
+            },
+            {
+              summary: 'Turn the heat to high. Push the vegetables to one side of the pot. Add the remaining 15g oil and the beef mince. Brown it well, breaking it up with a wooden spoon — about 5 minutes.',
+              substeps: [
+                'Turn the heat to high. Push the vegetables to one side of the pot. Add the remaining 15g oil and the beef mince. Brown it well, breaking it up with a wooden spoon — about 5 minutes.'
+              ]
+            },
+            {
+              summary: 'Pour in the red wine. Simmer rapidly for 2 minutes until reduced by half.',
+              substeps: ['Pour in the red wine. Simmer rapidly for 2 minutes until reduced by half.']
+            },
+            {
+              summary: 'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire, sugar, herbs, bay leaves, salt, and pepper. Stir well and bring to a simmer.',
+              substeps: [
+                'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire, sugar, herbs, bay leaves, salt, and pepper. Stir well and bring to a simmer.'
+              ]
+            },
+            {
+              summary: 'Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5-2 hours, stirring every 20 minutes. The sauce should be bubbling lazily, not vigorously.',
+              substeps: [
+                'Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5-2 hours, stirring every 20 minutes. The sauce should be bubbling lazily, not vigorously.'
+              ]
+            },
+            {
+              summary: 'After 1.5 hours, taste. Adjust salt and acidity (more sugar if too sharp). Remove the bay leaves. The sauce should be thick and glossy — if too watery, simmer uncovered for the last 20 minutes.',
+              substeps: [
+                'After 1.5 hours, taste. Adjust salt and acidity (more sugar if too sharp). Remove the bay leaves. The sauce should be thick and glossy — if too watery, simmer uncovered for the last 20 minutes.'
+              ]
+            }
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'slow_cooker',
+        display_name: 'Slow Cooker',
+        equipment_required: ['slow_cooker', 'stovetop'],
+        time_active_minutes: 10,
+        time_total_minutes: 250,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+      {
+        id: 'stovetop',
+        display_name: 'Stovetop',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 10,
+        time_total_minutes: 25,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'bolognese',
         display_name: 'Bolognese',
-        description: 'Slow-simmered beef and tomato ragù with red wine and pancetta.',
+        description: 'Rich beef and tomato bolognese sauce.',
         image_filename: undefined,
-        plate_macros: { kcal: 510, protein_g: 32, carbs_g: 18, fat_g: 32, fiber_g: 4 },
+        plate_macros: { kcal: 378, protein_g: 23.4, carbs_g: 11.9, fat_g: 25.6, fiber_g: 1.5 },
         assembly_time_minutes: 0,
         additional_instructions: [],
         additional_ingredients: [],
@@ -2728,13 +3031,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 12,
-        plate_macros: {
-          kcal: 996,
-          protein_g: 48,
-          carbs_g: 97,
-          fat_g: 46,
-          fiber_g: 8
-        }
+        plate_macros: { kcal: 879, protein_g: 44.1, carbs_g: 87.4, fat_g: 37.8, fiber_g: 4.7 }
       },
       {
         id: 'baked_potato',
@@ -2803,13 +3100,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 65,
-        plate_macros: {
-          kcal: 1007,
-          protein_g: 44,
-          carbs_g: 84,
-          fat_g: 55,
-          fiber_g: 12
-        }
+        plate_macros: { kcal: 872, protein_g: 38.6, carbs_g: 74.9, fat_g: 46.7, fiber_g: 9.2 }
       },
       {
         id: 'garlic_bread',
@@ -2853,13 +3144,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 18,
-        plate_macros: {
-          kcal: 968,
-          protein_g: 42,
-          carbs_g: 65,
-          fat_g: 59,
-          fiber_g: 7
-        }
+        plate_macros: { kcal: 862, protein_g: 38.2, carbs_g: 60.5, fat_g: 50.9, fiber_g: 4.5 }
       },
       {
         id: 'lasagne',
@@ -2978,347 +3263,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 70,
-        plate_macros: {
-          kcal: 1130,
-          protein_g: 62,
-          carbs_g: 76,
-          fat_g: 63,
-          fiber_g: 7
-        }
+        plate_macros: { kcal: 1041, protein_g: 59.0, carbs_g: 67.7, fat_g: 58.2, fiber_g: 3.6 }
       }
     ],
-    methods: [
-      {
-        id: 'slow_cooker',
-        display_name: 'Slow Cooker',
-        equipment_required: ['slow_cooker', 'stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 380,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'olive_oil',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Split: 15g for sautéing the soffritto, 15g for browning the mince.'
-          },
-          {
-            ingredient_id: 'beef_mince_regular',
-            base_amount: 1000,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Don\'t use lean — fat is doing real work here.'
-          },
-          {
-            ingredient_id: 'pancetta_diced',
-            base_amount: 100,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 300,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 medium onions, finely diced.'
-          },
-          {
-            ingredient_id: 'garlic_clove',
-            base_amount: 4,
-            unit: 'cloves',
-            scaling: 'scales',
-            notes: 'Minced.'
-          },
-          {
-            ingredient_id: 'carrot',
-            base_amount: 120,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 1 medium, finely diced.'
-          },
-          {
-            ingredient_id: 'celery',
-            base_amount: 100,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 stalks, finely diced.'
-          },
-          {
-            ingredient_id: 'red_wine_cooking',
-            base_amount: 250,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Cabernet sauvignon or merlot. Any cleanskin works.'
-          },
-          {
-            ingredient_id: 'crushed_tomatoes_canned',
-            base_amount: 1600,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Two 800g tins.'
-          },
-          {
-            ingredient_id: 'tomato_paste',
-            base_amount: 60,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 4 tbsp.'
-          },
-          {
-            ingredient_id: 'beef_stock_cube',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Three cubes.'
-          },
-          {
-            ingredient_id: 'worcestershire_sauce',
-            base_amount: 20,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Approximately 1 tbsp.'
-          },
-          {
-            ingredient_id: 'sugar_white',
-            base_amount: 8,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Approximately 2 tsp. Balances tomato acidity.'
-          },
-          {
-            ingredient_id: 'oregano_dried',
-            base_amount: 2,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'thyme_dried',
-            base_amount: 2,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'bay_leaves_dried',
-            base_amount: 3,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'salt',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Heat 15g of the olive oil in a large skillet over medium-high heat. Add the diced onion, carrot, and celery. Cook for 7 minutes until soft and the onion is translucent. Add the garlic and pancetta; cook 2 more minutes. Transfer everything to the slow cooker.',
-            substeps: [
-              'Heat 15g of the olive oil in a large skillet over medium-high heat. Add the diced onion, carrot, and celery. Cook for 7 minutes until soft and the onion is translucent. Add the garlic and pancetta; cook 2 more minutes. Transfer everything to the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Add the remaining 15g oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — don\'t overcrowd the pan. Break up the mince with a wooden spoon as it cooks. Transfer to the slow cooker.',
-            substeps: [
-              'Add the remaining 15g oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — don\'t overcrowd the pan. Break up the mince with a wooden spoon as it cooks. Transfer to the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Return the skillet to medium heat. Pour in the red wine and scrape all the browned bits from the bottom of the pan — this fond is where the flavour lives. Simmer for 2 minutes, then pour into the slow cooker.',
-            substeps: [
-              'Return the skillet to medium heat. Pour in the red wine and scrape all the browned bits from the bottom of the pan — this fond is where the flavour lives. Simmer for 2 minutes, then pour into the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire sauce, sugar, oregano, thyme, bay leaves, salt, and pepper to the slow cooker. Stir well.',
-            substeps: [
-              'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire sauce, sugar, oregano, thyme, bay leaves, salt, and pepper to the slow cooker. Stir well.'
-            ]
-          },
-          {
-            summary: 'Cook on LOW for 6 hours (or HIGH for 4 hours).',
-            substeps: ['Cook on LOW for 6 hours (or HIGH for 4 hours).']
-          },
-          {
-            summary: 'After cooking, taste and adjust salt. Remove the bay leaves. If the sauce looks too liquid (common in slow cookers — they don\'t reduce much), prop the lid open with a wooden spoon and cook on HIGH for 30 more minutes.',
-            substeps: [
-              'After cooking, taste and adjust salt. Remove the bay leaves. If the sauce looks too liquid (common in slow cookers — they don\'t reduce much), prop the lid open with a wooden spoon and cook on HIGH for 30 more minutes.'
-            ]
-          }
-        ]
-      },
-      {
-        id: 'stovetop',
-        display_name: 'Stovetop',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 140,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'olive_oil',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Split: 15g for sautéing the soffritto, 15g for browning the mince.'
-          },
-          {
-            ingredient_id: 'beef_mince_regular',
-            base_amount: 1000,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'pancetta_diced',
-            base_amount: 100,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 300,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 medium onions, finely diced.'
-          },
-          {
-            ingredient_id: 'garlic_clove',
-            base_amount: 4,
-            unit: 'cloves',
-            scaling: 'scales',
-            notes: 'Minced.'
-          },
-          {
-            ingredient_id: 'carrot',
-            base_amount: 120,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 1 medium, finely diced.'
-          },
-          {
-            ingredient_id: 'celery',
-            base_amount: 100,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 stalks, finely diced.'
-          },
-          {
-            ingredient_id: 'red_wine_cooking',
-            base_amount: 250,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'crushed_tomatoes_canned',
-            base_amount: 1200,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Three 400g tins or 1.5 of the 800g tins. Less than the slow cooker version because stovetop reduces more during the long simmer.'
-          },
-          {
-            ingredient_id: 'tomato_paste',
-            base_amount: 60,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 4 tbsp.'
-          },
-          {
-            ingredient_id: 'beef_stock_cube',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Three cubes.'
-          },
-          {
-            ingredient_id: 'worcestershire_sauce',
-            base_amount: 20,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'sugar_white',
-            base_amount: 8,
-            unit: 'g',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'oregano_dried',
-            base_amount: 2,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'thyme_dried',
-            base_amount: 2,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'bay_leaves_dried',
-            base_amount: 3,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'salt',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Heat 15g olive oil in a large heavy-based pot or Dutch oven over medium heat. Add the onion, carrot, and celery. Cook for 7 minutes until softened. Add the garlic and pancetta; cook 2 more minutes.',
-            substeps: [
-              'Heat 15g olive oil in a large heavy-based pot or Dutch oven over medium heat. Add the onion, carrot, and celery. Cook for 7 minutes until softened. Add the garlic and pancetta; cook 2 more minutes.'
-            ]
-          },
-          {
-            summary: 'Turn the heat to high. Push the vegetables to one side of the pot. Add the remaining 15g oil and the beef mince. Brown it well, breaking it up with a wooden spoon — about 5 minutes.',
-            substeps: [
-              'Turn the heat to high. Push the vegetables to one side of the pot. Add the remaining 15g oil and the beef mince. Brown it well, breaking it up with a wooden spoon — about 5 minutes.'
-            ]
-          },
-          {
-            summary: 'Pour in the red wine. Simmer rapidly for 2 minutes until reduced by half.',
-            substeps: ['Pour in the red wine. Simmer rapidly for 2 minutes until reduced by half.']
-          },
-          {
-            summary: 'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire, sugar, herbs, bay leaves, salt, and pepper. Stir well and bring to a simmer.',
-            substeps: [
-              'Add the crushed tomatoes, tomato paste, stock cubes, Worcestershire, sugar, herbs, bay leaves, salt, and pepper. Stir well and bring to a simmer.'
-            ]
-          },
-          {
-            summary: 'Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5-2 hours, stirring every 20 minutes. The sauce should be bubbling lazily, not vigorously.',
-            substeps: [
-              'Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5-2 hours, stirring every 20 minutes. The sauce should be bubbling lazily, not vigorously.'
-            ]
-          },
-          {
-            summary: 'After 1.5 hours, taste. Adjust salt and acidity (more sugar if too sharp). Remove the bay leaves. The sauce should be thick and glossy — if too watery, simmer uncovered for the last 20 minutes.',
-            substeps: [
-              'After 1.5 hours, taste. Adjust salt and acidity (more sugar if too sharp). Remove the bay leaves. The sauce should be thick and glossy — if too watery, simmer uncovered for the last 20 minutes.'
-            ]
-          }
-        ]
-      }
-    ]
   },
   massaman: {
     slug: 'massaman',
@@ -3337,13 +3284,361 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Cook the curry ahead; it reheats whole and deepens overnight. Rice is grab-and-go / done day-of.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // Common to every variant and both methods. NO sauce, NO rice — the potato is part of the curry.
+    base_ingredients: [
+      {
+        ingredient_id: 'beef_chuck',
+        base_amount: 1600,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Cut into 4cm cubes. Ask the butcher for chuck steak or gravy beef.'
+      },
+      {
+        ingredient_id: 'brown_onion',
+        base_amount: 200,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Approximately 1 large onion, sliced.'
+      },
+      {
+        ingredient_id: 'potato_waxy',
+        base_amount: 800,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Peeled and cut into 3cm chunks. Do not substitute with starchy baking potatoes — they fall apart.'
+      },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'paste',
+        display_name: 'Curry Paste',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default. Jarred massaman paste already carries the aromatics and whole spices — coconut cream, stock, fish sauce and a little sugar complete it.',
+        ingredients: [
+          {
+            ingredient_id: 'massaman_curry_paste',
+            base_amount: 200,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Any jarred massaman paste.',
+          },
+          {
+            ingredient_id: 'coconut_cream',
+            base_amount: 800,
+            unit: 'ml',
+            scaling: 'scales',
+          },
+          {
+            ingredient_id: 'beef_stock_liquid',
+            base_amount: 500,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'Canonical for both methods — on the stovetop, top up with a splash of water if it reduces hard.',
+          },
+          {
+            ingredient_id: 'fish_sauce',
+            base_amount: 45,
+            unit: 'ml',
+            scaling: 'scales',
+          },
+          {
+            ingredient_id: 'brown_sugar',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'fixed',
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary:
+                'Cut the beef into 4 cm cubes, peel and chunk the potatoes, and slice the onion.',
+              substeps: [
+                'Cut the beef into 4 cm cubes, peel and chunk the potatoes, and slice the onion.',
+              ],
+            },
+            {
+              summary:
+                'Add the beef, potato, onion, curry paste, stock, fish sauce, and brown sugar to the slow cooker — hold the coconut cream back for now. Stir until the paste is evenly distributed.',
+              substeps: [
+                'Add the beef, potato, onion, curry paste, stock, fish sauce, and brown sugar to the slow cooker — hold the coconut cream back for now. Stir until the paste is evenly distributed.',
+              ],
+            },
+            {
+              summary:
+                'Cook on LOW for 8 hours or HIGH for 5, until the beef is fork-tender. LOW is worth it for chuck — the slow climb breaks the connective tissue down completely; HIGH works but the beef comes out a touch stringier.',
+              substeps: [
+                'Cook on LOW for 8 hours or HIGH for 5, until the beef is fork-tender. LOW is worth it for chuck — the slow climb breaks the connective tissue down completely; HIGH works but the beef comes out a touch stringier.',
+              ],
+            },
+            {
+              summary:
+                'Stir in the coconut cream for the last 30-45 minutes of cooking — added at the start it splits and turns greasy over a long cook. Then taste and adjust: more fish sauce for salt, more sugar for sweetness. If the sauce looks thin, gently mash 2-3 potato chunks into it.',
+              substeps: [
+                'Stir in the coconut cream for the last 30-45 minutes of cooking — added at the start it splits and turns greasy over a long cook. Then taste and adjust: more fish sauce for salt, more sugar for sweetness. If the sauce looks thin, gently mash 2-3 potato chunks into it.',
+              ],
+            },
+          ],
+          stovetop: [
+            {
+              summary:
+                'Cut the beef into 4 cm cubes, peel and chunk the potatoes, and slice the onion.',
+              substeps: [
+                'Cut the beef into 4 cm cubes, peel and chunk the potatoes, and slice the onion.',
+              ],
+            },
+            {
+              summary:
+                'Spoon the thick top of the coconut cream into a large pot over medium heat. Add the curry paste and fry for 2-3 minutes until fragrant and the oil starts to split out.',
+              substeps: [
+                'Spoon the thick top of the coconut cream into a large pot over medium heat. Add the curry paste and fry for 2-3 minutes until fragrant and the oil starts to split out.',
+              ],
+            },
+            {
+              summary:
+                'Add the beef, onion, the remaining coconut cream, stock, fish sauce, and brown sugar. Bring to a simmer, cover loosely, and cook gently for 1 hour 15 minutes, stirring every 20 minutes.',
+              substeps: [
+                'Add the beef, onion, the remaining coconut cream, stock, fish sauce, and brown sugar. Bring to a simmer, cover loosely, and cook gently for 1 hour 15 minutes, stirring every 20 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Add the potato and simmer uncovered for 30-40 minutes, until tender and the sauce has thickened. Top up with a splash of water if it reduces too hard.',
+              substeps: [
+                'Add the potato and simmer uncovered for 30-40 minutes, until tender and the sauce has thickened. Top up with a splash of water if it reduces too hard.',
+              ],
+            },
+            {
+              summary:
+                'Taste and adjust — fish sauce for salt, sugar for sweetness.',
+              substeps: [
+                'Taste and adjust — fish sauce for salt, sugar for sweetness.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'aromatic',
+        display_name: 'Full Aromatics',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        skill_min: 3,
+        notes:
+          'The fuller build: fresh garlic and ginger, tamarind, and whole spices layered over the paste. This is the original recipe.',
+        ingredients: [
+          {
+            ingredient_id: 'massaman_curry_paste',
+            base_amount: 200,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two 114g cans of Maesri, or one jar of Valcom or Ayam.'
+          },
+          {
+            ingredient_id: 'coconut_cream',
+            base_amount: 800,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'Two 400ml cans of Ayam or Trang.'
+          },
+          {
+            ingredient_id: 'beef_stock_liquid',
+            base_amount: 500,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'Or 500ml water + 1 stock cube.'
+          },
+          {
+            ingredient_id: 'garlic_clove',
+            base_amount: 4,
+            unit: 'cloves',
+            scaling: 'scales',
+            notes: 'Minced.'
+          },
+          {
+            ingredient_id: 'ginger_fresh',
+            base_amount: 1,
+            unit: 'tsp',
+            scaling: 'scales',
+            notes: 'Grated.'
+          },
+          {
+            ingredient_id: 'fish_sauce',
+            base_amount: 45,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'Approximately 3 tbsp. Squid brand.'
+          },
+          {
+            ingredient_id: 'brown_sugar',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'Approximately 2 tbsp.'
+          },
+          {
+            ingredient_id: 'tamarind_paste',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'Approximately 2 tbsp.'
+          },
+          {
+            ingredient_id: 'olive_oil',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'For browning.'
+          },
+          {
+            ingredient_id: 'cinnamon_stick',
+            base_amount: 1,
+            unit: 'count',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'star_anise',
+            base_amount: 2,
+            unit: 'count',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'bay_leaves_dried',
+            base_amount: 3,
+            unit: 'count',
+            scaling: 'fixed'
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary: 'Heat 15ml of the olive oil in a large skillet over medium-high heat. Brown the beef in 2-3 batches, about 2 minutes per side to get a hard sear — don\'t crowd the pan. Transfer to the slow cooker as you go. Browning is optional but adds real depth of flavour.',
+              substeps: [
+                'Heat 15ml of the olive oil in a large skillet over medium-high heat. Brown the beef in 2-3 batches, about 2 minutes per side to get a hard sear — don\'t crowd the pan. Transfer to the slow cooker as you go. Browning is optional but adds real depth of flavour.'
+              ]
+            },
+            {
+              summary: 'In the same skillet (don\'t wipe out), drop the heat to medium. Add the sliced onion and cook 3 minutes until starting to soften. Add the garlic, ginger, and massaman curry paste. Cook 2 minutes, stirring constantly, until the paste is fragrant and the oil starts to split out — this "blooms" the paste and is the most important flavour step.',
+              substeps: [
+                'In the same skillet (don\'t wipe out), drop the heat to medium. Add the sliced onion and cook 3 minutes until starting to soften. Add the garlic, ginger, and massaman curry paste. Cook 2 minutes, stirring constantly, until the paste is fragrant and the oil starts to split out — this "blooms" the paste and is the most important flavour step.'
+              ]
+            },
+            {
+              summary: 'Pour in 1 cup of the coconut cream and stir to combine with the paste, scraping all the brown bits off the bottom of the pan. Bring to a simmer for 1 minute, then transfer everything to the slow cooker.',
+              substeps: [
+                'Pour in 1 cup of the coconut cream and stir to combine with the paste, scraping all the brown bits off the bottom of the pan. Bring to a simmer for 1 minute, then transfer everything to the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Add the beef stock, potatoes, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves to the slow cooker. Stir to combine. Hold the remaining coconut cream back — stir it in for the last 30-45 minutes so it doesn\'t split over the long cook (the cup bloomed with the paste is safe).',
+              substeps: [
+                'Add the beef stock, potatoes, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves to the slow cooker. Stir to combine. Hold the remaining coconut cream back — stir it in for the last 30-45 minutes so it doesn\'t split over the long cook (the cup bloomed with the paste is safe).'
+              ]
+            },
+            {
+              summary: 'Cook on LOW for 8 hours or HIGH for 5, until the beef is fork-tender and falls apart with light pressure. LOW is strongly preferred for chuck; HIGH works but comes out slightly stringier.',
+              substeps: [
+                'Cook on LOW for 8 hours or HIGH for 5, until the beef is fork-tender and falls apart with light pressure. LOW is strongly preferred for chuck; HIGH works but comes out slightly stringier.'
+              ]
+            },
+            {
+              summary: 'Optional finishing reduction: if the sauce looks too thin (slow cookers vary), transfer to a saucepan and simmer uncovered for 10 minutes to reduce. Or mash 2-3 potato chunks gently into the sauce to thicken naturally.',
+              substeps: [
+                'Optional finishing reduction: if the sauce looks too thin (slow cookers vary), transfer to a saucepan and simmer uncovered for 10 minutes to reduce. Or mash 2-3 potato chunks gently into the sauce to thicken naturally.'
+              ]
+            },
+            {
+              summary: 'Remove the cinnamon stick, star anise, and bay leaves before serving.',
+              substeps: ['Remove the cinnamon stick, star anise, and bay leaves before serving.']
+            }
+          ],
+          stovetop: [
+            {
+              summary: 'Heat 15ml olive oil in a large heavy-based pot or Dutch oven over medium-high heat. Brown the beef in batches, about 2 minutes per side. Transfer to a plate.',
+              substeps: [
+                'Heat 15ml olive oil in a large heavy-based pot or Dutch oven over medium-high heat. Brown the beef in batches, about 2 minutes per side. Transfer to a plate.'
+              ]
+            },
+            {
+              summary: 'Drop the heat to medium. Add the remaining 15ml oil and the sliced onion. Cook 5 minutes until soft. Add the garlic and ginger, cook 1 minute.',
+              substeps: [
+                'Drop the heat to medium. Add the remaining 15ml oil and the sliced onion. Cook 5 minutes until soft. Add the garlic and ginger, cook 1 minute.'
+              ]
+            },
+            {
+              summary: 'Add the massaman curry paste and cook for 3 minutes, stirring constantly. The paste should darken and the oil should split out — this is the bloom.',
+              substeps: [
+                'Add the massaman curry paste and cook for 3 minutes, stirring constantly. The paste should darken and the oil should split out — this is the bloom.'
+              ]
+            },
+            {
+              summary: 'Pour in the coconut cream and stir to combine with the paste. Bring to a simmer, then add the beef back in with any juices, plus the beef stock, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves.',
+              substeps: [
+                'Pour in the coconut cream and stir to combine with the paste. Bring to a simmer, then add the beef back in with any juices, plus the beef stock, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves.'
+              ]
+            },
+            {
+              summary: 'Bring to a simmer. Cover loosely (lid slightly ajar) and simmer gently for 1 hour 15 minutes, stirring every 20 minutes.',
+              substeps: [
+                'Bring to a simmer. Cover loosely (lid slightly ajar) and simmer gently for 1 hour 15 minutes, stirring every 20 minutes.'
+              ]
+            },
+            {
+              summary: 'Add the potato chunks. Continue simmering uncovered for 30-40 minutes, until the potatoes are tender and the beef shreds easily with a fork. The sauce should have reduced and thickened.',
+              substeps: [
+                'Add the potato chunks. Continue simmering uncovered for 30-40 minutes, until the potatoes are tender and the beef shreds easily with a fork. The sauce should have reduced and thickened.'
+              ]
+            },
+            {
+              summary: 'Remove the cinnamon stick, star anise, and bay leaves. Taste and adjust — more fish sauce for salt, more sugar for sweetness, more tamarind for sour.',
+              substeps: [
+                'Remove the cinnamon stick, star anise, and bay leaves. Taste and adjust — more fish sauce for salt, more sugar for sweetness, more tamarind for sour.'
+              ]
+            }
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'slow_cooker',
+        display_name: 'Slow Cooker',
+        equipment_required: ['slow_cooker', 'stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 495,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+      {
+        id: 'stovetop',
+        display_name: 'Stovetop',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 20,
+        time_total_minutes: 140,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'massaman',
         display_name: 'Massaman Beef Curry',
         description: 'Slow-cooked beef and potato in fragrant Thai coconut curry.',
         image_filename: undefined,
-        plate_macros: { kcal: 890, protein_g: 52, carbs_g: 42, fat_g: 58, fiber_g: 5 },
+        plate_macros: { kcal: 836, protein_g: 43.7, carbs_g: 31.8, fat_g: 60.0, fiber_g: 3.4 },
         assembly_time_minutes: 0,
         additional_instructions: [],
         additional_ingredients: [],
@@ -3414,325 +3709,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           }
         ],
         assembly_time_minutes: 15,
-        plate_macros: {
-          kcal: 1403,
-          protein_g: 59,
-          carbs_g: 133,
-          fat_g: 68,
-          fiber_g: 7
-        }
+        plate_macros: { kcal: 1322, protein_g: 55.7, carbs_g: 117.0, fat_g: 70.7, fiber_g: 6.6 }
       }
     ],
-    methods: [
-      {
-        id: 'slow_cooker',
-        display_name: 'Slow Cooker',
-        equipment_required: ['slow_cooker', 'stovetop'],
-        time_active_minutes: 15,
-        time_total_minutes: 495,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'beef_chuck',
-            base_amount: 1600,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Cut into 4cm cubes. Ask the butcher for chuck steak or gravy beef.'
-          },
-          {
-            ingredient_id: 'massaman_curry_paste',
-            base_amount: 200,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Two 114g cans of Maesri, or one jar of Valcom or Ayam.'
-          },
-          {
-            ingredient_id: 'coconut_cream',
-            base_amount: 800,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Two 400ml cans of Ayam or Trang.'
-          },
-          {
-            ingredient_id: 'beef_stock_liquid',
-            base_amount: 500,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Or 500ml water + 1 stock cube.'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 200,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 1 large onion, sliced.'
-          },
-          {
-            ingredient_id: 'garlic_clove',
-            base_amount: 4,
-            unit: 'cloves',
-            scaling: 'scales',
-            notes: 'Minced.'
-          },
-          {
-            ingredient_id: 'ginger_fresh',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'scales',
-            notes: 'Grated.'
-          },
-          {
-            ingredient_id: 'potato_waxy',
-            base_amount: 800,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Peeled and cut into 3cm chunks. Do not substitute with starchy baking potatoes — they fall apart.'
-          },
-          {
-            ingredient_id: 'fish_sauce',
-            base_amount: 45,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Approximately 3 tbsp. Squid brand.'
-          },
-          {
-            ingredient_id: 'brown_sugar',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Approximately 2 tbsp.'
-          },
-          {
-            ingredient_id: 'tamarind_paste',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Approximately 2 tbsp.'
-          },
-          {
-            ingredient_id: 'olive_oil',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'For browning.'
-          },
-          {
-            ingredient_id: 'cinnamon_stick',
-            base_amount: 1,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'star_anise',
-            base_amount: 2,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'bay_leaves_dried',
-            base_amount: 3,
-            unit: 'count',
-            scaling: 'fixed'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Heat 15ml of the olive oil in a large skillet over medium-high heat. Brown the beef in 2-3 batches, about 2 minutes per side to get a hard sear — don\'t crowd the pan. Transfer to the slow cooker as you go. Browning is optional but adds real depth of flavour.',
-            substeps: [
-              'Heat 15ml of the olive oil in a large skillet over medium-high heat. Brown the beef in 2-3 batches, about 2 minutes per side to get a hard sear — don\'t crowd the pan. Transfer to the slow cooker as you go. Browning is optional but adds real depth of flavour.'
-            ]
-          },
-          {
-            summary: 'In the same skillet (don\'t wipe out), drop the heat to medium. Add the sliced onion and cook 3 minutes until starting to soften. Add the garlic, ginger, and massaman curry paste. Cook 2 minutes, stirring constantly, until the paste is fragrant and the oil starts to split out — this "blooms" the paste and is the most important flavour step.',
-            substeps: [
-              'In the same skillet (don\'t wipe out), drop the heat to medium. Add the sliced onion and cook 3 minutes until starting to soften. Add the garlic, ginger, and massaman curry paste. Cook 2 minutes, stirring constantly, until the paste is fragrant and the oil starts to split out — this "blooms" the paste and is the most important flavour step.'
-            ]
-          },
-          {
-            summary: 'Pour in 1 cup of the coconut cream and stir to combine with the paste, scraping all the brown bits off the bottom of the pan. Bring to a simmer for 1 minute, then transfer everything to the slow cooker.',
-            substeps: [
-              'Pour in 1 cup of the coconut cream and stir to combine with the paste, scraping all the brown bits off the bottom of the pan. Bring to a simmer for 1 minute, then transfer everything to the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Add the remaining coconut cream, beef stock, potatoes, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves to the slow cooker. Stir to combine.',
-            substeps: [
-              'Add the remaining coconut cream, beef stock, potatoes, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves to the slow cooker. Stir to combine.'
-            ]
-          },
-          {
-            summary: 'Cook on LOW for 8 hours or HIGH for 5 hours, until the beef is fork-tender and falls apart with light pressure.',
-            substeps: [
-              'Cook on LOW for 8 hours or HIGH for 5 hours, until the beef is fork-tender and falls apart with light pressure.'
-            ]
-          },
-          {
-            summary: 'Optional finishing reduction: if the sauce looks too thin (slow cookers vary), transfer to a saucepan and simmer uncovered for 10 minutes to reduce. Or mash 2-3 potato chunks gently into the sauce to thicken naturally.',
-            substeps: [
-              'Optional finishing reduction: if the sauce looks too thin (slow cookers vary), transfer to a saucepan and simmer uncovered for 10 minutes to reduce. Or mash 2-3 potato chunks gently into the sauce to thicken naturally.'
-            ]
-          },
-          {
-            summary: 'Remove the cinnamon stick, star anise, and bay leaves before serving.',
-            substeps: ['Remove the cinnamon stick, star anise, and bay leaves before serving.']
-          }
-        ]
-      },
-      {
-        id: 'stovetop',
-        display_name: 'Stovetop',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 140,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'beef_chuck',
-            base_amount: 1600,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Cut into 4cm cubes.'
-          },
-          {
-            ingredient_id: 'massaman_curry_paste',
-            base_amount: 200,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Two 114g cans of Maesri, or one jar of Valcom or Ayam.'
-          },
-          {
-            ingredient_id: 'coconut_cream',
-            base_amount: 800,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'beef_stock_liquid',
-            base_amount: 750,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'More than the slow cooker version because stovetop reduction is real.'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 200,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 1 large onion, sliced.'
-          },
-          {
-            ingredient_id: 'garlic_clove',
-            base_amount: 4,
-            unit: 'cloves',
-            scaling: 'scales',
-            notes: 'Minced.'
-          },
-          {
-            ingredient_id: 'ginger_fresh',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'scales',
-            notes: 'Grated.'
-          },
-          {
-            ingredient_id: 'potato_waxy',
-            base_amount: 800,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Peeled and cut into 3cm chunks.'
-          },
-          {
-            ingredient_id: 'fish_sauce',
-            base_amount: 45,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'brown_sugar',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'tamarind_paste',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'olive_oil',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Split: 15g for browning the beef, 15g for sautéing the aromatics.'
-          },
-          {
-            ingredient_id: 'cinnamon_stick',
-            base_amount: 1,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'star_anise',
-            base_amount: 2,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'bay_leaves_dried',
-            base_amount: 3,
-            unit: 'count',
-            scaling: 'fixed'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Heat 15ml olive oil in a large heavy-based pot or Dutch oven over medium-high heat. Brown the beef in batches, about 2 minutes per side. Transfer to a plate.',
-            substeps: [
-              'Heat 15ml olive oil in a large heavy-based pot or Dutch oven over medium-high heat. Brown the beef in batches, about 2 minutes per side. Transfer to a plate.'
-            ]
-          },
-          {
-            summary: 'Drop the heat to medium. Add the remaining 15ml oil and the sliced onion. Cook 5 minutes until soft. Add the garlic and ginger, cook 1 minute.',
-            substeps: [
-              'Drop the heat to medium. Add the remaining 15ml oil and the sliced onion. Cook 5 minutes until soft. Add the garlic and ginger, cook 1 minute.'
-            ]
-          },
-          {
-            summary: 'Add the massaman curry paste and cook for 3 minutes, stirring constantly. The paste should darken and the oil should split out — this is the bloom.',
-            substeps: [
-              'Add the massaman curry paste and cook for 3 minutes, stirring constantly. The paste should darken and the oil should split out — this is the bloom.'
-            ]
-          },
-          {
-            summary: 'Pour in the coconut cream and stir to combine with the paste. Bring to a simmer, then add the beef back in with any juices, plus the beef stock, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves.',
-            substeps: [
-              'Pour in the coconut cream and stir to combine with the paste. Bring to a simmer, then add the beef back in with any juices, plus the beef stock, fish sauce, brown sugar, tamarind paste, cinnamon stick, star anise, and bay leaves.'
-            ]
-          },
-          {
-            summary: 'Bring to a simmer. Cover loosely (lid slightly ajar) and simmer gently for 1 hour 15 minutes, stirring every 20 minutes.',
-            substeps: [
-              'Bring to a simmer. Cover loosely (lid slightly ajar) and simmer gently for 1 hour 15 minutes, stirring every 20 minutes.'
-            ]
-          },
-          {
-            summary: 'Add the potato chunks. Continue simmering uncovered for 30-40 minutes, until the potatoes are tender and the beef shreds easily with a fork. The sauce should have reduced and thickened.',
-            substeps: [
-              'Add the potato chunks. Continue simmering uncovered for 30-40 minutes, until the potatoes are tender and the beef shreds easily with a fork. The sauce should have reduced and thickened.'
-            ]
-          },
-          {
-            summary: 'Remove the cinnamon stick, star anise, and bay leaves. Taste and adjust — more fish sauce for salt, more sugar for sweetness, more tamarind for sour.',
-            substeps: [
-              'Remove the cinnamon stick, star anise, and bay leaves. Taste and adjust — more fish sauce for salt, more sugar for sweetness, more tamarind for sour.'
-            ]
-          }
-        ]
-      }
-    ]
   },
   chilli_con_carne: {
     slug: 'chilli_con_carne',
@@ -3744,231 +3723,150 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     min_scale: 0.7,
     max_scale: 1.5,
     flex_ingredient_id: 'beef_mince_regular',
-    contains_allergens: ['Dairy'],
+    contains_allergens: ['Dairy', 'Gluten/Wheat'],
     image_filename: 'chilli_con_carne.png',
     meal_prep: {
       strategy: 'full',
       prep_note: 'Cook the chilli ahead; it reheats whole. Rice and corn chips are done per plate day-of.',
       storage: { fridge_days: 5, freeze_months: 3 },
     },
-    plates: [
+
+    // Common to every variant and both methods. NO sauce, NO rice.
+    base_ingredients: [
       {
-        id: 'chilli_con_carne',
-        display_name: 'Chilli Con Carne',
-        description: 'Slow-simmered beef chilli with kidney and black beans.',
-        image_filename: undefined,
-        plate_macros: { kcal: 620, protein_g: 42, carbs_g: 38, fat_g: 32, fiber_g: 14 },
-        assembly_time_minutes: 0,
-        additional_instructions: [],
-        additional_ingredients: [],
-        base_serving_multiplier: 1.0,
+        ingredient_id: 'beef_mince_regular',
+        base_amount: 1000,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Don\'t use lean — fat is doing real work here.'
       },
       {
-        id: 'bowl',
-        display_name: 'Bulking Chilli Bowl',
-        description: 'Weeknight bowl of rice topped with chilli, grated cheese, sour cream, fresh avocado, and a squeeze of lime. The most reliable chilli plate.',
-        base_serving_multiplier: 1.0,
-        equipment_required: ['stovetop'],
-        image_filename: 'chilli_con_carne_bowl.png',
-        additional_ingredients: [
-          {
-            ingredient_id: 'basmati_rice_dry',
-            base_amount: 85,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Approximately 85g dry rice. Cook per packet directions or in a rice cooker.'
-          },
-          {
-            ingredient_id: 'cheese_tasty_grated',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'sour_cream',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'avocado',
-            base_amount: 80,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Approximately half a small avocado.'
-          },
-          {
-            ingredient_id: 'coriander_fresh',
-            base_amount: 4,
-            unit: 'g',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'lime',
-            base_amount: 0.25,
-            unit: 'count',
-            scaling: 'fixed',
-            notes: 'One wedge, approximately 5ml juice.'
-          }
-        ],
-        additional_instructions: [
-          {
-            summary: 'Cook the rice according to packet directions, or use a rice cooker. 85g dry basmati + 170ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.',
-            substeps: [
-              'Cook the rice according to packet directions, or use a rice cooker. 85g dry basmati + 170ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.'
-            ]
-          },
-          {
-            summary: 'Reheat 1 serving of chilli in a saucepan or microwave.',
-            substeps: ['Reheat 1 serving of chilli in a saucepan or microwave.']
-          },
-          {
-            summary: 'Pile the rice into a bowl. Ladle the chilli over the rice — generously, you want sauce flooding the rice.',
-            substeps: [
-              'Pile the rice into a bowl. Ladle the chilli over the rice — generously, you want sauce flooding the rice.'
-            ]
-          },
-          {
-            summary: 'Top with grated cheese (the heat melts it), a dollop of sour cream, sliced or smashed avocado, and a scatter of fresh coriander leaves.',
-            substeps: [
-              'Top with grated cheese (the heat melts it), a dollop of sour cream, sliced or smashed avocado, and a scatter of fresh coriander leaves.'
-            ]
-          },
-          {
-            summary: 'Squeeze the lime wedge over everything just before eating.',
-            substeps: ['Squeeze the lime wedge over everything just before eating.']
-          }
-        ],
-        assembly_time_minutes: 15,
-        plate_macros: {
-          kcal: 1263,
-          protein_g: 52,
-          carbs_g: 123,
-          fat_g: 62,
-          fiber_g: 18
-        }
+        ingredient_id: 'brown_onion',
+        base_amount: 300,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Approximately 2 medium onions, diced.'
       },
-      {
-        id: 'nachos',
-        display_name: 'Loaded Chilli Nachos',
-        description: 'A Saturday-night stunt plate. Layer of corn chips, generous chilli, blanket of cheese baked until molten, then finished with sour cream, avocado, pickled jalapeños, spring onion, and lime.',
-        is_stunt_plate: true,
-        base_serving_multiplier: 1.0,
-        equipment_required: ['oven'],
-        additional_ingredients: [
-          {
-            ingredient_id: 'corn_chips',
-            base_amount: 80,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Approximately ⅓ of a 240g pack.'
-          },
-          {
-            ingredient_id: 'cheese_tasty_grated',
-            base_amount: 40,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'More than the bowl plate — needs to blanket the chips.'
-          },
-          {
-            ingredient_id: 'sour_cream',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'avocado',
-            base_amount: 60,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Less than the bowl plate — spreads across the surface.'
-          },
-          {
-            ingredient_id: 'jalapenos_pickled',
-            base_amount: 20,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Drained.'
-          },
-          {
-            ingredient_id: 'spring_onion',
-            base_amount: 1,
-            unit: 'count',
-            scaling: 'fixed',
-            notes: 'Finely sliced.'
-          },
-          {
-            ingredient_id: 'coriander_fresh',
-            base_amount: 4,
-            unit: 'g',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'lime',
-            base_amount: 0.25,
-            unit: 'count',
-            scaling: 'fixed',
-            notes: 'One wedge.'
-          }
-        ],
-        additional_instructions: [
-          {
-            summary: 'Preheat the oven to 200°C.',
-            substeps: ['Preheat the oven to 200°C.']
-          },
-          {
-            summary: 'Reheat 1 serving of chilli in a small saucepan or microwave until hot.',
-            substeps: ['Reheat 1 serving of chilli in a small saucepan or microwave until hot.']
-          },
-          {
-            summary: 'Spread the corn chips across an oven-safe dish or baking tray in a single thick layer.',
-            substeps: ['Spread the corn chips across an oven-safe dish or baking tray in a single thick layer.']
-          },
-          {
-            summary: 'Spoon the hot chilli evenly over the chips — go right to the edges, you want chilli on every chip.',
-            substeps: [
-              'Spoon the hot chilli evenly over the chips — go right to the edges, you want chilli on every chip.'
-            ]
-          },
-          {
-            summary: 'Scatter the grated cheese over the top in an even layer.',
-            substeps: ['Scatter the grated cheese over the top in an even layer.']
-          },
-          {
-            summary: 'Bake for 8-10 minutes, until the cheese is fully melted and bubbling at the edges.',
-            substeps: ['Bake for 8-10 minutes, until the cheese is fully melted and bubbling at the edges.']
-          },
-          {
-            summary: 'Remove from the oven. Top immediately with dollops of sour cream, sliced or smashed avocado, scattered jalapeños, sliced spring onion, and fresh coriander.',
-            substeps: [
-              'Remove from the oven. Top immediately with dollops of sour cream, sliced or smashed avocado, scattered jalapeños, sliced spring onion, and fresh coriander.'
-            ]
-          },
-          {
-            summary: 'Squeeze the lime wedge over everything. Eat straight from the dish.',
-            substeps: ['Squeeze the lime wedge over everything. Eat straight from the dish.']
-          }
-        ],
-        assembly_time_minutes: 18,
-        plate_macros: {
-          kcal: 1319,
-          protein_g: 53,
-          carbs_g: 94,
-          fat_g: 82,
-          fiber_g: 20
-        },
-        image_filename: 'chilli_con_carne_nachos.png'
-      }
     ],
-    methods: [
+
+    sauce_variants: [
       {
-        id: 'slow_cooker',
-        display_name: 'Slow Cooker',
-        equipment_required: ['slow_cooker', 'stovetop'],
-        time_active_minutes: 15,
-        time_total_minutes: 375,
-        skill_min: 2,
+        id: 'sachet',
+        display_name: 'Seasoning Sachet',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default. Two chilli con carne or taco seasoning sachets replace the nine-jar spice rack — most AU sachets thicken with wheat flour, hence the Gluten/Wheat declaration.',
+        ingredients: [
+          {
+            ingredient_id: 'chilli_seasoning_mix',
+            base_amount: 80,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two ~40g sachets — chilli con carne or taco seasoning.',
+          },
+          {
+            ingredient_id: 'crushed_tomatoes_canned',
+            base_amount: 1600,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two 800g tins.',
+          },
+          {
+            ingredient_id: 'kidney_beans_canned',
+            base_amount: 250,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Drained weight — one 400g tin.',
+          },
+          {
+            ingredient_id: 'black_beans_canned',
+            base_amount: 250,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Drained weight — one 400g tin.',
+          },
+          {
+            ingredient_id: 'water',
+            base_amount: 250,
+            unit: 'ml',
+            scaling: 'scales',
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary:
+                'Brown the beef mince and diced onion together in a large frying pan over medium-high heat, breaking the mince up — about 6-7 minutes. The mince renders its own fat.',
+              substeps: [
+                'Brown the beef mince and diced onion together in a large frying pan over medium-high heat, breaking the mince up — about 6-7 minutes. The mince renders its own fat.',
+              ],
+            },
+            {
+              summary:
+                'Transfer to the slow cooker with the seasoning mix, crushed tomatoes, and drained beans. Stir well. Hold the water back — slow cookers don\'t reduce, and the tomatoes bring plenty of liquid; add a splash only if it looks dry.',
+              substeps: [
+                'Transfer to the slow cooker with the seasoning mix, crushed tomatoes, and drained beans. Stir well. Hold the water back — slow cookers don\'t reduce, and the tomatoes bring plenty of liquid; add a splash only if it looks dry.',
+              ],
+            },
+            {
+              summary:
+                'Cook on LOW for 6 hours or HIGH for 4. With mince either setting works — the long cook is for flavour, not tenderising.',
+              substeps: [
+                'Cook on LOW for 6 hours or HIGH for 4. With mince either setting works — the long cook is for flavour, not tenderising.',
+              ],
+            },
+            {
+              summary:
+                'Taste and adjust. If it looks too liquid, prop the lid open and cook on HIGH for a final 20 minutes.',
+              substeps: [
+                'Taste and adjust. If it looks too liquid, prop the lid open and cook on HIGH for a final 20 minutes.',
+              ],
+            },
+          ],
+          stovetop: [
+            {
+              summary:
+                'Brown the beef mince and diced onion together in a large pot over medium-high heat, breaking the mince up — about 6-7 minutes. The mince renders its own fat.',
+              substeps: [
+                'Brown the beef mince and diced onion together in a large pot over medium-high heat, breaking the mince up — about 6-7 minutes. The mince renders its own fat.',
+              ],
+            },
+            {
+              summary:
+                'Stir in the seasoning mix and cook for 30 seconds until fragrant.',
+              substeps: [
+                'Stir in the seasoning mix and cook for 30 seconds until fragrant.',
+              ],
+            },
+            {
+              summary:
+                'Add the crushed tomatoes, drained beans, and water. Stir well and bring to a simmer.',
+              substeps: [
+                'Add the crushed tomatoes, drained beans, and water. Stir well and bring to a simmer.',
+              ],
+            },
+            {
+              summary:
+                'Simmer with the lid ajar for 20-25 minutes, stirring occasionally, until thick and rich. Taste and adjust.',
+              substeps: [
+                'Simmer with the lid ajar for 20-25 minutes, stirring occasionally, until thick and rich. Taste and adjust.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
         shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        extra_total_minutes: 70,
+        skill_min: 3,
+        notes:
+          'The full spice-rack build. Amounts follow the slow-cooker version for both methods; on the stovetop it simmers longer and reduces further.',
         ingredients: [
           {
             ingredient_id: 'olive_oil',
@@ -3976,20 +3874,6 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             unit: 'g',
             scaling: 'fixed',
             notes: 'Split: 15g for sautéing aromatics, 15g for browning the mince.'
-          },
-          {
-            ingredient_id: 'beef_mince_regular',
-            base_amount: 1000,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Don\'t use lean — fat is doing real work here.'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 300,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 medium onions, diced.'
           },
           {
             ingredient_id: 'garlic_clove',
@@ -4095,209 +3979,302 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             base_amount: 250,
             unit: 'ml',
             scaling: 'scales'
-          }
+          },
         ],
-        instructions: [
-          {
-            summary: 'Heat 15ml of the olive oil in a large skillet over medium-high heat. Add the onion, garlic, and capsicum. Cook 4-5 minutes until softening and slightly caramelised. Transfer to the slow cooker.',
-            substeps: [
-              'Heat 15ml of the olive oil in a large skillet over medium-high heat. Add the onion, garlic, and capsicum. Cook 4-5 minutes until softening and slightly caramelised. Transfer to the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Add the remaining 15ml oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — break it up with a wooden spoon as it cooks. You want proper browning, not stewing. Transfer to the slow cooker.',
-            substeps: [
-              'Add the remaining 15ml oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — break it up with a wooden spoon as it cooks. You want proper browning, not stewing. Transfer to the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Add to the slow cooker: crushed tomatoes, tomato paste, both drained beans, crumbled stock cubes, sugar, paprika, cumin, garlic powder, onion powder, oregano, cayenne, salt, and water. Stir well.',
-            substeps: [
-              'Add to the slow cooker: crushed tomatoes, tomato paste, both drained beans, crumbled stock cubes, sugar, paprika, cumin, garlic powder, onion powder, oregano, cayenne, salt, and water. Stir well.'
-            ]
-          },
-          {
-            summary: 'Cook on LOW for 6 hours or HIGH for 4 hours.',
-            substeps: ['Cook on LOW for 6 hours or HIGH for 4 hours.']
-          },
-          {
-            summary: 'Taste and adjust — more cayenne for heat, more salt if needed, more sugar if too acidic. If the sauce is too liquid, prop the lid open on HIGH for 20 minutes to reduce.',
-            substeps: [
-              'Taste and adjust — more cayenne for heat, more salt if needed, more sugar if too acidic. If the sauce is too liquid, prop the lid open on HIGH for 20 minutes to reduce.'
-            ]
-          }
-        ]
+        instructions: {
+          slow_cooker: [
+            {
+              summary: 'Heat 15ml of the olive oil in a large skillet over medium-high heat. Add the onion, garlic, and capsicum. Cook 4-5 minutes until softening and slightly caramelised. Transfer to the slow cooker.',
+              substeps: [
+                'Heat 15ml of the olive oil in a large skillet over medium-high heat. Add the onion, garlic, and capsicum. Cook 4-5 minutes until softening and slightly caramelised. Transfer to the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Add the remaining 15ml oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — break it up with a wooden spoon as it cooks. You want proper browning, not stewing. Transfer to the slow cooker.',
+              substeps: [
+                'Add the remaining 15ml oil to the same skillet over high heat. Add the beef mince and brown in two batches if needed — break it up with a wooden spoon as it cooks. You want proper browning, not stewing. Transfer to the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Add to the slow cooker: crushed tomatoes, tomato paste, both drained beans, crumbled stock cubes, sugar, paprika, cumin, garlic powder, onion powder, oregano, cayenne, salt, and water. Stir well.',
+              substeps: [
+                'Add to the slow cooker: crushed tomatoes, tomato paste, both drained beans, crumbled stock cubes, sugar, paprika, cumin, garlic powder, onion powder, oregano, cayenne, salt, and water. Stir well.'
+              ]
+            },
+            {
+              summary: 'Cook on LOW for 6 hours or HIGH for 4 hours.',
+              substeps: ['Cook on LOW for 6 hours or HIGH for 4 hours.']
+            },
+            {
+              summary: 'Taste and adjust — more cayenne for heat, more salt if needed, more sugar if too acidic. If the sauce is too liquid, prop the lid open on HIGH for 20 minutes to reduce.',
+              substeps: [
+                'Taste and adjust — more cayenne for heat, more salt if needed, more sugar if too acidic. If the sauce is too liquid, prop the lid open on HIGH for 20 minutes to reduce.'
+              ]
+            }
+          ],
+          stovetop: [
+            {
+              summary: 'Heat 15ml olive oil in a large heavy-based pot over medium-high heat. Add the onion, garlic, and capsicum. Cook 5 minutes until soft and lightly browned.',
+              substeps: [
+                'Heat 15ml olive oil in a large heavy-based pot over medium-high heat. Add the onion, garlic, and capsicum. Cook 5 minutes until soft and lightly browned.'
+              ]
+            },
+            {
+              summary: 'Push the vegetables to one side of the pot. Add the remaining 15ml oil and the beef mince. Brown it well, breaking it up — about 5-6 minutes. Don\'t rush this; the browning is where the flavour lives.',
+              substeps: [
+                'Push the vegetables to one side of the pot. Add the remaining 15ml oil and the beef mince. Brown it well, breaking it up — about 5-6 minutes. Don\'t rush this; the browning is where the flavour lives.'
+              ]
+            },
+            {
+              summary: 'Add all the spices (paprika, cumin, garlic powder, onion powder, oregano, cayenne) and stir for 30 seconds — toasting them in the fat blooms the flavour.',
+              substeps: [
+                'Add all the spices (paprika, cumin, garlic powder, onion powder, oregano, cayenne) and stir for 30 seconds — toasting them in the fat blooms the flavour.'
+              ]
+            },
+            {
+              summary: 'Add the crushed tomatoes, tomato paste, beans, stock cubes, sugar, salt, and water. Stir well.',
+              substeps: ['Add the crushed tomatoes, tomato paste, beans, stock cubes, sugar, salt, and water. Stir well.']
+            },
+            {
+              summary: 'Bring to a simmer. Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5 hours minimum, up to 2.5 hours for the weekend version. Stir every 20 minutes. The sauce thickens and the flavour deepens with time.',
+              substeps: [
+                'Bring to a simmer. Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5 hours minimum, up to 2.5 hours for the weekend version. Stir every 20 minutes. The sauce thickens and the flavour deepens with time.'
+              ]
+            },
+            {
+              summary: 'Taste and adjust. The sauce should be thick, glossy, and rich. If too thin, simmer uncovered for the last 15-20 minutes.',
+              substeps: [
+                'Taste and adjust. The sauce should be thick, glossy, and rich. If too thin, simmer uncovered for the last 15-20 minutes.'
+              ]
+            }
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'slow_cooker',
+        display_name: 'Slow Cooker',
+        equipment_required: ['slow_cooker', 'stovetop'],
+        time_active_minutes: 10,
+        time_total_minutes: 375,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
       },
       {
         id: 'stovetop',
         display_name: 'Stovetop',
         equipment_required: ['stovetop'],
-        time_active_minutes: 15,
-        time_total_minutes: 105,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
+        time_active_minutes: 10,
+        time_total_minutes: 35,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
+    plates: [
+      {
+        id: 'chilli_con_carne',
+        display_name: 'Chilli Con Carne',
+        description: 'Slow-simmered beef chilli with kidney and black beans.',
+        image_filename: undefined,
+        plate_macros: { kcal: 505, protein_g: 31.3, carbs_g: 38.1, fat_g: 26.4, fiber_g: 10.0 },
+        assembly_time_minutes: 0,
+        additional_instructions: [],
+        additional_ingredients: [],
+        base_serving_multiplier: 1.0,
+      },
+      {
+        id: 'bowl',
+        display_name: 'Bulking Chilli Bowl',
+        description: 'Weeknight bowl of rice topped with chilli, grated cheese, sour cream, fresh avocado, and a squeeze of lime. The most reliable chilli plate.',
+        base_serving_multiplier: 1.0,
+        equipment_required: ['stovetop'],
+        image_filename: 'chilli_con_carne_bowl.png',
+        additional_ingredients: [
           {
-            ingredient_id: 'olive_oil',
-            base_amount: 30,
+            ingredient_id: 'basmati_rice_dry',
+            base_amount: 85,
             unit: 'g',
             scaling: 'fixed',
-            notes: 'Split: 15g for sautéing aromatics, 15g for browning the mince.'
+            notes: 'Approximately 85g dry rice. Cook per packet directions or in a rice cooker.'
           },
           {
-            ingredient_id: 'beef_mince_regular',
-            base_amount: 1000,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 300,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 medium onions, diced.'
-          },
-          {
-            ingredient_id: 'garlic_clove',
-            base_amount: 5,
-            unit: 'cloves',
-            scaling: 'scales',
-            notes: 'Minced.'
-          },
-          {
-            ingredient_id: 'capsicum_red',
-            base_amount: 300,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 large, diced.'
-          },
-          {
-            ingredient_id: 'crushed_tomatoes_canned',
-            base_amount: 1600,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'tomato_paste',
-            base_amount: 90,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'kidney_beans_canned',
-            base_amount: 250,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'One 420g tin, drained to ~250g. Drain and rinse before adding.'
-          },
-          {
-            ingredient_id: 'black_beans_canned',
-            base_amount: 250,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'One 420g tin, drained to ~250g. Drain and rinse before adding.'
-          },
-          {
-            ingredient_id: 'beef_stock_cube',
+            ingredient_id: 'cheese_tasty_grated',
             base_amount: 30,
             unit: 'g',
-            scaling: 'scales',
-            notes: 'Three cubes, crumbled.'
+            scaling: 'fixed'
           },
           {
-            ingredient_id: 'sugar_white',
-            base_amount: 12,
+            ingredient_id: 'sour_cream',
+            base_amount: 30,
             unit: 'g',
             scaling: 'fixed'
           },
           {
-            ingredient_id: 'paprika_sweet',
-            base_amount: 8,
-            unit: 'tsp',
-            scaling: 'fixed'
+            ingredient_id: 'avocado',
+            base_amount: 80,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'Approximately half a small avocado.'
           },
           {
-            ingredient_id: 'ground_cumin',
-            base_amount: 10,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'garlic_powder',
+            ingredient_id: 'coriander_fresh',
             base_amount: 4,
-            unit: 'tsp',
+            unit: 'g',
             scaling: 'fixed'
           },
           {
-            ingredient_id: 'onion_powder',
-            base_amount: 4,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'oregano_dried',
-            base_amount: 4,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'cayenne_pepper',
-            base_amount: 2.5,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'salt',
-            base_amount: 1.5,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'water',
-            base_amount: 375,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'More than the slow cooker version because stovetop reduction is real.'
+            ingredient_id: 'lime',
+            base_amount: 0.25,
+            unit: 'count',
+            scaling: 'fixed',
+            notes: 'One wedge, approximately 5ml juice.'
           }
         ],
-        instructions: [
+        additional_instructions: [
           {
-            summary: 'Heat 15ml olive oil in a large heavy-based pot over medium-high heat. Add the onion, garlic, and capsicum. Cook 5 minutes until soft and lightly browned.',
+            summary: 'Cook the rice according to packet directions, or use a rice cooker. 85g dry basmati + 170ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.',
             substeps: [
-              'Heat 15ml olive oil in a large heavy-based pot over medium-high heat. Add the onion, garlic, and capsicum. Cook 5 minutes until soft and lightly browned.'
+              'Cook the rice according to packet directions, or use a rice cooker. 85g dry basmati + 170ml water on a low simmer, covered, for 12 minutes, then rest off heat 5 minutes.'
             ]
           },
           {
-            summary: 'Push the vegetables to one side of the pot. Add the remaining 15ml oil and the beef mince. Brown it well, breaking it up — about 5-6 minutes. Don\'t rush this; the browning is where the flavour lives.',
+            summary: 'Reheat 1 serving of chilli in a saucepan or microwave.',
+            substeps: ['Reheat 1 serving of chilli in a saucepan or microwave.']
+          },
+          {
+            summary: 'Pile the rice into a bowl. Ladle the chilli over the rice — generously, you want sauce flooding the rice.',
             substeps: [
-              'Push the vegetables to one side of the pot. Add the remaining 15ml oil and the beef mince. Brown it well, breaking it up — about 5-6 minutes. Don\'t rush this; the browning is where the flavour lives.'
+              'Pile the rice into a bowl. Ladle the chilli over the rice — generously, you want sauce flooding the rice.'
             ]
           },
           {
-            summary: 'Add all the spices (paprika, cumin, garlic powder, onion powder, oregano, cayenne) and stir for 30 seconds — toasting them in the fat blooms the flavour.',
+            summary: 'Top with grated cheese (the heat melts it), a dollop of sour cream, sliced or smashed avocado, and a scatter of fresh coriander leaves.',
             substeps: [
-              'Add all the spices (paprika, cumin, garlic powder, onion powder, oregano, cayenne) and stir for 30 seconds — toasting them in the fat blooms the flavour.'
+              'Top with grated cheese (the heat melts it), a dollop of sour cream, sliced or smashed avocado, and a scatter of fresh coriander leaves.'
             ]
           },
           {
-            summary: 'Add the crushed tomatoes, tomato paste, beans, stock cubes, sugar, salt, and water. Stir well.',
-            substeps: ['Add the crushed tomatoes, tomato paste, beans, stock cubes, sugar, salt, and water. Stir well.']
-          },
-          {
-            summary: 'Bring to a simmer. Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5 hours minimum, up to 2.5 hours for the weekend version. Stir every 20 minutes. The sauce thickens and the flavour deepens with time.',
-            substeps: [
-              'Bring to a simmer. Reduce the heat to low. Cover loosely (lid slightly ajar). Simmer gently for 1.5 hours minimum, up to 2.5 hours for the weekend version. Stir every 20 minutes. The sauce thickens and the flavour deepens with time.'
-            ]
-          },
-          {
-            summary: 'Taste and adjust. The sauce should be thick, glossy, and rich. If too thin, simmer uncovered for the last 15-20 minutes.',
-            substeps: [
-              'Taste and adjust. The sauce should be thick, glossy, and rich. If too thin, simmer uncovered for the last 15-20 minutes.'
-            ]
+            summary: 'Squeeze the lime wedge over everything just before eating.',
+            substeps: ['Squeeze the lime wedge over everything just before eating.']
           }
-        ]
+        ],
+        assembly_time_minutes: 15,
+        plate_macros: { kcal: 1127, protein_g: 47.3, carbs_g: 115.6, fat_g: 54.5, fiber_g: 16.7 }
+      },
+      {
+        id: 'nachos',
+        display_name: 'Loaded Chilli Nachos',
+        description: 'A Saturday-night stunt plate. Layer of corn chips, generous chilli, blanket of cheese baked until molten, then finished with sour cream, avocado, pickled jalapeños, spring onion, and lime.',
+        is_stunt_plate: true,
+        base_serving_multiplier: 1.0,
+        equipment_required: ['oven'],
+        additional_ingredients: [
+          {
+            ingredient_id: 'corn_chips',
+            base_amount: 80,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'Approximately ⅓ of a 240g pack.'
+          },
+          {
+            ingredient_id: 'cheese_tasty_grated',
+            base_amount: 40,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'More than the bowl plate — needs to blanket the chips.'
+          },
+          {
+            ingredient_id: 'sour_cream',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'avocado',
+            base_amount: 60,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'Less than the bowl plate — spreads across the surface.'
+          },
+          {
+            ingredient_id: 'jalapenos_pickled',
+            base_amount: 20,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'Drained.'
+          },
+          {
+            ingredient_id: 'spring_onion',
+            base_amount: 1,
+            unit: 'count',
+            scaling: 'fixed',
+            notes: 'Finely sliced.'
+          },
+          {
+            ingredient_id: 'coriander_fresh',
+            base_amount: 4,
+            unit: 'g',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'lime',
+            base_amount: 0.25,
+            unit: 'count',
+            scaling: 'fixed',
+            notes: 'One wedge.'
+          }
+        ],
+        additional_instructions: [
+          {
+            summary: 'Preheat the oven to 200°C.',
+            substeps: ['Preheat the oven to 200°C.']
+          },
+          {
+            summary: 'Reheat 1 serving of chilli in a small saucepan or microwave until hot.',
+            substeps: ['Reheat 1 serving of chilli in a small saucepan or microwave until hot.']
+          },
+          {
+            summary: 'Spread the corn chips across an oven-safe dish or baking tray in a single thick layer.',
+            substeps: ['Spread the corn chips across an oven-safe dish or baking tray in a single thick layer.']
+          },
+          {
+            summary: 'Spoon the hot chilli evenly over the chips — go right to the edges, you want chilli on every chip.',
+            substeps: [
+              'Spoon the hot chilli evenly over the chips — go right to the edges, you want chilli on every chip.'
+            ]
+          },
+          {
+            summary: 'Scatter the grated cheese over the top in an even layer.',
+            substeps: ['Scatter the grated cheese over the top in an even layer.']
+          },
+          {
+            summary: 'Bake for 8-10 minutes, until the cheese is fully melted and bubbling at the edges.',
+            substeps: ['Bake for 8-10 minutes, until the cheese is fully melted and bubbling at the edges.']
+          },
+          {
+            summary: 'Remove from the oven. Top immediately with dollops of sour cream, sliced or smashed avocado, scattered jalapeños, sliced spring onion, and fresh coriander.',
+            substeps: [
+              'Remove from the oven. Top immediately with dollops of sour cream, sliced or smashed avocado, scattered jalapeños, sliced spring onion, and fresh coriander.'
+            ]
+          },
+          {
+            summary: 'Squeeze the lime wedge over everything. Eat straight from the dish.',
+            substeps: ['Squeeze the lime wedge over everything. Eat straight from the dish.']
+          }
+        ],
+        assembly_time_minutes: 18,
+        plate_macros: { kcal: 1231, protein_g: 49.3, carbs_g: 100.2, fat_g: 73.2, fiber_g: 18.7 },
+        image_filename: 'chilli_con_carne_nachos.png'
       }
-    ]
+    ],
   },
   lamb_shanks: {
     slug: 'lamb_shanks',
