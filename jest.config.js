@@ -30,7 +30,7 @@ module.exports = {
 
   // tmp/ holds scratch copies of source and test files. Without this, jest picks up
   // tmp/utils/buildPrepSession.test.js and runs a stale duplicate of a real suite.
-  testPathIgnorePatterns: ['/node_modules/', '/tmp/', '/.aws-sam/'],
+  testPathIgnorePatterns: ['/node_modules/', '/tmp/', '/.aws-sam/', '/fable-handoff/'],
 
   // The preset's default testMatch treats EVERY file under __tests__/ as a suite,
   // so shared fixtures (testHelpers.ts) and scratch scripts (debugWorkoutUnits.js)
