@@ -24,12 +24,14 @@ import {
   CookingMethod,
   MealIngredient,
   RecipeStep,
+  SauceVariant,
 } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
 import { RecipeFavorites } from '../utils/recipeFavorites';
 import { clampCookPortions } from '../utils/cookPortions';
 import { displayIngredient } from '../utils/ingredientScaling';
 import { resolveBaseIngredients, resolveMealInstructions } from '../utils/resolveMealIngredients';
+import { computePlateMacros } from '../utils/computeMacros';
 
 type RecipeDetailRoute = RouteProp<RootStackParamList, 'RecipeDetail'>;
 type RecipeDetailNav = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
@@ -78,6 +80,36 @@ function getMethodDescriptor(method: CookingMethod): string {
   return 'Standard method';
 }
 
+// Descriptor + icon for the sauce-variant picker. Variants carry the
+// shortcut↔scratch effort axis on template meals, so the copy mirrors the
+// method descriptors users already know.
+function getVariantDescriptor(variant: SauceVariant): string {
+  const level = (variant.shortcut_level as any) ?? '';
+  if (level === 'scratch' || level === 'authentic' || level === 'from_scratch') {
+    return 'Best flavour · more effort';
+  }
+  if (level === 'shortcut' || level === 'jar') return 'Quickest · weeknight';
+  return 'Everyday';
+}
+
+function getVariantIcon(variant: SauceVariant): keyof typeof Ionicons.glyphMap {
+  const level = (variant.shortcut_level as any) ?? '';
+  if (level === 'scratch' || level === 'authentic' || level === 'from_scratch') {
+    return 'restaurant-outline';
+  }
+  return 'flask-outline';
+}
+
+// Extra wall-clock time a non-default variant adds on top of the method's
+// advertised total. extra_total_minutes is the wall-clock delta; when a
+// variant only declares extra_active (work that fits inside existing passive
+// time), fall back to that so the badge never under-sells the effort.
+function getVariantExtraMinutes(variant: SauceVariant): number {
+  const extraTotal = variant.extra_total_minutes ?? 0;
+  if (extraTotal > 0) return extraTotal;
+  return variant.extra_active_minutes ?? 0;
+}
+
 /**
  * Defensive accessor for step summary text.
  * Handles both new format ({summary, substeps}), intermediate ({text, ingredients_used}),
@@ -123,6 +155,21 @@ export default function RecipeDetailScreen() {
 
   const [selectedPlateIndex, setSelectedPlateIndex] = useState(initialPlateIndex);
   const [selectedMethodIndex, setSelectedMethodIndex] = useState(0);
+
+  // Sauce-variant selection (template meals only). Every template meal has
+  // exactly one is_default variant — the weeknight shortcut — which is what
+  // this screen showed before the picker existed, so that stays the initial
+  // state. Legacy meals have no sauce_variants; selectedVariantId stays
+  // undefined and the resolver ignores it.
+  const variants: SauceVariant[] = meal?.sauce_variants ?? [];
+  const defaultVariantId = useMemo(
+    () => variants.find((v) => v.is_default)?.id ?? variants[0]?.id,
+    [meal]
+  );
+  const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(
+    defaultVariantId
+  );
+
   // Optional servings to pre-set — e.g. deep-linked from a Meal-Prep Session
   // "Cook N servings" card. Clamped to the cook-flow portion range; absent → 1.
   const [servings, setServings] = useState(() =>
@@ -176,14 +223,43 @@ export default function RecipeDetailScreen() {
 
   const plate: Plate = meal.plates[selectedPlateIndex];
   const method: CookingMethod = meal.methods[selectedMethodIndex];
+
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId);
+  const isDefaultVariant = !selectedVariant || !!selectedVariant.is_default;
+  const showVariantPicker = variants.length > 1;
+  // Wall-clock delta the selected variant adds to every method's advertised
+  // total. Zero for the default — the method times ARE the default's times.
+  const variantExtraTotal = isDefaultVariant
+    ? 0
+    : (selectedVariant?.extra_total_minutes ?? 0);
+
   // Base recipe read through the single resolver path: legacy meals return
-  // method.ingredients/instructions unchanged; template meals (butter_chicken)
-  // surface base + default sauce variant, since their methods carry [].
-  const baseIngredients = resolveBaseIngredients(meal, { methodId: method.id });
-  const baseInstructions = resolveMealInstructions(meal, method.id);
+  // method.ingredients/instructions unchanged; template meals surface base +
+  // the SELECTED sauce variant, since their methods carry [].
+  const baseIngredients = resolveBaseIngredients(meal, {
+    methodId: method.id,
+    variantId: selectedVariantId,
+  });
+  const baseInstructions = resolveMealInstructions(meal, method.id, selectedVariantId);
 
+  // Macro panel. The frozen plate_macros ARE the default variant's computed
+  // macros (contract-pinned in plateMacros.divergence.test.ts), so the default
+  // path is unchanged. A non-default variant is computed live via the same
+  // computePlateMacros the tests pin, rounded app-style.
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  const macros = isDefaultVariant
+    ? plate.plate_macros
+    : (() => {
+        const m = computePlateMacros(meal, plate, method, selectedVariantId);
+        return {
+          kcal: Math.round(m.kcal),
+          protein_g: round1(m.protein_g),
+          carbs_g: round1(m.carbs_g),
+          fat_g: round1(m.fat_g),
+          fiber_g: round1(m.fiber_g),
+        };
+      })();
 
-  const macros = plate.plate_macros;
   // Macro panel reflects the planned serving: base plate macros × planScale.
   // planScale is 1 for un-scaled opens, so these equal the raw plate macros.
   const dispProtein = Math.round(macros.protein_g * planScale);
@@ -202,6 +278,10 @@ export default function RecipeDetailScreen() {
       mealSlug: meal.slug,
       plateIndex: selectedPlateIndex,
       methodIndex: selectedMethodIndex,
+      // Cook the SELECTED variant. CookMode resolves ingredients/steps through
+      // the same resolver, so passing the id through is all it needs; absent
+      // (legacy meals) it falls back to the default exactly as before.
+      variantId: selectedVariantId,
       // Carry the cook amount through so CookMode's in-step quantities match
       // this screen. CookMode must multiply ingredient amounts by
       // (servings × scaleFactor), same as IngredientRow does here.
@@ -375,6 +455,65 @@ export default function RecipeDetailScreen() {
           </View>
         )}
 
+        {/* SAUCE-VARIANT PICKER — the shortcut ↔ scratch effort axis. Template
+            meals only (legacy meals carry no sauce_variants). The default
+            variant is the frozen-macro weeknight shortcut; picking the scratch
+            variant swaps the ingredient list, steps, macros and time live. */}
+        {showVariantPicker && (
+          <View style={styles.sectionPad}>
+            <Text style={[styles.eyebrow, { color: themeColor }]}>MAKE IT</Text>
+            <View style={styles.methodList}>
+              {variants.map((v) => {
+                const isActive = v.id === selectedVariantId;
+                const extraMins = getVariantExtraMinutes(v);
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={[
+                      styles.methodRow,
+                      isActive && {
+                        borderColor: themeColor,
+                        backgroundColor: themeColor + '14',
+                      },
+                    ]}
+                    onPress={() => setSelectedVariantId(v.id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.methodIconWrap}>
+                      <Ionicons
+                        name={getVariantIcon(v)}
+                        size={18}
+                        color={isActive ? themeColor : '#71717a'}
+                      />
+                    </View>
+                    <View style={styles.methodMiddle}>
+                      <Text
+                        style={[styles.methodName, isActive && { color: '#fff' }]}
+                        numberOfLines={1}
+                      >
+                        {v.display_name}
+                      </Text>
+                      <Text style={styles.methodDescriptor} numberOfLines={1}>
+                        {getVariantDescriptor(v)}
+                      </Text>
+                    </View>
+                    {!v.is_default && extraMins > 0 && (
+                      <Text
+                        style={[
+                          styles.methodTime,
+                          isActive && { color: themeColor, fontWeight: '700' },
+                        ]}
+                      >
+                        +{formatTime(extraMins)}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {/* METHOD PICKER + SERVINGS */}
         <View style={styles.sectionPad}>
           <View style={styles.sectionHeader}>
@@ -455,7 +594,7 @@ export default function RecipeDetailScreen() {
                         isActive && { color: themeColor, fontWeight: '700' },
                       ]}
                     >
-                      {formatTime(m.time_total_minutes)}
+                      {formatTime(m.time_total_minutes + variantExtraTotal)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -463,7 +602,7 @@ export default function RecipeDetailScreen() {
             </View>
           ) : (
             <Text style={styles.singleMethodTime}>
-              {method.display_name} · {formatTime(method.time_total_minutes)}
+              {method.display_name} · {formatTime(method.time_total_minutes + variantExtraTotal)}
             </Text>
           )}
         </View>
@@ -530,7 +669,7 @@ export default function RecipeDetailScreen() {
             <Text style={[styles.eyebrow, { color: themeColor }]}>INSTRUCTIONS</Text>
             <View style={styles.sectionMetaRow}>
               <Text style={styles.sectionMeta}>
-                {totalSteps} steps · ~{formatTime(method.time_total_minutes + (plate.assembly_time_minutes ?? 0))}
+                {totalSteps} steps · ~{formatTime(method.time_total_minutes + variantExtraTotal + (plate.assembly_time_minutes ?? 0))}
               </Text>
               <Ionicons
                 name={instructionsExpanded ? 'chevron-up' : 'chevron-down'}
