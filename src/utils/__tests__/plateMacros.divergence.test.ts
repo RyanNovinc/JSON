@@ -91,15 +91,17 @@ describe('Phase 2 — plate macro divergence', () => {
 
   // FINDING: computePlateMacros models no cooking process, so a meal's computed
   // macros can only move by method if its methods were authored with different
-  // ingredient LISTS or AMOUNTS. One meal still does: beef_ragu_gnocchi
-  // (different id-sets: mince vs chuck scratch) — its restructure is a pending
-  // product decision. bolognese and massaman were in this set until Batch 1
-  // moved them (with chilli_con_carne and pulled_pork) onto the sauce-axis
-  // template: methods now carry ingredients: [], the recipe lives on
-  // base_ingredients + sauce_variants, and method choice moves nothing — the
-  // variant toggle is what moves macros. butter_chicken left the set the same
-  // way in Task 1. This guardrail pins the remaining set so new drift is caught.
-  it('method is macro-invariant except for beef_ragu_gnocchi', () => {
+  // ingredient LISTS or AMOUNTS. As of Batch 2, NO meal does — the whole
+  // catalogue is method-invariant. butter_chicken (Task 1); bolognese, massaman,
+  // chilli_con_carne, pulled_pork (Batch 1); turkey_meatballs_spaghetti,
+  // beef_stew, lamb_shanks, beef_ragu_gnocchi (Batch 2) all moved onto the
+  // sauce-axis template: methods carry ingredients: [], the recipe lives on
+  // base_ingredients + sauce_variants, and the variant toggle is what moves
+  // macros. beef_ragu_gnocchi's two legacy "methods" were really two recipes;
+  // it is now a single-method meal whose variants are mince + jar (default) and
+  // the original chuck slow-braise. This guardrail pins the EMPTY set so any
+  // new drift is caught.
+  it('method is macro-invariant for every meal in the catalogue', () => {
     // Group computed kcal by (slug, plate) across methods; a meal is "method-divergent"
     // if any plate's computed kcal moves by method.
     const byMeal: Record<string, number[][]> = {};
@@ -115,7 +117,7 @@ describe('Phase 2 — plate macro divergence', () => {
       )
       .map(([slug]) => slug)
       .sort();
-    expect(divergent).toEqual(['beef_ragu_gnocchi']);
+    expect(divergent).toEqual([]);
   });
 
   it('emits the divergence report', () => {
@@ -258,5 +260,83 @@ describe('sauce-axis template routing (batch 1)', () => {
     const alt = at(computePlateMacros(meal, plate, meal.methods[0], variant));
     expect(alt).toEqual(macros);
     expect(alt).not.toEqual(FROZEN[slug][plateId]);
+  });
+});
+
+// Batch 2: beef_ragu_gnocchi, turkey_meatballs_spaghetti, beef_stew and
+// lamb_shanks joined the sauce axis. beef_ragu_gnocchi collapsed its two legacy
+// recipe-methods into ONE stovetop method whose variants carry the axis (mince +
+// jar default, chuck slow-braise scratch). plate_macros are FROZEN to each
+// computed shortcut default; the maps below pin the contract — regenerate only
+// for a deliberate recipe change, never to silence a drift.
+describe('sauce-axis template routing (batch 2)', () => {
+  const MEALS = CURATED_MEALS as Record<string, CuratedMeal>;
+  const at = (m: BaseMacros) => ({
+    kcal: Math.round(m.kcal),
+    protein_g: Math.round(m.protein_g * 10) / 10,
+    carbs_g: Math.round(m.carbs_g * 10) / 10,
+    fat_g: Math.round(m.fat_g * 10) / 10,
+    fiber_g: Math.round(m.fiber_g * 10) / 10,
+  });
+
+  const FROZEN2: Record<string, Record<string, BaseMacros>> = {
+    beef_ragu_gnocchi: {
+      standard: { kcal: 1006, protein_g: 50.4, carbs_g: 93.6, fat_g: 45.5, fiber_g: 7.6 },
+    },
+    turkey_meatballs_spaghetti: {
+      standard: { kcal: 732, protein_g: 48.9, carbs_g: 87.8, fat_g: 19.8, fiber_g: 5.4 },
+    },
+    beef_stew: {
+      beef_stew: { kcal: 630, protein_g: 42.0, carbs_g: 36.2, fat_g: 35.9, fiber_g: 5.1 },
+      mash: { kcal: 1233, protein_g: 50.3, carbs_g: 91.8, fat_g: 75.5, fiber_g: 11.8 },
+      bread: { kcal: 920, protein_g: 50.7, carbs_g: 77.9, fat_g: 45.5, fiber_g: 7.0 },
+    },
+    lamb_shanks: {
+      lamb_shanks: { kcal: 580, protein_g: 49.0, carbs_g: 25.0, fat_g: 33.2, fiber_g: 5.7 },
+      mash: { kcal: 1183, protein_g: 57.4, carbs_g: 80.7, fat_g: 72.8, fiber_g: 12.4 },
+    },
+  };
+
+  const ALT2: Record<string, { variant: string; plate: string; macros: BaseMacros }> = {
+    beef_ragu_gnocchi: { variant: 'braise', plate: 'standard', macros: { kcal: 1002, protein_g: 54.0, carbs_g: 91.1, fat_g: 44.9, fiber_g: 9.8 } },
+    turkey_meatballs_spaghetti: { variant: 'scratch', plate: 'standard', macros: { kcal: 793, protein_g: 50.2, carbs_g: 90.5, fat_g: 26.6, fiber_g: 7.9 } },
+    beef_stew: { variant: 'scratch', plate: 'beef_stew', macros: { kcal: 756, protein_g: 43.7, carbs_g: 34.8, fat_g: 43.4, fiber_g: 4.8 } },
+    lamb_shanks: { variant: 'scratch', plate: 'lamb_shanks', macros: { kcal: 816, protein_g: 50.4, carbs_g: 29.4, fat_g: 44.6, fiber_g: 6.3 } },
+  };
+
+  const SLUGS2 = Object.keys(FROZEN2);
+
+  it.each(SLUGS2)('%s is a template meal with empty method ingredient/instruction lists', slug => {
+    const meal = MEALS[slug];
+    expect(isTemplateMeal(meal)).toBe(true);
+    for (const m of meal.methods) {
+      expect(m.ingredients).toEqual([]);
+      expect(m.instructions).toEqual([]);
+    }
+  });
+
+  it.each(SLUGS2)('%s: authored plate_macros == FROZEN == at(computed) on every plate and method', slug => {
+    const meal = MEALS[slug];
+    expect(meal.plates.map(p => p.id).sort()).toEqual(Object.keys(FROZEN2[slug]).sort());
+    for (const plate of meal.plates) {
+      expect(plate.plate_macros).toEqual(FROZEN2[slug][plate.id]);
+      for (const method of meal.methods) {
+        expect(at(computePlateMacros(meal, plate, method))).toEqual(FROZEN2[slug][plate.id]);
+      }
+    }
+  });
+
+  it.each(SLUGS2)('%s: the variant toggle moves macros away from the default', slug => {
+    const meal = MEALS[slug];
+    const { variant, plate: plateId, macros } = ALT2[slug];
+    const plate = meal.plates.find(p => p.id === plateId)!;
+    const alt = at(computePlateMacros(meal, plate, meal.methods[0], variant));
+    expect(alt).toEqual(macros);
+    expect(alt).not.toEqual(FROZEN2[slug][plateId]);
+  });
+
+  it('beef_ragu_gnocchi is single-method: the axis lives on the variant, not the method', () => {
+    expect(MEALS['beef_ragu_gnocchi'].methods).toHaveLength(1);
+    expect(MEALS['beef_ragu_gnocchi'].methods[0].id).toBe('stovetop');
   });
 });

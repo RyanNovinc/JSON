@@ -3113,5 +3113,39 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     macro_confidence: "estimated",
     user_overridable: true,
     brand_reference: "MasterFoods Barbecue Sauce 500mL, per 100g"
+  },
+  casserole_recipe_base_mix: {
+    id: "casserole_recipe_base_mix",
+    display_name: "Beef casserole recipe base (sachet)",
+    category: "pantry_grains",
+    canonical_unit: "g",
+    dietary_flags: ["vegetarian", "dairy_free", "nut_free"],
+    allergens: ["Gluten/Wheat", "Soy"],
+    typical_pack_size: 50,
+    notes: "Dry casserole/stew recipe-base sachet. Continental and McCormick sachets contain wheat flour and soy sauce powder; Maggi makes gluten-free variants — check the pack.",
+    state: "as_sold",
+    macros_per_100g: { kcal: 350, protein_g: 5.5, carbs_g: 74, fat_g: 2, fiber_g: 4 },
+    grams_per_canonical_unit: 1,
+    macro_source: "Estimated — Continental Rich Beef Casserole 50g panel: 356 kcal/100g dry (1490 kJ), P 5.6, C 76.1, F 2.1 (Woolworths/Calorie NZ); McCormick and Maggi 37-41g sachets in the same band",
+    macro_confidence: "estimated",
+    user_overridable: true,
+    brand_reference: "Continental Rich Beef Casserole Recipe Base 50g, per 100g dry"
+  },
+  slow_cook_recipe_base_pouch: {
+    id: "slow_cook_recipe_base_pouch",
+    display_name: "Slow-cook recipe base (pouch)",
+    category: "pantry_grains",
+    canonical_unit: "g",
+    dietary_flags: ["vegan", "vegetarian", "gluten_free", "dairy_free", "nut_free"],
+    allergens: [],
+    typical_pack_size: 175,
+    notes: "Wet 175g slow-cook recipe-base pouch (MasterFoods style: water, tomato, garlic, herbs, cornstarch thickener — no gluten). Flavours vary; macros barely do.",
+    state: "as_sold",
+    macros_per_100g: { kcal: 45, protein_g: 1.5, carbs_g: 8.5, fat_g: 0.4, fiber_g: 1 },
+    grams_per_canonical_unit: 1,
+    macro_source: "Estimated — MasterFoods Lamb Casserole Slow Cook Recipe Base per 100g: P 1.5, C 8.0, F 0.4, sugars 2.9 (calcount) ≈ 42 kcal by Atwater; Garlic & Herb Lamb Shanks pouch is the same water/herb/cornstarch family",
+    macro_confidence: "estimated",
+    user_overridable: true,
+    brand_reference: "MasterFoods Garlic & Herb Lamb Shanks Slow Cook Recipe Base 175g, per 100g"
   }
 };

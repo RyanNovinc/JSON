@@ -4278,7 +4278,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
   },
   lamb_shanks: {
     slug: 'lamb_shanks',
-    display_name: 'Red Wine–Braised Lamb Shanks',
+    display_name: 'Slow-Cooked Lamb Shanks',
     cuisine: 'australian',
     primary_protein: 'lamb',
     produces_servings: 4,
@@ -4293,13 +4293,353 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Braise the shanks and reduce the sauce ahead; reheat the shanks in the sauce. The creamy mash is made per plate day-of.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // Common to every variant and both methods: the shanks and the vegetables. NO braising liquid.
+    base_ingredients: [
+      {
+        ingredient_id: 'lamb_shank',
+        base_amount: 4,
+        unit: 'count',
+        scaling: 'scales',
+        notes: 'Approximately 400g each. Ask for French-trimmed if you want the bone exposed nicely.'
+      },
+      {
+        ingredient_id: 'brown_onion',
+        base_amount: 150,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Approximately 1 medium, finely diced.'
+      },
+      {
+        ingredient_id: 'carrot',
+        base_amount: 130,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Approximately 1 large, finely diced (about 1 cup).'
+      },
+      {
+        ingredient_id: 'celery',
+        base_amount: 100,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Approximately 2 stalks, finely diced (about 1 cup).'
+      },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'pouch',
+        display_name: 'Recipe-Base Pouch',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default, matching the MasterFoods pouch label recipe: one pouch, one tin of tomatoes, and tomato paste.',
+        ingredients: [
+          {
+            ingredient_id: 'slow_cook_recipe_base_pouch',
+            base_amount: 175,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'One 175g pouch — lamb shanks or lamb casserole slow-cook recipe base.',
+          },
+          {
+            ingredient_id: 'crushed_tomatoes_canned',
+            base_amount: 400,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'One 400g tin.',
+          },
+          {
+            ingredient_id: 'tomato_paste',
+            base_amount: 140,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Approximately 4 tbsp — per the pouch label recipe.',
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary:
+                'Optional but worth it: brown the shanks all over in a hot pan, about 2 minutes a side.',
+              substeps: [
+                'Optional but worth it: brown the shanks all over in a hot pan, about 2 minutes a side.',
+              ],
+            },
+            {
+              summary:
+                'Add the onion, carrot, celery, crushed tomatoes, tomato paste, and the recipe base pouch to the slow cooker. Stir, then nestle the shanks in so they are mostly submerged.',
+              substeps: [
+                'Add the onion, carrot, celery, crushed tomatoes, tomato paste, and the recipe base pouch to the slow cooker. Stir, then nestle the shanks in so they are mostly submerged.',
+              ],
+            },
+            {
+              summary:
+                'Cook on LOW for 8 hours or HIGH for 4. LOW is strongly preferred for shanks — the collagen melts out completely and the meat slips off the bone; HIGH works but comes out firmer.',
+              substeps: [
+                'Cook on LOW for 8 hours or HIGH for 4. LOW is strongly preferred for shanks — the collagen melts out completely and the meat slips off the bone; HIGH works but comes out firmer.',
+              ],
+            },
+            {
+              summary:
+                'Lift the shanks out gently (they will be fragile), skim the fat off the sauce, and season to taste. Spoon the sauce over to serve.',
+              substeps: [
+                'Lift the shanks out gently (they will be fragile), skim the fat off the sauce, and season to taste. Spoon the sauce over to serve.',
+              ],
+            },
+          ],
+          oven_braise: [
+            {
+              summary:
+                'Optional but worth it: brown the shanks all over in a hot pan, about 2 minutes a side.',
+              substeps: [
+                'Optional but worth it: brown the shanks all over in a hot pan, about 2 minutes a side.',
+              ],
+            },
+            {
+              summary:
+                'Combine the onion, carrot, celery, crushed tomatoes, tomato paste, and recipe base pouch in a deep baking dish or Dutch oven. Nestle the shanks in and cover tightly with a lid or two layers of foil.',
+              substeps: [
+                'Combine the onion, carrot, celery, crushed tomatoes, tomato paste, and recipe base pouch in a deep baking dish or Dutch oven. Nestle the shanks in and cover tightly with a lid or two layers of foil.',
+              ],
+            },
+            {
+              summary:
+                'Braise at 180°C (160°C fan-forced) for 2 hours, then uncover and cook a further 30 minutes to thicken and colour.',
+              substeps: [
+                'Braise at 180°C (160°C fan-forced) for 2 hours, then uncover and cook a further 30 minutes to thicken and colour.',
+              ],
+            },
+            {
+              summary:
+                'Lift the shanks out gently, skim the fat off the sauce, and season to taste. Spoon the sauce over to serve.',
+              substeps: [
+                'Lift the shanks out gently, skim the fat off the sauce, and season to taste. Spoon the sauce over to serve.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 10,
+        skill_min: 3,
+        notes:
+          'The original red wine braise. Amounts follow the slow-cooker version for both methods.',
+        ingredients: [
+          {
+            ingredient_id: 'olive_oil',
+            base_amount: 45,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'Split: 30g for searing the shanks, 15g for sautéing the vegetables.'
+          },
+          {
+            ingredient_id: 'garlic_clove',
+            base_amount: 3,
+            unit: 'cloves',
+            scaling: 'scales',
+            notes: 'Minced.'
+          },
+          {
+            ingredient_id: 'red_wine_cooking',
+            base_amount: 625,
+            unit: 'ml',
+            scaling: 'scales',
+            notes: 'Full-bodied — cabernet sauvignon, merlot, or shiraz. Don\'t use expensive wine; cleanskins are fine.'
+          },
+          {
+            ingredient_id: 'crushed_tomatoes_canned',
+            base_amount: 800,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'One 800g tin.'
+          },
+          {
+            ingredient_id: 'tomato_paste',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Approximately 2 tbsp.'
+          },
+          {
+            ingredient_id: 'chicken_stock_liquid',
+            base_amount: 500,
+            unit: 'ml',
+            scaling: 'scales'
+          },
+          {
+            ingredient_id: 'thyme_fresh',
+            base_amount: 5,
+            unit: 'count',
+            scaling: 'fixed',
+            notes: '5 sprigs, tied together for easy removal. Substitute 2 tsp dried thyme if unavailable.'
+          },
+          {
+            ingredient_id: 'bay_leaves_dried',
+            base_amount: 2,
+            unit: 'count',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'salt',
+            base_amount: 1,
+            unit: 'tsp',
+            scaling: 'fixed'
+          },
+          {
+            ingredient_id: 'black_pepper_ground',
+            base_amount: 0.5,
+            unit: 'tsp',
+            scaling: 'fixed'
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary: 'Pat the shanks dry with paper towel. Season generously with salt and pepper.',
+              substeps: ['Pat the shanks dry with paper towel. Season generously with salt and pepper.']
+            },
+            {
+              summary: 'Heat 30ml of the olive oil in a large heavy skillet over high heat. Sear the shanks in two batches until well-browned all over — about 5 minutes per batch. Don\'t rush this; the colour is where the flavour comes from. Transfer browned shanks to the slow cooker.',
+              substeps: [
+                'Heat 30ml of the olive oil in a large heavy skillet over high heat. Sear the shanks in two batches until well-browned all over — about 5 minutes per batch. Don\'t rush this; the colour is where the flavour comes from. Transfer browned shanks to the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Drain any excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15ml oil.',
+              substeps: ['Drain any excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15ml oil.']
+            },
+            {
+              summary: 'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes until the onion is translucent and starting to sweeten.',
+              substeps: [
+                'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes until the onion is translucent and starting to sweeten.'
+              ]
+            },
+            {
+              summary: 'Pour in the red wine. Bring to a simmer, scraping all the brown bits off the bottom of the pan into the wine — this is the fond, every bit of it matters. Simmer 2-3 minutes to cook off some of the alcohol.',
+              substeps: [
+                'Pour in the red wine. Bring to a simmer, scraping all the brown bits off the bottom of the pan into the wine — this is the fond, every bit of it matters. Simmer 2-3 minutes to cook off some of the alcohol.'
+              ]
+            },
+            {
+              summary: 'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir well and bring to a simmer.',
+              substeps: [
+                'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir well and bring to a simmer.'
+              ]
+            },
+            {
+              summary: 'Pour the entire braising liquid into the slow cooker over the shanks. The shanks should be mostly submerged — squeeze them in to fit if needed.',
+              substeps: [
+                'Pour the entire braising liquid into the slow cooker over the shanks. The shanks should be mostly submerged — squeeze them in to fit if needed.'
+              ]
+            },
+            {
+              summary: 'Cook on LOW for 8 hours. The meat should be fall-off-the-bone tender.',
+              substeps: ['Cook on LOW for 8 hours. The meat should be fall-off-the-bone tender.']
+            },
+            {
+              summary: 'Carefully remove the shanks (they\'re delicate when done — use two spoons). Strain the sauce into a saucepan, discarding the solids for a clean sauce or leaving the carrot and celery in for a rustic finish. Simmer on the stovetop for 10-15 minutes to reduce to a thick, glossy gravy.',
+              substeps: [
+                'Carefully remove the shanks (they\'re delicate when done — use two spoons). Strain the sauce into a saucepan, discarding the solids for a clean sauce or leaving the carrot and celery in for a rustic finish. Simmer on the stovetop for 10-15 minutes to reduce to a thick, glossy gravy.'
+              ]
+            },
+            {
+              summary: 'Return the shanks to the reduced sauce to warm through before serving.',
+              substeps: ['Return the shanks to the reduced sauce to warm through before serving.']
+            }
+          ],
+          oven_braise: [
+            {
+              summary: 'Preheat the oven to 180°C.',
+              substeps: ['Preheat the oven to 180°C.']
+            },
+            {
+              summary: 'Pat the shanks dry. Season with salt and pepper.',
+              substeps: ['Pat the shanks dry. Season with salt and pepper.']
+            },
+            {
+              summary: 'Heat 30ml olive oil in a large Dutch oven over high heat. Sear the shanks in two batches until browned all over, 5 minutes per batch. Set aside on a plate.',
+              substeps: [
+                'Heat 30ml olive oil in a large Dutch oven over high heat. Sear the shanks in two batches until browned all over, 5 minutes per batch. Set aside on a plate.'
+              ]
+            },
+            {
+              summary: 'Drain the fat. Drop the heat to medium-low. Add the remaining 15ml oil.',
+              substeps: ['Drain the fat. Drop the heat to medium-low. Add the remaining 15ml oil.']
+            },
+            {
+              summary: 'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes.',
+              substeps: ['Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes.']
+            },
+            {
+              summary: 'Pour in the red wine. Bring to a simmer, scraping the fond. Simmer 2-3 minutes.',
+              substeps: ['Pour in the red wine. Bring to a simmer, scraping the fond. Simmer 2-3 minutes.']
+            },
+            {
+              summary: 'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir. Return the shanks to the pot, squeezing them in so they\'re mostly submerged.',
+              substeps: [
+                'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir. Return the shanks to the pot, squeezing them in so they\'re mostly submerged.'
+              ]
+            },
+            {
+              summary: 'Bring the liquid to a simmer. Cover with the lid. Transfer to the oven for 2 hours covered.',
+              substeps: ['Bring the liquid to a simmer. Cover with the lid. Transfer to the oven for 2 hours covered.']
+            },
+            {
+              summary: 'Remove the lid. Return to the oven for another 30 minutes uncovered. This finishes reducing the sauce and gives the shanks a beautiful crust.',
+              substeps: [
+                'Remove the lid. Return to the oven for another 30 minutes uncovered. This finishes reducing the sauce and gives the shanks a beautiful crust.'
+              ]
+            },
+            {
+              summary: 'Remove from the oven. Carefully transfer the shanks to a plate. If the sauce needs more reduction, simmer on the stovetop for 5-10 minutes.',
+              substeps: [
+                'Remove from the oven. Carefully transfer the shanks to a plate. If the sauce needs more reduction, simmer on the stovetop for 5-10 minutes.'
+              ]
+            }
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'slow_cooker',
+        display_name: 'Slow Cooker',
+        equipment_required: ['slow_cooker', 'stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 495,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+      {
+        id: 'oven_braise',
+        display_name: 'Oven-Braise',
+        equipment_required: ['oven', 'stovetop'],
+        time_active_minutes: 20,
+        time_total_minutes: 175,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'lamb_shanks',
-        display_name: 'Red Wine–Braised Lamb Shank',
-        description: 'Whole lamb shank slow-braised in red wine and tomato.',
+        display_name: 'Slow-Cooked Lamb Shank',
+        description: 'Whole lamb shank slow-cooked in a rich tomato sauce until it slips off the bone.',
         image_filename: undefined,
-        plate_macros: { kcal: 825, protein_g: 54, carbs_g: 14, fat_g: 58, fiber_g: 2 },
+        plate_macros: { kcal: 580, protein_g: 49.0, carbs_g: 25.0, fat_g: 33.2, fiber_g: 5.7 },
         assembly_time_minutes: 0,
         additional_instructions: [],
         additional_ingredients: [],
@@ -4394,81 +4734,227 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             substeps: ['Scatter the chopped parsley over the top. Serve immediately.']
           }
         ],
-        plate_macros: {
-          kcal: 1417,
-          protein_g: 57,
-          carbs_g: 80,
-          fat_g: 90,
-          fiber_g: 12
-        },
+        plate_macros: { kcal: 1183, protein_g: 57.4, carbs_g: 80.7, fat_g: 72.8, fiber_g: 12.4 },
         image_filename: 'lamb_shanks_mash.png'
       }
     ],
-    methods: [
+  },
+  beef_stew: {
+    slug: 'beef_stew',
+    display_name: 'Hearty Beef Stew',
+    cuisine: 'australian',
+    primary_protein: 'beef',
+    produces_servings: 6,
+    eligible_slots: ['lunch', 'dinner', 'second_lunch', 'early_dinner'],
+    min_scale: 0.7,
+    max_scale: 1.5,
+    flex_ingredient_id: 'beef_chuck',
+    contains_allergens: ['Dairy', 'Gluten/Wheat', 'Fish', 'Soy'],
+    image_filename: 'beef_stew.png',
+    meal_prep: {
+      strategy: 'full',
+      prep_note: 'Cook the stew ahead; it reheats whole and improves overnight. Mash and crusty bread are done per plate day-of.',
+      storage: { fridge_days: 4, freeze_months: 3 },
+    },
+
+    // Common to every variant and both methods: the beef and the vegetables. NO thickener, NO braising liquid.
+    base_ingredients: [
       {
-        id: 'slow_cooker',
-        display_name: 'Slow Cooker',
-        equipment_required: ['slow_cooker', 'stovetop'],
-        time_active_minutes: 25,
-        time_total_minutes: 505,
-        skill_min: 3,
-        shortcut_level: 'scratch',
+        ingredient_id: 'beef_chuck',
+        base_amount: 1200,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Cut into 3.5cm cubes. Ask the butcher for it pre-cubed if you\'re rushed.'
+      },
+      {
+        ingredient_id: 'brown_onion',
+        base_amount: 250,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Approximately 1 large, halved and sliced 1cm thick.'
+      },
+      {
+        ingredient_id: 'carrot',
+        base_amount: 300,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Approximately 3 medium, cut into 2.5cm chunks on the diagonal.'
+      },
+      {
+        ingredient_id: 'celery',
+        base_amount: 150,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Approximately 2 stalks, cut into 2.5cm chunks.'
+      },
+      {
+        ingredient_id: 'mushroom_brown',
+        base_amount: 250,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Halved. Optional but recommended for depth of flavour.'
+      },
+      {
+        ingredient_id: 'potato_baby_chat',
+        base_amount: 400,
+        unit: 'g',
+        scaling: 'scales',
+        notes: 'Halved, skins on.'
+      },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'sachet',
+        display_name: 'Recipe-Base Sachet',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default. Two casserole recipe-base sachets replace the flour, wine, stock and herb layer — most AU sachets contain wheat and soy, hence the declarations.',
         ingredients: [
           {
-            ingredient_id: 'lamb_shank',
-            base_amount: 4,
-            unit: 'count',
+            ingredient_id: 'casserole_recipe_base_mix',
+            base_amount: 100,
+            unit: 'g',
             scaling: 'scales',
-            notes: 'Approximately 400g each. Ask for French-trimmed if you want the bone exposed nicely.'
+            notes: 'Two ~50g sachets — beef casserole or similar recipe base.',
+          },
+          {
+            ingredient_id: 'tomato_paste',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Approximately 2 tbsp — the sachet label recipes call for it.',
+          },
+          {
+            ingredient_id: 'water',
+            base_amount: 750,
+            unit: 'ml',
+            scaling: 'scales',
+          },
+        ],
+        instructions: {
+          slow_cooker: [
+            {
+              summary:
+                'Cut the beef into 3.5 cm cubes (or buy it pre-cubed) and prep the vegetables — onion sliced, carrot and celery in chunks, mushrooms and potatoes halved.',
+              substeps: [
+                'Cut the beef into 3.5 cm cubes (or buy it pre-cubed) and prep the vegetables — onion sliced, carrot and celery in chunks, mushrooms and potatoes halved.',
+              ],
+            },
+            {
+              summary:
+                'Optional but worth it: brown the beef in a hot dry pan in two batches, 2-3 minutes a side — chuck renders enough fat on its own.',
+              substeps: [
+                'Optional but worth it: brown the beef in a hot dry pan in two batches, 2-3 minutes a side — chuck renders enough fat on its own.',
+              ],
+            },
+            {
+              summary:
+                'Add the beef, vegetables, recipe base sachets, tomato paste, and HALF the water to the slow cooker. Stir well. Hold the rest of the water back — slow cookers don\'t reduce; stir it in at the end only if the stew is thicker than you like.',
+              substeps: [
+                'Add the beef, vegetables, recipe base sachets, tomato paste, and HALF the water to the slow cooker. Stir well. Hold the rest of the water back — slow cookers don\'t reduce; stir it in at the end only if the stew is thicker than you like.',
+              ],
+            },
+            {
+              summary:
+                'Cook on LOW for 8 hours or HIGH for 4. LOW is worth it for chuck — the slow climb breaks the connective tissue down completely; HIGH works but the beef comes out a touch stringier.',
+              substeps: [
+                'Cook on LOW for 8 hours or HIGH for 4. LOW is worth it for chuck — the slow climb breaks the connective tissue down completely; HIGH works but the beef comes out a touch stringier.',
+              ],
+            },
+            {
+              summary:
+                'Taste and season.',
+              substeps: [
+                'Taste and season.',
+              ],
+            },
+          ],
+          oven_braise: [
+            {
+              summary:
+                'Cut the beef into 3.5 cm cubes (or buy it pre-cubed) and prep the vegetables — onion sliced, carrot and celery in chunks, mushrooms and potatoes halved.',
+              substeps: [
+                'Cut the beef into 3.5 cm cubes (or buy it pre-cubed) and prep the vegetables — onion sliced, carrot and celery in chunks, mushrooms and potatoes halved.',
+              ],
+            },
+            {
+              summary:
+                'Optional but worth it: brown the beef in the casserole pot in two batches, 2-3 minutes a side.',
+              substeps: [
+                'Optional but worth it: brown the beef in the casserole pot in two batches, 2-3 minutes a side.',
+              ],
+            },
+            {
+              summary:
+                'Add the vegetables, recipe base sachets, tomato paste, and all the water. Stir well and cover with a lid or foil.',
+              substeps: [
+                'Add the vegetables, recipe base sachets, tomato paste, and all the water. Stir well and cover with a lid or foil.',
+              ],
+            },
+            {
+              summary:
+                'Braise at 160°C (140°C fan-forced) for 2 to 2.5 hours, until the beef is fork-tender. Uncover for the last 20 minutes if you want it thicker.',
+              substeps: [
+                'Braise at 160°C (140°C fan-forced) for 2 to 2.5 hours, until the beef is fork-tender. Uncover for the last 20 minutes if you want it thicker.',
+              ],
+            },
+            {
+              summary:
+                'Taste and season.',
+              substeps: [
+                'Taste and season.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 10,
+        skill_min: 3,
+        notes:
+          'The original red wine build. Amounts follow the slow-cooker version for both methods.',
+        ingredients: [
+          {
+            ingredient_id: 'flour_plain',
+            base_amount: 50,
+            unit: 'g',
+            scaling: 'fixed',
+            notes: 'For dusting the beef. Approximately ⅓ cup.'
           },
           {
             ingredient_id: 'olive_oil',
             base_amount: 45,
             unit: 'g',
             scaling: 'fixed',
-            notes: 'Split: 30g for searing the shanks, 15g for sautéing the vegetables.'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 150,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 1 medium, finely diced.'
+            notes: 'Split: 30g for browning, 15g for sautéing the vegetables.'
           },
           {
             ingredient_id: 'garlic_clove',
-            base_amount: 3,
+            base_amount: 4,
             unit: 'cloves',
             scaling: 'scales',
             notes: 'Minced.'
           },
           {
-            ingredient_id: 'carrot',
-            base_amount: 130,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 1 large, finely diced (about 1 cup).'
-          },
-          {
-            ingredient_id: 'celery',
-            base_amount: 100,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 stalks, finely diced (about 1 cup).'
-          },
-          {
             ingredient_id: 'red_wine_cooking',
-            base_amount: 625,
+            base_amount: 500,
             unit: 'ml',
             scaling: 'scales',
-            notes: 'Full-bodied — cabernet sauvignon, merlot, or shiraz. Don\'t use expensive wine; cleanskins are fine.'
+            notes: 'Full-bodied — cabernet sauvignon, merlot, or shiraz. Discount bottles are fine.'
           },
           {
-            ingredient_id: 'crushed_tomatoes_canned',
-            base_amount: 800,
-            unit: 'g',
+            ingredient_id: 'beef_stock_liquid',
+            base_amount: 750,
+            unit: 'ml',
             scaling: 'scales',
-            notes: 'One 800g tin.'
+            notes: 'Salt-reduced preferred. Campbell\'s Real Stock or Massel.'
           },
           {
             ingredient_id: 'tomato_paste',
@@ -4478,17 +4964,18 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             notes: 'Approximately 2 tbsp.'
           },
           {
-            ingredient_id: 'chicken_stock_liquid',
-            base_amount: 500,
+            ingredient_id: 'worcestershire_sauce',
+            base_amount: 10,
             unit: 'ml',
-            scaling: 'scales'
+            scaling: 'scales',
+            notes: 'Approximately 2 tsp.'
           },
           {
             ingredient_id: 'thyme_fresh',
-            base_amount: 5,
+            base_amount: 4,
             unit: 'count',
             scaling: 'fixed',
-            notes: '5 sprigs, tied together for easy removal. Substitute 2 tsp dried thyme if unavailable.'
+            notes: '4 sprigs, tied together for easy removal. Substitute 1 tsp dried thyme if unavailable.'
           },
           {
             ingredient_id: 'bay_leaves_dried',
@@ -4507,238 +4994,158 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             base_amount: 0.5,
             unit: 'tsp',
             scaling: 'fixed'
-          }
+          },
         ],
-        instructions: [
-          {
-            summary: 'Pat the shanks dry with paper towel. Season generously with salt and pepper.',
-            substeps: ['Pat the shanks dry with paper towel. Season generously with salt and pepper.']
-          },
-          {
-            summary: 'Heat 30ml of the olive oil in a large heavy skillet over high heat. Sear the shanks in two batches until well-browned all over — about 5 minutes per batch. Don\'t rush this; the colour is where the flavour comes from. Transfer browned shanks to the slow cooker.',
-            substeps: [
-              'Heat 30ml of the olive oil in a large heavy skillet over high heat. Sear the shanks in two batches until well-browned all over — about 5 minutes per batch. Don\'t rush this; the colour is where the flavour comes from. Transfer browned shanks to the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Drain any excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15ml oil.',
-            substeps: ['Drain any excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15ml oil.']
-          },
-          {
-            summary: 'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes until the onion is translucent and starting to sweeten.',
-            substeps: [
-              'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes until the onion is translucent and starting to sweeten.'
-            ]
-          },
-          {
-            summary: 'Pour in the red wine. Bring to a simmer, scraping all the brown bits off the bottom of the pan into the wine — this is the fond, every bit of it matters. Simmer 2-3 minutes to cook off some of the alcohol.',
-            substeps: [
-              'Pour in the red wine. Bring to a simmer, scraping all the brown bits off the bottom of the pan into the wine — this is the fond, every bit of it matters. Simmer 2-3 minutes to cook off some of the alcohol.'
-            ]
-          },
-          {
-            summary: 'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir well and bring to a simmer.',
-            substeps: [
-              'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir well and bring to a simmer.'
-            ]
-          },
-          {
-            summary: 'Pour the entire braising liquid into the slow cooker over the shanks. The shanks should be mostly submerged — squeeze them in to fit if needed.',
-            substeps: [
-              'Pour the entire braising liquid into the slow cooker over the shanks. The shanks should be mostly submerged — squeeze them in to fit if needed.'
-            ]
-          },
-          {
-            summary: 'Cook on LOW for 8 hours. The meat should be fall-off-the-bone tender.',
-            substeps: ['Cook on LOW for 8 hours. The meat should be fall-off-the-bone tender.']
-          },
-          {
-            summary: 'Carefully remove the shanks (they\'re delicate when done — use two spoons). Strain the sauce into a saucepan, discarding the solids for a clean sauce or leaving the carrot and celery in for a rustic finish. Simmer on the stovetop for 10-15 minutes to reduce to a thick, glossy gravy.',
-            substeps: [
-              'Carefully remove the shanks (they\'re delicate when done — use two spoons). Strain the sauce into a saucepan, discarding the solids for a clean sauce or leaving the carrot and celery in for a rustic finish. Simmer on the stovetop for 10-15 minutes to reduce to a thick, glossy gravy.'
-            ]
-          },
-          {
-            summary: 'Return the shanks to the reduced sauce to warm through before serving.',
-            substeps: ['Return the shanks to the reduced sauce to warm through before serving.']
-          }
-        ]
+        instructions: {
+          slow_cooker: [
+            {
+              summary: 'Pat the beef cubes dry with paper towel. Season with the salt and pepper. Place the beef and flour in a large zip-top bag or bowl and toss to coat evenly. Shake off the excess.',
+              substeps: [
+                'Pat the beef cubes dry with paper towel. Season with the salt and pepper. Place the beef and flour in a large zip-top bag or bowl and toss to coat evenly. Shake off the excess.'
+              ]
+            },
+            {
+              summary: 'Heat 30g olive oil in a large heavy skillet over high heat — get it properly hot. Brown the beef aggressively in 2-3 batches, about 1.5 minutes per side. Don\'t crowd the pan; you want crust, not steam. Transfer browned beef to the slow cooker.',
+              substeps: [
+                'Heat 30g olive oil in a large heavy skillet over high heat — get it properly hot. Brown the beef aggressively in 2-3 batches, about 1.5 minutes per side. Don\'t crowd the pan; you want crust, not steam. Transfer browned beef to the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Drain the excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15g oil.',
+              substeps: ['Drain the excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15g oil.']
+            },
+            {
+              summary: 'Add the onion and garlic; cook 3 minutes. Add the carrot and celery; cook 4 minutes until softening at the edges. Transfer to the slow cooker.',
+              substeps: [
+                'Add the onion and garlic; cook 3 minutes. Add the carrot and celery; cook 4 minutes until softening at the edges. Transfer to the slow cooker.'
+              ]
+            },
+            {
+              summary: 'Pour the red wine into the still-hot skillet. Bring to a vigorous simmer, scraping all the brown bits off the bottom of the pan (the fond). Simmer 2 minutes to cook off some alcohol and reduce slightly.',
+              substeps: [
+                'Pour the red wine into the still-hot skillet. Bring to a vigorous simmer, scraping all the brown bits off the bottom of the pan (the fond). Simmer 2 minutes to cook off some alcohol and reduce slightly.'
+              ]
+            },
+            {
+              summary: 'Pour the wine into the slow cooker. Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.',
+              substeps: [
+                'Pour the wine into the slow cooker. Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.'
+              ]
+            },
+            {
+              summary: 'Add the mushrooms and baby potatoes on top. Push down so everything is mostly submerged in liquid.',
+              substeps: [
+                'Add the mushrooms and baby potatoes on top. Push down so everything is mostly submerged in liquid.'
+              ]
+            },
+            {
+              summary: 'Cook on LOW for 8 hours or HIGH for 5 hours. Beef should be fork-tender and falling apart.',
+              substeps: ['Cook on LOW for 8 hours or HIGH for 5 hours. Beef should be fork-tender and falling apart.']
+            },
+            {
+              summary: 'Optional finishing reduction: if the sauce is thinner than you want (slow cookers vary), ladle the liquid into a saucepan and simmer 10-15 minutes to reduce. Or remove the lid for the last 30 minutes on HIGH.',
+              substeps: [
+                'Optional finishing reduction: if the sauce is thinner than you want (slow cookers vary), ladle the liquid into a saucepan and simmer 10-15 minutes to reduce. Or remove the lid for the last 30 minutes on HIGH.'
+              ]
+            },
+            {
+              summary: 'Discard the bay leaves and thyme sprigs before serving.',
+              substeps: ['Discard the bay leaves and thyme sprigs before serving.']
+            }
+          ],
+          oven_braise: [
+            {
+              summary: 'Preheat the oven to 160°C.',
+              substeps: ['Preheat the oven to 160°C.']
+            },
+            {
+              summary: 'Pat the beef cubes dry. Season with salt and pepper. Toss with the flour to coat; shake off the excess.',
+              substeps: [
+                'Pat the beef cubes dry. Season with salt and pepper. Toss with the flour to coat; shake off the excess.'
+              ]
+            },
+            {
+              summary: 'Heat 30g olive oil in a large Dutch oven over high heat. Brown the beef in 2-3 batches, 1.5 minutes per side. Transfer to a plate.',
+              substeps: [
+                'Heat 30g olive oil in a large Dutch oven over high heat. Brown the beef in 2-3 batches, 1.5 minutes per side. Transfer to a plate.'
+              ]
+            },
+            {
+              summary: 'Drain the excess fat. Drop the heat to medium-low. Add the remaining 15g oil. Sauté the onion and garlic for 3 minutes; add the carrot and celery, cook another 4 minutes.',
+              substeps: [
+                'Drain the excess fat. Drop the heat to medium-low. Add the remaining 15g oil. Sauté the onion and garlic for 3 minutes; add the carrot and celery, cook another 4 minutes.'
+              ]
+            },
+            {
+              summary: 'Pour in the red wine. Simmer 2 minutes, scraping the fond.',
+              substeps: ['Pour in the red wine. Simmer 2 minutes, scraping the fond.']
+            },
+            {
+              summary: 'Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.',
+              substeps: ['Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.']
+            },
+            {
+              summary: 'Return the beef to the pot with any juices. Add the mushrooms and potatoes. The liquid should cover everything.',
+              substeps: [
+                'Return the beef to the pot with any juices. Add the mushrooms and potatoes. The liquid should cover everything.'
+              ]
+            },
+            {
+              summary: 'Bring to a simmer on the stovetop. Cover and transfer to the oven for 1.5 hours.',
+              substeps: ['Bring to a simmer on the stovetop. Cover and transfer to the oven for 1.5 hours.']
+            },
+            {
+              summary: 'Uncover and return to the oven for another 30 minutes to reduce and thicken the sauce. Total oven time: 2 hours.',
+              substeps: [
+                'Uncover and return to the oven for another 30 minutes to reduce and thicken the sauce. Total oven time: 2 hours.'
+              ]
+            },
+            {
+              summary: 'Check the beef is fork-tender. If not quite there, return covered for another 20 minutes.',
+              substeps: ['Check the beef is fork-tender. If not quite there, return covered for another 20 minutes.']
+            },
+            {
+              summary: 'Discard the bay leaves and thyme sprigs before serving.',
+              substeps: ['Discard the bay leaves and thyme sprigs before serving.']
+            }
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'slow_cooker',
+        display_name: 'Slow Cooker',
+        equipment_required: ['slow_cooker', 'stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 495,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
       },
       {
         id: 'oven_braise',
         display_name: 'Oven-Braise',
         equipment_required: ['oven', 'stovetop'],
-        time_active_minutes: 25,
-        time_total_minutes: 175,
-        skill_min: 3,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'lamb_shank',
-            base_amount: 4,
-            unit: 'count',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'olive_oil',
-            base_amount: 45,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Split: 30g for searing, 15g for sautéing the vegetables.'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 150,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'garlic_clove',
-            base_amount: 3,
-            unit: 'cloves',
-            scaling: 'scales',
-            notes: 'Minced.'
-          },
-          {
-            ingredient_id: 'carrot',
-            base_amount: 130,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 1 large, finely diced.'
-          },
-          {
-            ingredient_id: 'celery',
-            base_amount: 100,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 stalks, finely diced.'
-          },
-          {
-            ingredient_id: 'red_wine_cooking',
-            base_amount: 625,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'crushed_tomatoes_canned',
-            base_amount: 800,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'tomato_paste',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'chicken_stock_liquid',
-            base_amount: 500,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'thyme_fresh',
-            base_amount: 5,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'bay_leaves_dried',
-            base_amount: 2,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'salt',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Preheat the oven to 180°C.',
-            substeps: ['Preheat the oven to 180°C.']
-          },
-          {
-            summary: 'Pat the shanks dry. Season with salt and pepper.',
-            substeps: ['Pat the shanks dry. Season with salt and pepper.']
-          },
-          {
-            summary: 'Heat 30ml olive oil in a large Dutch oven over high heat. Sear the shanks in two batches until browned all over, 5 minutes per batch. Set aside on a plate.',
-            substeps: [
-              'Heat 30ml olive oil in a large Dutch oven over high heat. Sear the shanks in two batches until browned all over, 5 minutes per batch. Set aside on a plate.'
-            ]
-          },
-          {
-            summary: 'Drain the fat. Drop the heat to medium-low. Add the remaining 15ml oil.',
-            substeps: ['Drain the fat. Drop the heat to medium-low. Add the remaining 15ml oil.']
-          },
-          {
-            summary: 'Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes.',
-            substeps: ['Add the onion and garlic; cook 2 minutes. Add the carrot and celery; cook 5 minutes.']
-          },
-          {
-            summary: 'Pour in the red wine. Bring to a simmer, scraping the fond. Simmer 2-3 minutes.',
-            substeps: ['Pour in the red wine. Bring to a simmer, scraping the fond. Simmer 2-3 minutes.']
-          },
-          {
-            summary: 'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir. Return the shanks to the pot, squeezing them in so they\'re mostly submerged.',
-            substeps: [
-              'Add the crushed tomatoes, tomato paste, chicken stock, thyme, and bay leaves. Stir. Return the shanks to the pot, squeezing them in so they\'re mostly submerged.'
-            ]
-          },
-          {
-            summary: 'Bring the liquid to a simmer. Cover with the lid. Transfer to the oven for 2 hours covered.',
-            substeps: ['Bring the liquid to a simmer. Cover with the lid. Transfer to the oven for 2 hours covered.']
-          },
-          {
-            summary: 'Remove the lid. Return to the oven for another 30 minutes uncovered. This finishes reducing the sauce and gives the shanks a beautiful crust.',
-            substeps: [
-              'Remove the lid. Return to the oven for another 30 minutes uncovered. This finishes reducing the sauce and gives the shanks a beautiful crust.'
-            ]
-          },
-          {
-            summary: 'Remove from the oven. Carefully transfer the shanks to a plate. If the sauce needs more reduction, simmer on the stovetop for 5-10 minutes.',
-            substeps: [
-              'Remove from the oven. Carefully transfer the shanks to a plate. If the sauce needs more reduction, simmer on the stovetop for 5-10 minutes.'
-            ]
-          }
-        ]
-      }
-    ]
-  },
-  beef_stew: {
-    slug: 'beef_stew',
-    display_name: 'Red Wine Beef Stew',
-    cuisine: 'australian',
-    primary_protein: 'beef',
-    produces_servings: 6,
-    eligible_slots: ['lunch', 'dinner', 'second_lunch', 'early_dinner'],
-    min_scale: 0.7,
-    max_scale: 1.5,
-    flex_ingredient_id: 'beef_chuck',
-    contains_allergens: ['Dairy', 'Gluten/Wheat', 'Fish'],
-    image_filename: 'beef_stew.png',
-    meal_prep: {
-      strategy: 'full',
-      prep_note: 'Cook the stew ahead; it reheats whole and improves overnight. Mash and crusty bread are done per plate day-of.',
-      storage: { fridge_days: 4, freeze_months: 3 },
-    },
+        time_active_minutes: 20,
+        time_total_minutes: 165,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'beef_stew',
-        display_name: 'Red Wine Beef Stew',
+        display_name: 'Hearty Beef Stew',
         description: 'Fork-tender beef chuck with carrots, mushrooms and baby potatoes.',
         image_filename: undefined,
-        plate_macros: { kcal: 700, protein_g: 46, carbs_g: 32, fat_g: 38, fiber_g: 6 },
+        plate_macros: { kcal: 630, protein_g: 42.0, carbs_g: 36.2, fat_g: 35.9, fiber_g: 5.1 },
         assembly_time_minutes: 0,
         additional_instructions: [],
         additional_ingredients: [],
@@ -4831,13 +5238,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             substeps: ['Scatter parsley over the top.']
           }
         ],
-        plate_macros: {
-          kcal: 1288,
-          protein_g: 52,
-          carbs_g: 87,
-          fat_g: 77,
-          fiber_g: 11
-        },
+        plate_macros: { kcal: 1233, protein_g: 50.3, carbs_g: 91.8, fat_g: 75.5, fiber_g: 11.8 },
         image_filename: 'beef_stew_mash.png'
       },
       {
@@ -4893,377 +5294,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             substeps: ['Eat by dipping the bread into the gravy as you go.']
           }
         ],
-        plate_macros: {
-          kcal: 977,
-          protein_g: 52,
-          carbs_g: 76,
-          fat_g: 48,
-          fiber_g: 7
-        },
+        plate_macros: { kcal: 920, protein_g: 50.7, carbs_g: 77.9, fat_g: 45.5, fiber_g: 7.0 },
         image_filename: 'beef_stew_bread.png'
       }
     ],
-    methods: [
-      {
-        id: 'slow_cooker',
-        display_name: 'Slow Cooker',
-        equipment_required: ['slow_cooker', 'stovetop'],
-        time_active_minutes: 25,
-        time_total_minutes: 505,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'beef_chuck',
-            base_amount: 1200,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Cut into 3.5cm cubes. Ask the butcher for it pre-cubed if you\'re rushed.'
-          },
-          {
-            ingredient_id: 'flour_plain',
-            base_amount: 50,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'For dusting the beef. Approximately ⅓ cup.'
-          },
-          {
-            ingredient_id: 'olive_oil',
-            base_amount: 45,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Split: 30g for browning, 15g for sautéing the vegetables.'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 250,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 1 large, halved and sliced 1cm thick.'
-          },
-          {
-            ingredient_id: 'garlic_clove',
-            base_amount: 4,
-            unit: 'cloves',
-            scaling: 'scales',
-            notes: 'Minced.'
-          },
-          {
-            ingredient_id: 'carrot',
-            base_amount: 300,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 3 medium, cut into 2.5cm chunks on the diagonal.'
-          },
-          {
-            ingredient_id: 'celery',
-            base_amount: 150,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 stalks, cut into 2.5cm chunks.'
-          },
-          {
-            ingredient_id: 'mushroom_brown',
-            base_amount: 250,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Halved. Optional but recommended for depth of flavour.'
-          },
-          {
-            ingredient_id: 'potato_baby_chat',
-            base_amount: 400,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Halved, skins on.'
-          },
-          {
-            ingredient_id: 'red_wine_cooking',
-            base_amount: 500,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Full-bodied — cabernet sauvignon, merlot, or shiraz. Discount bottles are fine.'
-          },
-          {
-            ingredient_id: 'beef_stock_liquid',
-            base_amount: 750,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Salt-reduced preferred. Campbell\'s Real Stock or Massel.'
-          },
-          {
-            ingredient_id: 'tomato_paste',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 tbsp.'
-          },
-          {
-            ingredient_id: 'worcestershire_sauce',
-            base_amount: 10,
-            unit: 'ml',
-            scaling: 'scales',
-            notes: 'Approximately 2 tsp.'
-          },
-          {
-            ingredient_id: 'thyme_fresh',
-            base_amount: 4,
-            unit: 'count',
-            scaling: 'fixed',
-            notes: '4 sprigs, tied together for easy removal. Substitute 1 tsp dried thyme if unavailable.'
-          },
-          {
-            ingredient_id: 'bay_leaves_dried',
-            base_amount: 2,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'salt',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Pat the beef cubes dry with paper towel. Season with the salt and pepper. Place the beef and flour in a large zip-top bag or bowl and toss to coat evenly. Shake off the excess.',
-            substeps: [
-              'Pat the beef cubes dry with paper towel. Season with the salt and pepper. Place the beef and flour in a large zip-top bag or bowl and toss to coat evenly. Shake off the excess.'
-            ]
-          },
-          {
-            summary: 'Heat 30g olive oil in a large heavy skillet over high heat — get it properly hot. Brown the beef aggressively in 2-3 batches, about 1.5 minutes per side. Don\'t crowd the pan; you want crust, not steam. Transfer browned beef to the slow cooker.',
-            substeps: [
-              'Heat 30g olive oil in a large heavy skillet over high heat — get it properly hot. Brown the beef aggressively in 2-3 batches, about 1.5 minutes per side. Don\'t crowd the pan; you want crust, not steam. Transfer browned beef to the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Drain the excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15g oil.',
-            substeps: ['Drain the excess fat from the skillet. Drop the heat to medium-low. Add the remaining 15g oil.']
-          },
-          {
-            summary: 'Add the onion and garlic; cook 3 minutes. Add the carrot and celery; cook 4 minutes until softening at the edges. Transfer to the slow cooker.',
-            substeps: [
-              'Add the onion and garlic; cook 3 minutes. Add the carrot and celery; cook 4 minutes until softening at the edges. Transfer to the slow cooker.'
-            ]
-          },
-          {
-            summary: 'Pour the red wine into the still-hot skillet. Bring to a vigorous simmer, scraping all the brown bits off the bottom of the pan (the fond). Simmer 2 minutes to cook off some alcohol and reduce slightly.',
-            substeps: [
-              'Pour the red wine into the still-hot skillet. Bring to a vigorous simmer, scraping all the brown bits off the bottom of the pan (the fond). Simmer 2 minutes to cook off some alcohol and reduce slightly.'
-            ]
-          },
-          {
-            summary: 'Pour the wine into the slow cooker. Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.',
-            substeps: [
-              'Pour the wine into the slow cooker. Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.'
-            ]
-          },
-          {
-            summary: 'Add the mushrooms and baby potatoes on top. Push down so everything is mostly submerged in liquid.',
-            substeps: [
-              'Add the mushrooms and baby potatoes on top. Push down so everything is mostly submerged in liquid.'
-            ]
-          },
-          {
-            summary: 'Cook on LOW for 8 hours or HIGH for 5 hours. Beef should be fork-tender and falling apart.',
-            substeps: ['Cook on LOW for 8 hours or HIGH for 5 hours. Beef should be fork-tender and falling apart.']
-          },
-          {
-            summary: 'Optional finishing reduction: if the sauce is thinner than you want (slow cookers vary), ladle the liquid into a saucepan and simmer 10-15 minutes to reduce. Or remove the lid for the last 30 minutes on HIGH.',
-            substeps: [
-              'Optional finishing reduction: if the sauce is thinner than you want (slow cookers vary), ladle the liquid into a saucepan and simmer 10-15 minutes to reduce. Or remove the lid for the last 30 minutes on HIGH.'
-            ]
-          },
-          {
-            summary: 'Discard the bay leaves and thyme sprigs before serving.',
-            substeps: ['Discard the bay leaves and thyme sprigs before serving.']
-          }
-        ]
-      },
-      {
-        id: 'oven_braise',
-        display_name: 'Oven-Braise',
-        equipment_required: ['oven', 'stovetop'],
-        time_active_minutes: 25,
-        time_total_minutes: 165,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          {
-            ingredient_id: 'beef_chuck',
-            base_amount: 1200,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'flour_plain',
-            base_amount: 50,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'For dusting the beef. Approximately ⅓ cup.'
-          },
-          {
-            ingredient_id: 'olive_oil',
-            base_amount: 45,
-            unit: 'g',
-            scaling: 'fixed',
-            notes: 'Split: 30g for browning, 15g for sautéing the vegetables.'
-          },
-          {
-            ingredient_id: 'brown_onion',
-            base_amount: 250,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'garlic_clove',
-            base_amount: 4,
-            unit: 'cloves',
-            scaling: 'scales',
-            notes: 'Minced.'
-          },
-          {
-            ingredient_id: 'carrot',
-            base_amount: 300,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 3 medium, cut into 2.5cm chunks.'
-          },
-          {
-            ingredient_id: 'celery',
-            base_amount: 150,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Approximately 2 stalks, cut into 2.5cm chunks.'
-          },
-          {
-            ingredient_id: 'mushroom_brown',
-            base_amount: 250,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Halved.'
-          },
-          {
-            ingredient_id: 'potato_baby_chat',
-            base_amount: 400,
-            unit: 'g',
-            scaling: 'scales',
-            notes: 'Halved, skins on.'
-          },
-          {
-            ingredient_id: 'red_wine_cooking',
-            base_amount: 500,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'beef_stock_liquid',
-            base_amount: 750,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'tomato_paste',
-            base_amount: 30,
-            unit: 'g',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'worcestershire_sauce',
-            base_amount: 10,
-            unit: 'ml',
-            scaling: 'scales'
-          },
-          {
-            ingredient_id: 'thyme_fresh',
-            base_amount: 4,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'bay_leaves_dried',
-            base_amount: 2,
-            unit: 'count',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'salt',
-            base_amount: 1,
-            unit: 'tsp',
-            scaling: 'fixed'
-          },
-          {
-            ingredient_id: 'black_pepper_ground',
-            base_amount: 0.5,
-            unit: 'tsp',
-            scaling: 'fixed'
-          }
-        ],
-        instructions: [
-          {
-            summary: 'Preheat the oven to 160°C.',
-            substeps: ['Preheat the oven to 160°C.']
-          },
-          {
-            summary: 'Pat the beef cubes dry. Season with salt and pepper. Toss with the flour to coat; shake off the excess.',
-            substeps: [
-              'Pat the beef cubes dry. Season with salt and pepper. Toss with the flour to coat; shake off the excess.'
-            ]
-          },
-          {
-            summary: 'Heat 30g olive oil in a large Dutch oven over high heat. Brown the beef in 2-3 batches, 1.5 minutes per side. Transfer to a plate.',
-            substeps: [
-              'Heat 30g olive oil in a large Dutch oven over high heat. Brown the beef in 2-3 batches, 1.5 minutes per side. Transfer to a plate.'
-            ]
-          },
-          {
-            summary: 'Drain the excess fat. Drop the heat to medium-low. Add the remaining 15g oil. Sauté the onion and garlic for 3 minutes; add the carrot and celery, cook another 4 minutes.',
-            substeps: [
-              'Drain the excess fat. Drop the heat to medium-low. Add the remaining 15g oil. Sauté the onion and garlic for 3 minutes; add the carrot and celery, cook another 4 minutes.'
-            ]
-          },
-          {
-            summary: 'Pour in the red wine. Simmer 2 minutes, scraping the fond.',
-            substeps: ['Pour in the red wine. Simmer 2 minutes, scraping the fond.']
-          },
-          {
-            summary: 'Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.',
-            substeps: ['Add the beef stock, tomato paste, Worcestershire sauce, thyme, and bay leaves. Stir.']
-          },
-          {
-            summary: 'Return the beef to the pot with any juices. Add the mushrooms and potatoes. The liquid should cover everything.',
-            substeps: [
-              'Return the beef to the pot with any juices. Add the mushrooms and potatoes. The liquid should cover everything.'
-            ]
-          },
-          {
-            summary: 'Bring to a simmer on the stovetop. Cover and transfer to the oven for 1.5 hours.',
-            substeps: ['Bring to a simmer on the stovetop. Cover and transfer to the oven for 1.5 hours.']
-          },
-          {
-            summary: 'Uncover and return to the oven for another 30 minutes to reduce and thicken the sauce. Total oven time: 2 hours.',
-            substeps: [
-              'Uncover and return to the oven for another 30 minutes to reduce and thicken the sauce. Total oven time: 2 hours.'
-            ]
-          },
-          {
-            summary: 'Check the beef is fork-tender. If not quite there, return covered for another 20 minutes.',
-            substeps: ['Check the beef is fork-tender. If not quite there, return covered for another 20 minutes.']
-          },
-          {
-            summary: 'Discard the bay leaves and thyme sprigs before serving.',
-            substeps: ['Discard the bay leaves and thyme sprigs before serving.']
-          }
-        ]
-      }
-    ]
   },
   maple_muscle_toast: {
     slug: 'maple_muscle_toast',
@@ -8636,6 +8670,124 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       day_of_summary: 'Boil fresh spaghetti',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The meatballs and pasta ARE the meal — they stay in base. Only the tomato sauce is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'turkey_mince', base_amount: 600, unit: 'g', scaling: 'flex', notes: 'Lean ground turkey (93/7). Can substitute chicken mince. 150g per serve.' },
+      { ingredient_id: 'spaghetti_dry', base_amount: 320, unit: 'g', scaling: 'scales', notes: '80g dry per serve. Cook fresh for each meal.' },
+      { ingredient_id: 'breadcrumbs', base_amount: 50, unit: 'g', scaling: 'scales', notes: 'For binding meatballs. Panko preferred.' },
+      { ingredient_id: 'full_cream_milk', base_amount: 60, unit: 'ml', scaling: 'scales', notes: 'Soaks breadcrumbs for tender meatballs.' },
+      { ingredient_id: 'egg_whole', base_amount: 1, unit: 'count', scaling: 'fixed', notes: 'Binds the meatballs.' },
+      { ingredient_id: 'parmesan_grated', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'In meatballs + for serving.' },
+      { ingredient_id: 'salt', base_amount: 1.5, unit: 'tsp', scaling: 'fixed' },
+      { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'jar',
+        display_name: 'Jar Sauce',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default. The jar replaces only the scratch tomato sauce — the meatballs are unchanged.',
+        ingredients: [
+          {
+            ingredient_id: 'pasta_sauce_tomato_jar',
+            base_amount: 750,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'One and a half 500g jars — use the rest of the second jar to loosen leftovers when reheating.',
+          },
+        ],
+        instructions: {
+          oven_stovetop: [
+            {
+              summary:
+                'Preheat the oven to 200°C (180°C fan-forced) and line a baking tray. Soak the breadcrumbs in the milk for 2 minutes.',
+              substeps: [
+                'Preheat the oven to 200°C (180°C fan-forced) and line a baking tray. Soak the breadcrumbs in the milk for 2 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Mix the turkey mince, soaked breadcrumbs, egg, half the parmesan, and the salt and pepper until just combined — do not overwork it. Roll into about 16 meatballs with wet hands and space them on the tray.',
+              substeps: [
+                'Mix the turkey mince, soaked breadcrumbs, egg, half the parmesan, and the salt and pepper until just combined — do not overwork it. Roll into about 16 meatballs with wet hands and space them on the tray.',
+              ],
+            },
+            {
+              summary:
+                'Bake for 15-18 minutes until browned and cooked through.',
+              substeps: [
+                'Bake for 15-18 minutes until browned and cooked through.',
+              ],
+            },
+            {
+              summary:
+                'Meanwhile, cook the spaghetti in salted boiling water per the packet, and warm the jar sauce in a large deep pan (swirl a splash of water in the jar to get the last of it out).',
+              substeps: [
+                'Meanwhile, cook the spaghetti in salted boiling water per the packet, and warm the jar sauce in a large deep pan (swirl a splash of water in the jar to get the last of it out).',
+              ],
+            },
+            {
+              summary:
+                'Simmer the baked meatballs in the sauce for 3-4 minutes so they soak it up. Serve over the spaghetti with the remaining parmesan.',
+              substeps: [
+                'Simmer the baked meatballs in the sauce for 3-4 minutes so they soak it up. Serve over the spaghetti with the remaining parmesan.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 10,
+        extra_total_minutes: 10,
+        skill_min: 3,
+        notes:
+          'The original from-scratch tomato sauce, built while the meatballs bake.',
+        ingredients: [
+          { ingredient_id: 'crushed_tomatoes_canned', base_amount: 800, unit: 'g', scaling: 'scales', notes: 'Base for sauce. 1 large can.' },
+          { ingredient_id: 'tomato_paste', base_amount: 30, unit: 'g', scaling: 'scales', notes: 'Concentrates tomato flavor. 2 tbsp.' },
+          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Diced for sauce. 1 medium onion.' },
+          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Fresh garlic preferred.' },
+          { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'For browning and sauce.' },
+          { ingredient_id: 'oregano_dried', base_amount: 2, unit: 'tsp', scaling: 'fixed', notes: 'Essential Italian herb.' },
+          { ingredient_id: 'dried_basil', base_amount: 2, unit: 'tsp', scaling: 'fixed', notes: 'Complements oregano.' },
+        ],
+        instructions: {
+          oven_stovetop: [
+            { summary: 'Prep meatball mixture: soak breadcrumbs in milk, mix with turkey, egg, half the parmesan, salt and pepper.', substeps: ['Prep meatball mixture: soak breadcrumbs in milk, mix with turkey, egg, half the parmesan, salt and pepper.'] },
+            { summary: 'Form 20-24 meatballs (about 30g each) and arrange on oiled baking sheet.', substeps: ['Form 20-24 meatballs (about 30g each) and arrange on oiled baking sheet.'] },
+            { summary: 'Bake meatballs at 200°C for 15-18 minutes until browned and cooked through.', substeps: ['Bake meatballs at 200°C for 15-18 minutes until browned and cooked through.'] },
+            { summary: 'Meanwhile, make sauce: sauté diced onion in olive oil until soft, add garlic for 1 minute.', substeps: ['Meanwhile, make sauce: sauté diced onion in olive oil until soft, add garlic for 1 minute.'] },
+            { summary: 'Add tomato paste, cook 2 minutes, then add crushed tomatoes, oregano, basil, season and simmer 10-15 minutes.', substeps: ['Add tomato paste, cook 2 minutes, then add crushed tomatoes, oregano, basil, season and simmer 10-15 minutes.'] },
+            { summary: 'Add baked meatballs to sauce, simmer 5 minutes. Serve over cooked spaghetti with remaining parmesan.', substeps: ['Add baked meatballs to sauce, simmer 5 minutes. Serve over cooked spaghetti with remaining parmesan.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'oven_stovetop',
+        display_name: 'Oven + Stovetop',
+        equipment_required: ['oven', 'stovetop'],
+        time_active_minutes: 20,
+        time_total_minutes: 35,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -8645,47 +8797,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 810, protein_g: 56, carbs_g: 91, fat_g: 25, fiber_g: 8 },
-      },
-    ],
-    methods: [
-      {
-        id: 'oven_stovetop',
-        display_name: 'Oven + Stovetop',
-        equipment_required: ['oven', 'stovetop'],
-        time_active_minutes: 30,
-        time_total_minutes: 45,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'turkey_mince', base_amount: 600, unit: 'g', scaling: 'flex', notes: 'Lean ground turkey (93/7). Can substitute chicken mince. 150g per serve.' },
-          { ingredient_id: 'spaghetti_dry', base_amount: 320, unit: 'g', scaling: 'scales', notes: '80g dry per serve. Cook fresh for each meal.' },
-          { ingredient_id: 'breadcrumbs', base_amount: 50, unit: 'g', scaling: 'scales', notes: 'For binding meatballs. Panko preferred.' },
-          { ingredient_id: 'full_cream_milk', base_amount: 60, unit: 'ml', scaling: 'scales', notes: 'Soaks breadcrumbs for tender meatballs.' },
-          { ingredient_id: 'egg_whole', base_amount: 1, unit: 'count', scaling: 'fixed', notes: 'Binds the meatballs.' },
-          { ingredient_id: 'parmesan_grated', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'In meatballs + for serving.' },
-          { ingredient_id: 'crushed_tomatoes_canned', base_amount: 800, unit: 'g', scaling: 'scales', notes: 'Base for sauce. 1 large can.' },
-          { ingredient_id: 'tomato_paste', base_amount: 30, unit: 'g', scaling: 'scales', notes: 'Concentrates tomato flavor. 2 tbsp.' },
-          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Diced for sauce. 1 medium onion.' },
-          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Fresh garlic preferred.' },
-          { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'For browning and sauce.' },
-          { ingredient_id: 'oregano_dried', base_amount: 2, unit: 'tsp', scaling: 'fixed', notes: 'Essential Italian herb.' },
-          { ingredient_id: 'dried_basil', base_amount: 2, unit: 'tsp', scaling: 'fixed', notes: 'Complements oregano.' },
-          { ingredient_id: 'salt', base_amount: 1.5, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
-        ],
-        instructions: [
-          { summary: 'Prep meatball mixture: soak breadcrumbs in milk, mix with turkey, egg, half the parmesan, salt and pepper.', substeps: ['Prep meatball mixture: soak breadcrumbs in milk, mix with turkey, egg, half the parmesan, salt and pepper.'] },
-          { summary: 'Form 20-24 meatballs (about 30g each) and arrange on oiled baking sheet.', substeps: ['Form 20-24 meatballs (about 30g each) and arrange on oiled baking sheet.'] },
-          { summary: 'Bake meatballs at 200°C for 15-18 minutes until browned and cooked through.', substeps: ['Bake meatballs at 200°C for 15-18 minutes until browned and cooked through.'] },
-          { summary: 'Meanwhile, make sauce: sauté diced onion in olive oil until soft, add garlic for 1 minute.', substeps: ['Meanwhile, make sauce: sauté diced onion in olive oil until soft, add garlic for 1 minute.'] },
-          { summary: 'Add tomato paste, cook 2 minutes, then add crushed tomatoes, oregano, basil, season and simmer 10-15 minutes.', substeps: ['Add tomato paste, cook 2 minutes, then add crushed tomatoes, oregano, basil, season and simmer 10-15 minutes.'] },
-          { summary: 'Add baked meatballs to sauce, simmer 5 minutes. Serve over cooked spaghetti with remaining parmesan.', substeps: ['Add baked meatballs to sauce, simmer 5 minutes. Serve over cooked spaghetti with remaining parmesan.'] },
-        ],
+        plate_macros: { kcal: 732, protein_g: 48.9, carbs_g: 87.8, fat_g: 19.8, fiber_g: 5.4 },
       },
     ],
   },
-
   tuna_pasta_bake: {
     slug: 'tuna_pasta_bake',
     display_name: 'Tuna Pasta Bake',
@@ -9162,100 +9277,150 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     min_scale: 0.5,
     max_scale: 2.0,
     contains_allergens: ['Gluten/Wheat', 'Dairy'],
-    flex_ingredient_id: 'beef_chuck',
+    flex_ingredient_id: 'beef_mince_regular',
     image_filename: 'beef_ragu_gnocchi.png',
     photo_url: undefined,
     meal_prep: {
       strategy: 'partial',
-      prep_note: 'Slow-braise and shred the ragù ahead; boil fresh gnocchi and toss through day-of.',
-      prep_ahead_summary: 'Slow-braised beef ragù',
+      prep_note: 'Cook the ragù ahead; boil fresh gnocchi and toss through day-of.',
+      prep_ahead_summary: 'Beef ragù',
       day_of_summary: 'Boil fresh gnocchi',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
-    plates: [
-      {
-        id: 'standard',
-        display_name: 'Beef Ragù with Gnocchi',
-        description: 'Cheap tough beef seared and slow-braised 2-3 hrs in a rich tomato-soffritto sauce until it shreds, tossed through pillowy gnocchi and finished with parmesan. The library\'s only slow-braise and its best meal-prepper.',
-        is_stunt_plate: false,
-        base_serving_multiplier: 1.0,
-        additional_ingredients: [],
-        additional_instructions: [],
-        assembly_time_minutes: 0,
-        plate_macros: { kcal: 856, protein_g: 53, carbs_g: 88, fat_g: 31, fiber_g: 10 },
-      },
+
+    // Common to both variants. The protein lives on the VARIANT — the jar↔braise toggle swaps mince for chuck.
+    base_ingredients: [
+      { ingredient_id: 'gnocchi', base_amount: 800, unit: 'g', scaling: 'scales', notes: '200g/serve; cook fresh to packet.' },
+      { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'parmesan_grated', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'To finish.' },
+      { ingredient_id: 'oregano_dried', base_amount: 1, unit: 'tsp', scaling: 'scales' },
+      { ingredient_id: 'salt', base_amount: 1.5, unit: 'tsp', scaling: 'fixed' },
+      { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
     ],
-    methods: [
+
+    sauce_variants: [
       {
-        id: 'slow_braise',
-        display_name: 'Slow Braise (default)',
-        equipment_required: ['stovetop', 'oven'],
-        time_active_minutes: 15,
-        time_total_minutes: 165,
-        skill_min: 2,
-        shortcut_level: 'scratch',
+        id: 'jar',
+        display_name: 'Jar Sauce (mince)',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default: mince and two jars, about 40 minutes end to end. The braise toggle is the original whole-chuck slow version.',
         ingredients: [
-          { ingredient_id: 'beef_chuck', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Whole chuck/blade. ~200g/serve. Braising renders fat you can skim.' },
-          { ingredient_id: 'gnocchi', base_amount: 800, unit: 'g', scaling: 'scales', notes: '200g/serve; cook fresh to packet.' },
+          {
+            ingredient_id: 'beef_mince_regular',
+            base_amount: 800,
+            unit: 'g',
+            scaling: 'flex',
+            notes: '~200g per serve. 3-star mince — the fat is flavour.',
+          },
+          {
+            ingredient_id: 'pasta_sauce_tomato_jar',
+            base_amount: 1000,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two 500g jars — any tomato or bolognese pasta sauce.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Dice the onion. Brown the beef mince and onion together in a large deep pan over medium-high heat, breaking the mince up — about 6-7 minutes. The mince renders its own fat.',
+              substeps: [
+                'Dice the onion. Brown the beef mince and onion together in a large deep pan over medium-high heat, breaking the mince up — about 6-7 minutes. The mince renders its own fat.',
+              ],
+            },
+            {
+              summary:
+                'Pour in the jar sauce (swirl a splash of water in each jar to get the last of it out). Simmer for 12-15 minutes, stirring occasionally, until thick and rich. Season with the salt, pepper, and oregano to taste.',
+              substeps: [
+                'Pour in the jar sauce (swirl a splash of water in each jar to get the last of it out). Simmer for 12-15 minutes, stirring occasionally, until thick and rich. Season with the salt, pepper, and oregano to taste.',
+              ],
+            },
+            {
+              summary:
+                'Meanwhile, cook the gnocchi in salted boiling water per the packet — they are done about a minute after they float. Drain, keeping a splash of the cooking water.',
+              substeps: [
+                'Meanwhile, cook the gnocchi in salted boiling water per the packet — they are done about a minute after they float. Drain, keeping a splash of the cooking water.',
+              ],
+            },
+            {
+              summary:
+                'Toss the gnocchi through the ragù with the splash of cooking water to loosen. Serve topped with the parmesan.',
+              substeps: [
+                'Toss the gnocchi through the ragù with the splash of cooking water to loosen. Serve topped with the parmesan.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'braise',
+        display_name: 'Slow-Braised Chuck',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 0,
+        extra_total_minutes: 125,
+        skill_min: 3,
+        notes:
+          'The original build — whole chuck seared and slow-braised 2-3 hours in a soffritto-tomato sauce until it shreds.',
+        ingredients: [
+          { ingredient_id: 'beef_chuck', base_amount: 800, unit: 'g', scaling: 'scales', notes: 'Whole chuck/blade. ~200g/serve. Braising renders fat you can skim.' },
           { ingredient_id: 'crushed_tomatoes_canned', base_amount: 700, unit: 'g', scaling: 'scales' },
           { ingredient_id: 'tomato_paste', base_amount: 50, unit: 'g', scaling: 'scales', notes: 'Browned for depth.' },
-          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales' },
           { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales' },
           { ingredient_id: 'carrot', base_amount: 120, unit: 'g', scaling: 'scales', notes: 'Soffritto; optional.' },
           { ingredient_id: 'celery', base_amount: 100, unit: 'g', scaling: 'scales', notes: 'Soffritto; optional.' },
           { ingredient_id: 'beef_stock_cube', base_amount: 10, unit: 'g', scaling: 'scales', notes: 'Made up to ~250ml braising liquid.' },
           { ingredient_id: 'red_wine_cooking', base_amount: 125, unit: 'ml', scaling: 'scales', notes: 'Optional; deglaze. Keep accessible — not required.' },
           { ingredient_id: 'olive_oil', base_amount: 18, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'parmesan_grated', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'To finish.' },
-          { ingredient_id: 'oregano_dried', base_amount: 1, unit: 'tsp', scaling: 'scales' },
           { ingredient_id: 'thyme_dried', base_amount: 1, unit: 'tsp', scaling: 'scales' },
           { ingredient_id: 'bay_leaves_dried', base_amount: 2, unit: 'count', scaling: 'fixed' },
-          { ingredient_id: 'salt', base_amount: 1.5, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
         ],
-        instructions: [
-          { summary: 'Pat the beef dry, season, and sear hard on all sides until deeply browned; remove.', substeps: ['Pat the beef chuck dry and season.', 'Sear hard on all sides in a heavy pot until deeply browned, then remove.'] },
-          { summary: 'Soften the soffritto, then brown the tomato paste.', substeps: ['Soften the onion, carrot, celery, and garlic in the oil.', 'Stir in the tomato paste and brown 1-2 minutes to deepen the flavour.'] },
-          { summary: 'Deglaze (optional wine), add tomatoes, stock, herbs; return the beef.', substeps: ['Deglaze with the wine if using.', 'Add the crushed tomatoes, stock, oregano, thyme, and bay; return the beef.'] },
-          { summary: 'Cover and braise low until the beef shreds — oven 160°C ~2.5 hrs (or stovetop low / slow-cooker 8 hrs low).', substeps: ['Cover and braise low until fork-tender and shreddable — oven 160°C about 2.5 hrs, stovetop low, or slow-cooker 8 hrs low.'] },
-          { summary: 'Shred the beef, return to the sauce, skim fat if you like, simmer 15-20 min to thicken.', substeps: ['Shred the beef with two forks and return it to the sauce.', 'Skim surface fat if you like, then simmer uncovered 15-20 minutes to thicken.'] },
-          { summary: 'Cook the gnocchi to packet and toss through with a splash of pasta water; finish with parmesan and basil.', substeps: ['Boil the gnocchi until they float (~2-3 min).', 'Toss through the ragù with a splash of pasta water; finish with parmesan and basil.'] },
-        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Pat the beef dry, season, and sear hard on all sides until deeply browned; remove.', substeps: ['Pat the beef chuck dry and season.', 'Sear hard on all sides in a heavy pot until deeply browned, then remove.'] },
+            { summary: 'Soften the soffritto, then brown the tomato paste.', substeps: ['Soften the onion, carrot, celery, and garlic in the oil.', 'Stir in the tomato paste and brown 1-2 minutes to deepen the flavour.'] },
+            { summary: 'Deglaze (optional wine), add tomatoes, stock, herbs; return the beef.', substeps: ['Deglaze with the wine if using.', 'Add the crushed tomatoes, stock, oregano, thyme, and bay; return the beef.'] },
+            { summary: 'Cover and braise low until the beef shreds — oven 160°C ~2.5 hrs (or stovetop low / slow-cooker 8 hrs low).', substeps: ['Cover and braise low until fork-tender and shreddable — oven 160°C about 2.5 hrs, stovetop low, or slow-cooker 8 hrs low.'] },
+            { summary: 'Shred the beef, return to the sauce, skim fat if you like, simmer 15-20 min to thicken.', substeps: ['Shred the beef with two forks and return it to the sauce.', 'Skim surface fat if you like, then simmer uncovered 15-20 minutes to thicken.'] },
+            { summary: 'Cook the gnocchi to packet and toss through with a splash of pasta water; finish with parmesan and basil.', substeps: ['Boil the gnocchi until they float (~2-3 min).', 'Toss through the ragù with a splash of pasta water; finish with parmesan and basil.'] },
+          ],
+        },
       },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
       {
-        id: 'quick_mince',
-        display_name: 'Quick Mince (weeknight)',
+        id: 'stovetop',
+        display_name: 'Stovetop',
         equipment_required: ['stovetop'],
         time_active_minutes: 15,
         time_total_minutes: 40,
         skill_min: 1,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'beef_mince_regular', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'QUICK version. ~200g/serve.' },
-          { ingredient_id: 'gnocchi', base_amount: 800, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'crushed_tomatoes_canned', base_amount: 700, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'tomato_paste', base_amount: 50, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales' },
-          { ingredient_id: 'carrot', base_amount: 120, unit: 'g', scaling: 'scales', notes: 'Optional.' },
-          { ingredient_id: 'celery', base_amount: 100, unit: 'g', scaling: 'scales', notes: 'Optional.' },
-          { ingredient_id: 'beef_stock_cube', base_amount: 5, unit: 'g', scaling: 'scales', notes: 'Made up to ~150ml.' },
-          { ingredient_id: 'olive_oil', base_amount: 18, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'parmesan_grated', base_amount: 40, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'oregano_dried', base_amount: 1, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'salt', base_amount: 1.5, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
-        ],
-        instructions: [
-          { summary: 'Brown the beef mince, breaking it up.', substeps: ['Brown the beef mince in a little oil, breaking it up.'] },
-          { summary: 'Soften the soffritto, then brown the tomato paste.', substeps: ['Soften the onion, carrot, celery, and garlic.', 'Stir in the tomato paste and brown 1-2 minutes.'] },
-          { summary: 'Add tomatoes, stock, herbs; simmer ~30 min until rich.', substeps: ['Add the crushed tomatoes, stock, and oregano; simmer about 30 minutes until rich.'] },
-          { summary: 'Cook the gnocchi and toss through; finish with parmesan and basil.', substeps: ['Boil the gnocchi until they float (~2-3 min).', 'Toss through the ragù; finish with parmesan and basil.'] },
-        ],
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
+    plates: [
+      {
+        id: 'standard',
+        display_name: 'Beef Ragù with Gnocchi',
+        description: 'Beef ragù in a rich tomato sauce tossed through pillowy gnocchi and finished with parmesan. The braise toggle slow-cooks whole chuck 2-3 hrs until it shreds — the library\'s best meal-prepper.',
+        is_stunt_plate: false,
+        base_serving_multiplier: 1.0,
+        additional_ingredients: [],
+        additional_instructions: [],
+        assembly_time_minutes: 0,
+        plate_macros: { kcal: 1006, protein_g: 50.4, carbs_g: 93.6, fat_g: 45.5, fiber_g: 7.6 },
       },
     ],
   },
-
   cevapi: {
     slug: 'cevapi',
     display_name: 'Ćevapi',

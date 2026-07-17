@@ -189,7 +189,9 @@ export type IngredientId =
   | 'ajvar'
   | 'pasta_sauce_tomato_jar'
   | 'chilli_seasoning_mix'
-  | 'bbq_sauce_bottled';
+  | 'bbq_sauce_bottled'
+  | 'casserole_recipe_base_mix'
+  | 'slow_cook_recipe_base_pouch';
 
 /**
  * Grocery store categories for organizing shopping lists
