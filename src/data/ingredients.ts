@@ -3232,5 +3232,39 @@ export const INGREDIENTS: Record<IngredientId, Ingredient> = {
     macro_confidence: "verified",
     user_overridable: true,
     brand_reference: "MasterFoods Soy, Honey & Garlic Marinade 375g, per 100g"
+  },
+  taco_seasoning_mix: {
+    id: "taco_seasoning_mix",
+    display_name: "Taco/fajita seasoning (sachet)",
+    category: "pantry_grains",
+    canonical_unit: "g",
+    dietary_flags: ["vegetarian", "dairy_free", "nut_free"],
+    allergens: ["Gluten/Wheat"],
+    typical_pack_size: 30,
+    notes: "Generic taco, fajita, burrito or chipotle seasoning sachet — spice, salt and starch. Conservatively declares Gluten/Wheat: many blends use wheat maltodextrin, though corn-based blends are gluten-free — check the pack.",
+    state: "as_sold",
+    macros_per_100g: { kcal: 280, protein_g: 7, carbs_g: 52, fat_g: 4, fiber_g: 11 },
+    grams_per_canonical_unit: 1,
+    macro_source: "Estimated — Old El Paso taco seasoning ~15 kcal/2 tsp (250-280 kcal/100g band across US and AU panels, ~67-80% carbs); band shared by fajita, burrito and chipotle variants",
+    macro_confidence: "estimated",
+    user_overridable: true,
+    brand_reference: "Old El Paso Taco Seasoning Mix 30g sachet, per 100g dry"
+  },
+  shawarma_seasoning_mix: {
+    id: "shawarma_seasoning_mix",
+    display_name: "Shawarma-style seasoning (blend)",
+    category: "pantry_grains",
+    canonical_unit: "g",
+    dietary_flags: ["vegan", "vegetarian", "gluten_free", "dairy_free", "nut_free"],
+    allergens: [],
+    typical_pack_size: 35,
+    notes: "Generic Middle Eastern seasoning blend (cumin, coriander, paprika, turmeric family) — works for shawarma and kofta alike. Pure spice blends carry no declared allergens; check flavoured variants.",
+    state: "as_sold",
+    macros_per_100g: { kcal: 340, protein_g: 12, carbs_g: 45, fat_g: 12, fiber_g: 25 },
+    grams_per_canonical_unit: 1,
+    macro_source: "Estimated — pure ground-spice blends (cumin/coriander/paprika/turmeric) sit at 330-375 kcal/100g with high fibre; representative mid-band values",
+    macro_confidence: "estimated",
+    user_overridable: true,
+    brand_reference: "Generic shawarma spice blend, per 100g dry"
   }
 };

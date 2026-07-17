@@ -196,7 +196,9 @@ export type IngredientId =
   | 'asian_stir_fry_sauce_bottled'
   | 'satay_simmer_sauce_jar'
   | 'bulgogi_marinade_bottled'
-  | 'honey_soy_garlic_marinade';
+  | 'honey_soy_garlic_marinade'
+  | 'taco_seasoning_mix'
+  | 'shawarma_seasoning_mix';
 
 /**
  * Grocery store categories for organizing shopping lists

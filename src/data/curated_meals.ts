@@ -8505,7 +8505,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     min_scale: 0.5,
     max_scale: 2.0,
     flex_ingredient_id: 'chicken_breast',
-    contains_allergens: [],
+    contains_allergens: ['Gluten/Wheat'],
     image_filename: 'chicken_fajita_bowl.png',
     photo_url: undefined,
     meal_prep: {
@@ -8513,6 +8513,118 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Built for meal prep — chicken, peppers, beans and rice all reheat. Fresh lime when serving.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The chicken, rice, veg, beans, oil and lime. The spice cluster is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'chicken_breast', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Cut into strips. 200g per serving.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 320, unit: 'g', scaling: 'scales', notes: 'Uncooked, about 1.5 cups.' },
+      { ingredient_id: 'capsicum_red', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Sliced into strips.' },
+      { ingredient_id: 'brown_onion', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Sliced.' },
+      { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: '1 can, drained and rinsed.' },
+      { ingredient_id: 'olive_oil', base_amount: 42, unit: 'g', scaling: 'scales', notes: 'For cooking.' },
+      { ingredient_id: 'lime', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Juice and wedges.' },
+      { ingredient_id: 'water', base_amount: 480, unit: 'ml', scaling: 'scales', notes: 'For cooking rice.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'sachet',
+        display_name: 'Seasoning Sachet',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default: two taco/fajita seasoning sachets replace the six-spice rub, salt included. Declares Gluten/Wheat conservatively — corn-based blends are gluten-free, check the pack.',
+        ingredients: [
+          {
+            ingredient_id: 'taco_seasoning_mix',
+            base_amount: 60,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two ~30g sachets — any taco or fajita seasoning.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first with the water. Slice the chicken into strips and the capsicum and onion into thin slices.',
+              substeps: [
+                'Get the rice on first with the water. Slice the chicken into strips and the capsicum and onion into thin slices.',
+              ],
+            },
+            {
+              summary:
+                'Toss the chicken strips with half the seasoning. Sear them in half the oil in a hot pan, 5-6 minutes, then set aside.',
+              substeps: [
+                'Toss the chicken strips with half the seasoning. Sear them in half the oil in a hot pan, 5-6 minutes, then set aside.',
+              ],
+            },
+            {
+              summary:
+                'Sauté the capsicum and onion in the rest of the oil until charred at the edges, 4-5 minutes. Return the chicken with the beans, the rest of the seasoning and a splash of water, and toss for 2 minutes.',
+              substeps: [
+                'Sauté the capsicum and onion in the rest of the oil until charred at the edges, 4-5 minutes. Return the chicken with the beans, the rest of the seasoning and a splash of water, and toss for 2 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Serve over the rice with the lime in wedges for squeezing.',
+              substeps: [
+                'Serve over the rice with the lime in wedges for squeezing.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original rub: cumin, chilli powder, paprika, garlic (fresh and powdered), salt and pepper.',
+        ingredients: [
+          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
+          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'chilli_powder', base_amount: 2, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'paprika_sweet', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'garlic_powder', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Cook the jasmine rice according to package directions (about 18 minutes).', substeps: ['Cook the jasmine rice according to package directions (about 18 minutes).'] },
+            { summary: 'Mix the fajita seasoning: combine cumin, chilli powder, paprika, garlic powder, salt, and pepper in a small bowl.', substeps: ['Mix the fajita seasoning: combine cumin, chilli powder, paprika, garlic powder, salt, and pepper in a small bowl.'] },
+            { summary: 'Season the chicken strips with half the fajita spice mix.', substeps: ['Season the chicken strips with half the fajita spice mix.'] },
+            { summary: 'Heat 2 tablespoons olive oil in a large pan over medium-high heat. Cook chicken strips 6-8 minutes until golden and cooked through. Remove and set aside.', substeps: ['Heat 2 tablespoons olive oil in a large pan over medium-high heat. Cook chicken strips 6-8 minutes until golden and cooked through. Remove and set aside.'] },
+            { summary: 'In the same pan, add remaining oil. Sauté onions and peppers with remaining spice mix for 5-6 minutes until softened.', substeps: ['In the same pan, add remaining oil. Sauté onions and peppers with remaining spice mix for 5-6 minutes until softened.'] },
+            { summary: 'Add garlic and cook 1 minute until fragrant.', substeps: ['Add garlic and cook 1 minute until fragrant.'] },
+            { summary: 'Return chicken to pan, add black beans, and warm through for 2-3 minutes.', substeps: ['Return chicken to pan, add black beans, and warm through for 2-3 minutes.'] },
+            { summary: 'Serve over rice with fresh lime juice and lime wedges.', substeps: ['Serve over rice with fresh lime juice and lime wedges.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'Stovetop',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 20,
+        time_total_minutes: 30,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -8522,45 +8634,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 770, protein_g: 56, carbs_g: 96, fat_g: 14, fiber_g: 10 }, // macros computed from ingredient amounts (USDA); 200g raw chicken, ~93g dry rice, ~240g drained black beans per serve.
-      },
-    ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'Stovetop',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 25,
-        time_total_minutes: 35,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'chicken_breast', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Cut into strips. 200g per serving.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 320, unit: 'g', scaling: 'scales', notes: 'Uncooked, about 1.5 cups.' },
-          { ingredient_id: 'capsicum_red', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Sliced into strips.' },
-          { ingredient_id: 'brown_onion', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Sliced.' },
-          { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: '1 can, drained and rinsed.' },
-          { ingredient_id: 'olive_oil', base_amount: 42, unit: 'g', scaling: 'scales', notes: 'For cooking.' },
-          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
-          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'chilli_powder', base_amount: 2, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'paprika_sweet', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'garlic_powder', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'lime', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Juice and wedges.' },
-          { ingredient_id: 'water', base_amount: 480, unit: 'ml', scaling: 'scales', notes: 'For cooking rice.' },
-        ],
-        instructions: [
-          { summary: 'Cook the jasmine rice according to package directions (about 18 minutes).', substeps: ['Cook the jasmine rice according to package directions (about 18 minutes).'] },
-          { summary: 'Mix the fajita seasoning: combine cumin, chilli powder, paprika, garlic powder, salt, and pepper in a small bowl.', substeps: ['Mix the fajita seasoning: combine cumin, chilli powder, paprika, garlic powder, salt, and pepper in a small bowl.'] },
-          { summary: 'Season the chicken strips with half the fajita spice mix.', substeps: ['Season the chicken strips with half the fajita spice mix.'] },
-          { summary: 'Heat 2 tablespoons olive oil in a large pan over medium-high heat. Cook chicken strips 6-8 minutes until golden and cooked through. Remove and set aside.', substeps: ['Heat 2 tablespoons olive oil in a large pan over medium-high heat. Cook chicken strips 6-8 minutes until golden and cooked through. Remove and set aside.'] },
-          { summary: 'In the same pan, add remaining oil. Sauté onions and peppers with remaining spice mix for 5-6 minutes until softened.', substeps: ['In the same pan, add remaining oil. Sauté onions and peppers with remaining spice mix for 5-6 minutes until softened.'] },
-          { summary: 'Add garlic and cook 1 minute until fragrant.', substeps: ['Add garlic and cook 1 minute until fragrant.'] },
-          { summary: 'Return chicken to pan, add black beans, and warm through for 2-3 minutes.', substeps: ['Return chicken to pan, add black beans, and warm through for 2-3 minutes.'] },
-          { summary: 'Serve over rice with fresh lime juice and lime wedges.', substeps: ['Serve over rice with fresh lime juice and lime wedges.'] },
-        ],
+        plate_macros: { kcal: 807, protein_g: 59.0, carbs_g: 99.7, fat_g: 17.5, fiber_g: 11.4 }, // macros computed from ingredient amounts (USDA); 200g raw chicken, ~93g dry rice, ~240g drained black beans per serve.
       },
     ],
   },
@@ -8582,6 +8656,114 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'The filling (chicken, rice, beans) is batch-and-reheat; the burrito_bowl plate is fully reheatable. The only day-of step is wrapping a fresh tortilla and the quick salsa — trivial assembly, so the meal stays full.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The chicken, rice, beans, cheese, fresh veg and herbs. The spice cluster is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'chicken_thigh_skinless', base_amount: 800, unit: 'g', scaling: 'flex', notes: '200g/serve; breast swaps in leaner.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 260, unit: 'g', scaling: 'scales', notes: '65g dry/serve.' },
+      { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: 'One drained can.' },
+      { ingredient_id: 'cheese_tasty_grated', base_amount: 80, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'cherry_tomatoes', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Salsa.' },
+      { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Red onion for salsa.' },
+      { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'lime', base_amount: 1, unit: 'count', scaling: 'scales' },
+      { ingredient_id: 'coriander_fresh', base_amount: 12, unit: 'g', scaling: 'scales' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'sachet',
+        display_name: 'Seasoning Sachet',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default: two chipotle or smoky taco seasoning sachets replace the smoked-paprika-cayenne rub, salt included.',
+        ingredients: [
+          {
+            ingredient_id: 'taco_seasoning_mix',
+            base_amount: 60,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two ~30g sachets — a chipotle or smoky taco blend suits this best.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first. Dice the thighs and toss them with the seasoning.',
+              substeps: [
+                'Get the rice on first. Dice the thighs and toss them with the seasoning.',
+              ],
+            },
+            {
+              summary:
+                'Sear the chicken in the oil in a hot pan until cooked through and charred at the edges, 6-8 minutes.',
+              substeps: [
+                'Sear the chicken in the oil in a hot pan until cooked through and charred at the edges, 6-8 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Stir the beans, tomatoes and onion through to warm for 2 minutes.',
+              substeps: [
+                'Stir the beans, tomatoes and onion through to warm for 2 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Assemble with the rice, cheese, coriander and a squeeze of lime.',
+              substeps: [
+                'Assemble with the rice, cheese, coriander and a squeeze of lime.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original rub: cumin, smoked paprika, chilli powder, cayenne, salt and pepper.',
+        ingredients: [
+          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'paprika_smoked', base_amount: 2, unit: 'tsp', scaling: 'scales', notes: 'Smoked preferred.' },
+          { ingredient_id: 'chilli_powder', base_amount: 2, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'cayenne_pepper', base_amount: 1, unit: 'tsp', scaling: 'scales', notes: 'Default heat.' },
+          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Cook the rice; stir through lime and coriander.', substeps: ['Cook the jasmine rice, then stir through lime juice and chopped coriander.'] },
+            { summary: 'Spice and cook the chicken (cumin, smoked paprika, chilli, cayenne).', substeps: ['Toss the diced chicken thigh with cumin, smoked paprika, chilli powder, cayenne, and salt.', 'Cook in the oil over high heat until browned and cooked through.'] },
+            { summary: 'Warm the beans and make a quick salsa.', substeps: ['Warm the drained black beans.', 'Chop tomato and red onion with a squeeze of lime for a quick salsa.'] },
+            { summary: 'Assemble per plate (burrito, extra hot, or bowl).', substeps: ['See the plate-specific assembly steps.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'Cook & Assemble',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 25,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -8596,7 +8778,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Wrap the burrito.', substeps: ['Pile chicken, rice, beans, cheese, and salsa onto each warmed tortilla.', 'Fold in the sides and roll up tightly; sear seam-down in a dry pan if you like.'] },
         ],
         assembly_time_minutes: 4,
-        plate_macros: { kcal: 933, protein_g: 56, carbs_g: 101, fat_g: 32, fiber_g: 10 },
+        plate_macros: { kcal: 985, protein_g: 60.4, carbs_g: 112.8, fat_g: 32.3, fiber_g: 11.5 },
         image_filename: 'Spicy Chipotle Chicken Burrito (standard).png',
         photo_url: undefined,
       },
@@ -8614,7 +8796,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Add the chipotle, then wrap.', substeps: ['Stir the chipotle in adobo through the chicken before filling.', 'Wrap as for the standard burrito.'] },
         ],
         assembly_time_minutes: 4,
-        plate_macros: { kcal: 933, protein_g: 56, carbs_g: 101, fat_g: 32, fiber_g: 10 },
+        plate_macros: { kcal: 998, protein_g: 60.7, carbs_g: 115.1, fat_g: 32.7, fiber_g: 12.4 },
         image_filename: 'Spicy Chipotle Chicken Burrito (standard).png',
         photo_url: undefined,
       },
@@ -8629,43 +8811,9 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Build the bowl.', substeps: ['Serve the chicken, rice, beans, cheese, and salsa in a bowl instead of wrapping.'] },
         ],
         assembly_time_minutes: 2,
-        plate_macros: { kcal: 747, protein_g: 51, carbs_g: 71, fat_g: 27, fiber_g: 8 },
+        plate_macros: { kcal: 786, protein_g: 55.1, carbs_g: 80.7, fat_g: 27.4, fiber_g: 9.3 },
         image_filename: 'Spicy Chipotle Chicken Burrito Bowl (burrito_bowl).png',
         photo_url: undefined,
-      },
-    ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'Cook & Assemble',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 30,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'chicken_thigh_skinless', base_amount: 800, unit: 'g', scaling: 'flex', notes: '200g/serve; breast swaps in leaner.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 260, unit: 'g', scaling: 'scales', notes: '65g dry/serve.' },
-          { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: 'One drained can.' },
-          { ingredient_id: 'cheese_tasty_grated', base_amount: 80, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'cherry_tomatoes', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Salsa.' },
-          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Red onion for salsa.' },
-          { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'paprika_smoked', base_amount: 2, unit: 'tsp', scaling: 'scales', notes: 'Smoked preferred.' },
-          { ingredient_id: 'chilli_powder', base_amount: 2, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'cayenne_pepper', base_amount: 1, unit: 'tsp', scaling: 'scales', notes: 'Default heat.' },
-          { ingredient_id: 'lime', base_amount: 1, unit: 'count', scaling: 'scales' },
-          { ingredient_id: 'coriander_fresh', base_amount: 12, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
-        ],
-        instructions: [
-          { summary: 'Cook the rice; stir through lime and coriander.', substeps: ['Cook the jasmine rice, then stir through lime juice and chopped coriander.'] },
-          { summary: 'Spice and cook the chicken (cumin, smoked paprika, chilli, cayenne).', substeps: ['Toss the diced chicken thigh with cumin, smoked paprika, chilli powder, cayenne, and salt.', 'Cook in the oil over high heat until browned and cooked through.'] },
-          { summary: 'Warm the beans and make a quick salsa.', substeps: ['Warm the drained black beans.', 'Chop tomato and red onion with a squeeze of lime for a quick salsa.'] },
-          { summary: 'Assemble per plate (burrito, extra hot, or bowl).', substeps: ['See the plate-specific assembly steps.'] },
-        ],
       },
     ],
   },
@@ -8689,6 +8837,114 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       day_of_summary: 'Salad, yoghurt sauce, warm rice/wrap',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The chicken, the yoghurt (marinade AND sauce), fresh garlic and lemon — the soul of the dish stays in every variant. Only the spice cluster toggles.
+    base_ingredients: [
+      { ingredient_id: 'chicken_thigh_skinless', base_amount: 800, unit: 'g', scaling: 'flex' },
+      { ingredient_id: 'greek_yoghurt_plain', base_amount: 200, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'garlic_clove', base_amount: 5, unit: 'cloves', scaling: 'scales' },
+      { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'lemon', base_amount: 1, unit: 'count', scaling: 'scales' },
+      { ingredient_id: 'cherry_tomatoes', base_amount: 200, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'cucumber', base_amount: 200, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'blend',
+        display_name: 'Seasoning Blend',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default: a shawarma-style seasoning blend replaces the measured spices, salt included. The yoghurt-garlic-lemon marinade is unchanged.',
+        ingredients: [
+          {
+            ingredient_id: 'shawarma_seasoning_mix',
+            base_amount: 25,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'About 2½ tablespoons of shawarma or Middle Eastern seasoning blend.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Mix half the yoghurt with the seasoning, half the garlic (crushed) and a good squeeze of lemon. Toss the thighs through it — they can cook straight away, or sit 20 minutes for deeper flavour.',
+              substeps: [
+                'Mix half the yoghurt with the seasoning, half the garlic (crushed) and a good squeeze of lemon. Toss the thighs through it — they can cook straight away, or sit 20 minutes for deeper flavour.',
+              ],
+            },
+            {
+              summary:
+                'Sear the thighs in the oil over medium-high heat, 4-5 minutes a side, until charred and cooked through. Rest 3 minutes, then slice.',
+              substeps: [
+                'Sear the thighs in the oil over medium-high heat, 4-5 minutes a side, until charred and cooked through. Rest 3 minutes, then slice.',
+              ],
+            },
+            {
+              summary:
+                'Stir the remaining garlic and lemon into the rest of the yoghurt for the sauce.',
+              substeps: [
+                'Stir the remaining garlic and lemon into the rest of the yoghurt for the sauce.',
+              ],
+            },
+            {
+              summary:
+                'Serve with the tomatoes, cucumber, onion and the garlic yoghurt.',
+              substeps: [
+                'Serve with the tomatoes, cucumber, onion and the garlic yoghurt.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original spice mix: cumin, ground coriander, paprika, turmeric, salt and pepper.',
+        ingredients: [
+          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'ground_coriander', base_amount: 2, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'paprika_sweet', base_amount: 2, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'ground_turmeric', base_amount: 1, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Make marinade with yogurt, garlic, lemon juice, spices, oil, salt and pepper', substeps: [] },
+            { summary: 'Marinate chicken for at least 30 minutes', substeps: [] },
+            { summary: 'Cook chicken in hot pan until done, rest and slice', substeps: [] },
+            { summary: 'Prepare vegetables - dice tomatoes, cucumber, slice onion', substeps: [] },
+            { summary: 'Assemble wraps or bowls with chicken, vegetables and remaining yogurt sauce', substeps: [] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'Marinate & Cook',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 20,
+        time_total_minutes: 35,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'wrap',
@@ -8700,7 +8956,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         ],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 738, protein_g: 51, carbs_g: 62, fat_g: 31, fiber_g: 5 },
+        plate_macros: { kcal: 739, protein_g: 53.4, carbs_g: 62.3, fat_g: 31.3, fiber_g: 6.8 },
         image_filename: 'Chicken Shawarma Wrap (wrap).png',
       },
       {
@@ -8713,42 +8969,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         ],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 793, protein_g: 50, carbs_g: 92, fat_g: 24, fiber_g: 4 },
+        plate_macros: { kcal: 806, protein_g: 52.5, carbs_g: 94.1, fat_g: 24.7, fiber_g: 4.7 },
         image_filename: 'Chicken Shawarma Rice Bowl (rice_bowl).png',
-      },
-    ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'Marinate & Cook',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 35,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'chicken_thigh_skinless', base_amount: 800, unit: 'g', scaling: 'flex' },
-          { ingredient_id: 'greek_yoghurt_plain', base_amount: 200, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'garlic_clove', base_amount: 5, unit: 'cloves', scaling: 'scales' },
-          { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'lemon', base_amount: 1, unit: 'count', scaling: 'scales' },
-          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'ground_coriander', base_amount: 2, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'paprika_sweet', base_amount: 2, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'ground_turmeric', base_amount: 1, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'cherry_tomatoes', base_amount: 200, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'cucumber', base_amount: 200, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
-        ],
-        instructions: [
-          { summary: 'Make marinade with yogurt, garlic, lemon juice, spices, oil, salt and pepper', substeps: [] },
-          { summary: 'Marinate chicken for at least 30 minutes', substeps: [] },
-          { summary: 'Cook chicken in hot pan until done, rest and slice', substeps: [] },
-          { summary: 'Prepare vegetables - dice tomatoes, cucumber, slice onion', substeps: [] },
-          { summary: 'Assemble wraps or bowls with chicken, vegetables and remaining yogurt sauce', substeps: [] },
-        ],
       },
     ],
   },
@@ -9332,6 +9554,116 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       day_of_summary: 'Salad, yoghurt sauce, warm rice/wrap',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The lamb, binder, yoghurt, fresh garlic, herbs and salad — the kofta itself stays whole in every variant. Only the spice cluster toggles.
+    base_ingredients: [
+      { ingredient_id: 'lamb_mince', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Lean default; regular for juicier/fattier. Not too lean — a bit of fat keeps them juicy. 200g/serve.' },
+      { ingredient_id: 'greek_yoghurt_plain', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Garlic-yoghurt sauce.' },
+      { ingredient_id: 'garlic_clove', base_amount: 5, unit: 'cloves', scaling: 'scales', notes: 'Mince + sauce.' },
+      { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Grated into the mince for moisture (red onion for the salad).' },
+      { ingredient_id: 'breadcrumbs', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Optional binder.' },
+      { ingredient_id: 'lemon', base_amount: 1, unit: 'count', scaling: 'scales', notes: 'Into the sauce.' },
+      { ingredient_id: 'parsley_flat_leaf', base_amount: 20, unit: 'g', scaling: 'scales', notes: 'Fresh parsley and/or mint, chopped into the mince.' },
+      { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'For searing.' },
+      { ingredient_id: 'cherry_tomatoes', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Salad.' },
+      { ingredient_id: 'cucumber', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Salad.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'blend',
+        display_name: 'Seasoning Blend',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default: a shawarma-style seasoning blend replaces the measured spices, salt included — the same jar the chicken shawarma uses.',
+        ingredients: [
+          {
+            ingredient_id: 'shawarma_seasoning_mix',
+            base_amount: 20,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'About 2 tablespoons of shawarma or Middle Eastern seasoning blend.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Mix the lamb with the grated onion, breadcrumbs, seasoning, half the garlic (crushed) and half the parsley. Shape into about 12 koftas with wet hands.',
+              substeps: [
+                'Mix the lamb with the grated onion, breadcrumbs, seasoning, half the garlic (crushed) and half the parsley. Shape into about 12 koftas with wet hands.',
+              ],
+            },
+            {
+              summary:
+                'Pan-fry the koftas in the oil over medium-high heat, turning, until browned all over and cooked through, 10-12 minutes.',
+              substeps: [
+                'Pan-fry the koftas in the oil over medium-high heat, turning, until browned all over and cooked through, 10-12 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Stir the remaining garlic and a squeeze of lemon into the yoghurt for the sauce.',
+              substeps: [
+                'Stir the remaining garlic and a squeeze of lemon into the yoghurt for the sauce.',
+              ],
+            },
+            {
+              summary:
+                'Serve with the tomatoes, cucumber, remaining parsley and the garlic yoghurt.',
+              substeps: [
+                'Serve with the tomatoes, cucumber, remaining parsley and the garlic yoghurt.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original spice mix: cumin, ground coriander, paprika, cinnamon, salt and pepper.',
+        ingredients: [
+          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'ground_coriander', base_amount: 2, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'paprika_sweet', base_amount: 2, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'cinnamon_ground', base_amount: 0.5, unit: 'tsp', scaling: 'scales', notes: 'KEY warm note — do not omit.' },
+          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Mix the kofta: lamb, grated onion, garlic, herbs, spice blend (incl. cinnamon), salt, pepper (+ soaked breadcrumbs). Do not overmix.', substeps: ['Combine the lamb mince with grated onion, minced garlic, chopped parsley/mint, cumin, coriander, paprika, cinnamon, salt, and pepper.', 'Add soaked breadcrumbs if using; mix just until combined — do not overmix.'] },
+            { summary: 'Form into ovals/patties and chill 10 min to hold shape.', substeps: ['Form into ovals or patties.', 'Chill 10 minutes to hold their shape.'] },
+            { summary: 'Grill or pan-sear 3-4 min per side until browned and cooked through; rest.', substeps: ['Heat the oil over medium-high.', 'Sear 3-4 minutes per side until browned and cooked through; rest.'] },
+            { summary: 'Make the garlic-yoghurt sauce and the salad.', substeps: ['Mix the yoghurt with garlic, lemon, and a pinch of salt.', 'Chop the tomato, cucumber, and red onion for the salad.'] },
+            { summary: 'Assemble per plate (rice bowl or wrap).', substeps: ['See the plate-specific assembly steps.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'Mix, Form & Grill',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 20,
+        time_total_minutes: 30,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'rice_bowl',
@@ -9346,7 +9678,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Build the bowl.', substeps: ['Serve the koftas over rice with the garlic-yoghurt sauce and salad.'] },
         ],
         assembly_time_minutes: 2,
-        plate_macros: { kcal: 857, protein_g: 53, carbs_g: 88, fat_g: 32, fiber_g: 4 },
+        plate_macros: { kcal: 869, protein_g: 53.8, carbs_g: 89.1, fat_g: 32.7, fiber_g: 4.9 },
         image_filename: 'Lamb Kofta Rice Bowl (rice_bowl).png',
         photo_url: undefined,
       },
@@ -9363,49 +9695,12 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Build the wrap.', substeps: ['Warm the flatbread.', 'Fill with koftas, garlic-yoghurt sauce, and salad; roll up.'] },
         ],
         assembly_time_minutes: 3,
-        plate_macros: { kcal: 856, protein_g: 55, carbs_g: 70, fat_g: 39, fiber_g: 6 },
+        plate_macros: { kcal: 857, protein_g: 55.8, carbs_g: 69.3, fat_g: 39.4, fiber_g: 7.1 },
         image_filename: 'Lamb Kofta Wrap (wrap).png',
         photo_url: undefined,
       },
     ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'Mix, Form & Grill',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 30,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'lamb_mince', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Lean default; regular for juicier/fattier. Not too lean — a bit of fat keeps them juicy. 200g/serve.' },
-          { ingredient_id: 'greek_yoghurt_plain', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Garlic-yoghurt sauce.' },
-          { ingredient_id: 'garlic_clove', base_amount: 5, unit: 'cloves', scaling: 'scales', notes: 'Mince + sauce.' },
-          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Grated into the mince for moisture (red onion for the salad).' },
-          { ingredient_id: 'breadcrumbs', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Optional binder.' },
-          { ingredient_id: 'lemon', base_amount: 1, unit: 'count', scaling: 'scales', notes: 'Into the sauce.' },
-          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'ground_coriander', base_amount: 2, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'paprika_sweet', base_amount: 2, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'cinnamon_ground', base_amount: 0.5, unit: 'tsp', scaling: 'scales', notes: 'KEY warm note — do not omit.' },
-          { ingredient_id: 'parsley_flat_leaf', base_amount: 20, unit: 'g', scaling: 'scales', notes: 'Fresh parsley and/or mint, chopped into the mince.' },
-          { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'For searing.' },
-          { ingredient_id: 'cherry_tomatoes', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Salad.' },
-          { ingredient_id: 'cucumber', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Salad.' },
-          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
-        ],
-        instructions: [
-          { summary: 'Mix the kofta: lamb, grated onion, garlic, herbs, spice blend (incl. cinnamon), salt, pepper (+ soaked breadcrumbs). Do not overmix.', substeps: ['Combine the lamb mince with grated onion, minced garlic, chopped parsley/mint, cumin, coriander, paprika, cinnamon, salt, and pepper.', 'Add soaked breadcrumbs if using; mix just until combined — do not overmix.'] },
-          { summary: 'Form into ovals/patties and chill 10 min to hold shape.', substeps: ['Form into ovals or patties.', 'Chill 10 minutes to hold their shape.'] },
-          { summary: 'Grill or pan-sear 3-4 min per side until browned and cooked through; rest.', substeps: ['Heat the oil over medium-high.', 'Sear 3-4 minutes per side until browned and cooked through; rest.'] },
-          { summary: 'Make the garlic-yoghurt sauce and the salad.', substeps: ['Mix the yoghurt with garlic, lemon, and a pinch of salt.', 'Chop the tomato, cucumber, and red onion for the salad.'] },
-          { summary: 'Assemble per plate (rice bowl or wrap).', substeps: ['See the plate-specific assembly steps.'] },
-        ],
-      },
-    ],
   },
-
   sheet_pan_sausage_veg: {
     slug: 'sheet_pan_sausage_veg',
     display_name: 'Sheet-Pan Sausage & Veg',
@@ -9616,7 +9911,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
     min_scale: 0.5,
     max_scale: 2.0,
     flex_ingredient_id: 'sirloin_steak',
-    contains_allergens: ['Dairy'],
+    contains_allergens: ['Dairy', 'Gluten/Wheat'],
     image_filename: 'carne_asada_bowl.png',
     photo_url: undefined,
     meal_prep: {
@@ -9624,6 +9919,119 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Grill and slice the steak and cook the cilantro-lime rice ahead; with beans and corn it divides into containers and reheats. Carb check: the rice is cooked in the method (cook-ahead) and there is no plate-level day-of step. The pico is a quick fresh garnish you can make day-of or pack.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The steak, rice, beans, corn, fresh veg, cheese and lime. The citrus-spice marinade is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'sirloin_steak', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Lean sirloin (default/accessible) or flank/skirt (authentic, fattier). 200g per serving.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Cilantro-lime style; ~75g dry/serve.' },
+      { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: 'One drained can.' },
+      { ingredient_id: 'sweetcorn', base_amount: 200, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'cherry_tomatoes', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Pico; or any tomato.' },
+      { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Red onion for the pico. ~1 medium onion.' },
+      { ingredient_id: 'lime', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Marinade + cilantro-lime rice.' },
+      { ingredient_id: 'cheese_tasty_grated', base_amount: 80, unit: 'g', scaling: 'scales', notes: 'Grated topping; optional.' },
+      { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: '~1 tbsp.' },
+      { ingredient_id: 'coriander_fresh', base_amount: 15, unit: 'g', scaling: 'scales', notes: 'Rice + pico.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'sachet',
+        display_name: 'Seasoning Sachet',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default: one seasoning sachet as a dry rub replaces the citrus-garlic marinade — no marinating time. The lime still gets squeezed over at the end.',
+        ingredients: [
+          {
+            ingredient_id: 'taco_seasoning_mix',
+            base_amount: 30,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'One ~30g sachet — taco, fajita or carne asada seasoning.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first. Rub the steak all over with the seasoning.',
+              substeps: [
+                'Get the rice on first. Rub the steak all over with the seasoning.',
+              ],
+            },
+            {
+              summary:
+                'Sear the steak in the oil in a ripping-hot pan, 3-4 minutes a side for medium-rare. Rest it 5 minutes, then slice thinly against the grain.',
+              substeps: [
+                'Sear the steak in the oil in a ripping-hot pan, 3-4 minutes a side for medium-rare. Rest it 5 minutes, then slice thinly against the grain.',
+              ],
+            },
+            {
+              summary:
+                'While it rests, warm the beans and corn, and chop the tomatoes and onion.',
+              substeps: [
+                'While it rests, warm the beans and corn, and chop the tomatoes and onion.',
+              ],
+            },
+            {
+              summary:
+                'Build the bowls: rice, beans, corn, tomatoes, onion, cheese, coriander, steak, and the lime squeezed over everything.',
+              substeps: [
+                'Build the bowls: rice, beans, corn, tomatoes, onion, cheese, coriander, steak, and the lime squeezed over everything.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        extra_total_minutes: 10,
+        skill_min: 2,
+        notes:
+          'The original citrus marinade: orange juice, fresh garlic, cumin, chilli powder, paprika, brown sugar, salt and pepper.',
+        ingredients: [
+          { ingredient_id: 'orange_juice', base_amount: 80, unit: 'ml', scaling: 'scales', notes: 'Citrus marinade base.' },
+          { ingredient_id: 'garlic_clove', base_amount: 3, unit: 'cloves', scaling: 'scales', notes: 'Marinade.' },
+          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'scales', notes: 'Marinade.' },
+          { ingredient_id: 'chilli_powder', base_amount: 2, unit: 'tsp', scaling: 'scales', notes: 'Marinade.' },
+          { ingredient_id: 'paprika_sweet', base_amount: 1, unit: 'tsp', scaling: 'scales' },
+          { ingredient_id: 'brown_sugar', base_amount: 5, unit: 'g', scaling: 'scales', notes: 'Optional pinch, helps the char. ~1 tsp.' },
+          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
+          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Make the marinade: lime and orange juice, garlic, cumin, chilli powder, oil, salt (and an optional pinch of sugar). Marinate the steak 2-4 hours — not more than 8, as the citrus turns it mushy.', substeps: ['Make the marinade: lime and orange juice, garlic, cumin, chilli powder, oil, salt (and an optional pinch of sugar). Marinate the steak 2-4 hours — not more than 8, as the citrus turns it mushy.'] },
+            { summary: 'Cook the rice, then stir through lime juice, chopped coriander, and salt.', substeps: ['Cook the rice, then stir through lime juice, chopped coriander, and salt.'] },
+            { summary: 'Warm the beans and make a quick pico (chopped tomato, red onion, coriander, lime).', substeps: ['Warm the beans and make a quick pico (chopped tomato, red onion, coriander, lime).'] },
+            { summary: 'Grill or sear the steak hot until charred, about 4-7 minutes per side to your doneness, then rest 5-10 minutes and slice thin against the grain (the key tenderness step).', substeps: ['Grill or sear the steak hot until charred, about 4-7 minutes per side to your doneness, then rest 5-10 minutes and slice thin against the grain (the key tenderness step).'] },
+            { summary: 'Build the bowl: rice, sliced steak, beans, corn, pico, and cheese.', substeps: ['Build the bowl: rice, sliced steak, beans, corn, pico, and cheese.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'Marinate & Grill',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 30,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -9633,49 +10041,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 827, protein_g: 62, carbs_g: 93, fat_g: 23, fiber_g: 10 },
-      },
-    ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'Marinate & Grill',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 35,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'sirloin_steak', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Lean sirloin (default/accessible) or flank/skirt (authentic, fattier). 200g per serving.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'Cilantro-lime style; ~75g dry/serve.' },
-          { ingredient_id: 'black_beans_canned', base_amount: 250, unit: 'g', scaling: 'scales', notes: 'One drained can.' },
-          { ingredient_id: 'sweetcorn', base_amount: 200, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'cherry_tomatoes', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Pico; or any tomato.' },
-          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Red onion for the pico. ~1 medium onion.' },
-          { ingredient_id: 'lime', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Marinade + cilantro-lime rice.' },
-          { ingredient_id: 'orange_juice', base_amount: 80, unit: 'ml', scaling: 'scales', notes: 'Citrus marinade base.' },
-          { ingredient_id: 'garlic_clove', base_amount: 3, unit: 'cloves', scaling: 'scales', notes: 'Marinade.' },
-          { ingredient_id: 'cheese_tasty_grated', base_amount: 80, unit: 'g', scaling: 'scales', notes: 'Grated topping; optional.' },
-          { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: '~1 tbsp.' },
-          { ingredient_id: 'ground_cumin', base_amount: 2, unit: 'tsp', scaling: 'scales', notes: 'Marinade.' },
-          { ingredient_id: 'chilli_powder', base_amount: 2, unit: 'tsp', scaling: 'scales', notes: 'Marinade.' },
-          { ingredient_id: 'paprika_sweet', base_amount: 1, unit: 'tsp', scaling: 'scales' },
-          { ingredient_id: 'brown_sugar', base_amount: 5, unit: 'g', scaling: 'scales', notes: 'Optional pinch, helps the char. ~1 tsp.' },
-          { ingredient_id: 'coriander_fresh', base_amount: 15, unit: 'g', scaling: 'scales', notes: 'Rice + pico.' },
-          { ingredient_id: 'salt', base_amount: 1, unit: 'tsp', scaling: 'fixed' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed' },
-        ],
-        instructions: [
-          { summary: 'Make the marinade: lime and orange juice, garlic, cumin, chilli powder, oil, salt (and an optional pinch of sugar). Marinate the steak 2-4 hours — not more than 8, as the citrus turns it mushy.', substeps: ['Make the marinade: lime and orange juice, garlic, cumin, chilli powder, oil, salt (and an optional pinch of sugar). Marinate the steak 2-4 hours — not more than 8, as the citrus turns it mushy.'] },
-          { summary: 'Cook the rice, then stir through lime juice, chopped coriander, and salt.', substeps: ['Cook the rice, then stir through lime juice, chopped coriander, and salt.'] },
-          { summary: 'Warm the beans and make a quick pico (chopped tomato, red onion, coriander, lime).', substeps: ['Warm the beans and make a quick pico (chopped tomato, red onion, coriander, lime).'] },
-          { summary: 'Grill or sear the steak hot until charred, about 4-7 minutes per side to your doneness, then rest 5-10 minutes and slice thin against the grain (the key tenderness step).', substeps: ['Grill or sear the steak hot until charred, about 4-7 minutes per side to your doneness, then rest 5-10 minutes and slice thin against the grain (the key tenderness step).'] },
-          { summary: 'Build the bowl: rice, sliced steak, beans, corn, pico, and cheese.', substeps: ['Build the bowl: rice, sliced steak, beans, corn, pico, and cheese.'] },
-        ],
+        plate_macros: { kcal: 829, protein_g: 63.0, carbs_g: 95.2, fat_g: 22.1, fiber_g: 10.0 },
       },
     ],
   },
-
   chicken_schnitzel: {
     slug: 'chicken_schnitzel',
     display_name: 'Chicken Schnitzel',
