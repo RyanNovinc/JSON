@@ -30,12 +30,14 @@ import {
 } from '../contexts/CookTimerContext';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { resolveMealInstructions } from '../utils/resolveMealIngredients';
+import { computePlateMacros } from '../utils/computeMacros';
 import { MEAL_SUBSTEPS } from '../data/meal_substeps';
 import {
   CuratedMeal,
   Plate,
   CookingMethod,
   RecipeStep,
+  SauceVariant,
 } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
 
@@ -384,10 +386,21 @@ export default function CookModeScreen() {
   const plate: Plate | undefined = meal?.plates?.[plateIndex];
   const method: CookingMethod | undefined = meal?.methods?.[methodIndex];
 
+  // Sauce-variant selection handed over by RecipeDetail. Absent (legacy meals,
+  // old deep links) → undefined, and the resolver falls back to the default
+  // variant, exactly the pre-picker behaviour.
+  const variantId: string | undefined = (route.params as any).variantId;
+  const variants: SauceVariant[] = meal?.sauce_variants ?? [];
+  const selectedVariant = variantId
+    ? variants.find((v) => v.id === variantId)
+    : variants.find((v) => v.is_default) ?? variants[0];
+  const isDefaultVariant = !selectedVariant || !!selectedVariant.is_default;
+  const isTemplateMeal = variants.length > 0;
+
   // Base steps via the single resolver path: legacy → method.instructions;
-  // template (butter_chicken) → the selected variant's steps for this method.
+  // template → the SELECTED variant's steps for this method.
   const baseInstructions: (RecipeStep | string)[] =
-    meal && method ? resolveMealInstructions(meal, method.id) : [];
+    meal && method ? resolveMealInstructions(meal, method.id, variantId) : [];
 
   const steps: CookStep[] = useMemo(() => {
     if (!method || !plate) return [];
@@ -445,7 +458,17 @@ export default function CookModeScreen() {
   const stepSummary = scaleAmounts(rawSummary, stepScale);
 
   const sectionId = currentStep.type === 'base' ? method.id : plate.id;
-  const overrideSubsteps = getSubstepsOverride(meal.slug, sectionId, currentStep.index);
+  // MEAL_SUBSTEPS overrides were authored against the LEGACY step lists. On a
+  // template meal's DEFAULT variant the base steps are new hand-authored
+  // shortcut steps, so a legacy override at the same index would attach the
+  // wrong checklist — skip base-step overrides there. Scratch variants preserve
+  // the legacy steps verbatim in the same order, so their overrides still line
+  // up. Plate steps are untouched by the migration and always allowed.
+  const allowOverride =
+    currentStep.type === 'plate' || !isTemplateMeal || !isDefaultVariant;
+  const overrideSubsteps = allowOverride
+    ? getSubstepsOverride(meal.slug, sectionId, currentStep.index)
+    : null;
 
   const hasSplitSubsteps =
     overrideSubsteps !== null &&
@@ -503,10 +526,32 @@ export default function CookModeScreen() {
     navigation.goBack();
   };
 
+  // The macros for the serving being cooked: the frozen plate_macros ARE the
+  // default variant's contract-pinned values; a non-default variant computes
+  // live via computePlateMacros (same call the divergence suite pins), rounded
+  // app-style. Used by the completion screen and share caption.
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  const servingMacros = isDefaultVariant
+    ? plate.plate_macros
+    : (() => {
+        const m = computePlateMacros(meal, plate, method, variantId);
+        return {
+          kcal: Math.round(m.kcal),
+          protein_g: round1(m.protein_g),
+          carbs_g: round1(m.carbs_g),
+          fat_g: round1(m.fat_g),
+          fiber_g: round1(m.fiber_g),
+        };
+      })();
+  // Wall-clock delta the selected variant adds to the method's advertised total.
+  const variantExtraTotal = isDefaultVariant
+    ? 0
+    : (selectedVariant?.extra_total_minutes ?? 0);
+
   const handleShare = async () => {
     try {
       const url = `https://json.fit/r/?meal=${meal.slug}&plate=${plate.id}`;
-      const m = plate.plate_macros;
+      const m = servingMacros;
       const caption = `${plate.display_name} — ${m.kcal} cal, ${m.protein_g}g protein`;
       await Share.share(
         Platform.OS === 'ios'
@@ -525,9 +570,9 @@ export default function CookModeScreen() {
     const imageSource = getMealImage(plate.image_filename ?? meal.image_filename);
 
     const totalMinutes =
-      (method.time_total_minutes ?? 0) + (plate.assembly_time_minutes ?? 0);
+      (method.time_total_minutes ?? 0) + variantExtraTotal + (plate.assembly_time_minutes ?? 0);
 
-    const macros = plate.plate_macros;
+    const macros = servingMacros;
     // Completion shows the serving you're about to eat → scale per-serving by
     // planScale (not the batch count). Matches the RecipeDetail macro panel.
     const dispKcal = Math.round(macros.kcal * planScale);
