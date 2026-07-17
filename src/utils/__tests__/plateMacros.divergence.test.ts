@@ -91,7 +91,7 @@ describe('Phase 2 — plate macro divergence', () => {
 
   // FINDING: computePlateMacros models no cooking process, so a meal's computed
   // macros can only move by method if its methods were authored with different
-  // ingredient LISTS or AMOUNTS. As of Batch 2, NO meal does — the whole
+  // ingredient LISTS or AMOUNTS. As of Batch 2, NO meal does (and Batch 3 adds seven more template meals) — the whole
   // catalogue is method-invariant. butter_chicken (Task 1); bolognese, massaman,
   // chilli_con_carne, pulled_pork (Batch 1); turkey_meatballs_spaghetti,
   // beef_stew, lamb_shanks, beef_ragu_gnocchi (Batch 2) all moved onto the
@@ -338,5 +338,87 @@ describe('sauce-axis template routing (batch 2)', () => {
   it('beef_ragu_gnocchi is single-method: the axis lives on the variant, not the method', () => {
     expect(MEALS['beef_ragu_gnocchi'].methods).toHaveLength(1);
     expect(MEALS['beef_ragu_gnocchi'].methods[0].id).toBe('stovetop');
+  });
+});
+
+// Batch 3: the seven bottled-Asian-sauce meals joined the axis. All were
+// already single-method; the whisked scratch sauce collapsed into a bottled
+// default (teriyaki, oyster-style stir-fry sauce x2, satay jar, bulgogi
+// marinade, honey-soy-garlic marinade x2). plate_macros FROZEN to computed
+// shortcut defaults; regenerate only for a deliberate recipe change.
+describe('sauce-axis template routing (batch 3)', () => {
+  const MEALS = CURATED_MEALS as Record<string, CuratedMeal>;
+  const at = (m: BaseMacros) => ({
+    kcal: Math.round(m.kcal),
+    protein_g: Math.round(m.protein_g * 10) / 10,
+    carbs_g: Math.round(m.carbs_g * 10) / 10,
+    fat_g: Math.round(m.fat_g * 10) / 10,
+    fiber_g: Math.round(m.fiber_g * 10) / 10,
+  });
+
+  const FROZEN3: Record<string, Record<string, BaseMacros>> = {
+    teriyaki_chicken_rice_bowl: {
+      standard: { kcal: 792, protein_g: 58.9, carbs_g: 100.3, fat_g: 15.8, fiber_g: 5.4 },
+    },
+    beef_broccoli_stir_fry: {
+      standard: { kcal: 777, protein_g: 55.7, carbs_g: 96.3, fat_g: 18.6, fiber_g: 4.7 },
+    },
+    satay_chicken: {
+      standard: { kcal: 879, protein_g: 51.3, carbs_g: 86.8, fat_g: 35.5, fiber_g: 4.3 },
+    },
+    beef_bulgogi_bowl: {
+      standard: { kcal: 743, protein_g: 52.7, carbs_g: 95.9, fat_g: 15.7, fiber_g: 1.9 },
+    },
+    honey_chicken: {
+      standard: { kcal: 765, protein_g: 52.2, carbs_g: 101.5, fat_g: 14.0, fiber_g: 1.8 },
+    },
+    thai_basil_chicken: {
+      standard: { kcal: 752, protein_g: 43.7, carbs_g: 88.2, fat_g: 24.2, fiber_g: 3.0 },
+      fried_egg: { kcal: 854, protein_g: 50.0, carbs_g: 88.5, fat_g: 32.5, fiber_g: 3.0 },
+    },
+    honey_soy_salmon_noodles: {
+      standard: { kcal: 800, protein_g: 51.8, carbs_g: 73.0, fat_g: 32.9, fiber_g: 5.1 },
+    },
+  };
+
+  const ALT3: Record<string, { variant: string; plate: string; macros: BaseMacros }> = {
+    teriyaki_chicken_rice_bowl: { variant: 'scratch', plate: 'standard', macros: { kcal: 855, protein_g: 59.2, carbs_g: 115.8, fat_g: 17.0, fiber_g: 5.7 } },
+    beef_broccoli_stir_fry: { variant: 'scratch', plate: 'standard', macros: { kcal: 782, protein_g: 56.7, carbs_g: 92.9, fat_g: 19.7, fiber_g: 4.8 } },
+    satay_chicken: { variant: 'scratch', plate: 'standard', macros: { kcal: 834, protein_g: 50.2, carbs_g: 76.9, fat_g: 37.9, fiber_g: 3.0 } },
+    beef_bulgogi_bowl: { variant: 'scratch', plate: 'standard', macros: { kcal: 740, protein_g: 53.4, carbs_g: 87.6, fat_g: 19.1, fiber_g: 2.8 } },
+    honey_chicken: { variant: 'scratch', plate: 'standard', macros: { kcal: 792, protein_g: 53.4, carbs_g: 104.0, fat_g: 16.4, fiber_g: 1.9 } },
+    thai_basil_chicken: { variant: 'scratch', plate: 'standard', macros: { kcal: 732, protein_g: 44.3, carbs_g: 83.5, fat_g: 24.2, fiber_g: 3.0 } },
+    honey_soy_salmon_noodles: { variant: 'scratch', plate: 'standard', macros: { kcal: 832, protein_g: 53.3, carbs_g: 76.1, fat_g: 35.3, fiber_g: 5.3 } },
+  };
+
+  const SLUGS3 = Object.keys(FROZEN3);
+
+  it.each(SLUGS3)('%s is a template meal with empty method ingredient/instruction lists', slug => {
+    const meal = MEALS[slug];
+    expect(isTemplateMeal(meal)).toBe(true);
+    for (const m of meal.methods) {
+      expect(m.ingredients).toEqual([]);
+      expect(m.instructions).toEqual([]);
+    }
+  });
+
+  it.each(SLUGS3)('%s: authored plate_macros == FROZEN == at(computed) on every plate and method', slug => {
+    const meal = MEALS[slug];
+    expect(meal.plates.map(p => p.id).sort()).toEqual(Object.keys(FROZEN3[slug]).sort());
+    for (const plate of meal.plates) {
+      expect(plate.plate_macros).toEqual(FROZEN3[slug][plate.id]);
+      for (const method of meal.methods) {
+        expect(at(computePlateMacros(meal, plate, method))).toEqual(FROZEN3[slug][plate.id]);
+      }
+    }
+  });
+
+  it.each(SLUGS3)('%s: the variant toggle moves macros away from the default', slug => {
+    const meal = MEALS[slug];
+    const { variant, plate: plateId, macros } = ALT3[slug];
+    const plate = meal.plates.find(p => p.id === plateId)!;
+    const alt = at(computePlateMacros(meal, plate, meal.methods[0], variant));
+    expect(alt).toEqual(macros);
+    expect(alt).not.toEqual(FROZEN3[slug][plateId]);
   });
 });

@@ -191,7 +191,12 @@ export type IngredientId =
   | 'chilli_seasoning_mix'
   | 'bbq_sauce_bottled'
   | 'casserole_recipe_base_mix'
-  | 'slow_cook_recipe_base_pouch';
+  | 'slow_cook_recipe_base_pouch'
+  | 'teriyaki_sauce_bottled'
+  | 'asian_stir_fry_sauce_bottled'
+  | 'satay_simmer_sauce_jar'
+  | 'bulgogi_marinade_bottled'
+  | 'honey_soy_garlic_marinade';
 
 /**
  * Grocery store categories for organizing shopping lists

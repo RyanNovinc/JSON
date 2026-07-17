@@ -7816,6 +7816,116 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Designed to divide across 4 containers and reheat — chicken, glaze, rice and broccoli all keep. Spring onion and sesame on top.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The protein, rice, veg and garnish. The whisked teriyaki is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'chicken_breast', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Cut into bite-size pieces. 200g per serving.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 370, unit: 'g', scaling: 'scales', notes: '2 cups uncooked.' },
+      { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'For browning the chicken.' },
+      { ingredient_id: 'broccoli', base_amount: 500, unit: 'g', scaling: 'scales', notes: 'Florets.' },
+      { ingredient_id: 'spring_onion', base_amount: 4, unit: 'count', scaling: 'scales', notes: 'Sliced, to finish.' },
+      { ingredient_id: 'sesame_seeds', base_amount: 18, unit: 'g', scaling: 'scales', notes: 'To finish.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'bottle',
+        display_name: 'Bottled Teriyaki',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default: one bottle of teriyaki replaces the whisked soy-honey-ginger sauce.',
+        ingredients: [
+          {
+            ingredient_id: 'teriyaki_sauce_bottled',
+            base_amount: 250,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'One 250ml bottle — any teriyaki marinade or stir-fry sauce.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first. Cut the chicken into bite-size pieces.',
+              substeps: [
+                'Get the rice on first. Cut the chicken into bite-size pieces.',
+              ],
+            },
+            {
+              summary:
+                'Sear the chicken in the oil in a large pan or wok over high heat until golden, 5-6 minutes.',
+              substeps: [
+                'Sear the chicken in the oil in a large pan or wok over high heat until golden, 5-6 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Add the broccoli with a splash of water and stir-fry 2 minutes. Pour in the teriyaki sauce and simmer 2-3 minutes until it coats everything in a glaze.',
+              substeps: [
+                'Add the broccoli with a splash of water and stir-fry 2 minutes. Pour in the teriyaki sauce and simmer 2-3 minutes until it coats everything in a glaze.',
+              ],
+            },
+            {
+              summary:
+                'Serve over the rice, topped with the spring onion and sesame seeds.',
+              substeps: [
+                'Serve over the rice, topped with the spring onion and sesame seeds.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        extra_total_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original whisked sauce: soy, honey, rice vinegar, fresh ginger and garlic, thickened with a cornstarch slurry.',
+        ingredients: [
+          { ingredient_id: 'soy_sauce', base_amount: 120, unit: 'ml', scaling: 'scales', notes: '1/2 cup.' },
+          { ingredient_id: 'honey', base_amount: 126, unit: 'g', scaling: 'scales' },
+          { ingredient_id: 'rice_vinegar', base_amount: 45, unit: 'ml', scaling: 'scales' },
+          { ingredient_id: 'ginger_fresh', base_amount: 3, unit: 'tsp', scaling: 'scales', notes: 'Grated.' },
+          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
+          { ingredient_id: 'cornstarch', base_amount: 12, unit: 'g', scaling: 'scales' },
+          { ingredient_id: 'water', base_amount: 30, unit: 'ml', scaling: 'scales' },
+          { ingredient_id: 'sesame_oil', base_amount: 5, unit: 'ml', scaling: 'fixed' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
+            { summary: 'Whisk the soy, honey, rice vinegar, ginger, garlic, cornstarch, water, and sesame oil into a smooth glaze with no lumps.', substeps: ['Whisk the soy, honey, rice vinegar, ginger, garlic, cornstarch, water, and sesame oil into a smooth glaze with no lumps.'] },
+            { summary: 'Steam the broccoli in a lidded pan with a splash of water until crisp-tender, then drain and set aside.', substeps: ['Steam the broccoli in a lidded pan with a splash of water until crisp-tender, then drain and set aside.'] },
+            { summary: 'Wipe the pan dry, heat the oil over medium-high, and brown the chicken in a single layer until golden and cooked through, turning once.', substeps: ['Wipe the pan dry, heat the oil over medium-high, and brown the chicken in a single layer until golden and cooked through, turning once.'] },
+            { summary: 'Pour the glaze over the chicken and simmer, stirring, until glossy and clinging.', substeps: ['Pour the glaze over the chicken and simmer, stirring, until glossy and clinging.'] },
+            { summary: 'Divide rice across 4 containers, top with chicken and broccoli, and finish with spring onions and sesame seeds.', substeps: ['Divide rice across 4 containers, top with chicken and broccoli, and finish with spring onions and sesame seeds.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'One-Pan Stovetop',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 25,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -7825,46 +7935,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 890, protein_g: 56, carbs_g: 108, fat_g: 18, fiber_g: 6 },
-      },
-    ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'One-Pan Stovetop',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 30,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'chicken_breast', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Cut into bite-size pieces. 200g per serving.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 370, unit: 'g', scaling: 'scales', notes: '2 cups uncooked.' },
-          { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'For browning the chicken.' },
-          { ingredient_id: 'soy_sauce', base_amount: 120, unit: 'ml', scaling: 'scales', notes: '1/2 cup.' },
-          { ingredient_id: 'honey', base_amount: 126, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'rice_vinegar', base_amount: 45, unit: 'ml', scaling: 'scales' },
-          { ingredient_id: 'ginger_fresh', base_amount: 3, unit: 'tsp', scaling: 'scales', notes: 'Grated.' },
-          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
-          { ingredient_id: 'cornstarch', base_amount: 12, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'water', base_amount: 30, unit: 'ml', scaling: 'scales' },
-          { ingredient_id: 'sesame_oil', base_amount: 5, unit: 'ml', scaling: 'fixed' },
-          { ingredient_id: 'broccoli', base_amount: 500, unit: 'g', scaling: 'scales', notes: 'Florets.' },
-          { ingredient_id: 'spring_onion', base_amount: 4, unit: 'count', scaling: 'scales', notes: 'Sliced, to finish.' },
-          { ingredient_id: 'sesame_seeds', base_amount: 18, unit: 'g', scaling: 'scales', notes: 'To finish.' },
-        ],
-        instructions: [
-          { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
-          { summary: 'Whisk the soy, honey, rice vinegar, ginger, garlic, cornstarch, water, and sesame oil into a smooth glaze with no lumps.', substeps: ['Whisk the soy, honey, rice vinegar, ginger, garlic, cornstarch, water, and sesame oil into a smooth glaze with no lumps.'] },
-          { summary: 'Steam the broccoli in a lidded pan with a splash of water until crisp-tender, then drain and set aside.', substeps: ['Steam the broccoli in a lidded pan with a splash of water until crisp-tender, then drain and set aside.'] },
-          { summary: 'Wipe the pan dry, heat the oil over medium-high, and brown the chicken in a single layer until golden and cooked through, turning once.', substeps: ['Wipe the pan dry, heat the oil over medium-high, and brown the chicken in a single layer until golden and cooked through, turning once.'] },
-          { summary: 'Pour the glaze over the chicken and simmer, stirring, until glossy and clinging.', substeps: ['Pour the glaze over the chicken and simmer, stirring, until glossy and clinging.'] },
-          { summary: 'Divide rice across 4 containers, top with chicken and broccoli, and finish with spring onions and sesame seeds.', substeps: ['Divide rice across 4 containers, top with chicken and broccoli, and finish with spring onions and sesame seeds.'] },
-        ],
+        plate_macros: { kcal: 792, protein_g: 58.9, carbs_g: 100.3, fat_g: 15.8, fiber_g: 5.4 },
       },
     ],
   },
-
   beef_broccoli_stir_fry: {
     slug: 'beef_broccoli_stir_fry',
     display_name: 'Beef & Broccoli Stir-Fry',
@@ -7883,32 +7957,77 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Divide across 4 containers and reheat — beef, sauce, broccoli and rice all keep.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
-    plates: [
-      {
-        id: 'standard',
-        display_name: 'Beef & Broccoli Stir-Fry',
-        description: 'Velveted lean beef and broccoli in a glossy brown sauce over jasmine rice — a fast one-pan stir-fry built for bulking. Makes 4 meal-prep portions.',
-        base_serving_multiplier: 1.0,
-        additional_ingredients: [],
-        additional_instructions: [],
-        assembly_time_minutes: 0,
-        plate_macros: { kcal: 860, protein_g: 52, carbs_g: 98, fat_g: 22, fiber_g: 5 },
-      },
+
+    // The beef, rice, broccoli and searing oil. The sauce layer is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'sirloin_steak', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Sliced thin against the grain. 200g per serving.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 370, unit: 'g', scaling: 'scales', notes: '2 cups uncooked.' },
+      { ingredient_id: 'broccoli', base_amount: 500, unit: 'g', scaling: 'scales', notes: 'Florets.' },
+      { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'For searing.' },
     ],
-    methods: [
+
+    sauce_variants: [
       {
-        id: 'stovetop',
-        display_name: 'One-Pan Stovetop',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 25,
+        id: 'bottle',
+        display_name: 'Bottled Stir-Fry Sauce',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
         skill_min: 2,
-        shortcut_level: 'scratch',
+        notes:
+          'The weeknight default: a bottled oyster-style stir-fry sauce replaces the whisked sauce and the velveting step.',
         ingredients: [
-          { ingredient_id: 'sirloin_steak', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Sliced thin against the grain. 200g per serving.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 370, unit: 'g', scaling: 'scales', notes: '2 cups uncooked.' },
-          { ingredient_id: 'broccoli', base_amount: 500, unit: 'g', scaling: 'scales', notes: 'Florets.' },
-          { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'For searing.' },
+          {
+            ingredient_id: 'asian_stir_fry_sauce_bottled',
+            base_amount: 200,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Oyster-based stir-fry sauce — a beef & broccoli or all-purpose blend.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first. Slice the beef into thin strips against the grain.',
+              substeps: [
+                'Get the rice on first. Slice the beef into thin strips against the grain.',
+              ],
+            },
+            {
+              summary:
+                'Sear the beef in the oil in a ripping-hot pan or wok in two batches, 1-2 minutes a batch — remove it while it is still pink inside.',
+              substeps: [
+                'Sear the beef in the oil in a ripping-hot pan or wok in two batches, 1-2 minutes a batch — remove it while it is still pink inside.',
+              ],
+            },
+            {
+              summary:
+                'Stir-fry the broccoli with a splash of water for 2 minutes. Return the beef, pour in the stir-fry sauce, and toss for 1-2 minutes until glossy.',
+              substeps: [
+                'Stir-fry the broccoli with a splash of water for 2 minutes. Return the beef, pour in the stir-fry sauce, and toss for 1-2 minutes until glossy.',
+              ],
+            },
+            {
+              summary:
+                'Serve over the rice.',
+              substeps: [
+                'Serve over the rice.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        extra_total_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original build: velveted beef, and a whisked oyster-soy sauce with cooking wine, aromatics and a cornstarch slurry.',
+        ingredients: [
           { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
           { ingredient_id: 'ginger_fresh', base_amount: 3, unit: 'tsp', scaling: 'scales', notes: 'Grated.' },
           { ingredient_id: 'soy_sauce', base_amount: 75, unit: 'ml', scaling: 'scales', notes: '15ml (1 tbsp) for velveting the beef + 60ml for the sauce.' },
@@ -7919,18 +8038,47 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { ingredient_id: 'water', base_amount: 125, unit: 'ml', scaling: 'scales' },
           { ingredient_id: 'sesame_oil', base_amount: 5, unit: 'ml', scaling: 'fixed' },
         ],
-        instructions: [
-          { summary: 'Velvet the beef: toss the sliced beef with 1 tbsp soy sauce and 2 tsp cornstarch, then rest while you prep everything else.', substeps: ['Velvet the beef: toss the sliced beef with 1 tbsp soy sauce and 2 tsp cornstarch, then rest while you prep everything else.'] },
-          { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
-          { summary: 'Whisk the sauce: 60ml soy, 3 tbsp oyster sauce, 2 tbsp Shaoxing wine, 1 tbsp brown sugar, 1.5 tbsp cornstarch, 125ml water, and 1 tsp sesame oil until smooth with no lumps.', substeps: ['Whisk the sauce: 60ml soy, 3 tbsp oyster sauce, 2 tbsp Shaoxing wine, 1 tbsp brown sugar, 1.5 tbsp cornstarch, 125ml water, and 1 tsp sesame oil until smooth with no lumps.'] },
-          { summary: 'Steam the broccoli in a lidded pan with a splash of water until crisp-tender, then drain.', substeps: ['Steam the broccoli in a lidded pan with a splash of water until crisp-tender, then drain.'] },
-          { summary: 'Sear the beef in 2 tbsp oil over high heat in two batches until browned, then remove.', substeps: ['Sear the beef in 2 tbsp oil over high heat in two batches until browned, then remove.'] },
-          { summary: 'Stir-fry the garlic and ginger for 30 seconds, return the beef and broccoli, pour in the sauce, and toss until glossy. Divide rice across 4 containers and top.', substeps: ['Stir-fry the garlic and ginger for 30 seconds, return the beef and broccoli, pour in the sauce, and toss until glossy. Divide rice across 4 containers and top.'] },
-        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Velvet the beef: toss the sliced beef with 1 tbsp soy sauce and 2 tsp cornstarch, then rest while you prep everything else.', substeps: ['Velvet the beef: toss the sliced beef with 1 tbsp soy sauce and 2 tsp cornstarch, then rest while you prep everything else.'] },
+            { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
+            { summary: 'Whisk the sauce: 60ml soy, 3 tbsp oyster sauce, 2 tbsp Shaoxing wine, 1 tbsp brown sugar, 1.5 tbsp cornstarch, 125ml water, and 1 tsp sesame oil until smooth with no lumps.', substeps: ['Whisk the sauce: 60ml soy, 3 tbsp oyster sauce, 2 tbsp Shaoxing wine, 1 tbsp brown sugar, 1.5 tbsp cornstarch, 125ml water, and 1 tsp sesame oil until smooth with no lumps.'] },
+            { summary: 'Steam the broccoli in a lidded pan with a splash of water until crisp-tender, then drain.', substeps: ['Steam the broccoli in a lidded pan with a splash of water until crisp-tender, then drain.'] },
+            { summary: 'Sear the beef in 2 tbsp oil over high heat in two batches until browned, then remove.', substeps: ['Sear the beef in 2 tbsp oil over high heat in two batches until browned, then remove.'] },
+            { summary: 'Stir-fry the garlic and ginger for 30 seconds, return the beef and broccoli, pour in the sauce, and toss until glossy. Divide rice across 4 containers and top.', substeps: ['Stir-fry the garlic and ginger for 30 seconds, return the beef and broccoli, pour in the sauce, and toss until glossy. Divide rice across 4 containers and top.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'One-Pan Stovetop',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 20,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
+    plates: [
+      {
+        id: 'standard',
+        display_name: 'Beef & Broccoli Stir-Fry',
+        description: 'Velveted lean beef and broccoli in a glossy brown sauce over jasmine rice — a fast one-pan stir-fry built for bulking. Makes 4 meal-prep portions.',
+        base_serving_multiplier: 1.0,
+        additional_ingredients: [],
+        additional_instructions: [],
+        assembly_time_minutes: 0,
+        plate_macros: { kcal: 777, protein_g: 55.7, carbs_g: 96.3, fat_g: 18.6, fiber_g: 4.7 },
       },
     ],
   },
-
   thai_basil_chicken: {
     slug: 'thai_basil_chicken',
     display_name: 'Thai Basil Chicken',
@@ -7949,6 +8097,110 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Cook the basil chicken and rice ahead; both reheat whole. (The fried-egg plate just adds an egg fried fresh on top.)',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The mince, rice, beans, oil — and the fresh garlic, chilli and basil, which ARE the dish and stay in every variant. Only the liquid seasoning is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'chicken_mince', base_amount: 800, unit: 'g', scaling: 'flex', notes: '200g/serve.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 360, unit: 'g', scaling: 'scales', notes: '90g dry/serve.' },
+      { ingredient_id: 'thai_basil_fresh', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Added at the end.' },
+      { ingredient_id: 'garlic_clove', base_amount: 6, unit: 'cloves', scaling: 'scales' },
+      { ingredient_id: 'red_chilli_fresh', base_amount: 20, unit: 'g', scaling: 'scales', notes: 'To taste.' },
+      { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales' },
+      { ingredient_id: 'green_beans', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Optional veg.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'bottle',
+        display_name: 'Bottled Stir-Fry Sauce',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default: a bottled oyster-style stir-fry sauce stands in for the oyster-soy-fish sauce mix. The fresh garlic, chilli and basil still do the heavy lifting.',
+        ingredients: [
+          {
+            ingredient_id: 'asian_stir_fry_sauce_bottled',
+            base_amount: 150,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Oyster-based all-purpose stir-fry sauce.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first. Roughly smash the garlic and chilli together — this pair IS the dish, so do not skip the fresh stuff.',
+              substeps: [
+                'Get the rice on first. Roughly smash the garlic and chilli together — this pair IS the dish, so do not skip the fresh stuff.',
+              ],
+            },
+            {
+              summary:
+                'Heat the oil in a wok over high heat. Fry the garlic and chilli for 30 seconds, then add the mince and sear hard, breaking it up, 4-5 minutes.',
+              substeps: [
+                'Heat the oil in a wok over high heat. Fry the garlic and chilli for 30 seconds, then add the mince and sear hard, breaking it up, 4-5 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Add the green beans and the stir-fry sauce and toss for 2 minutes. Kill the heat and fold the basil through — it wilts in seconds.',
+              substeps: [
+                'Add the green beans and the stir-fry sauce and toss for 2 minutes. Kill the heat and fold the basil through — it wilts in seconds.',
+              ],
+            },
+            {
+              summary:
+                'Serve over the rice.',
+              substeps: [
+                'Serve over the rice.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original seasoning mix: oyster sauce, soy, fish sauce and a little sugar.',
+        ingredients: [
+          { ingredient_id: 'oyster_sauce', base_amount: 60, unit: 'ml', scaling: 'scales' },
+          { ingredient_id: 'soy_sauce', base_amount: 40, unit: 'ml', scaling: 'scales' },
+          { ingredient_id: 'fish_sauce', base_amount: 20, unit: 'ml', scaling: 'scales' },
+          { ingredient_id: 'sugar_white', base_amount: 12, unit: 'g', scaling: 'scales' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Cook the jasmine rice.', substeps: ['Cook the jasmine rice and keep warm.'] },
+            { summary: 'Mix the sauce: oyster sauce, soy, fish sauce, sugar.', substeps: ['Stir together the oyster sauce, soy sauce, fish sauce, and sugar.'] },
+            { summary: 'Stir-fry garlic and chilli, then the chicken mince over high heat until browned.', substeps: ['Heat the oil in a wok over high heat.', 'Fry the garlic and chilli for a few seconds.', 'Add the chicken mince and stir-fry until browned and cooked through, adding the green beans for the last 2-3 minutes.'] },
+            { summary: 'Add the sauce, toss, then fold through the basil off the heat. Serve over rice.', substeps: ['Pour in the sauce and toss for a minute to coat.', 'Turn off the heat and fold through the Thai basil until just wilted.', 'Serve over the rice.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'Stir-Fry',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 20,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -7959,7 +8211,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 736, protein_g: 44, carbs_g: 84, fat_g: 25, fiber_g: 3 },
+        plate_macros: { kcal: 752, protein_g: 43.7, carbs_g: 88.2, fat_g: 24.2, fiber_g: 3.0 },
         image_filename: 'Thai Basil Chicken over Rice (standard).png',
         photo_url: undefined,
       },
@@ -7978,43 +8230,12 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Fry an egg per serve and set on top.', substeps: ['Fry an egg per serve in a little hot oil until the edges are crispy and the yolk still runs.', 'Set on top of the basil chicken and rice.'] },
         ],
         assembly_time_minutes: 4,
-        plate_macros: { kcal: 807, protein_g: 50, carbs_g: 84, fat_g: 29, fiber_g: 3 },
+        plate_macros: { kcal: 854, protein_g: 50.0, carbs_g: 88.5, fat_g: 32.5, fiber_g: 3.0 },
         image_filename: 'Thai Basil Chicken with Fried Egg (fried_egg).png',
         photo_url: undefined,
       },
     ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'Stir-Fry',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 15,
-        time_total_minutes: 25,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'chicken_mince', base_amount: 800, unit: 'g', scaling: 'flex', notes: '200g/serve.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 360, unit: 'g', scaling: 'scales', notes: '90g dry/serve.' },
-          { ingredient_id: 'thai_basil_fresh', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Added at the end.' },
-          { ingredient_id: 'garlic_clove', base_amount: 6, unit: 'cloves', scaling: 'scales' },
-          { ingredient_id: 'red_chilli_fresh', base_amount: 20, unit: 'g', scaling: 'scales', notes: 'To taste.' },
-          { ingredient_id: 'oyster_sauce', base_amount: 60, unit: 'ml', scaling: 'scales' },
-          { ingredient_id: 'soy_sauce', base_amount: 40, unit: 'ml', scaling: 'scales' },
-          { ingredient_id: 'fish_sauce', base_amount: 20, unit: 'ml', scaling: 'scales' },
-          { ingredient_id: 'sugar_white', base_amount: 12, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales' },
-          { ingredient_id: 'green_beans', base_amount: 200, unit: 'g', scaling: 'scales', notes: 'Optional veg.' },
-        ],
-        instructions: [
-          { summary: 'Cook the jasmine rice.', substeps: ['Cook the jasmine rice and keep warm.'] },
-          { summary: 'Mix the sauce: oyster sauce, soy, fish sauce, sugar.', substeps: ['Stir together the oyster sauce, soy sauce, fish sauce, and sugar.'] },
-          { summary: 'Stir-fry garlic and chilli, then the chicken mince over high heat until browned.', substeps: ['Heat the oil in a wok over high heat.', 'Fry the garlic and chilli for a few seconds.', 'Add the chicken mince and stir-fry until browned and cooked through, adding the green beans for the last 2-3 minutes.'] },
-          { summary: 'Add the sauce, toss, then fold through the basil off the heat. Serve over rice.', substeps: ['Pour in the sauce and toss for a minute to coat.', 'Turn off the heat and fold through the Thai basil until just wilted.', 'Serve over the rice.'] },
-        ],
-      },
-    ],
   },
-
   beef_bulgogi_bowl: {
     slug: 'beef_bulgogi_bowl',
     display_name: 'Beef Bulgogi Bowl',
@@ -8033,6 +8254,115 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Marinate and sear the beef and cook the rice ahead; both reheat. Spring onion and sesame on top.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The beef, rice, searing oil and garnish. The marinade is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'sirloin_steak', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Sliced thin against the grain; freeze ~1hr first for easier slicing. 200g per serving.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 370, unit: 'g', scaling: 'scales', notes: '2 cups uncooked.' },
+      { ingredient_id: 'sesame_seeds', base_amount: 9, unit: 'g', scaling: 'scales', notes: 'Half in marinade, half to garnish.' },
+      { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'For searing.' },
+      { ingredient_id: 'spring_onion', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Sliced, to garnish.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'bottle',
+        display_name: 'Bottled Marinade',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default: one bottle of Korean bulgogi marinade replaces the blitzed pear-soy marinade. Pour and sear — no marinating required.',
+        ingredients: [
+          {
+            ingredient_id: 'bulgogi_marinade_bottled',
+            base_amount: 240,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'One 240g bottle — Ottogi-style Korean BBQ bulgogi marinade.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first. Slice the beef as thinly as you can against the grain — 10 minutes in the freezer first makes this much easier.',
+              substeps: [
+                'Get the rice on first. Slice the beef as thinly as you can against the grain — 10 minutes in the freezer first makes this much easier.',
+              ],
+            },
+            {
+              summary:
+                'Toss the beef with the bulgogi marinade. It can go straight into the pan, or sit while the rice cooks for deeper flavour.',
+              substeps: [
+                'Toss the beef with the bulgogi marinade. It can go straight into the pan, or sit while the rice cooks for deeper flavour.',
+              ],
+            },
+            {
+              summary:
+                'Sear the beef in the oil in a ripping-hot pan in two or three batches, 2-3 minutes a batch, until caramelised at the edges.',
+              substeps: [
+                'Sear the beef in the oil in a ripping-hot pan in two or three batches, 2-3 minutes a batch, until caramelised at the edges.',
+              ],
+            },
+            {
+              summary:
+                'Serve over the rice, topped with the spring onion and sesame seeds.',
+              substeps: [
+                'Serve over the rice, topped with the spring onion and sesame seeds.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 10,
+        extra_total_minutes: 20,
+        skill_min: 2,
+        notes:
+          'The original marinade: soy, brown sugar, sesame oil and grated pear, onion and ginger — the fruit tenderises the beef. Worth a 30-minute marinate.',
+        ingredients: [
+          { ingredient_id: 'soy_sauce', base_amount: 60, unit: 'ml', scaling: 'scales', notes: 'Marinade.' },
+          { ingredient_id: 'brown_sugar', base_amount: 24, unit: 'g', scaling: 'scales', notes: 'Marinade; honey works too.' },
+          { ingredient_id: 'sesame_oil', base_amount: 15, unit: 'ml', scaling: 'scales', notes: 'Marinade.' },
+          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced, into marinade.' },
+          { ingredient_id: 'brown_onion', base_amount: 75, unit: 'g', scaling: 'scales', notes: 'Grated into the marinade.' },
+          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed', notes: 'Marinade.' },
+          { ingredient_id: 'pear', base_amount: 0.5, unit: 'count', scaling: 'scales', notes: 'Optional tenderiser, grated into marinade; or apple, or omit.' },
+          { ingredient_id: 'ginger_fresh', base_amount: 1, unit: 'tsp', scaling: 'scales', notes: 'Optional, grated into marinade.' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Slice the beef thinly against the grain (freezing it about 1 hour first makes this much easier).', substeps: ['Slice the beef thinly against the grain (freezing it about 1 hour first makes this much easier).'] },
+            { summary: 'Mix the marinade: soy sauce, brown sugar, sesame oil, minced garlic, grated onion, black pepper, and half the sesame seeds (plus grated pear and ginger if using).', substeps: ['Mix the marinade: soy sauce, brown sugar, sesame oil, minced garlic, grated onion, black pepper, and half the sesame seeds (plus grated pear and ginger if using).'] },
+            { summary: 'Toss the beef in the marinade and rest 30 minutes to overnight in the fridge.', substeps: ['Toss the beef in the marinade and rest 30 minutes to overnight in the fridge.'] },
+            { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
+            { summary: 'Sear the beef in a little olive oil in a hot pan, in batches so it caramelises rather than stews, for 2-3 minutes.', substeps: ['Sear the beef in a little olive oil in a hot pan, in batches so it caramelises rather than stews, for 2-3 minutes.'] },
+            { summary: 'Serve the beef over jasmine rice, garnished with spring onion and the remaining sesame seeds.', substeps: ['Serve the beef over jasmine rice, garnished with spring onion and the remaining sesame seeds.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'Marinate & Sear',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 25,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -8042,45 +8372,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 820, protein_g: 50, carbs_g: 96, fat_g: 22, fiber_g: 3 },
-      },
-    ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'Marinate & Sear',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 15,
-        time_total_minutes: 45,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'sirloin_steak', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Sliced thin against the grain; freeze ~1hr first for easier slicing. 200g per serving.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 370, unit: 'g', scaling: 'scales', notes: '2 cups uncooked.' },
-          { ingredient_id: 'soy_sauce', base_amount: 60, unit: 'ml', scaling: 'scales', notes: 'Marinade.' },
-          { ingredient_id: 'brown_sugar', base_amount: 24, unit: 'g', scaling: 'scales', notes: 'Marinade; honey works too.' },
-          { ingredient_id: 'sesame_oil', base_amount: 15, unit: 'ml', scaling: 'scales', notes: 'Marinade.' },
-          { ingredient_id: 'garlic_clove', base_amount: 4, unit: 'cloves', scaling: 'scales', notes: 'Minced, into marinade.' },
-          { ingredient_id: 'brown_onion', base_amount: 75, unit: 'g', scaling: 'scales', notes: 'Grated into the marinade.' },
-          { ingredient_id: 'black_pepper_ground', base_amount: 0.5, unit: 'tsp', scaling: 'fixed', notes: 'Marinade.' },
-          { ingredient_id: 'sesame_seeds', base_amount: 9, unit: 'g', scaling: 'scales', notes: 'Half in marinade, half to garnish.' },
-          { ingredient_id: 'pear', base_amount: 0.5, unit: 'count', scaling: 'scales', notes: 'Optional tenderiser, grated into marinade; or apple, or omit.' },
-          { ingredient_id: 'ginger_fresh', base_amount: 1, unit: 'tsp', scaling: 'scales', notes: 'Optional, grated into marinade.' },
-          { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'For searing.' },
-          { ingredient_id: 'spring_onion', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Sliced, to garnish.' },
-        ],
-        instructions: [
-          { summary: 'Slice the beef thinly against the grain (freezing it about 1 hour first makes this much easier).', substeps: ['Slice the beef thinly against the grain (freezing it about 1 hour first makes this much easier).'] },
-          { summary: 'Mix the marinade: soy sauce, brown sugar, sesame oil, minced garlic, grated onion, black pepper, and half the sesame seeds (plus grated pear and ginger if using).', substeps: ['Mix the marinade: soy sauce, brown sugar, sesame oil, minced garlic, grated onion, black pepper, and half the sesame seeds (plus grated pear and ginger if using).'] },
-          { summary: 'Toss the beef in the marinade and rest 30 minutes to overnight in the fridge.', substeps: ['Toss the beef in the marinade and rest 30 minutes to overnight in the fridge.'] },
-          { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
-          { summary: 'Sear the beef in a little olive oil in a hot pan, in batches so it caramelises rather than stews, for 2-3 minutes.', substeps: ['Sear the beef in a little olive oil in a hot pan, in batches so it caramelises rather than stews, for 2-3 minutes.'] },
-          { summary: 'Serve the beef over jasmine rice, garnished with spring onion and the remaining sesame seeds.', substeps: ['Serve the beef over jasmine rice, garnished with spring onion and the remaining sesame seeds.'] },
-        ],
+        plate_macros: { kcal: 743, protein_g: 52.7, carbs_g: 95.9, fat_g: 15.7, fiber_g: 1.9 },
       },
     ],
   },
-
   spaghetti_carbonara: {
     slug: 'spaghetti_carbonara',
     display_name: 'Spaghetti Carbonara',
@@ -8475,6 +8770,115 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Cook the chicken in the satay sauce and the rice ahead; reheats whole. Crushed peanuts and coriander on top.',
       storage: { fridge_days: 4, freeze_months: 3 },
     },
+
+    // The chicken, rice, onion and lime. The satay sauce is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'chicken_thigh_skinless', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Default cut (juicier). Swap chicken_breast for leaner/lower-fat. 200g per serving. Sliced.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'About 75g dry per serve.' },
+      { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Sliced, charred into the sauce.' },
+      { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'For searing.' },
+      { ingredient_id: 'lime', base_amount: 1, unit: 'count', scaling: 'scales', notes: 'To finish.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'jar',
+        display_name: 'Jar Satay Sauce',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default: two jars of satay simmer sauce replace the peanut butter-coconut build. Generous on purpose — satay should be saucy.',
+        ingredients: [
+          {
+            ingredient_id: 'satay_simmer_sauce_jar',
+            base_amount: 500,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'Two 250ml jars or cans — Ayam-style peanut satay sauce.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first. Cut the thighs into bite-size pieces.',
+              substeps: [
+                'Get the rice on first. Cut the thighs into bite-size pieces.',
+              ],
+            },
+            {
+              summary:
+                'Brown the chicken and onion in the oil in a large pan over medium-high heat, 5-6 minutes.',
+              substeps: [
+                'Brown the chicken and onion in the oil in a large pan over medium-high heat, 5-6 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Pour in the satay sauce, cover, and simmer 8-10 minutes until the chicken is cooked through and the sauce has thickened. Add a splash of water if it gets too thick.',
+              substeps: [
+                'Pour in the satay sauce, cover, and simmer 8-10 minutes until the chicken is cooked through and the sauce has thickened. Add a splash of water if it gets too thick.',
+              ],
+            },
+            {
+              summary:
+                'Serve over the rice with the lime in wedges for squeezing.',
+              substeps: [
+                'Serve over the rice with the lime in wedges for squeezing.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        extra_total_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original sauce built from natural peanut butter, coconut milk, soy and curry powder.',
+        ingredients: [
+          { ingredient_id: 'peanut_butter_natural', base_amount: 80, unit: 'g', scaling: 'scales', notes: 'Smooth natural; base of the sauce. Fat-dense — counts a lot.' },
+          { ingredient_id: 'coconut_milk', base_amount: 150, unit: 'ml', scaling: 'scales', notes: 'Full-fat canned; about a third of a 400ml can. Fat-dense.' },
+          { ingredient_id: 'soy_sauce', base_amount: 45, unit: 'ml', scaling: 'scales', notes: '~1 tbsp to velvet + ~2 tbsp in the sauce.' },
+          { ingredient_id: 'brown_sugar', base_amount: 18, unit: 'g', scaling: 'scales', notes: 'Balances the sauce.' },
+          { ingredient_id: 'curry_powder', base_amount: 3, unit: 'tsp', scaling: 'scales', notes: 'KEY — the Chinese-restaurant satay flavour. Do not omit.' },
+          { ingredient_id: 'garlic_clove', base_amount: 3, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
+          { ingredient_id: 'cornstarch', base_amount: 6, unit: 'g', scaling: 'scales', notes: 'For velveting the chicken.' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
+            { summary: 'Velvet the sliced chicken: toss with about 1 tbsp soy sauce and the cornstarch, then rest while you prep.', substeps: ['Velvet the sliced chicken: toss with about 1 tbsp soy sauce and the cornstarch, then rest while you prep.'] },
+            { summary: 'Mix the satay sauce: peanut butter, coconut milk, the remaining soy, brown sugar, curry powder, and a splash of water until smooth.', substeps: ['Mix the satay sauce: peanut butter, coconut milk, the remaining soy, brown sugar, curry powder, and a splash of water until smooth.'] },
+            { summary: 'Sear the chicken in a hot pan or wok until browned, then remove.', substeps: ['Sear the chicken in a hot pan or wok until browned, then remove.'] },
+            { summary: 'Char the onion and garlic in the same pan until soft with golden edges.', substeps: ['Char the onion and garlic in the same pan until soft with golden edges.'] },
+            { summary: 'Return the chicken, pour in the sauce, and simmer until glossy and clinging; finish with a squeeze of lime.', substeps: ['Return the chicken, pour in the sauce, and simmer until glossy and clinging; finish with a squeeze of lime.'] },
+            { summary: 'Serve over the jasmine rice, garnished with crushed peanuts and coriander.', substeps: ['Serve over the jasmine rice, garnished with crushed peanuts and coriander.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'One-Pan Stir-Fry',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 15,
+        time_total_minutes: 25,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -8484,41 +8888,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 919, protein_g: 50, carbs_g: 79, fat_g: 45, fiber_g: 4 },
-      },
-    ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'One-Pan Stir-Fry',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 20,
-        time_total_minutes: 30,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'chicken_thigh_skinless', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Default cut (juicier). Swap chicken_breast for leaner/lower-fat. 200g per serving. Sliced.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 300, unit: 'g', scaling: 'scales', notes: 'About 75g dry per serve.' },
-          { ingredient_id: 'peanut_butter_natural', base_amount: 80, unit: 'g', scaling: 'scales', notes: 'Smooth natural; base of the sauce. Fat-dense — counts a lot.' },
-          { ingredient_id: 'coconut_milk', base_amount: 150, unit: 'ml', scaling: 'scales', notes: 'Full-fat canned; about a third of a 400ml can. Fat-dense.' },
-          { ingredient_id: 'soy_sauce', base_amount: 45, unit: 'ml', scaling: 'scales', notes: '~1 tbsp to velvet + ~2 tbsp in the sauce.' },
-          { ingredient_id: 'brown_sugar', base_amount: 18, unit: 'g', scaling: 'scales', notes: 'Balances the sauce.' },
-          { ingredient_id: 'curry_powder', base_amount: 3, unit: 'tsp', scaling: 'scales', notes: 'KEY — the Chinese-restaurant satay flavour. Do not omit.' },
-          { ingredient_id: 'garlic_clove', base_amount: 3, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
-          { ingredient_id: 'brown_onion', base_amount: 150, unit: 'g', scaling: 'scales', notes: 'Sliced, charred into the sauce.' },
-          { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'For searing.' },
-          { ingredient_id: 'cornstarch', base_amount: 6, unit: 'g', scaling: 'scales', notes: 'For velveting the chicken.' },
-          { ingredient_id: 'lime', base_amount: 1, unit: 'count', scaling: 'scales', notes: 'To finish.' },
-        ],
-        instructions: [
-          { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
-          { summary: 'Velvet the sliced chicken: toss with about 1 tbsp soy sauce and the cornstarch, then rest while you prep.', substeps: ['Velvet the sliced chicken: toss with about 1 tbsp soy sauce and the cornstarch, then rest while you prep.'] },
-          { summary: 'Mix the satay sauce: peanut butter, coconut milk, the remaining soy, brown sugar, curry powder, and a splash of water until smooth.', substeps: ['Mix the satay sauce: peanut butter, coconut milk, the remaining soy, brown sugar, curry powder, and a splash of water until smooth.'] },
-          { summary: 'Sear the chicken in a hot pan or wok until browned, then remove.', substeps: ['Sear the chicken in a hot pan or wok until browned, then remove.'] },
-          { summary: 'Char the onion and garlic in the same pan until soft with golden edges.', substeps: ['Char the onion and garlic in the same pan until soft with golden edges.'] },
-          { summary: 'Return the chicken, pour in the sauce, and simmer until glossy and clinging; finish with a squeeze of lime.', substeps: ['Return the chicken, pour in the sauce, and simmer until glossy and clinging; finish with a squeeze of lime.'] },
-          { summary: 'Serve over the jasmine rice, garnished with crushed peanuts and coriander.', substeps: ['Serve over the jasmine rice, garnished with crushed peanuts and coriander.'] },
-        ],
+        plate_macros: { kcal: 879, protein_g: 51.3, carbs_g: 86.8, fat_g: 35.5, fiber_g: 4.3 },
       },
     ],
   },
@@ -8540,6 +8910,113 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Cook the chicken, glaze and rice ahead; reheats whole. Chicken softens slightly on reheat.',
       storage: { fridge_days: 4 },
     },
+
+    // The chicken, rice, crispy cornstarch coating, oil and garnish. The glaze is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'chicken_breast', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Breast (leaner, fits the lighter version) or thigh. Bite-size. 200g per serving.' },
+      { ingredient_id: 'jasmine_rice', base_amount: 370, unit: 'g', scaling: 'scales', notes: '2 cups uncooked.' },
+      { ingredient_id: 'cornstarch', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Most to coat the chicken + a little for the glaze slurry.' },
+      { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'Shallow-fry; most drains off (only ~20g retained in macros).' },
+      { ingredient_id: 'sesame_seeds', base_amount: 9, unit: 'g', scaling: 'scales', notes: 'Garnish.' },
+      { ingredient_id: 'spring_onion', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Garnish.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'bottle',
+        display_name: 'Bottled Marinade',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 2,
+        notes:
+          'The weeknight default: honey-soy-garlic marinade straight from the bottle as the glaze. Just over half a 375g bottle — the honey soy salmon noodles use the rest.',
+        ingredients: [
+          {
+            ingredient_id: 'honey_soy_garlic_marinade',
+            base_amount: 200,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'MasterFoods-style soy, honey & garlic marinade.',
+          },
+        ],
+        instructions: {
+          stovetop: [
+            {
+              summary:
+                'Get the rice on first. Cut the chicken into bite-size pieces and toss them in the cornstarch until evenly coated.',
+              substeps: [
+                'Get the rice on first. Cut the chicken into bite-size pieces and toss them in the cornstarch until evenly coated.',
+              ],
+            },
+            {
+              summary:
+                'Pan-fry the chicken in the oil over medium-high heat until golden and crisp all over, 6-8 minutes.',
+              substeps: [
+                'Pan-fry the chicken in the oil over medium-high heat until golden and crisp all over, 6-8 minutes.',
+              ],
+            },
+            {
+              summary:
+                'Pour in the marinade and let it bubble for 1-2 minutes — the cornstarch on the chicken thickens it into a glaze fast, so keep it moving.',
+              substeps: [
+                'Pour in the marinade and let it bubble for 1-2 minutes — the cornstarch on the chicken thickens it into a glaze fast, so keep it moving.',
+              ],
+            },
+            {
+              summary:
+                'Serve over the rice, topped with the sesame seeds and spring onion.',
+              substeps: [
+                'Serve over the rice, topped with the sesame seeds and spring onion.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        extra_total_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original glaze whisked from honey, soy, rice vinegar, sesame oil and fresh garlic.',
+        ingredients: [
+          { ingredient_id: 'honey', base_amount: 90, unit: 'g', scaling: 'scales', notes: 'Glaze base — the main carb/sugar contributor; defining feature.' },
+          { ingredient_id: 'soy_sauce', base_amount: 45, unit: 'ml', scaling: 'scales' },
+          { ingredient_id: 'rice_vinegar', base_amount: 30, unit: 'ml', scaling: 'scales' },
+          { ingredient_id: 'sesame_oil', base_amount: 10, unit: 'ml', scaling: 'fixed' },
+          { ingredient_id: 'garlic_clove', base_amount: 3, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
+        ],
+        instructions: {
+          stovetop: [
+            { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
+            { summary: 'Toss the bite-size chicken in cornstarch with a pinch of salt to coat.', substeps: ['Toss the bite-size chicken in cornstarch with a pinch of salt to coat.'] },
+            { summary: 'Shallow-fry / pan-crisp the chicken in oil over medium-high until golden and cooked through, then drain.', substeps: ['Shallow-fry / pan-crisp the chicken in oil over medium-high until golden and cooked through, then drain.'] },
+            { summary: 'Make the glaze: simmer honey, soy, rice vinegar, sesame oil, garlic, and a cornstarch slurry until glossy and thickened.', substeps: ['Make the glaze: simmer honey, soy, rice vinegar, sesame oil, garlic, and a cornstarch slurry until glossy and thickened.'] },
+            { summary: 'Toss the crispy chicken through the glaze just before serving to keep it crisper.', substeps: ['Toss the crispy chicken through the glaze just before serving to keep it crisper.'] },
+            { summary: 'Serve over rice, garnished with sesame seeds and spring onion.', substeps: ['Serve over rice, garnished with sesame seeds and spring onion.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'stovetop',
+        display_name: 'Pan-Fried (lighter)',
+        equipment_required: ['stovetop'],
+        time_active_minutes: 20,
+        time_total_minutes: 25,
+        skill_min: 2,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -8549,39 +9026,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 786, protein_g: 54, carbs_g: 104, fat_g: 15, fiber_g: 2 },
-      },
-    ],
-    methods: [
-      {
-        id: 'stovetop',
-        display_name: 'Pan-Fried (lighter)',
-        equipment_required: ['stovetop'],
-        time_active_minutes: 25,
-        time_total_minutes: 30,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'chicken_breast', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Breast (leaner, fits the lighter version) or thigh. Bite-size. 200g per serving.' },
-          { ingredient_id: 'jasmine_rice', base_amount: 370, unit: 'g', scaling: 'scales', notes: '2 cups uncooked.' },
-          { ingredient_id: 'cornstarch', base_amount: 40, unit: 'g', scaling: 'scales', notes: 'Most to coat the chicken + a little for the glaze slurry.' },
-          { ingredient_id: 'olive_oil', base_amount: 28, unit: 'g', scaling: 'scales', notes: 'Shallow-fry; most drains off (only ~20g retained in macros).' },
-          { ingredient_id: 'honey', base_amount: 90, unit: 'g', scaling: 'scales', notes: 'Glaze base — the main carb/sugar contributor; defining feature.' },
-          { ingredient_id: 'soy_sauce', base_amount: 45, unit: 'ml', scaling: 'scales' },
-          { ingredient_id: 'rice_vinegar', base_amount: 30, unit: 'ml', scaling: 'scales' },
-          { ingredient_id: 'sesame_oil', base_amount: 10, unit: 'ml', scaling: 'fixed' },
-          { ingredient_id: 'garlic_clove', base_amount: 3, unit: 'cloves', scaling: 'scales', notes: 'Minced.' },
-          { ingredient_id: 'sesame_seeds', base_amount: 9, unit: 'g', scaling: 'scales', notes: 'Garnish.' },
-          { ingredient_id: 'spring_onion', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Garnish.' },
-        ],
-        instructions: [
-          { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
-          { summary: 'Toss the bite-size chicken in cornstarch with a pinch of salt to coat.', substeps: ['Toss the bite-size chicken in cornstarch with a pinch of salt to coat.'] },
-          { summary: 'Shallow-fry / pan-crisp the chicken in oil over medium-high until golden and cooked through, then drain.', substeps: ['Shallow-fry / pan-crisp the chicken in oil over medium-high until golden and cooked through, then drain.'] },
-          { summary: 'Make the glaze: simmer honey, soy, rice vinegar, sesame oil, garlic, and a cornstarch slurry until glossy and thickened.', substeps: ['Make the glaze: simmer honey, soy, rice vinegar, sesame oil, garlic, and a cornstarch slurry until glossy and thickened.'] },
-          { summary: 'Toss the crispy chicken through the glaze just before serving to keep it crisper.', substeps: ['Toss the crispy chicken through the glaze just before serving to keep it crisper.'] },
-          { summary: 'Serve over rice, garnished with sesame seeds and spring onion.', substeps: ['Serve over rice, garnished with sesame seeds and spring onion.'] },
-        ],
+        plate_macros: { kcal: 765, protein_g: 52.2, carbs_g: 101.5, fat_g: 14.0, fiber_g: 1.8 },
       },
     ],
   },
@@ -9042,6 +9487,112 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
       prep_note: 'Cook the salmon, noodles and broccoli ahead and divide into containers. Sesame and spring onion on top.',
       storage: { fridge_days: 3 },
     },
+
+    // The salmon, noodles, broccoli and garnish. The honey-soy glaze is the toggle.
+    base_ingredients: [
+      { ingredient_id: 'salmon_fillet', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Skin off, cubed or whole. 200g per serving.' },
+      { ingredient_id: 'noodles', base_amount: 280, unit: 'g', scaling: 'scales', notes: '70g dry per serve; egg/soba/udon/rice — any noodle works.' },
+      { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'For roasting/searing. ~1 tbsp.' },
+      { ingredient_id: 'broccoli', base_amount: 400, unit: 'g', scaling: 'scales', notes: 'Roasted alongside; snap peas/brussels swap in.' },
+      { ingredient_id: 'sesame_seeds', base_amount: 6, unit: 'g', scaling: 'fixed', notes: 'Garnish.' },
+      { ingredient_id: 'spring_onion', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Garnish, sliced.' },
+    ],
+
+    sauce_variants: [
+      {
+        id: 'bottle',
+        display_name: 'Bottled Marinade',
+        shortcut_level: 'shortcut',
+        is_default: true,
+        extra_active_minutes: 0,
+        skill_min: 1,
+        notes:
+          'The weeknight default: honey-soy-garlic marinade straight over the tray — the rest of the honey chicken bottle.',
+        ingredients: [
+          {
+            ingredient_id: 'honey_soy_garlic_marinade',
+            base_amount: 175,
+            unit: 'g',
+            scaling: 'scales',
+            notes: 'MasterFoods-style soy, honey & garlic marinade.',
+          },
+        ],
+        instructions: {
+          oven: [
+            {
+              summary:
+                'Preheat the oven to 200°C (180°C fan-forced) and get the noodles on per the packet.',
+              substeps: [
+                'Preheat the oven to 200°C (180°C fan-forced) and get the noodles on per the packet.',
+              ],
+            },
+            {
+              summary:
+                'Put the salmon and broccoli on a lined tray. Pour the marinade over the salmon and a little over the broccoli.',
+              substeps: [
+                'Put the salmon and broccoli on a lined tray. Pour the marinade over the salmon and a little over the broccoli.',
+              ],
+            },
+            {
+              summary:
+                'Roast for 12-14 minutes, until the salmon just flakes.',
+              substeps: [
+                'Roast for 12-14 minutes, until the salmon just flakes.',
+              ],
+            },
+            {
+              summary:
+                'Toss the noodles through the tray juices, then top with the salmon, broccoli, sesame seeds and spring onion.',
+              substeps: [
+                'Toss the noodles through the tray juices, then top with the salmon, broccoli, sesame seeds and spring onion.',
+              ],
+            },
+          ],
+        },
+      },
+      {
+        id: 'scratch',
+        display_name: 'From Scratch',
+        shortcut_level: 'scratch',
+        extra_active_minutes: 5,
+        extra_total_minutes: 5,
+        skill_min: 2,
+        notes:
+          'The original glaze whisked from honey, soy, fresh garlic and ginger, sesame oil and rice vinegar.',
+        ingredients: [
+          { ingredient_id: 'honey', base_amount: 80, unit: 'g', scaling: 'scales', notes: 'Glaze; main carb driver.' },
+          { ingredient_id: 'soy_sauce', base_amount: 60, unit: 'ml', scaling: 'scales', notes: 'Glaze.' },
+          { ingredient_id: 'garlic_clove', base_amount: 3, unit: 'cloves', scaling: 'scales', notes: 'Glaze, minced.' },
+          { ingredient_id: 'ginger_fresh', base_amount: 3, unit: 'tsp', scaling: 'scales', notes: 'Glaze, grated. ~1 tbsp.' },
+          { ingredient_id: 'sesame_oil', base_amount: 10, unit: 'ml', scaling: 'fixed', notes: 'Glaze + noodles. ~2 tsp.' },
+          { ingredient_id: 'rice_vinegar', base_amount: 30, unit: 'ml', scaling: 'scales', notes: 'Splash in the glaze. ~2 tbsp.' },
+        ],
+        instructions: {
+          oven: [
+            { summary: 'Make the glaze: honey, soy, garlic, ginger, sesame oil, and a splash of rice vinegar.', substeps: ['Make the glaze: honey, soy, garlic, ginger, sesame oil, and a splash of rice vinegar.'] },
+            { summary: 'Toss the salmon in some glaze and roast on a sheet pan about 12-14 minutes at 200°C (or pan-sear), basting with more glaze partway. Roast the broccoli alongside.', substeps: ['Toss the salmon in some glaze and roast on a sheet pan about 12-14 minutes at 200°C (or pan-sear), basting with more glaze partway. Roast the broccoli alongside.'] },
+            { summary: 'Cook the noodles, then toss with a little sesame oil and the remaining glaze.', substeps: ['Cook the noodles, then toss with a little sesame oil and the remaining glaze.'] },
+            { summary: 'Build the bowl: noodles, salmon, broccoli; garnish with sesame seeds and spring onion.', substeps: ['Build the bowl: noodles, salmon, broccoli; garnish with sesame seeds and spring onion.'] },
+          ],
+        },
+      },
+    ],
+
+    // Methods are metadata only on template meals — steps live on the variants.
+    methods: [
+      {
+        id: 'oven',
+        display_name: 'Sheet-Pan or Pan-Sear',
+        equipment_required: ['oven'],
+        time_active_minutes: 12,
+        time_total_minutes: 25,
+        skill_min: 1,
+        shortcut_level: 'shortcut',
+        ingredients: [],
+        instructions: [],
+      },
+    ],
+
     plates: [
       {
         id: 'standard',
@@ -9051,42 +9602,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 820, protein_g: 53, carbs_g: 75, fat_g: 33, fiber_g: 5 },
-      },
-    ],
-    methods: [
-      {
-        id: 'oven',
-        display_name: 'Sheet-Pan or Pan-Sear',
-        equipment_required: ['oven'],
-        time_active_minutes: 12,
-        time_total_minutes: 25,
-        skill_min: 2,
-        shortcut_level: 'scratch',
-        ingredients: [
-          { ingredient_id: 'salmon_fillet', base_amount: 800, unit: 'g', scaling: 'flex', notes: 'Skin off, cubed or whole. 200g per serving.' },
-          { ingredient_id: 'noodles', base_amount: 280, unit: 'g', scaling: 'scales', notes: '70g dry per serve; egg/soba/udon/rice — any noodle works.' },
-          { ingredient_id: 'honey', base_amount: 80, unit: 'g', scaling: 'scales', notes: 'Glaze; main carb driver.' },
-          { ingredient_id: 'soy_sauce', base_amount: 60, unit: 'ml', scaling: 'scales', notes: 'Glaze.' },
-          { ingredient_id: 'garlic_clove', base_amount: 3, unit: 'cloves', scaling: 'scales', notes: 'Glaze, minced.' },
-          { ingredient_id: 'ginger_fresh', base_amount: 3, unit: 'tsp', scaling: 'scales', notes: 'Glaze, grated. ~1 tbsp.' },
-          { ingredient_id: 'sesame_oil', base_amount: 10, unit: 'ml', scaling: 'fixed', notes: 'Glaze + noodles. ~2 tsp.' },
-          { ingredient_id: 'olive_oil', base_amount: 14, unit: 'g', scaling: 'scales', notes: 'For roasting/searing. ~1 tbsp.' },
-          { ingredient_id: 'broccoli', base_amount: 400, unit: 'g', scaling: 'scales', notes: 'Roasted alongside; snap peas/brussels swap in.' },
-          { ingredient_id: 'rice_vinegar', base_amount: 30, unit: 'ml', scaling: 'scales', notes: 'Splash in the glaze. ~2 tbsp.' },
-          { ingredient_id: 'sesame_seeds', base_amount: 6, unit: 'g', scaling: 'fixed', notes: 'Garnish.' },
-          { ingredient_id: 'spring_onion', base_amount: 2, unit: 'count', scaling: 'scales', notes: 'Garnish, sliced.' },
-        ],
-        instructions: [
-          { summary: 'Make the glaze: honey, soy, garlic, ginger, sesame oil, and a splash of rice vinegar.', substeps: ['Make the glaze: honey, soy, garlic, ginger, sesame oil, and a splash of rice vinegar.'] },
-          { summary: 'Toss the salmon in some glaze and roast on a sheet pan about 12-14 minutes at 200°C (or pan-sear), basting with more glaze partway. Roast the broccoli alongside.', substeps: ['Toss the salmon in some glaze and roast on a sheet pan about 12-14 minutes at 200°C (or pan-sear), basting with more glaze partway. Roast the broccoli alongside.'] },
-          { summary: 'Cook the noodles, then toss with a little sesame oil and the remaining glaze.', substeps: ['Cook the noodles, then toss with a little sesame oil and the remaining glaze.'] },
-          { summary: 'Build the bowl: noodles, salmon, broccoli; garnish with sesame seeds and spring onion.', substeps: ['Build the bowl: noodles, salmon, broccoli; garnish with sesame seeds and spring onion.'] },
-        ],
+        plate_macros: { kcal: 800, protein_g: 51.8, carbs_g: 73.0, fat_g: 32.9, fiber_g: 5.1 },
       },
     ],
   },
-
   carne_asada_bowl: {
     slug: 'carne_asada_bowl',
     display_name: 'Carne Asada Bowl',
