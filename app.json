@@ -31,7 +31,7 @@
         "CFBundleName": "JSON.fit",
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true,
-        "LSSupportsOpeningDocumentsInPlace": false,
+        "LSSupportsOpeningDocumentsInPlace": true,
         "CFBundleDocumentTypes": [
           {
             "CFBundleTypeName": "JSON.fit Program",
