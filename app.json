@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "120",
+      "buildNumber": "121",
       "associatedDomains": [
         "applinks:json.fit"
       ],
