@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "121",
+      "buildNumber": "122",
       "associatedDomains": [
         "applinks:json.fit"
       ],
@@ -31,7 +31,7 @@
         "CFBundleName": "JSON.fit",
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true,
-        "LSSupportsOpeningDocumentsInPlace": false,
+        "LSSupportsOpeningDocumentsInPlace": true,
         "CFBundleDocumentTypes": [
           {
             "CFBundleTypeName": "JSON.fit Program",
@@ -75,7 +75,7 @@
         "backgroundColor": "#0f0f0f"
       },
       "package": "com.RyanNovinc.JSON",
-      "versionCode": 96,
+      "versionCode": 97,
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,
