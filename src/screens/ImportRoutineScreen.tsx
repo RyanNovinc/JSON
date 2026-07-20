@@ -206,7 +206,15 @@ export default function ImportRoutineScreen() {
           // query parsing, undoing toCanonicalUrl's encode). Do NOT decode again.
           const text = await new File(fileUri).text();
           console.log('📂 [FILE IMPORT] Read', text.length, 'chars');
-          processWorkoutData(text);
+          // Validation runs ~800ms later inside processWorkoutData; on the
+          // deep-link path its in-screen error view can't be relied on (this
+          // instance may be gone by then), so surface failures via an Alert.
+          processWorkoutData(text, () => {
+            Alert.alert(
+              "This file isn't a valid JSON.fit program",
+              "It looks incomplete or isn't a JSON.fit export. Re-generate or re-download your program, then open the file again.",
+            );
+          });
         } catch (e) {
           console.error('📂 [FILE IMPORT] Read failed:', e);
           Alert.alert('Import failed',
@@ -973,7 +981,15 @@ export default function ImportRoutineScreen() {
     }
   };
 
-  const processWorkoutData = async (text: string) => {
+  // onFailure fires whenever the import does NOT produce a program (validation
+  // rejected, merge failed, or an unexpected error). The picker path leaves it
+  // undefined and relies on the in-screen errorMessage view (it stays mounted and
+  // focused). The file-open/deep-link path passes one, because its transient
+  // ImportRoutine instance can be superseded before the ~800ms-deferred
+  // setErrorMessage renders, leaving the user on Home with no feedback — so it
+  // surfaces the failure via an Alert instead, which the OS draws over whatever is
+  // on screen.
+  const processWorkoutData = async (text: string, onFailure?: () => void) => {
     console.log('⚙️ [PROCESS WORKOUT] Starting processWorkoutData');
     console.log('⚙️ [PROCESS WORKOUT] Text length:', text.length);
     console.log('⚙️ [PROCESS WORKOUT] Text sample:', text.substring(0, 200) + '...');
@@ -1065,16 +1081,19 @@ export default function ImportRoutineScreen() {
           // Reset accumulated programs on error
           setAccumulatedPrograms([]);
           console.log('⚙️ [PROCESS WORKOUT] Reset accumulated programs due to merge error');
+          onFailure?.();
         }
       } else {
         console.error('⚙️ [PROCESS WORKOUT] Program validation failed - no program returned from validateAndParseJSON');
+        onFailure?.();
       }
-      
+
       } catch (outerError) {
         console.error('⚙️ [PROCESS WORKOUT] Outer try-catch error:', outerError);
         console.error('⚙️ [PROCESS WORKOUT] Outer error stack:', outerError?.stack);
         setIsLoading(false);
         setErrorMessage('Failed to process workout data: ' + (outerError?.message || 'Unknown error'));
+        onFailure?.();
       }
     }, 800);
   };
