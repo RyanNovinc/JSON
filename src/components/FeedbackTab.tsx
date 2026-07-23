@@ -38,6 +38,17 @@ interface FeedbackModalProps {
   onClose: () => void;
 }
 
+// The native review prompt is a system alert. Asking for it while the page sheet
+// is still up puts it on top of a sheet that is about to slide away — so the
+// sheet goes first and the prompt follows, with a beat after the dismissal lands
+// so the two animations don't collide.
+const REVIEW_PROMPT_DELAY_MS = 400;
+
+// Modal's onDismiss is iOS-only — see "OnDismiss is implemented on iOS only" in
+// react-native/Libraries/Modal/Modal.js. Android gets no such callback, so we
+// approximate the end of the slide-out before starting the delay above.
+const ANDROID_DISMISS_MS = 300;
+
 /**
  * FeedbackModal — same form/internals as the original FeedbackTab.
  *
@@ -73,6 +84,34 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
 
   const successOpacity = useRef(new Animated.Value(0)).current;
 
+  // Set by handleRatingSubmit, consumed once the sheet is actually gone.
+  const pendingReviewRef = useRef(false);
+  const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (reviewTimerRef.current) clearTimeout(reviewTimerRef.current);
+  }, []);
+
+  // Runs once the page sheet has finished dismissing. Silent on failure; the OS
+  // decides whether a dialog actually appears. Skipped if the user has already
+  // tapped through to the store from a manual rate link.
+  const handleDismissed = () => {
+    if (!pendingReviewRef.current) return;
+    pendingReviewRef.current = false;
+    if (reviewTimerRef.current) clearTimeout(reviewTimerRef.current);
+    reviewTimerRef.current = setTimeout(async () => {
+      reviewTimerRef.current = null;
+      try {
+        if (!(await hasRatingEngaged()) && (await StoreReview.isAvailableAsync())) {
+          await markReviewAttempt();
+          await StoreReview.requestReview();
+        }
+      } catch {
+        // no-op
+      }
+    }, REVIEW_PROMPT_DELAY_MS);
+  };
+
   // Reset form state every time the modal closes — was previously done
   // inside the closePanel animation callback.
   const resetForm = () => {
@@ -86,6 +125,11 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   const handleClose = () => {
     Keyboard.dismiss();
     onClose();
+    // iOS routes this through Modal's onDismiss instead, which knows when the
+    // sheet has really gone.
+    if (Platform.OS !== 'ios') {
+      reviewTimerRef.current = setTimeout(handleDismissed, ANDROID_DISMISS_MS);
+    }
     // Reset after a tick so the close animation looks clean (otherwise
     // the form snaps back to the rating tab while still visible)
     setTimeout(resetForm, 300);
@@ -135,17 +179,10 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
       return;
     }
 
-    // Native review flow — same for every score. Skipped only if the user has
-    // already tapped through to the store from a manual rate link. Silent on
-    // failure; the OS decides whether a dialog actually appears.
-    try {
-      if (!(await hasRatingEngaged()) && (await StoreReview.isAvailableAsync())) {
-        await markReviewAttempt();
-        await StoreReview.requestReview();
-      }
-    } catch {
-      // no-op
-    }
+    // Native review flow — same for every score. Queued rather than fired here:
+    // showInlineSuccess still has the sheet up for another 1.6s, so the actual
+    // request happens in handleDismissed once the sheet is off screen.
+    pendingReviewRef.current = true;
 
     showInlineSuccess('rating');
   };
@@ -198,6 +235,7 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
+      onDismiss={handleDismissed}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
