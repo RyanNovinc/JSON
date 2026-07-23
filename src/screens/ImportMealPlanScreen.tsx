@@ -31,8 +31,6 @@ import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningCon
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
-import NutritionGeneratorStep1 from '../components/NutritionGeneratorStep1';
-import NutritionGeneratorStep4 from '../components/NutritionGeneratorStep4';
 import NutritionGeneratorStep1New from '../components/NutritionGeneratorStep1New';
 import { Analytics } from '../services/analytics';
 

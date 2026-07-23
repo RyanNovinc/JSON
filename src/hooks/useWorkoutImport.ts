@@ -78,7 +78,6 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
   const [accumulatedPrograms, setAccumulatedPrograms] = useState<WorkoutProgram[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showAddMoreMode, setShowAddMoreMode] = useState(false);
-  const [showStep1New, setShowStep1New] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showInfo, setShowInfo] = useState(false);
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
