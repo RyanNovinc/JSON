@@ -32,6 +32,7 @@ import { clampCookPortions } from '../utils/cookPortions';
 import { displayIngredient } from '../utils/ingredientScaling';
 import { resolveBaseIngredients, resolveMealInstructions } from '../utils/resolveMealIngredients';
 import { computePlateMacros } from '../utils/computeMacros';
+import { getVariantChoices, setVariantChoice } from '../utils/variantChoices';
 
 type RecipeDetailRoute = RouteProp<RootStackParamList, 'RecipeDetail'>;
 type RecipeDetailNav = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
@@ -200,6 +201,22 @@ export default function RecipeDetailScreen() {
         active = false;
       };
     }, [mealSlug, selectedPlateIndex])
+  );
+
+  // MAKE IT choice is global (shared with the shopping list): load any stored
+  // deviation on focus; deviations are persisted on toggle below. Absence in
+  // storage means the easy default.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getVariantChoices().then(choices => {
+        const stored = choices[mealSlug];
+        if (active && stored && variants.some(v => v.id === stored)) {
+          setSelectedVariantId(stored);
+        }
+      });
+      return () => { active = false; };
+    }, [mealSlug])
   );
 
   const imageSource = useMemo(() => {
@@ -476,7 +493,7 @@ export default function RecipeDetailScreen() {
                         backgroundColor: themeColor + '14',
                       },
                     ]}
-                    onPress={() => setSelectedVariantId(v.id)}
+                    onPress={() => { setSelectedVariantId(v.id); setVariantChoice(mealSlug, v.is_default ? null : v.id); }}
                     activeOpacity={0.7}
                   >
                     <View style={styles.methodIconWrap}>

@@ -329,13 +329,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1185,
-          protein_g: 64,
-          carbs_g: 129,
-          fat_g: 46,
-          fiber_g: 10
-        }
+        plate_macros: { kcal: 1153, protein_g: 65.0, carbs_g: 138.1, fat_g: 41.4, fiber_g: 9.3 }
       }
     ],
     methods: [
@@ -457,13 +451,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1147,
-          protein_g: 52,
-          carbs_g: 126,
-          fat_g: 50,
-          fiber_g: 8
-        }
+        plate_macros: { kcal: 1102, protein_g: 54.4, carbs_g: 129.0, fat_g: 45.4, fiber_g: 9.0 }
       }
     ],
     methods: [
@@ -578,13 +566,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1418,
-          protein_g: 85,
-          carbs_g: 93,
-          fat_g: 79,
-          fiber_g: 8
-        }
+        plate_macros: { kcal: 1370, protein_g: 85.4, carbs_g: 98.3, fat_g: 75.8, fiber_g: 8.1 }
       }
     ],
     methods: [
@@ -714,13 +696,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1157,
-          protein_g: 56,
-          carbs_g: 100,
-          fat_g: 62,
-          fiber_g: 10
-        }
+        plate_macros: { kcal: 1128, protein_g: 58.1, carbs_g: 101.5, fat_g: 58.6, fiber_g: 9.6 }
       }
     ],
     methods: [
@@ -837,13 +813,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1111,
-          protein_g: 77,
-          carbs_g: 109,
-          fat_g: 40,
-          fiber_g: 12
-        }
+        plate_macros: { kcal: 1119, protein_g: 76.1, carbs_g: 121.4, fat_g: 41.0, fiber_g: 11.9 }
       }
     ],
     methods: [
@@ -963,13 +933,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1148,
-          protein_g: 56,
-          carbs_g: 128,
-          fat_g: 47,
-          fiber_g: 6
-        }
+        plate_macros: { kcal: 1101, protein_g: 57.8, carbs_g: 126.0, fat_g: 42.8, fiber_g: 5.4 }
       }
     ],
     methods: [
@@ -1084,13 +1048,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1070,
-          protein_g: 54,
-          carbs_g: 103,
-          fat_g: 52,
-          fiber_g: 16
-        }
+        plate_macros: { kcal: 1038, protein_g: 56.3, carbs_g: 106.3, fat_g: 48.5, fiber_g: 15.6 }
       }
     ],
     methods: [
@@ -1210,13 +1168,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 961,
-          protein_g: 52,
-          carbs_g: 108,
-          fat_g: 36,
-          fiber_g: 10
-        }
+        plate_macros: { kcal: 914, protein_g: 54.2, carbs_g: 111.3, fat_g: 31.3, fiber_g: 9.9 }
       }
     ],
     methods: [
@@ -1341,13 +1293,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1192,
-          protein_g: 57,
-          carbs_g: 86,
-          fat_g: 70,
-          fiber_g: 7
-        }
+        plate_macros: { kcal: 1159, protein_g: 57.7, carbs_g: 93.2, fat_g: 65.9, fiber_g: 7.2 }
       }
     ],
     methods: [
@@ -1473,13 +1419,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1165,
-          protein_g: 57,
-          carbs_g: 105,
-          fat_g: 60,
-          fiber_g: 19
-        }
+        plate_macros: { kcal: 1127, protein_g: 63.5, carbs_g: 115.1, fat_g: 52.5, fiber_g: 20.2 }
       }
     ],
     methods: [
@@ -1630,13 +1570,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1244,
-          protein_g: 63,
-          carbs_g: 150,
-          fat_g: 47,
-          fiber_g: 15
-        }
+        plate_macros: { kcal: 1196, protein_g: 63.9, carbs_g: 151.3, fat_g: 41.7, fiber_g: 16.4 }
       }
     ],
     methods: [
@@ -1763,13 +1697,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 1302,
-          protein_g: 64,
-          carbs_g: 152,
-          fat_g: 51,
-          fiber_g: 12
-        }
+        plate_macros: { kcal: 1249, protein_g: 64.8, carbs_g: 156.8, fat_g: 47.0, fiber_g: 11.9 }
       }
     ],
     methods: [
@@ -5325,7 +5253,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 1050, protein_g: 60, carbs_g: 120, fat_g: 40, fiber_g: 5 },
+        plate_macros: { kcal: 1075, protein_g: 59.0, carbs_g: 116.3, fat_g: 42.2, fiber_g: 5.5 },
       },
     ],
     methods: [
@@ -5383,7 +5311,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 960, protein_g: 53, carbs_g: 115, fat_g: 32, fiber_g: 13 },
+        plate_macros: { kcal: 945, protein_g: 51.3, carbs_g: 120.2, fat_g: 32.2, fiber_g: 12.8 },
       },
     ],
     methods: [
@@ -5524,7 +5452,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Slice the banana over the top.', substeps: ['Slice the banana over the top.'] },
         ],
         assembly_time_minutes: 2,
-        plate_macros: { kcal: 770, protein_g: 47, carbs_g: 105, fat_g: 20, fiber_g: 16 },
+        plate_macros: { kcal: 781, protein_g: 49.2, carbs_g: 105.9, fat_g: 20.1, fiber_g: 11.7 },
       },
       {
         id: 'loaded',
@@ -5540,7 +5468,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Top with sliced banana, a drizzle of peanut butter, and a scatter of granola.', substeps: ['Top with sliced banana, a drizzle of peanut butter, and a scatter of granola.'] },
         ],
         assembly_time_minutes: 3,
-        plate_macros: { kcal: 1140, protein_g: 59, carbs_g: 135, fat_g: 43, fiber_g: 21 },
+        plate_macros: { kcal: 1153, protein_g: 60.3, carbs_g: 135.0, fat_g: 44.4, fiber_g: 16.5 },
       },
     ],
     methods: [
@@ -5600,7 +5528,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Top with the berries, a sprinkle of chia, and a scatter of granola.', substeps: ['Top with the berries, a sprinkle of chia, and a scatter of granola.'] },
         ],
         assembly_time_minutes: 2,
-        plate_macros: { kcal: 740, protein_g: 47, carbs_g: 91, fat_g: 22, fiber_g: 10 },
+        plate_macros: { kcal: 752, protein_g: 51.7, carbs_g: 83.2, fat_g: 24.5, fiber_g: 10.2 },
       },
       {
         id: 'loaded',
@@ -5618,7 +5546,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Top with berries and sliced banana, a sprinkle of chia, a scatter of granola, and a drizzle of peanut butter.', substeps: ['Top with berries and sliced banana, a sprinkle of chia, a scatter of granola, and a drizzle of peanut butter.'] },
         ],
         assembly_time_minutes: 3,
-        plate_macros: { kcal: 1080, protein_g: 58, carbs_g: 130, fat_g: 40, fiber_g: 15 },
+        plate_macros: { kcal: 1095, protein_g: 61.1, carbs_g: 123.2, fat_g: 43.2, fiber_g: 15.7 },
       },
     ],
     methods: [
@@ -5668,13 +5596,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: {
-          kcal: 380,
-          protein_g: 28,
-          carbs_g: 12,
-          fat_g: 24,
-          fiber_g: 4
-        }
+        plate_macros: { kcal: 412, protein_g: 29.7, carbs_g: 16.0, fat_g: 26.0, fiber_g: 2.0 }
       }
     ],
     methods: [
@@ -5729,7 +5651,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 840, protein_g: 45, carbs_g: 113, fat_g: 26, fiber_g: 11 },
+        plate_macros: { kcal: 854, protein_g: 44.4, carbs_g: 115.2, fat_g: 27.0, fiber_g: 10.5 },
       },
     ],
     methods: [
@@ -5791,7 +5713,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Stack the pancakes, scatter over the berries, and drizzle with maple syrup.', substeps: ['Stack the pancakes, scatter over the berries, and drizzle with maple syrup.'] },
         ],
         assembly_time_minutes: 1,
-        plate_macros: { kcal: 760, protein_g: 52, carbs_g: 74, fat_g: 27, fiber_g: 9 },
+        plate_macros: { kcal: 777, protein_g: 53.4, carbs_g: 80.6, fat_g: 27.3, fiber_g: 8.9 },
       },
       {
         id: 'loaded',
@@ -5807,7 +5729,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Stack the pancakes, top with sliced banana and a drizzle of peanut butter, and finish with maple syrup.', substeps: ['Stack the pancakes, top with sliced banana and a drizzle of peanut butter, and finish with maple syrup.'] },
         ],
         assembly_time_minutes: 2,
-        plate_macros: { kcal: 1010, protein_g: 61, carbs_g: 98, fat_g: 43, fiber_g: 12 },
+        plate_macros: { kcal: 1037, protein_g: 61.0, carbs_g: 106.3, fat_g: 43.7, fiber_g: 10.8 },
       },
     ],
     methods: [
@@ -5863,7 +5785,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 820, protein_g: 65, carbs_g: 37, fat_g: 44, fiber_g: 4 },
+        plate_macros: { kcal: 795, protein_g: 67.8, carbs_g: 38.0, fat_g: 41.4, fiber_g: 4.5 },
       },
     ],
     methods: [
@@ -5924,7 +5846,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 880, protein_g: 46, carbs_g: 82, fat_g: 41, fiber_g: 8 },
+        plate_macros: { kcal: 895, protein_g: 47.8, carbs_g: 88.6, fat_g: 39.6, fiber_g: 10.5 },
       },
     ],
     methods: [
@@ -5987,7 +5909,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 680, protein_g: 37, carbs_g: 48, fat_g: 37, fiber_g: 3 },
+        plate_macros: { kcal: 741, protein_g: 37.4, carbs_g: 47.0, fat_g: 43.8, fiber_g: 4.2 },
       },
     ],
     methods: [
@@ -6054,7 +5976,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Top the warm baked oats with Greek yoghurt and berries.', substeps: ['Top the warm baked oats with Greek yoghurt and berries.'] },
         ],
         assembly_time_minutes: 1,
-        plate_macros: { kcal: 800, protein_g: 51, carbs_g: 104, fat_g: 19, fiber_g: 11 },
+        plate_macros: { kcal: 801, protein_g: 52.1, carbs_g: 107.6, fat_g: 19.4, fiber_g: 11.8 },
       },
       {
         id: 'loaded',
@@ -6070,7 +5992,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Top with Greek yoghurt, sliced banana, and a drizzle of peanut butter.', substeps: ['Top with Greek yoghurt, sliced banana, and a drizzle of peanut butter.'] },
         ],
         assembly_time_minutes: 2,
-        plate_macros: { kcal: 1010, protein_g: 59, carbs_g: 116, fat_g: 35, fiber_g: 13 },
+        plate_macros: { kcal: 1017, protein_g: 59.3, carbs_g: 121.8, fat_g: 35.7, fiber_g: 12.8 },
       },
     ],
     methods: [
@@ -6127,7 +6049,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 790, protein_g: 44, carbs_g: 59, fat_g: 44, fiber_g: 7 },
+        plate_macros: { kcal: 795, protein_g: 44.7, carbs_g: 58.7, fat_g: 43.0, fiber_g: 6.7 },
       },
     ],
     methods: [
@@ -6253,7 +6175,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Serve 3 egg muffins with smashed avocado on toasted sourdough.', substeps: ['Serve 3 egg muffins with smashed avocado on toasted sourdough.'] },
         ],
         assembly_time_minutes: 4,
-        plate_macros: { kcal: 790, protein_g: 44, carbs_g: 63, fat_g: 41, fiber_g: 8 },
+        plate_macros: { kcal: 850, protein_g: 44.9, carbs_g: 64.7, fat_g: 46.0, fiber_g: 8.1 },
       },
     ],
     methods: [
@@ -6313,7 +6235,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 415, protein_g: 39.9, carbs_g: 31, fat_g: 14.4, fiber_g: 0 },
+        plate_macros: { kcal: 415, protein_g: 39.9, carbs_g: 31.0, fat_g: 14.4, fiber_g: 0.0 },
       },
     ],
     methods: [
@@ -6367,7 +6289,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 390, protein_g: 29, carbs_g: 46, fat_g: 12, fiber_g: 3 },
+        plate_macros: { kcal: 428, protein_g: 34.6, carbs_g: 44.0, fat_g: 13.4, fiber_g: 4.3 },
       },
     ],
     methods: [
@@ -6421,7 +6343,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 325, protein_g: 34, carbs_g: 22, fat_g: 13, fiber_g: 3 },
+        plate_macros: { kcal: 340, protein_g: 34.1, carbs_g: 24.7, fat_g: 13.9, fiber_g: 2.9 },
       },
     ],
     methods: [
@@ -6479,7 +6401,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 245, protein_g: 13, carbs_g: 22, fat_g: 14, fiber_g: 2 },
+        plate_macros: { kcal: 240, protein_g: 12.4, carbs_g: 22.2, fat_g: 13.7, fiber_g: 2.7 },
       },
     ],
     methods: [
@@ -6541,7 +6463,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 210, protein_g: 11, carbs_g: 14, fat_g: 14, fiber_g: 1 },
+        plate_macros: { kcal: 210, protein_g: 10.1, carbs_g: 14.9, fat_g: 13.9, fiber_g: 1.5 },
       },
     ],
     methods: [
@@ -6601,7 +6523,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 190, protein_g: 10, carbs_g: 28, fat_g: 5, fiber_g: 2 },
+        plate_macros: { kcal: 186, protein_g: 10.2, carbs_g: 28.6, fat_g: 4.3, fiber_g: 2.8 },
       },
     ],
     methods: [
@@ -6664,7 +6586,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 340, protein_g: 20, carbs_g: 34, fat_g: 16, fiber_g: 2 },
+        plate_macros: { kcal: 340, protein_g: 18.6, carbs_g: 34.9, fat_g: 15.8, fiber_g: 3.6 },
       },
     ],
     methods: [
@@ -6721,7 +6643,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 380, protein_g: 22, carbs_g: 40, fat_g: 16, fiber_g: 3 },
+        plate_macros: { kcal: 456, protein_g: 20.8, carbs_g: 37.9, fat_g: 25.8, fiber_g: 3.4 },
       },
     ],
     methods: [
@@ -6781,7 +6703,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 395, protein_g: 38, carbs_g: 36, fat_g: 14, fiber_g: 4 },
+        plate_macros: { kcal: 396, protein_g: 37.6, carbs_g: 35.5, fat_g: 14.8, fiber_g: 4.6 },
       },
     ],
     methods: [
@@ -6839,7 +6761,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 190, protein_g: 6, carbs_g: 26, fat_g: 9, fiber_g: 2 },
+        plate_macros: { kcal: 187, protein_g: 5.1, carbs_g: 26.6, fat_g: 8.6, fiber_g: 2.9 },
       },
     ],
     methods: [
@@ -6896,7 +6818,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 463, protein_g: 12, carbs_g: 80, fat_g: 10, fiber_g: 2 },
+        plate_macros: { kcal: 303, protein_g: 8.4, carbs_g: 44.7, fat_g: 9.8, fiber_g: 1.0 },
         plate_finished_weight_g: 180,
       },
     ],
@@ -6951,7 +6873,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 194, protein_g: 18, carbs_g: 7.8, fat_g: 10, fiber_g: 0 },
+        plate_macros: { kcal: 194, protein_g: 18.0, carbs_g: 7.8, fat_g: 10.0, fiber_g: 0.0 },
       },
     ],
     methods: [
@@ -6995,7 +6917,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 115, protein_g: 14, carbs_g: 5, fat_g: 3, fiber_g: 0 },
+        plate_macros: { kcal: 100, protein_g: 14.0, carbs_g: 4.4, fat_g: 2.8, fiber_g: 0.0 },
       },
     ],
     methods: [
@@ -7039,7 +6961,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 190, protein_g: 17, carbs_g: 14, fat_g: 8, fiber_g: 8 },
+        plate_macros: { kcal: 183, protein_g: 18.0, carbs_g: 13.5, fat_g: 7.8, fiber_g: 7.8 },
       },
     ],
     methods: [
@@ -7086,7 +7008,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 364, protein_g: 39.5, carbs_g: 19.4, fat_g: 14, fiber_g: 0 },
+        plate_macros: { kcal: 364, protein_g: 39.5, carbs_g: 19.4, fat_g: 14.0, fiber_g: 0.0 },
       },
     ],
     methods: [
@@ -7131,7 +7053,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 220, protein_g: 20, carbs_g: 22, fat_g: 7, fiber_g: 5 },
+        plate_macros: { kcal: 240, protein_g: 19.8, carbs_g: 22.8, fat_g: 7.8, fiber_g: 3.6 },
       },
     ],
     methods: [
@@ -7175,7 +7097,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 115, protein_g: 7, carbs_g: 1, fat_g: 9, fiber_g: 0 },
+        plate_macros: { kcal: 121, protein_g: 7.5, carbs_g: 0.4, fat_g: 9.9, fiber_g: 0.0 },
       },
     ],
     methods: [
@@ -7223,7 +7145,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 140, protein_g: 12, carbs_g: 1, fat_g: 10, fiber_g: 0 },
+        plate_macros: { kcal: 143, protein_g: 12.6, carbs_g: 0.7, fat_g: 9.5, fiber_g: 0.0 },
       },
     ],
     methods: [
@@ -7270,7 +7192,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 110, protein_g: 25, carbs_g: 0, fat_g: 1, fiber_g: 0 },
+        plate_macros: { kcal: 110, protein_g: 24.2, carbs_g: 0.0, fat_g: 0.8, fiber_g: 0.0 },
       },
     ],
     methods: [
@@ -7318,7 +7240,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 190, protein_g: 10, carbs_g: 22, fat_g: 7, fiber_g: 6 },
+        plate_macros: { kcal: 161, protein_g: 6.3, carbs_g: 17.1, fat_g: 7.3, fiber_g: 5.0 },
       },
     ],
     methods: [
@@ -7371,7 +7293,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 150, protein_g: 8, carbs_g: 14, fat_g: 7, fiber_g: 2 },
+        plate_macros: { kcal: 154, protein_g: 7.9, carbs_g: 15.8, fat_g: 7.5, fiber_g: 1.8 },
       },
     ],
     methods: [
@@ -7422,7 +7344,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 250, protein_g: 9, carbs_g: 9, fat_g: 22, fiber_g: 3 },
+        plate_macros: { kcal: 240, protein_g: 7.2, carbs_g: 6.4, fat_g: 20.8, fiber_g: 2.8 },
       },
     ],
     methods: [
@@ -7466,7 +7388,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 290, protein_g: 8, carbs_g: 24, fat_g: 18, fiber_g: 3 },
+        plate_macros: { kcal: 289, protein_g: 6.3, carbs_g: 25.6, fat_g: 18.7, fiber_g: 3.7 },
       },
     ],
     methods: [
@@ -7512,7 +7434,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 105, protein_g: 1, carbs_g: 27, fat_g: 0, fiber_g: 3 },
+        plate_macros: { kcal: 107, protein_g: 1.3, carbs_g: 27.4, fat_g: 0.4, fiber_g: 3.1 },
       },
     ],
     methods: [
@@ -7556,7 +7478,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 274, protein_g: 5.3, carbs_g: 60, fat_g: 0.5, fiber_g: 1 },
+        plate_macros: { kcal: 274, protein_g: 5.3, carbs_g: 60.0, fat_g: 0.5, fiber_g: 1.0 },
       },
     ],
     methods: [
@@ -7600,7 +7522,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 65, protein_g: 4, carbs_g: 11, fat_g: 1, fiber_g: 5 },
+        plate_macros: { kcal: 51, protein_g: 4.2, carbs_g: 9.9, fat_g: 0.6, fiber_g: 3.9 },
       },
     ],
     methods: [
@@ -7644,7 +7566,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 140, protein_g: 3, carbs_g: 31, fat_g: 0, fiber_g: 3 },
+        plate_macros: { kcal: 116, protein_g: 3.0, carbs_g: 26.3, fat_g: 0.2, fiber_g: 3.3 },
       },
     ],
     methods: [
@@ -7689,7 +7611,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 80, protein_g: 1, carbs_g: 18, fat_g: 0, fiber_g: 5 },
+        plate_macros: { kcal: 72, protein_g: 1.5, carbs_g: 16.5, fat_g: 0.6, fiber_g: 5.3 },
       },
     ],
     methods: [
@@ -7733,7 +7655,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 130, protein_g: 1, carbs_g: 31, fat_g: 0, fiber_g: 3 },
+        plate_macros: { kcal: 122, protein_g: 1.0, carbs_g: 28.8, fat_g: 0.2, fiber_g: 2.0 },
       },
     ],
     methods: [
@@ -7777,7 +7699,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 170, protein_g: 2, carbs_g: 13, fat_g: 12, fiber_g: 3 },
+        plate_macros: { kcal: 179, protein_g: 2.3, carbs_g: 13.8, fat_g: 12.8, fiber_g: 3.3 },
       },
     ],
     methods: [
@@ -8402,7 +8324,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 1080, protein_g: 54, carbs_g: 96, fat_g: 52, fiber_g: 4 }, // macros computed from ingredient amounts (USDA); assumes 80g raw streaky bacon (~400 kcal/100g), 125g dry pasta, ~100g egg, 40g parmesan. Bacon is the main driver — leaner bacon lowers kcal/fat.
+        plate_macros: { kcal: 1094, protein_g: 55.2, carbs_g: 96.3, fat_g: 52.9, fiber_g: 4.0 }, // macros computed from ingredient amounts (USDA); assumes 80g raw streaky bacon (~400 kcal/100g), 125g dry pasta, ~100g egg, 40g parmesan. Bacon is the main driver — leaner bacon lowers kcal/fat.
       },
     ],
     methods: [
@@ -8460,7 +8382,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 780, protein_g: 46, carbs_g: 58, fat_g: 38, fiber_g: 7 },
+        plate_macros: { kcal: 746, protein_g: 48.1, carbs_g: 43.8, fat_g: 42.6, fiber_g: 7.5 },
       },
     ],
     methods: [
@@ -9279,7 +9201,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 935, protein_g: 80, carbs_g: 75, fat_g: 33, fiber_g: 3 },
+        plate_macros: { kcal: 932, protein_g: 79.9, carbs_g: 74.1, fat_g: 32.9, fiber_g: 2.9 },
       },
     ],
     methods: [
@@ -9495,7 +9417,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 795, protein_g: 57, carbs_g: 91, fat_g: 22, fiber_g: 7 },
+        plate_macros: { kcal: 795, protein_g: 57.2, carbs_g: 88.9, fat_g: 22.6, fiber_g: 6.1 },
       },
     ],
     methods: [
@@ -9728,7 +9650,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         additional_ingredients: [],
         additional_instructions: [],
         assembly_time_minutes: 0,
-        plate_macros: { kcal: 733, protein_g: 44, carbs_g: 74, fat_g: 30, fiber_g: 12 },
+        plate_macros: { kcal: 777, protein_g: 38.6, carbs_g: 80.1, fat_g: 35.1, fiber_g: 12.6 },
       },
     ],
     methods: [
@@ -10080,7 +10002,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Serve the schnitzel with roast potatoes or salad and a wedge of lemon.', substeps: ['Roast the potatoes alongside, or plate with a fresh salad.', 'Add a lemon wedge.'] },
         ],
         assembly_time_minutes: 2,
-        plate_macros: { kcal: 621, protein_g: 54, carbs_g: 53, fat_g: 20, fiber_g: 5 },
+        plate_macros: { kcal: 651, protein_g: 55.7, carbs_g: 53.1, fat_g: 22.9, fiber_g: 5.0 },
         image_filename: 'Schnitzel Plate (plate).png',
         meal_prep: { day_of_summary: 'Roast potatoes, lemon' },
       },
@@ -10100,7 +10022,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Build the roll.', substeps: ['Butter the buns.', 'Add a schnitzel, cheese, lettuce, and a drizzle of sweet chilli sauce.'] },
         ],
         assembly_time_minutes: 3,
-        plate_macros: { kcal: 881, protein_g: 63, carbs_g: 70, fat_g: 38, fiber_g: 4 },
+        plate_macros: { kcal: 912, protein_g: 65.4, carbs_g: 71.3, fat_g: 38.9, fiber_g: 3.2 },
         image_filename: 'Schnitzel Roll (roll).png',
         meal_prep: { day_of_summary: 'Build the roll' },
       },
@@ -10120,7 +10042,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Top and melt.', substeps: ['Top each schnitzel with tomato sauce, cheese, and jalapenos.', 'Grill or bake until the cheese melts and bubbles.', 'Serve with potato or salad.'] },
         ],
         assembly_time_minutes: 8,
-        plate_macros: { kcal: 747, protein_g: 62, carbs_g: 54, fat_g: 30, fiber_g: 6 },
+        plate_macros: { kcal: 777, protein_g: 63.9, carbs_g: 54.2, fat_g: 33.0, fiber_g: 5.6 },
         image_filename: 'Chicken Parma (parma).png',
         meal_prep: { day_of_summary: 'Sauce, cheese, grill to melt' },
       },
@@ -10341,7 +10263,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Serve in flatbread.', substeps: ['Warm the flatbread.', 'Fill with cevapi, plenty of raw onion, and a spoon of ajvar (and kajmak/yoghurt if using).'] },
         ],
         assembly_time_minutes: 3,
-        plate_macros: { kcal: 806, protein_g: 51, carbs_g: 71, fat_g: 35, fiber_g: 7 },
+        plate_macros: { kcal: 836, protein_g: 46.0, carbs_g: 59.2, fat_g: 44.8, fiber_g: 5.7 },
         image_filename: 'cevapi_flatbread.png',
         photo_url: undefined,
       },
@@ -10358,7 +10280,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Build the rice plate.', substeps: ['Serve the cevapi over rice with raw onion, ajvar, and the salad.'] },
         ],
         assembly_time_minutes: 2,
-        plate_macros: { kcal: 760, protein_g: 48, carbs_g: 81, fat_g: 26, fiber_g: 4 },
+        plate_macros: { kcal: 848, protein_g: 44.1, carbs_g: 79.0, fat_g: 38.1, fiber_g: 3.5 },
         image_filename: 'cevapi_rice_plate.png',
         photo_url: undefined,
       },

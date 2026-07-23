@@ -24,6 +24,8 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { GroceryItem, FoodCategory } from '../types/nutrition';
+import { buildNativeGroceryList, NativeGroceryBuild, CuratedPlanMeal } from '../utils/groceryEngine';
+import { getVariantChoices, setVariantChoice, VariantChoices } from '../utils/variantChoices';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'GroceryList'>;
 type GroceryListRouteProp = RouteProp<RootStackParamList, 'GroceryList'>;
@@ -192,7 +194,7 @@ export default function GroceryListScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<GroceryListRouteProp>();
   const { themeColor, themeColorLight } = useTheme();
-  const { getGroceryList, updateGroceryItem, addGroceryItem, currentMealPlan, saveMealPlan } = useMealPlanning();
+  const { getGroceryList, updateGroceryItem, addGroceryItem, currentMealPlan, saveMealPlan, simplifiedMealPlan } = useMealPlanning();
 
   console.log('🛒 GroceryListScreen route params:', route.params);
   const { groceryList: routeGroceryList } = route.params || {};
@@ -213,6 +215,10 @@ export default function GroceryListScreen() {
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<FoodCategory[]>(CATEGORY_ORDER);
   const [sortBy, setSortBy] = useState<'category' | 'price'>('category');
+  const [variantChoices, setVariantChoicesState] = useState<VariantChoices>({});
+  const [nativeBuild, setNativeBuild] = useState<NativeGroceryBuild | null>(null);
+  const [nativePurchased, setNativePurchased] = useState<Record<string, boolean>>({});
+  const [choicesExpanded, setChoicesExpanded] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'remaining' | 'completed'>('all');
 
   // Use passed grocery list data or fall back to context
@@ -300,7 +306,52 @@ export default function GroceryListScreen() {
     }, [passedGroceryList, currentMealPlan, purchasedItemsState, getGroceryList])
   );
 
-  if (!groceryList && !showLoadingState) {
+  // ── Cooking choices (MAKE IT) + native rebuild ──
+  // Choices persist globally (shared with the meal screens). Any deviation
+  // from the defaults — or the absence of an imported list — switches the
+  // list source to the native engine, so amounts always match what will
+  // actually be cooked.
+  const nativeKey = simplifiedMealPlan
+    ? `grocery_native_purchased_${simplifiedMealPlan.fingerprint || simplifiedMealPlan.id}`
+    : null;
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      (async () => {
+        const choices = await getVariantChoices();
+        if (!active) return;
+        setVariantChoicesState(choices);
+        if (simplifiedMealPlan) {
+          setNativeBuild(buildNativeGroceryList(simplifiedMealPlan, choices));
+          if (nativeKey) {
+            try {
+              const stored = await AsyncStorage.getItem(nativeKey);
+              if (active && stored) setNativePurchased(JSON.parse(stored));
+            } catch {}
+          }
+        }
+      })();
+      return () => { active = false; };
+    }, [simplifiedMealPlan])
+  );
+  const curatedChoices: CuratedPlanMeal[] = (nativeBuild?.curatedMeals ?? []).filter(m => m.hasAlt);
+  const useNative = !!nativeBuild && curatedChoices.some(m => m.chosenVariantId !== m.defaultId);
+  const showingNative = (useNative || !groceryList) && !!nativeBuild && nativeBuild.items.length > 0;
+  const sourceItems = showingNative && nativeBuild
+    ? nativeBuild.items.map(i => ({ ...i, isPurchased: !!nativePurchased[i.id] }))
+    : null;
+  const handleChooseVariant = async (cm: CuratedPlanMeal, variantId: string | null) => {
+    const next = await setVariantChoice(cm.slug, variantId);
+    setVariantChoicesState(next);
+    if (simplifiedMealPlan) setNativeBuild(buildNativeGroceryList(simplifiedMealPlan, next));
+  };
+  const toggleNativePurchased = async (item: GroceryItem) => {
+    const next = { ...nativePurchased, [item.id]: !nativePurchased[item.id] };
+    setNativePurchased(next);
+    if (nativeKey) { try { await AsyncStorage.setItem(nativeKey, JSON.stringify(next)); } catch {} }
+  };
+
+  if (!groceryList && !showLoadingState && !showingNative) {
     return (
       <View style={styles.container}>
         <View style={styles.topBar}>
@@ -323,7 +374,13 @@ export default function GroceryListScreen() {
   // Group items by category
   let groupedItems: Record<string, any[]>;
 
-  if (groceryList.categories) {
+  if (sourceItems) {
+    groupedItems = sourceItems.reduce((groups: Record<string, any[]>, item: any) => {
+      const category = item.category;
+      (groups[category] = groups[category] || []).push(item);
+      return groups;
+    }, {} as Record<FoodCategory, GroceryItem[]>);
+  } else if (groceryList.categories) {
     groupedItems = {};
     groceryList.categories.forEach((category: any) => {
       groupedItems[category.name] = category.items;
@@ -361,7 +418,9 @@ export default function GroceryListScreen() {
   // Calculate statistics - handle both formats
   let allItems: any[] = [];
 
-  if (groceryList.categories) {
+  if (sourceItems) {
+    allItems = sourceItems;
+  } else if (groceryList.categories) {
     allItems = groceryList.categories.flatMap((category: any) => category.items || []);
   } else if (groceryList.items) {
     allItems = groceryList.items;
@@ -389,7 +448,7 @@ export default function GroceryListScreen() {
   // Whole-dollar money formatter, with a space after multi-letter codes (AUD 191).
   const money = (n: number) => `${currencySymbol}${currencySymbol.length > 1 ? ' ' : ''}${Math.round(n || 0)}`;
 
-  const estimateDisplay = hasRange
+  const estimateDisplay = showingNative ? null : hasRange
     ? `${money(estimatedLow)}–${Math.round(estimatedHigh)}`
     : legacyEstimate != null
       ? money(legacyEstimate)
@@ -398,6 +457,7 @@ export default function GroceryListScreen() {
   const pct = totalItems > 0 ? Math.round((purchasedItems / totalItems) * 100) : 0;
 
   const toggleItemPurchased = async (item: GroceryItem) => {
+    if (showingNative) { return toggleNativePurchased(item); }
     try {
       const newPurchasedState = !item.isPurchased;
 
@@ -840,6 +900,82 @@ export default function GroceryListScreen() {
               );
             })}
           </View>
+
+          {curatedChoices.length > 0 && (
+
+            <View style={styles.section}>
+
+              {showingNative && (
+
+                <View style={{ backgroundColor: themeColor + '14', borderColor: themeColor + '40', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 10, marginBottom: 10 }}>
+
+                  <Text style={{ color: themeColor, fontSize: 12, lineHeight: 17 }}>
+
+                    List rebuilt from your cooking choices — imported prices no longer apply.
+
+                  </Text>
+
+                </View>
+
+              )}
+
+              <TouchableOpacity onPress={() => setChoicesExpanded(!choicesExpanded)} activeOpacity={0.7} style={styles.sectionHeader}>
+
+                <Text style={styles.sectionLabel}>Cooking choices</Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+
+                  <Text style={{ color: '#71717a', fontSize: 11 }}>
+
+                    {(() => { const s = curatedChoices.filter(c => c.altId != null && c.chosenVariantId === c.altId).length; return s > 0 ? `${curatedChoices.length} meals · ${s} from scratch` : 'all easy defaults'; })()}
+
+                  </Text>
+
+                  <Ionicons name={choicesExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#71717a" />
+
+                </View>
+
+              </TouchableOpacity>
+
+              {choicesExpanded && curatedChoices.map(cm => {
+
+                const scratchChosen = cm.altId != null && cm.chosenVariantId === cm.altId;
+
+                return (
+
+                  <View key={cm.slug} style={{ marginBottom: 12 }}>
+
+                    <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '500', marginBottom: 6 }}>{cm.name}</Text>
+
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+
+                      <TouchableOpacity onPress={() => handleChooseVariant(cm, null)} activeOpacity={0.7} style={{ flex: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: !scratchChosen ? themeColor : '#27272a', backgroundColor: !scratchChosen ? themeColor + '14' : 'transparent' }}>
+
+                        <Text numberOfLines={1} style={{ color: !scratchChosen ? themeColor : '#a1a1aa', fontSize: 12, fontWeight: '600' }}>{cm.defaultLabel}</Text>
+
+                        <Text style={{ color: '#52525b', fontSize: 10, marginTop: 2 }}>Quickest · weeknight</Text>
+
+                      </TouchableOpacity>
+
+                      <TouchableOpacity onPress={() => handleChooseVariant(cm, cm.altId)} activeOpacity={0.7} style={{ flex: 1, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: scratchChosen ? themeColor : '#27272a', backgroundColor: scratchChosen ? themeColor + '14' : 'transparent' }}>
+
+                        <Text numberOfLines={1} style={{ color: scratchChosen ? themeColor : '#a1a1aa', fontSize: 12, fontWeight: '600' }}>{cm.altLabel}</Text>
+
+                        <Text style={{ color: '#52525b', fontSize: 10, marginTop: 2 }}>{'Best flavour' + (cm.altExtraTime ? ' · +' + cm.altExtraTime : '')}</Text>
+
+                      </TouchableOpacity>
+
+                    </View>
+
+                  </View>
+
+                );
+
+              })}
+
+            </View>
+
+          )}
 
           {filteredCategories.map((category) => (
             <CategorySection key={category} category={category} />

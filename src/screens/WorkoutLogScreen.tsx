@@ -22,26 +22,121 @@
  *   - cyan accent (theme color, defaults to #22d3ee)
  *   - DM Mono for numbers, Outfit for text
  *
- * --- Changes in this version -------------------------------------------------
- *  1. Keyboard "Log set" accessory bar (self-rendered, iOS + Android):
- *     completes the focused set and auto-advances to the next set's weight
- *     field so users can blast through sets without dismissing the keyboard.
- *  2. PREV column + prefilled (greyed) inputs showing last session's numbers,
- *     loaded per-exercise from WorkoutStorage.getExerciseHistory.
- *  3. History promoted to a top-level cyan icon in the header.
- *  4. Header overflow replaced with a vertical dropdown menu (icon + label).
- *  5. Finish button now opens the existing FinishWorkoutModal (the summary),
- *     and a computed PR (best est. 1RM this session vs. history) is passed in.
- *  6. Tapping an "Up Next" exercise now smooth-scrolls back to the top so the
- *     sets table is in view (no more manual scroll-up after switching).
- *  7. Empty weight/reps fields render blank instead of "0" so a fresh program
- *     no longer reads as a prescribed 0kg.
- *  8. Image-cycling fix: cycling teardown now lives only in the cleanup return,
- *     so switching to an already-loaded exercise keeps the start/end animation.
- * ----------------------------------------------------------------------------
+ * ── PAGER ARCHITECTURE (the commit-flash fix) ────────────────────────────────
+ *
+ * The old pager positioned the live card at translateX = dragX and reset dragX to 0
+ * in the swipe's completion callback, one tick before onIndexChange's setState could
+ * land. That ordering painted the OLD exercise centred, on top of the correct peek,
+ * for a frame or more. Every patch that tried to reorder those writes was fighting a
+ * race between an Animated setValue (synchronous) and a React 19 concurrent commit
+ * (scheduled), and the race cannot be reliably won. So it is now unrepresentable:
+ *
+ *  1. ONE absolute page position. `pagePos` is an Animated.Value in page units
+ *     (0 = first exercise, 2.4 = mid-drag between the third and fourth). It moves
+ *     monotonically as you page and is NEVER reset or rebased. This is the same
+ *     principle the tick indicator already used, applied to the cards themselves.
+ *
+ *  2. Derived card transforms. Card N sits at (N - pagePos) * SCREEN_WIDTH, built
+ *     as an interpolation of pagePos. A card's position depends only on its own
+ *     index and pagePos; neither moves when currentIndex commits.
+ *
+ *  3. Three always-mounted cards, keyed by index: prev / current / next. On commit
+ *     the centred card KEEPS its React instance and native views (same key), so its
+ *     image never remounts and its content never changes. The only things a commit
+ *     does are mount the new far neighbour off screen, unmount the old far
+ *     neighbour off screen, and swap the `interactive` flag. None of that is
+ *     visible, so it does not matter how late React flushes the setState.
+ *
+ *  4. Early commit. onIndexChange fires at gesture END, while the settle animation
+ *     runs. Because positions are derived, the commit's timing is irrelevant to
+ *     what is painted, and committing early means the next flick always finds its
+ *     neighbour already mounted (rapid flick-flick-flick works).
+ *
+ *  5. NO layout animation. The stage's layout height is fixed at the tallest card
+ *     in the workout (so an incoming neighbour can never be clipped), and the
+ *     Up Next list is positioned by a translateY interpolated from the same
+ *     native value that drives the card transforms. Height is a layout property
+ *     and can never be native-driven; animating it put the list's motion on the
+ *     JS thread, where the commit render made it skip frames against the
+ *     natively driven cards. Now the list and the cards are interpolations of
+ *     ONE value on ONE thread, pixel-locked by construction. The trade: constant
+ *     scroll length per workout, so shorter exercises leave extra scrollable
+ *     black beneath the list, which reads as padding in this UI.
+ *
+ *  6. ONE card implementation. The live card and the swipe previews used to be two
+ *     parallel component trees (SetsTable/SetRow vs ExercisePagePreview), and every
+ *     place they drifted became a pop-on-commit bug: the missing Add set button,
+ *     the missing "×" delete mark, the chevron jumping lines, numbers shifting 2px.
+ *     There is now a single ExerciseCard rendered three times with an `interactive`
+ *     flag; the drift class is dead by construction.
+ *
+ *  7. Index changes that do not come from a swipe (superset auto-advance, Up Next
+ *     taps) reuse the same machinery: adjacent changes slide pagePos, distant taps
+ *     fade the cards out, snap pagePos and index together behind opacity 0, and
+ *     fade back in after the commit lands.
+ *
+ * Also in this revision:
+ *  8. Up Next and the neighbour cards resolve the selected alternative from
+ *     allSetsData's selectedExerciseIndex, the same source the live card uses,
+ *     instead of exercisePreferences. Two sources of truth landing from two async
+ *     reads was ANOTHER way a card could change content across a commit. The
+ *     adapter now seeds selectedExerciseIndex from saved preferences when
+ *     initialising a fresh workout, so allSetsData is the single display truth.
+ *  9. Adapter-supplied handlers are wrapped in identity-stable trampolines (latest
+ *     ref pattern) so ExerciseCard can be React.memo'd; without this, the adapter's
+ *     once-a-second duration tick would re-render all three cards forever.
+ * 10. Smoothness pass (the feel of the swipe itself):
+ *      - Card transforms moved to a NATIVE-driven twin of pagePos (`cardPos`), so
+ *        the settle runs on the UI thread and survives JS-thread hiccups. Height
+ *        stays on the JS-driven pagePos, because layout properties cannot be
+ *        native-driven; under load the height may trail the cards by a frame,
+ *        which is invisible next to a transform stutter.
+ *      - Release animations are velocity-seeded springs. A fixed-duration timing
+ *        restarts the card on its own curve regardless of how fast the finger was
+ *        moving at release, and that velocity discontinuity reads as roughness
+ *        even at a steady frame rate.
+ *      - The gesture is memoised, so the once-a-second duration re-render can no
+ *        longer rebuild and re-attach the handler config mid-drag.
+ *      - Image cycling holds its frame while a drag or settle is in flight, so a
+ *        1s phase flip cannot land a card re-render in the middle of a gesture.
+ *      - Neighbour cards are rasterised on Android (renderToHardwareTextureAndroid),
+ *        so translating them is a texture move rather than a subtree redraw.
+ * 11. Up Next no longer flashes on focus change: the background / border / title
+ *     colour cross-fades and the instant play-circle icon overlay are gone. The
+ *     CURRENT badge is the sole selection indicator, travelling with a native
+ *     fade + scale, so a commit does zero JS-driven animation work in the list.
+ * 12. Scroll depth on the hero image: pulling down inflates it IN PLACE (iOS
+ *     bounce only; Android offsets never go negative), scrolling away makes it
+ *     lag at half speed, grow slightly, and recede into the black. Driven by a
+ *     NATIVELY mapped scroll position (Animated.event, useNativeDriver), so
+ *     scrolling costs the JS thread nothing; render transforms only, so the
+ *     image box and the CARD_* height arithmetic are untouched. The pull side
+ *     deliberately has no translate: these are contained illustrations, not
+ *     cover-cropped photos, and translating up clipped the subject's head.
+ * 13. Up Next motion moved onto the native driver (supersedes the height half of
+ *     point 10). The stage height froze at the tallest card and the list is now
+ *     pulled up by a translateY derived from cardPos, so the list rides the exact
+ *     spring the cards ride, on the UI thread, and tracks the finger mid-drag.
+ *     pagePos survives purely as the JS mirror twin for mid-settle grabs.
+ * 14. Two Android commit artifacts fixed (removes the rasterisation bullet from
+ *     point 10): (a) renderToHardwareTextureAndroid is gone from the neighbour
+ *     wrappers — the bilinear-sampled texture during the slide versus live
+ *     rendering after the flip read as the sets table changing size at commit,
+ *     and the layer churn stepped on the Up Next badge fade; (b) TextInput
+ *     `editable` no longer flips with `interactive` (pointerEvents already makes
+ *     neighbours inert), because Android's setInputType path resets the typeface
+ *     and made the digits shimmer at commit.
+ * 15. Swipes that BEGIN on a weight/reps field now work on Android. A native
+ *     EditText wins Android's touch negotiation and starves the pager's pan
+ *     (RNGH issue #668; iOS unaffected), so each input carries a focus-gated
+ *     invisible Pressable: unfocused touches never reach the native field (pans
+ *     work; a tap focuses programmatically), and once focused the overlay
+ *     unmounts so all native editing behaviour is intact. Only delta: the first
+ *     tap on an unfocused field places the cursor at the end.
+ * ────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -51,10 +146,8 @@ import {
   ScrollView,
   Animated,
   Easing,
-  ActivityIndicator,
   Dimensions,
   Pressable,
-  Alert,
   Modal,
   Platform,
   Keyboard,
@@ -62,18 +155,18 @@ import {
 // expo-image, not RN's Image. RN's offers exactly two behaviours when `source` changes and
 // both are broken for a pager: keyed, it remounts the native view, which has no decoded bitmap
 // and paints BLANK; unkeyed, it retains the view and keeps painting the PREVIOUS source's
-// bitmap until the new one decodes. There is no third option, which is why 2e2514b / 27f8acb /
-// 8aa3c66 just oscillated between the two flashes. expo-image's recyclingKey is the third
-// option: it resets the view to blank the moment the identity changes, so it can never show a
-// stale frame, and prefetching means there is nothing to wait for.
+// bitmap until the new one decodes. expo-image's recyclingKey is the third option: it resets
+// the view to blank the moment the identity changes, so it can never show a stale frame, and
+// prefetching means there is nothing to wait for. With the index-keyed always-mounted cards a
+// slot never changes exercise in practice, but recyclingKey stays as belt and braces for any
+// future list reorder.
 import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { WorkoutStorage, WorkoutHistory, ExercisePreference } from '../utils/storage';
+import { WorkoutStorage, WorkoutHistory } from '../utils/storage';
 import { useTimer } from '../contexts/TimerContext';
 // Import existing modals and components
 import { TimerModal } from '../components/TimerModal';
@@ -164,7 +257,7 @@ export interface WorkoutLogScreenProps {
   onStartWorkout: () => void;
   onFinishWorkout: () => void;
 
-  /** Optional: custom action handlers */
+  /** Optional: custom action handlers (kept for interface compatibility; unused here) */
   onOpenNotes?: (exerciseIndex: number) => void;
   onOpenHistory?: (exerciseIndex: number) => void;
   onOpenSettings?: (exerciseIndex: number) => void;
@@ -172,6 +265,14 @@ export interface WorkoutLogScreenProps {
   /** Exercise alternatives functionality */
   onExerciseSelect: (exerciseIndex: number, selectedExerciseIndex: number) => void;
   onSetExercisePreference: (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => void;
+  /**
+   * WRITE PATH ONLY now. Which alternative is DISPLAYED is resolved everywhere from
+   * allSetsData's selectedExerciseIndex (the adapter seeds it from these saved
+   * preferences on a fresh workout). Reading preferences for display while the card
+   * read sets data gave two sources of truth that could land from storage at
+   * different times, and the swipe peeks resolving from one while the live card
+   * resolved from the other was itself a content flash across commit.
+   */
   exercisePreferences: { [exerciseName: string]: string };
   /** Superset management */
   onSuperset: (exerciseIndex1: number, exerciseIndex2: number, action: 'link' | 'unlink') => void;
@@ -200,12 +301,23 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 const DEFAULT_THEME = '#22d3ee';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+/**
+ * Stable empties, so a card slot with no data yet receives the SAME array/object
+ * identity every render. ExerciseCard is memoised on shallow prop equality; a fresh
+ * [] literal per render would defeat it.
+ */
+const EMPTY_SETS: SetData[] = [];
+const EMPTY_PREVIOUS: PreviousSets = {};
+const noopRegisterRef = (_ref: TextInput | null) => {};
+const noopFocusField = (_field: 'weight' | 'reps') => {};
+
 // ── Card height arithmetic ──────────────────────────────────────────
-// The pager stage is only as tall as the current card, so its height changes by up to
-// four set rows between exercises. We animate it, which means we need each card's height
-// BEFORE it renders — a measured height (onLayout) would be a frame behind and visibly
-// lag the drag. So it is computed, and every term below is a pinned style constant.
-// If any of these drift from styles.*, the stage will glide and then jump at the end.
+// The pager stage is only as tall as the page position says, and its height changes by
+// up to four set rows between exercises. It is animated (an interpolation of pagePos),
+// which means we need each card's height BEFORE it renders — a measured height
+// (onLayout) would be a frame behind and visibly lag the drag. So it is computed, and
+// every term below is a pinned style constant. If any of these drift from styles.*,
+// the stage will glide and then jump at the end.
 const CARD_IMAGE_H = (SCREEN_WIDTH * 9) / 16; // styles.imageContainer aspectRatio 16/9
 const CARD_TITLE_LINE_H = 26;                 // styles.title.lineHeight
 const CARD_MUSCLES_H = 4 + 16;                // styles.muscles marginTop + lineHeight
@@ -233,16 +345,6 @@ const TICK_GAP = 5;         // styles.progressTicks gap
 // mode it produces.
 const TITLE_CHEVRON_RESERVE = 18 + 8;
 
-const COMPOUND_HINTS = [
-  'bench', 'squat', 'deadlift', 'press', 'row', 'pull-up', 'pullup',
-  'chin-up', 'chinup', 'clean', 'snatch', 'lunge', 'rdl',
-];
-
-const isCompound = (name: string) => {
-  const n = (name || '').toLowerCase();
-  return COMPOUND_HINTS.some((k) => n.includes(k));
-};
-
 // ── Default Epley if not supplied ──────────────────────────────────
 const defaultCalc1RM = (weight: number, reps: number): number => {
   if (!weight || !reps || reps < 1) return 0;
@@ -266,6 +368,167 @@ function convertWeight(weight: number, from: 'kg' | 'lbs', to: 'kg' | 'lbs'): nu
     : Math.round(weight / 2.20462 * 10) / 10;
 }
 
+// ── Muscle groups for alternative exercises ─────────────────────────
+// Module scope: both the card and the parent-level derivations use it, and it
+// depends on nothing but its inputs.
+function getExerciseMuscles(
+  exerciseName: string,
+  fallbackPrimary: string[],
+  fallbackSecondary: string[],
+): { primary: string[]; secondary: string[] } {
+  const name = exerciseName.toLowerCase();
+
+  // Common exercise muscle mappings
+  if (name.includes('bench press')) {
+    return { primary: ['Chest'], secondary: ['Triceps', 'Front Delts'] };
+  } else if (name.includes('incline') && name.includes('press')) {
+    return { primary: ['Upper Chest'], secondary: ['Front Delts', 'Triceps'] };
+  } else if (name.includes('decline') && name.includes('press')) {
+    return { primary: ['Lower Chest'], secondary: ['Triceps', 'Front Delts'] };
+  } else if (name.includes('dumbbell press') && !name.includes('shoulder')) {
+    return { primary: ['Chest'], secondary: ['Triceps', 'Front Delts'] };
+  } else if (name.includes('flye') || name.includes('fly')) {
+    return { primary: ['Chest'], secondary: ['Front Delts'] };
+  } else if (name.includes('overhead press') || name.includes('shoulder press') || name.includes('military press')) {
+    return { primary: ['Shoulders'], secondary: ['Triceps', 'Upper Chest'] };
+  } else if (name.includes('lateral raise') || name.includes('side raise')) {
+    return { primary: ['Side Delts'], secondary: [] };
+  } else if (name.includes('rear delt') || (name.includes('reverse') && name.includes('fly'))) {
+    return { primary: ['Rear Delts'], secondary: ['Rhomboids'] };
+  } else if (name.includes('row') && !name.includes('upright')) {
+    return { primary: ['Lats', 'Middle Traps'], secondary: ['Rear Delts', 'Rhomboids', 'Biceps'] };
+  } else if (name.includes('pulldown') || name.includes('pull-up') || name.includes('pullup')) {
+    return { primary: ['Lats'], secondary: ['Biceps', 'Middle Traps', 'Rear Delts'] };
+  } else if (name.includes('squat')) {
+    return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
+  } else if (name.includes('deadlift')) {
+    if (name.includes('romanian') || name.includes('rdl')) {
+      return { primary: ['Hamstrings', 'Glutes'], secondary: ['Lower Back', 'Traps'] };
+    } else {
+      return { primary: ['Hamstrings', 'Glutes', 'Quads'], secondary: ['Lower Back', 'Traps', 'Lats'] };
+    }
+  } else if (name.includes('lunge')) {
+    return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
+  } else if (name.includes('bicep') || name.includes('curl')) {
+    return { primary: ['Biceps'], secondary: ['Forearms'] };
+  } else if (name.includes('tricep') || (name.includes('extension') && !name.includes('leg'))) {
+    return { primary: ['Triceps'], secondary: [] };
+  } else if (name.includes('calf')) {
+    return { primary: ['Calves'], secondary: [] };
+  } else if (name.includes('leg press')) {
+    return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
+  } else if (name.includes('leg curl')) {
+    return { primary: ['Hamstrings'], secondary: [] };
+  } else if (name.includes('leg extension')) {
+    return { primary: ['Quads'], secondary: [] };
+  }
+
+  // Default fallback to the exercise's own declared muscles if no mapping found
+  return { primary: fallbackPrimary, secondary: fallbackSecondary };
+}
+
+// ── Effective-exercise resolution (single source of truth) ─────────
+// Which variant an exercise slot shows lives in allSetsData: sets[0].selectedExerciseIndex,
+// 0 for the primary and 1+ for an entry in `alternatives`. EVERY consumer of "what is this
+// slot called / what does it look like" goes through this one helper: the live card, the
+// neighbour cards, the Up Next list, and the parent-level derivations for the pinned header
+// and modals. That is what guarantees a card cannot change its content across a commit:
+// there is no second source for it to disagree with.
+function resolveEffectiveExercise(exercise: Exercise, sets: SetData[]): {
+  selectedIndex: number;
+  alternativeNames: string[];
+  allNames: string[];
+  name: string;
+  effective: Exercise;
+} {
+  const selectedIndex = sets.length > 0 ? sets[0].selectedExerciseIndex || 0 : 0;
+  const alternativeNames = (exercise?.alternatives || [])
+    .filter((alt) => alt && typeof alt === 'string')
+    .map((alt) => String(alt));
+  const allNames = [exercise?.exercise || 'Exercise', ...alternativeNames];
+  const name = allNames[selectedIndex] || exercise?.exercise || exercise?.name || 'Exercise';
+
+  let effective = exercise;
+  if (selectedIndex !== 0 && exercise) {
+    const muscles = getExerciseMuscles(
+      name,
+      exercise.primaryMuscles || [],
+      exercise.secondaryMuscles || [],
+    );
+    effective = {
+      ...exercise,
+      exercise: name,
+      name,
+      primaryMuscles: muscles.primary,
+      secondaryMuscles: muscles.secondary,
+      // Same reps_weekly, rir_weekly, etc: alternatives follow the same progression.
+    };
+  }
+
+  return { selectedIndex, alternativeNames, allNames, name, effective };
+}
+
+// Helper function to parse target reps from weekly format
+// Converts "6, 6, 5, 5" or "8-12" to array of rep targets
+function parseTargetReps(repsString: string, setCount: number): string[] {
+  if (!repsString) return [];
+
+  // Handle comma-separated format like "6, 6, 5, 5" — one target per set
+  if (repsString.includes(',')) {
+    return repsString.split(',').map(rep => rep.trim());
+  }
+
+  // A single scheme like "8-12" or "10" is prescribed for every set
+  const scheme = repsString.trim();
+  return scheme ? Array(setCount).fill(scheme) : [];
+}
+
+/** Shown under PREV when last session's set carried no weight at all. */
+const PREV_NO_WEIGHT = '—';
+
+/**
+ * PREV shows last session's load, which is stored in whatever unit it was logged
+ * in — convert it to the unit on screen. Trailing zeros are dropped so a clean
+ * 60kg reads as "60", not "60.0", in a 60px-wide cell.
+ *
+ * Weight is optional: bodyweight work is logged with reps and no load, and stores
+ * as ''. That must render blank, not as a fabricated 0 — "0 × 10" reads as a real
+ * measurement the user never took. Note this is "did not parse", not "is falsy":
+ * a 0 the user actually typed is a genuine reading and still renders as 0.
+ */
+function formatPrevWeight(
+  previous: { weight: string; unit?: 'kg' | 'lbs' },
+  globalUnit: 'kg' | 'lbs',
+): string {
+  const raw = parseFloat(previous.weight);
+  if (!Number.isFinite(raw)) return PREV_NO_WEIGHT;
+
+  const converted = convertWeight(raw, previous.unit ?? globalUnit, globalUnit);
+  return String(Number(converted.toFixed(1)));
+}
+
+/** One { completed, total } per exercise index. Single source of the done-state rule. */
+function computeExerciseProgress(
+  exercises: Exercise[],
+  allSetsData: SetData[][],
+): { completed: number; total: number }[] {
+  return exercises.map((_, idx) => {
+    const sets = allSetsData[idx] || [];
+    const completed = sets.filter((s) => s.completed).length;
+    return { completed, total: sets.length };
+  });
+}
+
+function hexA(hex: string, alpha: number): string {
+  // Convert #RRGGBB or #RGB to rgba(r,g,b,a)
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // ──────────────────────────────────────────────────────────────────
 // Component
 // ──────────────────────────────────────────────────────────────────
@@ -286,12 +549,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     onBack,
     onStartWorkout,
     onFinishWorkout,
-    onOpenNotes,
-    onOpenHistory,
-    onOpenSettings,
     onExerciseSelect,
     onSetExercisePreference,
-    exercisePreferences,
     onSuperset,
     themeColor = DEFAULT_THEME,
     globalUnit = 'kg',
@@ -304,124 +563,262 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   } = props;
 
   const insets = useSafeAreaInsets();
+  const exerciseCount = exercises.length;
 
+  // ── Current-exercise derivations ──────────────────────────────────
+  // The three cards resolve their own content; these parent-level copies exist for
+  // everything OUTSIDE the cards: the pinned History button, the header menu, the
+  // modals, the keyboard accessory and the prescribed-reps autofill.
   const currentExercise = exercises[currentIndex];
-  const currentSets = allSetsData[currentIndex] || [];
+  const currentSets = allSetsData[currentIndex] || EMPTY_SETS;
+  const currentResolved = useMemo(
+    () => (currentExercise ? resolveEffectiveExercise(currentExercise, currentSets) : null),
+    [currentExercise, currentSets],
+  );
+  const effectiveCurrentExercise = currentResolved?.effective;
+  const currentSelectedIndex = currentResolved?.selectedIndex ?? 0;
 
-  // Calculate current exercise alternatives
-  const selectedIndex = currentSets.length > 0 ? currentSets[0].selectedExerciseIndex || 0 : 0;
-  const alternativeNames = (currentExercise?.alternatives || [])
-    .filter(alt => alt && typeof alt === 'string')
-    .map(alt => String(alt));
-  const allExercises = [currentExercise?.exercise || 'Exercise', ...alternativeNames];
-  const currentExerciseName = allExercises[selectedIndex] || currentExercise?.exercise || currentExercise?.name || 'Exercise';
+  // ── Latest-ref trampolines for adapter handlers ────────────────────
+  // The adapter re-renders once a second while the workout timer runs and recreates
+  // every handler each time. Passing those straight into a memoised ExerciseCard
+  // would defeat the memo, so the cards receive these stable wrappers instead. Each
+  // one calls whatever the CURRENT prop is, which preserves the adapter's closure
+  // semantics exactly (including handleSetComplete's deliberate render-closure read;
+  // see the pendingCompletion machinery further down, which compensates for it).
+  const latest = useRef({
+    onSetUpdate,
+    onSetComplete,
+    onSetAdd,
+    onSetTapWhenNotStarted,
+    onExerciseSelect,
+    onSetExercisePreference,
+  });
+  latest.current = {
+    onSetUpdate,
+    onSetComplete,
+    onSetAdd,
+    onSetTapWhenNotStarted,
+    onExerciseSelect,
+    onSetExercisePreference,
+  };
 
-  // Helper function to get muscle groups for specific exercises
-  const getExerciseMuscles = useCallback((exerciseName: string): { primary: string[], secondary: string[] } => {
-    const name = exerciseName.toLowerCase();
+  const stableSetUpdate = useCallback(
+    (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) =>
+      latest.current.onSetUpdate(exerciseIndex, setIndex, field, value),
+    [],
+  );
+  const stableSetAdd = useCallback(
+    (exerciseIndex: number) => latest.current.onSetAdd(exerciseIndex),
+    [],
+  );
+  const stableTapWhenNotStarted = useCallback(
+    () => latest.current.onSetTapWhenNotStarted?.(),
+    [],
+  );
+  const stableExerciseSelect = useCallback(
+    (exerciseIndex: number, selectedExerciseIndex: number) =>
+      latest.current.onExerciseSelect(exerciseIndex, selectedExerciseIndex),
+    [],
+  );
+  const stableSetPreference = useCallback(
+    (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) =>
+      latest.current.onSetExercisePreference(exerciseIndex, primaryExercise, alternatives, selectedAlternative),
+    [],
+  );
 
-    // Common exercise muscle mappings
-    if (name.includes('bench press')) {
-      return { primary: ['Chest'], secondary: ['Triceps', 'Front Delts'] };
-    } else if (name.includes('incline') && name.includes('press')) {
-      return { primary: ['Upper Chest'], secondary: ['Front Delts', 'Triceps'] };
-    } else if (name.includes('decline') && name.includes('press')) {
-      return { primary: ['Lower Chest'], secondary: ['Triceps', 'Front Delts'] };
-    } else if (name.includes('dumbbell press') && !name.includes('shoulder')) {
-      return { primary: ['Chest'], secondary: ['Triceps', 'Front Delts'] };
-    } else if (name.includes('flye') || name.includes('fly')) {
-      return { primary: ['Chest'], secondary: ['Front Delts'] };
-    } else if (name.includes('overhead press') || name.includes('shoulder press') || name.includes('military press')) {
-      return { primary: ['Shoulders'], secondary: ['Triceps', 'Upper Chest'] };
-    } else if (name.includes('lateral raise') || name.includes('side raise')) {
-      return { primary: ['Side Delts'], secondary: [] };
-    } else if (name.includes('rear delt') || (name.includes('reverse') && name.includes('fly'))) {
-      return { primary: ['Rear Delts'], secondary: ['Rhomboids'] };
-    } else if (name.includes('row') && !name.includes('upright')) {
-      return { primary: ['Lats', 'Middle Traps'], secondary: ['Rear Delts', 'Rhomboids', 'Biceps'] };
-    } else if (name.includes('pulldown') || name.includes('pull-up') || name.includes('pullup')) {
-      return { primary: ['Lats'], secondary: ['Biceps', 'Middle Traps', 'Rear Delts'] };
-    } else if (name.includes('squat')) {
-      return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
-    } else if (name.includes('deadlift')) {
-      if (name.includes('romanian') || name.includes('rdl')) {
-        return { primary: ['Hamstrings', 'Glutes'], secondary: ['Lower Back', 'Traps'] };
-      } else {
-        return { primary: ['Hamstrings', 'Glutes', 'Quads'], secondary: ['Lower Back', 'Traps', 'Lats'] };
+  // ── Pager core: ONE absolute page position, in synchronized twins ──
+  // pagePos is the JS-side twin. Since the Up Next list moved onto a native
+  // transform (see upNextTranslate below), pagePos drives NOTHING on screen any
+  // more: its sole job is feeding the pagePosMirror listener, so a gesture can grab
+  // the pager mid-settle without a bridge round-trip from the native value. With no
+  // views attached, its spring costs a few arithmetic ops and a ref write per frame.
+  // The tick indicator keeps its own native-driven twin (indicatorPage), as before.
+  const pagePos = useRef(new Animated.Value(currentIndex)).current;
+  // NATIVE-driven twin, carrying EVERYTHING the pager paints: the three card
+  // transforms and the Up Next list's translateY. Transforms are native-driver
+  // properties, so animations on this value are serialised to native once and run
+  // on the UI thread even while JS is busy — which is why the cards and the list
+  // can no longer move out of step: they are interpolations of the same value on
+  // the same thread. One value cannot serve both drivers (an Animated.Value is
+  // permanently claimed by whichever driver animates it first), hence the twins,
+  // steered with identical inputs everywhere.
+  const cardPos = useRef(new Animated.Value(currentIndex)).current;
+  // True while a drag or its settle is in flight. The interactive card's 1s image
+  // cycling checks it and holds the frame, so a cycle tick cannot land a re-render
+  // in the middle of a gesture.
+  const pagerDraggingRef = useRef(false);
+  // JS mirror of pagePos's current value, so a gesture can grab the pager MID-SETTLE
+  // (rapid flick-flick-flick) and continue from wherever it actually is instead of
+  // snapping. A ref assignment per frame; trivial.
+  const pagePosMirror = useRef(currentIndex);
+  // The index we most recently steered pagePos towards. The currentIndex effect uses
+  // it to tell "we initiated this change" (gesture commit, tap) from an external one
+  // (superset auto-advance), so it never double-drives an animation.
+  const pagePosTarget = useRef(currentIndex);
+  const gestureBase = useRef(currentIndex);
+  // Opacity over the three cards, used only by distant Up Next jumps: fade out, snap
+  // pagePos and index together where ordering cannot paint, fade back in post-commit.
+  const cardsFade = useRef(new Animated.Value(1)).current;
+  const pendingFadeIn = useRef(false);
+
+  // The progress bar's sliding highlight, in TICK UNITS. Native-driven (translateX is
+  // a native-driver property, and the JS thread is already carrying the stage height).
+  // It holds an ABSOLUTE tick position for the same reason pagePos holds an absolute
+  // page: nothing to rebase at commit, so it cannot paint a frame at the old tick.
+  const indicatorPage = useRef(new Animated.Value(currentIndex)).current;
+
+  useEffect(() => {
+    const id = pagePos.addListener(({ value }) => {
+      pagePosMirror.current = value;
+    });
+    return () => pagePos.removeListener(id);
+  }, [pagePos]);
+
+  // Card N's translateX = (N - cardPos) * SCREEN_WIDTH, as an interpolation with the
+  // default 'extend' extrapolation (linear everywhere). Built from the NATIVE twin,
+  // so the whole value → interpolation → transform chain lives on the UI thread once
+  // the first native animation runs. Cached per index so re-renders reuse the same
+  // Animated node instead of re-attaching a fresh one every second.
+  const translateCache = useRef(new Map<number, Animated.AnimatedInterpolation<number>>()).current;
+  const getCardTranslate = useCallback(
+    (n: number) => {
+      let t = translateCache.get(n);
+      if (!t) {
+        t = cardPos.interpolate({
+          inputRange: [n, n + 1],
+          outputRange: [0, -SCREEN_WIDTH],
+        });
+        translateCache.set(n, t);
       }
-    } else if (name.includes('lunge')) {
-      return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
-    } else if (name.includes('bicep') || name.includes('curl')) {
-      return { primary: ['Biceps'], secondary: ['Forearms'] };
-    } else if (name.includes('tricep') || (name.includes('extension') && !name.includes('leg'))) {
-      return { primary: ['Triceps'], secondary: [] };
-    } else if (name.includes('calf')) {
-      return { primary: ['Calves'], secondary: [] };
-    } else if (name.includes('leg press')) {
-      return { primary: ['Quads'], secondary: ['Glutes', 'Hamstrings'] };
-    } else if (name.includes('leg curl')) {
-      return { primary: ['Hamstrings'], secondary: [] };
-    } else if (name.includes('leg extension')) {
-      return { primary: ['Quads'], secondary: [] };
+      return t;
+    },
+    [cardPos, translateCache],
+  );
+
+  // ── React to currentIndex changes ──────────────────────────────────
+  // Three cases:
+  //  1. First real value (a restored workout could in principle start later): SNAP,
+  //     don't fly across ticks and cards.
+  //  2. We initiated it (gesture commit / tap): pagePos is already at or animating to
+  //     this value. Do nothing.
+  //  3. External change (the adapter's superset auto-advance is the only live source,
+  //     always ±1): slide there. Anything further away snaps; with the neighbours
+  //     being the only mounted cards there is nothing to slide across.
+  const pagePosReady = useRef(false);
+  useEffect(() => {
+    if (!pagePosReady.current) {
+      pagePosReady.current = true;
+      pagePosTarget.current = currentIndex;
+      pagePos.setValue(currentIndex);
+      cardPos.setValue(currentIndex);
+      indicatorPage.setValue(currentIndex);
+      return;
     }
+    if (pagePosTarget.current === currentIndex) return;
+    pagePosTarget.current = currentIndex;
 
-    // Default fallback to original exercise muscles if no mapping found
-    return {
-      primary: currentExercise?.primaryMuscles || [],
-      secondary: currentExercise?.secondaryMuscles || []
-    };
-  }, [currentExercise]);
-
-  // Create effective current exercise (primary or selected alternative) - memoized to prevent infinite loops
-  const effectiveCurrentExercise = useMemo(() => {
-    if (selectedIndex === 0) {
-      return currentExercise;
+    const distance = Math.abs(currentIndex - pagePosMirror.current);
+    if (distance <= 1.5) {
+      Animated.timing(pagePos, {
+        toValue: currentIndex,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false, // the JS mirror twin; drives nothing on screen
+      }).start();
+      Animated.timing(cardPos, {
+        toValue: currentIndex,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true, // transforms only; runs on the UI thread
+      }).start();
+    } else {
+      pagePos.setValue(currentIndex);
+      cardPos.setValue(currentIndex);
     }
+    Animated.timing(indicatorPage, {
+      toValue: currentIndex,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [currentIndex, pagePos, cardPos, indicatorPage]);
 
-    // For alternatives, get specific muscle groups for the exercise
-    const muscles = getExerciseMuscles(currentExerciseName);
+  // Second half of a distant jump: the fade-in must not start until the commit has
+  // landed and the new cards are mounted, or it would reveal a blank stage and then
+  // pop. An effect keyed on currentIndex runs after exactly that commit.
+  useEffect(() => {
+    if (!pendingFadeIn.current) return;
+    pendingFadeIn.current = false;
+    Animated.timing(cardsFade, {
+      toValue: 1,
+      duration: 180,
+      easing: Easing.in(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [currentIndex, cardsFade]);
 
-    return {
-      ...currentExercise,
-      exercise: currentExerciseName,
-      name: currentExerciseName,
-      primaryMuscles: muscles.primary,
-      secondaryMuscles: muscles.secondary,
-      // Note: We keep the same reps_weekly, rir_weekly, etc. as alternatives typically follow the same progression
-    };
-  }, [selectedIndex, currentExercise, currentExerciseName, getExerciseMuscles]);
+  /**
+   * Adjacent navigation (gesture commits reuse this shape inline; taps to a
+   * neighbour call it directly). Note the order: steer pagePos, then setState. With
+   * derived positions the setState's timing is irrelevant to what is painted, which
+   * is the entire architecture.
+   */
+  const slideTo = useCallback(
+    (target: number) => {
+      pagePosTarget.current = target;
+      Animated.timing(indicatorPage, {
+        toValue: target,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+      Animated.timing(cardPos, {
+        toValue: target,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true, // transforms only; runs on the UI thread
+      }).start();
+      Animated.timing(pagePos, {
+        toValue: target,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false, // the JS mirror twin; drives nothing on screen
+      }).start();
+      onIndexChange(target);
+    },
+    [indicatorPage, cardPos, pagePos, onIndexChange],
+  );
 
-
-  // Cross-fade animation when swapping focused exercise (used for tap-to-swap)
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-
-  // Ref to the main scroll view so tapping/swapping an exercise can snap back to the top
-  const scrollRef = useRef<ScrollView>(null);
-
-  // Guards against the finish action firing twice (double tap / re-entry).
-  // On a real device a second fire can pop one screen too many; the simulator's
-  // timing usually hides it, which is why the two behave differently.
-  const finishingRef = useRef(false);
-
-  // ── Swipe pager: finger-tracked translate + peeking neighbours ──
-  // dragX follows the finger during a horizontal pan; peek offsets place the
-  // previous/next exercise just off either edge so they slide in as you drag.
-  const dragX = useRef(new Animated.Value(0)).current;
-  const peekLeftX = useRef(Animated.subtract(dragX, SCREEN_WIDTH)).current;
-  const peekRightX = useRef(Animated.add(dragX, SCREEN_WIDTH)).current;
-
-  // The progress bar's sliding highlight, in TICK UNITS (0 = first tick, fractional while
-  // dragging). It is a value of its own rather than an interpolation of dragX for two
-  // reasons. First, dragX can never be native-driven — it feeds the stage's `height`
-  // (cd2049c), which the native driver cannot animate, and one value cannot be both. A
-  // translateX, though, IS a native-driver property, and the JS thread is already carrying
-  // the height. Second, holding an ABSOLUTE position means the interpolation never depends
-  // on currentIndex, so committing a swipe needs no rebase — and therefore cannot paint a
-  // frame at the old tick while the new config crosses the bridge.
-  const indicatorPage = useRef(new Animated.Value(0)).current;
-  // True only while an active horizontal drag is in progress, so neighbour
-  // previews are mounted only during a swipe (idle render stays unchanged).
-  const [isPaging, setIsPaging] = useState(false);
+  /**
+   * Distant navigation (Up Next tap two or more exercises away). The target's card is
+   * not mounted, so there is nothing to slide across; instead the cards fade out, the
+   * page position and index snap together behind opacity 0 (where their relative
+   * ordering cannot paint anything), and the post-commit effect above fades back in.
+   * The pinned tick indicator stays visible and slides across the ticks meanwhile.
+   */
+  const jumpTo = useCallback(
+    (target: number) => {
+      pagePosTarget.current = target;
+      Animated.timing(cardsFade, {
+        toValue: 0,
+        duration: 120,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
+        pagePos.setValue(target);
+        cardPos.setValue(target);
+        Animated.timing(indicatorPage, {
+          toValue: target,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+        pendingFadeIn.current = true;
+        onIndexChange(target);
+      });
+    },
+    [cardsFade, pagePos, cardPos, indicatorPage, onIndexChange],
+  );
 
   // ── Header dropdown menu animation (panel + staggered rows) ──────
   const menuAnim = useRef(new Animated.Value(0)).current; // panel opacity/scale
@@ -432,39 +829,214 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     new Animated.Value(0), // Notes
     new Animated.Value(0), // How it works
   ]).current;
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
 
-  // Dropdown arrow rotation animation (for the exercise-alternatives selector)
-  const arrowRotation = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (headerMenuOpen) {
+      menuRowAnims.forEach((a) => a.setValue(0));
+      Animated.parallel([
+        Animated.timing(menuAnim, {
+          toValue: 1,
+          duration: 160,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        ...menuRowAnims.map((a, i) =>
+          Animated.timing(a, {
+            toValue: 1,
+            duration: 160,
+            delay: 40 + i * 45, // top-to-bottom stagger
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ),
+      ]).start();
+    } else {
+      Animated.timing(menuAnim, {
+        toValue: 0,
+        duration: 130,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [headerMenuOpen]);
 
-  // Exercise alternatives dropdown animation
-  const dropdownOpacity = useRef(new Animated.Value(0)).current;
-  const dropdownScale = useRef(new Animated.Value(0.95)).current;
+  // ── Warm image cache ───────────────────────────────────────────────
+  // Every exercise AND every alternative, both start and end frames, resolved and
+  // decoded up front while the user is reading the first exercise. The cards read
+  // this map for their first frame, so a card sliding in never waits on a resolve.
+  const [miniCardImages, setMiniCardImages] = useState<Map<string, {start: any, end: any} | null>>(new Map());
 
-  // Image cache (in-memory; pair with AsyncStorage in production)
-  const [imageCache, setImageCache] = useState<Record<string, string | null>>({});
-  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    if (resolveExerciseImagePair && exercises.length > 0) {
+      const loadAllImages = async () => {
+        const newImagesMap = new Map<string, {start: any, end: any} | null>();
 
-  // Image cycling for exercise animations (start/end positions)
-  const [imagePairs, setImagePairs] = useState<Record<string, {start: any, end: any}>>({});
-  const [currentImagePhase, setCurrentImagePhase] = useState<'start' | 'end'>('start');
-  const cyclingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const currentCyclingKeyRef = useRef<string | null>(null);
+        const promises = exercises.map(async (exercise) => {
+          const exerciseKey = exercise.exercise || exercise.name || '';
 
-  // Finish workout confirmation / summary modal
-  const [showFinishModal, setShowFinishModal] = useState(false);
+          // Load images for the primary exercise
+          try {
+            const images = await resolveExerciseImagePair(exercise);
+            newImagesMap.set(exerciseKey, images);
+          } catch (error) {
+            newImagesMap.set(exerciseKey, null);
+          }
 
-  // Superset selection modal
-  const [showSupersetModal, setShowSupersetModal] = useState(false);
-  const [supersetSourceIndex, setSupersetSourceIndex] = useState<number | null>(null);
+          // Also load images for all alternatives
+          if (exercise.alternatives && exercise.alternatives.length > 0) {
+            const alternativePromises = exercise.alternatives.map(async (alternative: string) => {
+              if (alternative && typeof alternative === 'string') {
+                try {
+                  const altImages = await resolveExerciseImagePair({ exercise: alternative, name: alternative, sets: 0, reps: 0 });
+                  newImagesMap.set(alternative, altImages);
+                } catch (error) {
+                  newImagesMap.set(alternative, null);
+                }
+              }
+            });
+            await Promise.all(alternativePromises);
+          }
+        });
+
+        await Promise.all(promises);
+        setMiniCardImages(newImagesMap);
+
+        // Warm every frame now — both the start AND end frames, since the cycling
+        // animation swaps between them, and every alternative, since one can be
+        // selected at any time. Piggybacks on the resolve pass above rather than
+        // walking the list a second time.
+        //
+        // Asset.loadAsync, NOT Image.prefetch. expo-image's prefetch takes URL strings;
+        // these frames are require()'d bundled modules (see exerciseImages.ts), so
+        // prefetch would silently do nothing with them. Asset.loadAsync is the API for
+        // bundled assets — it is also what src/utils/imagePreloader.ts uses. Any frame
+        // that IS a string URI still goes through prefetch.
+        const frames = Array.from(newImagesMap.values())
+          .filter((pair): pair is { start: any; end: any } => !!pair)
+          .flatMap((pair) => [pair.start, pair.end])
+          .filter(Boolean);
+
+        const bundled = frames.filter((f) => typeof f !== 'string');
+        const remote = frames.filter((f): f is string => typeof f === 'string');
+
+        await Promise.allSettled([
+          bundled.length ? Asset.loadAsync(bundled) : Promise.resolve(),
+          remote.length ? Image.prefetch(remote, 'memory-disk') : Promise.resolve(),
+        ]);
+        console.log(
+          `🖼️ [WORKOUT] Warmed ${bundled.length} bundled + ${remote.length} remote exercise frames`,
+        );
+      };
+
+      loadAllImages();
+    }
+  }, [exercises, resolveExerciseImagePair, themeColor]);
+
+  // ── Load previous-session data for every exercise (+ alternatives) ──
+  // Used both by the PREV column (most recent session) and by PR detection
+  // (best estimated 1RM across all history).
+  const [previousByExercise, setPreviousByExercise] = useState<Record<string, PreviousSets>>({});
+  const [historyByExercise, setHistoryByExercise] = useState<Record<string, WorkoutHistory[]>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadHistory = async () => {
+      const prevMap: Record<string, PreviousSets> = {};
+      const histMap: Record<string, WorkoutHistory[]> = {};
+
+      for (const ex of exercises) {
+        const names = [
+          ex.exercise || ex.name || '',
+          ...((ex.alternatives || []).filter((a) => a && typeof a === 'string').map(String)),
+        ];
+
+        for (const name of names) {
+          if (!name || histMap[name]) continue; // skip blanks / already-loaded
+          try {
+            const hist = await WorkoutStorage.getExerciseHistory(name);
+            histMap[name] = hist;
+
+            // Most recent prior session → set-by-set reference
+            const sorted = [...hist].sort(
+              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+            );
+            const latestEntry = sorted[0];
+            if (latestEntry) {
+              const setsMap: PreviousSets = {};
+              latestEntry.sets.forEach((s) => {
+                setsMap[s.setNumber] = { weight: s.weight, reps: s.reps, unit: s.unit };
+              });
+              prevMap[name] = setsMap;
+            }
+          } catch (error) {
+            // Non-fatal — just no reference for this exercise
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setPreviousByExercise(prevMap);
+        setHistoryByExercise(histMap);
+      }
+    };
+
+    loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [exercises]);
+
+  // ── Timer context ──────────────────────────────────────────────────
+  const { timer, stopTimer, showModal: showTimerModal } = useTimer();
+
+  // Keep a ref to the latest stopTimer so the unmount cleanup always calls the
+  // current one (avoids a stale closure tearing down the wrong timer).
+  const stopTimerRef = useRef(stopTimer);
+  stopTimerRef.current = stopTimer;
+
+  // When this screen goes away (finish, back button, swipe-back, or hardware
+  // back), kill any running rest timer so it can't keep counting down and
+  // buzzing after the workout is over.
+  useEffect(() => {
+    return () => {
+      stopTimerRef.current?.();
+    };
+  }, []);
+
+  // Format timer display for rest timer badge
+  const getRestTimerDisplay = (): string => {
+    if (!timer) return '0:00';
+
+    if (timer.isCountUp) {
+      // Count up mode - show elapsed time
+      const elapsed = timer.timeElapsed;
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    } else {
+      // Countdown mode - show remaining time
+      const remaining = Math.max(0, timer.targetTime - timer.timeElapsed);
+      const minutes = Math.floor(remaining / 60);
+      const seconds = remaining % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  };
 
   // ── Keyboard "Log set" accessory state ───────────────────────────
   // Which set/field currently owns the keyboard (always within current exercise).
   const [focusedSet, setFocusedSet] = useState<{ setIndex: number; field: 'weight' | 'reps' } | null>(null);
   // Weight inputs of the current exercise, keyed by set index, so "Log set"
-  // can advance focus to the next set's weight field.
+  // can advance focus to the next set's weight field. Only the INTERACTIVE card
+  // registers into this map (the neighbour cards receive a no-op), so a neighbour
+  // can never clobber the live card's refs.
   const weightInputRefs = useRef<Record<number, TextInput | null>>({});
   const registerWeightRef = useCallback((setIndex: number, ref: TextInput | null) => {
     weightInputRefs.current[setIndex] = ref;
+  }, []);
+  const handleFocusField = useCallback((setIndex: number, field: 'weight' | 'reps') => {
+    setFocusedSet({ setIndex, field });
   }, []);
 
   // Keyboard height drives the floating accessory bar's position.
@@ -488,56 +1060,56 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     };
   }, []);
 
-  // ── Previous-session reference + full history (for PREV column + PRs) ──
-  const [previousByExercise, setPreviousByExercise] = useState<Record<string, PreviousSets>>({});
-  const [historyByExercise, setHistoryByExercise] = useState<Record<string, WorkoutHistory[]>>({});
+  // Reset keyboard focus tracking + weight input refs when the focused exercise
+  // (or its selected variant) changes: set counts differ per exercise.
+  useEffect(() => {
+    weightInputRefs.current = {};
+    setFocusedSet(null);
+  }, [currentIndex, currentSelectedIndex]);
 
-  // Format timer display for rest timer badge
-  const getRestTimerDisplay = (): string => {
-    if (!timer) return '0:00';
+  // ── Modal state ────────────────────────────────────────────────────
+  const [showFinishModal, setShowFinishModal] = useState(false);
+  // Guards against the finish action firing twice (double tap / re-entry).
+  // On a real device a second fire can pop one screen too many; the simulator's
+  // timing usually hides it, which is why the two behave differently.
+  const finishingRef = useRef(false);
 
-    if (timer.isCountUp) {
-      // Count up mode - show elapsed time
-      const elapsed = timer.timeElapsed;
-      const minutes = Math.floor(elapsed / 60);
-      const seconds = elapsed % 60;
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    } else {
-      // Countdown mode - show remaining time
-      const remaining = Math.max(0, timer.targetTime - timer.timeElapsed);
-      const minutes = Math.floor(remaining / 60);
-      const seconds = remaining % 60;
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-  };
+  const [showSupersetModal, setShowSupersetModal] = useState(false);
+  const [supersetSourceIndex, setSupersetSourceIndex] = useState<number | null>(null);
 
-  // History, Notes, Settings state
-  const [showHistory, setShowHistory] = useState<string | null>(null);
   const [exerciseHistory, setExerciseHistory] = useState<WorkoutHistory[]>([]);
   const [showNotes, setShowNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
   const [showExerciseNotes, setShowExerciseNotes] = useState<{ exerciseName: string; exerciseIndex: number } | null>(null);
   const [exerciseNotes, setExerciseNotes] = useState<{ [exerciseIndex: number]: NoteEntry[] }>({});
-  const [exerciseInSettings, setExerciseInSettings] = useState<number | null>(null);
-
-  // Header dropdown menu open state
-  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-
-  // Delete set modal state
   const [showDeleteSetModal, setShowDeleteSetModal] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
-
-  // Workout Heatmap Modal state
   const [showWorkoutHeatmap, setShowWorkoutHeatmap] = useState(false);
-
-  // "How it works" education modal state
   const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [showWorkoutHistory, setShowWorkoutHistory] = useState<{
+    exerciseName: string;
+    exerciseIndex: number;
+  } | null>(null);
+  const [show1RMProgression, setShow1RMProgression] = useState<{
+    exerciseName: string;
+    exerciseIndex: number;
+  } | null>(null);
 
-  // Exercise selector dropdown state
-  const [showExerciseSelector, setShowExerciseSelector] = useState<number | null>(null);
+  // Load history data when showWorkoutHistory changes
+  useEffect(() => {
+    const loadHistoryData = async () => {
+      if (showWorkoutHistory) {
+        const history = await WorkoutStorage.getExerciseHistory(showWorkoutHistory.exerciseName);
+        setExerciseHistory(history);
+      }
+    };
+    loadHistoryData();
+  }, [showWorkoutHistory]);
+
+  // ── Title wrap tracking ────────────────────────────────────────────
+  // Record whether an exercise's title wraps. All three mounted cards report it, so a
+  // neighbour's height is known BEFORE it slides in rather than only once it becomes
+  // current. No-ops when unchanged, so it cannot churn renders mid-drag.
   const [isMultiLine, setIsMultiLine] = useState<Map<number, boolean>>(new Map());
 
-  // Record whether an exercise's title wraps. The live card and the peek previews both
-  // report it, so a neighbour's height is known BEFORE it slides in rather than only
-  // once it becomes current. No-ops when unchanged, so it cannot churn renders mid-drag.
   const handleTitleMeasured = useCallback((idx: number, multi: boolean) => {
     setIsMultiLine((prev) => {
       if (prev.get(idx) === multi) return prev;
@@ -548,8 +1120,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   }, []);
 
   // ── Pager stage height ───────────────────────────────────────────
-  // Every exercise's card height, computed (not measured) so the stage can start
-  // resizing on the first frame of a drag. See the CARD_* constants.
+  // Every exercise's card height, computed (not measured) so the Up Next transform's
+  // output range and the stage's fixed height are known BEFORE the first frame of a
+  // drag. See the CARD_* constants.
   const cardHeights = useMemo(
     () =>
       exercises.map((ex, idx) => {
@@ -591,367 +1164,46 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     [exercises, allSetsData, currentWeek, isMultiLine],
   );
 
-  const currentCardH = cardHeights[currentIndex] ?? 0;
+  // The stage's LAYOUT height: fixed at the tallest card in the workout. It is not
+  // animated at all any more. Animating `height` was the last JS-driven motion on
+  // this screen: layout properties cannot use the native driver, so every frame of
+  // the old height spring needed the JS thread exactly when the commit render was
+  // hogging it, and the Up Next list (positioned by that height) visibly skipped
+  // frames against the natively driven cards. A box as tall as the tallest card
+  // also means an incoming neighbour can never be clipped, by construction.
+  // Changes only when set counts or title wraps change, at rest, as a snap.
+  const stageMaxHeight = useMemo(
+    () => (cardHeights.length ? Math.max(...cardHeights) : 0),
+    [cardHeights],
+  );
 
-  // The stage's height at rest. Animated on its own only when the CURRENT card changes
-  // shape (a set added or removed); during a drag the delta below does the work.
-  const stageBaseH = useRef(new Animated.Value(currentCardH)).current;
-  const stageHeightReady = useRef(false);
-
-  useEffect(() => {
-    if (!currentCardH) return;
-    if (!stageHeightReady.current) {
-      // First real measurement — snap, don't animate, or the card unfolds on mount.
-      stageHeightReady.current = true;
-      stageBaseH.setValue(currentCardH);
-      return;
-    }
-    Animated.timing(stageBaseH, {
-      toValue: currentCardH,
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false, // height is not a native-driver prop
-    }).start();
-  }, [currentCardH, stageBaseH]);
-
-  // Keep the highlight on the current exercise when the index changes WITHOUT a swipe —
-  // tapping an Up Next card, or a superset auto-advance. After a committed swipe this is a
-  // no-op: the gesture already animated it to exactly this value.
-  const indicatorReady = useRef(false);
-  useEffect(() => {
-    if (!indicatorReady.current) {
-      // Restoring a workout can start on a later exercise; land there, don't fly there.
-      indicatorReady.current = true;
-      indicatorPage.setValue(currentIndex);
-      return;
-    }
-    Animated.timing(indicatorPage, {
-      toValue: currentIndex,
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true, // translateX — unlike height, this can leave the JS thread
-    }).start();
-  }, [currentIndex, indicatorPage]);
-
-  // Grow/shrink the stage in step with the finger, so a taller neighbour is never clipped
-  // by pagerStage's overflow:'hidden' as it slides in. At the ends of the list there is no
-  // neighbour, so the delta is 0 and the height holds still through the rubber-band.
-  const stageHeight = useMemo(() => {
-    const prevH = cardHeights[currentIndex - 1];
-    const nextH = cardHeights[currentIndex + 1];
-    return Animated.add(
-      stageBaseH,
-      dragX.interpolate({
-        inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-        outputRange: [
-          (nextH ?? currentCardH) - currentCardH, // dragging left: next slides in
-          0,
-          (prevH ?? currentCardH) - currentCardH, // dragging right: prev slides in
-        ],
-        extrapolate: 'clamp',
-      }),
-    );
-  }, [cardHeights, currentIndex, currentCardH, stageBaseH, dragX]);
-
-  // Header dropdown staggered animation effect
-  useEffect(() => {
-    if (headerMenuOpen) {
-      menuRowAnims.forEach((a) => a.setValue(0));
-      Animated.parallel([
-        Animated.timing(menuAnim, {
-          toValue: 1,
-          duration: 160,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        ...menuRowAnims.map((a, i) =>
-          Animated.timing(a, {
-            toValue: 1,
-            duration: 160,
-            delay: 40 + i * 45, // top-to-bottom stagger
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ),
-      ]).start();
-    } else {
-      Animated.timing(menuAnim, {
-        toValue: 0,
-        duration: 130,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [headerMenuOpen]);
-
-  // Dropdown arrow rotation and alternatives animation effect
-  useEffect(() => {
-    if (showExerciseSelector !== null) {
-      // Opening: animate arrow rotation and dropdown appearance
-      Animated.parallel([
-        Animated.timing(arrowRotation, {
-          toValue: 1,
-          duration: 200,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(dropdownOpacity, {
-          toValue: 1,
-          duration: 250,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(dropdownScale, {
-          toValue: 1,
-          duration: 200,
-          easing: Easing.out(Easing.back(1.1)),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      // Closing: animate arrow rotation and dropdown disappearance
-      Animated.parallel([
-        Animated.timing(arrowRotation, {
-          toValue: 0,
-          duration: 150,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(dropdownOpacity, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dropdownScale, {
-          toValue: 0.95,
-          duration: 150,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [showExerciseSelector]);
-
-  // Mini card images cache (separate from main exercise images) - using state to trigger re-renders when loaded
-  const [miniCardImages, setMiniCardImages] = useState<Map<string, {start: any, end: any} | null>>(new Map());
-
-  // Pre-load all mini card images when component mounts or theme changes
-  useEffect(() => {
-    if (resolveExerciseImagePair && exercises.length > 0) {
-      const loadAllImages = async () => {
-        const newImagesMap = new Map<string, {start: any, end: any} | null>();
-
-        const promises = exercises.map(async (exercise) => {
-          const exerciseKey = exercise.exercise || exercise.name || '';
-
-          // Load images for the primary exercise
-          try {
-            const images = await resolveExerciseImagePair(exercise);
-            newImagesMap.set(exerciseKey, images);
-          } catch (error) {
-            newImagesMap.set(exerciseKey, null);
-          }
-
-          // Also load images for all alternatives
-          if (exercise.alternatives && exercise.alternatives.length > 0) {
-            const alternativePromises = exercise.alternatives.map(async (alternative: string) => {
-              if (alternative && typeof alternative === 'string') {
-                try {
-                  const altImages = await resolveExerciseImagePair({ exercise: alternative, name: alternative, sets: 0, reps: 0 });
-                  newImagesMap.set(alternative, altImages);
-                } catch (error) {
-                  newImagesMap.set(alternative, null);
-                }
-              }
-            });
-            await Promise.all(alternativePromises);
-          }
-        });
-
-        await Promise.all(promises);
-        setMiniCardImages(newImagesMap);
-
-        // Warm every frame now, while the user is reading the first exercise — both the start
-        // AND end frames, since the cycling animation swaps between them, and every alternative,
-        // since one can be selected at any time.
-        //
-        // This is what makes recyclingKey free: it blanks the view on an exercise change, so
-        // without a warm cache that blank would be visible for exactly as long as the load
-        // takes. Piggybacks on the resolve pass above rather than walking the list a second time.
-        //
-        // Asset.loadAsync, NOT Image.prefetch. expo-image's prefetch takes URL strings; these
-        // frames are require()'d bundled modules (see exerciseImages.ts), so prefetch would
-        // silently do nothing with them. Asset.loadAsync is the API for bundled assets — it is
-        // also what src/utils/imagePreloader.ts uses. Any frame that IS a string URI still goes
-        // through prefetch.
-        const frames = Array.from(newImagesMap.values())
-          .filter((pair): pair is { start: any; end: any } => !!pair)
-          .flatMap((pair) => [pair.start, pair.end])
-          .filter(Boolean);
-
-        const bundled = frames.filter((f) => typeof f !== 'string');
-        const remote = frames.filter((f): f is string => typeof f === 'string');
-
-        await Promise.allSettled([
-          bundled.length ? Asset.loadAsync(bundled) : Promise.resolve(),
-          remote.length ? Image.prefetch(remote, 'memory-disk') : Promise.resolve(),
-        ]);
-        console.log(
-          `🖼️ [WORKOUT] Warmed ${bundled.length} bundled + ${remote.length} remote exercise frames`,
-        );
-      };
-
-      loadAllImages();
-    }
-  }, [exercises, resolveExerciseImagePair, themeColor]);
-
-  // ── Load previous-session data for every exercise (+ alternatives) ──
-  // Used both by the PREV column (most recent session) and by PR detection
-  // (best estimated 1RM across all history).
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadHistory = async () => {
-      const prevMap: Record<string, PreviousSets> = {};
-      const histMap: Record<string, WorkoutHistory[]> = {};
-
-      for (const ex of exercises) {
-        const names = [
-          ex.exercise || ex.name || '',
-          ...((ex.alternatives || []).filter((a) => a && typeof a === 'string').map(String)),
-        ];
-
-        for (const name of names) {
-          if (!name || histMap[name]) continue; // skip blanks / already-loaded
-          try {
-            const hist = await WorkoutStorage.getExerciseHistory(name);
-            histMap[name] = hist;
-
-            // Most recent prior session → set-by-set reference
-            const sorted = [...hist].sort(
-              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-            );
-            const latest = sorted[0];
-            if (latest) {
-              const setsMap: PreviousSets = {};
-              latest.sets.forEach((s) => {
-                setsMap[s.setNumber] = { weight: s.weight, reps: s.reps, unit: s.unit };
-              });
-              prevMap[name] = setsMap;
-            }
-          } catch (error) {
-            // Non-fatal — just no reference for this exercise
-          }
-        }
-      }
-
-      if (!cancelled) {
-        setPreviousByExercise(prevMap);
-        setHistoryByExercise(histMap);
-      }
-    };
-
-    loadHistory();
-    return () => {
-      cancelled = true;
-    };
-  }, [exercises]);
-
-  // Workout History Modal state
-  const [showWorkoutHistory, setShowWorkoutHistory] = useState<{
-    exerciseName: string;
-    exerciseIndex: number;
-  } | null>(null);
-
-  // 1RM Progression Modal state
-  const [show1RMProgression, setShow1RMProgression] = useState<{
-    exerciseName: string;
-    exerciseIndex: number;
-  } | null>(null);
-
-
-  // Timer context
-  const { timer, stopTimer, showModal: showTimerModal } = useTimer();
-
-  // Keep a ref to the latest stopTimer so the unmount cleanup always calls the
-  // current one (avoids a stale closure tearing down the wrong timer).
-  const stopTimerRef = useRef(stopTimer);
-  stopTimerRef.current = stopTimer;
-
-  // When this screen goes away (finish, back button, swipe-back, or hardware
-  // back), kill any running rest timer so it can't keep counting down and
-  // buzzing after the workout is over.
-  useEffect(() => {
-    return () => {
-      stopTimerRef.current?.();
-    };
-  }, []);
-
-  // Calculate workout duration for display on finish button
-  const [workoutDuration, setWorkoutDuration] = useState(0);
-
-  // Update workout duration in real-time
-  useEffect(() => {
-    if (!workoutStartTime) {
-      setWorkoutDuration(0);
-      return;
-    }
-
-    const updateDuration = () => {
-      const elapsed = Math.floor((Date.now() - workoutStartTime.getTime()) / 1000);
-      setWorkoutDuration(elapsed);
-    };
-
-    // Update immediately
-    updateDuration();
-
-    // Update every second
-    const interval = setInterval(updateDuration, 1000);
-
-    return () => clearInterval(interval);
-  }, [workoutStartTime]);
-
-  // Format workout duration as MM:SS
-  const formatWorkoutDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Handle finish workout button press → open the summary modal
-  const handleFinishWorkoutPress = () => {
-    Keyboard.dismiss();
-    setFocusedSet(null);
-    finishingRef.current = false; // allow a fresh finish each time the modal opens
-    setShowFinishModal(true);
-  };
-
-  // Confirm finish workout
-  const confirmFinishWorkout = () => {
-    if (finishingRef.current) return; // ignore repeat taps / re-entry
-    finishingRef.current = true;
-    stopTimer(); // kill any running rest timer so it can't buzz after completion
-    setShowFinishModal(false);
-    onFinishWorkout();
-  };
-
-  const handleExerciseLongPress = useCallback((exerciseIndex: number) => {
-    setSupersetSourceIndex(exerciseIndex);
-    setShowSupersetModal(true);
-  }, []);
-
-  // Open full history for the current exercise (top-level header icon)
-  const openHistoryForCurrent = () => {
-    setHeaderMenuOpen(false);
-    setShowWorkoutHistory({
-      exerciseName: effectiveCurrentExercise.exercise,
-      exerciseIndex: currentIndex,
+  // What the old animated height actually did visually was position the Up Next
+  // list. That job now belongs to a translateY derived from cardPos, the SAME
+  // native value the card transforms ride: the list is pulled up into the gap
+  // below a shorter card by exactly (cardHeight - stageMaxHeight), interpolated
+  // across every exercise. Because list and cards are interpolations of one value
+  // on one thread, they are pixel-locked through drags, settles, and rubber-bands;
+  // no JS hiccup can move them out of step. The clamp keeps the list still through
+  // the end-of-list rubber-band, as the height clamp did before.
+  //
+  // The trade: the scroll content's layout length is now constant per workout, so
+  // on exercises shorter than the tallest one there is extra scrollable black
+  // beneath the list (up to the height difference). In this UI that reads as
+  // padding. If that ever bothers more than the jank did, revert to interpolating
+  // pagePos into the stage height and accept the JS-driven list motion.
+  const upNextTranslate = useMemo(() => {
+    if (cardHeights.length < 2) return 0;
+    const maxH = Math.max(...cardHeights);
+    return cardPos.interpolate({
+      inputRange: cardHeights.map((_, i) => i),
+      outputRange: cardHeights.map((h) => h - maxH), // ≤ 0: pull up into the gap
+      extrapolate: 'clamp',
     });
-  };
+  }, [cardHeights, cardPos]);
 
   // ── Prescribed reps for the current exercise ─────────────────────
   // Same derivation SetsTable uses for the greyed placeholder, lifted here so
-  // both completion paths can commit it. Reuses parseTargetReps (hoisted below).
+  // both completion paths can commit it.
   const currentTargetReps = useMemo(() => {
     const weeklyReps =
       effectiveCurrentExercise?.reps_weekly?.[String(currentWeek)] ?? effectiveCurrentExercise?.reps;
@@ -959,41 +1211,55 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   }, [effectiveCurrentExercise, currentWeek, currentSets.length]);
 
   // A set completed with blank reps is marked done but silently skips history,
-  // the rest timer and the superset transition (the adapter gates all three on
-  // `weight && reps`). The user saw the prescription as a placeholder and assumed
-  // it was logged, so commit it for them — but only when it is unambiguous.
+  // the rest timer and the superset transition (the adapter gates history on
+  // `reps`). The user saw the prescription as a placeholder and assumed it was
+  // logged, so commit it for them — but only when it is unambiguous.
   const [pendingCompletion, setPendingCompletion] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
 
+  // Refs so completeSet can be identity-stable for the memoised cards while always
+  // reading the latest committed data. Reading refs at call time gives the same
+  // values the freshest render closure would have, which is what the old inline
+  // useCallback read anyway.
+  const allSetsDataRef = useRef(allSetsData);
+  allSetsDataRef.current = allSetsData;
+  const currentIndexRef = useRef(currentIndex);
+  currentIndexRef.current = currentIndex;
+  const currentTargetRepsRef = useRef(currentTargetReps);
+  currentTargetRepsRef.current = currentTargetReps;
+
   const completeSet = useCallback((exerciseIndex: number, setIndex: number) => {
-    const set = allSetsData[exerciseIndex]?.[setIndex];
+    const set = allSetsDataRef.current[exerciseIndex]?.[setIndex];
 
     // Un-completing, no set, or reps the user actually typed: never autofill.
     if (!set || set.completed || set.reps?.trim()) {
-      onSetComplete(exerciseIndex, setIndex);
+      latest.current.onSetComplete(exerciseIndex, setIndex);
       return;
     }
 
     // Only the focused exercise has a target array in scope.
-    const target = exerciseIndex === currentIndex ? currentTargetReps[setIndex]?.trim() : undefined;
+    const target =
+      exerciseIndex === currentIndexRef.current
+        ? currentTargetRepsRef.current[setIndex]?.trim()
+        : undefined;
 
     // Defensive: a user-imported program can prescribe a range ("8-12"). We will
     // not guess which end the user hit — leave reps blank rather than invent one.
     if (!target || !/^\d+$/.test(target) || parseInt(target, 10) <= 0) {
-      onSetComplete(exerciseIndex, setIndex);
+      latest.current.onSetComplete(exerciseIndex, setIndex);
       return;
     }
 
     // Write the reps, then defer completion — see the effect below for why.
-    onSetUpdate(exerciseIndex, setIndex, 'reps', target);
+    latest.current.onSetUpdate(exerciseIndex, setIndex, 'reps', target);
     setPendingCompletion({ exerciseIndex, setIndex });
-  }, [allSetsData, currentIndex, currentTargetReps, onSetUpdate, onSetComplete]);
+  }, []);
 
   // The adapter's handleSetComplete reads `allSetsData` from its render closure
   // rather than via a functional update, so completing in the same tick as the
-  // reps write would read reps:'' — skipping history/timer/superset — and its
-  // own setAllSetsData would then clobber the value we just wrote. Waiting for
-  // the updated `allSetsData` prop to arrive means the onSetComplete we call is
-  // the one closing over the state that already contains the reps.
+  // reps write would read reps:'' — skipping history — and its own setAllSetsData
+  // would then clobber the value we just wrote. Waiting for the updated
+  // `allSetsData` prop to arrive means the onSetComplete we call is the one
+  // closing over the state that already contains the reps.
   useEffect(() => {
     if (!pendingCompletion) return;
     const { exerciseIndex, setIndex } = pendingCompletion;
@@ -1006,8 +1272,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     if (!set.reps) return; // autofill not visible yet — wait for the next render
 
     setPendingCompletion(null);
-    onSetComplete(exerciseIndex, setIndex);
-  }, [pendingCompletion, allSetsData, onSetComplete]);
+    latest.current.onSetComplete(exerciseIndex, setIndex);
+  }, [pendingCompletion, allSetsData]);
 
   // ── "Log set" from the keyboard accessory ────────────────────────
   // Completes the focused set (same as tapping the circle) and advances
@@ -1058,292 +1324,85 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const accessoryVisible = focusedSet !== null && keyboardHeight > 0;
   const accessoryBottom = Platform.OS === 'ios' ? keyboardHeight : 0;
 
-  // Load history data when showWorkoutHistory changes
+  // ── Workout duration (for the finish button) ──────────────────────
+  const [workoutDuration, setWorkoutDuration] = useState(0);
+
   useEffect(() => {
-    const loadHistoryData = async () => {
-      if (showWorkoutHistory) {
-        const history = await WorkoutStorage.getExerciseHistory(showWorkoutHistory.exerciseName);
-        setExerciseHistory(history);
-      }
+    if (!workoutStartTime) {
+      setWorkoutDuration(0);
+      return;
+    }
+
+    const updateDuration = () => {
+      const elapsed = Math.floor((Date.now() - workoutStartTime.getTime()) / 1000);
+      setWorkoutDuration(elapsed);
     };
-    loadHistoryData();
-  }, [showWorkoutHistory]);
 
+    // Update immediately
+    updateDuration();
 
+    // Update every second
+    const interval = setInterval(updateDuration, 1000);
 
+    return () => clearInterval(interval);
+  }, [workoutStartTime]);
 
-  // Resolve image for current exercise (lazy, cached)
-  useEffect(() => {
-    if (!effectiveCurrentExercise) {
-      return;
-    }
+  // Format workout duration as MM:SS
+  const formatWorkoutDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
-    const key = `${effectiveCurrentExercise.exercise || effectiveCurrentExercise.name || ''}-${themeColor}`;
+  // Handle finish workout button press → open the summary modal
+  const handleFinishWorkoutPress = () => {
+    Keyboard.dismiss();
+    setFocusedSet(null);
+    finishingRef.current = false; // allow a fresh finish each time the modal opens
+    setShowFinishModal(true);
+  };
 
-    // Don't try to reload if we already tried and failed (null means we tried and failed)
-    if (key in imageCache) {
-      // Even though images are cached, we need to restart cycling for the new color theme
-      const cachedImagePair = imagePairs[key];
-      if (cachedImagePair && cachedImagePair.start && cachedImagePair.end) {
-        // Start cycling immediately (the startImageCycling function now prevents duplicates)
-        startImageCycling(key, cachedImagePair);
-      }
+  // Confirm finish workout
+  const confirmFinishWorkout = () => {
+    if (finishingRef.current) return; // ignore repeat taps / re-entry
+    finishingRef.current = true;
+    stopTimer(); // kill any running rest timer so it can't buzz after completion
+    setShowFinishModal(false);
+    onFinishWorkout();
+  };
 
-      return; // already resolved (or null)
-    }
-
-    if (effectiveCurrentExercise.imageUrl) {
-      setImageCache((c) => ({ ...c, [key]: effectiveCurrentExercise.imageUrl! }));
-      return;
-    }
-
-    // Try the new image pair resolver first (for cycling animations)
-    if (resolveExerciseImagePair) {
-      setImageLoading((s) => ({ ...s, [key]: true }));
-
-      resolveExerciseImagePair(effectiveCurrentExercise)
-        .then((imagePair) => {
-          if (imagePair && imagePair.start && imagePair.end) {
-            // Store both images for cycling
-            setImagePairs((prev) => ({ ...prev, [key]: imagePair }));
-            // Start with the 'start' image in the cache
-            setImageCache((c) => ({ ...c, [key]: imagePair.start }));
-            // Start cycling between start and end every 1 second
-            startImageCycling(key, imagePair);
-          } else {
-            setImageCache((c) => ({ ...c, [key]: null }));
-          }
-        })
-        .catch((error) => {
-          setImageCache((c) => ({ ...c, [key]: null }));
-        })
-        .finally(() => {
-          setImageLoading((s) => ({ ...s, [key]: false }));
-        });
-      return;
-    }
-
-    // Fallback to single image resolver
-    if (!resolveExerciseImage) {
-      setImageCache((c) => ({ ...c, [key]: null }));
-      return;
-    }
-
-    setImageLoading((s) => ({ ...s, [key]: true }));
-
-    resolveExerciseImage(effectiveCurrentExercise)
-      .then((url) => {
-        setImageCache((c) => ({ ...c, [key]: url }));
-      })
-      .catch((error) => {
-        setImageCache((c) => ({ ...c, [key]: null }));
-      })
-      .finally(() => {
-        setImageLoading((s) => ({ ...s, [key]: false }));
-      });
-  }, [effectiveCurrentExercise, resolveExerciseImage, resolveExerciseImagePair, themeColor]);
-
-  // Image cycling function
-  const startImageCycling = useCallback((fullKey: string, imagePair: {start: any, end: any}) => {
-    // Only start cycling if this is a new exercise (prevent duplicate intervals)
-    if (currentCyclingKeyRef.current === fullKey) {
-      return; // Already cycling this exercise
-    }
-
-    // Clear any existing interval
-    if (cyclingIntervalRef.current) {
-      clearInterval(cyclingIntervalRef.current);
-      cyclingIntervalRef.current = null;
-    }
-
-    // Set the new cycling key
-    currentCyclingKeyRef.current = fullKey;
-
-    // Reset to start phase
-    setCurrentImagePhase('start');
-    setImageCache(prev => ({ ...prev, [fullKey]: imagePair.start }));
-
-    // Start the cycling interval
-    cyclingIntervalRef.current = setInterval(() => {
-      // Check if we're still supposed to be cycling this exercise
-      if (currentCyclingKeyRef.current !== fullKey) {
-        if (cyclingIntervalRef.current) {
-          clearInterval(cyclingIntervalRef.current);
-          cyclingIntervalRef.current = null;
-        }
-        return;
-      }
-
-      setCurrentImagePhase((prevPhase) => {
-        const newPhase = prevPhase === 'start' ? 'end' : 'start';
-        const newImage = newPhase === 'start' ? imagePair.start : imagePair.end;
-
-        // Batch the state updates
-        setImageCache((prev) => ({ ...prev, [fullKey]: newImage }));
-
-        return newPhase;
-      });
-    }, 1000); // Cycle every 1 second
+  // ── Handlers reachable from the pinned header / menu / cards ──────
+  const handleExerciseLongPress = useCallback((exerciseIndex: number) => {
+    setSupersetSourceIndex(exerciseIndex);
+    setShowSupersetModal(true);
   }, []);
 
+  // Stable card-facing openers (identity-stable so the memoised cards hold)
+  const handleOpenOneRM = useCallback((exerciseName: string, exerciseIndex: number) => {
+    setShow1RMProgression({ exerciseName, exerciseIndex });
+  }, []);
+  const handleShowDeleteModal = useCallback((exerciseIndex: number, setIndex: number) => {
+    setShowDeleteSetModal({ exerciseIndex, setIndex });
+  }, []);
 
-
-  // Cleanup cycling when component unmounts or exercise changes
-  useEffect(() => {
-    // Reset keyboard focus tracking + weight input refs (set counts differ per exercise)
-    weightInputRefs.current = {};
-    setFocusedSet(null);
-
-    // Cycling teardown lives ONLY in the cleanup return below. React runs every
-    // effect's cleanup before any effect body, so this stops the previous
-    // exercise's cycling *before* the image-resolve effect (declared earlier)
-    // starts the new one. Tearing it down in the body too would run *after* that
-    // effect and kill the cycling we just started, leaving a static image.
-    return () => {
-      if (cyclingIntervalRef.current) {
-        clearInterval(cyclingIntervalRef.current);
-        cyclingIntervalRef.current = null;
-      }
-      currentCyclingKeyRef.current = null;
-    };
-  }, [currentIndex, selectedIndex]); // Reset when exercise or alternative changes
-
-  // Cross-fade on exercise swap
-  const swapFocus = useCallback(
-    (newIndex: number) => {
-      if (newIndex === currentIndex) return;
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 120,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }).start(() => {
-        onIndexChange(newIndex);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 180,
-          easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
-        }).start();
-      });
-    },
-    [currentIndex, onIndexChange, fadeAnim],
-  );
-
-  // Swipe gesture: tracks the finger, snaps on threshold or velocity.
-  // activeOffsetX/failOffsetY ensure it only claims clearly-horizontal drags,
-  // so vertical scrolling (Up Next) and taps into inputs still work.
-  const swipeGesture = Gesture.Pan()
-    .activeOffsetX([-15, 15])
-    .failOffsetY([-12, 12])
-    .onStart(() => {
-      Keyboard.dismiss();
-      setFocusedSet(null);
-      setIsPaging(true);
-    })
-    .onUpdate((event) => {
-      let tx = event.translationX;
-      // Rubber-band resistance at the ends of the list
-      if (
-        (currentIndex === 0 && tx > 0) ||
-        (currentIndex === exercises.length - 1 && tx < 0)
-      ) {
-        tx *= 0.35;
-      }
-      dragX.setValue(tx);
-
-      // Drift the progress highlight with the finger. One screen-width of travel moves it
-      // exactly one tick. Clamped to the neighbours that actually exist, so at either end
-      // of the list there is nowhere to go and the indicator holds still through the
-      // rubber-band.
-      const lo = Math.max(0, currentIndex - 1);
-      const hi = Math.min(exercises.length - 1, currentIndex + 1);
-      const page = currentIndex - tx / SCREEN_WIDTH;
-      indicatorPage.setValue(Math.min(hi, Math.max(lo, page)));
-    })
-    .onEnd((event) => {
-      const W = SCREEN_WIDTH;
-      const threshold = W * 0.22; // ~22% of the screen, matches the prototype
-      const tx = event.translationX;
-      const vx = event.velocityX;
-
-      const goNext = (tx <= -threshold || vx < -800) && currentIndex < exercises.length - 1;
-      const goPrev = (tx >= threshold || vx > 800) && currentIndex > 0;
-
-      if (goNext || goPrev) {
-        const target = goNext ? currentIndex + 1 : currentIndex - 1;
-
-        // Carry the highlight the rest of the way, in step with the card. Native-driven:
-        // translateX is a native-driver property, and the JS thread is already busy with
-        // the stage height. It holds an absolute tick position, so when currentIndex swaps
-        // below there is nothing to rebase — it is already exactly where it belongs.
-        Animated.timing(indicatorPage, {
-          toValue: target,
-          duration: 180,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }).start();
-
-        // Finish sliding the card off, then swap content under it and reset.
-        Animated.timing(dragX, {
-          toValue: goNext ? -W : W,
-          duration: 180,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }).start(() => {
-          // The 180ms ease-out above already carried the stage height all the way to the
-          // target card's height (dragX hit ±W, so the interpolation is at its end stop).
-          // Hand it over synchronously: zero the drag first so the delta collapses, then
-          // rebase. Both land in the same tick, so no intermediate height is ever painted
-          // and there is nothing left to animate.
-          dragX.setValue(0);
-          stageBaseH.setValue(cardHeights[target] ?? currentCardH);
-          onIndexChange(target);
-          setIsPaging(false);
-          Analytics.track('exercise_swiped', { direction: goNext ? 'next' : 'prev' });
-        });
-      } else {
-        // Didn't pass the threshold — spring back to centre. The highlight springs home on
-        // the same curve, so it returns in step with the card rather than lagging it.
-        Animated.spring(indicatorPage, {
-          toValue: currentIndex,
-          friction: 9,
-          tension: 70,
-          useNativeDriver: true,
-        }).start();
-
-        Animated.spring(dragX, {
-          toValue: 0,
-          friction: 9,
-          tension: 70,
-          useNativeDriver: false,
-        }).start(() => setIsPaging(false));
-      }
+  // Open full history for the current exercise (top-level header icon)
+  const openHistoryForCurrent = () => {
+    if (!effectiveCurrentExercise) return;
+    setHeaderMenuOpen(false);
+    setShowWorkoutHistory({
+      exerciseName: effectiveCurrentExercise.exercise,
+      exerciseIndex: currentIndex,
     });
-
-  // Handler functions for buttons
-  const handleHistoryPress = async (exerciseIndex: number) => {
-    // Use the effective exercise name (including alternatives)
-    const exerciseName = exerciseIndex === currentIndex ? effectiveCurrentExercise.exercise : exercises[exerciseIndex].exercise;
-    const history = await WorkoutStorage.getExerciseHistory(exerciseName);
-    setExerciseHistory(history);
-    setShowHistory(exerciseName);
   };
 
-  const handleNotesPress = (exerciseIndex: number) => {
-    // Use the effective exercise name (including alternatives)
-    const exerciseName = exerciseIndex === currentIndex ? effectiveCurrentExercise.exercise : exercises[exerciseIndex].exercise;
-    setShowNotes({ exerciseName, exerciseIndex });
+  const handleNotesPress = () => {
+    if (!effectiveCurrentExercise) return;
+    setShowNotes({ exerciseName: effectiveCurrentExercise.exercise, exerciseIndex: currentIndex });
   };
 
-  const handleExerciseNotesPress = (exerciseIndex: number) => {
-    // Use the effective exercise name (including alternatives)
-    const exerciseName = exerciseIndex === currentIndex ? effectiveCurrentExercise.exercise : exercises[exerciseIndex].exercise;
-    setShowExerciseNotes({ exerciseName, exerciseIndex });
-  };
-
-  const handleExerciseSettings = (exerciseIndex: number) => {
-    setExerciseInSettings(exerciseInSettings === exerciseIndex ? null : exerciseIndex);
+  const handleExerciseNotesPress = () => {
+    if (!effectiveCurrentExercise) return;
+    setShowExerciseNotes({ exerciseName: effectiveCurrentExercise.exercise, exerciseIndex: currentIndex });
   };
 
   const handleAddNote = (exerciseIndex: number, text: string) => {
@@ -1365,44 +1424,81 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     }));
   };
 
+  // One path to the 1RM progression modal for the header menu. The badge inside the
+  // card goes through handleOpenOneRM with the card's OWN resolved name, so a
+  // selected alternative opens ITS progression rather than the primary exercise's.
+  //
+  // Optional-chained, and it MUST be: exercises starts as [] (the adapter fills it in
+  // an effect), so on the first render there is no current exercise, and the render
+  // guard sits below the hooks per the rules of hooks.
+  const openOneRMProgressionForCurrent = useCallback(() => {
+    const exerciseName = effectiveCurrentExercise?.exercise;
+    if (!exerciseName) return;
+    setShow1RMProgression({ exerciseName, exerciseIndex: currentIndex });
+  }, [effectiveCurrentExercise?.exercise, currentIndex]);
+
+  // ── Up Next derivations ────────────────────────────────────────────
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Scroll position, mapped straight from the ScrollView's onScroll on the UI thread
+  // (Animated.event with useNativeDriver). It drives the hero image's depth
+  // transforms in every card; because the mapping is native, a frame of scrolling
+  // never touches the JS thread, and because the value is shared, all three cards
+  // agree on the image's depth if a swipe happens mid-scroll.
+  const scrollY = useRef(new Animated.Value(0)).current;
+
   // Compute progress per exercise (used in mini cards and the image progress ticks)
   const exerciseProgress = useMemo(
     () => computeExerciseProgress(exercises, allSetsData),
     [exercises, allSetsData],
   );
 
-  // ── Up Next list: keep every ExerciseMiniCard prop identity-stable ──
-  // The cards are React.memo'd, but the memo only pays off if none of their props are
-  // rebuilt on each render. Two things were doing exactly that: the inline onPress/
-  // onLongPress lambdas, and this object — `{...ex, exercise: alt}` is a fresh literal
-  // every render for any exercise with a selected alternative. Both meant all N cards
-  // re-rendered on every parent render, including every frame of a drag, while the JS
-  // thread is already carrying the stage-height animation.
-  const effectiveExercises = useMemo(
-    () =>
-      exercises.map((ex) => {
-        const primaryName = ex.exercise || ex.name || '';
-        const selectedAlternative = exercisePreferences[primaryName];
-        if (
-          selectedAlternative &&
-          ex.alternatives &&
-          ex.alternatives.includes(selectedAlternative)
-        ) {
-          return { ...ex, exercise: selectedAlternative, name: selectedAlternative };
-        }
-        return ex;
-      }),
-    [exercises, exercisePreferences],
+  // Which variant each slot shows, from allSetsData — but keyed through a STRING so
+  // the derived arrays keep their identity across keystrokes. allSetsData changes on
+  // every character typed; the selected indices almost never do, and rebuilding
+  // effectiveExercises per keystroke would hand every memoised mini card a fresh
+  // `exercise` prop and defeat the whole memo contract.
+  const selectedKey = useMemo(
+    () => allSetsData.map((sets) => sets?.[0]?.selectedExerciseIndex || 0).join(','),
+    [allSetsData],
+  );
+  const selectedIndices = useMemo(
+    () => (selectedKey.length ? selectedKey.split(',').map((v) => parseInt(v, 10) || 0) : []),
+    [selectedKey],
   );
 
-  // The row index travels as an argument rather than baked into a closure, so one stable
-  // handler serves every card instead of a fresh lambda per row per render.
+  const effectiveExercises = useMemo(
+    () =>
+      exercises.map((ex, idx) => {
+        const sel = selectedIndices[idx] || 0;
+        if (sel === 0) return ex;
+        const alternativeNames = (ex.alternatives || [])
+          .filter((a) => a && typeof a === 'string')
+          .map(String);
+        const altName = alternativeNames[sel - 1];
+        if (!altName) return ex;
+        return { ...ex, exercise: altName, name: altName };
+      }),
+    [exercises, selectedIndices],
+  );
+
+  // The row index travels as an argument rather than baked into a closure, so one
+  // stable handler serves every card instead of a fresh lambda per row per render.
+  // Adjacent taps SLIDE (the neighbour card is already mounted, so it is exactly a
+  // swipe commit); distant taps fade-jump, since there is nothing mounted to slide
+  // across.
   const handleMiniCardPress = useCallback(
     (idx: number) => {
       scrollRef.current?.scrollTo({ y: 0, animated: true });
-      swapFocus(idx);
+      const cur = currentIndexRef.current;
+      if (idx === cur) return;
+      if (Math.abs(idx - cur) === 1) {
+        slideTo(idx);
+      } else {
+        jumpTo(idx);
+      }
     },
-    [swapFocus],
+    [slideTo, jumpTo],
   );
 
   // ── PR detection for the finish summary ──────────────────────────
@@ -1479,37 +1575,126 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       reps: best.reps,
       estimatedOneRM: best.estimatedOneRM,
     };
-  }, [exercises, allSetsData, historyByExercise, calculate1RM]);
+  }, [exercises, allSetsData, historyByExercise, calculate1RM, globalUnit]);
 
-  // One path to the 1RM progression modal, shared by the header menu item and the badge.
-  // effectiveCurrentExercise, so a selected alternative opens ITS progression rather than
-  // the primary exercise's.
+  // ── Swipe gesture ──────────────────────────────────────────────────
+  // activeOffsetX/failOffsetY ensure it only claims clearly-horizontal drags, so
+  // vertical scrolling (Up Next) and taps into inputs still work.
   //
-  // Optional-chained, and it MUST be. The adapter starts `exercises` as [] and fills it in an
-  // effect, so on the very first render exercises[currentIndex] is undefined and so is
-  // effectiveCurrentExercise. The component's `if (!effectiveCurrentExercise) return` guard is
-  // below the hooks — it has to be, or it would break the rules of hooks — so a dependency
-  // array is evaluated BEFORE the guard ever runs. Dereferencing .exercise there threw on the
-  // first render of every workout.
-  const openOneRMProgression = useCallback(() => {
-    const exerciseName = effectiveCurrentExercise?.exercise;
-    if (!exerciseName) return;
+  // MEMOISED: everything it closes over is a ref, a module constant, or an
+  // identity-stable function, so the handler config is built once per workout.
+  // Without this, the parent's once-a-second duration re-render rebuilt the Gesture
+  // object and re-attached its config every tick, including mid-drag.
+  //
+  // Commit ordering, and why there is no completion-callback cleanup here: onEnd
+  // steers the page values towards the target AND calls onIndexChange in the same
+  // breath. Positions are derived from those values alone, so whenever React gets
+  // around to flushing that setState, nothing on screen moves — the commit only
+  // mounts the new far neighbour off screen and swaps the `interactive` flag.
+  // Committing early (rather than in the settle's completion callback) also means a
+  // rapid second flick always finds its next neighbour already mounted.
+  const swipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-15, 15])
+        .failOffsetY([-12, 12])
+        .onStart(() => {
+          Keyboard.dismiss();
+          setFocusedSet(null);
+          // Grab the pager wherever it actually is, including mid-settle from a
+          // previous flick, and continue from there. stopAnimation runs BEFORE the
+          // dragging flag is raised: a stopped spring's completion callback fires
+          // synchronously (finished: false) and lowers the flag, so this order is
+          // what keeps the flag true for the new drag.
+          pagePos.stopAnimation();
+          cardPos.stopAnimation();
+          indicatorPage.stopAnimation();
+          pagerDraggingRef.current = true;
+          gestureBase.current = pagePosMirror.current;
+        })
+        .onUpdate((event) => {
+          const base = gestureBase.current;
+          const from = Math.round(base);
+          const raw = base - event.translationX / SCREEN_WIDTH;
 
-    setShow1RMProgression({ exerciseName, exerciseIndex: currentIndex });
-  }, [effectiveCurrentExercise?.exercise, currentIndex]);
+          // Resist beyond the reachable neighbours. At the ends of the list this is
+          // the same 0.35 rubber-band as before; mid-list it also resists past ±1
+          // page, so a two-screen fling cannot drag into space where no card is
+          // mounted.
+          const min = Math.max(0, from - 1);
+          const max = Math.min(exerciseCount - 1, from + 1);
+          let page = raw;
+          if (raw < min) page = min + (raw - min) * 0.35;
+          else if (raw > max) page = max + (raw - max) * 0.35;
 
-  // Header dropdown menu items (History lives top-level now, so it's not here)
-  const headerMenuItems: { label: string; icon: any; onPress: () => void }[] = [
-    { label: 'Muscle map', icon: 'body-outline', onPress: () => setShowWorkoutHeatmap(true) },
-    { label: 'Rep scheme', icon: 'repeat-outline', onPress: () => handleNotesPress(currentIndex) },
-    { label: '1RM progress', icon: 'trending-up-outline', onPress: openOneRMProgression },
-    { label: 'Notes', icon: 'document-text-outline', onPress: () => handleExerciseNotesPress(currentIndex) },
-    { label: 'How it works', icon: 'help-circle-outline', onPress: () => setShowHowItWorks(true) },
-  ];
+          pagePos.setValue(page);
+          cardPos.setValue(page);
+          // The indicator holds still through the rubber-band, exactly as before.
+          indicatorPage.setValue(Math.min(max, Math.max(min, page)));
+        })
+        .onEnd((event) => {
+          const from = Math.round(gestureBase.current);
+          const threshold = SCREEN_WIDTH * 0.22; // ~22% of the screen
+          const tx = event.translationX;
+          const vx = event.velocityX;
+
+          const goNext = (tx <= -threshold || vx < -800) && from < exerciseCount - 1;
+          const goPrev = (tx >= threshold || vx > 800) && from > 0;
+          const target = goNext ? from + 1 : goPrev ? from - 1 : from;
+
+          pagePosTarget.current = target;
+
+          // Velocity-carried springs, NOT a fixed-duration timing. A timing restarts
+          // the card on its own curve regardless of how fast the finger was moving
+          // at release, and that velocity discontinuity is what reads as roughness
+          // even at a steady frame rate. Seeding the spring with the release
+          // velocity makes the card LEAVE the finger at the finger's speed and
+          // decelerate from there. RNGH reports velocityX in px/s; page units are
+          // px/SCREEN_WIDTH, and page = base - tx/W, so the sign flips.
+          // overshootClamping keeps a hard fling from carrying past the target
+          // page, iOS-pager style. stiffness/damping are the two feel knobs: raise
+          // stiffness for a snappier settle, raise damping for a softer stop.
+          const pageVelocity = -vx / SCREEN_WIDTH;
+          const spring = {
+            toValue: target,
+            velocity: pageVelocity,
+            stiffness: 250,
+            damping: 30,
+            mass: 0.8,
+            overshootClamping: true,
+            restDisplacementThreshold: 0.005, // ~2px in page units
+            restSpeedThreshold: 0.05,
+          } as const;
+
+          // One trajectory, three drivers: cardPos carries every visible pager
+          // motion on the UI thread (the cards AND the Up Next list, whose
+          // transform is derived from it), while the JS mirror twin and the tick
+          // highlight follow the identical spring on their own drivers. Whichever
+          // branch was taken (commit or spring-back), the release is the same shape.
+          Animated.spring(cardPos, { ...spring, useNativeDriver: true }).start(() => {
+            pagerDraggingRef.current = false;
+          });
+          Animated.spring(pagePos, { ...spring, useNativeDriver: false }).start();
+          Animated.spring(indicatorPage, { ...spring, useNativeDriver: true }).start();
+
+          if (goNext || goPrev) {
+            Analytics.track('exercise_swiped', { direction: goNext ? 'next' : 'prev' });
+          }
+
+          // Early commit (or, in the spring-back case, a correction: grabbing a card
+          // mid-settle and dragging it back past halfway cancels the commit that
+          // flick already made, so the index must follow it home).
+          if (target !== currentIndexRef.current) {
+            onIndexChange(target);
+          }
+        }),
+    [exerciseCount, onIndexChange, pagePos, cardPos, indicatorPage],
+  );
 
   // ── Render ────────────────────────────────────────────────────────
-  // Everything below here is a render-time early return, so it MUST stay beneath every hook —
-  // the hooks above run unconditionally on every render, including the ones where we bail.
+  // Everything below here is a render-time early return, so it MUST stay beneath
+  // every hook — the hooks above run unconditionally on every render, including the
+  // ones where we bail.
 
   if (!effectiveCurrentExercise) {
     return (
@@ -1521,104 +1706,17 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     );
   }
 
-  // The parent's sets data and preferences are separate async reads. allSetsData is what
-  // carries the saved alternative (via selectedExerciseIndex), so painting before it lands
-  // shows the PRIMARY exercise — wrong title, wrong image, wrong muscles, no 1RM badge — and
-  // then flips all of it when storage answers. On a real device that is 100ms+ of wrong
-  // content; the simulator only hides it because AsyncStorage is fast there.
-  //
-  // Hold on an empty frame instead. A blank frame beats a wrong one, and unlike a spinner it
+  // The parent's sets data and preferences are separate async reads. allSetsData is
+  // what carries the saved alternative (via selectedExerciseIndex), so painting
+  // before it lands shows the PRIMARY exercise — wrong title, wrong image, wrong
+  // muscles, no 1RM badge — and then flips all of it when storage answers. Hold on an
+  // empty frame instead: a blank frame beats a wrong one, and unlike a spinner it
   // does not announce a wait that is usually imperceptible.
   if (!contentReady) {
     return <SafeAreaView style={styles.root} />;
   }
 
-  const exName = effectiveCurrentExercise.exercise || effectiveCurrentExercise.name || '';
-  const exKey = `${exName}-${themeColor}`;
-
-  // Two caches feed this image, and the handover between them was the blink.
-  //
-  // imageCache is keyed by name+theme and filled LAZILY, by an effect that only runs after
-  // currentIndex has already changed. So the first frame of a newly-committed exercise found
-  // no entry, no loading flag either, and fell all the way through to the "No preview"
-  // placeholder — then a spinner — then the image. Meanwhile the peek layer that had just
-  // slid in was showing the picture perfectly well the whole time, because it reads
-  // miniCardImages, which is pre-loaded on mount for every exercise AND every alternative.
-  //
-  // So: show miniCardImages' frame while imageCache is still catching up. Same picture, no
-  // gap; the live (cycling) image swaps in silently once resolved.
-  const liveImage = imageCache[exKey];
-  const warmImage = miniCardImages.get(exName)?.start ?? null;
-  const exImage = liveImage ?? warmImage;
-
-  // "Not resolved yet" and "resolved, and there is nothing" are different states, and only the
-  // second one has earned the barbell placeholder. They used to be indistinguishable: on a cold
-  // open imageCache had no entry, imageLoading had no flag either (the effect that sets it has
-  // not run), and miniCardImages was still an empty Map — so the render fell straight through to
-  // "No preview", then a spinner, then the picture. Three states for one image.
-  //
-  // The resolve effect always writes SOMETHING under exKey — the image, or null on failure — so
-  // the key's presence is exactly the "we tried" signal.
-  const imageResolved = exKey in imageCache;
-
-  // History view for a specific exercise
-  if (showHistory) {
-    return (
-      <SafeAreaView style={styles.root}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={() => setShowHistory(null)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chevron-back" size={22} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{showHistory} History</Text>
-          <View style={styles.headerBtn} />
-        </View>
-
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.historyContainer}>
-            <Text style={styles.historyTitle}>Previous Workouts</Text>
-
-            {exerciseHistory.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No previous workouts</Text>
-                <Text style={styles.emptyText}>
-                  Your workout history will appear here after you complete sets
-                </Text>
-              </View>
-            ) : (
-              exerciseHistory.map((workout, index) => (
-                <View key={workout.id} style={styles.historyEntry}>
-                  <Text style={styles.historyDate}>
-                    {new Date(workout.date).toLocaleDateString()} • {workout.dayName}
-                  </Text>
-                  {workout.sets.map((set, setIndex) => (
-                    <View key={setIndex} style={styles.historySet}>
-                      <Text style={styles.historySetNumber}>
-                        {set.setNumber}
-                      </Text>
-                      <Text style={styles.historyDetails}>
-                        {convertWeight(parseFloat(set.weight) || 0, set.unit ?? globalUnit, globalUnit).toFixed(1)}{globalUnit} × {set.reps}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ))
-            )}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-
-  // Workout History Modal - rendered alongside main content
+  // Workout History Modal props - rendered alongside main content
   const historyModalProps = showWorkoutHistory ? {
     visible: true,
     exerciseName: showWorkoutHistory.exerciseName,
@@ -1645,9 +1743,22 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     globalUnit,
   } : null;
 
-  // PREV reference for the current exercise's sets table
-  const currentPreviousSets = previousByExercise[effectiveCurrentExercise.exercise] || {};
+  // Header dropdown menu items (History lives top-level, so it's not here)
+  const headerMenuItems: { label: string; icon: any; onPress: () => void }[] = [
+    { label: 'Muscle map', icon: 'body-outline', onPress: () => setShowWorkoutHeatmap(true) },
+    { label: 'Rep scheme', icon: 'repeat-outline', onPress: handleNotesPress },
+    { label: '1RM progress', icon: 'trending-up-outline', onPress: openOneRMProgressionForCurrent },
+    { label: 'Notes', icon: 'document-text-outline', onPress: handleExerciseNotesPress },
+    { label: 'How it works', icon: 'help-circle-outline', onPress: () => setShowHowItWorks(true) },
+  ];
 
+  // The three mounted card slots: prev / current / next, bounds-filtered. Keyed by
+  // INDEX, which is the crucial property: when currentIndex changes, the slot that is
+  // centred keeps its React instance and native views (same key), so a commit cannot
+  // remount, blank, or restyle the card the user is looking at.
+  const visibleCardIndices = [currentIndex - 1, currentIndex, currentIndex + 1].filter(
+    (n) => n >= 0 && n < exercises.length,
+  );
 
   return (
     <>
@@ -1655,331 +1766,89 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       <View style={styles.root}>
 
       {/* ── SCROLLABLE CONTENT ──────────────────────────── */}
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        // The scroll event is consumed natively and written into scrollY on the UI
+        // thread; no JS listener is attached, so scrolling costs the JS thread
+        // nothing. throttle 1 so no frame of the mapping is ever missed.
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true },
+        )}
+        scrollEventThrottle={1}
       >
-        {/* ── PAGED EXERCISE STAGE (image + focus area travel together) ──
-            Height is animated: it tracks the drag so a taller neighbour grows the stage
-            as it slides in (no clipping), and everything below — the Up Next list —
-            glides instead of snapping when the swipe commits. */}
-        <Animated.View style={[styles.pagerStage, { height: stageHeight }]}>
-          {/* Previous-exercise peek (slides in from the left edge) */}
-          {isPaging && currentIndex > 0 && (
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.pagerPeek, { transform: [{ translateX: peekLeftX }] }]}
-            >
-              <ExercisePagePreview
-                index={currentIndex - 1}
-                exercises={exercises}
-                allSetsData={allSetsData}
-                exercisePreferences={exercisePreferences}
-                previousByExercise={previousByExercise}
-                miniCardImages={miniCardImages}
-                themeColor={themeColor}
-                globalUnit={globalUnit}
-                currentWeek={currentWeek}
-                calculate1RM={calculate1RM}
-                onTitleMeasured={handleTitleMeasured}
-                isMultiLine={!!isMultiLine.get(currentIndex - 1)}
-              />
-            </Animated.View>
-          )}
-
-          {/* Next-exercise peek (slides in from the right edge) */}
-          {isPaging && currentIndex < exercises.length - 1 && (
-            <Animated.View
-              pointerEvents="none"
-              style={[styles.pagerPeek, { transform: [{ translateX: peekRightX }] }]}
-            >
-              <ExercisePagePreview
-                index={currentIndex + 1}
-                exercises={exercises}
-                allSetsData={allSetsData}
-                exercisePreferences={exercisePreferences}
-                previousByExercise={previousByExercise}
-                miniCardImages={miniCardImages}
-                themeColor={themeColor}
-                globalUnit={globalUnit}
-                currentWeek={currentWeek}
-                calculate1RM={calculate1RM}
-                onTitleMeasured={handleTitleMeasured}
-                isMultiLine={!!isMultiLine.get(currentIndex + 1)}
-              />
-            </Animated.View>
-          )}
-
-          {/* Live centre card — follows the finger via dragX */}
-          <Animated.View style={{ transform: [{ translateX: dragX }] }}>
-        {/* ── SCROLLABLE IMAGE ──────────────────────── */}
-        <View style={styles.imageContainer}>
-          {/* Full screen media */}
-          <View style={styles.fullScreenMediaContainer}>
-            {(() => {
-              if (exImage) {
-                return (
-                  // Deliberately UNKEYED. This view must be retained across an exercise change
-                  // and have its `source` swapped, never remounted.
-                  //
-                  // A changing key unmounts the native image view and mounts a fresh one, and a
-                  // fresh view has no decoded bitmap — so it paints empty, decodes, then shows.
-                  // The miniCardImages fallback cannot rescue that: handing a warm source to a
-                  // brand-new view still leaves it with nothing decoded. That was a visible
-                  // flash on every swipe on a real device (instant in the simulator, where the
-                  // decode is free).
-                  //
-                  // The cycling animation is the proof: it swaps `source` on this same view
-                  // every second and never flashes. A source swap on a retained view is smooth;
-                  // the remount was the entire problem.
-                  //
-                  // 27f8acb added a key to stop a retained view painting a STALE bitmap — but
-                  // that only ever showed a wrong exercise because of the load-time
-                  // primary -> alternative flip, and 3d3a955 gated that behind contentReady, so
-                  // the card no longer renders an exercise it is about to change its mind
-                  // about. The disease is gone; this was still taking the medicine.
-                  <Image
-                    // THE fix. recyclingKey resets this view to blank the instant the exercise
-                    // identity changes, so the previous exercise's bitmap can never survive a
-                    // swipe — and it does NOT reset on a mere source swap, so the 1s start/end
-                    // cycling still animates on a retained, already-decoded view.
-                    recyclingKey={exName}
-                    source={typeof exImage === 'string' ? { uri: exImage } : exImage}
-                    style={styles.fullScreenImage}
-                    contentFit="contain"
-                    cachePolicy="memory-disk"
-                    // transition 0, deliberately. This one prop governs BOTH source changes, and
-                    // the cycling swaps every second: a crossfade there would dissolve the two
-                    // frames into each other and turn a crisp two-frame motion demo into a
-                    // mush. The swipe does not need it either — every frame is prefetched, so
-                    // the new image is already decoded in memory when recyclingKey flips.
-                    transition={0}
-                  />
-                );
-              } else if (imageResolved) {
-                // Resolved, and there is genuinely no picture for this exercise. The only case
-                // that has earned the placeholder.
-                return (
-                  <View style={styles.fullScreenPlaceholder}>
-                    <Ionicons name="barbell-outline" size={60} color="#3a3a44" />
-                    <Text style={styles.mediaPlaceholderText}>No preview</Text>
-                  </View>
-                );
-              } else {
-                // Not resolved yet. Hold on an empty frame — no barbell claiming there is no
-                // image, and no spinner announcing a wait that is over in a frame or two. The
-                // container already carries the surface colour, so this reads as the image
-                // simply not having arrived, which is the truth.
-                return null;
-              }
-            })()}
-            {/* Dark overlay for text legibility */}
-            <View style={styles.imageOverlay} />
-          </View>
-
-          {/* Header controls are NOT here — they belong to the screen, not the exercise,
-              so they are pinned in pagerStage below and hold still during a swipe. */}
-        </View>
-
-        <TouchableOpacity
-          style={[styles.focusArea, { opacity: fadeAnim }]}
-          onLongPress={() => handleExerciseLongPress(currentIndex)}
-          activeOpacity={1}
-          delayLongPress={600}
-        >
-          {/* Exercise title and info */}
-          <View style={styles.titleRow}>
-            <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
-              <TouchableOpacity
-                style={[
-                  styles.titleButton,
-                  isMultiLine.get(currentIndex) && styles.titleButtonMultiline,
-                  // Column mode puts the chevron inline, so reserve its width here to match
-                  // what row mode's sibling chevron takes. See TITLE_CHEVRON_RESERVE.
-                  isMultiLine.get(currentIndex) &&
-                    allExercises.length > 1 && { paddingRight: TITLE_CHEVRON_RESERVE },
-                ]}
-                onPress={() => allExercises.length > 1 && setShowExerciseSelector(showExerciseSelector === currentIndex ? null : currentIndex)}
-                activeOpacity={allExercises.length > 1 ? 0.7 : 1}
+        {/* ── PAGED EXERCISE STAGE ──
+            Sized to the TALLEST card in the workout and never animated, so an
+            incoming neighbour can never be clipped. The Up Next section below is
+            positioned by a native transform (upNextTranslate) instead of by this
+            box's height, so its motion rides the same UI-thread value as the
+            cards. */}
+        <Animated.View style={[styles.pagerStage, { height: stageMaxHeight }]}>
+          {/* The card layer. Faded only by distant Up Next jumps; box-none so the
+              cards' own touchables work and empty space still feeds the pan. */}
+          <Animated.View
+            style={[StyleSheet.absoluteFillObject, { opacity: cardsFade }]}
+            pointerEvents="box-none"
+          >
+            {visibleCardIndices.map((n) => (
+              <Animated.View
+                key={n}
+                style={[styles.pagerCard, { transform: [{ translateX: getCardTranslate(n) }] }]}
+                pointerEvents={n === currentIndex ? 'box-none' : 'none'}
+                // renderToHardwareTextureAndroid used to live here (neighbours only)
+                // and was REMOVED after real-device testing. A rasterised card is
+                // composited with bilinear sampling at the fractional pixel offsets
+                // of a slide, then re-renders live the instant the flag flips at
+                // commit, so the sets table visibly changed crispness and apparent
+                // size on Android at exactly that moment; and creating/destroying
+                // two card-sized layers landed in the commit frame, stepping on the
+                // Up Next badge fade. It also bought almost nothing: translation on
+                // Android is a RenderNode property and does not invalidate the
+                // subtree, so sliding an un-rasterised card was already cheap.
               >
-                <Text
-                  style={styles.title}
-                  numberOfLines={2}
-                  onTextLayout={(event) =>
-                    handleTitleMeasured(currentIndex, event.nativeEvent.lines.length > 1)
-                  }
-                >
-                  {currentExerciseName}
-                  {allExercises.length > 1 && isMultiLine.get(currentIndex) && (
-                    <Text style={styles.inlineArrow}>
-                      {' '}
-                      <Animated.View
-                        style={{
-                          transform: [
-                            {
-                              rotate: arrowRotation.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: ['0deg', '180deg'],
-                              }),
-                            },
-                          ],
-                        }}
-                      >
-                        <Ionicons
-                          name="chevron-down"
-                          size={18}
-                          color={themeColor}
-                        />
-                      </Animated.View>
-                    </Text>
-                  )}
-                </Text>
-                {allExercises.length > 1 && !isMultiLine.get(currentIndex) && (
-                  <Animated.View
-                    style={{
-                      marginLeft: 8,
-                      transform: [
-                        {
-                          rotate: arrowRotation.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['0deg', '180deg'],
-                          }),
-                        },
-                      ],
-                    }}
-                  >
-                    <Ionicons
-                      name="chevron-down"
-                      size={18}
-                      color={themeColor}
-                    />
-                  </Animated.View>
-                )}
-              </TouchableOpacity>
-              {!!(effectiveCurrentExercise.primaryMuscles?.length ||
-                effectiveCurrentExercise.secondaryMuscles?.length) && (
-                <Text style={styles.muscles}>
-                  {[
-                    ...(effectiveCurrentExercise.primaryMuscles || []),
-                    ...(effectiveCurrentExercise.secondaryMuscles || []),
-                  ].join(' · ')}
-                </Text>
-              )}
-            </View>
-            <OneRMBadge
-              sets={currentSets}
-              themeColor={themeColor}
-              calculate1RM={calculate1RM}
-              unit={globalUnit}
-              onPress={openOneRMProgression}
-            />
-          </View>
-
-          {/* Exercise selector dropdown */}
-          {showExerciseSelector === currentIndex && allExercises.length > 1 && (
-            <Animated.View
-              style={[
-                styles.exerciseSelector,
-                {
-                  opacity: dropdownOpacity,
-                  transform: [
-                    {
-                      scaleY: dropdownScale,
-                    },
-                    {
-                      scaleX: dropdownScale,
-                    },
-                  ],
-                },
-              ]}
-            >
-              {allExercises.map((exerciseName, index) => {
-                const preferredExercise = exercisePreferences[currentExercise.exercise];
-                const isSelected = index === selectedIndex;
-                const isPrimary = index === 0;
-
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.exerciseOption,
-                      isSelected && [styles.exerciseOptionSelected, { borderLeftColor: themeColor }]
-                    ]}
-                    onPress={() => {
-                      // Update the visual selection
-                      onExerciseSelect(currentIndex, index);
-                      // Handle preference saving
-                      const alternativeNames = (currentExercise.alternatives || [])
-                        .filter(alt => alt && typeof alt === 'string')
-                        .map(alt => String(alt));
-
-                      if (index === 0) {
-                        // Going back to original exercise - clear the preference
-                        onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, '');
-                      } else {
-                        // Selecting an alternative
-                        onSetExercisePreference(currentIndex, currentExercise.exercise, alternativeNames, exerciseName);
-                      }
-                      setShowExerciseSelector(null);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.exerciseOptionContent}>
-                      <Text style={[
-                        styles.exerciseOptionText,
-                        isSelected && { color: themeColor }
-                      ]}>
-                        {exerciseName}
-                      </Text>
-                      {isSelected && (
-                        <View style={[styles.exerciseSelectedDot, { backgroundColor: themeColor }]} />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </Animated.View>
-          )}
-
-          {/* Prescription banner (week + sets × reps + RIR) */}
-          <PrescriptionBanner
-            exercise={effectiveCurrentExercise}
-            currentWeek={currentWeek}
-            themeColor={themeColor}
-          />
-
-          {/* Sets table */}
-          <SetsTable
-            exerciseIndex={currentIndex}
-            sets={currentSets}
-            unit={globalUnit}
-            themeColor={themeColor}
-            workoutStarted={workoutStarted}
-            exercise={effectiveCurrentExercise}
-            currentWeek={currentWeek}
-            previousSets={currentPreviousSets}
-            onUpdate={onSetUpdate}
-            onComplete={completeSet}
-            onAdd={onSetAdd}
-            onRemove={onSetRemove}
-            onSetTapWhenNotStarted={onSetTapWhenNotStarted}
-            onFocusField={(setIndex, field) => setFocusedSet({ setIndex, field })}
-            registerWeightRef={registerWeightRef}
-            onShowDeleteModal={(exerciseIndex, setIndex) => {
-              setShowDeleteSetModal({ exerciseIndex, setIndex });
-            }}
-          />
-        </TouchableOpacity>
+                <ExerciseCard
+                  index={n}
+                  exercise={exercises[n]}
+                  sets={allSetsData[n] ?? EMPTY_SETS}
+                  interactive={n === currentIndex}
+                  draggingRef={pagerDraggingRef}
+                  scrollY={scrollY}
+                  workoutStarted={workoutStarted}
+                  themeColor={themeColor}
+                  globalUnit={globalUnit}
+                  currentWeek={currentWeek}
+                  calculate1RM={calculate1RM}
+                  previousByExercise={previousByExercise}
+                  miniCardImages={miniCardImages}
+                  resolveExerciseImagePair={resolveExerciseImagePair}
+                  resolveExerciseImage={resolveExerciseImage}
+                  isMultiLine={!!isMultiLine.get(n)}
+                  onTitleMeasured={handleTitleMeasured}
+                  onSetUpdate={stableSetUpdate}
+                  onSetComplete={completeSet}
+                  onSetAdd={stableSetAdd}
+                  onSetTapWhenNotStarted={stableTapWhenNotStarted}
+                  onFocusField={handleFocusField}
+                  registerWeightRef={registerWeightRef}
+                  onShowDeleteModal={handleShowDeleteModal}
+                  onExerciseSelect={stableExerciseSelect}
+                  onSetExercisePreference={stableSetPreference}
+                  onLongPress={handleExerciseLongPress}
+                  onOpenOneRM={handleOpenOneRM}
+                />
+              </Animated.View>
+            ))}
           </Animated.View>
 
           {/* Workout progress — the ONE bar in the tree.
               It describes the workout, not the exercise, so it is a sibling of the
-              animated card rather than a child of it: the cards slide underneath while
-              this holds still. Declared after the card, so it paints above every pager
-              layer; the box mirrors imageContainer's 16:9 so the ticks land on exactly
-              the same pixels they did when they lived inside the image. */}
+              card layer rather than a child of it: the cards slide underneath while
+              this holds still. The box mirrors imageContainer's 16:9 so the ticks
+              land on exactly the same pixels they did when they lived inside the
+              image. */}
           <View style={styles.pinnedTicksLayer} pointerEvents="none">
             <ExerciseProgressTicks
               progress={exerciseProgress}
@@ -1989,15 +1858,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           </View>
 
           {/* ── HEADER BUTTONS — pinned, the ONE header in the tree ─────────────
-              These belong to the screen, not the exercise, so like the ticks they are a
-              sibling of the animated card and dragX never touches them.
+              These belong to the screen, not the exercise, so like the ticks they
+              are a sibling of the card layer and pagePos never touches them.
 
-              box-none, not none: the buttons must stay tappable, but the bar spans the
-              full width of the image, so an `auto` container would eat every horizontal
-              pan that began in the empty space between the buttons and kill the swipe in
-              a strip across the top of the image. box-none lets touches through except
-              where they land on an actual button. overlayHeaderActions needs it too — its
-              8px gap is part of its box. */}
+              box-none, not none: the buttons must stay tappable, but the bar spans
+              the full width of the image, so an `auto` container would eat every
+              horizontal pan that began in the empty space between the buttons and
+              kill the swipe in a strip across the top of the image. box-none lets
+              touches through except where they land on an actual button.
+              overlayHeaderActions needs it too — its 8px gap is part of its box. */}
           <View
             style={[styles.overlayHeader, { paddingTop: insets.top + 12 }]}
             pointerEvents="box-none"
@@ -2036,21 +1905,23 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         </Animated.View>
         {/* end paged exercise stage */}
 
-        {/* ── UPCOMING LIST ──────────────────────────────── */}
-        <View style={styles.upcomingSection}>
+        {/* ── UPCOMING LIST ──
+            Pulled up into the gap below a shorter card by the native transform, so
+            it moves in lockstep with the cards through drags and settles. */}
+        <Animated.View
+          style={[styles.upcomingSection, { transform: [{ translateY: upNextTranslate }] }]}
+        >
           <Text style={styles.upcomingHeader}>UP NEXT</Text>
           {exercises.map((ex, idx) => {
             const progress = exerciseProgress[idx];
             const isActive = idx === currentIndex;
 
-            // Resolved once in a memo, not rebuilt here: a fresh {...ex} literal per render
-            // would give ExerciseMiniCard a new `exercise` prop every time and defeat its memo.
+            // Resolved once in a memo, not rebuilt here: a fresh {...ex} literal per
+            // render would give ExerciseMiniCard a new `exercise` prop every time and
+            // defeat its memo.
             const effectiveExercise = effectiveExercises[idx] ?? ex;
 
-            // Check if this exercise is part of a superset
-            const isPartOfSuperset = ex.superset_group && ex.superset_group.trim() !== '';
             const nextExercise = exercises[idx + 1];
-            const isLastInSuperset = !nextExercise || nextExercise.superset_group !== ex.superset_group;
             const hasNextExercise = idx < exercises.length - 1;
 
             // Check if current and next exercise are linked
@@ -2073,21 +1944,15 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                   exerciseImages={miniCardImages.get(effectiveExercise.exercise || effectiveExercise.name || '') || null}
                 />
 
-                {/* Show appropriate UI between exercises */}
-                {hasNextExercise && (
-                  <>
-                    {/* Show superset connector if linked */}
-                    {isLinkedToNext && (
-                      <SupersetConnector themeColor={themeColor} />
-                    )}
-
-                  </>
+                {/* Show superset connector if linked */}
+                {hasNextExercise && isLinkedToNext && (
+                  <SupersetConnector themeColor={themeColor} />
                 )}
               </React.Fragment>
             );
           })}
-        </View>
-      </ScrollView>
+        </Animated.View>
+      </Animated.ScrollView>
 
       {/* ── HEADER DROPDOWN MENU (overlays, stays fixed) ───────────── */}
       {headerMenuOpen && (
@@ -2184,10 +2049,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
             <Text style={styles.accessoryDone}>Done</Text>
           </TouchableOpacity>
 
-          {/* Centre slot. The "last: 60 × 10" hint used to live here and is gone: the PREV
-              column already says that, in the very row being typed into. The space now
-              carries the rest timer and the live 1RM, which can both show at once — you are
-              usually typing the next set while the previous set's rest counts down. */}
+          {/* Centre slot: the rest timer and the live 1RM, which can both show at
+              once — you are usually typing the next set while the previous set's
+              rest counts down. */}
           <View style={styles.accessoryCenter}>
             {/* A finished countdown leaves `timer` non-null with isRunning/isPaused
                 both false, so truthiness alone would strand a dead 0:00 here. */}
@@ -2243,7 +2107,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         globalUnit={globalUnit}
       />
     )}
-
 
     {/* Superset Selection Modal */}
     <SupersetSelectionModal
@@ -2341,9 +2204,9 @@ interface OneRMBadgeProps {
   unit: string;
   calculate1RM: (w: number, r: number) => number;
   /**
-   * Opens the progression modal. OPTIONAL, and deliberately so: the swipe-peek layers render
-   * their own badge, and cards sliding past mid-drag must not carry live tap targets. Omit it
-   * and the badge is inert, exactly as before.
+   * Opens the progression modal. OPTIONAL, and deliberately so: the neighbour cards
+   * render this same badge, and cards sliding past mid-drag must not carry live tap
+   * targets. Omit it and the badge is inert, with identical geometry.
    */
   onPress?: () => void;
 }
@@ -2422,44 +2285,532 @@ function PrescriptionBanner({
   );
 }
 
-// Helper function to parse target reps from weekly format
-// Converts "6, 6, 5, 5" or "8-12" to array of rep targets
-/** Shown under PREV when last session's set carried no weight at all. */
-const PREV_NO_WEIGHT = '—';
+// ──────────────────────────────────────────────────────────────────
+// ExerciseCard — THE card, singular.
+//
+// Rendered three times (prev / current / next) with an `interactive` flag. The old
+// pager had a second, parallel implementation for the swipe previews, and every
+// place the two drifted became a pop-on-commit bug: a missing Add set button, a
+// missing "×" delete mark, a chevron jumping lines, numbers sitting 2px off. Those
+// bugs are now impossible, because there is nothing to drift FROM.
+//
+// Non-interactive cards render the exact same tree (same TextInputs, same button
+// heights, same title modes), with inputs uneditable and handlers inert; their
+// wrapper additionally gets pointerEvents="none". Only the interactive card runs the
+// image cycling, registers keyboard refs, or opens the alternatives dropdown.
+// ──────────────────────────────────────────────────────────────────
 
-/**
- * PREV shows last session's load, which is stored in whatever unit it was logged
- * in — convert it to the unit on screen. Trailing zeros are dropped so a clean
- * 60kg reads as "60", not "60.0", in a 60px-wide cell.
- *
- * Weight is optional: bodyweight work is logged with reps and no load, and stores
- * as ''. That must render blank, not as a fabricated 0 — "0 × 10" reads as a real
- * measurement the user never took. Note this is "did not parse", not "is falsy":
- * a 0 the user actually typed is a genuine reading and still renders as 0.
- */
-function formatPrevWeight(
-  previous: { weight: string; unit?: 'kg' | 'lbs' },
-  globalUnit: 'kg' | 'lbs',
-): string {
-  const raw = parseFloat(previous.weight);
-  if (!Number.isFinite(raw)) return PREV_NO_WEIGHT;
-
-  const converted = convertWeight(raw, previous.unit ?? globalUnit, globalUnit);
-  return String(Number(converted.toFixed(1)));
+interface ExerciseCardProps {
+  /** This card's exercise index. Constant for the life of the mounted slot. */
+  index: number;
+  exercise: Exercise;
+  sets: SetData[];
+  /** True only for the centred, focused card. */
+  interactive: boolean;
+  /**
+   * Shared flag, true while a pager drag or its settle is in flight. Identity-stable
+   * (a ref), so it never breaks the card's memo.
+   */
+  draggingRef: React.MutableRefObject<boolean>;
+  /**
+   * The screen's scroll position, natively mapped. Drives the hero image's depth
+   * transforms. Identity-stable, so it never breaks the card's memo.
+   */
+  scrollY: Animated.Value;
+  workoutStarted: boolean;
+  themeColor: string;
+  globalUnit: 'kg' | 'lbs';
+  currentWeek: number;
+  calculate1RM: (w: number, r: number) => number;
+  previousByExercise: Record<string, PreviousSets>;
+  miniCardImages: Map<string, { start: any; end: any } | null>;
+  resolveExerciseImagePair?: (exercise: Exercise) => Promise<{ start: any; end: any } | null>;
+  resolveExerciseImage?: (exercise: Exercise) => Promise<string | null>;
+  isMultiLine: boolean;
+  onTitleMeasured: (index: number, multi: boolean) => void;
+  onSetUpdate: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => void;
+  onSetComplete: (exerciseIndex: number, setIndex: number) => void;
+  onSetAdd: (exerciseIndex: number) => void;
+  onSetTapWhenNotStarted: () => void;
+  onFocusField: (setIndex: number, field: 'weight' | 'reps') => void;
+  registerWeightRef: (setIndex: number, ref: TextInput | null) => void;
+  onShowDeleteModal: (exerciseIndex: number, setIndex: number) => void;
+  onExerciseSelect: (exerciseIndex: number, selectedExerciseIndex: number) => void;
+  onSetExercisePreference: (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => void;
+  onLongPress: (exerciseIndex: number) => void;
+  onOpenOneRM: (exerciseName: string, exerciseIndex: number) => void;
 }
 
-function parseTargetReps(repsString: string, setCount: number): string[] {
-  if (!repsString) return [];
+const ExerciseCard = React.memo(function ExerciseCard({
+  index,
+  exercise,
+  sets,
+  interactive,
+  draggingRef,
+  scrollY,
+  workoutStarted,
+  themeColor,
+  globalUnit,
+  currentWeek,
+  calculate1RM,
+  previousByExercise,
+  miniCardImages,
+  resolveExerciseImagePair,
+  resolveExerciseImage,
+  isMultiLine,
+  onTitleMeasured,
+  onSetUpdate,
+  onSetComplete,
+  onSetAdd,
+  onSetTapWhenNotStarted,
+  onFocusField,
+  registerWeightRef,
+  onShowDeleteModal,
+  onExerciseSelect,
+  onSetExercisePreference,
+  onLongPress,
+  onOpenOneRM,
+}: ExerciseCardProps) {
+  // Which variant this slot shows, resolved from sets[0].selectedExerciseIndex, the
+  // single display source of truth. The neighbour cards go through this exact same
+  // line, which is what guarantees the card that slides in during a swipe IS the
+  // card that will be interactive after the commit.
+  const resolved = useMemo(() => resolveEffectiveExercise(exercise, sets), [exercise, sets]);
+  const { selectedIndex, alternativeNames, allNames, name, effective } = resolved;
+  const hasAlternatives = allNames.length > 1;
 
-  // Handle comma-separated format like "6, 6, 5, 5" — one target per set
-  if (repsString.includes(',')) {
-    return repsString.split(',').map(rep => rep.trim());
-  }
+  const previousSets = previousByExercise[name] || EMPTY_PREVIOUS;
 
-  // A single scheme like "8-12" or "10" is prescribed for every set
-  const scheme = repsString.trim();
-  return scheme ? Array(setCount).fill(scheme) : [];
-}
+  // ── Alternatives dropdown (card-local) ─────────────────────────────
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const arrowRotation = useRef(new Animated.Value(0)).current;
+  const dropdownOpacity = useRef(new Animated.Value(0)).current;
+  const dropdownScale = useRef(new Animated.Value(0.95)).current;
+
+  // Losing focus (swipe away, superset advance) closes the dropdown, the same net
+  // behaviour the old index-keyed parent state produced.
+  useEffect(() => {
+    if (!interactive && selectorOpen) setSelectorOpen(false);
+  }, [interactive, selectorOpen]);
+
+  // Dropdown arrow rotation and alternatives animation effect
+  useEffect(() => {
+    if (selectorOpen) {
+      Animated.parallel([
+        Animated.timing(arrowRotation, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownOpacity, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownScale, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.back(1.1)),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(arrowRotation, {
+          toValue: 0,
+          duration: 150,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dropdownScale, {
+          toValue: 0.95,
+          duration: 150,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [selectorOpen]);
+
+  // ── Image: resolve + warm fallback + cycling ───────────────────────
+  // The warm map (preloaded on mount for every exercise AND alternative) supplies the
+  // first frame instantly, so a card sliding in never shows a gap while its own
+  // resolve is in flight; the resolved pair takes over silently once it lands.
+  const warmPair = miniCardImages.get(name) || null;
+  const [resolvedPair, setResolvedPair] = useState<{ start: any; end: any } | null>(null);
+  // "Not resolved yet" and "resolved, and there is nothing" are different states, and
+  // only the second one has earned the barbell placeholder. Before this flag existed
+  // the two were indistinguishable and a cold open flashed placeholder → image.
+  const [resolveDone, setResolveDone] = useState(false);
+  const [phase, setPhase] = useState<'start' | 'end'>('start');
+
+  useEffect(() => {
+    let cancelled = false;
+    setResolvedPair(null);
+    setResolveDone(false);
+    setPhase('start');
+
+    if (exercise.imageUrl) {
+      setResolvedPair({ start: exercise.imageUrl, end: exercise.imageUrl });
+      setResolveDone(true);
+      return;
+    }
+
+    // Built here from `name` + `exercise` rather than using `effective`, whose
+    // identity changes on every keystroke (it derives from `sets`) and would re-run
+    // this effect per character typed.
+    const resolveTarget: Exercise =
+      name === (exercise.exercise || exercise.name)
+        ? exercise
+        : { ...exercise, exercise: name, name };
+
+    if (resolveExerciseImagePair) {
+      resolveExerciseImagePair(resolveTarget)
+        .then((pair) => {
+          if (!cancelled) setResolvedPair(pair && pair.start && pair.end ? pair : null);
+        })
+        .catch(() => {
+          if (!cancelled) setResolvedPair(null);
+        })
+        .finally(() => {
+          if (!cancelled) setResolveDone(true);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (resolveExerciseImage) {
+      resolveExerciseImage(resolveTarget)
+        .then((url) => {
+          if (!cancelled) setResolvedPair(url ? { start: url, end: url } : null);
+        })
+        .catch(() => {
+          if (!cancelled) setResolvedPair(null);
+        })
+        .finally(() => {
+          if (!cancelled) setResolveDone(true);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setResolveDone(true);
+    return undefined;
+  }, [name, exercise, resolveExerciseImagePair, resolveExerciseImage]);
+
+  const pair = resolvedPair ?? warmPair;
+  const startFrame = pair?.start ?? null;
+  const endFrame = pair?.end ?? null;
+
+  // The 1s start/end cycling that animates the exercise. Gated on `interactive`, so
+  // exactly one card in the tree ever runs an interval, and losing focus freezes the
+  // image where it is (its cleanup clears the interval; the phase resets on the next
+  // pass through the non-interactive branch).
+  useEffect(() => {
+    if (!interactive || !startFrame || !endFrame) {
+      setPhase('start');
+      return;
+    }
+    const id = setInterval(() => {
+      // Hold the frame while a drag or its settle is in flight: a phase flip is a
+      // setState on this card, and a re-render landing mid-gesture competes on the
+      // JS thread with the work already carrying the drag and the stage height.
+      if (draggingRef.current) return;
+      setPhase((p) => (p === 'start' ? 'end' : 'start'));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [interactive, startFrame, endFrame, draggingRef]);
+
+  const frame = phase === 'end' && endFrame ? endFrame : startFrame;
+
+  // ── Scroll depth on the hero image ─────────────────────────────────
+  // Three motions, all native-driver properties (transform + opacity), so the whole
+  // effect rides the natively mapped scrollY and never touches the JS thread:
+  //  - Pull down past the top (iOS bounce; Android offsets never go negative, so
+  //    Android simply skips this part): the image inflates IN PLACE, up to 1.35x,
+  //    riding the bounce with no translate of its own.
+  //  - Scroll away: the image lags at roughly half the scroll speed, grows gently
+  //    to 1.08x as it leaves, and recedes to 40% opacity into the black.
+  //
+  // Why the pull side has NO translate: the canonical stretchy-header recipe
+  // (translate up by half the pull + scale hard) assumes cover-cropped photos,
+  // where clipping the top just reveals more image. These are CONTAINED
+  // illustrations; the whole subject is the picture, and the upward translate was
+  // walking the subject's head out of the frame. Geometry of the safe scale: the
+  // media layer is the 16:9 frame (height H) with paddingTop 45, and in the worst
+  // case (contain fits by height) the drawn top sits exactly at that padded edge,
+  // offset H/2 - 45 above centre. A centred scale k lifts it by (k - 1)(H/2 - 45),
+  // which reaches the clip edge only at k ≈ (H/2)/(H/2 - 45) ≈ 1.69 on a phone
+  // width. 1.35 keeps roughly half the padding as margin at a full-image-height
+  // pull. Raise it if you like, but stay under that ceiling.
+  //
+  // The image BOX never changes size — these are render transforms, not layout —
+  // so the CARD_* height arithmetic is untouched. Feel knobs: the 0.45 lag factor,
+  // the 1.35 pull stretch (hard ceiling ~1.69), and the 0.4 floor of the fade.
+  const imageDepthStyle = useMemo(
+    () => ({
+      opacity: scrollY.interpolate({
+        inputRange: [0, CARD_IMAGE_H * 0.9],
+        outputRange: [1, 0.4],
+        extrapolate: 'clamp',
+      }),
+      transform: [
+        {
+          translateY: scrollY.interpolate({
+            inputRange: [-CARD_IMAGE_H, 0, CARD_IMAGE_H],
+            outputRange: [0, 0, CARD_IMAGE_H * 0.45],
+            extrapolate: 'clamp',
+          }),
+        },
+        {
+          scale: scrollY.interpolate({
+            inputRange: [-CARD_IMAGE_H, 0, CARD_IMAGE_H],
+            outputRange: [1.35, 1, 1.08],
+            extrapolate: 'clamp',
+          }),
+        },
+      ],
+    }),
+    [scrollY],
+  );
+
+  return (
+    <View>
+      {/* ── IMAGE HEADER ─────────────────────────── */}
+      <View style={styles.imageContainer}>
+        {/* The depth transforms live on the media layer INSIDE the clipping frame:
+            imageContainer keeps its fixed 16:9 box, overflow hidden, and bottom
+            radius; only the picture (and its scrim) moves within it. */}
+        <Animated.View style={[styles.fullScreenMediaContainer, imageDepthStyle]}>
+          {frame ? (
+            // Deliberately UNKEYED by React: this view must be retained across a
+            // variant change and have its `source` swapped, never remounted. A
+            // changing React key unmounts the native image view and mounts a fresh
+            // one with no decoded bitmap, which paints BLANK; the cycling animation
+            // is the proof a source swap on a retained view is smooth (it swaps
+            // `source` every second and never flashes).
+            //
+            // recyclingKey is the expo-image half of that contract: it resets the
+            // view to blank the instant the exercise identity changes, so a stale
+            // bitmap can never survive, and it does NOT reset on a mere source swap,
+            // so cycling still animates on a retained, already-decoded view.
+            <Image
+              recyclingKey={name}
+              source={typeof frame === 'string' ? { uri: frame } : frame}
+              style={styles.fullScreenImage}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              // transition 0, deliberately. This one prop governs BOTH source
+              // changes, and the cycling swaps every second: a crossfade there would
+              // dissolve the two frames into each other and turn a crisp two-frame
+              // motion demo into a mush. Nothing needs it anyway — every frame is
+              // prefetched, so a new image is already decoded when it is asked for.
+              transition={0}
+            />
+          ) : resolveDone ? (
+            // Resolved, and there is genuinely no picture for this exercise. The
+            // only case that has earned the placeholder.
+            <View style={styles.fullScreenPlaceholder}>
+              <Ionicons name="barbell-outline" size={60} color="#3a3a44" />
+              <Text style={styles.mediaPlaceholderText}>No preview</Text>
+            </View>
+          ) : null
+          /* Not resolved yet and no warm frame: hold on an empty frame — no barbell
+             claiming there is no image, and no spinner announcing a wait that is
+             over in a frame or two. The container carries the surface colour, so
+             this reads as the image simply not having arrived, which is the truth. */
+          }
+          {/* Dark overlay for text legibility */}
+          <View style={styles.imageOverlay} />
+        </Animated.View>
+
+        {/* Header controls are NOT here — they belong to the screen, not the
+            exercise, so they are pinned in pagerStage and hold still during a
+            swipe. Rendering a copy per card would show through as a double image. */}
+      </View>
+
+      {/* ── FOCUS AREA ───────────────────────────── */}
+      <TouchableOpacity
+        style={styles.focusArea}
+        onLongPress={interactive ? () => onLongPress(index) : undefined}
+        activeOpacity={1}
+        delayLongPress={600}
+      >
+        {/* Exercise title and info */}
+        <View style={styles.titleRow}>
+          <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
+            <TouchableOpacity
+              style={[
+                styles.titleButton,
+                isMultiLine && styles.titleButtonMultiline,
+                // Column mode puts the chevron inline, so reserve its width here to
+                // match what row mode's sibling chevron takes. See
+                // TITLE_CHEVRON_RESERVE.
+                isMultiLine && hasAlternatives && { paddingRight: TITLE_CHEVRON_RESERVE },
+              ]}
+              onPress={() => interactive && hasAlternatives && setSelectorOpen((o) => !o)}
+              activeOpacity={interactive && hasAlternatives ? 0.7 : 1}
+            >
+              <Text
+                style={styles.title}
+                numberOfLines={2}
+                onTextLayout={(event) =>
+                  onTitleMeasured(index, event.nativeEvent.lines.length > 1)
+                }
+              >
+                {name}
+                {hasAlternatives && isMultiLine && (
+                  <Text style={styles.inlineArrow}>
+                    {' '}
+                    <Animated.View
+                      style={{
+                        transform: [
+                          {
+                            rotate: arrowRotation.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0deg', '180deg'],
+                            }),
+                          },
+                        ],
+                      }}
+                    >
+                      <Ionicons name="chevron-down" size={18} color={themeColor} />
+                    </Animated.View>
+                  </Text>
+                )}
+              </Text>
+              {hasAlternatives && !isMultiLine && (
+                <Animated.View
+                  style={{
+                    marginLeft: 8,
+                    transform: [
+                      {
+                        rotate: arrowRotation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '180deg'],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Ionicons name="chevron-down" size={18} color={themeColor} />
+                </Animated.View>
+              )}
+            </TouchableOpacity>
+            {!!(effective.primaryMuscles?.length || effective.secondaryMuscles?.length) && (
+              <Text style={styles.muscles}>
+                {[
+                  ...(effective.primaryMuscles || []),
+                  ...(effective.secondaryMuscles || []),
+                ].join(' · ')}
+              </Text>
+            )}
+          </View>
+          <OneRMBadge
+            sets={sets}
+            themeColor={themeColor}
+            calculate1RM={calculate1RM}
+            unit={globalUnit}
+            // Neighbour cards get an inert badge with identical geometry.
+            onPress={interactive ? () => onOpenOneRM(name, index) : undefined}
+          />
+        </View>
+
+        {/* Exercise selector dropdown */}
+        {interactive && selectorOpen && hasAlternatives && (
+          <Animated.View
+            style={[
+              styles.exerciseSelector,
+              {
+                opacity: dropdownOpacity,
+                transform: [{ scaleY: dropdownScale }, { scaleX: dropdownScale }],
+              },
+            ]}
+          >
+            {allNames.map((optionName, optionIndex) => {
+              const isSelected = optionIndex === selectedIndex;
+
+              return (
+                <TouchableOpacity
+                  key={optionIndex}
+                  style={[
+                    styles.exerciseOption,
+                    isSelected && [styles.exerciseOptionSelected, { borderLeftColor: themeColor }],
+                  ]}
+                  onPress={() => {
+                    // Update the visual selection (the single source of truth:
+                    // selectedExerciseIndex inside allSetsData)
+                    onExerciseSelect(index, optionIndex);
+                    // Persist the preference for FUTURE workouts (the adapter seeds
+                    // fresh sets data from it)
+                    if (optionIndex === 0) {
+                      onSetExercisePreference(index, exercise.exercise, alternativeNames, '');
+                    } else {
+                      onSetExercisePreference(index, exercise.exercise, alternativeNames, optionName);
+                    }
+                    setSelectorOpen(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.exerciseOptionContent}>
+                    <Text style={[styles.exerciseOptionText, isSelected && { color: themeColor }]}>
+                      {optionName}
+                    </Text>
+                    {isSelected && (
+                      <View style={[styles.exerciseSelectedDot, { backgroundColor: themeColor }]} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </Animated.View>
+        )}
+
+        {/* Prescription banner (week + sets × reps + RIR) */}
+        <PrescriptionBanner
+          exercise={effective}
+          currentWeek={currentWeek}
+          themeColor={themeColor}
+        />
+
+        {/* Sets table */}
+        <SetsTable
+          exerciseIndex={index}
+          sets={sets}
+          unit={globalUnit}
+          themeColor={themeColor}
+          workoutStarted={workoutStarted}
+          interactive={interactive}
+          exercise={effective}
+          currentWeek={currentWeek}
+          previousSets={previousSets}
+          onUpdate={onSetUpdate}
+          onComplete={onSetComplete}
+          onAdd={onSetAdd}
+          onSetTapWhenNotStarted={onSetTapWhenNotStarted}
+          onFocusField={onFocusField}
+          registerWeightRef={registerWeightRef}
+          onShowDeleteModal={onShowDeleteModal}
+        />
+      </TouchableOpacity>
+    </View>
+  );
+});
+// React.memo with the DEFAULT shallow comparison, which only works because every
+// prop is kept identity-stable upstream: the parent's trampolines for adapter
+// handlers, EMPTY_SETS for missing slices, and the adapter's immutable sets updates
+// (an in-place mutation hands this card the same array object it already has, and no
+// comparator can see inside that). The payoff: the adapter's once-a-second duration
+// tick re-renders ZERO cards, and a keystroke re-renders exactly one.
 
 interface SetsTableProps {
   exerciseIndex: number;
@@ -2467,6 +2818,8 @@ interface SetsTableProps {
   unit: 'kg' | 'lbs';
   themeColor: string;
   workoutStarted: boolean;
+  /** False on the neighbour cards: same tree, inert inputs and handlers. */
+  interactive: boolean;
   exercise: Exercise; // For accessing weekly reps
   currentWeek: number; // For determining which week's reps to use
   previousSets: PreviousSets; // Last session's reference, keyed by setNumber
@@ -2478,8 +2831,7 @@ interface SetsTableProps {
   ) => void;
   onComplete: (exerciseIndex: number, setIndex: number) => void;
   onAdd: (exerciseIndex: number) => void;
-  onRemove: (exerciseIndex: number, setIndex: number) => void;
-  onSetTapWhenNotStarted?: () => void;
+  onSetTapWhenNotStarted: () => void;
   onFocusField: (setIndex: number, field: 'weight' | 'reps') => void;
   registerWeightRef: (setIndex: number, ref: TextInput | null) => void;
   onShowDeleteModal: (exerciseIndex: number, setIndex: number) => void;
@@ -2491,13 +2843,13 @@ function SetsTable({
   unit,
   themeColor,
   workoutStarted,
+  interactive,
   exercise,
   currentWeek,
   previousSets,
   onUpdate,
   onComplete,
   onAdd,
-  onRemove,
   onSetTapWhenNotStarted,
   onFocusField,
   registerWeightRef,
@@ -2528,25 +2880,30 @@ function SetsTable({
           index={i}
           themeColor={themeColor}
           workoutStarted={workoutStarted}
+          interactive={interactive}
           targetReps={targetRepsArray[i] || undefined}
           previous={previousSets[i + 1]}
           isLastSet={i === sets.length - 1}
           onUpdate={(field, val) => onUpdate(exerciseIndex, i, field, val)}
           onComplete={() => onComplete(exerciseIndex, i)}
-          onLongPress={() => {
-            onShowDeleteModal(exerciseIndex, i);
-          }}
+          onLongPress={() => onShowDeleteModal(exerciseIndex, i)}
           onSetTapWhenNotStarted={onSetTapWhenNotStarted}
-          onFocusField={(field) => onFocusField(i, field)}
-          registerWeightRef={(ref) => registerWeightRef(i, ref)}
+          // Only the INTERACTIVE card registers keyboard refs / focus, or the
+          // neighbours would clobber the live card's map (it is keyed by set index
+          // alone).
+          onFocusField={interactive ? (field) => onFocusField(i, field) : noopFocusField}
+          registerWeightRef={interactive ? (ref) => registerWeightRef(i, ref) : noopRegisterRef}
           globalUnit={unit}
         />
       ))}
 
-      {/* Add set */}
+      {/* Add set. Rendered on every card (it occupies real height, and its absence
+          from the old previews was the loudest pop on commit); pressable only on the
+          interactive one. */}
       <TouchableOpacity
         style={styles.addSetBtn}
-        onPress={() => onAdd(exerciseIndex)}
+        onPress={interactive ? () => onAdd(exerciseIndex) : undefined}
+        disabled={!interactive}
       >
         <Ionicons name="add" size={18} color="#9898a4" />
         <Text style={styles.addSetText}>Add set</Text>
@@ -2560,16 +2917,17 @@ interface SetRowProps {
   index: number;
   themeColor: string;
   workoutStarted: boolean;
+  interactive: boolean;
   targetReps?: string; // Target reps for this specific set
   previous?: { weight: string; reps: string; unit?: 'kg' | 'lbs' }; // Last session's numbers for this set
   isLastSet: boolean; // Whether this is the last set in the array
   onUpdate: (field: 'weight' | 'reps', val: string) => void;
   onComplete: () => void;
   onLongPress: () => void;
-  onSetTapWhenNotStarted?: () => void;
+  onSetTapWhenNotStarted: () => void;
   onFocusField: (field: 'weight' | 'reps') => void;
   registerWeightRef: (ref: TextInput | null) => void;
-  globalUnit: 'kg' | 'lbs'; // Added for unit indicator
+  globalUnit: 'kg' | 'lbs'; // For the PREV column's unit conversion
 }
 
 function SetRow({
@@ -2577,6 +2935,7 @@ function SetRow({
   index,
   themeColor,
   workoutStarted,
+  interactive,
   targetReps,
   previous,
   isLastSet,
@@ -2589,10 +2948,45 @@ function SetRow({
   globalUnit,
 }: SetRowProps) {
   const completed = set.completed;
+  const handlePressIn = () => {
+    if (interactive && !workoutStarted) {
+      onSetTapWhenNotStarted();
+    }
+  };
+
+  // ── Android pan-over-input fix: the focus-gated overlay ────────────
+  // A horizontal swipe that BEGINS on a native EditText does not reach the pager's
+  // pan on Android: the EditText wins Android's touch negotiation and can disallow
+  // parent interception, and RNGH can cancel JS-responder views when the pan
+  // activates but not a raw native text field (gesture-handler issue #668; iOS is
+  // unaffected because its recognizers cancel touches to any subview). RNGH's own
+  // wrapped TextInput is reported in that thread not to fix it. So we route around
+  // the negotiation: while a field is NOT focused, an invisible Pressable covers
+  // it, the native input never sees the touch, and the pan works exactly as it
+  // does over the rest of the card. A tap on the overlay focuses the input
+  // programmatically (same keyboard, same onFocus path); once focused the overlay
+  // unmounts, so cursor placement, selection, and paste all behave natively while
+  // actually editing. The only delta: the FIRST tap on an unfocused field puts the
+  // cursor at the end rather than at the tapped character.
+  const weightRef = useRef<TextInput | null>(null);
+  const repsRef = useRef<TextInput | null>(null);
+  const [weightFocused, setWeightFocused] = useState(false);
+  const [repsFocused, setRepsFocused] = useState(false);
+
+  const pressUnfocusedField = (field: 'weight' | 'reps') => {
+    if (!interactive) return;
+    if (!workoutStarted) {
+      onSetTapWhenNotStarted();
+      return;
+    }
+    if (completed) return;
+    (field === 'weight' ? weightRef : repsRef).current?.focus();
+  };
+
   return (
     <View style={[styles.setRow, completed && styles.setRowCompleted]}>
         <Pressable
-          onLongPress={onLongPress}
+          onLongPress={interactive ? onLongPress : undefined}
           delayLongPress={500}
           style={styles.setNumCell}
         >
@@ -2612,52 +3006,76 @@ function SetRow({
         {/* No per-row unit label — the column header already states kg/lbs, and it
             tracks the toggle. Repeating it on every row cost the weight input width
             for nothing, leaving it narrower than REPS. */}
-        <TextInput
-          ref={(r) => registerWeightRef(r)}
-          style={[styles.setInput, { flex: 1 }]}
-          value={set.weight}
-          onChangeText={(v) => onUpdate('weight', v)}
-          onFocus={() => onFocusField('weight')}
-          onPressIn={() => {
-            if (!workoutStarted && onSetTapWhenNotStarted) {
-              onSetTapWhenNotStarted();
-            }
-          }}
-          keyboardType="decimal-pad"
-          // No ghost weight — last session's load is already one column left,
-          // under PREV. The plan prescribes reps, not load, so there is no
-          // target to suggest here.
-          placeholder=""
-          placeholderTextColor="#3a3a44"
-          editable={workoutStarted && !completed}
-        />
+        {/* editable is deliberately IDENTICAL on the interactive card and the
+            neighbours. Flipping it at commit ran Android's setInputType path on
+            every input, which resets and re-applies the typeface, and the digits
+            visibly changed size for a beat exactly as the swipe landed. What
+            actually makes a neighbour inert is its wrapper's pointerEvents="none";
+            editable never needed to differ. */}
+        <View style={styles.setInputCell}>
+          <TextInput
+            ref={(r) => {
+              weightRef.current = r;
+              registerWeightRef(r);
+            }}
+            style={[styles.setInput, styles.setInputField]}
+            value={set.weight}
+            onChangeText={(v) => onUpdate('weight', v)}
+            onFocus={() => {
+              setWeightFocused(true);
+              onFocusField('weight');
+            }}
+            onBlur={() => setWeightFocused(false)}
+            onPressIn={handlePressIn}
+            keyboardType="decimal-pad"
+            // No ghost weight — last session's load is already one column left,
+            // under PREV. The plan prescribes reps, not load, so there is no
+            // target to suggest here.
+            placeholder=""
+            placeholderTextColor="#3a3a44"
+            editable={workoutStarted && !completed}
+          />
+          {!weightFocused && (
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => pressUnfocusedField('weight')}
+            />
+          )}
+        </View>
 
-        <TextInput
-          style={[styles.setInput, { flex: 1 }]}
-          value={set.reps}
-          onChangeText={(v) => onUpdate('reps', v)}
-          onFocus={() => onFocusField('reps')}
-          onPressIn={() => {
-            if (!workoutStarted && onSetTapWhenNotStarted) {
-              onSetTapWhenNotStarted();
-            }
-          }}
-          keyboardType="number-pad"
-          // The rep target is the prescription for this week — the ghost text
-          // should say what to hit, not what was hit last time. Last session's
-          // reps are still one column to the left, under PREV.
-          placeholder={targetReps || previous?.reps || ''}
-          placeholderTextColor="#3a3a44"
-          editable={workoutStarted && !completed}
-        />
+        <View style={styles.setInputCell}>
+          <TextInput
+            ref={(r) => {
+              repsRef.current = r;
+            }}
+            style={[styles.setInput, styles.setInputField]}
+            value={set.reps}
+            onChangeText={(v) => onUpdate('reps', v)}
+            onFocus={() => {
+              setRepsFocused(true);
+              onFocusField('reps');
+            }}
+            onBlur={() => setRepsFocused(false)}
+            onPressIn={handlePressIn}
+            keyboardType="number-pad"
+            // The rep target is the prescription for this week — the ghost text
+            // should say what to hit, not what was hit last time. Last session's
+            // reps are still one column to the left, under PREV.
+            placeholder={targetReps || previous?.reps || ''}
+            placeholderTextColor="#3a3a44"
+            editable={workoutStarted && !completed}
+          />
+          {!repsFocused && (
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => pressUnfocusedField('reps')}
+            />
+          )}
+        </View>
 
         <TouchableOpacity
-          onPress={workoutStarted ? onComplete : undefined}
-          onPressIn={() => {
-            if (!workoutStarted && onSetTapWhenNotStarted) {
-              onSetTapWhenNotStarted();
-            }
-          }}
+          onPress={interactive && workoutStarted ? onComplete : undefined}
+          onPressIn={handlePressIn}
           style={styles.setCheckCell}
         >
           {completed ? (
@@ -2668,243 +3086,6 @@ function SetRow({
         </TouchableOpacity>
     </View>
   );
-}
-
-interface ExerciseMiniCardProps {
-  /** This card's row index. Passed back to the handlers so they can stay identity-stable. */
-  index: number;
-  exercise: Exercise;
-  progress: { completed: number; total: number };
-  themeColor: string;
-  isActive?: boolean;
-  onPress: (index: number) => void;
-  onLongPress?: (index: number) => void;
-  exerciseImages?: {start: any, end: any} | null;
-}
-
-const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
-  index,
-  exercise,
-  progress,
-  themeColor,
-  isActive = false,
-  onPress,
-  onLongPress,
-  exerciseImages,
-}: ExerciseMiniCardProps) {
-  const allDone = progress.total > 0 && progress.completed === progress.total;
-
-  // The CURRENT badge used to blink in and out the instant currentIndex changed. Fade and
-  // scale it instead, so it arrives with the rest of the gesture.
-  //
-  // The animated value lives INSIDE the card, keyed off the isActive prop, so no new prop
-  // is threaded down and React.memo still holds: a commit re-renders only the two cards
-  // whose isActive actually flipped, not all N.
-  //
-  // Native-driven — opacity and transform both qualify, and the JS thread is already
-  // carrying the stage height.
-  const badgeAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
-  // Keep the badge mounted through its exit, or there is nothing left to fade. Mounting it
-  // permanently is not an option: currentBadge has real width, and an invisible one would
-  // squeeze every inactive card's title.
-  const [badgeMounted, setBadgeMounted] = useState(isActive);
-
-  // The active card's background, border and title colour used to flip instantly. Cross-fade
-  // them instead, so the outgoing card relaxes out of its active state as the incoming one
-  // settles into it.
-  //
-  // JS-driven, and it has to be: backgroundColor, borderColor and colour are NOT
-  // native-driver properties. That is acceptable here because this runs only on COMMIT, not
-  // during the drag — by the time it starts the finger is up — and only the two cards whose
-  // isActive flipped animate, not all N. That is also why this keys off isActive rather than
-  // interpolating dragX: doing the latter would drive every row in the list on every frame.
-  const activeAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
-
-  useEffect(() => {
-    if (isActive) setBadgeMounted(true);
-
-    Animated.timing(badgeAnim, {
-      toValue: isActive ? 1 : 0,
-      duration: 180,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished && !isActive) setBadgeMounted(false);
-    });
-
-    Animated.timing(activeAnim, {
-      toValue: isActive ? 1 : 0,
-      duration: 180,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false, // colour properties cannot leave the JS thread
-    }).start();
-  }, [isActive, badgeAnim, activeAnim]);
-
-  return (
-    <AnimatedTouchableOpacity
-      style={[
-        styles.miniCard,
-        allDone && styles.miniCardDone,
-        {
-          // Interpolated rather than swapped, so the state cross-fades. End values match
-          // styles.miniCard and styles.miniCardActive exactly.
-          borderColor: activeAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: ['rgba(255,255,255,0.04)', 'rgba(255,255,255,0.08)'],
-          }),
-          backgroundColor: activeAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: ['#0a0a0f', 'rgba(255,255,255,0.02)'],
-          }),
-        },
-      ]}
-      onPress={() => onPress(index)}
-      onLongPress={onLongPress ? () => onLongPress(index) : undefined}
-      delayLongPress={600}
-      activeOpacity={0.75}
-    >
-      <View style={styles.miniIcon}>
-        {exerciseImages?.start ? (
-          <Image
-            // The row is memo'd and its exercise never changes, so this never recycles — the
-            // key is here so the view can never be reused across two different exercises if
-            // the list is ever reordered.
-            recyclingKey={exercise.exercise || exercise.name || ''}
-            source={exerciseImages.start}
-            style={styles.miniExerciseImage}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={0}
-          />
-        ) : (
-          <Ionicons
-            name={allDone ? 'checkmark-circle' : isActive ? 'play-circle' : 'barbell-outline'}
-            size={20}
-            color={allDone ? themeColor : isActive ? themeColor : '#9898a4'}
-          />
-        )}
-        {/* Status overlay for completed/active states when image is shown */}
-        {exerciseImages?.start && (allDone || isActive) && (
-          <View style={styles.miniIconOverlay}>
-            <Ionicons
-              name={allDone ? 'checkmark-circle' : 'play-circle'}
-              size={16}
-              color={themeColor}
-            />
-          </View>
-        )}
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <View style={styles.miniTitleRow}>
-          <Animated.Text
-            style={[
-              styles.miniTitle,
-              allDone && styles.miniTitleDone,
-              {
-                color: activeAnim.interpolate({
-                  inputRange: [0, 1],
-                  // Resting colour depends on whether the exercise is finished; the active
-                  // colour is the same either way.
-                  outputRange: [allDone ? '#9898a4' : '#f0f0f2', '#ffffff'],
-                }),
-              },
-            ]}
-          >
-            {exercise.exercise || exercise.name || 'Exercise'}
-          </Animated.Text>
-          {badgeMounted && (
-            <Animated.View
-              style={[
-                styles.currentBadge,
-                {
-                  backgroundColor: themeColor,
-                  opacity: badgeAnim,
-                  transform: [
-                    {
-                      scale: badgeAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.8, 1],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.currentBadgeText}>CURRENT</Text>
-            </Animated.View>
-          )}
-        </View>
-        <Text style={styles.miniMeta}>
-          {exercise.sets} × {exercise.reps}
-          {progress.total > 0 ? `  ·  ${progress.completed}/${progress.total} done` : ''}
-        </Text>
-      </View>
-
-      {/* progress bar */}
-      <View style={styles.miniProgressTrack}>
-        <View
-          style={[
-            styles.miniProgressFill,
-            {
-              width: progress.total
-                ? `${(progress.completed / progress.total) * 100}%`
-                : '0%',
-              backgroundColor: themeColor,
-            },
-          ]}
-        />
-      </View>
-    </AnimatedTouchableOpacity>
-  );
-}, (prev, next) =>
-  // Compare `progress` BY VALUE. computeExerciseProgress rebuilds a {completed, total}
-  // object for every exercise whenever allSetsData changes, so a shallow compare fails for
-  // all N cards the moment any set is edited — even the ones that did not change. Every
-  // other prop is compared by identity, which is why they are all kept stable upstream.
-  prev.index === next.index &&
-  prev.exercise === next.exercise &&
-  prev.themeColor === next.themeColor &&
-  prev.isActive === next.isActive &&
-  prev.onPress === next.onPress &&
-  prev.onLongPress === next.onLongPress &&
-  prev.exerciseImages === next.exerciseImages &&
-  prev.progress.completed === next.progress.completed &&
-  prev.progress.total === next.progress.total,
-);
-
-// ── Exercise Page Preview (read-only, used by the swipe peek layers) ──
-// A lightweight, non-interactive copy of the image header + focus area for a
-// neighbour exercise, so the card sliding in during a swipe looks complete.
-// Only the live centre card runs image cycling / inputs; this never does.
-
-interface ExercisePagePreviewProps {
-  /** Reports whether this exercise's title wraps, so its card height is known before it lands. */
-  onTitleMeasured?: (index: number, multi: boolean) => void;
-  /** Whether this exercise's title wraps. Drives the same two-mode layout as the live card. */
-  isMultiLine?: boolean;
-  index: number;
-  exercises: Exercise[];
-  allSetsData: SetData[][];
-  exercisePreferences: { [exerciseName: string]: string };
-  previousByExercise: Record<string, PreviousSets>;
-  miniCardImages: Map<string, { start: any; end: any } | null>;
-  themeColor: string;
-  globalUnit: 'kg' | 'lbs';
-  currentWeek: number;
-  calculate1RM: (w: number, r: number) => number;
-}
-
-/** One { completed, total } per exercise index. Single source of the done-state rule. */
-function computeExerciseProgress(
-  exercises: Exercise[],
-  allSetsData: SetData[][],
-): { completed: number; total: number }[] {
-  return exercises.map((_, idx) => {
-    const sets = allSetsData[idx] || [];
-    const completed = sets.filter((s) => s.completed).length;
-    return { completed, total: sets.length };
-  });
 }
 
 /** Completed exercises are present but recede; the current one is the focal point. */
@@ -2924,8 +3105,9 @@ interface ExerciseProgressTicksProps {
  * One tick per exercise along the bottom edge of the image — where you are and what
  * is done, at a glance, without scrolling to "Up Next".
  *
- * Rendered ONCE, pinned in pagerStage outside the animated layers. The bar describes the
- * workout rather than any one exercise, so it holds still while the cards slide beneath it.
+ * Rendered ONCE, pinned in pagerStage outside the card layer. The bar describes the
+ * workout rather than any one exercise, so it holds still while the cards slide
+ * beneath it.
  *
  * The ticks themselves are only ever two states — complete (faded accent) or grey. "You
  * are here" is NOT one of them: it is a separate bright bar layered on top, which slides
@@ -2975,215 +3157,166 @@ function ExerciseProgressTicks({ progress, indicatorPage, themeColor }: Exercise
   );
 }
 
-function ExercisePagePreview({
+interface ExerciseMiniCardProps {
+  /** This card's row index. Passed back to the handlers so they can stay identity-stable. */
+  index: number;
+  exercise: Exercise;
+  progress: { completed: number; total: number };
+  themeColor: string;
+  isActive?: boolean;
+  onPress: (index: number) => void;
+  onLongPress?: (index: number) => void;
+  exerciseImages?: {start: any, end: any} | null;
+}
+
+const ExerciseMiniCard = React.memo(function ExerciseMiniCard({
   index,
-  exercises,
-  allSetsData,
-  exercisePreferences,
-  previousByExercise,
-  miniCardImages,
+  exercise,
+  progress,
   themeColor,
-  globalUnit,
-  currentWeek,
-  calculate1RM,
-  onTitleMeasured,
-  isMultiLine,
-}: ExercisePagePreviewProps) {
-  const ex = exercises[index];
-  if (!ex) return null;
+  isActive = false,
+  onPress,
+  onLongPress,
+  exerciseImages,
+}: ExerciseMiniCardProps) {
+  const allDone = progress.total > 0 && progress.completed === progress.total;
 
-  // Resolve the effective exercise (preferred alternative if one is set)
-  const primaryName = ex.exercise || ex.name || '';
-  const pref = exercisePreferences[primaryName];
-  let eff: Exercise = ex;
-  if (pref && ex.alternatives && ex.alternatives.includes(pref)) {
-    eff = { ...ex, exercise: pref, name: pref };
-  }
-  const name = eff.exercise || eff.name || 'Exercise';
-  const sets = allSetsData[index] || [];
-  const previousSets = previousByExercise[name] || {};
-  const img = miniCardImages.get(name)?.start || null;
+  // The CURRENT badge is the ONE thing on a mini card that changes when focus moves.
+  // It used to be accompanied by a background / border / title-colour cross-fade and
+  // an instant play-circle overlay on the icon; all of that firing at once on two
+  // rows read as the list flashing, and the colour interpolations were JS-driven
+  // (colour is not a native-driver property), landing exactly as the settle spring
+  // finished. The highlight treatment is gone entirely; the badge alone travels,
+  // fade + scale, native-driven, so a commit does zero JS animation work in the list.
+  //
+  // The animated value lives INSIDE the card, keyed off the isActive prop, so no new
+  // prop is threaded down and React.memo still holds: a commit re-renders only the
+  // two cards whose isActive actually flipped, not all N.
+  const badgeAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+  // Keep the badge mounted through its exit, or there is nothing left to fade. Mounting it
+  // permanently is not an option: currentBadge has real width, and an invisible one would
+  // squeeze every inactive card's title.
+  const [badgeMounted, setBadgeMounted] = useState(isActive);
 
-  // The live card shows a chevron beside the title when the exercise has alternatives
-  // (its `allExercises.length > 1`). Mirror that, or it pops in on commit — and because
-  // the chevron shares the title's row, its absence also let the title claim ~26px more
-  // width, so a long name could reflow the instant the card settled.
-  const hasAlternatives =
-    (ex.alternatives || []).filter((a) => a && typeof a === 'string').length > 0;
+  useEffect(() => {
+    if (isActive) setBadgeMounted(true);
+
+    Animated.timing(badgeAnim, {
+      toValue: isActive ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished && !isActive) setBadgeMounted(false);
+    });
+  }, [isActive, badgeAnim]);
 
   return (
-    <View>
-      {/* Image header */}
-      <View style={styles.imageContainer}>
-        <View style={styles.fullScreenMediaContainer}>
-          {img ? (
-            <Image
-              recyclingKey={name}
-              source={img}
-              style={styles.fullScreenImage}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-              transition={0}
+    <TouchableOpacity
+      style={[styles.miniCard, allDone && styles.miniCardDone]}
+      onPress={() => onPress(index)}
+      onLongPress={onLongPress ? () => onLongPress(index) : undefined}
+      delayLongPress={600}
+      activeOpacity={0.75}
+    >
+      <View style={styles.miniIcon}>
+        {exerciseImages?.start ? (
+          <Image
+            // The row is memo'd and its exercise never changes, so this never recycles — the
+            // key is here so the view can never be reused across two different exercises if
+            // the list is ever reordered.
+            recyclingKey={exercise.exercise || exercise.name || ''}
+            source={exerciseImages.start}
+            style={styles.miniExerciseImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={0}
+          />
+        ) : (
+          <Ionicons
+            name={allDone ? 'checkmark-circle' : 'barbell-outline'}
+            size={20}
+            color={allDone ? themeColor : '#9898a4'}
+          />
+        )}
+        {/* Completion overlay when an image is shown. Deliberately NOT tied to
+            isActive: an instant play-circle popping in and out on focus change was
+            part of the flash. Selection is the badge's job alone. */}
+        {exerciseImages?.start && allDone && (
+          <View style={styles.miniIconOverlay}>
+            <Ionicons
+              name="checkmark-circle"
+              size={16}
+              color={themeColor}
             />
-          ) : (
-            <View style={styles.fullScreenPlaceholder}>
-              <Ionicons name="barbell-outline" size={60} color="#3a3a44" />
-              <Text style={styles.mediaPlaceholderText}>No preview</Text>
-            </View>
-          )}
-          <View style={styles.imageOverlay} />
-        </View>
-
-        {/* Neither the progress ticks nor the header controls live here. Both are pinned
-            once in pagerStage, outside every animated layer, and hold still while these
-            peek cards slide beneath them. The fake header this used to render existed
-            only to mask the real one sliding away — with the real one pinned, a duplicate
-            would now show through as a double image. */}
+          </View>
+        )}
       </View>
 
-      {/* Focus area */}
-      <View style={styles.focusArea}>
-        <View style={styles.titleRow}>
-          <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
-            {/* Mirrors the live title EXACTLY, but with Views: nothing here is tappable.
-                The live card has two modes — a single-line title lays out as a row with the
-                chevron beside it, while a wrapping title switches to a column and moves the
-                chevron INLINE, to the end of the second line. Implementing only the row mode
-                is what made the chevron jump lines the moment a long title committed, and it
-                also gave the two different text widths (col vs col - 26), so they could wrap
-                in different places. */}
-            <View
+      <View style={{ flex: 1 }}>
+        <View style={styles.miniTitleRow}>
+          <Text style={[styles.miniTitle, allDone && styles.miniTitleDone]}>
+            {exercise.exercise || exercise.name || 'Exercise'}
+          </Text>
+          {badgeMounted && (
+            <Animated.View
               style={[
-                styles.titleButton,
-                isMultiLine && styles.titleButtonMultiline,
-                isMultiLine && hasAlternatives && { paddingRight: TITLE_CHEVRON_RESERVE },
+                styles.currentBadge,
+                {
+                  backgroundColor: themeColor,
+                  opacity: badgeAnim,
+                  transform: [
+                    {
+                      scale: badgeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.8, 1],
+                      }),
+                    },
+                  ],
+                },
               ]}
             >
-              <Text
-                style={styles.title}
-                numberOfLines={2}
-                onTextLayout={(e) => onTitleMeasured?.(index, e.nativeEvent.lines.length > 1)}
-              >
-                {name}
-                {hasAlternatives && isMultiLine && (
-                  <Text style={styles.inlineArrow}>
-                    {' '}
-                    <View>
-                      <Ionicons name="chevron-down" size={18} color={themeColor} />
-                    </View>
-                  </Text>
-                )}
-              </Text>
-              {hasAlternatives && !isMultiLine && (
-                <View style={{ marginLeft: 8 }}>
-                  <Ionicons name="chevron-down" size={18} color={themeColor} />
-                </View>
-              )}
-            </View>
-            {!!(eff.primaryMuscles?.length || eff.secondaryMuscles?.length) && (
-              <Text style={styles.muscles}>
-                {[...(eff.primaryMuscles || []), ...(eff.secondaryMuscles || [])].join(' · ')}
-              </Text>
-            )}
-          </View>
-          <OneRMBadge sets={sets} themeColor={themeColor} calculate1RM={calculate1RM} unit={globalUnit} />
+              <Text style={styles.currentBadgeText}>CURRENT</Text>
+            </Animated.View>
+          )}
         </View>
+        <Text style={styles.miniMeta}>
+          {exercise.sets} × {exercise.reps}
+          {progress.total > 0 ? `  ·  ${progress.completed}/${progress.total} done` : ''}
+        </Text>
+      </View>
 
-        <PrescriptionBanner exercise={eff} currentWeek={currentWeek} themeColor={themeColor} />
-
-        <PreviewSetsTable
-          sets={sets}
-          exercise={eff}
-          currentWeek={currentWeek}
-          unit={globalUnit}
-          themeColor={themeColor}
-          previousSets={previousSets}
+      {/* progress bar */}
+      <View style={styles.miniProgressTrack}>
+        <View
+          style={[
+            styles.miniProgressFill,
+            {
+              width: progress.total
+                ? `${(progress.completed / progress.total) * 100}%`
+                : '0%',
+              backgroundColor: themeColor,
+            },
+          ]}
         />
       </View>
-    </View>
+    </TouchableOpacity>
   );
-}
-
-interface PreviewSetsTableProps {
-  sets: SetData[];
-  exercise: Exercise;
-  currentWeek: number;
-  unit: 'kg' | 'lbs';
-  themeColor: string;
-  previousSets: PreviousSets;
-}
-
-function PreviewSetsTable({
-  sets,
-  exercise,
-  currentWeek,
-  unit,
-  themeColor,
-  previousSets,
-}: PreviewSetsTableProps) {
-  const weeklyReps = exercise.reps_weekly?.[String(currentWeek)] || exercise.reps;
-  const targetRepsArray = weeklyReps ? parseTargetReps(String(weeklyReps), sets.length) : [];
-
-  return (
-    <View style={styles.setsTable}>
-      <View style={styles.setsHeader}>
-        <Text style={[styles.setsHeaderCell, { width: 30 }]}>SET</Text>
-        <Text style={[styles.setsHeaderCell, { width: 60 }]}>PREV</Text>
-        <Text style={[styles.setsHeaderCell, { flex: 1, textAlign: 'center' }]}>{unit.toUpperCase()}</Text>
-        <Text style={[styles.setsHeaderCell, { flex: 1, textAlign: 'center' }]}>REPS</Text>
-        <Text style={[styles.setsHeaderCell, { width: 34, textAlign: 'center' }]}>✓</Text>
-      </View>
-
-      {sets.map((s, i) => {
-        const prev = previousSets[i + 1];
-        const wTxt = s.weight || '';
-        const rTxt = s.reps || targetRepsArray[i] || '';
-        const isLastSet = i === sets.length - 1;
-        return (
-          <View key={i} style={[styles.setRow, s.completed && styles.setRowCompleted]}>
-            <View style={styles.setNumCell}>
-              <View style={styles.setNumInner}>
-                <Text style={styles.setNum}>{i + 1}</Text>
-                {/* The live row draws this on the last set; without it, it popped in on commit */}
-                {isLastSet && <Text style={styles.setRowLastMark}>×</Text>}
-              </View>
-            </View>
-            <View style={styles.prevCellBox}>
-              <Text style={styles.prevCell} numberOfLines={1}>
-                {prev ? `${formatPrevWeight(prev, unit)} × ${prev.reps}` : '—'}
-              </Text>
-            </View>
-            {/* Direct children of the row, exactly like the live TextInputs. The extra
-                wrapper these used to sit in was a second box in the flex chain that the
-                live row does not have. */}
-            <View style={[styles.setInput, { flex: 1 }]}>
-              <Text style={[styles.previewCellText, { color: s.weight ? '#f0f0f2' : '#3a3a44' }]}>{wTxt}</Text>
-            </View>
-            <View style={[styles.setInput, { flex: 1 }]}>
-              <Text style={[styles.previewCellText, { color: s.reps ? '#f0f0f2' : '#3a3a44' }]}>{rTxt}</Text>
-            </View>
-            <View style={styles.setCheckCell}>
-              <Ionicons
-                name={s.completed ? 'checkmark-circle' : 'ellipse-outline'}
-                size={26}
-                color={s.completed ? themeColor : '#3a3a44'}
-              />
-            </View>
-          </View>
-        );
-      })}
-
-      {/* "Add set" — a plain View, not a TouchableOpacity: the peek layer is read-only.
-          Its absence was the loudest pop, and the costliest: the button occupies real
-          height, so the whole preview card was short and everything below it jumped on
-          commit. Same styles as the live button, so the geometry is identical. */}
-      <View style={styles.addSetBtn}>
-        <Ionicons name="add" size={18} color="#9898a4" />
-        <Text style={styles.addSetText}>Add set</Text>
-      </View>
-    </View>
-  );
-}
+}, (prev, next) =>
+  // Compare `progress` BY VALUE. computeExerciseProgress rebuilds a {completed, total}
+  // object for every exercise whenever allSetsData changes, so a shallow compare fails for
+  // all N cards the moment any set is edited — even the ones that did not change. Every
+  // other prop is compared by identity, which is why they are all kept stable upstream.
+  prev.index === next.index &&
+  prev.exercise === next.exercise &&
+  prev.themeColor === next.themeColor &&
+  prev.isActive === next.isActive &&
+  prev.onPress === next.onPress &&
+  prev.onLongPress === next.onLongPress &&
+  prev.exerciseImages === next.exerciseImages &&
+  prev.progress.completed === next.progress.completed &&
+  prev.progress.total === next.progress.total,
+);
 
 // ── Superset Connector Component ──────────────────────────────────
 
@@ -3452,27 +3585,6 @@ function SupersetSelectionModal({
   );
 }
 
-
-// ──────────────────────────────────────────────────────────────────
-// Helpers
-// ──────────────────────────────────────────────────────────────────
-
-function formatTime(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function hexA(hex: string, alpha: number): string {
-  // Convert #RRGGBB or #RGB to rgba(r,g,b,a)
-  const h = hex.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
-  const r = parseInt(full.slice(0, 2), 16);
-  const g = parseInt(full.slice(2, 4), 16);
-  const b = parseInt(full.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 // ──────────────────────────────────────────────────────────────────
 // Styles
 // ──────────────────────────────────────────────────────────────────
@@ -3527,12 +3639,12 @@ const styles = StyleSheet.create({
   // ── Swipe pager ────────────────────────────────
   pagerStage: {
     width: '100%',
-    overflow: 'hidden', // clips the peeking neighbours to the screen edge
+    overflow: 'hidden', // clips the off-screen neighbour cards to the screen edge
   },
-  // Pinned progress bar: a sibling of the animated card, so the swipe's dragX never
-  // touches it. Mirrors imageContainer's box (top of the stage, 16:9) so the ticks
-  // inside it land at the same screen position they did when they lived in the image.
-  // Sits inside pagerStage's bounds, so overflow: 'hidden' does not clip it.
+  // Pinned progress bar: a sibling of the card layer, so the swipe never touches it.
+  // Mirrors imageContainer's box (top of the stage, 16:9) so the ticks inside it land
+  // at the same screen position they did when they lived in the image. Sits inside
+  // pagerStage's bounds, so overflow: 'hidden' does not clip it.
   pinnedTicksLayer: {
     position: 'absolute',
     top: 0,
@@ -3541,7 +3653,10 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     zIndex: 20,
   },
-  pagerPeek: {
+  // One of the three mounted card slots (prev / current / next). All are absolute and
+  // positioned purely by their pagePos-derived translateX; they never overlap, so
+  // their sibling order is irrelevant.
+  pagerCard: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -3694,10 +3809,11 @@ const styles = StyleSheet.create({
   setRowCompleted: {
     opacity: 0.55,
   },
-  // ── Shared set-row cell geometry ───────────────────────────────
-  // SetRow (live) and PreviewSetsTable (swipe peek) MUST lay out identically, or the
-  // card visibly shifts the instant a swipe commits. These live in one place so the
-  // two cannot drift apart again.
+  // ── Set-row cell geometry ───────────────────────────────────────
+  // Every cell height in this chain is pinned. The pager's stage height is COMPUTED
+  // from these (see CARD_*), so an implicit height that depends on a font's metrics
+  // would make the arithmetic drift per platform, and the stage would glide and then
+  // jump at the end of a swipe.
   setNumCell: {
     width: 30,
     alignItems: 'center',
@@ -3754,17 +3870,20 @@ const styles = StyleSheet.create({
     fontFamily: 'DMMono-Medium',
     textAlign: 'center',
     minHeight: 44,
-    // A TextInput centres its own text in the box; a Text inside a View does not — it
-    // sits against the top padding. PreviewSetsTable reuses this style on a View, so
-    // without this its numbers rendered a few px higher than the live ones and visibly
-    // jumped on commit. No-op on the TextInput itself (it has no flex children).
+    // Inert on a TextInput (it centres its own text); retained so any non-input
+    // reuse of this style centres its content at exactly the same pixels.
     justifyContent: 'center',
   },
-  previewCellText: {
-    fontFamily: 'DMMono-Medium',
-    fontSize: 16,
-    lineHeight: 20,
-    textAlign: 'center',
+  // The focus-gated overlay (see SetRow) needs a positioned box that matches the
+  // input exactly, so the input's horizontal margin moves out to this cell and
+  // everything else stays on the input itself. Geometry is unchanged: the row's
+  // height still comes from setInput.minHeight, so CARD_SET_ROW_H is untouched.
+  setInputCell: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  setInputField: {
+    marginHorizontal: 0,
   },
   addSetBtn: {
     flexDirection: 'row',
@@ -3938,10 +4057,6 @@ const styles = StyleSheet.create({
   miniCardDone: {
     opacity: 0.6,
   },
-  miniCardActive: {
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
   miniIcon: {
     width: 32,
     height: 32,
@@ -3975,9 +4090,6 @@ const styles = StyleSheet.create({
   miniTitleDone: {
     textDecorationLine: 'line-through',
     color: '#9898a4',
-  },
-  miniTitleActive: {
-    color: '#ffffff',
   },
   miniTitleRow: {
     flexDirection: 'row',
@@ -4077,7 +4189,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
 
-  // ── History View Styles ──────────────
+  // ── History styles (used by ExerciseHistoryModal-adjacent layouts) ──
   headerTitle: {
     color: '#fff',
     fontSize: 16,

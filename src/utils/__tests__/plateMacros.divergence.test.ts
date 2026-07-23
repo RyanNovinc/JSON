@@ -500,3 +500,34 @@ describe('sauce-axis template routing (batch 4)', () => {
     expect(alt).not.toEqual(FROZEN4[slug][plateId]);
   });
 });
+
+// Batch 5: catalogue-wide macro sync. Every remaining legacy meal's authored
+// plate_macros was frozen to its computed value (28 plates had drifted by
+// 25-160 kcal — palacinke was the worst). This guard pins the WHOLE catalogue:
+// authored == at(computed) on every plate of every meal, so no authored number
+// can ever drift from the ingredient maths again. Regenerate literals only for
+// a deliberate recipe change, never to silence a failure here.
+describe('catalogue-wide macro integrity (batch 5)', () => {
+  const MEALS = CURATED_MEALS as Record<string, CuratedMeal>;
+  const at = (m: BaseMacros) => ({
+    kcal: Math.round(m.kcal),
+    protein_g: Math.round(m.protein_g * 10) / 10,
+    carbs_g: Math.round(m.carbs_g * 10) / 10,
+    fat_g: Math.round(m.fat_g * 10) / 10,
+    fiber_g: Math.round(m.fiber_g * 10) / 10,
+  });
+
+  it('every plate of every meal: authored plate_macros == at(computed)', () => {
+    const mismatches: string[] = [];
+    for (const slug of Object.keys(MEALS)) {
+      const meal = MEALS[slug];
+      for (const plate of meal.plates) {
+        const computed = at(computePlateMacros(meal, plate, meal.methods[0]));
+        if (JSON.stringify(computed) !== JSON.stringify(plate.plate_macros)) {
+          mismatches.push(slug + '/' + plate.id + ': authored ' + JSON.stringify(plate.plate_macros) + ' != computed ' + JSON.stringify(computed));
+        }
+      }
+    }
+    expect(mismatches).toEqual([]);
+  });
+});

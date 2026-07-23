@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -16,6 +16,44 @@ import RobustStorage from '../utils/robustStorage';
 import { Analytics } from '../services/analytics';
 
 // This adapter connects the new beautiful WorkoutLogScreen with your existing app navigation and data structures
+
+/**
+ * ── Changes in this revision (paired with the WorkoutLogScreen pager rewrite) ──
+ *
+ * 1. IMMUTABLE sets updates. Every handler that changes allSetsData now replaces
+ *    the inner array (and the set object) instead of mutating in place. The screen
+ *    memoises its three exercise cards on prop identity, and an in-place mutation
+ *    hands a card the SAME array object it already holds — no comparator can detect
+ *    a change it cannot see the "before" of, so the card would skip its re-render
+ *    and paint stale data. Mutation also wrote through to the PREVIOUS state object
+ *    (the copies were shallow), which is exactly the kind of shared-reference bug
+ *    React state is supposed to rule out.
+ *
+ * 2. handleSetComplete still reads allSetsData from its RENDER CLOSURE, not a
+ *    functional update. That is deliberate and preserved: the screen's deferred
+ *    completion (pendingCompletion) is built around it, and changing it would
+ *    reorder the timer / history / superset side effects. Only the copying inside
+ *    it became immutable.
+ *
+ * 3. Fresh workouts seed selectedExerciseIndex from the saved exercisePreferences.
+ *    Previously a fresh workout initialised every set with selectedExerciseIndex: 0
+ *    while Up Next resolved names from the preferences map — two sources of truth
+ *    that disagreed until the user reselected the alternative, and the screen's
+ *    swipe previews resolving from one while the live card resolved from the other
+ *    was itself a content flash across a swipe commit. allSetsData is now the
+ *    single display source; preferences persist the default for FUTURE workouts.
+ *
+ * 4. handleSetAdd inherits the exercise's current selectedExerciseIndex instead of
+ *    hardcoding 0. An added set on an exercise running an alternative used to file
+ *    its history under the PRIMARY exercise (getLoggedExerciseName reads the set's
+ *    own selectedExerciseIndex), silently splitting the history.
+ *
+ * 5. calculate1RM and themedResolveExerciseImagePair are memoised. They were
+ *    recreated on every adapter render — once a second while the workout timer
+ *    runs — and every useMemo/useEffect in the screen that lists them as a
+ *    dependency was being thrashed on each tick.
+ * ──────────────────────────────────────────────────────────────────────────────
+ */
 
 /** Rest fallback for a value that exists but cannot be read as a duration. */
 const DEFAULT_REST_SECONDS = 90;
@@ -62,6 +100,27 @@ const parseRestSeconds = (rest: number | string | undefined | null): number | nu
   return DEFAULT_REST_SECONDS;
 };
 
+/**
+ * Map a saved preference (an alternative's NAME) to the selectedExerciseIndex the
+ * sets data stores: 0 for the primary, 1 + position for an entry in `alternatives`.
+ * Unknown or stale names (the program changed since the preference was saved) fall
+ * back to the primary.
+ */
+const preferredSelectedIndex = (
+  exercise: Exercise,
+  prefs: { [exerciseName: string]: string },
+): number => {
+  const preferred = prefs[exercise.exercise];
+  if (!preferred) return 0;
+
+  const alternativeNames = (exercise.alternatives || [])
+    .filter((alt) => alt && typeof alt === 'string')
+    .map((alt) => String(alt));
+
+  const altIdx = alternativeNames.indexOf(preferred);
+  return altIdx >= 0 ? altIdx + 1 : 0;
+};
+
 export default function WorkoutLogScreenAdapter() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'WorkoutLog'>>();
@@ -90,10 +149,12 @@ export default function WorkoutLogScreenAdapter() {
   // Local exercises state for superset modifications
   const [exercises, setExercises] = useState<Exercise[]>([]);
 
-  // exercisePreferences is a SECOND async read, independent of the sets data, and it drives
-  // which alternative Up Next and the dropdown show — while the card's own selectedIndex reads
-  // allSetsData. Two sources of truth for "which alternative is selected", landing at different
-  // times, so without its own ready flag Up Next can flip a beat after (or before) the card.
+  // exercisePreferences is a SECOND async read, independent of the sets data. Which
+  // alternative is DISPLAYED is now resolved everywhere from allSetsData (seeded
+  // from these preferences on a fresh workout, below), so preferences only persist
+  // the default for future workouts — but the screen still holds its first paint
+  // until both reads land, and gating render also prevents a dropdown write from
+  // racing this load and being clobbered by it.
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   // Load exercise preferences on mount
@@ -212,13 +273,33 @@ export default function WorkoutLogScreenAdapter() {
           }
         }
       } else {
+        // FRESH workout: seed each exercise's selected alternative from the saved
+        // global preference. selectedExerciseIndex inside allSetsData is the single
+        // display source of truth for which variant a slot shows (the screen's card,
+        // its swipe neighbours, and Up Next all resolve from it), so a fresh init of
+        // 0 while a preference exists would show the primary on the card until the
+        // user reselected it.
+        //
+        // Read directly from AsyncStorage rather than the exercisePreferences state:
+        // that state is filled by a separate effect, and depending on it here would
+        // couple this init to that effect's timing (or re-run it when the user
+        // changes a preference mid-workout).
+        let prefs: { [exerciseName: string]: string } = {};
+        try {
+          const savedPrefs = await AsyncStorage.getItem('exercisePreferences');
+          if (savedPrefs) prefs = JSON.parse(savedPrefs);
+        } catch (error) {
+          console.log('Could not load exercise preferences for seeding:', error);
+        }
+
         const initialSetsData = exercises.map((exercise) => {
           const setsCount = exercise.sets;
+          const selectedExerciseIndex = preferredSelectedIndex(exercise, prefs);
           return Array(setsCount).fill(null).map(() => ({
             weight: '',
             reps: '',
             completed: false,
-            selectedExerciseIndex: 0,
+            selectedExerciseIndex,
             exerciseData: {},
           }));
         });
@@ -323,43 +404,68 @@ export default function WorkoutLogScreenAdapter() {
     // Only clear it when explicitly finishing the workout
   }, [workoutStartTime, workoutDuration, day?.day_name, blockName, currentWeek, block, isFinishingWorkout]);
 
-  // Epley formula for 1RM calculation (preserving decimal precision)
-  const calculate1RM = (weight: number, reps: number): number => {
+  // Epley formula for 1RM calculation (preserving decimal precision).
+  // Memoised: this used to be recreated every render (once a second while the
+  // workout timer runs), and it sits in the dependency arrays of several of the
+  // screen's memos, so each tick was recomputing PR detection and re-rendering the
+  // memoised exercise cards for nothing.
+  const calculate1RM = useCallback((weight: number, reps: number): number => {
     if (reps <= 0 || weight <= 0) return 0;
     if (reps === 1) return weight;
     return weight * (1 + reps / 30);
-  };
+  }, []);
 
   // Handler functions that adapt to your existing app logic
+  //
+  // NOTE on immutability: every update below replaces the inner per-exercise array
+  // (and the set object) rather than mutating in place. The screen's exercise cards
+  // are memoised on prop identity; an in-place mutation hands a card the same array
+  // object it already holds, which no comparator can detect, so the card would skip
+  // its re-render and paint stale data. Shallow-copying only the OUTER array also
+  // meant the previous state object was being written through — mutation of state
+  // React believes is immutable.
   const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
     setAllSetsData(prev => {
       const newData = [...prev];
-      if (!newData[exerciseIndex]) {
-        newData[exerciseIndex] = [];
+      const inner = [...(newData[exerciseIndex] || [])];
+      // Defensive backfill (contiguous, unlike the old sparse assignment), inheriting
+      // the exercise's current variant so a backfilled set files history correctly.
+      while (inner.length <= setIndex) {
+        inner.push({
+          weight: '',
+          reps: '',
+          completed: false,
+          selectedExerciseIndex: inner[0]?.selectedExerciseIndex || 0,
+          exerciseData: {},
+        });
       }
-      if (!newData[exerciseIndex][setIndex]) {
-        newData[exerciseIndex][setIndex] = { weight: '', reps: '', completed: false, selectedExerciseIndex: 0, exerciseData: {} };
-      }
-      newData[exerciseIndex][setIndex] = {
-        ...newData[exerciseIndex][setIndex],
+      inner[setIndex] = {
+        ...inner[setIndex],
         [field]: value,
       };
+      newData[exerciseIndex] = inner;
       return newData;
     });
   };
 
   const handleSetComplete = async (exerciseIndex: number, setIndex: number) => {
+    // Deliberately reads allSetsData from the render closure, NOT a functional
+    // update. The screen's deferred completion (pendingCompletion) is built around
+    // exactly this: it waits for the updated prop to arrive so this closure already
+    // contains the autofilled reps. Do not "fix" this into setAllSetsData(prev =>).
     const newData = [...allSetsData];
-    const wasCompleted = newData[exerciseIndex]?.[setIndex]?.completed || false;
-    
-    if (!newData[exerciseIndex]?.[setIndex]) return;
-    
+    const inner = [...(newData[exerciseIndex] || [])];
+    if (!inner[setIndex]) return;
+
+    const wasCompleted = inner[setIndex].completed || false;
+
     // Toggle completion state
-    newData[exerciseIndex][setIndex] = {
-      ...newData[exerciseIndex][setIndex],
+    inner[setIndex] = {
+      ...inner[setIndex],
       completed: !wasCompleted,
     };
-    
+    newData[exerciseIndex] = inner;
+
     setAllSetsData(newData);
     
     if (!wasCompleted) {
@@ -389,7 +495,8 @@ export default function WorkoutLogScreenAdapter() {
         
         // Check if we're currently on this exercise
         if (exerciseIndex === currentIndex && exerciseIndex < exercises.length - 1) {
-          // Switch to next exercise IMMEDIATELY
+          // Switch to next exercise IMMEDIATELY. The screen sees this as an external
+          // index change and slides the pager to the neighbour.
           console.log(`🔗 [SUPERSET] ⏩ Switching NOW to ${nextExercise?.exercise}`);
           setCurrentIndex(exerciseIndex + 1);
           
@@ -416,8 +523,8 @@ export default function WorkoutLogScreenAdapter() {
       // record. Weight may be an empty string; downstream 1RM, PR detection and
       // volume all skip a set whose weight does not parse, rather than counting it
       // as 0kg.
-      if (newData[exerciseIndex][setIndex].reps) {
-        await saveSetToHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
+      if (inner[setIndex].reps) {
+        await saveSetToHistory(exerciseIndex, setIndex, inner[setIndex]);
       }
     } else if (wasCompleted) {
       // Un-completing a set retracts everything that completing it produced —
@@ -427,23 +534,26 @@ export default function WorkoutLogScreenAdapter() {
       stopTimerForSet(exerciseIndex, setIndex);
 
       // Remove from history when set is uncompleted
-      await removeSetFromHistory(exerciseIndex, setIndex, newData[exerciseIndex][setIndex]);
+      await removeSetFromHistory(exerciseIndex, setIndex, inner[setIndex]);
     }
   };
 
   const handleSetAdd = (exerciseIndex: number) => {
     setAllSetsData(prev => {
       const newData = [...prev];
-      if (!newData[exerciseIndex]) {
-        newData[exerciseIndex] = [];
-      }
-      newData[exerciseIndex].push({
+      const inner = [...(newData[exerciseIndex] || [])];
+      inner.push({
         weight: '',
         reps: '',
         completed: false,
-        selectedExerciseIndex: 0,
+        // Inherit the exercise's current variant. Hardcoding 0 here meant a set
+        // added while an alternative was active filed its history under the PRIMARY
+        // exercise (getLoggedExerciseName reads the set's own selectedExerciseIndex),
+        // silently splitting the history across two names.
+        selectedExerciseIndex: inner[0]?.selectedExerciseIndex || 0,
         exerciseData: {},
       });
+      newData[exerciseIndex] = inner;
       return newData;
     });
   };
@@ -452,7 +562,7 @@ export default function WorkoutLogScreenAdapter() {
     setAllSetsData(prev => {
       const newData = [...prev];
       if (newData[exerciseIndex]) {
-        newData[exerciseIndex].splice(setIndex, 1);
+        newData[exerciseIndex] = newData[exerciseIndex].filter((_, idx) => idx !== setIndex);
       }
       return newData;
     });
@@ -488,45 +598,38 @@ export default function WorkoutLogScreenAdapter() {
   // Exercise alternatives handlers
   const handleExerciseSelect = (exerciseIndex: number, selectedExerciseIndex: number) => {
     setAllSetsData(prev => {
-      const newData = [...prev];
-      const currentSelection = newData[exerciseIndex][0]?.selectedExerciseIndex || 0;
-      
+      const inner = prev[exerciseIndex] || [];
+      const currentSelection = inner[0]?.selectedExerciseIndex || 0;
+
       // Only update if selection actually changed
-      if (currentSelection !== selectedExerciseIndex) {
-        const exercise = exercises[exerciseIndex];
-        const alternativeNames = (exercise.alternatives || []).filter(Boolean);
-        const allExercises = [exercise.exercise, ...alternativeNames];
-        const newExerciseName = allExercises[selectedExerciseIndex] || exercise.exercise;
-        
-        // Update exercise selection for all sets of this exercise
-        for (let i = 0; i < newData[exerciseIndex].length; i++) {
-          const setData = newData[exerciseIndex][i];
-          
-          // Store current data before switching
-          if (!setData.exerciseData) setData.exerciseData = {};
-          setData.exerciseData[currentSelection] = {
+      if (currentSelection === selectedExerciseIndex) return prev;
+
+      // Immutable rebuild of every set: stash the current variant's numbers, switch
+      // the selection, restore the target variant's numbers if it has been used
+      // before, otherwise start it fresh.
+      const newInner = inner.map(setData => {
+        const stash = {
+          ...(setData.exerciseData || {}),
+          [currentSelection]: {
             weight: setData.weight,
             reps: setData.reps,
             completed: setData.completed,
-          };
-          
-          // Update selected exercise index
-          setData.selectedExerciseIndex = selectedExerciseIndex;
-          
-          // Restore previous data for this exercise if it exists
-          if (setData.exerciseData[selectedExerciseIndex]) {
-            setData.weight = setData.exerciseData[selectedExerciseIndex].weight;
-            setData.reps = setData.exerciseData[selectedExerciseIndex].reps;
-            setData.completed = setData.exerciseData[selectedExerciseIndex].completed;
-          } else {
-            // First time selecting this exercise - start fresh
-            setData.weight = '';
-            setData.reps = '';
-            setData.completed = false;
-          }
-        }
-      }
-      
+          },
+        };
+        const restored = stash[selectedExerciseIndex];
+
+        return {
+          ...setData,
+          selectedExerciseIndex,
+          exerciseData: stash,
+          weight: restored?.weight ?? '',
+          reps: restored?.reps ?? '',
+          completed: restored?.completed ?? false,
+        };
+      });
+
+      const newData = [...prev];
+      newData[exerciseIndex] = newInner;
       return newData;
     });
   };
@@ -981,11 +1084,17 @@ export default function WorkoutLogScreenAdapter() {
     }
   };
 
-  // Create themed image resolver
-  const themedResolveExerciseImagePair = async (exercise: Exercise) => {
-    const theme = isPinkTheme ? 'pink' : 'blue';
-    return resolveExerciseImagePair(exercise, theme);
-  };
+  // Create themed image resolver.
+  // Memoised on the theme: a fresh function identity every adapter render (once a
+  // second while the timer runs) re-ran the screen's per-card image resolve effects
+  // for nothing.
+  const themedResolveExerciseImagePair = useCallback(
+    async (exercise: Exercise) => {
+      const theme = isPinkTheme ? 'pink' : 'blue';
+      return resolveExerciseImagePair(exercise, theme);
+    },
+    [isPinkTheme],
+  );
 
 
   return (
@@ -993,7 +1102,8 @@ export default function WorkoutLogScreenAdapter() {
       <WorkoutLogScreen
       exercises={exercises}
       // Both async reads must have landed before the card paints anything. dataLoaded alone is
-      // not enough: preferences arrive separately and drive Up Next's alternatives.
+      // not enough: preferences arrive separately, and a dropdown write racing the preferences
+      // load could be clobbered by it.
       contentReady={dataLoaded && preferencesLoaded}
       currentIndex={currentIndex}
       onIndexChange={setCurrentIndex}
