@@ -1203,10 +1203,26 @@ export default function ImportRoutineScreen() {
 
 
   const handleModalCancel = () => {
-    // If this was from a shared import (shareId or prefilledJson), navigate back to home instead of staying here
-    const { prefilledJson, shareId } = route.params || {};
-    if (prefilledJson || shareId) {
-      setPrefilledCancelled(true);
+    // All THREE inbound delivery mechanisms land the user here with a program already
+    // parsed, so declining means "I don't want this program" — not "show me the paste
+    // screen". Send them home instead of falling through to the legacy paste UI:
+    //   shareId       — share link (json.fit/p/<id>), fetched by this screen
+    //   prefilledJson — share/curated program, handed over by ImportSharedContent
+    //   fileUri       — Open-with / share sheet file, routed here as /import-file
+    // fileUri was the omission: this condition was written in the sharing era and not
+    // revisited when inbound file import landed, so cancelling a file open dropped
+    // through to "Paste Your Plan" (and from there, its back button reached the legacy
+    // "Your Prompt is Ready!" screen).
+    const { prefilledJson, shareId, fileUri } = route.params || {};
+    if (prefilledJson || shareId || fileUri) {
+      // Deliberately NOT setting prefilledCancelled on the fileUri path. It's a one-way
+      // latch that nothing resets, and the file path keeps this screen mounted — setting
+      // it would permanently wedge the fileUri effect shut for this instance, the exact
+      // failure its latch comment (:189-198) warns about. The per-delivery receivedAt
+      // nonce is the intended guard there, so re-opening the same file still works.
+      if (prefilledJson || shareId) {
+        setPrefilledCancelled(true);
+      }
       // Navigate to home screen for shared imports
       navigation.navigate('Main');
       return;
