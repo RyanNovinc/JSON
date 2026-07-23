@@ -88,3 +88,4 @@ venv/
 # Local scratch
 simulator_screenshot_*.pngfable-handoff/
 .aws-sam/
+fable-handoff/
