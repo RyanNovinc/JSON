@@ -86,4 +86,5 @@ eas.json.backup*
 venv/
 
 # Local scratch
-simulator_screenshot_*.png
+simulator_screenshot_*.pngfable-handoff/
+.aws-sam/
