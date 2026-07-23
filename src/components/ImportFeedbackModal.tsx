@@ -17,6 +17,7 @@ import {
 // so RNGH touchables inside it silently receive no touches.
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { getWriteReviewUrl } from '../utils/storeLinks';
 
 interface ImportFeedbackModalProps {
   visible: boolean;
@@ -43,9 +44,7 @@ export default function ImportFeedbackModal({
   };
 
   const handleAppStoreRate = async () => {
-    const appStoreUrl = Platform.OS === 'ios'
-      ? 'https://apps.apple.com/au/app/json-09d4ce/id6758357834?action=write-review'
-      : 'https://play.google.com/store/apps/details?id=com.RyanNovinc.JSON';
+    const appStoreUrl = getWriteReviewUrl();
     try {
       await Linking.openURL(appStoreUrl);
     } catch (error) {

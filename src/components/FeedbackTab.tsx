@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { sendRatingFeedback, sendBugReport, sendFeatureRequest } from '../services/feedbackApi';
+import { getWriteReviewUrl } from '../utils/storeLinks';
 
 type TabType = 'rating' | 'bug' | 'feature';
 
@@ -108,9 +109,7 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
   // ===== Submit handlers — identical to original =====
   const handleRatingSubmit = async () => {
     if (rating === 5) {
-      const appStoreUrl = Platform.OS === 'ios'
-        ? 'https://apps.apple.com/au/app/json-09d4ce/id6758357834?action=write-review'
-        : 'https://play.google.com/store/apps/details?id=com.RyanNovinc.JSON';
+      const appStoreUrl = getWriteReviewUrl();
 
       Linking.openURL(appStoreUrl).catch(err =>
         console.error('Failed to open app store:', err)

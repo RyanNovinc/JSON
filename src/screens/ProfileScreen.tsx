@@ -6,7 +6,6 @@ import {
   ScrollView,
   Alert,
   Linking,
-  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TouchableOpacity } from 'react-native-gesture-handler';
@@ -17,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { WorkoutStorage } from '../utils/storage';
+import { getWriteReviewUrl } from '../utils/storeLinks';
 import { FeedbackModal } from '../components/FeedbackTab';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
@@ -25,9 +25,6 @@ import TermsOfServiceModal from '../components/TermsOfServiceModal';
 // otherwise hard-code here. The Workouts redesign memory mentioned v1.2 in
 // App Store review, so that's the starting value.
 const APP_VERSION = '1.2.0';
-
-// App Store URLs — same values used in FeedbackModal's 5-star flow.
-const APP_STORE_URL_IOS = 'https://apps.apple.com/au/app/json-09d4ce/id6758357834';
 
 /**
  * ProfileScreen — the user-level utility hub.
@@ -132,10 +129,7 @@ export default function ProfileScreen() {
   };
 
   const handleRateApp = () => {
-    const url = Platform.OS === 'ios'
-      ? `${APP_STORE_URL_IOS}?action=write-review`
-      : 'https://play.google.com/store/apps/details?id=com.RyanNovinc.JSON';
-    openExternalUrl(url);
+    openExternalUrl(getWriteReviewUrl());
   };
 
   const handleResetOnboarding = () => {
