@@ -17,6 +17,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { WorkoutStorage } from '../utils/storage';
 import { getWriteReviewUrl } from '../utils/storeLinks';
+import { markRatingEngaged } from '../utils/reviewGate';
 import { FeedbackModal } from '../components/FeedbackTab';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
@@ -129,6 +130,9 @@ export default function ProfileScreen() {
   };
 
   const handleRateApp = () => {
+    // Tapping through to the store means they've likely rated — silence the
+    // automatic prompt permanently. Fire-and-forget so the link opens instantly.
+    markRatingEngaged().catch(() => {});
     openExternalUrl(getWriteReviewUrl());
   };
 

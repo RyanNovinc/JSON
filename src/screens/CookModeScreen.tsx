@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,12 @@ import {
   SauceVariant,
 } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
+import * as StoreReview from 'expo-store-review';
+import {
+  incrementCookCompletions,
+  markReviewAttempt,
+  shouldPromptForCookReview,
+} from '../utils/reviewGate';
 
 type CookModeRoute = RouteProp<RootStackParamList, 'CookMode'>;
 type CookModeNav = StackNavigationProp<RootStackParamList, 'CookMode'>;
@@ -421,6 +427,39 @@ export default function CookModeScreen() {
   const [checkedSubsteps, setCheckedSubsteps] = useState<Set<string>>(new Set());
   const [completed, setCompleted] = useState(false);
   const [showStopModal, setShowStopModal] = useState(false);
+  // Sharing from the completion screen already hands the user a task; don't
+  // stack a review prompt on top of it. Mirrored into a ref so the check still
+  // holds if they tap share while the gate lookups are in flight.
+  const [hasShared, setHasShared] = useState(false);
+  const hasSharedRef = useRef(false);
+
+  // ===== Review prompt =====
+  // Count the completion exactly once, even if `completed` re-renders.
+  const countedCompletionRef = useRef(false);
+  useEffect(() => {
+    if (!completed || countedCompletionRef.current) return;
+    countedCompletionRef.current = true;
+    incrementCookCompletions().catch(() => {});
+  }, [completed]);
+
+  // Native store review, offered only while the completion screen is on screen.
+  // Nothing is attached to the Done button — if they leave first, they don't get
+  // asked. All failures are silent; the OS owns whether a dialog ever appears.
+  useEffect(() => {
+    if (!completed || hasShared) return;
+    const timeout = setTimeout(async () => {
+      try {
+        if (!(await StoreReview.isAvailableAsync())) return;
+        if (!(await shouldPromptForCookReview())) return;
+        if (hasSharedRef.current) return;
+        await markReviewAttempt();
+        await StoreReview.requestReview();
+      } catch {
+        // no-op
+      }
+    }, 2500);
+    return () => clearTimeout(timeout);
+  }, [completed, hasShared]);
 
   const sortedTimers = useMemo(() => {
     return [...timers].sort((a, b) => {
@@ -549,6 +588,8 @@ export default function CookModeScreen() {
     : (selectedVariant?.extra_total_minutes ?? 0);
 
   const handleShare = async () => {
+    hasSharedRef.current = true;
+    setHasShared(true);
     try {
       const url = `https://json.fit/r/?meal=${meal.slug}&plate=${plate.id}`;
       const m = servingMacros;

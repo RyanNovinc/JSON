@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { getWriteReviewUrl } from '../utils/storeLinks';
+import { markRatingEngaged } from '../utils/reviewGate';
 
 interface ImportFeedbackModalProps {
   visible: boolean;
@@ -45,6 +46,9 @@ export default function ImportFeedbackModal({
 
   const handleAppStoreRate = async () => {
     const appStoreUrl = getWriteReviewUrl();
+    // Tapping through to the store means they've likely rated — never fire the
+    // automatic cook-completion prompt at them again.
+    await markRatingEngaged().catch(() => {});
     try {
       await Linking.openURL(appStoreUrl);
     } catch (error) {

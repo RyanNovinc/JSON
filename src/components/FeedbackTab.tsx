@@ -9,7 +9,6 @@ import {
   Platform,
   Keyboard,
   Alert,
-  Linking,
   ScrollView,
   Pressable,
   Modal,
@@ -19,7 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { sendRatingFeedback, sendBugReport, sendFeatureRequest } from '../services/feedbackApi';
-import { getWriteReviewUrl } from '../utils/storeLinks';
+import * as StoreReview from 'expo-store-review';
+import { hasRatingEngaged, markReviewAttempt } from '../utils/reviewGate';
 
 type TabType = 'rating' | 'bug' | 'feature';
 
@@ -49,8 +49,7 @@ interface FeedbackModalProps {
  * What stayed identical:
  *  - All 3 tabs (Rate, Bug, Feature)
  *  - Star rating with friendly labels
- *  - 5-star → App Store deep link (iOS + Android)
- *  - <5-star → follow-up text field
+ *  - Follow-up text field
  *  - AsyncStorage of all feedback to 'userFeedback' key
  *  - sendRatingFeedback / sendBugReport / sendFeatureRequest API calls
  *  - Inline success state with auto-close after 1.6s
@@ -106,40 +105,49 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
     }, 1600);
   };
 
-  // ===== Submit handlers — identical to original =====
+  // ===== Submit handlers =====
+  //
+  // Star selection deliberately does NOT gate access to the store review flow.
+  // Routing only 5-star raters to the store is review gating and violates Google
+  // Play policy (and Apple's guidance), so every rating takes the same path:
+  // capture the feedback internally, then offer the native review flow.
   const handleRatingSubmit = async () => {
-    if (rating === 5) {
-      const appStoreUrl = getWriteReviewUrl();
+    const feedbackEntry = {
+      type: 'rating',
+      rating: rating,
+      message: feedback,
+      timestamp: new Date().toISOString(),
+      device: Platform.OS,
+    };
 
-      Linking.openURL(appStoreUrl).catch(err =>
-        console.error('Failed to open app store:', err)
-      );
-      handleClose();
-    } else {
-      const feedbackEntry = {
-        type: 'rating',
-        rating: rating,
-        message: feedback,
-        timestamp: new Date().toISOString(),
-        device: Platform.OS,
-      };
+    try {
+      const existingFeedback = await AsyncStorage.getItem('userFeedback');
+      const feedbackArray = existingFeedback ? JSON.parse(existingFeedback) : [];
+      feedbackArray.push(feedbackEntry);
+      await AsyncStorage.setItem('userFeedback', JSON.stringify(feedbackArray));
 
-      try {
-        const existingFeedback = await AsyncStorage.getItem('userFeedback');
-        const feedbackArray = existingFeedback ? JSON.parse(existingFeedback) : [];
-        feedbackArray.push(feedbackEntry);
-        await AsyncStorage.setItem('userFeedback', JSON.stringify(feedbackArray));
-
-        sendRatingFeedback(rating, feedback).catch(error => {
-          console.log('Failed to send rating to server:', error);
-        });
-
-        showInlineSuccess('rating');
-      } catch (error) {
-        console.error('Failed to save rating:', error);
-        Alert.alert('Error', 'Failed to submit rating. Please try again.');
-      }
+      sendRatingFeedback(rating, feedback).catch(error => {
+        console.log('Failed to send rating to server:', error);
+      });
+    } catch (error) {
+      console.error('Failed to save rating:', error);
+      Alert.alert('Error', 'Failed to submit rating. Please try again.');
+      return;
     }
+
+    // Native review flow — same for every score. Skipped only if the user has
+    // already tapped through to the store from a manual rate link. Silent on
+    // failure; the OS decides whether a dialog actually appears.
+    try {
+      if (!(await hasRatingEngaged()) && (await StoreReview.isAvailableAsync())) {
+        await markReviewAttempt();
+        await StoreReview.requestReview();
+      }
+    } catch {
+      // no-op
+    }
+
+    showInlineSuccess('rating');
   };
 
   const handleFeedbackSubmit = async () => {
@@ -322,9 +330,11 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
                     )}
                   </View>
 
-                  {rating > 0 && rating < 5 && (
+                  {rating > 0 && (
                     <View style={styles.followUpSection}>
-                      <Text style={styles.label}>WHAT CAN WE IMPROVE?</Text>
+                      <Text style={styles.label}>
+                        {rating === 5 ? 'ANYTHING TO ADD?' : 'WHAT CAN WE IMPROVE?'}
+                      </Text>
                       <TextInput
                         style={styles.input}
                         placeholder="Tell us more..."
@@ -335,28 +345,6 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
                         maxLength={500}
                       />
                       <Text style={styles.charCount}>{feedback.length} / 500</Text>
-                    </View>
-                  )}
-
-                  {rating === 5 && (
-                    <View
-                      style={[
-                        styles.appStoreCard,
-                        {
-                          backgroundColor: hexA(currentThemeColor, 0.05),
-                          borderColor: hexA(currentThemeColor, 0.3),
-                        },
-                      ]}
-                    >
-                      <Ionicons name="sparkles" size={18} color={currentThemeColor} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.appStoreTitle, { color: currentThemeColor }]}>
-                          Love JSON.fit?
-                        </Text>
-                        <Text style={styles.appStoreSubtitle}>
-                          Help others discover it with a quick review.
-                        </Text>
-                      </View>
                     </View>
                   )}
 
@@ -379,14 +367,10 @@ export function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
                         { color: rating === 0 ? '#55555f' : '#000' },
                       ]}
                     >
-                      {rating === 5 ? 'Rate on App Store' : 'Submit feedback'}
+                      Submit feedback
                     </Text>
                     {rating > 0 && (
-                      <Ionicons
-                        name={rating === 5 ? 'open-outline' : 'arrow-forward'}
-                        size={16}
-                        color="#000"
-                      />
+                      <Ionicons name="arrow-forward" size={16} color="#000" />
                     )}
                   </TouchableOpacity>
                 </>
@@ -599,31 +583,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     letterSpacing: 0.5,
     fontFamily: 'DMMono-Regular',
-  },
-
-  // App Store invitation card
-  appStoreCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  appStoreTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: 'Outfit-SemiBold',
-    letterSpacing: -0.2,
-    marginBottom: 2,
-  },
-  appStoreSubtitle: {
-    fontSize: 12,
-    color: '#9898a4',
-    fontFamily: 'Outfit-Regular',
-    lineHeight: 16,
   },
 
   // Submit
