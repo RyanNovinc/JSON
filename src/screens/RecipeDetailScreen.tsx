@@ -322,7 +322,9 @@ export default function RecipeDetailScreen() {
 
   const handleShare = async () => {
     try {
-      const url = `https://json.fit/r/?meal=${meal.slug}&plate=${plate.id}`;
+      // Static per-plate page — it carries a real og: card, so the link previews
+      // properly in iMessage/WhatsApp. The old ?meal=&plate= form redirects here.
+      const url = `https://json.fit/r/${meal.slug}/${plate.id}/`;
       const caption = `${plate.display_name} — ${macros.kcal} cal, ${macros.protein_g}g protein`;
       await Share.share(
         Platform.OS === 'ios'
