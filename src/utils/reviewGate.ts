@@ -23,3 +23,4 @@ export async function markReviewPrompted() {
   await AsyncStorage.setItem('lastReviewPrompt', String(Date.now()));
   await AsyncStorage.setItem('reviewPromptVersion', currentVersion());
 }
+
