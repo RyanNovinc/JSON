@@ -28,10 +28,7 @@ export function useImportFeedback(): UseImportFeedbackReturn {
     
     // Save feedback locally
     await WorkoutStorage.saveFeedback(feedbackEntry);
-    
-    // Mark that review was prompted to avoid showing again during cooldown period
-    await markReviewPrompted();
-    
+
     // Send feedback to AWS (only negative feedback)
     // This runs async but we don't await it to avoid blocking the UI
     sendImportFeedback(feedback, details, currentProgramId).catch(error => {
@@ -53,9 +50,6 @@ export function useImportFeedback(): UseImportFeedbackReturn {
   }, [currentProgramId]);
 
   const skipFeedback = useCallback(async () => {
-    // Mark that review was prompted to avoid showing again during cooldown period
-    await markReviewPrompted();
-    
     setShowFeedbackModal(false);
     setCurrentProgramId(null);
   }, []);
@@ -72,6 +66,11 @@ export function useImportFeedback(): UseImportFeedbackReturn {
       const shouldShow = await shouldPromptReview();
       
       if (shouldShow) {
+        // Close the gate as soon as the prompt is shown, not when it's answered —
+        // an unmount or app kill while the modal is visible would otherwise leave
+        // the cooldown unrecorded and the prompt would reappear on the next import.
+        await markReviewPrompted();
+
         setCurrentProgramId(programId);
         setShowFeedbackModal(true);
       }
