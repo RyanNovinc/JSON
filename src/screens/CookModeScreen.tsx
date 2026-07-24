@@ -40,7 +40,7 @@ import {
   SauceVariant,
 } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
-import * as StoreReview from 'expo-store-review';
+import * as StoreReview from '../utils/storeReview';
 import {
   incrementCookCompletions,
   markReviewAttempt,

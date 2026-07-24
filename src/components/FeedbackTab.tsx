@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { sendRatingFeedback, sendBugReport, sendFeatureRequest } from '../services/feedbackApi';
-import * as StoreReview from 'expo-store-review';
+import * as StoreReview from '../utils/storeReview';
 import { hasRatingEngaged, markReviewAttempt } from '../utils/reviewGate';
 
 type TabType = 'rating' | 'bug' | 'feature';
