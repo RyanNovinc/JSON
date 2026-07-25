@@ -8,7 +8,7 @@ import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 /**
  * Custom bottom tab bar for JSON.fit.
  *
- * Layout: Workouts | Nutrition | [Create floats above] | Browse | Profile
+ * Layout: Workouts | Nutrition | [Create floats above] | Recipes | Profile
  *
  * Structure:
  * - The bar is a regular row of 5 slots (4 real tabs + 1 spacer middle slot).
@@ -27,7 +27,7 @@ const TAB_CONFIG: Record<
 > = {
   Workouts: { active: 'barbell', inactive: 'barbell-outline', label: 'Workouts' },
   Nutrition: { active: 'restaurant', inactive: 'restaurant-outline', label: 'Nutrition' },
-  Library: { active: 'bookmark', inactive: 'bookmark-outline', label: 'Library' },
+  Recipes: { active: 'play-circle', inactive: 'play-circle-outline', label: 'Recipes' },
   Profile: { active: 'person', inactive: 'person-outline', label: 'Profile' },
 };
 

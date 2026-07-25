@@ -19,7 +19,7 @@ import { CURATED_MEALS } from '../data/curated_meals';
 import { getMealImage } from '../assets/mealImages';
 
 /**
- * MealPlanPreviewScreen — opens when a user taps a saved meal plan in Library.
+ * MealPlanPreviewScreen — opens when a user taps a saved meal plan in SavedNutrition.
  *
  * Revamped layout (v2) — photo-forward, fewer taps:
  *   - Hero mosaic: up to 4 unique meal photos as a full-bleed grid at the top,
@@ -294,7 +294,7 @@ export default function MealPlanPreviewScreen() {
   const handleImport = () => {
     Alert.alert(
       'Use this meal plan?',
-      `"${planName}" will become your active meal plan. You can still find it here in Library.`,
+      `"${planName}" will become your active meal plan. You can still find it here in Saved.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

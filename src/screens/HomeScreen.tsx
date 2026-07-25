@@ -1024,6 +1024,34 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   // ==========================================================================
   // Render helpers
   // ==========================================================================
+
+  // Title row — rendered by BOTH the empty and populated states so the Saved
+  // pill is always reachable. The pill opens the workout-side saved content
+  // (saved routines + favourite exercises); its nutrition twin lives in
+  // NutritionHomeScreen.
+  const renderTitleRow = () => (
+    <View style={styles.titleRow}>
+      <Text style={[styles.title, styles.titleInRow]}>Workouts</Text>
+      <Pressable
+        onPress={() => navigation.navigate('SavedWorkouts')}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel="View saved items"
+        style={({ pressed }) => [
+          styles.savedPill,
+          {
+            borderColor: themeColor + '59',
+            backgroundColor: themeColor + '14',
+            opacity: pressed ? 0.7 : 1,
+          },
+        ]}
+      >
+        <Ionicons name="heart" size={14} color={themeColor} />
+        <Text style={[styles.savedPillText, { color: themeColor }]}>Saved</Text>
+      </Pressable>
+    </View>
+  );
+
   const renderBulkingPrograms = (subtitle?: string) => (
     <>
       <View style={styles.bulkingHeader}>
@@ -1173,7 +1201,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
-            <Text style={styles.title}>Workouts</Text>
+            {renderTitleRow()}
             <View
               style={[
                 styles.emptyHeroCard,
@@ -1217,7 +1245,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
-            <Text style={styles.title}>Workouts</Text>
+            {renderTitleRow()}
             <View style={styles.sectionHeaderActionRow}>
               <Text style={styles.sectionLabel}>YOUR PLANS</Text>
               <TouchableOpacity
@@ -1780,6 +1808,32 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     letterSpacing: -0.4,
     marginBottom: 16,
+  },
+
+  // Title + Saved pill row. The row owns the bottom margin so the title can
+  // sit optically centred against the pill (its own marginBottom would push
+  // it off-centre inside an alignItems: 'center' row).
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  titleInRow: {
+    marginBottom: 0,
+  },
+  savedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  savedPillText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   scroll: { flex: 1 },

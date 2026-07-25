@@ -18,7 +18,7 @@ import { useWorkoutRoutines } from '../contexts/WorkoutRoutineContext';
 import { resolveExerciseImagePair } from '../utils/exerciseImages';
 
 /**
- * WorkoutPreviewScreen — opens when a user taps a saved workout in Library.
+ * WorkoutPreviewScreen — opens when a user taps a saved workout in SavedWorkouts.
  *
  * Leads with a full-bleed 16:9 hero of the featured exercise and gives every
  * exercise row a thumbnail. The hero image cycles between the exercise's start
@@ -266,7 +266,7 @@ export default function WorkoutPreviewScreen() {
   const handleStartUsing = () => {
     Alert.alert(
       'Start using this plan?',
-      `"${planName}" will become your active workout. You can still find it here in Library.`,
+      `"${planName}" will become your active workout. You can still find it here in Saved.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

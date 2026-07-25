@@ -10,13 +10,11 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
-  ActivityIndicator,
   TouchableOpacity as RNTouchable,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -38,6 +36,7 @@ import { startNutritionFlow } from '../utils/questionnaireRouting';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { CuratedMeal } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
+import { CookbookCaptureCard } from '../components/CookbookCaptureCard';
 
 type NutritionNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -54,192 +53,6 @@ const MAINS_TITLE = 'Mains';
 // shelf stays the exact same height as every other category shelf. See
 // `mealHasTag` / `getWorkoutTagLabel` below.
 const AROUND_WORKOUT_TITLE = 'Around your workout';
-
-// ============================================================================
-// COOKBOOK EMAIL CAPTURE — mirrors the json.fit website's working signup flow.
-// Same AWS subscribe API, same double-opt-in behaviour, distinct source value
-// so app vs web signups can be split in analytics. The card renders once,
-// after the first category shelf in the populated state (see the populated
-// ScrollView below), and hides itself permanently after the user subscribes
-// or dismisses it. No feature is gated behind the email — it is strictly
-// optional (Apple 5.1.1(ii) / Play User Data compliance).
-//
-// NOTE: adding this makes the app collect an email address. Before shipping,
-// update the App Store privacy label + Play Data safety form ("Email Address"
-// — collected, linked to user, purpose: marketing/communications, optional)
-// and add the newsletter carve-out to the privacy policy.
-// ============================================================================
-const COOKBOOK_SUBSCRIBE_URL =
-  'https://2w2wk18qp8.execute-api.ap-southeast-2.amazonaws.com/subscribe';
-const COOKBOOK_DISMISSED_KEY = '@jsonfit_cookbook_capture_dismissed';
-const COOKBOOK_SUBSCRIBED_KEY = '@jsonfit_cookbook_capture_subscribed';
-// The cookbook keeps the website's green identity (deliberately NOT themeColor
-// — the offer should look identical to the site so it reads as the same thing).
-const COOKBOOK_GREEN = '#22c55e';
-const COOKBOOK_GREEN_DARK = '#041109';
-
-type CookbookStatus = 'idle' | 'sending' | 'success' | 'already' | 'error';
-
-function CookbookCaptureCard() {
-  // Start hidden until AsyncStorage confirms the card hasn't been dismissed
-  // or already used — prevents a one-frame flash for users who opted out.
-  const [hidden, setHidden] = useState(true);
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<CookbookStatus>('idle');
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const [dismissed, subscribed] = await Promise.all([
-          AsyncStorage.getItem(COOKBOOK_DISMISSED_KEY),
-          AsyncStorage.getItem(COOKBOOK_SUBSCRIBED_KEY),
-        ]);
-        if (mounted && !dismissed && !subscribed) setHidden(false);
-      } catch (error) {
-        // Storage read failed — show the card rather than silently never
-        // showing it. Worst case a dismissed user sees it once more.
-        if (mounted) setHidden(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const handleDismiss = async () => {
-    setHidden(true);
-    try {
-      await AsyncStorage.setItem(COOKBOOK_DISMISSED_KEY, '1');
-    } catch (error) {
-      console.error('Failed to persist cookbook dismissal:', error);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (status === 'sending') return;
-    const value = email.trim();
-    if (!value || !value.includes('@') || value.length < 5) {
-      setStatus('error');
-      return;
-    }
-    setStatus('sending');
-    try {
-      // Same payload shape as the website form. `website` is the site's bot
-      // honeypot — sent empty so the Lambda treats this as a human signup.
-      const response = await fetch(COOKBOOK_SUBSCRIBE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ email: value, website: '', source: 'cookbook-app' }),
-      });
-      const data = await response.json();
-      if (data && data.ok) {
-        setStatus(data.status === 'already_subscribed' ? 'already' : 'success');
-        try {
-          await AsyncStorage.setItem(COOKBOOK_SUBSCRIBED_KEY, '1');
-        } catch (storageError) {
-          console.error('Failed to persist cookbook subscription:', storageError);
-        }
-      } else {
-        setStatus('error');
-      }
-    } catch (error) {
-      console.error('Cookbook subscribe failed:', error);
-      setStatus('error');
-    }
-  };
-
-  if (hidden) return null;
-
-  const succeeded = status === 'success' || status === 'already';
-
-  return (
-    <View style={styles.cookbookCard}>
-      {/* Green accent strip — full-width top edge, clipped by overflow:hidden
-          so the card's rounded corners stay clean. */}
-      <View style={styles.cookbookAccent} />
-
-      {!succeeded && (
-        <RNTouchable
-          style={styles.cookbookClose}
-          onPress={handleDismiss}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss cookbook offer"
-        >
-          <Ionicons name="close" size={16} color="#71717a" />
-        </RNTouchable>
-      )}
-
-      <View style={styles.cookbookHeaderRow}>
-        <View style={styles.cookbookBook}>
-          <Ionicons name="book" size={18} color={COOKBOOK_GREEN} />
-        </View>
-        <View style={styles.cookbookHeaderText}>
-          <Text style={styles.cookbookEyebrow}>FREE COOKBOOK</Text>
-          <Text style={styles.cookbookTitle}>All 81 meals as a printable PDF</Text>
-          <Text style={styles.cookbookSub}>Plus new meals by email as they land.</Text>
-        </View>
-      </View>
-
-      {succeeded ? (
-        <View style={styles.cookbookSuccessRow}>
-          <View style={styles.cookbookTick}>
-            <Ionicons name="checkmark" size={13} color={COOKBOOK_GREEN_DARK} />
-          </View>
-          <Text style={styles.cookbookSuccessText}>
-            {status === 'already'
-              ? "You're already on the list. Check your inbox for the cookbook."
-              : 'Almost there. Check your inbox to confirm and unlock your cookbook.'}
-          </Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.cookbookFormRow}>
-            <TextInput
-              style={[styles.cookbookInput, status === 'error' && styles.cookbookInputError]}
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (status === 'error') setStatus('idle');
-              }}
-              placeholder="your@email.com"
-              placeholderTextColor="#52525b"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              textContentType="emailAddress"
-              returnKeyType="send"
-              onSubmitEditing={handleSubmit}
-              editable={status !== 'sending'}
-              accessibilityLabel="Email address for the free cookbook"
-            />
-            <TouchableOpacity
-              style={[styles.cookbookBtn, status === 'sending' && styles.cookbookBtnSending]}
-              onPress={handleSubmit}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Send me the cookbook"
-            >
-              {status === 'sending' ? (
-                <ActivityIndicator size="small" color={COOKBOOK_GREEN_DARK} />
-              ) : (
-                <Text style={styles.cookbookBtnText}>Send it</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.cookbookNote}>
-            {status === 'error'
-              ? "That didn't work — check the email and try again."
-              : 'No spam. Unsubscribe anytime.'}
-          </Text>
-        </>
-      )}
-    </View>
-  );
-}
 
 // ============================================================================
 // HELPERS — preserved verbatim from the original file. These are pure
@@ -1235,6 +1048,33 @@ export default function NutritionHomeScreen({ route }: any) {
     await startNutritionFlow(navigation);
   };
 
+  // Title row — rendered by BOTH the empty and populated states so the Saved
+  // pill is always reachable. The pill opens the nutrition-side saved content
+  // (favourite meals + saved meal plans); its workout twin lives in
+  // HomeScreen. themeColor is already green here (NutritionThemeProvider).
+  const renderTitleRow = () => (
+    <View style={styles.titleRow}>
+      <Text style={[styles.title, styles.titleInRow]}>Nutrition</Text>
+      <Pressable
+        onPress={() => navigation.navigate('SavedNutrition')}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel="View saved items"
+        style={({ pressed }) => [
+          styles.savedPill,
+          {
+            borderColor: themeColor + '59',
+            backgroundColor: themeColor + '14',
+            opacity: pressed ? 0.7 : 1,
+          },
+        ]}
+      >
+        <Ionicons name="heart" size={14} color={themeColor} />
+        <Text style={[styles.savedPillText, { color: themeColor }]}>Saved</Text>
+      </Pressable>
+    </View>
+  );
+
   // ============================================================================
   // HANDLERS — for the category feed
   // ============================================================================
@@ -1467,8 +1307,14 @@ export default function NutritionHomeScreen({ route }: any) {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
-            <Text style={styles.title}>Nutrition</Text>
+            {renderTitleRow()}
             <ExamplePlanCard />
+
+            {/* Cookbook capture — a user with no plan yet is the highest-
+                intent lead: they haven't committed to the AI flow but they're
+                clearly interested in the food. Same component instance rules
+                apply (dismiss/subscribe hides it everywhere permanently). */}
+            <CookbookCaptureCard />
 
             {/* Category sections, even without a plan */}
             {renderAllSections()}
@@ -1485,7 +1331,7 @@ export default function NutritionHomeScreen({ route }: any) {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColor} colors={[themeColor]} />
             }
           >
-            <Text style={styles.title}>Nutrition</Text>
+            {renderTitleRow()}
 
             <View style={styles.sectionHeaderActionRow}>
               <Text style={styles.sectionLabel}>YOUR PLANS</Text>
@@ -2100,6 +1946,33 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     marginBottom: 16,
   },
+
+  // Title + Saved pill row. The row owns the bottom margin so the title can
+  // sit optically centred against the pill (its own marginBottom would push
+  // it off-centre inside an alignItems: 'center' row).
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  titleInRow: {
+    marginBottom: 0,
+  },
+  savedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  savedPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
   titleAction: {
     width: 32,
     height: 32,
@@ -2142,156 +2015,6 @@ const styles = StyleSheet.create({
   sectionAction: {
     fontSize: 12,
     fontWeight: '600',
-  },
-
-  // ===== Cookbook email capture card =====
-  // Sits between shelves at the scroll's normal 16px padding (shelves break
-  // out with marginHorizontal: -16; this card deliberately doesn't). Website
-  // green identity on the app's standard #18181b surface + hairline border so
-  // it reads as part of the app, not an injected banner. marginBottom: 12
-  // pairs with the next shelf's marginTop: 12 to keep the feed rhythm.
-  cookbookCard: {
-    backgroundColor: '#18181b',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(34,197,94,0.35)',
-    overflow: 'hidden',
-    padding: 14,
-    marginBottom: 12,
-    position: 'relative',
-  },
-  cookbookAccent: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: COOKBOOK_GREEN,
-  },
-  cookbookClose: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  cookbookHeaderRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-    paddingRight: 26,
-  },
-  cookbookBook: {
-    width: 38,
-    height: 48,
-    borderRadius: 6,
-    borderTopLeftRadius: 3,
-    borderBottomLeftRadius: 3,
-    backgroundColor: '#0a2114',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(34,197,94,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  cookbookHeaderText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cookbookEyebrow: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    color: COOKBOOK_GREEN,
-    marginBottom: 3,
-  },
-  cookbookTitle: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-    lineHeight: 19,
-    letterSpacing: -0.2,
-  },
-  cookbookSub: {
-    color: '#71717a',
-    fontSize: 12,
-    marginTop: 3,
-    lineHeight: 16,
-  },
-  cookbookFormRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  cookbookInput: {
-    flex: 1,
-    minWidth: 0,
-    height: 42,
-    backgroundColor: '#0f0f12',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    color: '#f0f0f2',
-    fontSize: 14,
-  },
-  cookbookInputError: {
-    borderColor: '#ef4444',
-    borderWidth: 1,
-  },
-  cookbookBtn: {
-    height: 42,
-    minWidth: 82,
-    borderRadius: 10,
-    backgroundColor: COOKBOOK_GREEN,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-    flexShrink: 0,
-  },
-  cookbookBtnSending: {
-    opacity: 0.7,
-  },
-  cookbookBtnText: {
-    color: COOKBOOK_GREEN_DARK,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  cookbookNote: {
-    color: '#52525b',
-    fontSize: 11,
-    marginTop: 8,
-  },
-  cookbookSuccessRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 12,
-    padding: 11,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(34,197,94,0.3)',
-    backgroundColor: 'rgba(34,197,94,0.07)',
-  },
-  cookbookTick: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: COOKBOOK_GREEN,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  cookbookSuccessText: {
-    flex: 1,
-    color: '#e9e9ec',
-    fontSize: 12.5,
-    lineHeight: 17,
   },
 
   // ===== Hero additions: day badge, filmstrip, progress, footer links =====

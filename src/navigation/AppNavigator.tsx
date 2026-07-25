@@ -12,7 +12,8 @@ import HomeScreen from '../screens/HomeScreen';
 import NutritionHomeScreen from '../screens/NutritionHomeScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import LibraryScreen from '../screens/LibraryScreen';
+import SavedWorkoutsScreen from '../screens/SavedWorkoutsScreen';
+import SavedNutritionScreen from '../screens/SavedNutritionScreen';
 import WorkoutPreviewScreen from '../screens/WorkoutPreviewScreen';
 import MealPlanPreviewScreen from '../screens/MealPlanPreviewScreen';
 import SamplePlanDetailScreen from '../screens/SamplePlanDetailScreen';
@@ -306,6 +307,10 @@ export type RootStackParamList = {
   };
   MealRatings: undefined;
   FavoriteMeals: undefined;
+  // Per-domain saved content, opened by the "Saved" pill in each home
+  // screen's title row (replaced the old Library tab).
+  SavedNutrition: undefined;
+  SavedWorkouts: undefined;
   AddMeal: undefined;
   ManualMealEntry: { editMeal?: any; isEditing?: boolean } | undefined;
   MealPlanHelp: undefined;
@@ -374,7 +379,7 @@ export type MainTabParamList = {
   Workouts: undefined;
   Nutrition: undefined;
   [CREATE_ROUTE]: undefined;
-  Library: undefined;
+  Recipes: undefined;
   Profile: undefined;
 };
 
@@ -397,6 +402,14 @@ function PlaceholderScreen({ title, subtitle }: { title: string; subtitle?: stri
 
 function BrowseStub() {
   return <PlaceholderScreen title="Browse" />;
+}
+
+// Recipes tab — took over the Library tab's slot when saved content moved
+// behind the per-domain "Saved" pills. The meal-prep video feed ships here
+// later; keeping the slot filled keeps the bar at 5 tabs so the floating
+// Create button stays centred.
+function RecipesScreen() {
+  return <PlaceholderScreen title="Recipes" subtitle="Meal prep videos coming soon." />;
 }
 
 function ProfileStub() {
@@ -453,7 +466,7 @@ function MainNavigator() {
           },
         })}
       />
-      <Tab.Screen name="Library" component={LibraryScreen} />
+      <Tab.Screen name="Recipes" component={RecipesScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -828,7 +841,7 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   headerShown: false,
                 }}
               />
-              {/* WorkoutPreview — opens when a user taps a saved workout in Library */}
+              {/* WorkoutPreview — opens when a user taps a saved workout in SavedWorkouts */}
               <RootStack.Screen
                 name="WorkoutPreview"
                 component={WorkoutPreviewScreen}
@@ -1179,6 +1192,27 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                     <FavoriteMealsScreen />
                   </NutritionThemeProvider>
                 )}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              {/* Saved content, per domain. SavedNutrition re-wraps in
+                  NutritionThemeProvider — a root-stack nutrition screen loses
+                  the green accent otherwise. */}
+              <RootStack.Screen
+                name="SavedNutrition"
+                children={() => (
+                  <NutritionThemeProvider>
+                    <SavedNutritionScreen />
+                  </NutritionThemeProvider>
+                )}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen
+                name="SavedWorkouts"
+                component={SavedWorkoutsScreen}
                 options={{
                   headerShown: false,
                 }}
