@@ -44,6 +44,7 @@ import AppIconScreen from '../screens/AppIconScreen';
 import PaymentScreen from '../screens/PaymentScreen';
 import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import CookModeScreen from '../screens/CookModeScreen';
+import CookScreen from '../screens/CookScreen';
 import MealsLibraryScreen from '../screens/MealsLibraryScreen';
 import SmoothiesLibraryScreen from '../screens/SmoothiesLibraryScreen';
 import MealDetailScreen from '../screens/nutrition/MealDetailScreen';
@@ -379,7 +380,7 @@ export type MainTabParamList = {
   Workouts: undefined;
   Nutrition: undefined;
   [CREATE_ROUTE]: undefined;
-  Recipes: undefined;
+  Cook: undefined;
   Profile: undefined;
 };
 
@@ -402,14 +403,6 @@ function PlaceholderScreen({ title, subtitle }: { title: string; subtitle?: stri
 
 function BrowseStub() {
   return <PlaceholderScreen title="Browse" />;
-}
-
-// Recipes tab — took over the Library tab's slot when saved content moved
-// behind the per-domain "Saved" pills. The meal-prep video feed ships here
-// later; keeping the slot filled keeps the bar at 5 tabs so the floating
-// Create button stays centred.
-function RecipesScreen() {
-  return <PlaceholderScreen title="Recipes" subtitle="Meal prep videos coming soon." />;
 }
 
 function ProfileStub() {
@@ -466,7 +459,15 @@ function MainNavigator() {
           },
         })}
       />
-      <Tab.Screen name="Recipes" component={RecipesScreen} />
+      {/* Cook — the full-bleed vertical meal feed that took over the old
+          Library tab's slot. Its cards run edge-to-edge under the bar, so it
+          hides the tab bar for this route only (CustomTabBar honours
+          tabBarStyle.display); the other tabs are unaffected. */}
+      <Tab.Screen
+        name="Cook"
+        component={CookScreen}
+        options={{ tabBarStyle: { display: 'none' } }}
+      />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

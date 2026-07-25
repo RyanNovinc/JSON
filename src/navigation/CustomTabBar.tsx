@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 /**
  * Custom bottom tab bar for JSON.fit.
  *
- * Layout: Workouts | Nutrition | [Create floats above] | Recipes | Profile
+ * Layout: Workouts | Nutrition | [Create floats above] | Cook | Profile
  *
  * Structure:
  * - The bar is a regular row of 5 slots (4 real tabs + 1 spacer middle slot).
@@ -27,7 +27,7 @@ const TAB_CONFIG: Record<
 > = {
   Workouts: { active: 'barbell', inactive: 'barbell-outline', label: 'Workouts' },
   Nutrition: { active: 'restaurant', inactive: 'restaurant-outline', label: 'Nutrition' },
-  Recipes: { active: 'play-circle', inactive: 'play-circle-outline', label: 'Recipes' },
+  Cook: { active: 'flame', inactive: 'flame-outline', label: 'Cook' },
   Profile: { active: 'person', inactive: 'person-outline', label: 'Profile' },
 };
 
@@ -45,7 +45,7 @@ const PULSE_MIN_SCALE = 1.0;
 const PULSE_MAX_SCALE = 1.08;
 const PULSE_DURATION_MS = 2400;
 
-export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
+export function CustomTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
   const { themeColor } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -78,6 +78,19 @@ export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   };
 
   const bottomPad = Math.max(insets.bottom, 8);
+
+  // Honour `options.tabBarStyle: { display: 'none' }` on the focused route.
+  // The built-in tab bar does this for free, but we replace it wholesale — so
+  // without this check the option is silently ignored. Read from the FOCUSED
+  // route only, so hiding is per-route: switching back to any other tab
+  // re-renders the bar normally. Must stay below the hooks above.
+  const focusedRoute = state.routes[state.index];
+  const focusedTabBarStyle = StyleSheet.flatten(
+    descriptors[focusedRoute.key]?.options?.tabBarStyle as ViewStyle | undefined
+  );
+  if (focusedTabBarStyle?.display === 'none') {
+    return null;
+  }
 
   return (
     <View style={[styles.container, { paddingBottom: bottomPad }]}>
