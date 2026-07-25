@@ -30,7 +30,9 @@ import React, {
 import {
   AccessibilityActionEvent,
   Animated,
+  FlatList,
   Image,
+  ListRenderItemInfo,
   Modal,
   PanResponder,
   Platform,
@@ -41,8 +43,8 @@ import {
   Text,
   useWindowDimensions,
   View,
+  ViewToken,
 } from 'react-native';
-import { FlashList, ListRenderItemInfo, ViewToken } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -158,6 +160,11 @@ const PRELOAD_AHEAD_ANDROID = 1;
 const PRELOAD_AHEAD =
   Platform.OS === 'ios' ? PRELOAD_AHEAD_IOS : PRELOAD_AHEAD_ANDROID;
 
+/** Must be module-level, not an inline literal: FlatList captures this once and
+ *  throws "Changing viewabilityConfig on the fly is not supported" if the
+ *  identity changes between renders. */
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
+
 /** TODO(repo): these three mirror the picker screen's helpers. Move the
  *  originals into a shared module and import them in both screens. */
 const INGREDIENT_WARN_AT = 11;
@@ -270,7 +277,7 @@ export default function CookScreen(): React.JSX.Element {
   const [savedSlugs, setSavedSlugs] = useState<ReadonlySet<string>>(new Set());
   const [hintDismissed, setHintDismissed] = useState(false);
 
-  const listRef = useRef<FlashList<Row>>(null);
+  const listRef = useRef<FlatList<Row>>(null);
   const lastIndexRef = useRef(0);
   const dwellRef = useRef<{ slug: string; since: number } | null>(null);
 
@@ -490,23 +497,28 @@ export default function CookScreen(): React.JSX.Element {
         barStyle="light-content"
       />
 
-      <FlashList
+      <FlatList
         ref={listRef}
         data={rows}
         renderItem={renderItem}
         keyExtractor={(row) => (row.kind === 'meal' ? row.meal.slug : '__end__')}
-        estimatedItemSize={cardHeight}
-        overrideItemLayout={(layout) => {
-          layout.size = cardHeight;
-        }}
+        /* Every row is exactly one screen tall, so the layout is known up front
+         * — this keeps scrollToIndex synchronous and the snap exact. */
+        getItemLayout={(_, index) => ({
+          length: cardHeight,
+          offset: cardHeight * index,
+          index,
+        })}
         pagingEnabled
         snapToInterval={cardHeight}
         decelerationRate="fast"
         disableIntervalMomentum
         showsVerticalScrollIndicator={false}
-        drawDistance={cardHeight * PRELOAD_AHEAD}
+        initialNumToRender={1}
+        maxToRenderPerBatch={2}
+        windowSize={3}
         onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+        viewabilityConfig={VIEWABILITY_CONFIG}
       />
 
       {/* Category pill — the only persistent chrome on the video. */}
