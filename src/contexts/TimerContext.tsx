@@ -21,6 +21,130 @@ if (Platform.OS === 'ios') {
 import { DebugLogger } from '../components/DebugOverlay';
 
 /**
+ * The audio mode the countdown alert needs. Applied in two places: loadCountdownSound at
+ * setup, and the top of playCountdownSound before every playback. Always spread, never
+ * passed directly — see the bottom of this comment.
+ *
+ * FIRST, A CORRECTION, because the original reason for re-applying this mode was wrong and
+ * the wrong version is more persuasive than the right one.
+ *
+ * The claim was: the setIsEnabledAsync(false)/(true) cycle at the end of playCountdownSound
+ * brings the audio session back with expo-av's defaults, so a mode set once at load only
+ * survives one playback. That is false. The mode and the enabled flag are different stores,
+ * and nothing on the enable/disable path touches the mode. Traced in expo-av 16.0.8:
+ *
+ *   iOS      _playsInSilentMode, _audioInterruptionMode, _allowsAudioRecording and
+ *            _staysActiveInBackground are each written in exactly two places — the
+ *            initialisers in -init (EXAV.m:96-99) and _setAudioMode: (EXAV.m:281-284).
+ *            Every other mention is a read. setAudioIsEnabled: (EXAV.m:674) writes only
+ *            _audioIsEnabled; _deactivateAudioSession (EXAV.m:387) writes only
+ *            _currentAudioSessionMode. Neither writes any of the four.
+ *   Android  mShouldDuckAudio (AVManager.java:101), mAudioInterruptionMode (:100),
+ *            mStaysActiveInBackground (:103) and mShouldRouteThroughEarpiece (:81) are
+ *            written only by their initialisers and by setAudioMode (:407, :421/:425,
+ *            :428, :414). setAudioIsEnabled (:398) writes only mEnabled; abandonAudioFocus
+ *            (:362) writes only mAcquiredAudioFocus. Neither writes any of the four.
+ *
+ * Nor does any OS-level event reach them: handleAudioSessionInterruption: (EXAV.m:433)
+ * writes only _currentAudioSessionMode, and handleMediaServicesReset: (EXAV.m:449) only
+ * _mediaServicesDidReset. A phone call, a route change or another app taking the session
+ * changes the live AVAudioSession category, which expo-av recomputes from these very fields
+ * at the next activation. So an interruption cannot leave the mode stale either.
+ *
+ * SO WHY IS IT STILL APPLIED BEFORE EVERY PLAY? Because there is a real writer, just not
+ * the one originally blamed: this app sets the audio mode from two other places, and the
+ * store is global and last-writer-wins.
+ *
+ *   src/screens/CookScreen.tsx      setAudioModeAsync({ playsInSilentModeIOS: true })
+ *   src/contexts/CookTimerContext.tsx  setAudioModeAsync({ playsInSilentModeIOS: true,
+ *                                        shouldDuckAndroid: true })
+ *
+ * Both pass PARTIAL modes, and setAudioModeAsync fills the gaps from the last full mode it
+ * saw (_populateMissingKeys against getCurrentAudioMode(), src/Audio.ts:9-20 and :47), not
+ * from expo-av's defaults. Today that is benign by coincidence: their explicit values match
+ * ours, and the keys they omit are inherited from whatever we set last, so the four stores
+ * come out unchanged. That coincidence is undeclared and unenforced. If a Cook call site
+ * runs while the cached mode is expo-av's defaultMode rather than ours, iOS
+ * _audioInterruptionMode (EXAV.m:282) lands on MixWithOthers instead of DuckOthers and the
+ * beeps stop ducking; the same happens the day someone edits a value in either Cook file.
+ *
+ * Writing the full mode immediately before replayAsync makes the countdown independent of
+ * all of that, and it is also where the native side reads it: on iOS the category and its
+ * options are computed from these fields inside
+ * _updateAudioSessionCategoryForAudioSessionMode:, reached from
+ * promoteAudioSessionIfNecessary when a sound starts; on Android the focus request type
+ * (AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK, what actually ducks other apps) is computed from
+ * mAudioInterruptionMode inside acquireAudioFocus, also at play time. The write belongs
+ * next to the read.
+ *
+ * WHAT IT COSTS — both sides, because the cheap side is the one that gets quoted:
+ *
+ *   iOS      One bridge hop. With no session active _setAudioMode: is a plain field write
+ *            and returns without touching AVAudioSession, so this is nearly free.
+ *   Android  One bridge hop AND a pair of global AudioManager writes. Because the object
+ *            reaches native with playThroughEarpieceAndroid present, the containsKey guard
+ *            at AVManager.java:413 passes and updatePlaySoundThroughEarpiece(false) runs,
+ *            which calls mAudioManager.setMode(AudioManager.MODE_NORMAL) and
+ *            mAudioManager.setSpeakerphoneOn(true) at AVManager.java:392-394. Moving this
+ *            call to the play path moved that pair from once per app launch to once per
+ *            rest. setSpeakerphoneOn is deprecated from API 31, and what these two do on a
+ *            device with Bluetooth or wired headphones connected is UNVERIFIED — nobody has
+ *            put this on real Android hardware with headphones and listened.
+ *
+ * That is the ledger. Anyone reconsidering this call should weigh the Android column, not
+ * just the iOS one.
+ *
+ * All seven keys are listed even though playThroughEarpieceAndroid: false is already the
+ * Android default. Omitting it would not avoid the AVManager.java:413 branch above —
+ * _populateMissingKeys would fill the key in before it crossed the bridge, so the branch
+ * fires either way — and a complete object is the only way to know what native receives.
+ *
+ * THE ALTERNATIVE THAT WOULD REMOVE THIS CALL, recorded as an option and not as a
+ * recommendation: unify TimerContext, CookScreen and CookTimerContext onto one shared full
+ * mode constant. The reason this call exists is that those two write the same global with
+ * partial objects, so the countdown's mode is only correct by value coincidence; a single
+ * shared constant would make the invariant true at the source instead of defending it
+ * before every beep, and the per-rest Android writes above would go away with it. The cost
+ * is that it reaches into two other features' files and makes one audio mode serve three
+ * callers with different needs — Cook's requirements have not been analysed here, and it is
+ * not this file's call to make. Whoever picks it up should read the Q on whether the
+ * didJustFinish cycle can go at the same time; the two decisions interact.
+ *
+ * ALWAYS SPREAD THIS AT THE CALL SITE. _populateMissingKeys fills gaps by MUTATING the
+ * object it is handed (src/Audio.ts:16), and `as const` is compile-time only. It cannot
+ * bite while this lists every key, but an expo-av version that adds an eighth would
+ * silently write into shared module state. A spread costs nothing.
+ *
+ * All of the above is a reading of expo-av 16.0.8 internals, not of a documented contract.
+ * Re-check it on the next expo-av upgrade.
+ */
+const COUNTDOWN_AUDIO_MODE = {
+  allowsRecordingIOS: false,
+  staysActiveInBackground: false,
+  interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+  playsInSilentModeIOS: true,
+  shouldDuckAndroid: true,
+  interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+  playThroughEarpieceAndroid: false,
+} as const;
+
+/**
+ * How far before the end of a rest the alert must START.
+ *
+ * json_fit_timer_v3.wav is ONE fixed ~3s asset containing four beeps laid out at 3/2/1/0,
+ * so its beeps only land on their seconds if playback begins exactly 3000ms before the
+ * countdown reaches zero. This is a property of the asset, not a preference: change the
+ * asset's length or beep layout and this number has to change with it.
+ *
+ * It is also why the alert is scheduled against a wall-clock deadline rather than triggered
+ * off the 1s interval. The interval ticks every 1000ms from whenever it happened to be
+ * created, with no relationship to the second boundary, so the tick that first observed
+ * `remaining <= 3` could land anywhere from the true 3.000s mark to a full second late —
+ * and a late start pushes the final beep past zero.
+ */
+const COUNTDOWN_ALERT_LEAD_MS = 3000;
+
+/**
  * A timer is in exactly one of four states. Read them from the flags; never infer
  * "finished" from `targetTime <= 0`, which cannot tell a completed countdown apart
  * from one that never started.
@@ -46,7 +170,23 @@ export interface TimerState {
   isQuickMode: boolean;
   exerciseIndex?: number;
   setIndex?: number;
-  countdownSoundPlayed?: boolean; // Track if countdown sound has been played
+  /**
+   * VESTIGIAL as of the move to deadline-scheduled alerts. Nothing reads it any more.
+   *
+   * It used to be the one-shot latch for the old interval-based trigger
+   * (`!countdownSoundPlayed && remaining <= 3`), and addTime/subtractTime reset it so the
+   * alert could fire again after the window moved. The scheduling effect replaced both jobs:
+   * a timeout is inherently one-shot, and rescheduling on any change of startTime/targetTime
+   * is what re-arms it. It could not do the new job anyway — it is a bare boolean with no
+   * notion of WHICH deadline it refers to, and being persisted, a stale `true` from a
+   * previous app run would have suppressed a legitimate alert.
+   *
+   * Left in place, still written by the existing mutators, because it is a persisted field
+   * with values already on users' devices: removing it is a storage-schema change that
+   * belongs with a migration (see migrationFramework.ts / SCHEMA_VERSION), not with a timing
+   * fix. Delete it there, together with its writes, and nothing needs to read it in between.
+   */
+  countdownSoundPlayed?: boolean;
   liveActivityId?: string; // Track native Live Activity ID
   themeColor?: string; // Theme color for Live Activity
   fixedEndTime?: number; // Fixed end timestamp to prevent Live Activity jumping
@@ -92,10 +232,10 @@ interface TimerContextType {
   showModal: () => void;
   hideModal: () => void;
   minimize: () => void;
-  
+
   // Auto-timer for set completion
   startAutoTimer: (restTime: number, quickRestTime: number, exerciseIndex: number, setIndex: number, themeColor?: string) => void;
-  
+
   // Exercise context for Live Activities
   setExerciseContext: (getContext: ((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null) => void;
   
@@ -117,6 +257,13 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   });
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  // The pending countdown-alert timeout. A ref, not TimerState: TimerState is JSON.stringified
+  // into AsyncStorage on every change, and a timer handle is neither serialisable nor
+  // meaningful after a reload.
+  const countdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // The `endTime - LEAD` instant we have already dispatched an alert for. Guards the
+  // catch-up branch only; see scheduleCountdownAlert.
+  const dispatchedAlertFireAtRef = useRef<number | null>(null);
   const appStateRef = useRef(AppState.currentState);
   const soundRef = useRef<Audio.Sound | null>(null);
   const getExerciseContextRef = useRef<((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null>(null);
@@ -138,34 +285,53 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const loadCountdownSound = async () => {
     try {
       console.log('Loading countdown sound...');
-      
-      // Set audio mode to duck background music for better timer alerts
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: false,
-        interruptionModeIOS: InterruptionModeIOS.DuckOthers,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-        playThroughEarpieceAndroid: false,
-      });
 
-      // Load the sound with proper initial settings
+      // This is not only mount-time code: playCountdownSound's recovery path calls it too,
+      // so a reload has to hand over from a live sound to a live sound. The ordering below
+      // is load-bearing — soundRef must only ever hold a USABLE sound.
+      //
+      // Detach the old sound's status handler first. That handler is the audio-session
+      // cycler, and it reads soundRef.current rather than the sound it was attached to, so
+      // one firing across the swap would cycle the session out from under the NEW sound.
+      const previous = soundRef.current;
+      previous?.setOnPlaybackStatusUpdate(null);
+
+      // Set audio mode to duck background music for better timer alerts.
+      // Spread, never the constant itself — see COUNTDOWN_AUDIO_MODE.
+      await Audio.setAudioModeAsync({ ...COUNTDOWN_AUDIO_MODE });
+
+      // Load the sound with proper initial settings.
+      //
+      // Create BEFORE swapping and unload AFTER. If this throws, the error propagates to
+      // the handler below with soundRef still pointing at the previous, working sound —
+      // the alert keeps firing on the old copy instead of going quiet. Nulling the ref up
+      // front (or unloading first) would leave it null or dead on exactly the failure it
+      // is supposed to survive. Two loaded copies for the few ms between create and unload
+      // is a fair price; a null or dead ref is not.
       const { sound } = await Audio.Sound.createAsync(
         require('../../json_fit_timer_v3.wav'),
-        { 
+        {
           shouldPlay: false,
           isLooping: false,
           volume: 1.0,
         }
       );
-      
+
       soundRef.current = sound;
+
+      if (previous) {
+        try {
+          await previous.unloadAsync();
+        } catch (unloadError) {
+          console.warn('Failed to unload previous countdown sound:', unloadError);
+        }
+      }
+
       console.log('Countdown sound loaded successfully');
-      
+
       // Test play to ensure it's working (optional)
       // await sound.setPositionAsync(0);
-      
+
     } catch (error) {
       console.error('Failed to load countdown sound:', error);
     }
@@ -307,71 +473,291 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         DebugLogger.log(`📱 App activated - refreshing Live Activity timer to sync accurate time`, 'log');
         const now = new Date();
         const elapsed = Math.floor((now.getTime() - timer.startTime.getTime()) / 1000);
-        setTimer(prev => prev ? { 
-          ...prev, 
+        setTimer(prev => prev ? {
+          ...prev,
           timeElapsed: elapsed,
           // Force Live Activity refresh by clearing lastSentRemaining
-          lastSentRemaining: undefined 
+          lastSentRemaining: undefined
         } : null);
       }
+
+      // Re-arm the alert against the real wall clock. On iOS the JS runtime is suspended
+      // while backgrounded, so a setTimeout scheduled before we went away resumes with its
+      // remaining delay intact and therefore fires at the wrong absolute moment — late by
+      // however long the app spent in the background. Recomputing from endTime fixes it.
+      //
+      // Android's background timer behaviour is NOT the same and I could not settle it from
+      // source in this repo (react-native ships only prebuilt Android artifacts here, no
+      // JavaTimerManager to read), so this is deliberately unconditional rather than
+      // iOS-gated: if Android's timers did keep running on real wall-clock time, this
+      // recomputes an identical schedule and changes nothing; if they were throttled or
+      // suspended, it repairs them. Correct either way, and it costs one arithmetic
+      // comparison per foreground.
+      //
+      // The setTimer above only moves timeElapsed, which is not a scheduling dependency, so
+      // the effect will not re-run on its own — hence the explicit call, from the ref rather
+      // than the render closure so it sees the committed timer.
+      scheduleCountdownAlert(timerRef.current);
     }
     appStateRef.current = nextAppState;
   };
 
-  const playCountdownSound = async () => {
+  /**
+   * Fire the countdown alert (one asset, four beeps at 3/2/1/0).
+   *
+   * Deliberately ONE native round trip on the happy path. This used to await
+   * getStatusAsync, then stopAsync, then setPositionAsync(0), then playAsync — four
+   * awaited bridge crossings before a single sample reached the speaker, with the beep
+   * arriving whenever they happened to finish. replayAsync is the API for precisely this
+   * (rewind to 0 and play) and does it in one call. That does not make the alert louder;
+   * it makes it land ON the second it is announcing, which the on-screen countdown added
+   * later has to line up against.
+   *
+   * The getStatusAsync isLoaded gate went with them. It existed only to choose between
+   * playing and reloading, and replayAsync rejecting when the sound is not loaded answers
+   * that same question without paying for a round trip on every rest. So the reload lives
+   * in the catch now.
+   *
+   * `isRetry` bounds that recovery to a single attempt. Recovery reloads and then plays —
+   * the old code reloaded and returned, so an alert that arrived before the asset finished
+   * loading was dropped silently instead of being delayed by the load.
+   *
+   * `fromPositionMs` exists for the catch-up case in scheduleCountdownAlert: when the alert
+   * is already overdue, starting the asset at 0 would put its beeps on the wrong seconds, so
+   * it starts partway in instead. playFromPositionAsync is one setStatusAsync round trip
+   * that seeks and plays together, so the seek costs the same one bridge hop the ordinary
+   * path pays — this is the only place the extra positioning is worth it.
+   *
+   * One interleaving is worth knowing about. If a rest is short enough — or the user taps
+   * ±time in the final seconds, which reschedules the alert — this can be re-entered
+   * while the PREVIOUS playback's session cycle is still in flight, inside the brief window
+   * where Audio is disabled. replayAsync throws there ('audio is not enabled'), with no
+   * .code, so it falls through to the reload-and-retry. That retry is a wasted load attempt
+   * but it is harmless: loadCountdownSound only publishes a sound it successfully created,
+   * so a reload that fails for the same reason leaves the working sound in place and the
+   * next rest plays normally. At worst one beep is lost to a window a few milliseconds
+   * wide. The fix for that would be to stop disabling Audio, not to add a flag here.
+   */
+  const playCountdownSound = async (isRetry = false, fromPositionMs = 0) => {
+    // Reload once, then play. Never more than once: loadCountdownSound swallows its own
+    // failures, so without this latch a permanently unloadable asset would recurse.
+    const reloadAndPlayOnce = async (reason: string) => {
+      if (isRetry) {
+        console.error(`Countdown sound still unavailable after reload (${reason}) - giving up`);
+        return;
+      }
+      console.warn(`Countdown sound not ready (${reason}) - reloading, then playing`);
+      await loadCountdownSound();
+      await playCountdownSound(true, fromPositionMs);
+    };
+
     try {
       console.log('Attempting to play countdown sound...');
-      if (soundRef.current) {
-        // Get sound status to check if it's loaded
-        const status = await soundRef.current.getStatusAsync();
-        console.log('Sound status:', status);
-        
-        if (status.isLoaded) {
-          // Stop and reset position first
-          await soundRef.current.stopAsync();
-          await soundRef.current.setPositionAsync(0);
-          
-          // Set up cleanup handler for when sound finishes
-          soundRef.current.setOnPlaybackStatusUpdate((playbackStatus) => {
-            if (playbackStatus.isLoaded && !playbackStatus.isPlaying && playbackStatus.didJustFinish) {
-              // Clear the status update handler to prevent repeated calls
-              soundRef.current?.setOnPlaybackStatusUpdate(null);
-              
-              // Properly deactivate and reactivate audio session to restore background music
-              Audio.setIsEnabledAsync(false)
-                .then(() => Audio.setIsEnabledAsync(true))
-                .then(() => {
-                  console.log('Audio session cycled to restore background music');
-                })
-                .catch((error) => {
-                  console.error('Failed to cycle audio session:', error);
-                });
-            }
-          });
-          
-          // Play the sound
-          await soundRef.current.playAsync();
-          console.log('Countdown sound played successfully');
-        } else {
-          console.warn('Sound not loaded yet');
-          // Try to reload the sound
-          await loadCountdownSound();
-        }
-      } else {
-        console.warn('Sound not loaded - soundRef.current is null');
-        // Try to reload the sound
-        await loadCountdownSound();
+
+      if (!soundRef.current) {
+        await reloadAndPlayOnce('soundRef.current is null');
+        return;
       }
+
+      // Apply the mode immediately before playing. NOT because the session cycle below
+      // resets it — traced, it does not, and COUNTDOWN_AUDIO_MODE records that trace — but
+      // because CookScreen and CookTimerContext write the same global mode with partial
+      // objects, and because this is the instant the native side reads it. Do not delete
+      // this on the grounds that loadCountdownSound already set the mode: that is true and
+      // is not sufficient.
+      //
+      // Spread, never the constant itself. Also note this call is NOT gated by Audio's
+      // enabled flag, so it is not the call that fails when the previous playback's session
+      // cycle is still in flight; replayAsync is.
+      await Audio.setAudioModeAsync({ ...COUNTDOWN_AUDIO_MODE });
+
+      // Set up cleanup handler for when sound finishes
+      soundRef.current.setOnPlaybackStatusUpdate((playbackStatus) => {
+        if (playbackStatus.isLoaded && !playbackStatus.isPlaying && playbackStatus.didJustFinish) {
+          // Clear the status update handler to prevent repeated calls
+          soundRef.current?.setOnPlaybackStatusUpdate(null);
+
+          // Properly deactivate and reactivate audio session to restore background music.
+          //
+          // UNVERIFIED, and left exactly as it is on purpose. Reading expo-av 16.0.8,
+          // EXAudioSessionManager.m's _updateSessionConfiguration has its [session
+          // setActive:NO] path commented out (see expo/expo#15873) and replaced with a
+          // bookkeeping flag, so on iOS this pair appears to issue no AVAudioSession calls
+          // at all — which would mean whatever restores background music on iOS is
+          // something else we have not identified. On Android it does real work:
+          // setAudioIsEnabled(false) abandons audio focus, and abandoning focus is what
+          // un-ducks the music.
+          //
+          // That is a source reading, not a measurement. Do not delete, shorten or
+          // platform-gate this cycle on the strength of it — it needs device evidence
+          // first, on a phone with music playing.
+          Audio.setIsEnabledAsync(false)
+            .then(() => Audio.setIsEnabledAsync(true))
+            .then(() => {
+              console.log('Audio session cycled to restore background music');
+            })
+            .catch((error) => {
+              console.error('Failed to cycle audio session:', error);
+            });
+        }
+      });
+
+      if (fromPositionMs > 0) {
+        await soundRef.current.playFromPositionAsync(fromPositionMs);
+      } else {
+        await soundRef.current.replayAsync();
+      }
+      console.log('Countdown sound played successfully');
     } catch (error) {
-      // Handle background audio session errors gracefully
+      // Handle background audio session errors gracefully. This one is NOT a reload
+      // candidate — the sound is fine, the app just is not allowed to make noise right
+      // now, and reloading would not change that.
       if (error.code === 'E_AV_PLAY' && error.message?.includes('audio session not activated')) {
         console.log('⚠️ Audio session not active (app in background) - skipping sound');
-      } else {
-        console.error('Failed to play countdown sound:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
+        return;
       }
+
+      // Anything else is treated as "the sound was not playable", which is the case the
+      // dropped isLoaded gate used to catch. One reload, one retry.
+      console.error('Failed to play countdown sound:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      await reloadAndPlayOnce('replayAsync threw');
     }
   };
+
+  /**
+   * Silence an alert that is still audible. Called when one rest replaces another: finishing
+   * a set with two seconds left on the previous rest used to play the tail of the old
+   * countdown over the start of the new one, because nothing ever stopped an in-flight
+   * playback.
+   *
+   * Uses the existing sound handle and adds no lifecycle of its own. Note one consequence:
+   * stopAsync does not produce didJustFinish, so the audio-session cycle in
+   * playCountdownSound's status handler does not run for a playback that was cut short. On
+   * Android that means focus stays held until the next alert plays to its natural end, which
+   * then cycles it. Self-healing, and fixing it properly belongs with the open question about
+   * that cycle rather than here.
+   */
+  const stopCountdownSound = () => {
+    const sound = soundRef.current;
+    if (!sound) return;
+    // Fire and forget, and swallow: a sound that is not playing, or not loaded, throws here
+    // and there is nothing to do about it — the goal is silence and silence is what we have.
+    sound.stopAsync().catch(() => undefined);
+  };
+
+  /**
+   * Arm (or re-arm) the countdown alert for a timer state.
+   *
+   * Everything derives from one value:
+   *
+   *   endTime = startTime.getTime() + targetTime * 1000
+   *
+   * startTime is shifted forward by the pause duration in resumeTimer, so that expression is
+   * correct for a live countdown at any moment, including after pause/resume cycles and after
+   * rehydration. Deliberately NOT fixedEndTime: that is written once in startTimer and never
+   * updated by addTime, subtractTime or resumeTimer, so it goes stale the first time a user
+   * taps ±30s. It is fine for its own purpose (keeping the Live Activity from jumping) and
+   * wrong for this one.
+   *
+   * This function is the single owner of countdownTimeoutRef. It is called from one
+   * declarative effect keyed on the values that define the schedule, so startTimer,
+   * pauseTimer, resumeTimer, addTime, subtractTime, stopTimer, resetTimer and stopTimerForSet
+   * all get correct rescheduling without any of them knowing this exists — and no call site
+   * added later can forget to. It always clears before it schedules, so calling it twice is
+   * harmless.
+   */
+  const scheduleCountdownAlert = (t: TimerState | null) => {
+    if (countdownTimeoutRef.current) {
+      clearTimeout(countdownTimeoutRef.current);
+      countdownTimeoutRef.current = null;
+    }
+
+    // Nothing to schedule: no timer, not running, paused, or counting up (count-up mode has
+    // no deadline to count down to). A timer with no target has no end either.
+    if (!t || !t.isRunning || t.isPaused || t.isCountUp || !t.startTime || t.targetTime <= 0) {
+      if (!t) dispatchedAlertFireAtRef.current = null;
+      return;
+    }
+
+    const endTime = t.startTime.getTime() + t.targetTime * 1000;
+    const now = Date.now();
+
+    // Already at or past zero. Do not schedule and do not catch up: the rest is over, and
+    // the interval's `remaining <= 0` branch owns what happens next.
+    if (endTime - now <= 0) return;
+
+    const fireAt = endTime - COUNTDOWN_ALERT_LEAD_MS;
+    const delay = fireAt - now;
+
+    const dispatch = (seekMs: number) => {
+      dispatchedAlertFireAtRef.current = fireAt;
+      if (__DEV__) {
+        // The whole point of this step, in one number. `drift` is how far the alert actually
+        // started from where it was supposed to: positive is late, negative is early, and the
+        // old interval-driven trigger could be anywhere up to +1000. Step 4's on-screen
+        // countdown is measured against the same fireAt, so this is also how to tell whether
+        // the two agree. Dev-only: it is one line per rest, but it is noise in production.
+        console.log(
+          `⏱️ [COUNTDOWN-ALERT] dispatched drift=${Date.now() - fireAt}ms seek=${seekMs}ms ` +
+            `fireAt=${fireAt} endTime=${endTime}`,
+        );
+      }
+      playCountdownSound(false, seekMs);
+    };
+
+    // Overdue but the rest is still running: a rest shorter than the lead, or ±time landing
+    // the deadline inside the window. Starting the asset at 0 now would put its 3/2/1/0 beeps
+    // on 2/1/0/-1, so start it partway in by exactly how late we are. seek is
+    // `LEAD - remaining`, which the `endTime - now <= 0` return above guarantees is inside
+    // the asset (remaining > 0, so seek < LEAD).
+    //
+    // The ref guard is what stops this being re-triggered for the SAME deadline. This branch
+    // can be re-entered without the deadline moving — foregrounding forces a reschedule, and
+    // so does any pause/resume — and without it, resuming with a second left would stack a
+    // fresh tail on top of the one already playing.
+    if (delay <= 0) {
+      if (dispatchedAlertFireAtRef.current === fireAt) return;
+      dispatch(-delay);
+      return;
+    }
+
+    countdownTimeoutRef.current = setTimeout(() => {
+      countdownTimeoutRef.current = null;
+      dispatch(0);
+    }, delay);
+  };
+
+  /**
+   * The one place the alert schedule is owned.
+   *
+   * Depends on the values that DEFINE the schedule and deliberately not on timeElapsed —
+   * including it would tear down and rebuild the timeout every single tick, which is both
+   * wasteful and a way to reintroduce exactly the second-boundary drift this replaced. The
+   * same partial-dependency shape as the interval effect above.
+   *
+   * Rehydration needs no special case: loadPersistedState calls setTimer with the restored
+   * startTime and targetTime, which changes these deps from undefined, so this runs and
+   * schedules from the restored deadline like any other change. A countdown restored with
+   * less than three seconds left lands in the catch-up branch and gets a seeked alert; one
+   * restored already past zero is turned into a finished timer by loadPersistedState before
+   * it ever reaches here.
+   */
+  useEffect(() => {
+    scheduleCountdownAlert(timer);
+    return () => {
+      if (countdownTimeoutRef.current) {
+        clearTimeout(countdownTimeoutRef.current);
+        countdownTimeoutRef.current = null;
+      }
+    };
+  }, [
+    timer?.isRunning,
+    timer?.isPaused,
+    timer?.isCountUp,
+    timer?.startTime?.getTime(),
+    timer?.targetTime,
+  ]);
 
   const startInterval = () => {
     if (intervalRef.current) return;
@@ -383,18 +769,21 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         const now = new Date();
         const elapsed = Math.floor((now.getTime() - prev.startTime.getTime()) / 1000);
         
-        // Check for countdown completion and sound trigger
+        // Check for countdown completion. The alert is NOT triggered here any more — see
+        // scheduleCountdownAlert. Two reasons it moved out:
+        //
+        //   Timing.  This interval ticks every 1000ms from whenever it was created, with no
+        //            relationship to the second boundary, so the tick that first saw
+        //            `remaining <= 3` could be up to a full second late and push the asset's
+        //            last beep past zero.
+        //   Purity.  playCountdownSound() was a side effect inside a state updater. React can
+        //            double-invoke updaters in development, so the beep could double in Expo
+        //            Go. Scheduling it outside the updater fixes that by construction rather
+        //            than by guarding.
         if (!prev.isCountUp) {
           const remaining = prev.targetTime - elapsed;
           console.log(`Countdown check: remaining=${remaining}, elapsed=${elapsed}, targetTime=${prev.targetTime}`);
-          
-          // Play countdown sound when hitting 3 seconds
-          if (!prev.countdownSoundPlayed && remaining <= 3 && remaining > 0) {
-            console.log('Triggering countdown sound!');
-            playCountdownSound();
-            return { ...prev, timeElapsed: elapsed, countdownSoundPlayed: true };
-          }
-          
+
           // Stop timer when countdown reaches 0
           if (remaining <= 0) {
             console.log('Countdown finished! Stopping timer.');
@@ -450,6 +839,11 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     // Read the outgoing activity id from the ref, not the render closure, and claim
     // it immediately so a second rapid startTimer cannot tear down the same id twice.
     const previousActivityId = timerRef.current?.liveActivityId;
+
+    // Silence any alert still playing from the rest this one replaces. Completing a set with
+    // two seconds left on the previous rest otherwise plays the tail of the old countdown
+    // over the start of the new one. The new schedule is armed by the effect, not here.
+    stopCountdownSound();
 
     const now = new Date();
     const fixedEndTime = now.getTime() + (targetSeconds * 1000); // Calculate stable end time once
@@ -522,6 +916,11 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     // Read from the ref, not the render closure, so a rapid stop/start pair cannot
     // tear down the wrong activity.
     const activityId = timerRef.current?.liveActivityId;
+
+    // A rest that is dismissed should not keep beeping at the user. Clearing the pending
+    // timeout is the effect's job (setTimer(null) below re-runs it); this is for a playback
+    // that has already started.
+    stopCountdownSound();
 
     // Clear timer state and storage FIRST — the widget teardown must not gate it.
     setTimer(null);
