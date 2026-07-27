@@ -7,8 +7,10 @@ export interface StrengthExercise {
   exercise: string;                // Freeform name, e.g., "Barbell Back Squat"
   sets: number;
   reps: string;                    // e.g., "8-12"
-  rest: number;                    // seconds (optimal rest)
-  restQuick?: number;              // seconds (quick mode rest)
+  // No rest fields. Rest is resolved at runtime by resolveRest() in
+  // src/utils/restResolver.ts from the exercise's rest family plus reps_weekly /
+  // rir_weekly / deload state, and returned as a {optimal, moderate, minimal}
+  // triple. Plans that still carry `rest` / `restQuick` import fine; both are ignored.
   reps_weekly?: { [week: string]: string };
   rir_weekly?: { [week: string]: string };
   sets_weekly?: { [week: string]: number };

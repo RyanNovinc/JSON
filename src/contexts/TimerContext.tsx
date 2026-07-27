@@ -19,6 +19,7 @@ if (Platform.OS === 'ios') {
   }
 }
 import { DebugLogger } from '../components/DebugOverlay';
+import type { RestPace, RestTriple } from '../utils/restResolver';
 
 /**
  * The audio mode the countdown alert needs. Applied in two places: loadCountdownSound at
@@ -167,7 +168,19 @@ export interface TimerState {
   startTime: Date | null;
   pausedAt: Date | null;
   isCountUp: boolean;
-  isQuickMode: boolean;
+  /**
+   * The pace this timer is currently targeting. Retargeted in place by setTimerSettings
+   * when the user switches pace mid-rest, so it tracks the live target rather than
+   * recording what the pace happened to be at the moment the rest started.
+   */
+  pace: RestPace;
+  /**
+   * The three resolved durations for the rest this timer represents. Present only for
+   * timers started from a resolved rest (i.e. by set completion); absent for the manual
+   * timer in TimerModal, which has no exercise behind it. Its presence is what makes a
+   * running timer retargetable at all — without it there is nothing to retarget TO.
+   */
+  restOptions?: RestTriple;
   exerciseIndex?: number;
   setIndex?: number;
   /**
@@ -204,7 +217,7 @@ interface ExerciseContext {
 
 export interface TimerSettings {
   countUp: boolean;
-  quickMode: boolean;
+  pace: RestPace;
 }
 
 
@@ -218,7 +231,7 @@ interface TimerContextType {
   setTimerSettings: (settings: TimerSettings) => void;
   
   // Timer controls
-  startTimer: (targetSeconds?: number, exerciseIndex?: number, setIndex?: number, themeColor?: string) => void;
+  startTimer: (targetSeconds?: number, exerciseIndex?: number, setIndex?: number, themeColor?: string, restOptions?: RestTriple) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
   stopTimer: () => Promise<void>;
@@ -233,9 +246,6 @@ interface TimerContextType {
   hideModal: () => void;
   minimize: () => void;
 
-  // Auto-timer for set completion
-  startAutoTimer: (restTime: number, quickRestTime: number, exerciseIndex: number, setIndex: number, themeColor?: string) => void;
-
   // Exercise context for Live Activities
   setExerciseContext: (getContext: ((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null) => void;
   
@@ -248,12 +258,42 @@ const TimerContext = createContext<TimerContextType | undefined>(undefined);
 const STORAGE_KEY = '@timer_state';
 const SETTINGS_KEY = '@timer_settings';
 
+/** The paces a stored settings blob may legitimately name. Anything else is not trusted. */
+const REST_PACES: readonly string[] = ['optimal', 'moderate', 'minimal'];
+
+/**
+ * Read `@timer_settings` written by ANY version of the app.
+ *
+ * Settings written before the three-pace switch carry a boolean `quickMode` and no
+ * `pace`. Quick rest was the shortest of the available rests, so it maps to 'minimal';
+ * its off state was the app default, which is 'moderate'. The `quickMode` key is not
+ * carried forward — this returns a fresh object with only the two current fields, and
+ * the next setTimerSettings write persists the legacy key out of existence.
+ *
+ * Anything unreadable — no pace, a pace this build does not know, a blob from a newer
+ * version — falls back to 'moderate' rather than discarding the whole object, so a bad
+ * pace cannot cost the user their countUp preference or vice versa.
+ */
+const migrateTimerSettings = (raw: any): TimerSettings => {
+  const countUp = !!raw?.countUp;
+
+  if (typeof raw?.pace === 'string' && REST_PACES.includes(raw.pace)) {
+    return { countUp, pace: raw.pace as RestPace };
+  }
+
+  if (typeof raw?.quickMode === 'boolean') {
+    return { countUp, pace: raw.quickMode ? 'minimal' : 'moderate' };
+  }
+
+  return { countUp, pace: 'moderate' };
+};
+
 export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const [timer, setTimer] = useState<TimerState | null>(null);
   const [isMinimized, setIsMinimized] = useState(true);
   const [timerSettings, setTimerSettingsState] = useState<TimerSettings>({
     countUp: false,
-    quickMode: false,
+    pace: 'moderate',
   });
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -442,7 +482,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const saved = await AsyncStorage.getItem(SETTINGS_KEY);
       if (saved) {
-        setTimerSettingsState(JSON.parse(saved));
+        setTimerSettingsState(migrateTimerSettings(JSON.parse(saved)));
       }
     } catch (error) {
       console.error('Error loading timer settings:', error);
@@ -457,8 +497,87 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  /**
+   * Move a rest already under way onto a different pace.
+   *
+   * The rest is NOT restarted. timeElapsed is wall-clock, derived from startTime, so the
+   * only honest way to say "this rest is now 120s instead of 165s" is to move the target
+   * and leave the clock alone — startTime is never touched here. Rewriting it would either
+   * teleport the countdown or hand the user back time they had already served.
+   *
+   * fixedEndTime moves with the target so the Live Activity agrees with the on-screen
+   * countdown; syncLiveActivity only honours it while it is within 2s of the deadline it
+   * computes, so leaving it stale would silently demote the widget to the calculated path.
+   *
+   * Reads timerRef rather than the render closure, and does its one side effect out here
+   * rather than inside the updater — see the note on scheduleCountdownAlert about React
+   * double-invoking updaters in development.
+   */
+  const retargetLiveRest = (nextPace: RestPace) => {
+    const current = timerRef.current;
+
+    // Only a running or paused countdown with resolved options can be retargeted. A
+    // finished or idle timer represents a rest that is over; switching pace must not
+    // resurrect it. A manual timer has no restOptions and nothing to retarget to.
+    if (!current || !current.restOptions || current.isCountUp) return;
+    if (!current.isRunning && !current.isPaused) return;
+    if (nextPace === current.pace) return;
+
+    const newTarget = current.restOptions[nextPace];
+    if (!newTarget || newTarget === current.targetTime) {
+      // Two paces can resolve to the same number of seconds (a deload flattens all three).
+      // Nothing to retarget, but the timer still now belongs to the new pace.
+      const unchanged: TimerState = { ...current, pace: nextPace };
+      setTimer(unchanged);
+      timerRef.current = unchanged;
+      return;
+    }
+
+    const fixedEndTime = current.startTime
+      ? current.startTime.getTime() + newTarget * 1000
+      : current.fixedEndTime;
+
+    // The deadline moved, so any alert already playing belongs to the old one. Silence it;
+    // the effect re-arms against the new deadline off the targetTime change below.
+    stopCountdownSound();
+
+    const next: TimerState =
+      current.timeElapsed >= newTarget
+        ? {
+            // The shorter rest is already spent. The documented finished shape: elapsed
+            // driven to target so remaining renders a clean 0:00, targetTime PRESERVED so
+            // the finished duration is still known.
+            ...current,
+            pace: nextPace,
+            targetTime: newTarget,
+            timeElapsed: newTarget,
+            isRunning: false,
+            isPaused: false,
+            isFinished: true,
+            fixedEndTime,
+            countdownSoundPlayed: false,
+          }
+        : {
+            ...current,
+            pace: nextPace,
+            targetTime: newTarget,
+            fixedEndTime,
+            countdownSoundPlayed: false,
+          };
+
+    DebugLogger.log(
+      `🎚️ [PACE] retargeted ${current.pace}→${nextPace}: ${current.targetTime}s→${newTarget}s ` +
+        `(elapsed=${current.timeElapsed}s, finished=${!!next.isFinished})`,
+      'log',
+    );
+
+    setTimer(next);
+    timerRef.current = next;
+  };
+
   const setTimerSettings = async (settings: TimerSettings) => {
     setTimerSettingsState(settings);
+    retargetLiveRest(settings.pace);
     try {
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (error) {
@@ -683,10 +802,6 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     const endTime = t.startTime.getTime() + t.targetTime * 1000;
     const now = Date.now();
 
-    // Already at or past zero. Do not schedule and do not catch up: the rest is over, and
-    // the interval's `remaining <= 0` branch owns what happens next.
-    if (endTime - now <= 0) return;
-
     const fireAt = endTime - COUNTDOWN_ALERT_LEAD_MS;
     const delay = fireAt - now;
 
@@ -706,19 +821,26 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       playCountdownSound(false, seekMs);
     };
 
-    // Overdue but the rest is still running: a rest shorter than the lead, or ±time landing
-    // the deadline inside the window. Starting the asset at 0 now would put its 3/2/1/0 beeps
-    // on 2/1/0/-1, so start it partway in by exactly how late we are. seek is
-    // `LEAD - remaining`, which the `endTime - now <= 0` return above guarantees is inside
-    // the asset (remaining > 0, so seek < LEAD).
-    //
-    // The ref guard is what stops this being re-triggered for the SAME deadline. This branch
-    // can be re-entered without the deadline moving — foregrounding forces a reschedule, and
-    // so does any pause/resume — and without it, resuming with a second left would stack a
-    // fresh tail on top of the one already playing.
+    // Overdue: a rest shorter than the lead, ±time landing the deadline inside the window,
+    // or a pace switch shortening the rest to within three seconds of where it already is.
+    // Starting the asset at 0 now would put its 3/2/1/0 beeps on 2/1/0/-1, so start it
+    // partway in by exactly how late we are.
     if (delay <= 0) {
+      const overdue = -delay;
+
+      // The lead IS the asset's length (see COUNTDOWN_ALERT_LEAD_MS), so `overdue` doubles
+      // as the seek offset, and overdue > LEAD means the entire asset would land after zero
+      // — nothing of the 3-2-1-0 is still ahead, so there is nothing worth playing. Being
+      // overdue by LESS than that leaves a real tail (overdue of 2000ms still plays the
+      // "1" and the "0"), which is why this is the only case that skips.
+      if (overdue > COUNTDOWN_ALERT_LEAD_MS) return;
+
+      // The ref guard is what stops this being re-triggered for the SAME deadline. This
+      // branch can be re-entered without the deadline moving — foregrounding forces a
+      // reschedule, and so does any pause/resume — and without it, resuming with a second
+      // left would stack a fresh tail on top of the one already playing.
       if (dispatchedAlertFireAtRef.current === fireAt) return;
-      dispatch(-delay);
+      dispatch(overdue);
       return;
     }
 
@@ -833,7 +955,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       });
   };
 
-  const startTimer = (targetSeconds = 0, exerciseIndex?: number, setIndex?: number, themeColor?: string) => {
+  const startTimer = (targetSeconds = 0, exerciseIndex?: number, setIndex?: number, themeColor?: string, restOptions?: RestTriple) => {
     DebugLogger.log(`🚀 startTimer called: targetSeconds=${targetSeconds}, exerciseIndex=${exerciseIndex}, setIndex=${setIndex}`, 'log');
 
     // Read the outgoing activity id from the ref, not the render closure, and claim
@@ -856,7 +978,8 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       startTime: now,
       pausedAt: null,
       isCountUp: timerSettings.countUp,
-      isQuickMode: timerSettings.quickMode,
+      pace: timerSettings.pace,
+      restOptions,
       exerciseIndex,
       setIndex,
       countdownSoundPlayed: false,
@@ -1004,7 +1127,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         startTime: null,
         pausedAt: null,
         isCountUp: timerSettings.countUp,
-        isQuickMode: timerSettings.quickMode,
+        pace: timerSettings.pace,
         countdownSoundPlayed: false,
       });
       return;
@@ -1059,7 +1182,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         startTime: null,
         pausedAt: null,
         isCountUp: timerSettings.countUp,
-        isQuickMode: timerSettings.quickMode,
+        pace: timerSettings.pace,
         countdownSoundPlayed: false,
       });
       return;
@@ -1113,11 +1236,6 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
 
   const minimize = () => {
     setIsMinimized(true);
-  };
-
-  const startAutoTimer = (restTime: number, quickRestTime: number, exerciseIndex: number, setIndex: number, themeColor?: string) => {
-    const targetTime = timerSettings.quickMode ? quickRestTime : restTime;
-    startTimer(targetTime, exerciseIndex, setIndex, themeColor);
   };
 
   const testAudio = () => {
@@ -1333,7 +1451,6 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     showModal,
     hideModal,
     minimize,
-    startAutoTimer,
     setExerciseContext,
     testAudio,
   };

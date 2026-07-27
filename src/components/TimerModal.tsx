@@ -10,6 +10,33 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTimer } from '../contexts/TimerContext';
 import { useTheme } from '../contexts/ThemeContext';
+import type { RestPace } from '../utils/restResolver';
+
+/**
+ * The three paces, in the order they are shown: longest rest first, so the row reads
+ * left-to-right as "most recovery" to "least". Labels are deliberately not the internal
+ * pace names — "optimal" would imply the other two are wrong choices, when the point of
+ * the control is that all three are legitimate depending on how much time you have.
+ */
+const PACE_OPTIONS: { pace: RestPace; label: string }[] = [
+  { pace: 'optimal', label: 'Full' },
+  { pace: 'moderate', label: 'Balanced' },
+  { pace: 'minimal', label: 'Quick' },
+];
+
+const PACE_TITLES: Record<RestPace, string> = {
+  optimal: 'Full Rest',
+  moderate: 'Balanced Rest',
+  minimal: 'Quick Rest',
+};
+
+/** Matches the main display's m:ss above a minute, and stays compact below it. */
+const formatPaceSeconds = (seconds: number): string => {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+};
 
 export const TimerModal: React.FC = () => {
   const { timer, isMinimized, timerSettings, setTimerSettings, startTimer, pauseTimer, resumeTimer, stopTimer, resetTimer, addTime, subtractTime, hideModal } = useTimer();
@@ -133,8 +160,8 @@ export const TimerModal: React.FC = () => {
             
             <View style={styles.titleContainer}>
               <Text style={styles.title}>
-                {!timerSettings.countUp 
-                  ? (timer?.isQuickMode ? 'Quick Rest' : 'Optimal Rest')
+                {!timerSettings.countUp
+                  ? PACE_TITLES[timerSettings.pace]
                   : 'Count Up'
                 }
               </Text>
@@ -209,22 +236,43 @@ export const TimerModal: React.FC = () => {
               </View>
             </TouchableOpacity>
 
-            {/* Rest Time Toggle (only for countdown) */}
+            {/* Rest pace (only for countdown) */}
             {!timerSettings.countUp && (
-              <TouchableOpacity 
-                style={styles.settingRow}
-                onPress={() => setTimerSettings({ ...timerSettings, quickMode: !timerSettings.quickMode })}
-              >
-                <Text style={styles.settingLabel}>
-                  {timerSettings.quickMode ? 'Quick Rest' : 'Optimal Rest'}
-                </Text>
-                <View style={[styles.simpleToggle, timerSettings.quickMode && { backgroundColor: themeColor }]}>
-                  <View style={[
-                    styles.toggleKnob,
-                    timerSettings.quickMode && styles.toggleKnobActive
-                  ]} />
+              <View>
+                <Text style={styles.settingLabel}>Rest Pace</Text>
+                <View style={styles.paceControl}>
+                  {PACE_OPTIONS.map(({ pace, label }) => {
+                    const isSelected = timerSettings.pace === pace;
+                    // Only shown once a rest is actually under way. Seeing what each pace
+                    // costs is the whole point — switching blind is what the old two-state
+                    // toggle already did.
+                    const seconds = timer?.restOptions?.[pace];
+
+                    return (
+                      <TouchableOpacity
+                        key={pace}
+                        style={[
+                          styles.paceOption,
+                          isSelected && { backgroundColor: `${themeColor}26`, borderColor: themeColor },
+                        ]}
+                        onPress={() => setTimerSettings({ ...timerSettings, pace })}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
+                        accessibilityLabel={seconds ? `${label} rest, ${seconds} seconds` : `${label} rest`}
+                      >
+                        <Text style={[styles.paceLabel, isSelected && { color: themeColor }]}>
+                          {label}
+                        </Text>
+                        {seconds !== undefined && (
+                          <Text style={[styles.paceSeconds, isSelected && { color: themeColor }]}>
+                            {formatPaceSeconds(seconds)}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              </TouchableOpacity>
+              </View>
             )}
           </View>
         </Animated.View>
@@ -358,6 +406,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: '#ffffff',
+  },
+  paceControl: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  paceOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    backgroundColor: '#141414',
+    gap: 2,
+  },
+  paceLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#ccc',
+  },
+  paceSeconds: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#888',
+    fontVariant: ['tabular-nums'],
   },
   simpleToggle: {
     width: 44,

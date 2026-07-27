@@ -1380,10 +1380,10 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
     if (!exercise.reps || typeof exercise.reps !== 'string') {
       throw new Error(`Exercise "${exercise.exercise}" has invalid reps`);
     }
-    if (typeof exercise.rest !== 'number' || exercise.rest <= 0) {
-      throw new Error(`Exercise "${exercise.exercise}" has invalid rest`);
-    }
-    
+    // `rest` and `restQuick` are deliberately NOT validated, required or read. Rest is
+    // resolved at runtime by resolveRest() (src/utils/restResolver.ts). Plans generated
+    // before that change still carry both fields; they import cleanly and are ignored.
+
     // Validate required muscle groups
     if (!exercise.primaryMuscles) {
       throw new Error(`Exercise "${exercise.exercise}" missing primaryMuscles`);
@@ -1395,9 +1395,6 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
     validateMuscles(exercise.secondaryMuscles, exercise.exercise, 'secondary');
 
     // Validate optional fields
-    if (exercise.restQuick && (typeof exercise.restQuick !== 'number' || exercise.restQuick <= 0)) {
-      throw new Error(`Exercise "${exercise.exercise}" has invalid restQuick`);
-    }
     if (exercise.notes && typeof exercise.notes !== 'string') {
       throw new Error(`Exercise "${exercise.exercise}" notes must be a string`);
     }

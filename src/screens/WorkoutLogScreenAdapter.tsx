@@ -11,6 +11,7 @@ import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { useTimer } from '../contexts/TimerContext';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { resolveExerciseImagePair } from '../utils/exerciseImages';
+import { resolveRest } from '../utils/restResolver';
 import { WorkoutStorage } from '../utils/storage';
 import RobustStorage from '../utils/robustStorage';
 import { Analytics } from '../services/analytics';
@@ -55,51 +56,6 @@ import { Analytics } from '../services/analytics';
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
-/** Rest fallback for a value that exists but cannot be read as a duration. */
-const DEFAULT_REST_SECONDS = 90;
-
-/**
- * `rest` comes from user-imported JSON and is typed `number | string`, so it is
- * whatever the model wrote. A bare parseInt turns "2 min" into a 2-second rest —
- * worse than useless. Read the unit, and when the value is unintelligible fall back
- * to a sane default rather than a nonsense one.
- *
- * Accepts: 90 · "90" · "90s" · "90 sec" · "2 min" · "1:30"
- * Returns null only when there is nothing to parse at all, in which case the caller
- * starts no timer (unchanged behaviour for an exercise with no prescribed rest).
- */
-const parseRestSeconds = (rest: number | string | undefined | null): number | null => {
-  if (rest === undefined || rest === null || rest === '') return null;
-
-  if (typeof rest === 'number') {
-    return Number.isFinite(rest) && rest > 0 ? Math.round(rest) : DEFAULT_REST_SECONDS;
-  }
-
-  const value = String(rest).trim().toLowerCase();
-  if (!value) return null;
-
-  // "1:30" → 90
-  const clock = value.match(/^(\d+):([0-5]\d)$/);
-  if (clock) return parseInt(clock[1], 10) * 60 + parseInt(clock[2], 10);
-
-  // "2 min", "2m", "1.5 minutes"
-  const minutes = value.match(/^(\d+(?:\.\d+)?)\s*(m|min|mins|minute|minutes)$/);
-  if (minutes) {
-    const seconds = Math.round(parseFloat(minutes[1]) * 60);
-    return seconds > 0 ? seconds : DEFAULT_REST_SECONDS;
-  }
-
-  // "90", "90s", "90 sec"
-  const seconds = value.match(/^(\d+(?:\.\d+)?)\s*(s|sec|secs|second|seconds)?$/);
-  if (seconds) {
-    const parsed = Math.round(parseFloat(seconds[1]));
-    return parsed > 0 ? parsed : DEFAULT_REST_SECONDS;
-  }
-
-  console.log(`⏱️ [REST] Unparseable rest value ${JSON.stringify(rest)} — falling back to ${DEFAULT_REST_SECONDS}s`);
-  return DEFAULT_REST_SECONDS;
-};
-
 /**
  * Map a saved preference (an alternative's NAME) to the selectedExerciseIndex the
  * sets data stores: 0 for the primary, 1 + position for an entry in `alternatives`.
@@ -126,7 +82,7 @@ export default function WorkoutLogScreenAdapter() {
   const route = useRoute<RouteProp<RootStackParamList, 'WorkoutLog'>>();
   const { themeColor, isPinkTheme } = useTheme();
   const { globalUnit } = useWeightUnit();
-  const { startTimer, stopTimerForSet } = useTimer();
+  const { startTimer, stopTimerForSet, timerSettings } = useTimer();
   const { activeWorkout, setActiveWorkout } = useActiveWorkout();
   
   // Extract data from your existing route params
@@ -187,7 +143,6 @@ export default function WorkoutLogScreenAdapter() {
             name: exercise.exercise,
             sets: exercise.sets_weekly?.[currentWeek?.toString()] || exercise.sets || 3,
             reps: exercise.reps_weekly?.[currentWeek?.toString()] || exercise.reps || "8-12",
-            rest: exercise.rest,
             notes: exercise.notes,
             primaryMuscles: Array.isArray(exercise.primaryMuscles) ? exercise.primaryMuscles : [],
             secondaryMuscles: Array.isArray(exercise.secondaryMuscles) ? exercise.secondaryMuscles : [],
@@ -448,6 +403,24 @@ export default function WorkoutLogScreenAdapter() {
     });
   };
 
+  /**
+   * The inputs resolveRest() needs, gathered from the exercise as it sits in THIS block and
+   * week. Rest is no longer carried by the plan JSON — it is derived from what the exercise
+   * costs (its rest family) and how heavily it is being loaded right now, so the same
+   * movement rests longer in a low-rep block than a high-rep one without anything being
+   * regenerated.
+   *
+   * setIndex is passed only where a set has actually been completed; it exists so the
+   * resolver can add the extra rest that follows a set taken to failure.
+   */
+  const buildRestContext = (exercise: any, setIndex?: number) => ({
+    exerciseName: exercise?.exercise ?? '',
+    repsThisWeek: exercise?.reps_weekly?.[String(currentWeek ?? 1)] ?? exercise?.reps,
+    rirThisWeek: exercise?.rir_weekly?.[String(currentWeek ?? 1)],
+    isDeloadWeek: block?.deload_weeks?.includes(currentWeek ?? 1) ?? false,
+    setIndex,
+  });
+
   const handleSetComplete = async (exerciseIndex: number, setIndex: number) => {
     // Deliberately reads allSetsData from the render closure, NOT a functional
     // update. The screen's deferred completion (pendingCompletion) is built around
@@ -500,11 +473,16 @@ export default function WorkoutLogScreenAdapter() {
           console.log(`🔗 [SUPERSET] ⏩ Switching NOW to ${nextExercise?.exercise}`);
           setCurrentIndex(exerciseIndex + 1);
           
-          // Start a 5-second transition timer on the NEW exercise
-          // This gives user time to get ready for the next exercise
+          // Start the transition rest on the NEW exercise. The resolver has a dedicated
+          // superset_transition row (60/45/30) — this used to be a hardcoded 5 seconds,
+          // which is not a rest, it is barely time to walk to the other station.
           setTimeout(() => {
-            console.log('🔗 [SUPERSET] Starting 5-second transition timer on new exercise');
-            startTimer(5, exerciseIndex + 1, 0, themeColor);
+            const transition = resolveRest({
+              ...buildRestContext(exercises[exerciseIndex]),
+              supersetRole: 'transition',
+            });
+            console.log(`🔗 [SUPERSET] Starting ${transition[timerSettings.pace]}s transition timer on new exercise`);
+            startTimer(transition[timerSettings.pace], exerciseIndex + 1, 0, themeColor, transition);
           }, 100); // Small delay to ensure the view has switched
         } else {
           console.log('🔗 [SUPERSET] ⚠️ Not transitioning - exercise index mismatch or last exercise');
@@ -512,11 +490,8 @@ export default function WorkoutLogScreenAdapter() {
       } else {
         // Regular rest timer for non-superset exercises
         const exercise = exercises[exerciseIndex];
-
-        const restSeconds = parseRestSeconds(exercise?.rest);
-        if (restSeconds && restSeconds > 0) {
-          startTimer(restSeconds, exerciseIndex, setIndex, themeColor);
-        }
+        const restOptions = resolveRest(buildRestContext(exercise, setIndex));
+        startTimer(restOptions[timerSettings.pace], exerciseIndex, setIndex, themeColor, restOptions);
       }
 
       // History still needs reps to mean anything — "3 sets of nothing" is not a

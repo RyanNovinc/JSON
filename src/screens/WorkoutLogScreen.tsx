@@ -205,7 +205,6 @@ export interface Exercise {
   name?: string;
   sets: number;
   reps: string | number;
-  rest?: number | string;
   notes?: string;
   primaryMuscles?: string[];
   secondaryMuscles?: string[];
