@@ -189,11 +189,14 @@ their macros.
     works today by luck of RNGH's defaults. Both screens keep RNGH touchables (and use
     `AppModal`) for that reason. Someone should look at this deliberately; do not casually
     swap their touchables to `react-native` without understanding the gesture interaction.
-13. **Deduplication is covered by no test.** `src/utils/__tests__/importDeduplication.test.ts`
-    is `describe.skip`ped: its fixtures never survive validation, and the fingerprint dedupe
-    it claims to test lives behind `_metadata.exportType === 'unified_mesocycle_structure'`
-    in `handleUnifiedMesocycleImport`, reachable only via `confirmImport` — which that suite
-    never calls. Read its header before writing the real suite.
+13. **Deduplication is covered by no test, and a green `npm test` implies otherwise.** The
+    fingerprint dedupe lives behind `_metadata.exportType === 'unified_mesocycle_structure'`
+    in `handleUnifiedMesocycleImport`, reachable only via `confirmImport`. The old
+    `importDeduplication.test.ts` never tested it and was deleted (2026-07-29) rather than
+    left `describe.skip`ped — four permanently-skipped tests encoding a wrong model of where
+    dedupe lives. Its analysis, the four independent reasons it could never have worked, and
+    a spec for the real suite are in `docs/import-deduplication-coverage-gap.md`. Read that
+    before writing it.
 14. **`expo prebuild` is DESTRUCTIVE on `ios/`.** The `expo-live-activity` plugin calls
     `addTarget` non-idempotently, so prebuilding over the existing `ios/` duplicates
     targets/build-phases and corrupts `project.pbxproj` (`pod install` then fails with

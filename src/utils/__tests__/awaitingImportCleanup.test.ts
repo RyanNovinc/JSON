@@ -47,9 +47,41 @@ jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn(),
 }));
 
+// useWorkoutImport calls useTimer() (useWorkoutImport.ts:103) purely to hand the plan's
+// requested rest pace to the timer. This suite mocks the CONTEXT rather than the modules
+// underneath it, which fixes two separate breakages at once:
+//
+//  1. IMPORT. TimerContext imports expo-av at module scope, whose ExponentAV native module
+//     does not exist under jest — "Cannot find native module 'ExponentAV'", presenting as
+//     "suite failed to run" with zero tests executed rather than as a test failure. Behind
+//     that sat a whole chain: expo-haptics, then DebugOverlay -> @expo/vector-icons ->
+//     expo-font -> expo-asset -> expo-constants, each dying against the trimmed react-native
+//     mock above. Mocking the four of them individually works, but loads a real timer this
+//     suite has no use for.
+//  2. RENDER. useTimer() throws 'useTimer must be used within a TimerProvider' by the
+//     context convention, and renderHook below supplies no wrapper — so every test failed
+//     even once the imports were fixed.
+//
+// applyPlanDefaultPace is the only member the hook uses, and no test here asserts on rest
+// pace, so a jest.fn() is a faithful stand-in. If a future test needs the real timer, wrap
+// renderHook in TimerProvider instead of extending this mock.
+jest.mock('../../contexts/TimerContext', () => ({
+  useTimer: () => ({ applyPlanDefaultPace: jest.fn() }),
+}));
+
 describe('Awaiting Import Cleanup (Fix 5)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // mockReset on this one mock, not jest.resetAllMocks(). clearAllMocks wipes call records
+    // but leaves a mockRejectedValueOnce queue intact, so test 3's queued rejection survives
+    // into the next test if test 3 ever stops consuming it — surfacing as a baffling
+    // 'Storage error' failure in test 4, pointing at test 3's line.
+    //
+    // A blanket jest.resetAllMocks() closes that, but also strips the implementations out of
+    // the jest.mock('react-native') factory above: Animated.parallel(...) then returns
+    // undefined and every cancel path dies on "Cannot read properties of undefined (reading
+    // 'start')" at useWorkoutImport.ts:1685. Reset only what actually leaks.
+    mockWorkoutStorage.setAwaitingImport.mockReset();
     mockWorkoutStorage.setAwaitingImport.mockResolvedValue();
   });
 
@@ -82,12 +114,17 @@ describe('Awaiting Import Cleanup (Fix 5)', () => {
 
     const { result } = renderHook(() => useWorkoutImport({}));
 
-    // Should not reject even if setAwaitingImport fails — handleModalCancel swallows it.
-    await expect(
-      act(async () => {
-        result.current.cancelConfirmation();
-      })
-    ).resolves.not.toThrow();
+    // A bare act(): if handleModalCancel stopped swallowing the storage rejection, act would
+    // propagate it and fail this test. That is the whole "does not break the cancel flow"
+    // claim, expressed by the call itself.
+    //
+    // This replaces `await expect(act(...)).resolves.not.toThrow()`, which was decorative —
+    // `.resolves` on a promise that resolves passes whatever the code does, so it could not
+    // fail. The assertion below is the one that bites (verified by mutation: neutering the
+    // setAwaitingImport call in handleModalCancel turns this test red).
+    await act(async () => {
+      result.current.cancelConfirmation();
+    });
 
     expect(mockWorkoutStorage.setAwaitingImport).toHaveBeenCalledWith(false);
   });
