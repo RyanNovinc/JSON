@@ -1,27 +1,131 @@
 /**
  * CookScreen — JSON.fit "Cook" tab (replaces the freed Library tab).
  *
- * Phase 1: stills only. Video mounts later behind VIDEO_ENABLED without
- * layout changes; the hero still stays mounted underneath the video surface.
+ * ROUND TWO (this revision):
+ *   - Title sits as CLOSE TO THE TOP as the hardware allows: anchored at
+ *     safe-area top + 8. insets.top is what keeps it clear of notches,
+ *     Dynamic Islands and Android punch-hole cameras on every device — never
+ *     hardcode a status bar height. The block is inset 70pt each side so it
+ *     never collides with the category pill (left) or the saved heart
+ *     (right), which share the same band.
+ *   - Double tap is now a TOGGLE: like, then double tap again to unlike.
+ *     (Instagram/TikTok deliberately make double tap like-only; since our
+ *     pause lives on single tap, accidental unlikes are unlikely enough to
+ *     allow the toggle.)
+ *   - Like/unlike animations modelled on the two canonical patterns:
+ *     LIKE = Instagram's big overlay heart (spring in with a random slight
+ *     tilt, hold, drift up and fade) + Twitter's celebration burst (an
+ *     expanding ring that dissolves into particle dots). UNLIKE gets the
+ *     conventional quiet exit: an outline heart that deflates and drops —
+ *     celebration in, no ceremony out. The saved chip pulses on both.
+ *   - Filter sheet redesigned: grabber handle, category as a grid of icon
+ *     tiles with per-category meal counts (structure that says something),
+ *     Show me as icon chips beneath with LIVE counts scoped to the selected
+ *     category — so "Mains · Under 10 min" is knowable before tapping.
+ *   - Macro numbers ROLL to their new values (~380ms ease-out count-up)
+ *     whenever the plate, variant, or portions change — on the base card's
+ *     macro line, the panel hero's calories, and the macro gauges' gram
+ *     values. The stacked composition bar is GONE after device feedback (a
+ *     kcal-scaled length stopped short of its container and read as broken):
+ *     macros now render as three per-macro GAUGE rows on one shared gram
+ *     scale — the largest gram value across every plate of the meal — so a
+ *     partial fill reads as "room on the scale" and all three gauges move
+ *     visibly on every plate switch. See useCountUp / CountText / MacroRows.
+ *   - Tab bar HIDE-ON-PLAY (flagged, TAB_BAR_HIDE_ON_PLAY): once the active
+ *     card's footage has played untouched for ~1.8s the overlaid bar fades
+ *     away; pausing, the panel opening/closing, landing on a card without
+ *     footage, reaching the end card, or leaving the screen brings it back.
+ *     One screen-level coordinator writes cookTabBarOpacity (panel state +
+ *     play state), so the two hiding reasons can't fight. Flip the flag to
+ *     false for the always-visible convention the major feeds use.
+ *   - New SMOOTHIES category. RESOLVED against NutritionHomeScreen: that
+ *     screen's shelves derive from `cuisine`, with four leaf cuisines
+ *     ('breakfast' / 'snack' / 'dessert' / 'smoothie') and Mains defined as
+ *     everything else (the savoury dishes spread across australian, indian,
+ *     mexican, italian, thai, …). Cook's categories now use the SAME rule
+ *     (see matchesCategory), so the Cook filter and the Nutrition shelves
+ *     can never disagree about where a meal lives. This also means one meal
+ *     belongs to exactly one category, matching the Nutrition tab.
  *
- * Approved design (mockup: cook_screen_clean_centered_macros):
- *   - Full-bleed media, one card per viewport, vertical snap paging, no peek
- *   - Base layer shows only: centered meal name, centered macro line, Cook this
- *   - Everything else (serves, method, effort tags, Save / Add / Share / Mute)
- *     lives in a side panel revealed by swiping left or tapping the edge tab
- *   - Horizontal swipe is reserved for the panel. Vertical swipe navigates.
- *   - Single tap: play/pause on video cards only. Double tap: save.
+ * PREVIOUS ROUND (kept):
+ *   - Top title + macro line, no scrim, text-shadow legibility, site-hero
+ *     stat treatment (bold numbers, muted units, middots)
+ *   - Saved-state heart chip top right — a TAPPABLE save toggle (same toggle
+ *     as a double tap; the chip pulse is its confirmation, no overlay heart
+ *     for a button press). Its displayed state still under-reports on a
+ *     fresh launch until hydration lands (see savedSlugs TODO). The
+ *     "Double tap to save" hint pill is gone — with a visible save button
+ *     the hidden gesture no longer needs a nudge.
+ *   - Single tap waits DOUBLE_TAP_MS before pausing so a double tap never
+ *     touches playback
+ *   - Sound ON by default (Shorts/Reels convention);
+ *     Audio.setAudioModeAsync playsInSilentModeIOS required on iOS. Because
+ *     that bypasses the hardware silent switch, the card carries a feed-wide
+ *     mute chip under the save chip — the only in-app way to silence it.
+ *     The mode is applied IN FULL (FEED_AUDIO_MODE) and re-applied on focus,
+ *     because the expo-av mode store is one global that TimerContext also
+ *     writes; a partial mode inherits whatever ran last, which made mixing
+ *     vs ducking with the user's music depend on session history.
+ *   - Playback is gated on ONE value (screenActive): viewport position, screen
+ *     focus, app state, and whether the panel or filter sheet is covering the
+ *     feed. Anything that should stop audio belongs in that gate.
+ *   - Panel: solid near-black surface, inset rounded plate hero below the
+ *     notch, spring open/close, edge tab rides the panel, synced dim fade
+ *   - Tab bar fades with the panel via the exported cookTabBarOpacity
+ *
+ * VIDEO PHASE 1 (unchanged): recipe videos stream from S3 and own the base
+ * card's media layer. No files ship in the binary — MEAL_VIDEOS maps a meal
+ * slug to a URL, and a meal with no entry keeps the deterministic tone.
+ * Playback uses expo-av (already a dependency, so no EAS rebuild).
+ *
+ * Current design:
+ *   - Base layer: video (or tone) + top-anchored meal name + macro line
+ *     (the selected plate's macros × portions). Nothing else — no buttons.
+ *   - The side panel (swipe left or the edge tab) is the detail surface:
+ *     inset plate-carousel hero card (arrows + tappable dots; arrows, not
+ *     swipe — horizontal swipe stays reserved for the panel), coloured
+ *     proportional macro bar, icon method cards, easy vs from-scratch
+ *     variant toggle (persisted via variantChoices), portions stepper
+ *     scaling calories AND amounts, and the composed ingredient list.
+ *   - View full recipe is the panel's ONLY primary action; the funnel is
+ *     Cook feed → RecipeDetail → its own start-cooking flow. Share is the
+ *     one secondary action. Double tap likes/unlikes.
+ *   - While the panel is open the pager is locked (scrollEnabled false).
+ *   - Cooking steps deliberately never render here — RecipeDetail/cook mode
+ *     is the destination.
  *   - Category pill (top left) opens the filter sheet (category + intent)
  *   - Explicit end-of-category card; never a silent loop
  *
- * Navigator requirement (not this file's job): hide the tab bar on this route
- * (tabBarStyle: { display: 'none' }) so the pager owns the full screen.
+ * Data: CURATED_MEALS from src/data/curated_meals. Categories derive from
+ * `cuisine` (see matchesCategory), mirroring NutritionHomeScreen's shelves.
+ * Defaults when the user hasn't chosen: plate = id 'standard' else
+ * plates[0]; sauce variant = persisted choice, else is_default, else first;
+ * method = methods[0].
  *
- * Every point that must plug into existing app code is marked TODO(repo):
+ * Navigator requirements (not this file's job):
+ *   1. Overlay the tab bar on this route instead of hiding it:
+ *        tabBarStyle: {
+ *          position: 'absolute',
+ *          backgroundColor: 'rgba(12,12,12,0.62)',
+ *          borderTopWidth: 0,
+ *        }
+ *   2. CustomTabBar imports { cookTabBarOpacity } from this file and, when
+ *      the focused route is Cook, wraps its bar in
+ *        <Animated.View style={{ opacity: cookTabBarOpacity }}>
+ *      That one line is the whole fade-with-panel behaviour. The value is
+ *      reset to 1 on blur so leaving Cook with the panel open never strands
+ *      the bar invisible on other tabs.
+ * The footage still fills the whole window behind the bar. This screen reads
+ * the overlaid bar's height via BottomTabBarHeightContext and falls back to
+ * the raw bottom inset when rendered outside a tab navigator (e.g. a
+ * standalone test shell), so both environments lay out correctly.
+ *
+ * Remaining integration seams are marked TODO(repo):
  */
 
 import React, {
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -30,130 +134,186 @@ import React, {
 import {
   AccessibilityActionEvent,
   Animated,
+  AppState,
+  AppStateStatus,
+  Easing,
   FlatList,
   Image,
+  ImageSourcePropType,
   ListRenderItemInfo,
   Modal,
   PanResponder,
   Platform,
   Pressable,
+  ScrollView,
   Share,
   StatusBar,
+  StyleProp,
   StyleSheet,
   Text,
+  TextStyle,
   useWindowDimensions,
   View,
   ViewToken,
 } from 'react-native';
+import {
+  Audio,
+  InterruptionModeAndroid,
+  InterruptionModeIOS,
+  ResizeMode,
+  Video,
+} from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+/* The raw context, not useBottomTabBarHeight(): the hook throws when no tab
+ * navigator is above us (the standalone test shell), the context just returns
+ * undefined. */
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+} from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import type { CuratedMeal, MealSlug } from '../types/curated_meals';
+import { CURATED_MEALS } from '../data/curated_meals';
+import { getMealImage } from '../assets/mealImages';
+import { INGREDIENTS } from '../data/ingredients';
+import { clampCookPortions } from '../utils/cookPortions';
+import { displayIngredient } from '../utils/ingredientScaling';
+import { getVariantChoices, setVariantChoice } from '../utils/variantChoices';
+import { resolveBaseIngredients } from '../utils/resolveMealIngredients';
+import { computePlateMacros } from '../utils/computeMacros';
+import { RecipeFavorites } from '../utils/recipeFavorites';
 
-/* Cook is a tab screen, but every destination it pushes (CookMode, …) lives on
- * the root stack, which the tab navigator is nested in — so type against the
- * root stack's param list. Type-only import, so no runtime import cycle with
- * AppNavigator (which imports this screen). */
+/* Cook is a tab screen, but every destination it pushes (CookMode,
+ * RecipeDetail, …) lives on the root stack, which the tab navigator is nested
+ * in — so type against the root stack's param list. Type-only import, so no
+ * runtime import cycle with AppNavigator (which imports this screen). */
 type CookScreenNav = StackNavigationProp<RootStackParamList>;
 
+/* Structural aliases via indexed access, so this file only depends on the
+ * CuratedMeal name itself — whatever the sub-types are called in
+ * types/curated_meals, this compiles as long as the fields match. */
+type MealPlate = CuratedMeal['plates'][number];
+type MealMethod = NonNullable<CuratedMeal['methods']>[number];
+type MealIngredient = NonNullable<CuratedMeal['base_ingredients']>[number];
+
 /* ────────────────────────────────────────────────────────────────────────────
- * Types and data seams
+ * Tab bar coordination
+ *
+ * CustomTabBar consumes this (see the navigator requirement in the header).
+ * 1 = bar fully visible, 0 = hidden. This screen animates it when the side
+ * panel opens/closes and hard-resets it to 1 on blur.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-export type MealCategory = 'breakfast' | 'mains' | 'snacks' | 'dessert';
+export const cookTabBarOpacity = new Animated.Value(1);
 
-/** TODO(repo): replace with the real meal type from src/data/curated_meals.ts
- *  and delete this local definition. Field names below are a best guess from
- *  the build brief; align them with meals.json when wiring. */
-export interface CuratedMeal {
-  slug: string;
-  name: string;
-  category: MealCategory;
-  serves: number;
-  /** Display name of the default cooking method, e.g. 'Stovetop'. */
-  defaultMethod: string;
-  /** Equipment ids for the default method, e.g. ['stovetop']. */
-  equipmentRequired: string[];
-  /** Smallest image variant that survives full-screen display.
-   *  TODO(repo): reuse whatever variant helper the plate pages ship. */
-  heroStill: string;
-  /** Present once vertical footage exists for this meal. */
-  videoUrl?: string;
-  kcal: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  /** TODO(repo): derive via the shared ingredientCount helper instead. */
-  ingredientCount: number;
-  activeMinutes: number;
-  scaleMin: number;
-  scaleMax: number;
+/* ────────────────────────────────────────────────────────────────────────────
+ * Video catalogue
+ *
+ * The whole video "database" for now: slug → hosted URL. Files live in S3
+ * (ap-southeast-2, public read) and stream over HTTP range requests. Each MP4
+ * is 720p vertical H.264 with the moov atom at the front (-movflags
+ * +faststart), which is what lets playback start before the file finishes
+ * downloading. Nothing is bundled, so adding a video is: encode, upload,
+ * add a line here.
+ *
+ * TODO(repo): once this passes a handful of entries, move it out of the app
+ * entirely — a videos.json in the same bucket, fetched on launch and cached,
+ * so new footage ships without an app release.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const VIDEO_BASE =
+  'https://jsonfit-videos-au.s3.ap-southeast-2.amazonaws.com/videos';
+
+interface MealVideo {
+  video: string;
+  /** Frame-zero still, shown while the video buffers. Optional until the
+   *  poster JPGs are uploaded alongside the MP4s. */
+  poster?: string;
 }
 
-/** TODO(repo): import { CURATED_MEALS } from '../data/curated_meals' and
- *  delete SAMPLE_MEALS. These three exist only so the file runs standalone. */
-const SAMPLE_MEALS: CuratedMeal[] = [
-  {
-    slug: 'garlic-butter-chicken-rice',
-    name: 'Garlic butter chicken and rice',
-    category: 'mains',
-    serves: 2,
-    defaultMethod: 'Stovetop',
-    equipmentRequired: ['stovetop'],
-    heroStill: '',
-    videoUrl: undefined,
-    kcal: 620,
-    protein: 48,
-    carbs: 58,
-    fat: 20,
-    ingredientCount: 9,
-    activeMinutes: 25,
-    scaleMin: 0.5,
-    scaleMax: 2,
-  },
-  {
-    slug: 'one-pan-salmon-traybake',
-    name: 'One-pan salmon traybake',
-    category: 'mains',
-    serves: 2,
-    defaultMethod: 'Oven',
-    equipmentRequired: ['oven'],
-    heroStill: '',
-    kcal: 580,
-    protein: 41,
-    carbs: 32,
-    fat: 30,
-    ingredientCount: 8,
-    activeMinutes: 30,
-    scaleMin: 0.5,
-    scaleMax: 2,
-  },
-  {
-    slug: 'beef-stir-fry',
-    name: 'Beef stir fry',
-    category: 'mains',
-    serves: 2,
-    defaultMethod: 'Stovetop',
-    equipmentRequired: ['stovetop'],
-    heroStill: '',
-    kcal: 540,
-    protein: 42,
-    carbs: 44,
-    fat: 19,
-    ingredientCount: 12,
-    activeMinutes: 18,
-    scaleMin: 0.5,
-    scaleMax: 2,
-  },
-];
+/* Keyed by MealSlug, not string: the table is hand-edited every time footage
+ * lands, and a typo'd key is otherwise invisible — the meal just silently
+ * keeps its tone card and nobody notices until someone goes looking for the
+ * video on device. Partial because coverage is (and will long remain) a small
+ * subset of the catalogue.
+ *
+ * HEADS UP — this annotation does NOT currently catch a typo. MealSlug ends
+ * in `| (string & {})` (types/curated_meals.ts:90, a deliberate escape hatch
+ * for test fixtures and future slugs), which makes the union absorb every
+ * string, so Record<MealSlug, …> accepts any key. Verified: a deliberately
+ * misspelled key compiles clean. The annotation is kept because it documents
+ * intent and starts biting for free the day that union is tightened, but
+ * until then a typo is only catchable by a test asserting every key of this
+ * table exists in CURATED_MEALS. */
+const MEAL_VIDEOS: Partial<Record<MealSlug, MealVideo>> = {
+  butter_chicken: { video: `${VIDEO_BASE}/butter_chicken.mp4` },
+  /* Encoded and ready to upload:
+   * mango_mass:                 { video: `${VIDEO_BASE}/mango_mass.mp4` },
+   * turkey_meatballs_spaghetti: { video: `${VIDEO_BASE}/turkey_meatballs_spaghetti.mp4` }, */
+};
+
+function mealVideo(slug: MealSlug): MealVideo | undefined {
+  return MEAL_VIDEOS[slug];
+}
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Constants
  * ──────────────────────────────────────────────────────────────────────────── */
 
-/** Capability flag. Flip only once a video library ships (needs approval:
- *  a video library is a native dependency → EAS rebuild on both platforms). */
-const VIDEO_ENABLED = false;
+/**
+ * The audio mode this feed needs, declared IN FULL.
+ *
+ * Every key is listed on purpose. expo-av's setAudioModeAsync fills any key
+ * you omit from the last full mode it saw (_populateMissingKeys against
+ * getCurrentAudioMode, src/Audio.ts:9-20), NOT from expo-av's own defaults —
+ * and that cache is one global, last-writer-wins, with three writers in this
+ * app: here, CookTimerContext, and TimerContext's COUNTDOWN_AUDIO_MODE.
+ *
+ * This screen previously passed { playsInSilentModeIOS: true } alone, which
+ * made its behaviour depend on session history: open Cook first after launch
+ * and interruptionModeIOS inherited expo-av's default of MixWithOthers, so an
+ * unmuted recipe video played ON TOP of the user's music at full volume. Do a
+ * workout first and TimerContext had already cached DuckOthers, so the music
+ * ducked instead. Same build, same user, different behaviour.
+ *
+ * These values are deliberately identical to TimerContext's
+ * COUNTDOWN_AUDIO_MODE, so whichever writes last, the result is the same.
+ * Read the long comment above that constant before changing anything here —
+ * it traces the expo-av 16.0.8 internals this depends on, and it names the
+ * shared-module refactor that would delete both copies.
+ *
+ * TODO(repo): that refactor. One exported mode constant consumed by
+ * TimerContext, CookTimerContext and this screen makes the invariant true at
+ * the source instead of defending it in three places. Left undone here
+ * because it reaches into two other features' files.
+ *
+ * staysActiveInBackground: false is asserted rather than inherited. It is what
+ * makes expo-av stop playback natively when the app backgrounds, and nothing
+ * previously stated that dependency.
+ */
+const FEED_AUDIO_MODE = {
+  allowsRecordingIOS: false,
+  staysActiveInBackground: false,
+  interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+  playsInSilentModeIOS: true,
+  shouldDuckAndroid: true,
+  interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+  playThroughEarpieceAndroid: false,
+} as const;
+
+/** Video is live. Kept as a flag so playback can be killed from one place if
+ *  streaming misbehaves in the wild. */
+const VIDEO_ENABLED = true;
+
+/** Meals with footage sort to the front of every filtered list. With a handful
+ *  of videos against 85 meals, burying them behind 30 tone cards would mean
+ *  nobody ever sees one. Remove this once coverage is broad.
+ *  TODO(repo): revisit when the catalogue passes ~20 videos. */
+const VIDEOS_FIRST = true;
 
 const PRELOAD_AHEAD_IOS = 2;
 const PRELOAD_AHEAD_ANDROID = 1;
@@ -165,30 +325,98 @@ const PRELOAD_AHEAD =
  *  identity changes between renders. */
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
 
-/** TODO(repo): these three mirror the picker screen's helpers. Move the
- *  originals into a shared module and import them in both screens. */
+/** TODO(repo): these two mirror the picker screen's helpers. Move the
+ *  originals into a shared module and import them in both screens; the
+ *  composed ingredient count below should reconcile with the picker's
+ *  ingredientCount helper. */
 const INGREDIENT_WARN_AT = 11;
 const QUICK_MAX_ACTIVE_MINUTES = 10;
 const HEAT_EQUIPMENT = ['stovetop', 'oven', 'slow_cooker', 'microwave'];
 
-const PANEL_WIDTH = 248;
+const PANEL_WIDTH = 280;
 const SWIPE_TRIGGER_DX = 48;
 const DOUBLE_TAP_MS = 300;
 
-const CATEGORIES: MealCategory[] = ['breakfast', 'mains', 'snacks', 'dessert'];
-const CATEGORY_LABEL: Record<MealCategory, string> = {
+/** Horizontal inset of the title block so it clears the category pill (left)
+ *  and the saved heart chip (right), which sit on the same top band. */
+const TITLE_SIDE_INSET = 70;
+
+/** Tab bar hide-on-play. When true, the overlaid tab bar fades out once the
+ *  active card's video has played untouched for the grace period, and comes
+ *  straight back when the person pauses (the "chrome on pause" video-player
+ *  convention), lands on a card without footage, opens/closes the panel, or
+ *  leaves the screen. The grace period stops the bar vanishing the instant a
+ *  card arrives, which read as jumpy. Shipped as a flag because the major
+ *  feeds (TikTok/Reels/Shorts) deliberately keep their bars up for
+ *  wayfinding — flip to false to fall back to always-visible. */
+const TAB_BAR_HIDE_ON_PLAY = true;
+const TAB_BAR_HIDE_DELAY_MS = 1800;
+
+export type CookCategory =
+  | 'breakfast'
+  | 'mains'
+  | 'smoothies'
+  | 'snacks'
+  | 'dessert';
+
+const CATEGORIES: CookCategory[] = [
+  'breakfast',
+  'mains',
+  'smoothies',
+  'snacks',
+  'dessert',
+];
+const CATEGORY_LABEL: Record<CookCategory, string> = {
   breakfast: 'Breakfast',
   mains: 'Mains',
+  smoothies: 'Smoothies',
   snacks: 'Snacks',
   dessert: 'Dessert',
 };
+const CATEGORY_ICON: Record<CookCategory, keyof typeof Ionicons.glyphMap> = {
+  breakfast: 'sunny-outline',
+  mains: 'restaurant-outline',
+  smoothies: 'cafe-outline',
+  snacks: 'nutrition-outline',
+  dessert: 'ice-cream-outline',
+};
 
-type IntentFilter = 'fits' | 'quick' | 'nocook' | 'few';
+/** Categories derive from `cuisine`, EXACTLY mirroring NutritionHomeScreen's
+ *  shelves: the four leaf cuisines map 1:1 onto chips, and Mains is
+ *  everything else — the savoury dishes spread across australian, indian,
+ *  mexican, italian, thai, and any cuisine added later. One shared rule
+ *  means the Cook filter and the Nutrition shelves can never disagree about
+ *  where a meal lives, and each meal belongs to exactly one category.
+ *  TODO(repo): NutritionHomeScreen hardcodes the same LEAF set — extract
+ *  this to a shared util (e.g. src/utils/mealCategories) and import it in
+ *  both screens so a fifth leaf cuisine can't drift them apart. */
+const LEAF_CUISINES = new Set(['breakfast', 'snack', 'dessert', 'smoothie']);
+const CATEGORY_CUISINE: Record<Exclude<CookCategory, 'mains'>, string> = {
+  breakfast: 'breakfast',
+  smoothies: 'smoothie',
+  snacks: 'snack',
+  dessert: 'dessert',
+};
+
+function matchesCategory(meal: CuratedMeal, category: CookCategory): boolean {
+  if (category === 'mains') return !LEAF_CUISINES.has(meal.cuisine);
+  return meal.cuisine === CATEGORY_CUISINE[category];
+}
+
+type IntentFilter = 'fits' | 'quick' | 'nocook' | 'few' | 'saved';
 const INTENT_LABEL: Record<IntentFilter, string> = {
   fits: 'Fits your day',
   quick: 'Under 10 min',
   nocook: 'No cook',
   few: '5 ingredients or fewer',
+  saved: 'Saved',
+};
+const INTENT_ICON: Record<IntentFilter, keyof typeof Ionicons.glyphMap> = {
+  fits: 'today-outline',
+  quick: 'timer-outline',
+  nocook: 'snow-outline',
+  few: 'list-outline',
+  saved: 'heart-outline',
 };
 
 /** TODO(repo): swap for the app's theme tokens. */
@@ -198,7 +426,12 @@ const C = {
   sub: '#C9C7C2',
   faint: '#8A8880',
   overlay: 'rgba(20,20,20,0.5)',
-  panel: 'rgba(18,18,17,0.94)',
+  /* Solid near-black, not translucent grey: the food photography is shot on
+   * black, so the panel surface has to sit in the same register or every
+   * image edge shows. */
+  panel: '#111110',
+  panelEdge: '#26261F',
+  heroBacking: '#0C0C0B',
   hairline: '#33332F',
   outline: '#3A3A38',
   cta: '#E8E6E1',
@@ -206,8 +439,201 @@ const C = {
   saved: '#F0997B',
   savedOutline: '#5A4038',
   amber: '#FAD9A0',
-  amberBg: 'rgba(120,74,10,0.75)',
+  selectedBg: 'rgba(232,230,225,0.06)',
 };
+
+/** Macro bar colours — protein green, carbs amber, fat coral. Distinct on
+ *  the dark theme and readable at 8pt bar height.
+ *  TODO(repo): swap for the app's canonical macro colours if the nutrition
+ *  screens define them. */
+const MACRO_COLORS = {
+  protein: '#6FCF97',
+  carbs: '#F2C94C',
+  fat: '#EB7A5A',
+};
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Data helpers — defaults and composition
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Meal-planning ADJUSTERS, not browsable meals. These four exist in the
+ *  catalogue as near-pure macro dials the plan generator bolts onto a day to
+ *  close a carb/fibre gap (see the ADJUSTERS table in utils/mealPlanPromptV2)
+ *  — a serving of rice, a potato, a handful of berries, some steamed veg.
+ *  They are legitimate rows for a meal plan, a shopping list, and the
+ *  Foods-you-like picker, so they stay in CURATED_MEALS and stay on the
+ *  Nutrition shelves. But this feed gives every entry a full-screen
+ *  "Cook this" card, and a full-screen card for Berries is not a recipe.
+ *  Scoped to this screen ON PURPOSE: no is_adjuster flag in the data, and no
+ *  change to curatedShelves / NutritionHomeScreen, both of which want them.
+ *  The MealSlug annotation is documentation only — see the note on
+ *  MEAL_VIDEOS above for why it cannot fail the build. A renamed slug here
+ *  silently un-hides a card, so this list needs test cover. */
+const ADJUSTER_SLUGS: ReadonlySet<MealSlug> = new Set<MealSlug>([
+  'steamed_rice',
+  'steamed_mixed_veg',
+  'baked_potato',
+  'berries',
+]);
+
+const MEALS: CuratedMeal[] = Object.values(CURATED_MEALS).filter(
+  (m) => !ADJUSTER_SLUGS.has(m.slug),
+);
+
+/** Default plate: the 'standard' plate when present, else the first. Index is
+ *  what CookMode's plateIndex expects. */
+function defaultPlateIndex(meal: CuratedMeal): number {
+  const i = meal.plates.findIndex((p) => p.id === 'standard');
+  return i >= 0 ? i : 0;
+}
+
+/** Default sauce variant: is_default when flagged, else the first. The panel
+ *  starts here; the easy/from-scratch toggle moves off it. */
+function defaultVariant(meal: CuratedMeal) {
+  const variants = meal.sauce_variants;
+  if (!variants || variants.length === 0) return undefined;
+  return variants.find((v) => v.is_default) ?? variants[0];
+}
+
+function defaultVariantIndex(meal: CuratedMeal): number {
+  const variants = meal.sauce_variants;
+  if (!variants || variants.length === 0) return 0;
+  const i = variants.findIndex((v) => v.is_default);
+  return i >= 0 ? i : 0;
+}
+
+function defaultMethod(meal: CuratedMeal): MealMethod | undefined {
+  return meal.methods?.[0];
+}
+
+/** Active minutes advertised on the default experience: the default method's
+ *  active time, else the default plate's assembly time (no-method meals like
+ *  smoothies), else 0. */
+function activeMinutes(meal: CuratedMeal): number {
+  const method = defaultMethod(meal);
+  if (method) return method.time_active_minutes;
+  const plate = meal.plates[defaultPlateIndex(meal)];
+  return plate.assembly_time_minutes ?? 0;
+}
+
+/** No-cook: no method at all, or the default method needs no heat appliance.
+ *
+ *  equipment_required is OPTIONAL on CookingMethod and is genuinely absent on
+ *  17 catalogue meals — dereferencing it unguarded threw
+ *  "Cannot read properties of undefined (reading 'some')" during render for
+ *  every category containing one (All / Snacks / Dessert), because
+ *  intentCounts below runs this over the whole category on every render, not
+ *  just when the No-cook chip is selected. strictNullChecks is off in this
+ *  project, so the compiler never flagged it.
+ *
+ *  A method that declares no equipment declares no heat, so absent is treated
+ *  as the empty list — same answer the field would give if authored as [].
+ *
+ *  Exported ONLY so utils/__tests__/cookFeedGuards.test.ts can run the real
+ *  predicate over the whole catalogue as a regression guard for that crash.
+ *  Nothing in the app imports it; the screen's other helpers stay private. */
+export function isNoCook(meal: CuratedMeal): boolean {
+  const method = defaultMethod(meal);
+  if (!method) return true;
+  const equipment = method.equipment_required ?? [];
+  return !equipment.some((e) => HEAT_EQUIPMENT.includes(e));
+}
+
+/** One row of the composed list. producesServings is what displayIngredient
+ *  must divide by: the meal's batch size for base and variant rows, but 1 for
+ *  plate rows, which are stored per-serving already (per the wiring report —
+ *  the old code divided burger buns by the batch size). */
+interface IngredientRow {
+  ingredient: MealIngredient;
+  producesServings: number;
+}
+
+/** The composed ingredient list for a plate: the app's own resolver for the
+ *  base recipe (legacy meals carry ingredients on the method; template meals
+ *  surface base + the selected sauce variant) + the plate's additions. Base
+ *  rows are batch-sized; plate rows are stored per-serving — exactly what
+ *  RecipeDetail's IngredientRow contract expects. */
+function composedIngredients(
+  meal: CuratedMeal,
+  plate: MealPlate,
+  methodId: string,
+  variantId?: string,
+): IngredientRow[] {
+  const batch = meal.produces_servings;
+  return [
+    ...resolveBaseIngredients(meal, { methodId, variantId }).map(
+      (ingredient) => ({ ingredient, producesServings: batch }),
+    ),
+    ...(plate.additional_ingredients ?? []).map((ingredient) => ({
+      ingredient,
+      producesServings: 1,
+    })),
+  ];
+}
+
+function composedIngredientCount(meal: CuratedMeal): number {
+  return composedIngredients(
+    meal,
+    meal.plates[defaultPlateIndex(meal)],
+    defaultMethod(meal)?.id ?? '',
+    defaultVariant(meal)?.id,
+  ).length;
+}
+
+/** Real name from the ingredients table, with a prettified id as the miss
+ *  fallback (RecipeDetail falls back to the raw id; prettified is kinder). */
+function ingredientDisplayName(ingredientId: string): string {
+  const known = INGREDIENTS[ingredientId as keyof typeof INGREDIENTS];
+  if (known?.display_name) return known.display_name;
+  const words = ingredientId.split('_').join(' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/* ── INTEGRATION STATUS ─────────────────────────────────────────────────────
+ * Wired to the real app utilities per the repo report:
+ *   getMealImage (src/assets/mealImages, keyed by image_filename, returns
+ *   require refs), INGREDIENTS, displayIngredient (object args; plate rows
+ *   pass producesServings 1), clampCookPortions (1–20), and the async
+ *   getVariantChoices/setVariantChoice persistence.
+ * Still local on purpose: methodIcon (RecipeDetail's getMethodIcon is
+ * module-private — TODO(repo): extract it to a shared util and delete this),
+ * plus the analytics, GoalsProfile, and saved-meals hydration seams below.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** Plate-first image resolution, matching RecipeDetail: the registry returns
+ *  a require() module ref, so it goes straight into <Image source>. */
+function resolveMealImage(filename?: string): ImageSourcePropType | null {
+  return (getMealImage(filename) as ImageSourcePropType | undefined) ?? null;
+}
+
+/** Mirrors RecipeDetail's module-private getMethodIcon (substring chain) so
+ *  both screens show identical iconography.
+ *  TODO(repo): extract that function to a shared util and delete this copy. */
+function methodIcon(methodId: string): keyof typeof Ionicons.glyphMap {
+  const id = methodId.toLowerCase();
+  if (id.includes('slow_cooker')) return 'time-outline';
+  if (id.includes('pressure_cooker') || id.includes('instant_pot')) {
+    return 'flash-outline';
+  }
+  if (id.includes('oven')) return 'bonfire-outline';
+  if (id.includes('jar') || id.includes('shortcut')) return 'flask-outline';
+  if (id.includes('blender') || id.includes('smoothie')) return 'cafe-outline';
+  if (id.includes('stovetop') || id.includes('pan') || id.includes('fry')) {
+    return 'flame-outline';
+  }
+  return 'restaurant-outline';
+}
+
+/** Amount string via the app's own scaler, so rounding and unit rules match
+ *  RecipeDetail exactly (including its handling of fixed-scaling rows). */
+function portionAmount(row: IngredientRow, portions: number): string {
+  return displayIngredient({
+    baseAmount: row.ingredient.base_amount,
+    unit: row.ingredient.unit,
+    producesServings: row.producesServings,
+    portions,
+  });
+}
 
 /* ────────────────────────────────────────────────────────────────────────────
  * App service seams
@@ -228,29 +654,29 @@ function useRemainingToday(): { kcal: number; protein: number } | null {
   return null;
 }
 
-/** A meal "fits your day" when some legal scale factor lands it inside the
- *  remaining calories AND protein. Feasibility: the largest factor that fits
- *  both budgets must still be at or above the meal's scaleMin.
+/** Slack on the min_scale comparison below. maxFactor is a quotient, so a
+ *  budget of exactly (plate × min_scale) does not reliably reproduce
+ *  min_scale: pulled_pork (772 kcal, 47.9g protein, min_scale 0.7) comes back
+ *  as 0.6999999999999998 and failed its own boundary. A scale-factor
+ *  difference of 1e-9 is far below anything the portions stepper or the macro
+ *  rounding can express, so this only ever absorbs float error. */
+const SCALE_EPSILON = 1e-9;
+
+/** A meal "fits your day" when some legal scale factor lands its DEFAULT
+ *  plate inside the remaining calories AND protein: the largest factor that
+ *  fits both budgets must still be at or above min_scale.
  *  TODO(repo): confirm this predicate against GoalsProfile semantics. */
 function fitsRemaining(
   meal: CuratedMeal,
   remaining: { kcal: number; protein: number },
 ): boolean {
+  const macros = meal.plates[defaultPlateIndex(meal)].plate_macros;
   const maxFactor = Math.min(
-    remaining.kcal / meal.kcal,
-    remaining.protein / meal.protein,
+    remaining.kcal / macros.kcal,
+    remaining.protein / macros.protein_g,
   );
-  return maxFactor >= meal.scaleMin;
+  return maxFactor >= meal.min_scale - SCALE_EPSILON;
 }
-
-/** TODO(repo): reuse the picker screen's No-cook helper once shared. */
-function isNoCook(meal: CuratedMeal): boolean {
-  return !meal.equipmentRequired.some((e) => HEAT_EQUIPMENT.includes(e));
-}
-
-/** Global mute for video cards. Per-card mute is deliberately not a thing.
- *  TODO(repo): persist across sessions via the app's storage util. */
-const mutedGlobal = { value: true };
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Row model
@@ -267,39 +693,201 @@ type Row =
 export default function CookScreen(): React.JSX.Element {
   const { height: cardHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  /* Height of the translucent tab bar overlaid on this route (it already
+   * includes the bottom safe area). undefined outside a tab navigator, so
+   * fall back to clearing the raw inset. Cards stay full-window height —
+   * the bar floats over the footage, content just anchors above it. */
+  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
+  const bottomClearance = Math.max(tabBarHeight, insets.bottom);
   const navigation = useNavigation<CookScreenNav>();
 
   const remaining = useRemainingToday();
 
-  const [category, setCategory] = useState<MealCategory | null>('mains');
+  const [category, setCategory] = useState<CookCategory | null>('mains');
   const [intent, setIntent] = useState<IntentFilter | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  /* Saved meals. TODAY: only this session's double-tap likes land here, so
+   * the heart indicator and the Saved filter under-report on a fresh launch.
+   * Nutrition-side picture (per NutritionHomeScreen): favourite MEALS are the
+   * RecipeFavorites per-plate store, surfaced via the Saved pill →
+   * SavedNutrition screen (saved meal PLANS are a separate WorkoutStorage
+   * concept — not this). So the write path here is already correct; what's
+   * missing is read: TODO(repo): hydrate on focus from RecipeFavorites once
+   * its list-all API is known (a meal counts as saved when ANY of its plates
+   * is favourited — SavedNutrition's definition). isPlateFavorite-only would
+   * mean ~200 per-plate reads on mount, so wire the list call instead. */
   const [savedSlugs, setSavedSlugs] = useState<ReadonlySet<string>>(new Set());
-  const [hintDismissed, setHintDismissed] = useState(false);
+  /* Which card is on screen. Only that card's video plays; everything else is
+   * paused, so scrolling never leaves audio or decoders running behind you. */
+  const [activeIndex, setActiveIndex] = useState(0);
+  /* Feed-wide mute, deliberately NOT per card: muting is a statement about the
+   * room you are in, not about one recipe, so it has to survive scrolling. On
+   * iOS the hardware silent switch is bypassed by design (playsInSilentModeIOS
+   * — sound is the point of a recipe feed), which makes this the only in-app
+   * way to shut the feed up. Session-only; nothing persists it. */
+  const [muted, setMuted] = useState(false);
+  /* Reads `muted` directly rather than using the updater form: an updater must
+   * stay pure, and this call site has a tracking event attached. */
+  const toggleMute = useCallback(() => {
+    track('cook_action', { action: muted ? 'unmute' : 'mute' });
+    setMuted(!muted);
+  }, [muted]);
+  /* True while any card's panel is open. Locks the pager: no paging under an
+   * open panel, and the panel's own ScrollView gets vertical gestures
+   * uncontested (the on-device unscrollable-ingredients bug). */
+  const [panelLocked, setPanelLocked] = useState(false);
+  /* Whether the ACTIVE card is currently playing footage. Cards report up;
+   * a deactivating card reports false via its effect cleanup. */
+  const [activePlaying, setActivePlaying] = useState(false);
+  const handlePlayingChange = useCallback((playing: boolean) => {
+    setActivePlaying(playing);
+  }, []);
+
+  /* The ONE writer for the tab bar's opacity: hidden while a panel is open,
+   * and (behind TAB_BAR_HIDE_ON_PLAY) once the active card's video has been
+   * playing for the grace period. Pausing, closing the panel, or landing on
+   * a card without footage brings it straight back. */
+  const [barHidden, setBarHidden] = useState(false);
+  useEffect(() => {
+    if (panelLocked) {
+      setBarHidden(true);
+      return undefined;
+    }
+    if (TAB_BAR_HIDE_ON_PLAY && activePlaying) {
+      const t = setTimeout(() => setBarHidden(true), TAB_BAR_HIDE_DELAY_MS);
+      return () => clearTimeout(t);
+    }
+    setBarHidden(false);
+    return undefined;
+  }, [panelLocked, activePlaying]);
+  useEffect(() => {
+    Animated.timing(cookTabBarOpacity, {
+      toValue: barHidden ? 0 : 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [barHidden]);
+  /* Persisted jar/scratch choices (slug → variantId), loaded once. Cards
+   * initialise from this and write through setVariantChoice on selection,
+   * matching RecipeDetail's persistence. */
+  const [variantChoices, setVariantChoicesState] = useState<Record<
+    string,
+    string
+  > | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getVariantChoices()
+      .then((c) => {
+        if (alive) setVariantChoicesState(c);
+      })
+      .catch(() => {
+        if (alive) setVariantChoicesState({});
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /* Playback gate. Scroll position alone is not enough: a card that is still
+   * the active index keeps its video (and its AUDIO) running when you switch
+   * tabs or background the app. Focus and app state are the other two halves —
+   * 'inactive' (iOS app switcher, incoming call) counts as backgrounded, since
+   * audible playback under the switcher is the same bug. */
+  const isFocused = useIsFocused();
+  const [appActive, setAppActive] = useState(
+    () => AppState.currentState === 'active',
+  );
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      setAppActive(next === 'active');
+    });
+    return () => sub.remove();
+  }, []);
+  /* ...and neither is foreground alone. An open side panel or filter sheet
+   * covers the feed with something the person is reading, and a raw RN Modal
+   * is not a navigation event — useIsFocused stays true underneath it — so
+   * both have to be folded in here rather than gated separately. One gate, so
+   * there is exactly one answer to "should this card be playing". */
+  const screenActive = isFocused && appActive && !panelLocked && !sheetOpen;
+
+  /* Sound is ON by default (Shorts/Reels convention). Without this audio
+   * mode, iOS devices with the ringer switch on silent play video with no
+   * sound at all, which reads as broken rather than muted.
+   *
+   * Applied on focus, not once on mount: the mode store is global and
+   * last-writer-wins, and TimerContext rewrites it before every countdown
+   * beep. A mount-only call would be silently overwritten by the first rest
+   * timer of the session and never restored. Re-applying on focus makes
+   * Cook's behaviour independent of what else ran first. */
+  useEffect(() => {
+    if (!isFocused) return;
+    /* Spread, never the constant itself — expo-av's _populateMissingKeys
+     * MUTATES the object it is handed, so passing FEED_AUDIO_MODE directly
+     * would let it write into shared module state. */
+    Audio.setAudioModeAsync({ ...FEED_AUDIO_MODE }).catch((e) => {
+      /* Not swallowed: if this rejects, video plays with NO sound at all on a
+       * silent-switched iPhone, and the screen looks broken with no clue why. */
+      if (__DEV__) console.warn('[cook] setAudioModeAsync failed', e);
+      track('cook_audio_mode_error');
+    });
+  }, [isFocused]);
 
   const listRef = useRef<FlatList<Row>>(null);
   const lastIndexRef = useRef(0);
   const dwellRef = useRef<{ slug: string; since: number } | null>(null);
 
-  const meals = SAMPLE_MEALS; // TODO(repo): CURATED_MEALS
+  /* Per-category meal counts for the filter sheet tiles. Static data, so
+   * computed once. */
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: MEALS.length };
+    for (const c of CATEGORIES) {
+      counts[c] = MEALS.filter((m) => matchesCategory(m, c)).length;
+    }
+    return counts as Record<'all' | CookCategory, number>;
+  }, []);
+
+  /* Per-intent counts for the Show me chips, scoped to the SELECTED category
+   * so the numbers answer the actual question ("how many quick mains?"),
+   * updating live as the category changes. */
+  const intentCounts = useMemo<Record<IntentFilter, number>>(() => {
+    const base = MEALS.filter((m) => !category || matchesCategory(m, category));
+    return {
+      fits: remaining
+        ? base.filter((m) => fitsRemaining(m, remaining)).length
+        : 0,
+      quick: base.filter((m) => activeMinutes(m) <= QUICK_MAX_ACTIVE_MINUTES)
+        .length,
+      nocook: base.filter(isNoCook).length,
+      few: base.filter((m) => composedIngredientCount(m) <= 5).length,
+      saved: base.filter((m) => savedSlugs.has(m.slug)).length,
+    };
+  }, [category, remaining, savedSlugs]);
 
   const filtered = useMemo(() => {
-    return meals.filter((m) => {
-      if (category && m.category !== category) return false;
+    const list = MEALS.filter((m) => {
+      if (category && !matchesCategory(m, category)) return false;
       switch (intent) {
         case 'fits':
           return remaining ? fitsRemaining(m, remaining) : true;
         case 'quick':
-          return m.activeMinutes <= QUICK_MAX_ACTIVE_MINUTES;
+          return activeMinutes(m) <= QUICK_MAX_ACTIVE_MINUTES;
         case 'nocook':
           return isNoCook(m);
         case 'few':
-          return m.ingredientCount <= 5;
+          return composedIngredientCount(m) <= 5;
+        case 'saved':
+          return savedSlugs.has(m.slug);
         default:
           return true;
       }
     });
-  }, [meals, category, intent, remaining]);
+    if (!VIDEOS_FIRST) return list;
+    /* Stable partition, not a sort: everything with footage keeps its relative
+     * order at the front, everything else keeps its order behind. */
+    const withVideo = list.filter((m) => mealVideo(m.slug));
+    if (withVideo.length === 0) return list;
+    return [...withVideo, ...list.filter((m) => !mealVideo(m.slug))];
+  }, [category, intent, remaining, savedSlugs]);
 
   const rows = useMemo<Row[]>(() => {
     const mealRows: Row[] = filtered.map((meal) => ({ kind: 'meal', meal }));
@@ -315,16 +903,8 @@ export default function CookScreen(): React.JSX.Element {
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
     lastIndexRef.current = 0;
+    setActiveIndex(0);
   }, [category, intent]);
-
-  /* Screen view + dwell flush on blur. */
-  useFocusEffect(
-    useCallback(() => {
-      track('cook_screen_view', { category, intent });
-      return () => flushDwell();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []),
-  );
 
   const flushDwell = useCallback(() => {
     const d = dwellRef.current;
@@ -337,16 +917,53 @@ export default function CookScreen(): React.JSX.Element {
     }
   }, []);
 
+  /* Screen view + dwell flush on blur. category/intent live in refs so the
+   * event reports the CURRENT filters without this effect re-running (and
+   * re-firing the view event) every time a chip changes. */
+  const categoryRef = useRef(category);
+  categoryRef.current = category;
+  const intentRef = useRef(intent);
+  intentRef.current = intent;
+
+  useFocusEffect(
+    useCallback(() => {
+      track('cook_screen_view', {
+        category: categoryRef.current,
+        intent: intentRef.current,
+      });
+      return () => {
+        flushDwell();
+        /* Never strand the tab bar hidden on other tabs if the user leaves
+         * Cook while a panel is open. */
+        cookTabBarOpacity.setValue(1);
+      };
+    }, [flushDwell]),
+  );
+
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const visible = viewableItems.find(
         (v) => v.isViewable && (v.item as Row).kind === 'meal',
       );
-      if (!visible) return;
+      if (!visible) {
+        /* Only the end card is on screen: deactivate everything so the last
+         * video (and its audio) stops instead of playing on underneath the
+         * end card — and the tab bar comes back. Guard against transient
+         * empty callbacks. */
+        if (viewableItems.some((v) => v.isViewable)) {
+          flushDwellRef.current();
+          setActiveIndex(-1);
+        }
+        return;
+      }
       const row = visible.item as Extract<Row, { kind: 'meal' }>;
       const index = visible.index ?? 0;
 
-      flushDwell();
+      /* setState from useState is stable, so capturing it in this once-created
+       * ref callback is safe. */
+      setActiveIndex(index);
+
+      flushDwellRef.current();
       dwellRef.current = { slug: row.meal.slug, since: Date.now() };
       track('cook_card_impression', { slug: row.meal.slug, index });
 
@@ -355,60 +972,77 @@ export default function CookScreen(): React.JSX.Element {
       lastIndexRef.current = index;
       for (let i = 1; i <= PRELOAD_AHEAD; i += 1) {
         const next = rowsRef.current[index + direction * i];
-        if (next && next.kind === 'meal' && next.meal.heroStill) {
-          Image.prefetch(next.meal.heroStill).catch(() => undefined);
+        if (next && next.kind === 'meal') {
+          const poster = mealVideo(next.meal.slug)?.poster;
+          if (poster) Image.prefetch(poster).catch(() => undefined);
         }
       }
     },
   ).current;
 
-  /* onViewableItemsChanged must stay referentially stable; read rows via ref. */
+  /* onViewableItemsChanged must stay referentially stable; read through refs. */
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  const flushDwellRef = useRef(flushDwell);
+  flushDwellRef.current = flushDwell;
 
-  const enterCookMode = useCallback(
-    (meal: CuratedMeal) => {
-      track('cook_action', { action: 'cook', slug: meal.slug });
+  /* View full recipe is the screen's conversion action — the funnel runs
+   * Cook feed → RecipeDetail → its own start-cooking flow. Dwell flushes here
+   * because this is where the person leaves the feed. Portions carry through
+   * as servings so RecipeDetail opens at the amount configured here; the
+   * jar/scratch choice carries via the shared variantChoices persistence. */
+  const openRecipe = useCallback(
+    (meal: CuratedMeal, plate: MealPlate, portions: number) => {
+      track('cook_action', {
+        action: 'view_recipe',
+        slug: meal.slug,
+        plateId: plate.id,
+        portions,
+      });
       flushDwell();
-      /* The feed has no plate/method picker, so enter on the defaults — index 0
-       * for both, the same pair RecipeDetail starts on. scaleFactor is omitted
-       * rather than passed as 1: CookMode already defaults it to 1. */
-      navigation.navigate('CookMode', {
+      navigation.navigate('RecipeDetail', {
         mealSlug: meal.slug,
-        plateIndex: 0,
-        methodIndex: 0,
+        plateId: plate.id,
+        servings: portions,
       });
     },
     [navigation, flushDwell],
   );
 
-  const toggleSave = useCallback((meal: CuratedMeal) => {
+  /* Double-tap like/unlike — a TRUE TOGGLE now that double tap is also the
+   * unsave affordance. Writes through to the same per-plate favourites
+   * RecipeDetail's heart uses.
+   * NOTE: favourites are per plate while the feed's saved state is per meal;
+   * unliking toggles the CURRENTLY SELECTED plate, which can differ from the
+   * plate originally liked. TODO(repo): resolve alongside the Nutrition
+   * saved-meals linkage. */
+  const toggleSave = useCallback((meal: CuratedMeal, plateId: string) => {
     setSavedSlugs((prev) => {
       const next = new Set(prev);
-      const saving = !next.has(meal.slug);
-      if (saving) next.add(meal.slug);
-      else next.delete(meal.slug);
-      track('cook_action', {
-        action: saving ? 'save' : 'unsave',
-        slug: meal.slug,
-      });
-      /* TODO(repo): write through to the per-screen Saved destination. */
+      if (next.has(meal.slug)) next.delete(meal.slug);
+      else next.add(meal.slug);
       return next;
     });
-    setHintDismissed(true);
+    track('cook_action', { action: 'toggle_save', slug: meal.slug, plateId });
+    RecipeFavorites.togglePlateFavorite(meal.slug, plateId).catch(
+      () => undefined,
+    );
   }, []);
 
-  const addToPlan = useCallback((meal: CuratedMeal) => {
-    track('cook_action', { action: 'add_to_plan', slug: meal.slug });
-    /* TODO(repo): call the plan mutation the picker screen uses. */
+  /* Same share payload as RecipeDetail: the static per-plate page with a real
+   * og: card, URL in the iOS url field, appended for Android. */
+  const shareMeal = useCallback((meal: CuratedMeal, plate: MealPlate) => {
+    track('cook_action', { action: 'share', slug: meal.slug, plateId: plate.id });
+    const url = `https://json.fit/r/${meal.slug}/${plate.id}/`;
+    const caption = `${plate.display_name} — ${Math.round(plate.plate_macros.kcal)} cal, ${Math.round(plate.plate_macros.protein_g)}g protein`;
+    Share.share(
+      Platform.OS === 'ios'
+        ? { message: caption, url }
+        : { message: `${caption}\n\n${url}` },
+    ).catch(() => undefined);
   }, []);
 
-  const shareMeal = useCallback((meal: CuratedMeal) => {
-    track('cook_action', { action: 'share', slug: meal.slug });
-    Share.share({ message: `${meal.name} — JSON.fit` }).catch(() => undefined);
-  }, []);
-
-  const selectCategory = useCallback((next: MealCategory | null) => {
+  const selectCategory = useCallback((next: CookCategory | null) => {
     setCategory(next);
     track('cook_chip_select', { row: 'category', chip: next ?? 'all' });
   }, []);
@@ -420,7 +1054,8 @@ export default function CookScreen(): React.JSX.Element {
 
   const goToAdjacentCategory = useCallback(() => {
     const current = category ?? 'breakfast';
-    const next = CATEGORIES[(CATEGORIES.indexOf(current) + 1) % CATEGORIES.length];
+    const next =
+      CATEGORIES[(CATEGORIES.indexOf(current) + 1) % CATEGORIES.length];
     selectCategory(next);
   }, [category, selectCategory]);
 
@@ -458,13 +1093,18 @@ export default function CookScreen(): React.JSX.Element {
           meal={item.meal}
           index={index}
           height={cardHeight}
-          bottomInset={insets.bottom}
+          bottomClearance={bottomClearance}
           topInset={insets.top}
+          isActive={index === activeIndex && screenActive}
+          isCardVisible={index === activeIndex}
+          muted={muted}
+          onToggleMute={toggleMute}
           saved={savedSlugs.has(item.meal.slug)}
-          showHint={index === 0 && !hintDismissed}
-          onCook={enterCookMode}
+          preferredVariantId={variantChoices?.[item.meal.slug]}
+          onPlayingChange={handlePlayingChange}
+          onPanelToggle={setPanelLocked}
+          onOpenRecipe={openRecipe}
           onToggleSave={toggleSave}
-          onAddToPlan={addToPlan}
           onShare={shareMeal}
           onPrev={() => scrollToIndex(Math.max(0, index - 1))}
           onNext={() => scrollToIndex(index + 1)}
@@ -473,14 +1113,18 @@ export default function CookScreen(): React.JSX.Element {
     },
     [
       cardHeight,
-      insets.bottom,
+      bottomClearance,
       insets.top,
+      activeIndex,
+      screenActive,
+      muted,
+      toggleMute,
       savedSlugs,
-      hintDismissed,
+      variantChoices,
       category,
-      enterCookMode,
+      handlePlayingChange,
+      openRecipe,
       toggleSave,
-      addToPlan,
       shareMeal,
       goToAdjacentCategory,
       selectCategory,
@@ -510,6 +1154,7 @@ export default function CookScreen(): React.JSX.Element {
           index,
         })}
         pagingEnabled
+        scrollEnabled={!panelLocked}
         snapToInterval={cardHeight}
         decelerationRate="fast"
         disableIntervalMomentum
@@ -521,10 +1166,10 @@ export default function CookScreen(): React.JSX.Element {
         viewabilityConfig={VIEWABILITY_CONFIG}
       />
 
-      {/* Category pill — the only persistent chrome on the video. */}
+      {/* Category pill — persistent chrome, top left. */}
       <Pressable
         onPress={() => setSheetOpen(true)}
-        style={[styles.categoryPill, { top: insets.top + 10 }]}
+        style={[styles.categoryPill, { top: insets.top + 8 }]}
         accessibilityRole="button"
         accessibilityLabel={`Filters. Showing ${
           category ? CATEGORY_LABEL[category] : 'all meals'
@@ -542,9 +1187,13 @@ export default function CookScreen(): React.JSX.Element {
         onClose={() => setSheetOpen(false)}
         category={category}
         intent={intent}
+        counts={categoryCounts}
+        intentCounts={intentCounts}
         showFits={remaining !== null}
         onSelectCategory={selectCategory}
         onSelectIntent={selectIntent}
+        /* Deliberately insets.bottom, not bottomClearance: Modal renders above
+         * the tab bar, so the sheet only needs to clear the home indicator. */
         bottomInset={insets.bottom}
       />
     </View>
@@ -560,49 +1209,311 @@ interface MealCardProps {
   index: number;
   height: number;
   topInset: number;
-  bottomInset: number;
+  /** How much every bottom-anchored element must clear: the overlaid tab bar
+   *  height when inside the tab navigator, else the bottom safe area inset. */
+  bottomClearance: number;
+  /** This card should be playing: it fills the viewport AND the screen is
+   *  focused AND the app is foregrounded. Everything else stays paused. */
+  isActive: boolean;
+  /** Scroll position ONLY — this card fills the viewport, regardless of focus
+   *  or app state. Distinct from isActive so that leaving the tab doesn't get
+   *  mistaken for scrolling away and silently clear a manual pause. */
+  isCardVisible: boolean;
+  /** Feed-wide mute. Owned by the screen, not the card, so it survives
+   *  scrolling between cards. */
+  muted: boolean;
+  onToggleMute: () => void;
   saved: boolean;
-  showHint: boolean;
-  onCook: (meal: CuratedMeal) => void;
-  onToggleSave: (meal: CuratedMeal) => void;
-  onAddToPlan: (meal: CuratedMeal) => void;
-  onShare: (meal: CuratedMeal) => void;
+  /** Persisted variant choice for this meal (slug → variantId), if any. */
+  preferredVariantId?: string;
+  /** Reports whether this card is actively playing footage (only called
+   *  while active; deactivation reports false via effect cleanup). */
+  onPlayingChange: (playing: boolean) => void;
+  onPanelToggle: (open: boolean) => void;
+  onOpenRecipe: (meal: CuratedMeal, plate: MealPlate, portions: number) => void;
+  onToggleSave: (meal: CuratedMeal, plateId: string) => void;
+  onShare: (meal: CuratedMeal, plate: MealPlate) => void;
   onPrev: () => void;
   onNext: () => void;
 }
+
+/** Six particle dots for the like burst, precomputed unit vectors. */
+const PARTICLE_ANGLES = [0, 60, 120, 180, 240, 300].map((deg) => {
+  const rad = ((deg - 90) * Math.PI) / 180;
+  return { x: Math.cos(rad), y: Math.sin(rad) };
+});
 
 function MealCard(props: MealCardProps): React.JSX.Element {
   const {
     meal,
     height,
     topInset,
-    bottomInset,
+    bottomClearance,
+    isActive,
+    isCardVisible,
+    muted,
+    onToggleMute,
     saved,
-    showHint,
-    onCook,
+    preferredVariantId,
+    onPlayingChange,
+    onPanelToggle,
+    onOpenRecipe,
     onToggleSave,
-    onAddToPlan,
     onShare,
     onPrev,
     onNext,
   } = props;
 
+  /* The card's chooser state. Defaults advertise the standard experience;
+   * the panel edits them. */
+  const [plateIndex, setPlateIndex] = useState(() => defaultPlateIndex(meal));
+  const [methodIndex, setMethodIndex] = useState(0);
+  const [variantIndex, setVariantIndex] = useState(() =>
+    defaultVariantIndex(meal),
+  );
+  const [portions, setPortions] = useState(1);
+  /* Manual pause via single tap. Orthogonal to isActive (viewport + focus +
+   * app state) — a card plays only when it's active AND not hand-paused. */
+  const [paused, setPaused] = useState(false);
+  const plate = meal.plates[plateIndex] ?? meal.plates[0];
+  const selectedVariant = meal.sauce_variants?.[variantIndex];
+  const currentMethod = meal.methods?.[methodIndex];
+  const isDefaultVariant = !selectedVariant || !!selectedVariant.is_default;
+  const video = mealVideo(meal.slug);
+  /* The frozen plate_macros ARE the default variant's numbers (RecipeDetail's
+   * contract), so the default path stays frozen; a non-default variant is
+   * computed live via the same computePlateMacros RecipeDetail uses, rounded
+   * app-style. */
+  const macros = useMemo(() => {
+    if (isDefaultVariant || !currentMethod) return plate.plate_macros;
+    const round1 = (n: number) => Math.round(n * 10) / 10;
+    const m = computePlateMacros(meal, plate, currentMethod, selectedVariant?.id);
+    return {
+      kcal: Math.round(m.kcal),
+      protein_g: round1(m.protein_g),
+      carbs_g: round1(m.carbs_g),
+      fat_g: round1(m.fat_g),
+      fiber_g: round1(m.fiber_g),
+    };
+  }, [isDefaultVariant, currentMethod, meal, plate, selectedVariant]);
+  /* Largest single gram value across every plate of the meal — the ONE
+   * shared scale all three macro gauges fill against, so rows stay
+   * comparable with each other and the reference never moves as you flip
+   * plates. Frozen plate_macros are close enough as the reference even when
+   * a non-default variant recomputes live. */
+  const maxPlateGrams = useMemo(
+    () =>
+      Math.max(
+        ...meal.plates.flatMap((p) => [
+          p.plate_macros.protein_g,
+          p.plate_macros.carbs_g,
+          p.plate_macros.fat_g,
+        ]),
+      ),
+    [meal],
+  );
+  const extraActive = selectedVariant?.extra_active_minutes ?? 0;
+  const extraTotal = selectedVariant?.extra_total_minutes ?? 0;
+
+  /* Scrolling away clears a manual pause, so coming back to a card doesn't
+   * strand it paused with no visible affordance to resume. Keyed on
+   * isCardVisible, NOT isActive: leaving the tab or backgrounding the app also
+   * drops isActive, and resetting on those would silently resume a card the
+   * user hand-paused. A hand-pause survives a tab switch; only scrolling away
+   * clears it. */
+  useEffect(() => {
+    if (!isCardVisible && paused) setPaused(false);
+  }, [isCardVisible, paused]);
+
+  /* Report play state up while this is the active card. Deactivation reports
+   * false via the cleanup — React runs all cleanups before all effects in a
+   * commit, so the handoff between an outgoing and incoming card always
+   * lands in the right order. NOTE: a stream that errors into the tone
+   * fallback still reports as playing — acceptable rounding. */
+  const playing = VIDEO_ENABLED && !!video && !paused;
+  useEffect(() => {
+    if (!isActive) return undefined;
+    onPlayingChange(playing);
+    return () => onPlayingChange(false);
+  }, [isActive, playing, onPlayingChange]);
+
+  /* The persisted choice loads async, so it can land after mount. Adopt it
+   * until the user touches the toggle themselves. */
+  const variantTouchedRef = useRef(false);
+  useEffect(() => {
+    if (variantTouchedRef.current || !preferredVariantId) return;
+    const variants = meal.sauce_variants;
+    if (!variants) return;
+    const i = variants.findIndex((v) => v.id === preferredVariantId);
+    if (i >= 0) setVariantIndex(i);
+  }, [preferredVariantId, meal.sauce_variants]);
+
+  const selectVariant = useCallback(
+    (index: number) => {
+      variantTouchedRef.current = true;
+      setVariantIndex(index);
+      const v = meal.sauce_variants?.[index];
+      if (v) {
+        track('cook_action', {
+          action: 'variant',
+          slug: meal.slug,
+          variantId: v.id,
+        });
+        setVariantChoice(meal.slug, v.id).catch(() => undefined);
+      }
+    },
+    [meal],
+  );
+
   const [panelOpen, setPanelOpen] = useState(false);
   const panelX = useRef(new Animated.Value(PANEL_WIDTH)).current;
-  const heartScale = useRef(new Animated.Value(0)).current;
-  const lastTapRef = useRef(0);
+
+  /* ── Like / unlike animation values ───────────────────────────────────── */
+  /* LIKE: big heart springs in with a random slight tilt, holds, drifts up
+   * and fades (Instagram), while a ring + six particle dots burst outward
+   * (Twitter's celebration). UNLIKE: an outline heart deflates and drops —
+   * quiet by convention. The saved chip pulses on both. */
+  const likeProg = useRef(new Animated.Value(0)).current;
+  const ringProg = useRef(new Animated.Value(0)).current;
+  const unlikeProg = useRef(new Animated.Value(0)).current;
+  const chipScale = useRef(new Animated.Value(1)).current;
+  const [likeTilt, setLikeTilt] = useState('0deg');
+
+  const pulseChip = useCallback(() => {
+    chipScale.setValue(1);
+    Animated.sequence([
+      Animated.spring(chipScale, {
+        toValue: 1.35,
+        useNativeDriver: true,
+        speed: 30,
+        bounciness: 10,
+      }),
+      Animated.timing(chipScale, {
+        toValue: 1,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [chipScale]);
+
+  const playLike = useCallback(() => {
+    setLikeTilt(`${Math.round(Math.random() * 16 - 8)}deg`);
+    unlikeProg.setValue(0);
+    likeProg.setValue(0);
+    ringProg.setValue(0);
+    Animated.parallel([
+      Animated.timing(likeProg, {
+        toValue: 1,
+        duration: 720,
+        useNativeDriver: true,
+      }),
+      Animated.timing(ringProg, {
+        toValue: 1,
+        duration: 460,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    pulseChip();
+  }, [likeProg, ringProg, unlikeProg, pulseChip]);
+
+  const playUnlike = useCallback(() => {
+    likeProg.setValue(0);
+    ringProg.setValue(0);
+    unlikeProg.setValue(0);
+    Animated.timing(unlikeProg, {
+      toValue: 1,
+      duration: 480,
+      useNativeDriver: true,
+    }).start();
+    pulseChip();
+  }, [likeProg, ringProg, unlikeProg, pulseChip]);
+
+  /* Heart chip tap — the same toggle as a double tap. A button press is
+   * confirmed by the button itself (the chip pulse), not the big overlay
+   * heart; that's how like buttons behave everywhere. */
+  const onChipPress = useCallback(() => {
+    onToggleSave(meal, plate.id);
+    pulseChip();
+  }, [meal, plate, onToggleSave, pulseChip]);
+
+  const likeScale = likeProg.interpolate({
+    inputRange: [0, 0.18, 0.32, 0.78, 1],
+    outputRange: [0.3, 1.16, 1, 1, 0.72],
+  });
+  const likeOpacity = likeProg.interpolate({
+    inputRange: [0, 0.1, 0.72, 1],
+    outputRange: [0, 1, 1, 0],
+  });
+  const likeY = likeProg.interpolate({
+    inputRange: [0, 0.72, 1],
+    outputRange: [0, 0, -20],
+  });
+  const ringScale = ringProg.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.45, 1.65],
+  });
+  const ringOpacity = ringProg.interpolate({
+    inputRange: [0, 0.15, 1],
+    outputRange: [0, 0.55, 0],
+  });
+  const unlikeScale = unlikeProg.interpolate({
+    inputRange: [0, 0.15, 1],
+    outputRange: [0.95, 1, 0.55],
+  });
+  const unlikeOpacity = unlikeProg.interpolate({
+    inputRange: [0, 0.12, 0.72, 1],
+    outputRange: [0, 1, 0.9, 0],
+  });
+  const unlikeY = unlikeProg.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 22],
+  });
+
+  /* The video dims softly under the open panel, in sync with the slide.
+   * The dim layer doubles as the tap-to-dismiss surface. */
+  const dimOpacity = useRef(
+    panelX.interpolate({
+      inputRange: [0, PANEL_WIDTH],
+      outputRange: [0.35, 0],
+    }),
+  ).current;
+
+  /* The edge tab rides the SAME animated value as the panel, so it slides
+   * with the panel edge instead of jumping between two fixed positions. */
+  const edgeTabShift = useRef(Animated.subtract(panelX, PANEL_WIDTH)).current;
 
   const setPanel = useCallback(
     (open: boolean) => {
       setPanelOpen(open);
-      Animated.timing(panelX, {
+      onPanelToggle(open);
+      Animated.spring(panelX, {
         toValue: open ? 0 : PANEL_WIDTH,
-        duration: 220,
         useNativeDriver: true,
+        stiffness: 260,
+        damping: 28,
+        mass: 0.9,
       }).start();
+      /* Tab bar visibility is coordinated at the SCREEN level (one writer):
+       * onPanelToggle → panelLocked drives the fade, alongside play state. */
       if (open) track('cook_panel_open', { slug: meal.slug });
     },
-    [panelX, meal.slug],
+    [panelX, meal.slug, onPanelToggle],
+  );
+
+  /* A card can unmount with its panel still open: the category pill is screen
+   * chrome rendered ABOVE the card's dim layer, so it stays tappable, and a
+   * filter change swaps the dataset out from under an open panel. Nothing else
+   * ever reports the panel closed in that case, which used to strand
+   * panelLocked true — pager locked, tab bar faded out. Now that panelLocked
+   * also gates playback, stranding it would silence the feed permanently, so
+   * this cleanup is load-bearing rather than tidiness. */
+  const panelOpenRef = useRef(panelOpen);
+  panelOpenRef.current = panelOpen;
+  useEffect(
+    () => () => {
+      if (panelOpenRef.current) onPanelToggle(false);
+    },
+    [onPanelToggle],
   );
 
   /* Horizontal swipe opens/closes the panel. Claims the gesture only on a
@@ -620,39 +1531,36 @@ function MealCard(props: MealCardProps): React.JSX.Element {
   const setPanelRef = useRef(setPanel);
   setPanelRef.current = setPanel;
 
-  const popHeart = useCallback(() => {
-    heartScale.setValue(0);
-    Animated.sequence([
-      Animated.spring(heartScale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 24,
-        bounciness: 12,
-      }),
-      Animated.timing(heartScale, {
-        toValue: 0,
-        duration: 260,
-        delay: 220,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [heartScale]);
+  /* Tap model: a single tap WAITS one double-tap window before acting, so a
+   * double tap likes/unlikes without ever toggling playback (the second tap
+   * cancels the pending pause). The ~300ms delay before pause is the
+   * standard price every double-tap-to-like feed pays. */
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+    },
+    [],
+  );
 
-  /* Single tap: play/pause on video cards only, nothing on stills.
-   * Double tap: save, with the heart confirmation. */
   const onMediaPress = useCallback(() => {
-    const now = Date.now();
-    if (now - lastTapRef.current < DOUBLE_TAP_MS) {
-      lastTapRef.current = 0;
-      if (!saved) onToggleSave(meal);
-      popHeart();
+    if (singleTapTimer.current) {
+      /* Second tap inside the window: this is a double tap. Cancel the
+       * pending pause and toggle the like. */
+      clearTimeout(singleTapTimer.current);
+      singleTapTimer.current = null;
+      if (saved) playUnlike();
+      else playLike();
+      onToggleSave(meal, plate.id);
       return;
     }
-    lastTapRef.current = now;
-    if (VIDEO_ENABLED && meal.videoUrl) {
-      /* TODO(video): toggle play/pause on the mounted player. */
-    }
-  }, [meal, saved, onToggleSave, popHeart]);
+    singleTapTimer.current = setTimeout(() => {
+      singleTapTimer.current = null;
+      /* Confirmed single tap: play/pause on video cards, nothing on tone
+       * cards. */
+      if (VIDEO_ENABLED && video) setPaused((p) => !p);
+    }, DOUBLE_TAP_MS);
+  }, [meal, plate, saved, onToggleSave, playLike, playUnlike, video]);
 
   const onA11yAction = useCallback(
     (e: AccessibilityActionEvent) => {
@@ -663,178 +1571,721 @@ function MealCard(props: MealCardProps): React.JSX.Element {
   );
 
   return (
-    <View
-      style={{ height }}
-      {...pan.panHandlers}
-      accessible
-      accessibilityLabel={`${meal.name}. ${meal.kcal} calories, ${meal.protein} grams protein, ${meal.carbs} carbs, ${meal.fat} fat.`}
-      accessibilityActions={[
-        { name: 'increment', label: 'Next meal' },
-        { name: 'decrement', label: 'Previous meal' },
-      ]}
-      onAccessibilityAction={onA11yAction}
-    >
-      <CardMedia meal={meal} onPress={onMediaPress} />
+    /* NOTE: `accessible` deliberately does NOT go on this root View. Setting it
+     * here collapses the whole card into a single element for VoiceOver and
+     * makes the panel's buttons unfocusable. The card's summary label and the
+     * next/previous actions live on the title block instead, which has no
+     * focusable children. */
+    <View style={{ height }} {...pan.panHandlers}>
+      <CardMedia
+        meal={meal}
+        video={video}
+        shouldPlay={isActive && !paused}
+        muted={muted}
+        onPress={onMediaPress}
+      />
 
-      {/* Bottom scrim over the lower third only. Dependency-free stand-in for
-          a real gradient; TODO(repo): swap to the app's gradient approach if
-          one already ships (never a new native dependency for this). */}
-      <View pointerEvents="none" style={styles.scrim}>
-        {SCRIM_STEPS.map((opacity, i) => (
-          <View
+      {/* Like burst: ring + particles + big tilted heart. */}
+      <View pointerEvents="none" style={styles.fxLayer}>
+        <Animated.View
+          style={[
+            styles.fxRing,
+            { opacity: ringOpacity, transform: [{ scale: ringScale }] },
+          ]}
+        />
+        {PARTICLE_ANGLES.map((v, i) => (
+          <Animated.View
             key={i}
-            style={{ flex: 1, backgroundColor: `rgba(8,8,8,${opacity})` }}
+            style={[
+              styles.fxParticle,
+              {
+                backgroundColor: i % 2 === 0 ? C.saved : C.amber,
+                opacity: ringOpacity,
+                transform: [
+                  {
+                    translateX: ringProg.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [v.x * 18, v.x * 58],
+                    }),
+                  },
+                  {
+                    translateY: ringProg.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [v.y * 18, v.y * 58],
+                    }),
+                  },
+                  {
+                    scale: ringProg.interpolate({
+                      inputRange: [0, 0.2, 1],
+                      outputRange: [0, 1, 0.1],
+                    }),
+                  },
+                ],
+              },
+            ]}
           />
         ))}
+        <Animated.View
+          style={{
+            opacity: likeOpacity,
+            transform: [
+              { translateY: likeY },
+              { rotate: likeTilt },
+              { scale: likeScale },
+            ],
+          }}
+        >
+          <Ionicons name="heart" size={84} color="#FFFFFF" />
+        </Animated.View>
+        {/* Unlike: quiet deflate-and-drop of the outline heart. */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.fxCenter,
+            {
+              opacity: unlikeOpacity,
+              transform: [{ translateY: unlikeY }, { scale: unlikeScale }],
+            },
+          ]}
+        >
+          <Ionicons name="heart-outline" size={72} color={C.text} />
+        </Animated.View>
       </View>
 
-      {/* Double-tap confirmation heart. */}
-      <Animated.Text
+      {/* Saved-state heart, top right — a real save button now: tapping it
+          toggles the like exactly like a double tap, with the chip's own
+          pulse as confirmation. Still under-reports on a fresh launch until
+          hydration (see savedSlugs TODO). */}
+      <Animated.View
         style={[
-          styles.heartPop,
-          { opacity: heartScale, transform: [{ scale: heartScale }] },
+          styles.savedChip,
+          { top: topInset + 8, transform: [{ scale: chipScale }] },
         ]}
       >
-        ♥
-      </Animated.Text>
+        <Pressable
+          onPress={onChipPress}
+          hitSlop={8}
+          style={styles.savedChipPress}
+          accessibilityRole="button"
+          accessibilityState={{ selected: saved }}
+          accessibilityLabel={saved ? 'Remove from saved' : 'Save'}
+        >
+          <Ionicons
+            name={saved ? 'heart' : 'heart-outline'}
+            size={16}
+            color={saved ? C.saved : C.text}
+          />
+        </Pressable>
+      </Animated.View>
 
-      {/* First-run gesture hint (research: hidden gestures need a nudge). */}
-      {showHint ? (
-        <View pointerEvents="none" style={styles.hintPill}>
-          <Text style={styles.hintText}>Double tap to save</Text>
+      {/* Mute toggle, directly under the save chip. On the BASE card rather
+          than in the panel: the feed plays with the panel shut, so a control
+          hidden behind a swipe cannot be the answer to "make it stop". Only
+          rendered for cards that actually have footage — a tone-only card has
+          no audio to mute. Toggling it is feed-wide, not per card. */}
+      {VIDEO_ENABLED && video ? (
+        <View style={[styles.muteChip, { top: topInset + 46 }]}>
+          <Pressable
+            onPress={onToggleMute}
+            hitSlop={8}
+            style={styles.savedChipPress}
+            accessibilityRole="button"
+            accessibilityState={{ selected: muted }}
+            accessibilityLabel={muted ? 'Unmute videos' : 'Mute videos'}
+          >
+            <Ionicons
+              name={muted ? 'volume-mute' : 'volume-high'}
+              size={16}
+              color={C.text}
+            />
+          </Pressable>
         </View>
       ) : null}
 
-      {/* Centered name + macro line. */}
+      {/* Title + macro line anchored as high as the hardware allows:
+          insets.top clears notches, Dynamic Islands and punch-hole cameras on
+          every device. Inset each side to clear the pill and heart chip. No
+          scrim — text shadows carry legibility over footage. Also the card's
+          accessibility summary and the next/previous rotor actions. */}
       <View
         pointerEvents="none"
-        style={[styles.titleBlock, { bottom: bottomInset + 96 }]}
+        style={[styles.titleBlock, { top: topInset + 8 }]}
+        accessible
+        accessibilityLabel={`${meal.display_name}. ${Math.round(macros.kcal * portions)} calories, ${Math.round(macros.protein_g * portions)} grams protein, ${Math.round(macros.carbs_g * portions)} carbs, ${Math.round(macros.fat_g * portions)} fat${portions > 1 ? `, ${portions} portions` : ''}.`}
+        accessibilityActions={[
+          { name: 'increment', label: 'Next meal' },
+          { name: 'decrement', label: 'Previous meal' },
+        ]}
+        onAccessibilityAction={onA11yAction}
       >
         <Text style={styles.title} numberOfLines={2}>
-          {meal.name}
+          {meal.display_name}
         </Text>
-        <View style={styles.macroRow}>
-          <Text style={styles.macroStrong}>{meal.kcal} kcal</Text>
-          <Text style={styles.macro}>P {meal.protein}</Text>
-          <Text style={styles.macro}>C {meal.carbs}</Text>
-          <Text style={styles.macro}>F {meal.fat}</Text>
-        </View>
+        {/* Site-hero stat treatment: bold numbers, muted units, middots.
+            Numbers ROLL to new values when plate/variant/portions change. */}
+        <Text style={styles.macroLine}>
+          <CountText
+            style={styles.macroNum}
+            value={Math.round(macros.kcal * portions)}
+          />
+          <Text style={styles.macroUnit}> kcal</Text>
+          {portions > 1 ? (
+            <Text style={styles.macroUnit}> · {portions}×</Text>
+          ) : null}
+          <Text style={styles.macroUnit}>  ·  </Text>
+          <CountText
+            style={styles.macroNum}
+            value={Math.round(macros.protein_g * portions)}
+          />
+          <Text style={styles.macroUnit}>P</Text>
+          <Text style={styles.macroUnit}>  ·  </Text>
+          <CountText
+            style={styles.macroNum}
+            value={Math.round(macros.carbs_g * portions)}
+          />
+          <Text style={styles.macroUnit}>C</Text>
+          <Text style={styles.macroUnit}>  ·  </Text>
+          <CountText
+            style={styles.macroNum}
+            value={Math.round(macros.fat_g * portions)}
+          />
+          <Text style={styles.macroUnit}>F</Text>
+        </Text>
       </View>
 
-      {/* Cook this — the one persistent action; the metric depends on it. */}
-      <View
-        style={[styles.ctaWrap, { bottom: bottomInset + 28 }]}
-        pointerEvents="box-none"
+      {/* Dim + tap-to-dismiss, fading in sync with the panel. */}
+      <Animated.View
+        pointerEvents={panelOpen ? 'auto' : 'none'}
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: '#000', opacity: dimOpacity },
+        ]}
       >
-        <Pressable
-          onPress={() => onCook(meal)}
-          style={styles.cta}
-          accessibilityRole="button"
-          accessibilityLabel={`Cook ${meal.name}`}
-        >
-          <Text style={styles.ctaText}>Cook this</Text>
-        </Pressable>
-      </View>
-
-      {/* Edge tab: visible affordance for the swipe-in panel. */}
-      <Pressable
-        onPress={() => setPanel(true)}
-        style={styles.edgeTab}
-        accessibilityRole="button"
-        accessibilityLabel="Show details and actions"
-      >
-        <Text style={styles.edgeTabChevron}>‹</Text>
-      </Pressable>
-
-      {/* Tap-to-dismiss layer while the panel is open. */}
-      {panelOpen ? (
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={() => setPanel(false)}
           accessibilityRole="button"
           accessibilityLabel="Hide details and actions"
         />
-      ) : null}
+      </Animated.View>
 
-      {/* Side panel: serves, method, effort tags, secondary actions. */}
+      {/* Side panel: the chooser. Plate carousel, method and variant
+          selection, portions, the composed ingredient list, and View full
+          recipe as the primary action. Solid near-black surface so the black
+          food photography blends into it. */}
       <Animated.View
         style={[
           styles.panel,
           {
             width: PANEL_WIDTH,
-            paddingTop: topInset + 44,
-            paddingBottom: bottomInset + 20,
+            paddingTop: topInset + 8,
             transform: [{ translateX: panelX }],
           },
         ]}
       >
-        <Pressable
-          onPress={() => setPanel(false)}
-          style={styles.panelClose}
-          accessibilityRole="button"
-          accessibilityLabel="Hide panel"
+        {/* Hero: an inset rounded card BELOW the notch — the image never
+            sits behind the camera. Name and calories centered over it. */}
+        <View style={styles.heroCard}>
+          <PlateCarousel
+            meal={meal}
+            plateIndex={plateIndex}
+            portions={portions}
+            height={184}
+            onSelect={setPlateIndex}
+          />
+        </View>
+
+        <View
+          style={[styles.panelBody, { paddingBottom: bottomClearance + 16 }]}
         >
-          <Text style={styles.panelCloseChevron}>›</Text>
+          <MacroRows
+            macros={macros}
+            portions={portions}
+            maxGrams={maxPlateGrams}
+          />
+
+          <ScrollView
+            style={styles.panelScroll}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+          >
+            {meal.methods && meal.methods.length > 0 ? (
+              <View style={styles.methodRow}>
+                {meal.methods.map((m, i) => (
+                  <Pressable
+                    key={m.id}
+                    onPress={() => setMethodIndex(i)}
+                    style={[
+                      styles.methodCard,
+                      i === methodIndex && styles.methodCardSelected,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: i === methodIndex }}
+                    accessibilityLabel={`${m.display_name}, ${m.time_active_minutes + extraActive} minutes active`}
+                  >
+                    <Ionicons
+                      name={methodIcon(m.id)}
+                      size={16}
+                      color={i === methodIndex ? C.cta : C.faint}
+                    />
+                    <Text style={styles.methodCardName}>{m.display_name}</Text>
+                    <Text style={styles.methodCardTime}>
+                      {methodTime(m, extraActive, extraTotal)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
+            {/* Easy vs from-scratch, mirroring RecipeDetail's MAKE IT choice.
+                Swaps the variant's ingredients and adds its extra minutes. */}
+            {meal.sauce_variants && meal.sauce_variants.length > 1 ? (
+              <View style={styles.variantRow}>
+                {meal.sauce_variants.map((v, i) => (
+                  <Pressable
+                    key={v.id}
+                    onPress={() => selectVariant(i)}
+                    style={[
+                      styles.variantOption,
+                      i === variantIndex && styles.variantOptionSelected,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: i === variantIndex }}
+                    accessibilityLabel={`${v.display_name}${
+                      v.extra_active_minutes > 0
+                        ? `, adds ${v.extra_active_minutes} minutes`
+                        : ''
+                    }`}
+                  >
+                    <Text
+                      style={[
+                        styles.variantName,
+                        i === variantIndex && styles.variantNameSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {v.display_name}
+                    </Text>
+                    {v.extra_active_minutes > 0 ? (
+                      <Text style={styles.variantExtra}>
+                        +{v.extra_active_minutes} min
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.panelDivider} />
+            <View style={styles.ingredientHeader}>
+              <Text style={styles.panelLabel}>INGREDIENTS</Text>
+              <View style={styles.stepper}>
+                <Text style={styles.stepperLabel}>Portions</Text>
+                <Pressable
+                  onPress={() => setPortions((p) => clampCookPortions(p - 1))}
+                  style={styles.stepperButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fewer portions"
+                >
+                  <Text style={styles.stepperGlyph}>−</Text>
+                </Pressable>
+                <Text
+                  style={styles.stepperValue}
+                  accessibilityLabel={`${portions} portions`}
+                >
+                  {portions}
+                </Text>
+                <Pressable
+                  onPress={() => setPortions((p) => clampCookPortions(p + 1))}
+                  style={styles.stepperButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="More portions"
+                >
+                  <Text style={styles.stepperGlyph}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+            <IngredientList
+              meal={meal}
+              plate={plate}
+              methodId={currentMethod?.id ?? ''}
+              variantId={selectedVariant?.id}
+              portions={portions}
+            />
+          </ScrollView>
+
+          {/* Footer: View full recipe + share. No mute button — sound is on. */}
+          <View style={styles.footerRow}>
+            <Pressable
+              onPress={() => onOpenRecipe(meal, plate, portions)}
+              style={styles.recipeCta}
+              accessibilityRole="button"
+              accessibilityLabel={`View full recipe for ${plate.display_name}`}
+            >
+              <Text style={styles.recipeCtaText}>View full recipe</Text>
+            </Pressable>
+            <IconAction
+              icon="share-outline"
+              label="Share"
+              onPress={() => onShare(meal, plate)}
+            />
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Edge tab — rides the panel's motion, flips direction when open.
+          Rendered last so it stays above the dismiss layer. */}
+      <Animated.View
+        style={[
+          styles.edgeTabWrap,
+          { transform: [{ translateX: edgeTabShift }] },
+        ]}
+      >
+        <Pressable
+          onPress={() => setPanel(!panelOpen)}
+          style={styles.edgeTab}
+          accessibilityRole="button"
+          accessibilityLabel={
+            panelOpen ? 'Hide details' : 'Show details and actions'
+          }
+        >
+          <Text style={styles.edgeTabChevron}>{panelOpen ? '›' : '‹'}</Text>
         </Pressable>
-
-        <Text style={styles.panelMeta}>
-          Serves {meal.serves} · {meal.defaultMethod}
-        </Text>
-
-        <View style={styles.panelDivider} />
-        <EffortTags meal={meal} />
-
-        <View style={{ flex: 1 }} />
-
-        <PanelAction
-          label={saved ? 'Saved' : 'Save'}
-          active={saved}
-          onPress={() => onToggleSave(meal)}
-        />
-        <PanelAction label="Add to plan" onPress={() => onAddToPlan(meal)} />
-        <PanelAction label="Share" onPress={() => onShare(meal)} />
-        {VIDEO_ENABLED && meal.videoUrl ? <MuteAction slug={meal.slug} /> : null}
       </Animated.View>
     </View>
   );
 }
 
-const SCRIM_STEPS = [0.08, 0.2, 0.34, 0.5, 0.66, 0.82];
+function methodTime(
+  m: MealMethod,
+  extraActive: number,
+  extraTotal: number,
+): string {
+  const active = m.time_active_minutes + extraActive;
+  const passive = m.time_total_minutes + extraTotal - active;
+  if (passive >= 60) {
+    return `${active} min + ${Math.round(passive / 60)} h`;
+  }
+  return `${active} min`;
+}
 
-/* ────────────────────────────────────────────────────────────────────────────
- * Media layer — the still stays mounted underneath any future video surface,
- * so the Android still→video transition never shows a black frame.
- * ──────────────────────────────────────────────────────────────────────────── */
-
-function CardMedia(props: {
+/** The hero: the plate image fills its inset card, with the plate name and
+ *  portion-scaled calories over it, arrows and tappable dots for selection.
+ *  Arrows rather than swipe — horizontal swipe is reserved for closing the
+ *  panel. Falls back to the meal image, then a deterministic tone, when the
+ *  plate has no image (plate-level image_filename coverage is patchy in the
+ *  data). */
+function PlateCarousel(props: {
   meal: CuratedMeal;
-  onPress: () => void;
+  plateIndex: number;
+  portions: number;
+  height: number;
+  onSelect: (index: number) => void;
 }): React.JSX.Element {
-  const { meal, onPress } = props;
+  const { meal, plateIndex, portions, height, onSelect } = props;
+  const plate = meal.plates[plateIndex] ?? meal.plates[0];
+  const count = meal.plates.length;
+  const kcal = Math.round(plate.plate_macros.kcal * portions);
+  const source =
+    resolveMealImage(plate.image_filename) ??
+    resolveMealImage(meal.image_filename);
+  const step = (delta: number) => onSelect((plateIndex + delta + count) % count);
+
   return (
-    <Pressable style={StyleSheet.absoluteFill} onPress={onPress}>
-      {meal.heroStill ? (
+    <View
+      style={[styles.hero, { height }]}
+      accessible
+      accessibilityLabel={`Plate ${plateIndex + 1} of ${count}: ${plate.display_name}, ${kcal} calories${portions > 1 ? ` for ${portions} portions` : ''}`}
+    >
+      {source ? (
         <Image
-          source={{ uri: meal.heroStill }}
-          style={StyleSheet.absoluteFill}
+          source={source}
+          style={styles.heroMedia}
           resizeMode="cover"
           fadeDuration={0}
         />
       ) : (
         <View
           style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: fallbackTone(meal.slug) },
+            styles.heroMedia,
+            { backgroundColor: fallbackTone(`${meal.slug}-${plate.id}`) },
           ]}
         />
       )}
-      {/* TODO(video): when VIDEO_ENABLED, mount the video surface HERE, above
-          the Image and absolutely filled, once ready — never unmount the still. */}
+      <View style={styles.carouselScrim} />
+      <View style={styles.carouselCaption}>
+        <Text style={styles.carouselName} numberOfLines={2}>
+          {plate.display_name}
+        </Text>
+        <Text style={styles.carouselKcal}>
+          <CountText style={styles.carouselKcalNum} value={kcal} /> kcal
+          {portions > 1 ? ` · ${portions} portions` : ''}
+        </Text>
+      </View>
+      {count > 1 ? (
+        <>
+          <Pressable
+            onPress={() => step(-1)}
+            style={[styles.carouselArrow, { left: 8 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Previous plate"
+          >
+            <Ionicons name="chevron-back" size={16} color={C.cta} />
+          </Pressable>
+          <Pressable
+            onPress={() => step(1)}
+            style={[styles.carouselArrow, { right: 8 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Next plate"
+          >
+            <Ionicons name="chevron-forward" size={16} color={C.cta} />
+          </Pressable>
+          <View style={styles.dotRow}>
+            {meal.plates.map((p, i) => (
+              <Pressable
+                key={p.id}
+                onPress={() => onSelect(i)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Plate ${i + 1} of ${count}`}
+                style={[styles.dot, i === plateIndex && styles.dotActive]}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+/** Rolls a displayed number from its previous value to `target` with an
+ *  ease-out curve. Runs on JS via requestAnimationFrame because text content
+ *  can't be driven natively; an interruption restarts from wherever the roll
+ *  currently sits, so rapid plate-arrow taps stay smooth instead of
+ *  stuttering back to the start. */
+function useCountUp(target: number, duration = 380): number {
+  const [display, setDisplay] = useState(target);
+  const displayRef = useRef(target);
+  useEffect(() => {
+    const from = displayRef.current;
+    if (from === target) return undefined;
+    const start = Date.now();
+    let raf = 0;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const v = Math.round(from + (target - from) * eased);
+      displayRef.current = v;
+      setDisplay(v);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  return display;
+}
+
+/** Text whose number rolls instead of snapping — the macro-change animation
+ *  for plate / variant / portion switches. Pass PRE-ROUNDED values so the
+ *  roll lands exactly on the displayed number. */
+function CountText(props: {
+  value: number;
+  style?: StyleProp<TextStyle>;
+}): React.JSX.Element {
+  return <Text style={props.style}>{useCountUp(props.value)}</Text>;
+}
+
+/** Macro readout, rethought after device feedback on the stacked bar (a
+ *  kcal-scaled composition bar that stopped short of its container looked
+ *  broken rather than "smaller plate"): three GAUGE rows — Protein / Carbs /
+ *  Fat — each filled against the largest gram value across every plate of
+ *  the meal. One shared scale keeps the rows comparable with each other, a
+ *  partial fill reads as room on the scale (a familiar gauge pattern), and
+ *  since plates differ mainly in AMOUNT rather than ratio, all three gauges
+ *  move visibly on every plate switch. Widths animate (~380ms, JS driver —
+ *  width is a layout prop; three views, cheap) in step with the rolling
+ *  numbers. Portions scale the numbers but not the widths, since both sides
+ *  of the ratio scale together. */
+function MacroRows(props: {
+  macros: CuratedMeal['plates'][number]['plate_macros'];
+  portions: number;
+  maxGrams: number;
+}): React.JSX.Element {
+  const { macros, portions, maxGrams } = props;
+  return (
+    <View
+      style={styles.macroRows}
+      accessible
+      accessibilityLabel={`${Math.round(macros.protein_g * portions)} grams protein, ${Math.round(macros.carbs_g * portions)} carbs, ${Math.round(macros.fat_g * portions)} fat`}
+    >
+      <MacroGaugeRow
+        label="P"
+        grams={macros.protein_g}
+        color={MACRO_COLORS.protein}
+        portions={portions}
+        maxGrams={maxGrams}
+      />
+      <MacroGaugeRow
+        label="C"
+        grams={macros.carbs_g}
+        color={MACRO_COLORS.carbs}
+        portions={portions}
+        maxGrams={maxGrams}
+      />
+      <MacroGaugeRow
+        label="F"
+        grams={macros.fat_g}
+        color={MACRO_COLORS.fat}
+        portions={portions}
+        maxGrams={maxGrams}
+      />
+    </View>
+  );
+}
+
+function MacroGaugeRow(props: {
+  label: string;
+  grams: number;
+  color: string;
+  portions: number;
+  maxGrams: number;
+}): React.JSX.Element {
+  const { label, grams, color, portions, maxGrams } = props;
+  const share = Math.min(1, grams / Math.max(1, maxGrams));
+  const anim = useRef(new Animated.Value(share)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: share,
+      duration: 380,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [share, anim]);
+  const width = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+  return (
+    <View style={styles.macroRow}>
+      <Text style={styles.macroRowLabel}>{label}</Text>
+      <View style={styles.macroRowTrack}>
+        <Animated.View
+          style={[styles.macroRowFill, { backgroundColor: color, width }]}
+        />
+      </View>
+      <Text style={[styles.macroRowValue, { color }]}>
+        <CountText value={Math.round(grams * portions)} />g
+      </Text>
+    </View>
+  );
+}
+
+/* Allergens/storage line deliberately removed from the panel per design
+ * feedback — that detail lives in RecipeDetail. */
+
+function IngredientList(props: {
+  meal: CuratedMeal;
+  plate: MealPlate;
+  methodId: string;
+  variantId?: string;
+  portions: number;
+}): React.JSX.Element {
+  const { meal, plate, methodId, variantId, portions } = props;
+  const rows = composedIngredients(meal, plate, methodId, variantId);
+  const warn = rows.length >= INGREDIENT_WARN_AT;
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${rows.length} ingredients for ${portions} ${portions === 1 ? 'portion' : 'portions'}`}
+    >
+      {warn ? (
+        <Text style={styles.ingredientWarn}>{rows.length} ingredients</Text>
+      ) : null}
+      {rows.map((row, i) => (
+        <View
+          key={`${row.ingredient.ingredient_id}-${i}`}
+          style={styles.ingredientRow}
+        >
+          <Text style={styles.ingredientName} numberOfLines={2}>
+            {ingredientDisplayName(row.ingredient.ingredient_id)}
+          </Text>
+          <Text style={styles.ingredientAmount}>
+            {portionAmount(row, portions)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Media layer
+ *
+ * The tone backing stays mounted underneath the video surface, so the
+ * still→video transition never shows a black frame (the Android failure mode).
+ * A meal with no MEAL_VIDEOS entry, or one whose stream errors, simply keeps
+ * the tone — the feed degrades to exactly what it looked like before video.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+function CardMedia(props: {
+  meal: CuratedMeal;
+  video?: MealVideo;
+  shouldPlay: boolean;
+  muted: boolean;
+  onPress: () => void;
+}): React.JSX.Element {
+  const { meal, video, shouldPlay, muted, onPress } = props;
+  const [failed, setFailed] = useState(false);
+  const showVideo = VIDEO_ENABLED && !!video && !failed;
+
+  return (
+    <Pressable style={StyleSheet.absoluteFill} onPress={onPress}>
+      {/* Backing tone — always mounted, never unmounted. */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: fallbackTone(meal.slug) },
+        ]}
+      />
+
+      {/* Frame-zero poster, when one has been uploaded. Sits between the tone
+          and the video so the first painted frame matches the video's own. */}
+      {showVideo && video?.poster ? (
+        <Image
+          source={{ uri: video.poster }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          fadeDuration={0}
+        />
+      ) : null}
+
+      {showVideo ? (
+        <Video
+          source={{ uri: video!.video }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={shouldPlay}
+          isLooping
+          /* Sound on by default (Shorts/Reels convention), with the mute chip
+           * on the card as the in-app control — the screen-level
+           * Audio.setAudioModeAsync call deliberately plays past the iOS
+           * silent switch, so the hardware rocker alone was not enough. */
+          isMuted={muted}
+          /* No native controls: the pager owns every gesture on this surface. */
+          useNativeControls={false}
+          onError={() => {
+            /* Network blip, bad URL, unsupported file: fall back to the tone
+             * rather than showing a black rectangle. */
+            setFailed(true);
+            track('cook_video_error', { slug: meal.slug });
+          }}
+        />
+      ) : null}
     </Pressable>
   );
 }
 
-/** Deterministic placeholder tone until real hero stills are wired. */
+/** Deterministic placeholder tone until the image resolver is wired. */
 function fallbackTone(slug: string): string {
   const tones = ['#26221C', '#1E2823', '#2D211C', '#241F1D', '#22282A'];
   let hash = 0;
@@ -845,66 +2296,25 @@ function fallbackTone(slug: string): string {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * Panel pieces
+ * Panel action pieces
  * ──────────────────────────────────────────────────────────────────────────── */
 
-function EffortTags(props: { meal: CuratedMeal }): React.JSX.Element {
-  const { meal } = props;
-  const warn = meal.ingredientCount >= INGREDIENT_WARN_AT;
-  return (
-    <View
-      style={styles.effortWrap}
-      accessible
-      accessibilityLabel={`${meal.ingredientCount} ingredients, ${meal.activeMinutes} minutes hands on`}
-    >
-      <View style={[styles.effortTag, warn && styles.effortTagWarn]}>
-        <Text style={[styles.effortText, warn && styles.effortTextWarn]}>
-          {meal.ingredientCount} ingredients
-        </Text>
-      </View>
-      <View style={styles.effortTag}>
-        <Text style={styles.effortText}>{meal.activeMinutes} min hands on</Text>
-      </View>
-    </View>
-  );
-}
-
-function PanelAction(props: {
+function IconAction(props: {
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   active?: boolean;
   onPress: () => void;
 }): React.JSX.Element {
-  const { label, active, onPress } = props;
+  const { icon, label, active, onPress } = props;
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.panelAction, active && styles.panelActionActive]}
+      style={[styles.iconAction, active && styles.iconActionActive]}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Text
-        style={[styles.panelActionText, active && styles.panelActionTextActive]}
-      >
-        {label}
-      </Text>
+      <Ionicons name={icon} size={17} color={active ? C.saved : C.cta} />
     </Pressable>
-  );
-}
-
-function MuteAction(props: { slug: string }): React.JSX.Element {
-  const [muted, setMuted] = useState(mutedGlobal.value);
-  return (
-    <PanelAction
-      label={muted ? 'Unmute' : 'Mute'}
-      onPress={() => {
-        mutedGlobal.value = !mutedGlobal.value;
-        setMuted(mutedGlobal.value);
-        track('cook_action', {
-          action: mutedGlobal.value ? 'mute' : 'unmute',
-          slug: props.slug,
-        });
-      }}
-    />
   );
 }
 
@@ -956,66 +2366,122 @@ function EndCard(props: {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * Filter sheet — category and intent, single-select per row, combinable.
+ * Filter sheet — redesigned.
+ *
+ * Category is a grid of icon tiles with per-category meal counts (the count
+ * is real information: it says what's behind each door before you open it).
+ * Show me stays as chips beneath. Grabber handle on top. The backdrop FADES
+ * while the sheet slides, run by one progress value on a transparent,
+ * non-animating Modal; the sheet stays mounted through the exit animation.
  * ──────────────────────────────────────────────────────────────────────────── */
+
+const SHEET_SLIDE_DISTANCE = 420;
 
 function FilterSheet(props: {
   visible: boolean;
   onClose: () => void;
-  category: MealCategory | null;
+  category: CookCategory | null;
   intent: IntentFilter | null;
+  counts: Record<'all' | CookCategory, number>;
+  intentCounts: Record<IntentFilter, number>;
   showFits: boolean;
-  onSelectCategory: (c: MealCategory | null) => void;
+  onSelectCategory: (c: CookCategory | null) => void;
   onSelectIntent: (i: IntentFilter | null) => void;
   bottomInset: number;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const {
     visible,
     onClose,
     category,
     intent,
+    counts,
+    intentCounts,
     showFits,
     onSelectCategory,
     onSelectIntent,
     bottomInset,
   } = props;
 
+  const [mounted, setMounted] = useState(visible);
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 210,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(progress, {
+        toValue: 0,
+        duration: 170,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
+  }, [visible, progress]);
+
+  const sheetY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SHEET_SLIDE_DISTANCE, 0],
+  });
+
   const intents: IntentFilter[] = (
-    ['fits', 'quick', 'nocook', 'few'] as IntentFilter[]
+    ['fits', 'quick', 'nocook', 'few', 'saved'] as IntentFilter[]
   ).filter((i) => i !== 'fits' || showFits);
 
+  if (!mounted) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.sheetBackdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: bottomInset + 20 }]}>
-        <Text style={styles.sheetHeading}>Meal type</Text>
-        <View style={styles.chipRow}>
-          <SheetChip
-            label="All"
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
+      {/* Backdrop fades; it never slides. */}
+      <Animated.View style={[styles.sheetBackdrop, { opacity: progress }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            paddingBottom: bottomInset + 20,
+            transform: [{ translateY: sheetY }],
+          },
+        ]}
+      >
+        <View style={styles.sheetGrabber} />
+
+        <Text style={styles.sheetHeading}>MEAL TYPE</Text>
+        <View style={styles.tileGrid}>
+          <CategoryTile
+            icon="apps-outline"
+            label="All meals"
+            count={counts.all}
             active={category === null}
             onPress={() => onSelectCategory(null)}
           />
           {CATEGORIES.map((c) => (
-            <SheetChip
+            <CategoryTile
               key={c}
+              icon={CATEGORY_ICON[c]}
               label={CATEGORY_LABEL[c]}
+              count={counts[c]}
               active={category === c}
               onPress={() => onSelectCategory(category === c ? null : c)}
             />
           ))}
         </View>
 
-        <Text style={styles.sheetHeading}>Show me</Text>
+        <Text style={styles.sheetHeading}>SHOW ME</Text>
         <View style={styles.chipRow}>
           {intents.map((i) => (
-            <SheetChip
+            <IntentChip
               key={i}
+              icon={INTENT_ICON[i]}
               label={INTENT_LABEL[i]}
+              count={intentCounts[i]}
               active={intent === i}
               onPress={() => onSelectIntent(intent === i ? null : i)}
             />
@@ -1029,28 +2495,67 @@ function FilterSheet(props: {
         >
           <Text style={styles.sheetDoneText}>Done</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
 
-function SheetChip(props: {
+function CategoryTile(props: {
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  count: number;
   active: boolean;
   onPress: () => void;
 }): React.JSX.Element {
-  const { label, active, onPress } = props;
+  const { icon, label, count, active, onPress } = props;
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chip, active && styles.chipActive]}
+      style={[styles.tile, active && styles.tileActive]}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      accessibilityLabel={label}
+      accessibilityLabel={`${label}, ${count} meals`}
     >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+      <Ionicons name={icon} size={17} color={active ? C.cta : C.faint} />
+      <View style={styles.tileTextCol}>
+        <Text
+          style={[styles.tileLabel, active && styles.tileLabelActive]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        <Text style={styles.tileCount}>{count} meals</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/** Show me chip — same visual language as the category tiles (icon + quiet
+ *  selected fill, not the old solid-cream flip) plus a live count scoped to
+ *  the selected category. */
+function IntentChip(props: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  count: number;
+  active: boolean;
+  onPress: () => void;
+}): React.JSX.Element {
+  const { icon, label, count, active, onPress } = props;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.intentChip, active && styles.intentChipActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={`${label}, ${count} meals`}
+    >
+      <Ionicons name={icon} size={13} color={active ? C.cta : C.faint} />
+      <Text
+        style={[styles.intentChipText, active && styles.intentChipTextActive]}
+      >
         {label}
       </Text>
+      <Text style={styles.intentChipCount}>{count}</Text>
     </Pressable>
   );
 }
@@ -1058,6 +2563,12 @@ function SheetChip(props: {
 /* ────────────────────────────────────────────────────────────────────────────
  * Styles
  * ──────────────────────────────────────────────────────────────────────────── */
+
+const TEXT_SHADOW = {
+  textShadowColor: 'rgba(0,0,0,0.55)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 8,
+} as const;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
@@ -1076,66 +2587,89 @@ const styles = StyleSheet.create({
   categoryPillText: { color: C.text, fontSize: 12, fontWeight: '500' },
   categoryPillChevron: { color: C.sub, fontSize: 12, marginTop: -2 },
 
-  scrim: {
+  savedChip: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '30%',
+    right: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: C.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  savedChipPress: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  heartPop: {
+  /* Same plate as savedChip, stacked under it. Kept as its own rule rather
+   * than shared: savedChip is wrapped in an Animated.View for the like pulse
+   * and this one is not. */
+  muteChip: {
     position: 'absolute',
-    alignSelf: 'center',
-    top: '38%',
-    fontSize: 76,
-    color: '#FFFFFF',
-    pointerEvents: 'none',
+    right: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: C.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  hintPill: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: '52%',
-    backgroundColor: 'rgba(20,20,20,0.55)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  /* Like/unlike effects layer — centered over the media. */
+  fxLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  hintText: { color: C.text, fontSize: 12 },
+  fxCenter: { alignItems: 'center', justifyContent: 'center' },
+  fxRing: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 3,
+    borderColor: C.saved,
+  },
+  fxParticle: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
 
   titleBlock: {
     position: 'absolute',
-    left: 20,
-    right: 20,
+    left: TITLE_SIDE_INSET,
+    right: TITLE_SIDE_INSET,
     alignItems: 'center',
   },
   title: {
     color: C.text,
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: 0.2,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 25,
+    ...TEXT_SHADOW,
   },
-  macroRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
-  macroStrong: { color: C.text, fontSize: 12, fontWeight: '500' },
-  macro: { color: C.sub, fontSize: 12 },
-
-  ctaWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  cta: {
-    height: 40,
-    paddingHorizontal: 26,
-    borderRadius: 20,
-    backgroundColor: C.cta,
-    alignItems: 'center',
-    justifyContent: 'center',
+  macroLine: {
+    marginTop: 6,
+    fontSize: 13,
+    textAlign: 'center',
+    ...TEXT_SHADOW,
   },
-  ctaText: { color: C.ctaText, fontSize: 14, fontWeight: '500' },
+  macroNum: { color: C.text, fontWeight: '700' },
+  macroUnit: { color: C.sub, fontWeight: '400' },
 
-  edgeTab: {
+  edgeTabWrap: {
     position: 'absolute',
     right: 0,
     top: '46%',
+  },
+  edgeTab: {
     width: 24,
     height: 58,
     backgroundColor: C.overlay,
@@ -1152,51 +2686,202 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     backgroundColor: C.panel,
-    paddingHorizontal: 16,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: C.panelEdge,
+    overflow: 'hidden',
   },
-  panelClose: {
-    position: 'absolute',
-    top: 14,
-    left: 12,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  panelBody: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    backgroundColor: C.panel,
   },
-  panelCloseChevron: { color: C.sub, fontSize: 18, marginTop: -2 },
-  panelMeta: { color: C.faint, fontSize: 13 },
+  heroCard: {
+    marginHorizontal: 12,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: C.heroBacking,
+  },
+  hero: { width: '100%', overflow: 'hidden', backgroundColor: C.heroBacking },
+  heroMedia: { width: '100%', height: '100%' },
+  panelScroll: { flex: 1 },
+  panelLabel: {
+    color: C.faint,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    marginTop: 10,
+    marginBottom: 6,
+  },
   panelDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: C.hairline,
-    marginVertical: 12,
+    marginTop: 12,
   },
 
-  effortWrap: { gap: 6 },
-  effortTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(22,22,22,0.6)',
-    borderRadius: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+  carouselScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '46%',
+    backgroundColor: 'rgba(8,8,8,0.5)',
   },
-  effortTagWarn: { backgroundColor: C.amberBg },
-  effortText: { color: C.cta, fontSize: 12 },
-  effortTextWarn: { color: C.amber },
+  carouselCaption: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 26,
+    alignItems: 'center',
+  },
+  carouselName: {
+    color: C.text,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+  carouselKcal: { color: C.sub, fontSize: 11, marginTop: 3 },
+  carouselKcalNum: { color: C.text, fontWeight: '700' },
+  carouselArrow: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(20,20,20,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 10,
+    flexDirection: 'row',
+    gap: 5,
+    justifyContent: 'center',
+  },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
+  dotActive: { width: 14, backgroundColor: C.cta },
 
-  panelAction: {
+  variantRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  variantOption: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: C.hairline,
+    borderRadius: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    gap: 2,
+  },
+  variantOptionSelected: { borderColor: C.cta, backgroundColor: C.selectedBg },
+  variantName: { color: C.sub, fontSize: 11 },
+  variantNameSelected: { color: C.cta, fontWeight: '500' },
+  variantExtra: { color: C.amber, fontSize: 9 },
+
+  macroRows: { marginTop: 5 },
+  macroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 7,
+  },
+  macroRowLabel: { color: C.faint, fontSize: 10, width: 10 },
+  macroRowTrack: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#1F1F1C',
+    overflow: 'hidden',
+  },
+  /* Gauge fills take MACRO_COLORS inline. TODO(repo): if the nutrition
+   * screens already define canonical macro colours, import those instead. */
+  macroRowFill: { height: '100%', borderRadius: 3 },
+  macroRowValue: {
+    fontSize: 10,
+    minWidth: 34,
+    textAlign: 'right',
+    fontWeight: '600',
+  },
+
+  methodRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  methodCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: C.hairline,
+    borderRadius: 12,
+    paddingVertical: 9,
+    alignItems: 'center',
+    gap: 3,
+  },
+  methodCardSelected: {
+    borderColor: C.cta,
+    backgroundColor: C.selectedBg,
+  },
+  methodCardName: { color: C.sub, fontSize: 10 },
+  methodCardTime: { color: C.faint, fontSize: 9 },
+
+  ingredientHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  stepperLabel: { color: C.faint, fontSize: 11, marginRight: 1 },
+  stepperButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: C.outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperGlyph: { color: C.sub, fontSize: 13, lineHeight: 15 },
+  stepperValue: {
+    color: C.text,
+    fontSize: 12,
+    minWidth: 12,
+    textAlign: 'center',
+  },
+
+
+  ingredientRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 3,
+  },
+  ingredientName: { color: C.sub, fontSize: 11, flexShrink: 1 },
+  ingredientAmount: { color: C.faint, fontSize: 11 },
+  ingredientWarn: { color: C.amber, fontSize: 11, marginBottom: 4 },
+
+  recipeCta: {
+    flex: 1,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: C.cta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recipeCtaText: { color: C.ctaText, fontSize: 13, fontWeight: '500' },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  iconAction: {
+    width: 40,
+    height: 36,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: C.outline,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
   },
-  panelActionActive: { borderColor: C.savedOutline },
-  panelActionText: { color: C.cta, fontSize: 13 },
-  panelActionTextActive: { color: C.saved },
+  iconActionActive: { borderColor: C.savedOutline },
 
   endCard: {
     alignItems: 'center',
@@ -1215,31 +2900,74 @@ const styles = StyleSheet.create({
   },
   endButtonText: { color: C.cta, fontSize: 13 },
 
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
   sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#1D1D1C',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingTop: 10,
+  },
+  sheetGrabber: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.outline,
+    marginBottom: 6,
   },
   sheetHeading: {
     color: C.faint,
-    fontSize: 12,
+    fontSize: 10,
+    letterSpacing: 1.1,
     marginBottom: 10,
     marginTop: 8,
   },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  chip: {
+  tileGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tile: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderWidth: 1,
     borderColor: C.outline,
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 10,
   },
-  chipActive: { backgroundColor: C.cta, borderColor: C.cta },
-  chipText: { color: C.sub, fontSize: 12 },
-  chipTextActive: { color: C.ctaText, fontWeight: '500' },
+  tileActive: { borderColor: C.cta, backgroundColor: C.selectedBg },
+  tileTextCol: { flexShrink: 1 },
+  tileLabel: { color: C.sub, fontSize: 12 },
+  tileLabelActive: { color: C.cta, fontWeight: '500' },
+  tileCount: { color: C.faint, fontSize: 10, marginTop: 1 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  intentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: C.outline,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  intentChipActive: { borderColor: C.cta, backgroundColor: C.selectedBg },
+  intentChipText: { color: C.sub, fontSize: 12 },
+  intentChipTextActive: { color: C.cta, fontWeight: '500' },
+  intentChipCount: { color: C.faint, fontSize: 10, marginLeft: 1 },
 
   sheetDone: {
     height: 42,
