@@ -73,13 +73,23 @@
  *     notch, spring open/close, edge tab rides the panel, synced dim fade
  *   - Tab bar fades with the panel via the exported cookTabBarOpacity
  *
- * VIDEO PHASE 1 (unchanged): recipe videos stream from S3 and own the base
- * card's media layer. No files ship in the binary — MEAL_VIDEOS maps a meal
- * slug to a URL, and a meal with no entry keeps the deterministic tone.
+ * VIDEO PHASE 1: recipe videos stream from S3 and own the base card's media
+ * layer. No files ship in the binary — MEAL_VIDEOS maps a meal slug to a URL.
  * Playback uses expo-av (already a dependency, so no EAS rebuild).
  *
+ * THIN COVERAGE (the current reality: 1 video, 81 meals). A meal with no entry
+ * falls back to its still from the image registry — contained, not covered,
+ * so the whole dish is visible — drifting under a slow Ken Burns so the card
+ * reads as a feed rather than a paused one. Cards WITH
+ * footage carry a small play glyph; cards without carry nothing at all. The
+ * filter sheet gains a "Has video" intent whose count is live, so the tab can
+ * be honest about coverage without printing an apology on every other card.
+ * All three are load-bearing only while coverage is thin — see the TODO on
+ * VIDEOS_FIRST for the point at which this whole scaffold comes out.
+ *
  * Current design:
- *   - Base layer: video (or tone) + top-anchored meal name + macro line
+ *   - Base layer: video (or drifting still, or tone) + top-anchored meal name
+ *     + macro line
  *     (the selected plate's macros × portions). Nothing else — no buttons.
  *   - The side panel (swipe left or the edge tab) is the detail surface:
  *     inset plate-carousel hero card (arrows + tappable dots; arrows, not
@@ -158,6 +168,7 @@ import {
 } from 'react-native';
 import {
   Audio,
+  AVPlaybackStatus,
   InterruptionModeAndroid,
   InterruptionModeIOS,
   ResizeMode,
@@ -186,6 +197,14 @@ import { getVariantChoices, setVariantChoice } from '../utils/variantChoices';
 import { resolveBaseIngredients } from '../utils/resolveMealIngredients';
 import { computePlateMacros } from '../utils/computeMacros';
 import { RecipeFavorites } from '../utils/recipeFavorites';
+import {
+  VIDEO_BASE,
+  fetchVideoTableIfStale,
+  loadCachedVideoTable,
+  sameVideoTable,
+  type MealVideo,
+  type VideoTable,
+} from '../services/videoManifest';
 
 /* Cook is a tab screen, but every destination it pushes (CookMode,
  * RecipeDetail, …) lives on the root stack, which the tab navigator is nested
@@ -217,29 +236,34 @@ export const cookTabBarOpacity = new Animated.Value(1);
  * (ap-southeast-2, public read) and stream over HTTP range requests. Each MP4
  * is 720p vertical H.264 with the moov atom at the front (-movflags
  * +faststart), which is what lets playback start before the file finishes
- * downloading. Nothing is bundled, so adding a video is: encode, upload,
- * add a line here.
+ * downloading. Nothing is bundled.
+ *
+ * Adding a video no longer touches this file at all: encode, upload the mp4
+ * and its poster, add two lines to manifest.json in the same S3 prefix, done.
+ * No build, no submission, no review. The table below is only the fallback
+ * for when that manifest cannot be reached — see services/videoManifest.
  *
  * TODO(repo): once this passes a handful of entries, move it out of the app
  * entirely — a videos.json in the same bucket, fetched on launch and cached,
  * so new footage ships without an app release.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-const VIDEO_BASE =
-  'https://jsonfit-videos-au.s3.ap-southeast-2.amazonaws.com/videos';
-
-interface MealVideo {
-  video: string;
-  /** Frame-zero still, shown while the video buffers. Optional until the
-   *  poster JPGs are uploaded alongside the MP4s. */
-  poster?: string;
-}
+/* VIDEO_BASE and MealVideo now live in services/videoManifest, so the bucket
+ * is named in exactly one place and the wire format and the screen cannot
+ * drift apart. */
 
 /* Keyed by MealSlug, not string: the table is hand-edited every time footage
  * lands, and a typo'd key is otherwise invisible — the meal just silently
  * keeps its tone card and nobody notices until someone goes looking for the
  * video on device. Partial because coverage is (and will long remain) a small
  * subset of the catalogue.
+ *
+ * THIS TABLE IS NOW THE FLOOR, NOT THE WHOLE TRUTH. The live list comes from
+ * manifest.json on S3 (services/videoManifest), which is merged OVER this one
+ * so that uploading footage costs no release. Entries here are what the app
+ * falls back to when the manifest cannot be fetched or parsed — a cold install
+ * on a plane still plays whatever shipped in the binary. Keep butter_chicken
+ * here for exactly that reason; there is no need to add future videos to it.
  *
  * HEADS UP — this annotation does NOT currently catch a typo. MealSlug ends
  * in `| (string & {})` (types/curated_meals.ts:90, a deliberate escape hatch
@@ -250,14 +274,37 @@ interface MealVideo {
  * until then a typo is only catchable by a test asserting every key of this
  * table exists in CURATED_MEALS. */
 const MEAL_VIDEOS: Partial<Record<MealSlug, MealVideo>> = {
-  butter_chicken: { video: `${VIDEO_BASE}/butter_chicken.mp4` },
+  butter_chicken: {
+    video: `${VIDEO_BASE}/butter_chicken.mp4`,
+    poster: `${VIDEO_BASE}/butter_chicken.jpg`,
+  },
   /* Encoded and ready to upload:
    * mango_mass:                 { video: `${VIDEO_BASE}/mango_mass.mp4` },
    * turkey_meatballs_spaghetti: { video: `${VIDEO_BASE}/turkey_meatballs_spaghetti.mp4` }, */
 };
 
+/* Module-scope overlay rather than context or a prop: mealVideo() is called
+ * from memo bodies, from a referentially-stable viewability callback and from
+ * deep inside the card, and threading a table through all of those would be a
+ * far bigger change than the feature warrants. The cost is that mutating it is
+ * invisible to React, so every read site is paired with videoTableVersion in
+ * its dependency array and the screen bumps that counter when — and only
+ * when — it is safe to reorder. */
+let REMOTE_VIDEOS: VideoTable = {};
+
+function setRemoteVideos(table: VideoTable): void {
+  REMOTE_VIDEOS = table;
+}
+
+function remoteVideos(): VideoTable {
+  return REMOTE_VIDEOS;
+}
+
+/** Remote first, bundled second. The remote table can add a meal or replace a
+ *  bundled entry, but a meal absent from the manifest keeps whatever shipped,
+ *  so a manifest that loses an entry can never take footage away. */
 function mealVideo(slug: MealSlug): MealVideo | undefined {
-  return MEAL_VIDEOS[slug];
+  return REMOTE_VIDEOS[slug] ?? MEAL_VIDEOS[slug];
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -310,9 +357,11 @@ const FEED_AUDIO_MODE = {
 const VIDEO_ENABLED = true;
 
 /** Meals with footage sort to the front of every filtered list. With a handful
- *  of videos against 85 meals, burying them behind 30 tone cards would mean
+ *  of videos against 81 meals, burying them behind 30 photo cards would mean
  *  nobody ever sees one. Remove this once coverage is broad.
- *  TODO(repo): revisit when the catalogue passes ~20 videos. */
+ *  TODO(repo): at ~20 videos, drop this partition, the play-glyph marker and
+ *  the 'video' intent together — once footage is the norm, marking it is
+ *  noise and pinning it to the front distorts the feed. */
 const VIDEOS_FIRST = true;
 
 const PRELOAD_AHEAD_IOS = 2;
@@ -337,9 +386,9 @@ const PANEL_WIDTH = 280;
 const SWIPE_TRIGGER_DX = 48;
 const DOUBLE_TAP_MS = 300;
 
-/** Horizontal inset of the title block so it clears the category pill (left)
- *  and the saved heart chip (right), which sit on the same top band. */
-const TITLE_SIDE_INSET = 70;
+/** Horizontal inset of the title block. The title sits on its own band below
+ *  the pill/chip row, so this is plain side margin, not collision dodging. */
+const TITLE_SIDE_INSET = 20;
 
 /** Tab bar hide-on-play. When true, the overlaid tab bar fades out once the
  *  active card's video has played untouched for the grace period, and comes
@@ -403,13 +452,14 @@ function matchesCategory(meal: CuratedMeal, category: CookCategory): boolean {
   return meal.cuisine === CATEGORY_CUISINE[category];
 }
 
-type IntentFilter = 'fits' | 'quick' | 'nocook' | 'few' | 'saved';
+type IntentFilter = 'fits' | 'quick' | 'nocook' | 'few' | 'saved' | 'video';
 const INTENT_LABEL: Record<IntentFilter, string> = {
   fits: 'Fits your day',
   quick: 'Under 10 min',
   nocook: 'No cook',
   few: '5 ingredients or fewer',
   saved: 'Saved',
+  video: 'Has video',
 };
 const INTENT_ICON: Record<IntentFilter, keyof typeof Ionicons.glyphMap> = {
   fits: 'today-outline',
@@ -417,6 +467,7 @@ const INTENT_ICON: Record<IntentFilter, keyof typeof Ionicons.glyphMap> = {
   nocook: 'snow-outline',
   few: 'list-outline',
   saved: 'heart-outline',
+  video: 'play-circle-outline',
 };
 
 /** TODO(repo): swap for the app's theme tokens. */
@@ -706,6 +757,9 @@ export default function CookScreen(): React.JSX.Element {
   const [category, setCategory] = useState<CookCategory | null>('mains');
   const [intent, setIntent] = useState<IntentFilter | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  /* Measured, not assumed: the pill's height depends on the font, and the
+   * title band on every card is positioned directly below it. */
+  const [pillHeight, setPillHeight] = useState(0);
   /* Saved meals. TODAY: only this session's double-tap likes land here, so
    * the heart indicator and the Saved filter under-report on a fresh launch.
    * Nutrition-side picture (per NutritionHomeScreen): favourite MEALS are the
@@ -720,6 +774,23 @@ export default function CookScreen(): React.JSX.Element {
   /* Which card is on screen. Only that card's video plays; everything else is
    * paused, so scrolling never leaves audio or decoders running behind you. */
   const [activeIndex, setActiveIndex] = useState(0);
+  /* Bumped whenever the remote video table is swapped in. Nothing reads its
+   * value — it exists purely to invalidate the memos below, since mealVideo()
+   * reads module scope that React cannot observe. */
+  const [videoTableVersion, setVideoTableVersion] = useState(0);
+
+  /* Declared up here with the state it drives, not down with the fetch: the
+   * stable-ref mirror further below assigns it DURING render, so it has to
+   * exist by then. */
+  const pendingVideosRef = useRef<VideoTable | null>(null);
+
+  const applyPendingVideos = useCallback(() => {
+    const pending = pendingVideosRef.current;
+    if (!pending) return;
+    pendingVideosRef.current = null;
+    setRemoteVideos(pending);
+    setVideoTableVersion((v) => v + 1);
+  }, []);
   /* Feed-wide mute, deliberately NOT per card: muting is a statement about the
    * room you are in, not about one recipe, so it has to survive scrolling. On
    * iOS the hardware silent switch is bypassed by design (playsInSilentModeIOS
@@ -860,8 +931,15 @@ export default function CookScreen(): React.JSX.Element {
       nocook: base.filter(isNoCook).length,
       few: base.filter((m) => composedIngredientCount(m) <= 5).length,
       saved: base.filter((m) => savedSlugs.has(m.slug)).length,
+      /* Deliberately a live count and not a promise: it reads 1 today and
+       * climbs on its own as slugs land in MEAL_VIDEOS, so the chip never
+       * advertises footage that hasn't been uploaded. */
+      video: base.filter((m) => !!mealVideo(m.slug)).length,
     };
-  }, [category, remaining, savedSlugs]);
+    /* videoTableVersion is intentionally an unused dependency: mealVideo()
+     * reads a module-scope overlay, so this is the only thing tying the count
+     * to the manifest arriving. */
+  }, [category, remaining, savedSlugs, videoTableVersion]);
 
   const filtered = useMemo(() => {
     const list = MEALS.filter((m) => {
@@ -877,6 +955,8 @@ export default function CookScreen(): React.JSX.Element {
           return composedIngredientCount(m) <= 5;
         case 'saved':
           return savedSlugs.has(m.slug);
+        case 'video':
+          return !!mealVideo(m.slug);
         default:
           return true;
       }
@@ -887,7 +967,9 @@ export default function CookScreen(): React.JSX.Element {
     const withVideo = list.filter((m) => mealVideo(m.slug));
     if (withVideo.length === 0) return list;
     return [...withVideo, ...list.filter((m) => !mealVideo(m.slug))];
-  }, [category, intent, remaining, savedSlugs]);
+    /* See the note on intentCounts: videoTableVersion is what makes VIDEOS_FIRST
+     * re-partition once new footage is known about. */
+  }, [category, intent, remaining, savedSlugs, videoTableVersion]);
 
   const rows = useMemo<Row[]>(() => {
     const mealRows: Row[] = filtered.map((meal) => ({ kind: 'meal', meal }));
@@ -962,6 +1044,11 @@ export default function CookScreen(): React.JSX.Element {
       /* setState from useState is stable, so capturing it in this once-created
        * ref callback is safe. */
       setActiveIndex(index);
+      activeIndexRef.current = index;
+      /* Back at the top: a reorder here cannot move a card out from under the
+       * user, so this is the moment to swap in a manifest that arrived while
+       * they were scrolling. */
+      if (index === 0) applyPendingVideosRef.current();
 
       flushDwellRef.current();
       dwellRef.current = { slug: row.meal.slug, since: Date.now() };
@@ -981,6 +1068,9 @@ export default function CookScreen(): React.JSX.Element {
   ).current;
 
   /* onViewableItemsChanged must stay referentially stable; read through refs. */
+  const activeIndexRef = useRef(0);
+  const applyPendingVideosRef = useRef(applyPendingVideos);
+  applyPendingVideosRef.current = applyPendingVideos;
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   const flushDwellRef = useRef(flushDwell);
@@ -1042,15 +1132,97 @@ export default function CookScreen(): React.JSX.Element {
     ).catch(() => undefined);
   }, []);
 
-  const selectCategory = useCallback((next: CookCategory | null) => {
-    setCategory(next);
-    track('cook_chip_select', { row: 'category', chip: next ?? 'all' });
+  /* Both setters flush any pending manifest first. Changing a filter rebuilds
+   * the list from scratch, so a reorder is free here — and folding it into the
+   * setters rather than wrapping them means every caller gets it, including
+   * "clear filters" and the swipe-to-adjacent-category shortcut. */
+  const selectCategory = useCallback(
+    (next: CookCategory | null) => {
+      applyPendingVideos();
+      setCategory(next);
+      track('cook_chip_select', { row: 'category', chip: next ?? 'all' });
+    },
+    [applyPendingVideos],
+  );
+
+  const selectIntent = useCallback(
+    (next: IntentFilter | null) => {
+      applyPendingVideos();
+      setIntent(next);
+      track('cook_chip_select', { row: 'intent', chip: next ?? 'none' });
+    },
+    [applyPendingVideos],
+  );
+
+  /* ──────────────────────────────────────────────────────────────────────
+   * Remote video manifest
+   *
+   * Two-stage on purpose. The CACHED table is applied immediately: it is what
+   * the last launch already saw, so applying it before the first card is on
+   * screen reorders nothing the user has looked at. The NETWORK table is held
+   * back, because VIDEOS_FIRST partitions the feed and the "Has video" chip
+   * counts off the same lookup — swapping it in mid-scroll would slide the
+   * list under the user's thumb while they are reading a card.
+   *
+   * Pending work is flushed only at a point where a reorder is invisible:
+   * sitting on the first card, or changing a filter, which rebuilds the list
+   * from scratch anyway.
+   * ────────────────────────────────────────────────────────────────────── */
+  /* Cache only. The network fetch lives in the focus effect below, which also
+   * fires on mount — keeping both in here would mean two fetches racing on
+   * every cold start. */
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const cached = await loadCachedVideoTable();
+      if (cancelled || !cached) return;
+      if (sameVideoTable(cached, remoteVideos())) return;
+      /* Applied straight away rather than staged: this is what the last launch
+       * already showed, so there is nothing on screen for it to disturb. */
+      setRemoteVideos(cached);
+      setVideoTableVersion((v) => v + 1);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const selectIntent = useCallback((next: IntentFilter | null) => {
-    setIntent(next);
-    track('cook_chip_select', { row: 'intent', chip: next ?? 'none' });
-  }, []);
+  /* Refetch on focus, throttled to once every 30 minutes inside the service.
+   * Fires on mount too, so this is also the cold-start fetch.
+   *
+   * Focus rather than mount-only because the Cook screen can stay mounted for
+   * days inside the tab navigator. Without this, someone who never fully quits
+   * the app would keep whatever manifest they had at install and never see new
+   * footage at all. */
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      (async () => {
+        const fresh = await fetchVideoTableIfStale();
+        /* Null means either a failed fetch or a throttled one. Both are
+         * handled identically: keep whatever is loaded — cached, or the
+         * bundled floor — and try again on the next focus. */
+        if (cancelled || !fresh) return;
+        if (sameVideoTable(fresh, remoteVideos())) return;
+
+        pendingVideosRef.current = fresh;
+        /* Almost always true on a cold launch, so in practice the manifest is
+         * live before the user has scrolled anywhere. Mid-session it usually
+         * is not, and the pending table waits for the top of the feed or the
+         * next filter change. */
+        if (activeIndexRef.current === 0) applyPendingVideos();
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [applyPendingVideos]),
+  );
+
+
 
   const goToAdjacentCategory = useCallback(() => {
     const current = category ?? 'breakfast';
@@ -1095,6 +1267,7 @@ export default function CookScreen(): React.JSX.Element {
           height={cardHeight}
           bottomClearance={bottomClearance}
           topInset={insets.top}
+          pillHeight={pillHeight}
           isActive={index === activeIndex && screenActive}
           isCardVisible={index === activeIndex}
           muted={muted}
@@ -1115,6 +1288,7 @@ export default function CookScreen(): React.JSX.Element {
       cardHeight,
       bottomClearance,
       insets.top,
+      pillHeight,
       activeIndex,
       screenActive,
       muted,
@@ -1170,12 +1344,17 @@ export default function CookScreen(): React.JSX.Element {
       <Pressable
         onPress={() => setSheetOpen(true)}
         style={[styles.categoryPill, { top: insets.top + 8 }]}
+        onLayout={(e) => setPillHeight(e.nativeEvent.layout.height)}
         accessibilityRole="button"
         accessibilityLabel={`Filters. Showing ${
           category ? CATEGORY_LABEL[category] : 'all meals'
         }${intent ? `, ${INTENT_LABEL[intent]}` : ''}`}
       >
-        <Text style={styles.categoryPillText}>
+        <Text
+          style={styles.categoryPillText}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {category ? CATEGORY_LABEL[category] : 'All meals'}
           {intent ? ` · ${INTENT_LABEL[intent]}` : ''}
         </Text>
@@ -1209,6 +1388,9 @@ interface MealCardProps {
   index: number;
   height: number;
   topInset: number;
+  /** Measured height of the screen-level category pill (onLayout, not
+   *  assumed). The title band sits directly below the pill/chip row. */
+  pillHeight: number;
   /** How much every bottom-anchored element must clear: the overlaid tab bar
    *  height when inside the tab navigator, else the bottom safe area inset. */
   bottomClearance: number;
@@ -1248,6 +1430,7 @@ function MealCard(props: MealCardProps): React.JSX.Element {
     meal,
     height,
     topInset,
+    pillHeight,
     bottomClearance,
     isActive,
     isCardVisible,
@@ -1581,6 +1764,7 @@ function MealCard(props: MealCardProps): React.JSX.Element {
         meal={meal}
         video={video}
         shouldPlay={isActive && !paused}
+        animateStill={isActive && !panelOpen}
         muted={muted}
         onPress={onMediaPress}
       />
@@ -1702,14 +1886,30 @@ function MealCard(props: MealCardProps): React.JSX.Element {
         </View>
       ) : null}
 
-      {/* Title + macro line anchored as high as the hardware allows:
-          insets.top clears notches, Dynamic Islands and punch-hole cameras on
-          every device. Inset each side to clear the pill and heart chip. No
-          scrim — text shadows carry legibility over footage. Also the card's
-          accessibility summary and the next/previous rotor actions. */}
+      {/* Presence marker, under the mute chip. Marks the cards that DO have
+          footage rather than the ones that don't: with coverage at 1 in 81 an
+          absence badge would paint 80 cards with an apology, while a play
+          glyph on the rare card reads as a bonus. Not a button — tapping the
+          media already toggles playback, so this is signage only, and it
+          disappears on its own as coverage stops being remarkable. */}
+      {VIDEO_ENABLED && video ? (
+        <View
+          pointerEvents="none"
+          style={[styles.videoChip, { top: topInset + 84 }]}
+        >
+          <Ionicons name="play" size={13} color={C.text} />
+        </View>
+      ) : null}
+
+      {/* Title + macro line on its own band BELOW the pill/chip row — beside
+          it, the growing pill label ("Mains · 5 ingredients or fewer") walks
+          straight into the title. Positioned off the pill's MEASURED height,
+          so a font change moves the band with it. No scrim — text shadows
+          carry legibility over footage. Also the card's accessibility
+          summary and the next/previous rotor actions. */}
       <View
         pointerEvents="none"
-        style={[styles.titleBlock, { top: topInset + 8 }]}
+        style={[styles.titleBlock, { top: topInset + 8 + pillHeight + 10 }]}
         accessible
         accessibilityLabel={`${meal.display_name}. ${Math.round(macros.kcal * portions)} calories, ${Math.round(macros.protein_g * portions)} grams protein, ${Math.round(macros.carbs_g * portions)} carbs, ${Math.round(macros.fat_g * portions)} fat${portions > 1 ? `, ${portions} portions` : ''}.`}
         accessibilityActions={[
@@ -2221,26 +2421,125 @@ function IngredientList(props: {
 /* ────────────────────────────────────────────────────────────────────────────
  * Media layer
  *
- * The tone backing stays mounted underneath the video surface, so the
- * still→video transition never shows a black frame (the Android failure mode).
- * A meal with no MEAL_VIDEOS entry, or one whose stream errors, simply keeps
- * the tone — the feed degrades to exactly what it looked like before video.
+ * Three layers, bottom to top: deterministic tone, meal still, video. Each is
+ * a fallback for the one above it, so nothing ever paints black.
+ *
+ * The still matters more than it looks. Coverage is 1 video against 81 meals,
+ * so the overwhelmingly common card is a meal with no footage — a flat tone
+ * there reads as a broken screen rather than a considered one. What it must
+ * NOT do is turn Cook into a second NutritionHome: the slow Ken Burns is the
+ * whole difference between "a feed that happens to be paused" and "a grid of
+ * photos you already have a tab for".
+ *
+ * Absence is never labelled. No "video coming soon", no placeholder glyph on
+ * the 80 cards without footage — presence is marked instead (see the play
+ * chip on the card), because a badge repeated 80 times reads as an unfinished
+ * app and there is nothing the viewer can do about it either way.
  * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Seconds for one direction of the Ken Burns drift. Slow on purpose: fast
+ *  enough that the card is visibly alive next to a video card, slow enough
+ *  that it never competes with one. */
+const STILL_ZOOM_MS = 14000;
+const STILL_ZOOM_TO = 1.045;
 
 function CardMedia(props: {
   meal: CuratedMeal;
   video?: MealVideo;
   shouldPlay: boolean;
+  /** Runs the Ken Burns drift. False for off-screen cards and while the side
+   *  panel is open — an animation nobody is looking at is just battery. */
+  animateStill: boolean;
   muted: boolean;
   onPress: () => void;
 }): React.JSX.Element {
-  const { meal, video, shouldPlay, muted, onPress } = props;
+  const { meal, video, shouldPlay, animateStill, muted, onPress } = props;
   const [failed, setFailed] = useState(false);
   const showVideo = VIDEO_ENABLED && !!video && !failed;
+  /* Registry lookup, never a constructed path: getMealImage is keyed by
+   * image_filename and its keys are not disk filenames. */
+  const still = resolveMealImage(meal.image_filename);
+
+  const { width: cardWidth } = useWindowDimensions();
+  /* Explicit geometry instead of resizeMode: the runtime renders this image
+   * as cover no matter what resizeMode says (canary-verified against the
+   * live bundle), so the letterbox is built from real numbers it cannot
+   * override. Ratio comes from Image.resolveAssetSource per asset, not a
+   * hardcoded 941/1672, so a still with different dimensions still lays out
+   * correctly. */
+  const stillSize = useMemo(() => {
+    if (!still) return null;
+    const resolved = Image.resolveAssetSource(still);
+    if (!resolved?.width || !resolved?.height) return null;
+    return {
+      width: cardWidth,
+      height: cardWidth * (resolved.height / resolved.width),
+    };
+  }, [still, cardWidth]);
+
+  /* Scale only, no translate: a pan on a cover-fitted image can walk a plate
+   * edge into frame on tall aspect ratios. */
+  const zoom = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!animateStill || !still || showVideo) {
+      zoom.stopAnimation();
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(zoom, {
+          toValue: 1,
+          duration: STILL_ZOOM_MS,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(zoom, {
+          toValue: 0,
+          duration: STILL_ZOOM_MS,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animateStill, still, showVideo, zoom]);
+
+  const zoomScale = zoom.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, STILL_ZOOM_TO],
+  });
+
+  /* Video reveal. The footage is held at opacity 0 until expo-av reports its
+   * first loaded status, then faded up — cutting straight from the
+   * letterboxed still to full-bleed vertical footage put two very different
+   * frames back to back and read as a glitch. Reset when this card instance
+   * is recycled onto a different meal, so a scroll never shows the previous
+   * meal's last frame at full opacity. */
+  const videoOpacity = useRef(new Animated.Value(0)).current;
+  const videoRevealed = useRef(false);
+  useEffect(() => {
+    videoRevealed.current = false;
+    videoOpacity.setValue(0);
+  }, [meal.slug, videoOpacity]);
+
+  const onPlaybackStatus = useCallback(
+    (status: AVPlaybackStatus) => {
+      if (!status.isLoaded || videoRevealed.current) return;
+      videoRevealed.current = true;
+      Animated.timing(videoOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+    },
+    [videoOpacity],
+  );
 
   return (
     <Pressable style={StyleSheet.absoluteFill} onPress={onPress}>
-      {/* Backing tone — always mounted, never unmounted. */}
+      {/* Backing tone — always mounted, never unmounted. Last fallback, for a
+          meal the image registry has no entry for. */}
       <View
         style={[
           StyleSheet.absoluteFill,
@@ -2248,44 +2547,104 @@ function CardMedia(props: {
         ]}
       />
 
-      {/* Frame-zero poster, when one has been uploaded. Sits between the tone
-          and the video so the first painted frame matches the video's own. */}
-      {showVideo && video?.poster ? (
-        <Image
-          source={{ uri: video.poster }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          fadeDuration={0}
-        />
+      {/* Pure black under a contained still, replacing the tone. The tone is
+          a warm brown/green, so letterboxing a black-background photo onto it
+          would draw a visible frame around the dish; on black there is no
+          seam at all. */}
+      {still && !showVideo ? (
+        <View style={[StyleSheet.absoluteFill, styles.stillBacking]} />
       ) : null}
 
+      {/* Meal still — only when the card is NOT showing video. It used to sit
+          under the video too, but the letterboxed 16:9 strip flashing before
+          the full-bleed footage read as a glitch; error recovery survives the
+          unmount because onError flips `failed`, which turns showVideo off
+          and brings this whole stack back.
+          Letterboxed, not covered. The stills are 16:9 landscape; covering
+          one into a 9:19.5 card scales to fill the HEIGHT, which throws
+          most of the width off both edges and lands you on a crop of one
+          corner of the pan. Sized to the card width at the asset's own
+          ratio and centred, the whole dish shows, and because the
+          photography is shot on black the letterbox reads as the photo's own
+          background rather than as bars. */}
+      {still && !showVideo ? (
+        <View style={styles.stillFrame}>
+          <Animated.Image
+            source={still}
+            style={[
+              stillSize ?? StyleSheet.absoluteFillObject,
+              { transform: [{ scale: zoomScale }] },
+            ]}
+            fadeDuration={0}
+          />
+        </View>
+      ) : null}
+
+      {/* Uniform wash rather than a top gradient: the stepped scrim was
+          rejected for its visible seams, and a real gradient would mean a new
+          native dependency. Photography is shot on black, so an even 12% is
+          invisible on the image and enough for the title's text shadows to
+          hold. Lighter than it was: a contained still leaves black around the
+          dish, so there is far less bright pixel under the title to fight.
+          Skipped over video — footage is already graded darker. */}
+      {still && !showVideo ? (
+        <View pointerEvents="none" style={styles.stillWash} />
+      ) : null}
+
+      {/* Video stack. Bottom to top: black gap filler, frame-zero poster
+          (when one has been uploaded), the footage itself. The still stack
+          above is unmounted for a video card, so until the first frame lands
+          the viewer sees the poster if there is one and plain black
+          otherwise — black is the deliberate gap filler, not the still. */}
       {showVideo ? (
-        <Video
-          source={{ uri: video!.video }}
-          style={StyleSheet.absoluteFill}
-          resizeMode={ResizeMode.COVER}
-          shouldPlay={shouldPlay}
-          isLooping
-          /* Sound on by default (Shorts/Reels convention), with the mute chip
-           * on the card as the in-app control — the screen-level
-           * Audio.setAudioModeAsync call deliberately plays past the iOS
-           * silent switch, so the hardware rocker alone was not enough. */
-          isMuted={muted}
-          /* No native controls: the pager owns every gesture on this surface. */
-          useNativeControls={false}
-          onError={() => {
-            /* Network blip, bad URL, unsupported file: fall back to the tone
-             * rather than showing a black rectangle. */
-            setFailed(true);
-            track('cook_video_error', { slug: meal.slug });
-          }}
-        />
+        <>
+          <View style={[StyleSheet.absoluteFill, styles.stillBacking]} />
+          {video?.poster ? (
+            <Image
+              source={{ uri: video.poster }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              fadeDuration={0}
+            />
+          ) : null}
+          {/* Held at opacity 0 until onPlaybackStatus sees isLoaded, then
+              faded up — see the reveal note above. */}
+          <Animated.View
+            style={[StyleSheet.absoluteFill, { opacity: videoOpacity }]}
+          >
+            <Video
+              source={{ uri: video!.video }}
+              style={StyleSheet.absoluteFill}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={shouldPlay}
+              isLooping
+              /* Sound on by default (Shorts/Reels convention), with the mute
+               * chip on the card as the in-app control — the screen-level
+               * Audio.setAudioModeAsync call deliberately plays past the iOS
+               * silent switch, so the hardware rocker alone was not enough. */
+              isMuted={muted}
+              /* No native controls: the pager owns every gesture on this
+               * surface. */
+              useNativeControls={false}
+              onPlaybackStatusUpdate={onPlaybackStatus}
+              onError={() => {
+                /* Network blip, bad URL, unsupported file: fall back to the
+                 * still (or the tone, if the registry has no entry) rather
+                 * than showing a black rectangle. */
+                setFailed(true);
+                track('cook_video_error', { slug: meal.slug });
+              }}
+            />
+          </Animated.View>
+        </>
       ) : null}
     </Pressable>
   );
 }
 
-/** Deterministic placeholder tone until the image resolver is wired. */
+/** Deterministic backing tone. Only reached when the image registry has no
+ *  entry for the meal — coverage is currently complete, so this is a guard,
+ *  not the common path. */
 function fallbackTone(slug: string): string {
   const tones = ['#26221C', '#1E2823', '#2D211C', '#241F1D', '#22282A'];
   let hash = 0;
@@ -2429,9 +2788,15 @@ function FilterSheet(props: {
     outputRange: [SHEET_SLIDE_DISTANCE, 0],
   });
 
+  /* 'video' sits last: it's the narrowest filter in the row while coverage is
+   * thin, and it has to be reachable without pushing the everyday intents
+   * down. Hidden entirely when playback is switched off at VIDEO_ENABLED,
+   * since the chip would then filter to a list nothing can play. */
   const intents: IntentFilter[] = (
-    ['fits', 'quick', 'nocook', 'few', 'saved'] as IntentFilter[]
-  ).filter((i) => i !== 'fits' || showFits);
+    ['fits', 'quick', 'nocook', 'few', 'saved', 'video'] as IntentFilter[]
+  )
+    .filter((i) => i !== 'fits' || showFits)
+    .filter((i) => i !== 'video' || VIDEO_ENABLED);
 
   if (!mounted) return null;
 
@@ -2576,6 +2941,9 @@ const styles = StyleSheet.create({
   categoryPill: {
     position: 'absolute',
     left: 14,
+    /* Capped so a long filter label ("Mains · 5 ingredients or fewer") can
+     * never dominate the row; the text truncates, the chevron never does. */
+    maxWidth: '60%',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: C.overlay,
@@ -2584,7 +2952,12 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     gap: 5,
   },
-  categoryPillText: { color: C.text, fontSize: 12, fontWeight: '500' },
+  categoryPillText: {
+    color: C.text,
+    fontSize: 12,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
   categoryPillChevron: { color: C.sub, fontSize: 12, marginTop: -2 },
 
   savedChip: {
@@ -2616,6 +2989,36 @@ const styles = StyleSheet.create({
     backgroundColor: C.overlay,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  /* Quieter plate than savedChip/muteChip: this one is signage, and matching
+   * their weight would read as a third button. */
+  videoChip: {
+    position: 'absolute',
+    right: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(20,20,20,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  stillBacking: {
+    backgroundColor: '#000000',
+  },
+
+  /* Centring frame for the explicitly-sized still: see the note in CardMedia. */
+  stillFrame: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* Flat, full-bleed, no gradient: see the note in CardMedia. */
+  stillWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.12)',
   },
 
   /* Like/unlike effects layer — centered over the media. */
