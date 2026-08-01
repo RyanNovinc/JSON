@@ -2,7 +2,7 @@
   "expo": {
     "name": "JSON.fit",
     "slug": "json",
-    "version": "1.0.23",
+    "version": "1.0.24",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -15,8 +15,11 @@
     },
     "ios": {
       "supportsTablet": true,
+      "splash": {
+        "backgroundColor": "#000000"
+      },
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "122",
+      "buildNumber": "129",
       "associatedDomains": [
         "applinks:json.fit"
       ],
@@ -31,6 +34,7 @@
         "CFBundleName": "JSON.fit",
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true,
+        "NSSupportsLiveActivitiesFrequentUpdates": false,
         "LSSupportsOpeningDocumentsInPlace": true,
         "CFBundleDocumentTypes": [
           {
@@ -137,6 +141,12 @@
       "expo-notifications",
       "./plugins/withAdiRegistration",
       "react-native-edge-to-edge"
-    ]
+    ],
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/836fbcc1-7997-4d00-b9eb-5d259570a9a7"
+    }
   }
 }
