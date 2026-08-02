@@ -2,34 +2,21 @@ import { hasCompleteQuestionnaire, loadQuestionnaireAnswers } from './questionna
 import {
   hasCompleteNutritionAnswers,
   loadNutritionAnswers,
-  saveNutritionAnswers,
+  mergeNutritionAnswers,
 } from './nutritionQuestionnaireStorage';
-import type { NutritionAnswers } from './nutritionQuestionnaireStorage';
 import { hasGoalsProfile, loadGoalsProfile } from './goalsProfileStorage';
 import { derivePhase } from './goalsProfile';
-import type { DerivedPhase } from './goalsProfile';
 
-// Synthetic N1 (goal) and N2 (rate) answers per phase.
-// Persisted before navigating to N3 so hasCompleteNutritionAnswers() can
-// reach `true` even though those screens were skipped.
-const PHASE_SYNTH: Record<
-  DerivedPhase,
-  { goal: NutritionAnswers['goal']; targetRatePercentage?: number }
-> = {
-  cut:       { goal: 'lose_weight', targetRatePercentage: 0.5  },
-  recomp:    { goal: 'maintain' },
-  lean_bulk: { goal: 'gain_weight', targetRatePercentage: 0.25 },
-  bulk:      { goal: 'gain_weight', targetRatePercentage: 0.5  },
-  maintain:  { goal: 'maintain' },
-};
+// The phase -> synthetic N1/N2 mapping now lives in its own leaf module so
+// nutritionQuestionnaireStorage can use it for goal recovery without an
+// import cycle. Re-exported here so existing importers (GoalsIntakeScreen)
+// keep working unchanged.
+export {
+  deriveSyntheticNutritionAnswers,
+} from './syntheticNutritionAnswers';
+export type { SyntheticNutritionAnswers } from './syntheticNutritionAnswers';
 
-// Shared with GoalsIntakeScreen's first-run skip path, so both places that
-// bypass N1/N2 derive the same synthetic answers from a single mapping.
-export function deriveSyntheticNutritionAnswers(
-  phase: DerivedPhase
-): { goal: NutritionAnswers['goal']; targetRatePercentage?: number } {
-  return PHASE_SYNTH[phase];
-}
+import { deriveSyntheticNutritionAnswers } from './syntheticNutritionAnswers';
 
 // ── Continuation helpers ───────────────────────────────────────────────────
 //
@@ -70,8 +57,10 @@ export async function continueNutritionFlow(
     if (profile?.goalWeightKg) {
       const phase = derivePhase(profile);
       const synth = deriveSyntheticNutritionAnswers(phase);
-      const merged = { ...saved, ...synth };
-      await saveNutritionAnswers(merged);
+      // mergeNutritionAnswers re-reads and writes the draft itself, and returns
+      // the merged result. It also refuses to write a non-object, so a bad
+      // synth can no longer disappear into saveNutritionAnswers' catch block.
+      const merged = await mergeNutritionAnswers(synth);
       // N1 and N2 are being skipped — shift the step count down by 2 so
       // N3 onward still number continuously (see the flowStepOffset
       // convention: the same shift is applied uniformly to every

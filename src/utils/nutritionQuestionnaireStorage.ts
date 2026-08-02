@@ -13,6 +13,9 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutStorage } from './storage';
+import { deriveSyntheticNutritionAnswers } from './syntheticNutritionAnswers';
+import { derivePhase } from './goalsProfile';
+import { loadGoalsProfile } from './goalsProfileStorage';
 
 const KEY = '@nutrition_questionnaire_answers';
 
@@ -56,17 +59,35 @@ export interface NutritionAnswers {
   [key: string]: any;
 }
 
+// "Not answered", for merge purposes. Deliberately NOT `[]` or `0`: an empty
+// equipment list and a zero budget are real answers. An empty string is what
+// `String(a.goal || '')` in finalizeNutrition leaves behind when the answer
+// was missing, which is the case this exists to catch.
+function isBlank(v: any): boolean {
+  return v === undefined || v === null || v === '';
+}
+
+// Assign only the keys that carry a real answer, so a blank on top can never
+// erase a good value underneath.
+function overlay(base: NutritionAnswers, top: NutritionAnswers): NutritionAnswers {
+  const out: NutritionAnswers = { ...base };
+  Object.keys(top || {}).forEach((k) => {
+    if (!isBlank(top[k])) out[k] = top[k];
+  });
+  return out;
+}
+
 export async function loadNutritionAnswers(): Promise<NutritionAnswers> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     const answers = raw ? JSON.parse(raw) : {};
-    
+
     // Migration: Convert 14-day plans to 7-day plans
     if (answers.planDuration === 14) {
       answers.planDuration = 7;
       await saveNutritionAnswers(answers);
     }
-    
+
     return answers;
   } catch (e) {
     console.error('loadNutritionAnswers failed', e);
@@ -77,11 +98,34 @@ export async function loadNutritionAnswers(): Promise<NutritionAnswers> {
 export async function saveNutritionAnswers(
   answers: NutritionAnswers
 ): Promise<void> {
+  // Guard: JSON.stringify(undefined) is not a string, so setItem throws and
+  // the catch below swallows it. That is how a bad synthetic-answers call
+  // could lose the goal without leaving any trace. Fail loudly instead.
+  if (!answers || typeof answers !== 'object') {
+    console.error(
+      '[saveNutritionAnswers] refusing to save non-object answers:',
+      answers
+    );
+    return;
+  }
   try {
     await AsyncStorage.setItem(KEY, JSON.stringify(answers));
   } catch (e) {
     console.error('saveNutritionAnswers failed', e);
   }
+}
+
+// Merge a partial set of answers into the draft rather than replacing it.
+// Use this anywhere that contributes only a few fields (the N1/N2 skip paths
+// in GoalsIntakeScreen and continueNutritionFlow) so a partially filled draft
+// survives the write.
+export async function mergeNutritionAnswers(
+  partial: NutritionAnswers
+): Promise<NutritionAnswers> {
+  const current = await loadNutritionAnswers();
+  const merged = overlay(current, partial || {});
+  await saveNutritionAnswers(merged);
+  return merged;
 }
 
 // Merge-update a single field. Used by editMode on each Q screen, the
@@ -102,6 +146,36 @@ export async function clearNutritionAnswers(): Promise<void> {
   }
 }
 
+// The N1/N2 skip path derives goal (and rate) from the GoalsProfile phase and
+// persists them as synthetic answers. If that write never landed, or the goal
+// was lost somewhere between there and finalize, the profile is still on disk
+// and still implies the same direction, so re-derive it rather than showing an
+// empty summary to someone who answered every question. Returns the answers
+// untouched when there is nothing to recover from.
+async function recoverGoalFromProfile(
+  a: NutritionAnswers
+): Promise<NutritionAnswers> {
+  if (!isBlank(a.goal)) return a;
+
+  try {
+    const profile = await loadGoalsProfile();
+    if (!profile?.goalWeightKg) return a;
+
+    const synth = deriveSyntheticNutritionAnswers(derivePhase(profile));
+    const recovered: NutritionAnswers = { ...a, goal: synth.goal };
+    if (isBlank(a.targetRatePercentage) && synth.targetRatePercentage != null) {
+      recovered.targetRatePercentage = synth.targetRatePercentage;
+    }
+    console.warn(
+      `[resolveNutritionAnswers] no stored goal; recovered "${synth.goal}" from GoalsProfile`
+    );
+    return recovered;
+  } catch (e) {
+    console.error('recoverGoalFromProfile failed', e);
+    return a;
+  }
+}
+
 /**
  * The answers as anything AFTER the questionnaire should read them.
  *
@@ -119,6 +193,16 @@ export async function clearNutritionAnswers(): Promise<void> {
  * re-finalizes on Continue, which re-persists the merge and re-clears the
  * draft — so the two stores never diverge.
  *
+ * The overlay is BLANK-AWARE, and that is the third bug of this shape.
+ * finalizeNutrition writes `goal: String(a.goal || '')`, so a goal lost
+ * upstream is persisted as an empty string rather than as an absent key.
+ * Stripping only `undefined` (as this used to) let that empty string reach
+ * `!answers.goal` in NutritionSummaryScreen, which is the blank
+ * "No saved questionnaire" screen for a user who had just answered
+ * everything. Empty strings now count as unanswered on both sides of the
+ * merge, and a still-missing goal is re-derived from the GoalsProfile that
+ * the skip path took it from in the first place.
+ *
  * Returns null when the user genuinely has no questionnaire, so callers can
  * still show their empty state.
  */
@@ -127,7 +211,8 @@ export async function resolveNutritionAnswers(): Promise<NutritionAnswers | null
   const results = await WorkoutStorage.loadNutritionResults();
 
   if (!results?.formData) {
-    return draft && Object.keys(draft).length > 0 ? draft : null;
+    if (!draft || Object.keys(draft).length === 0) return null;
+    return recoverGoalFromProfile(draft);
   }
 
   const f = results.formData;
@@ -182,12 +267,15 @@ export async function resolveNutritionAnswers(): Promise<NutritionAnswers | null
     eatingChallenges: budget?.eatingChallenges,
   };
 
-  // Drop undefined keys so they don't shadow draft values in the spread.
+  // Drop blank keys: `undefined` AND `''`. The empty string is the important
+  // one — it is a placeholder written by finalizeNutrition, never an answer.
+  // Explicit nulls on age/height/weight are kept, since the summary formats
+  // those as "—" and callers distinguish null from absent.
   Object.keys(fromResults).forEach((k) => {
-    if (fromResults[k] === undefined) delete fromResults[k];
+    if (fromResults[k] === undefined || fromResults[k] === '') delete fromResults[k];
   });
 
-  return { ...fromResults, ...draft };
+  return recoverGoalFromProfile(overlay(fromResults, draft));
 }
 
 // Has the user finished the NEW nutrition questionnaire?

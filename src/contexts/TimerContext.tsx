@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 
 // Mirror the guard pattern in src/utils/liveActivity.ts: conditional require so
 // the native module is never loaded on Android (named exports throw when called there).
@@ -143,7 +144,7 @@ const COUNTDOWN_AUDIO_MODE = {
  * `remaining <= 3` could land anywhere from the true 3.000s mark to a full second late —
  * and a late start pushes the final beep past zero.
  */
-const COUNTDOWN_ALERT_LEAD_MS = 3000;
+export const COUNTDOWN_ALERT_LEAD_MS = 3000;
 
 /**
  * A timer is in exactly one of four states. Read them from the flags; never infer
@@ -217,7 +218,30 @@ interface ExerciseContext {
 
 export interface TimerSettings {
   countUp: boolean;
+  /**
+   * The three alert channels for the last three seconds of a rest. All default ON.
+   *
+   * They are independent on purpose. Someone training in a quiet room mutes the sound and
+   * keeps the screen; someone with the phone in a pocket keeps the vibration and does not
+   * care about either of the others; someone who finds the whole thing intrusive turns all
+   * three off and still has the badge counting down.
+   */
+  sound: boolean;
+  haptics: boolean;
+  visualCountdown: boolean;
   pace: RestPace;
+  /**
+   * Has the user ever picked a pace themselves?
+   *
+   * Exists so an imported plan can set the pace it was designed for WITHOUT overwriting a
+   * choice the user made deliberately. Someone who answered "optimal for muscle growth" in
+   * the questionnaire and has never touched the control should get that pace when their plan
+   * lands. Someone who switched to Quick on purpose should keep Quick, even when they import
+   * the next block of the same program months later.
+   *
+   * Set true by the pace control in TimerModal, never by applyPlanDefaultPace.
+   */
+  paceTouched: boolean;
 }
 
 
@@ -229,7 +253,31 @@ interface TimerContextType {
   // Settings
   timerSettings: TimerSettings;
   setTimerSettings: (settings: TimerSettings) => void;
-  
+
+  /**
+   * The three durations for the exercise the user is CURRENTLY LOOKING AT, whether or not a
+   * rest is running. Published by WorkoutLogScreenAdapter as the pager moves, and cleared
+   * when it unmounts — TimerModal is rendered globally, so without that it would keep
+   * showing numbers belonging to a screen the user has left.
+   *
+   * Display only. Nothing schedules off it, nothing retargets to it, and it is deliberately
+   * NOT persisted: it describes where the user is standing right now, which is not a fact
+   * that should survive a relaunch. A live timer's own restOptions always take precedence
+   * over this — see TimerModal.
+   */
+  previewRestOptions: RestTriple | null;
+  setPreviewRestOptions: (options: RestTriple | null) => void;
+
+  /**
+   * Adopt the rest pace a freshly imported plan was designed around.
+   *
+   * Call this on a successful routine import, passing the plan's root `default_pace`. It is
+   * a no-op when the user has already chosen a pace themselves (settings.paceTouched), so an
+   * import can never silently undo a deliberate choice — which matters most for cumulative
+   * multi-block programs, where the same user imports the same program repeatedly.
+   */
+  applyPlanDefaultPace: (pace?: RestPace | null) => void;
+
   // Timer controls
   startTimer: (targetSeconds?: number, exerciseIndex?: number, setIndex?: number, themeColor?: string, restOptions?: RestTriple) => void;
   pauseTimer: () => void;
@@ -277,15 +325,34 @@ const REST_PACES: readonly string[] = ['optimal', 'moderate', 'minimal'];
 const migrateTimerSettings = (raw: any): TimerSettings => {
   const countUp = !!raw?.countUp;
 
+  // `!== false`, NOT `!!`. These three landed after the settings object shipped, so every
+  // existing user has a stored blob with no such keys. Coercing with `!!` would read
+  // undefined as false and silently ship the alert, the vibration and the countdown
+  // overlay turned OFF to everyone who has ever opened the timer — the exact failure this
+  // migrate function exists to prevent. Absent means "never chose", and the default is on.
+  const alerts = {
+    sound: raw?.sound !== false,
+    haptics: raw?.haptics !== false,
+    visualCountdown: raw?.visualCountdown !== false,
+  };
+
   if (typeof raw?.pace === 'string' && REST_PACES.includes(raw.pace)) {
-    return { countUp, pace: raw.pace as RestPace };
+    return { countUp, ...alerts, pace: raw.pace as RestPace, paceTouched: !!raw?.paceTouched };
   }
 
   if (typeof raw?.quickMode === 'boolean') {
-    return { countUp, pace: raw.quickMode ? 'minimal' : 'moderate' };
+    // quickMode true means the user went and switched the old toggle on, which is a
+    // deliberate choice and carries forward as one. quickMode false was the shipped
+    // default, so it tells us nothing and does not count as touched.
+    return {
+      countUp,
+      ...alerts,
+      pace: raw.quickMode ? 'minimal' : 'moderate',
+      paceTouched: raw.quickMode === true,
+    };
   }
 
-  return { countUp, pace: 'moderate' };
+  return { countUp, ...alerts, pace: 'moderate', paceTouched: false };
 };
 
 export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
@@ -294,7 +361,14 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const [timerSettings, setTimerSettingsState] = useState<TimerSettings>({
     countUp: false,
     pace: 'moderate',
+    paceTouched: false,
+    sound: true,
+    haptics: true,
+    visualCountdown: true,
   });
+  // Ephemeral, not persisted. Owned by whichever screen is showing an exercise; see the
+  // doc on previewRestOptions in TimerContextType.
+  const [previewRestOptions, setPreviewRestOptions] = useState<RestTriple | null>(null);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   // The pending countdown-alert timeout. A ref, not TimerState: TimerState is JSON.stringified
@@ -304,6 +378,9 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   // The `endTime - LEAD` instant we have already dispatched an alert for. Guards the
   // catch-up branch only; see scheduleCountdownAlert.
   const dispatchedAlertFireAtRef = useRef<number | null>(null);
+  // Pending haptic pulses for the current alert. An array because the pattern is four
+  // separate beats, not one buzz; see fireCountdownHaptics.
+  const hapticTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const appStateRef = useRef(AppState.currentState);
   const soundRef = useRef<Audio.Sound | null>(null);
   const getExerciseContextRef = useRef<((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null>(null);
@@ -313,6 +390,11 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   // startTimer/stopTimer previously read `timer` from the closure, which meant two
   // rapid calls saw the same liveActivityId and could leak or double-stop an activity.
   const timerRef = useRef<TimerState | null>(null);
+  // Same idea for settings. applyPlanDefaultPace is called from the import path, which is
+  // not this component, so it cannot rely on a fresh render closure — and it must not read
+  // state through an updater either, because React double-invokes those in development and
+  // this function persists to AsyncStorage.
+  const timerSettingsRef = useRef<TimerSettings>(timerSettings);
 
   // Load persisted state on mount
   useEffect(() => {
@@ -398,6 +480,10 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     timerRef.current = timer;
   }, [timer]);
+
+  useEffect(() => {
+    timerSettingsRef.current = timerSettings;
+  }, [timerSettings]);
 
   // Persist state changes
   useEffect(() => {
@@ -540,6 +626,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     // The deadline moved, so any alert already playing belongs to the old one. Silence it;
     // the effect re-arms against the new deadline off the targetTime change below.
     stopCountdownSound();
+    stopCountdownHaptics();
 
     const next: TimerState =
       current.timeElapsed >= newTarget
@@ -583,6 +670,35 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Error saving timer settings:', error);
     }
+  };
+
+  /**
+   * Adopt an imported plan's rest pace, if and only if the user has not chosen one.
+   *
+   * Deliberately does NOT set paceTouched. The pace came from the plan, not from the user
+   * putting their finger on the control, so a later import of a differently-paced program is
+   * still allowed to move it. The moment they touch the control themselves, that stops.
+   *
+   * Reads timerSettingsRef rather than a state updater or the render closure. An updater
+   * would be the obvious way to see current settings, but React double-invokes updaters in
+   * development and this function writes to AsyncStorage — the same trap the countdown alert
+   * was moved out of the interval to avoid. The closure is no good either, because the caller
+   * lives in the import screen, not in this component.
+   *
+   * Takes a pace rather than a whole settings object so a caller in the import path cannot
+   * accidentally clobber countUp on its way past.
+   */
+  const applyPlanDefaultPace = (pace?: RestPace | null) => {
+    if (!pace || !REST_PACES.includes(pace)) return;
+
+    const current = timerSettingsRef.current;
+    if (current.paceTouched || current.pace === pace) return;
+
+    DebugLogger.log(`🎚️ [PACE] adopted plan default: ${current.pace}→${pace}`, 'log');
+
+    // Route through setTimerSettings so persistence and live-rest retargeting stay in one
+    // place. paceTouched is carried through unchanged — this is not the user choosing.
+    setTimerSettings({ ...current, pace });
   };
 
   const handleAppStateChange = (nextAppState: AppStateStatus) => {
@@ -766,6 +882,54 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   /**
+   * Where the haptic pulses land, as offsets into the alert.
+   *
+   * The alert is ONE ~3s asset with four beeps at 3/2/1/0, so haptics cannot ride on its
+   * playback events — there are none between start and finish. They are scheduled instead,
+   * against the same instant the asset starts, which keeps buzz and beep on the same beat
+   * without either knowing about the other.
+   */
+  const HAPTIC_BEATS_MS = [0, 1000, 2000, 3000];
+
+  /** Cancel any pending pulses. Silence is the goal; a failed cancel has nothing to undo. */
+  const stopCountdownHaptics = () => {
+    hapticTimeoutsRef.current.forEach(clearTimeout);
+    hapticTimeoutsRef.current = [];
+  };
+
+  /**
+   * Fire the haptic half of the alert, skipping any beat already behind us — `seekMs` is the
+   * same catch-up offset the audio seeks by, so the two stay aligned when a rest is joined
+   * mid-window.
+   *
+   * Zero gets Heavy where 3/2/1 get Medium. The point of the last three seconds is knowing
+   * when they END, and a pocket cannot tell four identical buzzes apart.
+   */
+  const fireCountdownHaptics = (seekMs: number) => {
+    stopCountdownHaptics();
+
+    HAPTIC_BEATS_MS.forEach((beat, index) => {
+      if (beat < seekMs) return;
+      const isZero = index === HAPTIC_BEATS_MS.length - 1;
+      const delay = beat - seekMs;
+
+      const fire = () => {
+        // Fire and forget. A device with no haptic motor, or one in a low-power state,
+        // rejects these — that is not a reason to interrupt anything.
+        Haptics.impactAsync(
+          isZero ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Medium,
+        ).catch(() => undefined);
+      };
+
+      if (delay <= 0) {
+        fire();
+      } else {
+        hapticTimeoutsRef.current.push(setTimeout(fire, delay));
+      }
+    });
+  };
+
+  /**
    * Arm (or re-arm) the countdown alert for a timer state.
    *
    * Everything derives from one value:
@@ -791,6 +955,9 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       clearTimeout(countdownTimeoutRef.current);
       countdownTimeoutRef.current = null;
     }
+    // Pending pulses belong to the schedule being replaced. Leaving them would buzz on the
+    // OLD deadline's beats after the timer has been retargeted, stopped or restarted.
+    stopCountdownHaptics();
 
     // Nothing to schedule: no timer, not running, paused, or counting up (count-up mode has
     // no deadline to count down to). A timer with no target has no end either.
@@ -818,7 +985,12 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
             `fireAt=${fireAt} endTime=${endTime}`,
         );
       }
-      playCountdownSound(false, seekMs);
+      // Each channel is independent and each is read from the ref, so a toggle flipped
+      // mid-rest applies to this very alert. A user with all three off still gets the
+      // badge counting down; nothing here is load-bearing for the timer itself.
+      const settings = timerSettingsRef.current;
+      if (settings.sound) playCountdownSound(false, seekMs);
+      if (settings.haptics) fireCountdownHaptics(seekMs);
     };
 
     // Overdue: a rest shorter than the lead, ±time landing the deadline inside the window,
@@ -966,6 +1138,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     // two seconds left on the previous rest otherwise plays the tail of the old countdown
     // over the start of the new one. The new schedule is armed by the effect, not here.
     stopCountdownSound();
+    stopCountdownHaptics();
 
     const now = new Date();
     const fixedEndTime = now.getTime() + (targetSeconds * 1000); // Calculate stable end time once
@@ -1044,6 +1217,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     // timeout is the effect's job (setTimer(null) below re-runs it); this is for a playback
     // that has already started.
     stopCountdownSound();
+    stopCountdownHaptics();
 
     // Clear timer state and storage FIRST — the widget teardown must not gate it.
     setTimer(null);
@@ -1058,8 +1232,8 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
    *
    * `exerciseIndex`/`setIndex` have always been written by startTimer but never
    * read — so nothing could tell which set owned the running timer. Un-completing
-   * set 2 must not kill a timer started by set 3, and it must not kill the 5s
-   * superset transition timer (which is owned by the *next* exercise, index+1).
+   * set 2 must not kill a timer started by set 3, and it must not kill the superset
+   * transition timer (which is owned by the *next* exercise, index+1).
    */
   const stopTimerForSet = (exerciseIndex: number, setIndex: number) => {
     const current = timerRef.current;
@@ -1440,6 +1614,9 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     isMinimized,
     timerSettings,
     setTimerSettings,
+    previewRestOptions,
+    setPreviewRestOptions,
+    applyPlanDefaultPace,
     startTimer,
     pauseTimer,
     resumeTimer,

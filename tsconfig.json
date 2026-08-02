@@ -4,5 +4,5 @@
     "allowSyntheticDefaultImports": true
   },
   "extends": "expo/tsconfig.base",
-  "exclude": ["DateDownMobile"]
+  "exclude": ["DateDownMobile", "fable-handoff"]
 }

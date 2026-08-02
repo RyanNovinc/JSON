@@ -1396,68 +1396,66 @@ export default function NutritionHomeScreen({ route }: any) {
                       {getMacroSplitDisplay(currentPlanLegacy) ? ` • ${getMacroSplitDisplay(currentPlanLegacy)}` : ''}
                     </Text>
                   )}
+
+                  {/* TODAY filmstrip — today's meals as photo thumbnails,
+                      resolved from the plan's curated references. Invented
+                      meals get a monogram tile; overflow collapses into a
+                      "+N" tile. Meal names have been removed from the tiles:
+                      the day list on MealPlanDays is where names live. */}
+                  {heroToday && heroToday.meals.length > 0 && (
+                    <>
+                      <Text style={styles.heroStripLabel}>{heroToday.stripLabel}</Text>
+                      <View style={styles.heroStrip}>
+                        {heroToday.meals.slice(0, 4).map((m) => (
+                          <View key={m.key} style={styles.heroThumb}>
+                            {m.image ? (
+                              <Image
+                                source={m.image}
+                                style={styles.heroThumbImg}
+                                contentFit="cover"
+                                transition={120}
+                              />
+                            ) : (
+                              <View style={styles.heroThumbMono}>
+                                <Text style={styles.heroThumbMonoText}>
+                                  {(m.name || '?').slice(0, 1).toUpperCase()}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                        {heroToday.meals.length > 4 && (
+                          <View style={[styles.heroThumb, styles.heroThumbMore]}>
+                            <Text style={styles.heroThumbMoreCount}>
+                              +{heroToday.meals.length - 4}
+                            </Text>
+                            <Text style={styles.heroThumbMoreLabel}>MORE</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.heroProgressTrack}>
+                        <View
+                          style={[
+                            styles.heroProgressFill,
+                            {
+                              backgroundColor: themeColor,
+                              width: `${Math.round(((heroToday.dayIndex + 1) / heroToday.totalDays) * 100)}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                    </>
+                  )}
                 </Pressable>
 
-                {/* TODAY filmstrip — today's meals as photo thumbnails, resolved
-                    from the plan's curated references. Invented meals get a
-                    monogram tile; overflow collapses into a "+N" tile. Tapping
-                    anywhere on the strip is the same as the Start button. */}
-                {heroToday && heroToday.meals.length > 0 && (
-                  <Pressable onPress={() => handleJumpToToday(currentPlanLegacy)}>
-                    <Text style={styles.heroStripLabel}>{heroToday.stripLabel}</Text>
-                    <View style={styles.heroStrip}>
-                      {heroToday.meals.slice(0, 4).map((m) => (
-                        <View key={m.key} style={styles.heroThumb}>
-                          {m.image ? (
-                            <Image
-                              source={m.image}
-                              style={styles.heroThumbImg}
-                              contentFit="cover"
-                              transition={120}
-                            />
-                          ) : (
-                            <View style={styles.heroThumbMono}>
-                              <Text style={styles.heroThumbMonoText}>
-                                {(m.name || '?').slice(0, 1).toUpperCase()}
-                              </Text>
-                            </View>
-                          )}
-                          <View style={styles.heroThumbNameWrap}>
-                            <Text style={styles.heroThumbName} numberOfLines={1}>
-                              {m.name}
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
-                      {heroToday.meals.length > 4 && (
-                        <View style={[styles.heroThumb, styles.heroThumbMore]}>
-                          <Text style={styles.heroThumbMoreCount}>
-                            +{heroToday.meals.length - 4}
-                          </Text>
-                          <Text style={styles.heroThumbMoreLabel}>MORE</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.heroProgressTrack}>
-                      <View
-                        style={[
-                          styles.heroProgressFill,
-                          {
-                            backgroundColor: themeColor,
-                            width: `${Math.round(((heroToday.dayIndex + 1) / heroToday.totalDays) * 100)}%`,
-                          },
-                        ]}
-                      />
-                    </View>
-                  </Pressable>
-                )}
-
-                {/* Primary: full-width "Start today's meals" button.
-                    Routes through handleJumpToToday → cleanMealPlanNavigation
-                    → finds today's day-of-week in the plan and navigates to it. */}
+                {/* Primary CTA — full-width button into the plan's day list
+                    (MealPlanDays). Same destination as tapping the card body,
+                    so the whole card has one behaviour. The shopping list and
+                    meal prep rows live on that screen, which is why the old
+                    footer links are gone. */}
                 <TouchableOpacity
                   style={[styles.heroTodayBtn, { backgroundColor: themeColor, shadowColor: themeColor }]}
-                  onPress={() => handleJumpToToday(currentPlanLegacy)}
+                  onPress={() => handleMealPlanNavigation(currentPlanLegacy)}
                   activeOpacity={0.85}
                   accessibilityRole="button"
                   accessibilityLabel="Start today's meals"
@@ -1465,40 +1463,6 @@ export default function NutritionHomeScreen({ route }: any) {
                   <Ionicons name="restaurant" size={14} color="#0a0a0b" />
                   <Text style={styles.heroTodayText}>Start today's meals</Text>
                 </TouchableOpacity>
-
-                {/* Footer links: full plan + grocery list (people open this
-                    screen standing in the supermarket — the list shouldn't be
-                    two taps deep). */}
-                <View style={styles.heroLinksRow}>
-                  <TouchableOpacity
-                    style={styles.heroLinkBtn}
-                    onPress={() => handleMealPlanNavigation(currentPlanLegacy)}
-                    activeOpacity={0.6}
-                    accessibilityRole="button"
-                    accessibilityLabel="View full plan"
-                  >
-                    <Text style={[styles.heroPlanLinkText, { color: themeColor }]}>View full plan</Text>
-                    <Ionicons name="chevron-forward" size={13} color={themeColor} />
-                  </TouchableOpacity>
-                  <View style={styles.heroLinkSep} />
-                  <TouchableOpacity
-                    style={styles.heroLinkBtn}
-                    onPress={() => {
-                      const groceryList = heroOriginal?.grocery_list;
-                      if (groceryList) {
-                        navigation.navigate('GroceryList' as any, { groceryList });
-                      } else {
-                        handleMealPlanNavigation(currentPlanLegacy);
-                      }
-                    }}
-                    activeOpacity={0.6}
-                    accessibilityRole="button"
-                    accessibilityLabel="Open grocery list"
-                  >
-                    <Ionicons name="cart-outline" size={13} color={themeColor} />
-                    <Text style={[styles.heroPlanLinkText, { color: themeColor }]}>Grocery list</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             )}
 
@@ -2082,20 +2046,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#52525b',
   },
-  heroThumbNameWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.62)',
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-  },
-  heroThumbName: {
-    fontSize: 8.5,
-    fontWeight: '600',
-    color: '#e9e9ec',
-  },
   heroThumbMore: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -2125,25 +2075,6 @@ const styles = StyleSheet.create({
   heroProgressFill: {
     height: '100%',
     borderRadius: 2,
-  },
-  heroLinksRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-    paddingTop: 13,
-    paddingBottom: 2,
-  },
-  heroLinkBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  heroLinkSep: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#3f3f46',
   },
 
   // ===== Compact secondary plan rows =====
@@ -2287,10 +2218,6 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingTop: 14,
     paddingBottom: 2,
-  },
-  heroPlanLinkText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
 
   // ===== Secondary plan card — mirrors HomeScreen.tsx planCardSecondary =====

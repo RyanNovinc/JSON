@@ -51,7 +51,10 @@ const FIBER_FLOOR = 0.80; // ≥80% of fiber target daily
 
 const DEFAULT_S_MIN = 0.7;
 const DEFAULT_S_MAX = 1.5;
-const FILLER_MAX_MINUTES = 15; // empty-slot pool = quick/simple eligible meals
+// Empty-slot pool = quick/simple eligible meals. 20, not 15: this must equal
+// FILLER_MAX_ACTIVE_MINUTES in mealPlanPromptV2.ts or the engine models a
+// smaller rescue pool than the plan actually gets (found drifted at 15/20).
+const FILLER_MAX_MINUTES = 20;
 const MAX_FIXES = 3;
 
 // ---------------------------------------------------------------------------
@@ -233,7 +236,28 @@ const DEFAULT_FILLER_SLUGS: string[] = [
 ];
 const FALLBACK_UF_PLATES = 6;
 
-function fillerOptionsForSlot(spec: SlotSpec, allMeals: CuratedMeal[]): Opt[] {
+/** Lowercased allergen/avoid lists, applied to FILLER options only — picked
+ *  options are never filtered (self-selection is the filter), exactly like
+ *  buildFrames' passesDiet in mealPlanPromptV2.ts. Without this the engine
+ *  models rescue meals an allergic user's plan will never contain. */
+interface DietFilter {
+  allergies: string[];
+  avoid: string[];
+}
+
+function passesDiet(meal: CuratedMeal, diet: DietFilter): boolean {
+  const mealAllergens = String((meal as any).contains_allergens ?? '').toLowerCase();
+  if (diet.allergies.some((a) => a && mealAllergens.includes(a))) return false;
+  const nameLc = meal.display_name.toLowerCase();
+  if (diet.avoid.some((a) => a && nameLc.includes(a))) return false;
+  return true;
+}
+
+function fillerOptionsForSlot(
+  spec: SlotSpec,
+  allMeals: CuratedMeal[],
+  diet: DietFilter
+): Opt[] {
   const eligible = mealsForSlots(spec.mealSlots, allMeals, emptyFilter(), 'default');
   // Tier 1: authored filler pool, gated on HANDS-ON time (overnight oats is
   // 5 min active / 245 total and belongs in the pool).
@@ -243,6 +267,7 @@ function fillerOptionsForSlot(spec: SlotSpec, allMeals: CuratedMeal[]): Opt[] {
       (meal as any).universal_filler === true ||
       DEFAULT_FILLER_SLUGS.includes(meal.slug as string);
     if (!isFiller) continue;
+    if (!passesDiet(meal, diet)) continue;
     const m0: any = (meal as any).methods?.[0];
     const active = m0?.time_active_minutes ?? m0?.time_total_minutes ?? 0;
     if (active > FILLER_MAX_MINUTES) continue;
@@ -257,6 +282,7 @@ function fillerOptionsForSlot(spec: SlotSpec, allMeals: CuratedMeal[]): Opt[] {
   // lunch/dinner is still assessable instead of skipping the whole check.
   const candidates: Opt[] = [];
   for (const meal of eligible) {
+    if (!passesDiet(meal, diet)) continue;
     for (const plate of nonStuntPlates(meal)) {
       const o = plateToOpt(meal, plate);
       if (o) candidates.push(o);
@@ -280,11 +306,14 @@ interface WeekModel {
   dayTypes: [DayType, number][];
 }
 
+const NO_DIET: DietFilter = { allergies: [], avoid: [] };
+
 function buildWeek(
   slots: SlotSpec[],
   selectedKeys: string[],
   allMeals: CuratedMeal[],
-  injected?: { slotId: string; opt: Opt }
+  injected?: { slotId: string; opt: Opt },
+  diet: DietFilter = NO_DIET
 ): WeekModel | null {
   // Resolve options per slot, with lunch/dinner borrowing.
   const perSlot = new Map<string, Opt[]>();
@@ -302,7 +331,7 @@ function buildWeek(
   // Empty slots fall back to the filler pool.
   for (const spec of slots) {
     if ((perSlot.get(spec.id) ?? []).length === 0) {
-      const fillers = fillerOptionsForSlot(spec, allMeals);
+      const fillers = fillerOptionsForSlot(spec, allMeals, diet);
       if (fillers.length === 0) return null; // can't model this slot — skip check
       perSlot.set(spec.id, fillers);
     }
@@ -385,28 +414,56 @@ function maxAxisAtKcal(
   return val;
 }
 
-/** Min achievable {axis} while keeping calories ≥ kLo. Mirror greedy. */
+/**
+ * SOUND lower bound on achievable {axis} while keeping calories ≥ kLo.
+ *
+ * The previous implementation was a mirror of the max greedy: pick the
+ * min-density option per occurrence and lock ITS kcal·sMin. That is not a
+ * lower bound — when a slot holds a low-density giant (banana bulk: cheap
+ * carbs per kcal, huge minimum serve) next to a small higher-density option,
+ * the greedy locked the giant's floor and reported a minimum ~35 g ABOVE what
+ * the plan can actually reach, so the engine could claim hard infeasibility
+ * for feasible baskets. The design brief is fire-only-on-certainty, so the
+ * bound must never exceed the true minimum.
+ *
+ * New bound (each term provably ≤ the true minimum):
+ *   floors  = Σ_occ min over options of axis·sMin
+ *             (every occurrence serves SOME option at ≥ its own sMin)
+ *   + pour  = max(0, kLo − Σ_occ max over options of kcal·sMin) · ρmin
+ *             (calories a real day must still add beyond even the most
+ *              generous reading of its floor spend, each costing at least
+ *              the day's best density ρmin = min over ALL options of
+ *              axis/kcal)
+ *   and, taken together with the simple density bound ρmin · kLo:
+ *   return max(floors + pour, ρmin · kLo)
+ *
+ * Proof sketch for floors+pour: write each occurrence's kcal as
+ * kMin(chosen) + eᵢ with eᵢ ≥ 0. Then axis ≥ Σ floorᵢ + ρmin·Σeᵢ and
+ * Σeᵢ ≥ kLo − Σ kMin(chosen) ≥ kLo − Σ maxKMinᵢ.
+ *
+ * This is exactly the "two servings of the cheapest option lock in N grams"
+ * arithmetic: locked per-slot floors summed, which is the failure mode the
+ * check exists to catch.
+ */
 function minAxisAtKcal(day: DayType, axis: (o: Opt) => number, kLo: number): number {
-  const occ = day.map((o) => {
-    let best = o.options[0];
-    let bestPhi = Number.POSITIVE_INFINITY;
+  let floors = 0;
+  let maxKMinSum = 0;
+  let rhoMin = Number.POSITIVE_INFINITY;
+  for (const o of day) {
+    let axisFloor = Number.POSITIVE_INFINITY;
+    let maxKMin = 0;
     for (const x of o.options) {
-      const phi = axis(x) / x.kcal;
-      if (phi < bestPhi) { bestPhi = phi; best = x; }
+      axisFloor = Math.min(axisFloor, axis(x) * x.sMin);
+      maxKMin = Math.max(maxKMin, x.kcal * x.sMin);
+      rhoMin = Math.min(rhoMin, axis(x) / x.kcal);
     }
-    return { phi: bestPhi, kMin: best.kcal * best.sMin, kMax: best.kcal * best.sMax };
-  });
-  let spend = sum(occ.map((o) => o.kMin));
-  let val = sum(occ.map((o) => o.phi * o.kMin));
-  let needed = kLo - spend;
-  if (needed > 0) {
-    for (const o of [...occ].sort((a, b) => a.phi - b.phi)) {
-      const add = Math.min(needed, o.kMax - o.kMin);
-      if (add > 0) { val += o.phi * add; needed -= add; }
-      if (needed <= 0) break;
-    }
+    if (!Number.isFinite(axisFloor)) return 0; // occurrence with no options — degenerate, claim nothing
+    floors += axisFloor;
+    maxKMinSum += maxKMin;
   }
-  return val;
+  if (!Number.isFinite(rhoMin)) return 0;
+  const pour = Math.max(0, kLo - maxKMinSum) * rhoMin;
+  return Math.max(floors + pour, rhoMin * kLo);
 }
 
 // ---------------------------------------------------------------------------
@@ -497,7 +554,11 @@ function feasibilityMargin(week: WeekModel, T: Targets): number {
 export function assessBasket(args: AssessArgs): BasketVerdict | null {
   const { slots, selectedKeys, allMeals, targets } = args;
   if (!targets || !targets.kcal || !targets.protein_g) return null;
-  const week = buildWeek(slots, selectedKeys, allMeals);
+  const diet: DietFilter = {
+    allergies: (args.allergies ?? []).map((a) => a.toLowerCase()),
+    avoid: (args.avoid ?? []).map((a) => a.toLowerCase()),
+  };
+  const week = buildWeek(slots, selectedKeys, allMeals, undefined, diet);
   if (!week) return null; // structure not modelable — silently pass (never block)
 
   const failures = checkWeek(week, targets);
@@ -511,8 +572,7 @@ export function assessBasket(args: AssessArgs): BasketVerdict | null {
       return k.includes(':') ? k.split(':')[0] : k;
     })
   );
-  const allergies = (args.allergies ?? []).map((a) => a.toLowerCase());
-  const avoid = (args.avoid ?? []).map((a) => a.toLowerCase());
+  const { allergies, avoid } = diet;
 
   const candidates: (CertifiedFix & { margin: number })[] = [];
   for (const spec of slots) {
@@ -530,7 +590,7 @@ export function assessBasket(args: AssessArgs): BasketVerdict | null {
         const hypo = buildWeek(slots, selectedKeys, allMeals, {
           slotId: spec.id,
           opt,
-        });
+        }, diet);
         if (!hypo) continue;
         if (checkWeek(hypo, targets).length === 0) {
           candidates.push({

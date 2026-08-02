@@ -460,13 +460,24 @@ function MainNavigator() {
         })}
       />
       {/* Cook — the full-bleed vertical meal feed that took over the old
-          Library tab's slot. Its cards run edge-to-edge under the bar, so it
-          hides the tab bar for this route only (CustomTabBar honours
-          tabBarStyle.display); the other tabs are unaffected. */}
+          Library tab's slot. The bar is OVERLAID here, not hidden: iOS has no
+          system back for tabs, so a hidden bar strands the user on this tab.
+          position: 'absolute' puts CustomTabBar into overlay mode — it floats
+          over the footage instead of taking layout space, so CookScreen keeps
+          sizing cards to the full window and reads the bar's real height from
+          BottomTabBarHeightContext to keep its content clear of it. The rest
+          of the style makes the bar translucent (the 0.62 alpha is the knob).
+          Other tabs are unaffected. */}
       <Tab.Screen
         name="Cook"
         component={CookScreen}
-        options={{ tabBarStyle: { display: 'none' } }}
+        options={{
+          tabBarStyle: {
+            position: 'absolute',
+            backgroundColor: 'rgba(12,12,12,0.62)',
+            borderTopWidth: 0,
+          },
+        }}
       />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

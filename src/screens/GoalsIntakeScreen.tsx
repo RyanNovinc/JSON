@@ -17,9 +17,15 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { TrainingState, derivePhase } from '../utils/goalsProfile';
-import { saveGoalsProfile } from '../utils/goalsProfileStorage';
+import {
+  saveGoalsProfile,
+  BODY_FAT_MIN,
+  BODY_FAT_MAX,
+  WEIGHT_KG_MIN,
+  WEIGHT_KG_MAX,
+} from '../utils/goalsProfileStorage';
 import { WorkoutStorage } from '../utils/storage';
-import { saveNutritionAnswers } from '../utils/nutritionQuestionnaireStorage';
+import { mergeNutritionAnswers } from '../utils/nutritionQuestionnaireStorage';
 import { deriveSyntheticNutritionAnswers } from '../utils/questionnaireRouting';
 import QuestionCard from './questionnaire/QuestionCard';
 import QuestionnaireHeader from './questionnaire/QuestionnaireHeader';
@@ -91,6 +97,43 @@ const LEANNESS_OPTIONS: Array<{
     subtitle: 'Focusing on performance or size, not leanness.',
   },
 ];
+
+// ── Input validation ────────────────────────────────────────────────────────
+// Ranges are IMPORTED from goalsProfileStorage, not declared here, so this
+// screen, GoalsStatsScreen and the storage sanitiser can never disagree about
+// what a human looks like. They were local copies until now, which is exactly
+// the kind of duplication that drifts the first time someone widens one of them.
+//
+// Both fields were previously unvalidated: the text was stripped to digits,
+// parseFloat'd, and written straight to the profile. A real stored profile came
+// back with currentBodyFatPct: 183 — the user's height, typed into the body-fat
+// box, which is four characters and accepts anything. That number feeds
+// computeMacrosPhaseAware, where body fat caps the cutting deficit, so a typo
+// here silently rewrote someone's calorie target for every plan they generated.
+
+/** null = empty (valid, both fields are optional). string = why it's rejected. */
+function validateBodyFat(raw: string): string | null {
+  if (!raw.trim()) return null;
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n)) return 'Enter a number, or leave this blank.';
+  if (n < BODY_FAT_MIN || n > BODY_FAT_MAX) {
+    return `Body fat should be between ${BODY_FAT_MIN}% and ${BODY_FAT_MAX}%. Leave it blank if you're not sure.`;
+  }
+  return null;
+}
+
+function validateGoalWeight(raw: string, unit: 'kg' | 'lbs'): string | null {
+  if (!raw.trim()) return null;
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n)) return 'Enter a number, or leave this blank.';
+  const kg = unit === 'lbs' ? n * 0.453592 : n;
+  if (kg < WEIGHT_KG_MIN || kg > WEIGHT_KG_MAX) {
+    const lo = unit === 'lbs' ? Math.round(WEIGHT_KG_MIN / 0.453592) : WEIGHT_KG_MIN;
+    const hi = unit === 'lbs' ? Math.round(WEIGHT_KG_MAX / 0.453592) : WEIGHT_KG_MAX;
+    return `Target weight should be between ${lo} and ${hi} ${unit}.`;
+  }
+  return null;
+}
 
 export default function GoalsIntakeScreen() {
   const navigation = useNavigation<Nav>();
@@ -170,8 +213,15 @@ export default function GoalsIntakeScreen() {
     if (!currentWeightKg || !trainingState || saving) return;
     setSaving(true);
     try {
-      const currentBFPct = bodyFatInput ? parseFloat(bodyFatInput) : undefined;
-      const rawGoalWeight = goalWeightInput ? parseFloat(goalWeightInput) : undefined;
+      // Re-check at the save site as well as in the CTA gate. The gate is the
+      // UX; this is the guarantee — nothing out of range reaches the profile
+      // even if a future edit changes how the button is enabled.
+      const currentBFPct =
+        bodyFatInput && !validateBodyFat(bodyFatInput) ? parseFloat(bodyFatInput) : undefined;
+      const rawGoalWeight =
+        goalWeightInput && !validateGoalWeight(goalWeightInput, weightUnit)
+          ? parseFloat(goalWeightInput)
+          : undefined;
       const goalWeightKg =
         rawGoalWeight != null
           ? weightUnit === 'lbs'
@@ -213,9 +263,14 @@ export default function GoalsIntakeScreen() {
           trainingState,
         });
         const synth = deriveSyntheticNutritionAnswers(phase);
-        await saveNutritionAnswers(synth);
+        // Merge, don't replace: saveNutritionAnswers(synth) overwrote the whole
+        // draft, so a user who had already answered some nutrition questions
+        // before a GoalsProfile existed lost them here. mergeNutritionAnswers
+        // also guards against a non-object write, which previously vanished
+        // into a swallowed catch and left the flow with no goal at all.
+        const merged = await mergeNutritionAnswers(synth);
         navigation.navigate('N3AboutYou', {
-          answersSoFar: synth,
+          answersSoFar: merged,
           flowStepOffset: 1,
         });
       } else {
@@ -230,10 +285,47 @@ export default function GoalsIntakeScreen() {
   };
 
   // ── Derived UI state ───────────────────────────────────────────────────────
+  // Both fields stay optional; they just can't hold a number that isn't a
+  // body fat percentage or a body weight.
+  const bodyFatError = validateBodyFat(bodyFatInput);
+  const goalWeightError = validateGoalWeight(goalWeightInput, weightUnit);
+
+  // Say out loud which direction the target implies, live, while they type.
+  //
+  // This field silently sets the whole plan's direction: derivePhase reads
+  // goalWeightKg against currentWeightKg, and anything above current becomes a
+  // gain phase — hundreds of calories a day in the opposite direction from a
+  // cut. A real stored profile had 90 kg against a current 82 kg, from a user
+  // who wanted to lose weight. Nothing on screen ever told them what they had
+  // set, and a second corrupt field happened to mask it, so it went unnoticed
+  // through months of generated plans.
+  //
+  // Deliberately a statement, not a warning: gaining is a legitimate goal, so
+  // this reads as confirmation rather than a scold. It just has to be
+  // impossible to set the direction without being told which one you picked.
+  const goalDirection: 'gain' | 'loss' | 'maintain' | null = (() => {
+    if (goalWeightError || !goalWeightInput.trim() || !currentWeightKg) return null;
+    const n = parseFloat(goalWeightInput);
+    if (!Number.isFinite(n)) return null;
+    const kg = weightUnit === 'lbs' ? n * 0.453592 : n;
+    const delta = kg - currentWeightKg;
+    if (Math.abs(delta) < 0.5) return 'maintain';
+    return delta > 0 ? 'gain' : 'loss';
+  })();
+
+  const goalDirectionNote =
+    goalDirection === 'gain'
+      ? 'Above your current weight, so this is a muscle gain goal. Enter a lower number if you meant to lose weight.'
+      : goalDirection === 'loss'
+      ? 'Below your current weight, so this is a fat loss goal.'
+      : goalDirection === 'maintain'
+      ? 'About the same as your current weight, so this is a maintenance goal.'
+      : null;
+
   const ctaActive =
     step === 1 ? trainingState !== null
-    : step === 2 ? currentWeightKg !== null
-    : true; // step 3 is always completable (all fields optional)
+    : step === 2 ? currentWeightKg !== null && !bodyFatError
+    : !goalWeightError; // step 3 is completable with everything blank, just not with a bad number
 
   const ctaLabel = step === 3 ? 'Build my plan' : 'Continue';
 
@@ -337,9 +429,13 @@ export default function GoalsIntakeScreen() {
                 ) : null}
               </View>
 
-              <Text style={styles.hint}>
-                Don't know your body fat? Leave it blank — the app works fine without it.
-              </Text>
+              {bodyFatError ? (
+                <Text style={styles.inputError}>{bodyFatError}</Text>
+              ) : (
+                <Text style={styles.hint}>
+                  Don't know your body fat? Leave it blank — the app works fine without it.
+                </Text>
+              )}
             </>
           )}
 
@@ -376,6 +472,19 @@ export default function GoalsIntakeScreen() {
                   <Text style={styles.unitSuffix}>{weightUnit}</Text>
                 ) : null}
               </View>
+
+              {goalWeightError ? (
+                <Text style={styles.inputError}>{goalWeightError}</Text>
+              ) : goalDirectionNote ? (
+                <Text
+                  style={[
+                    styles.directionNote,
+                    goalDirection === 'gain' && styles.directionNoteGain,
+                  ]}
+                >
+                  {goalDirectionNote}
+                </Text>
+              ) : null}
 
               <View style={styles.sectionDivider} />
 
@@ -529,6 +638,26 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 4,
     marginHorizontal: 4,
+  },
+  inputError: {
+    fontSize: 12,
+    color: '#f87171',
+    lineHeight: 17,
+    marginTop: 4,
+    marginHorizontal: 4,
+  },
+  directionNote: {
+    fontSize: 12,
+    color: '#a1a1aa',
+    lineHeight: 17,
+    marginTop: 4,
+    marginHorizontal: 4,
+  },
+  // Gain is the surprising outcome for most people typing in this box, so it
+  // gets a warmer tone. Not red: it isn't an error, it's the answer to a
+  // question they didn't know they were being asked.
+  directionNoteGain: {
+    color: '#fbbf24',
   },
   // ── Step 3 extras ─────────────────────────────────────────────────────────
   sectionDivider: {

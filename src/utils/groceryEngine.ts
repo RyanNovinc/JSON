@@ -42,9 +42,67 @@ export interface CuratedPlanMeal {
 export interface NativeGroceryBuild {
   items: GroceryItem[];
   curatedMeals: CuratedPlanMeal[];
+  /** Items that carried a price across from the plan's imported list. */
+  pricedItemCount: number;
+  /** Items with no price — scratch-only ingredients the AI never costed. */
+  unpricedItemCount: number;
+  /** Currency of the imported list, when there is one. */
+  currency?: string;
 }
 
 const fmtTime = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`);
+
+/**
+ * Prices come from the plan's imported (AI-built) grocery list, matched on
+ * `ingredient_id` — the id the generation prompt puts in its ingredient tables
+ * and the JSON step writes onto each grocery item. Without this the native
+ * list showed every item at 0, so switching one meal to from-scratch silently
+ * wiped the whole budget.
+ *
+ * Older plans have no `ingredient_id`, so a normalised exact name match is
+ * tried as a fallback. Deliberately exact — a fuzzy match that attaches the
+ * wrong price is worse than no price.
+ *
+ * The price is carried as-is, not rescaled. Nearly everything is bought by the
+ * pack, so the pack price holds even when the amount shifts a little. Anything
+ * the AI never costed (scratch-only spices, say) stays at 0 and is counted in
+ * `unpricedItemCount` so the screen can say the total is partial.
+ */
+const normaliseName = (s: string): string =>
+  String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+interface PriceIndex {
+  byId: Record<string, number>;
+  byName: Record<string, number>;
+  currency?: string;
+}
+
+const buildPriceIndex = (plan: any): PriceIndex => {
+  const byId: Record<string, number> = {};
+  const byName: Record<string, number> = {};
+  const list = plan?.grocery_list;
+
+  const index = (item: any) => {
+    const price = Number(item?.estimated_price);
+    if (!Number.isFinite(price) || price <= 0) return;
+    const id = item?.ingredient_id;
+    if (id) byId[String(id)] = price;
+    const name = normaliseName(item?.item_name);
+    if (name && byName[name] === undefined) byName[name] = price;
+  };
+
+  for (const cat of list?.categories ?? []) {
+    for (const item of cat?.items ?? []) index(item);
+  }
+
+  // From-scratch extras: priced separately by the generation step because they
+  // are NOT part of the default shop. Without them, switching a meal to
+  // from-scratch swapped in ingredients nobody had costed, and the list came
+  // back full of unpriced rows.
+  for (const item of list?.scratch_extras ?? []) index(item);
+
+  return { byId, byName, currency: list?.currency };
+};
 
 const roundAmount = (amount: number, unit: string): number => {
   const u = String(unit || '').toLowerCase();
@@ -73,6 +131,7 @@ export function buildNativeGroceryList(
     }
   }
 
+  const priceIndex = buildPriceIndex(plan);
   const merged: Record<string, GroceryItem> = {};
   const add = (key: string, name: string, amount: number, unit: string, category: FoodCategory) => {
     const existing = merged[key];
@@ -112,6 +171,10 @@ export function buildNativeGroceryList(
     });
     for (const l of lines) {
       const row = INGS[l.ingredient_id];
+      // The ingredient library's own contract: pantry-negligible rows stay off
+      // shopping lists (they still render in cook steps). Without this, going
+      // from-scratch put salt and oil spray on the list.
+      if (row?.is_pantry_negligible) continue;
       add(
         `ing_${l.ingredient_id}`,
         row?.display_name ?? l.ingredient_id,
@@ -126,6 +189,7 @@ export function buildNativeGroceryList(
       const plate = (meal.plates ?? []).find((x: any) => x.id === p.plate_id);
       for (const l of plate?.additional_ingredients ?? []) {
         const row = INGS[l.ingredient_id];
+        if (row?.is_pantry_negligible) continue;
         add(
           `ing_${l.ingredient_id}`,
           row?.display_name ?? l.ingredient_id,
@@ -163,10 +227,28 @@ export function buildNativeGroceryList(
     }
   }
 
+  let pricedItemCount = 0;
+  let unpricedItemCount = 0;
+
   const items = Object.values(merged)
-    .map(i => ({ ...i, amount: roundAmount(i.amount, i.unit) }))
+    .map(i => {
+      const ingredientId = i.id.startsWith('ing_') ? i.id.slice(4).split('__')[0] : null;
+      const price =
+        (ingredientId ? priceIndex.byId[ingredientId] : undefined) ??
+        priceIndex.byName[normaliseName(i.name)] ??
+        0;
+      if (price > 0) pricedItemCount += 1;
+      else unpricedItemCount += 1;
+      return { ...i, amount: roundAmount(i.amount, i.unit), estimatedCost: price };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   curatedMeals.sort((a, b) => a.name.localeCompare(b.name));
-  return { items, curatedMeals };
+  return {
+    items,
+    curatedMeals,
+    pricedItemCount,
+    unpricedItemCount,
+    currency: priceIndex.currency,
+  };
 }

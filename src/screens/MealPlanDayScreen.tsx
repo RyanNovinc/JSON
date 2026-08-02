@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
   Dimensions,
   Pressable,
   TouchableOpacity,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -61,6 +63,125 @@ interface MealCardProps {
   isCompleted: boolean;
   freshnessIndex: Map<string, Set<string>>;
   currentDate: string;
+}
+
+// Header figure that counts to its new value instead of snapping. Same timing
+// as the bars, so the number and its bar move together. Like the bars, the
+// first render lands on the value directly rather than counting up from zero.
+interface CountUpTextProps {
+  value: number;
+  style?: any;
+  format?: (n: number) => string;
+  children?: React.ReactNode;
+}
+
+function CountUpText({ value, style, format, children }: CountUpTextProps) {
+  const anim = useRef(new Animated.Value(value)).current;
+  const [display, setDisplay] = useState(value);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    const id = anim.addListener(({ value: v }) => setDisplay(v));
+    return () => anim.removeListener(id);
+  }, [anim]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      anim.setValue(value);
+      setDisplay(value);
+      return;
+    }
+    const animation = Animated.timing(anim, {
+      toValue: value,
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [value, anim]);
+
+  const rounded = Math.round(display);
+
+  return (
+    <Text style={style}>
+      {format ? format(rounded) : String(rounded)}
+      {children}
+    </Text>
+  );
+}
+
+// A single protein / carbs / fat column. It's a component rather than inline
+// JSX so each column can own the hooks behind its counting figure.
+interface MacroStatProps {
+  label: string;
+  eaten: number;
+  target: number;
+  pct: number;
+  color: string;
+}
+
+function MacroStat({ label, eaten, target, pct, color }: MacroStatProps) {
+  return (
+    <View style={styles.macroCol}>
+      <Text style={styles.macroLabel}>{label}</Text>
+      <CountUpText value={eaten} style={styles.macroFigure}>
+        <Text style={styles.macroTarget}> / {Math.round(target)}g</Text>
+      </CountUpText>
+      <ProgressBar
+        pct={pct}
+        color={color}
+        trackStyle={styles.macroTrack}
+        fillStyle={styles.macroFill}
+      />
+    </View>
+  );
+}
+
+// Header progress bar. Animates its width whenever the percentage changes, so
+// ticking a meal off slides the bar rather than snapping it. The first render
+// lands on the current value with no animation — otherwise every visit to the
+// screen would replay a sweep from zero.
+interface ProgressBarProps {
+  pct: number;
+  color: string;
+  trackStyle: any;
+  fillStyle: any;
+}
+
+function ProgressBar({ pct, color, trackStyle, fillStyle }: ProgressBarProps) {
+  const anim = useRef(new Animated.Value(pct)).current;
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      anim.setValue(pct);
+      return;
+    }
+    const animation = Animated.timing(anim, {
+      toValue: pct,
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+      // Width can't run on the native driver.
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [pct, anim]);
+
+  const width = anim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={trackStyle}>
+      <Animated.View style={[fillStyle, { width, backgroundColor: color }]} />
+    </View>
+  );
 }
 
 function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, mealIcon, mealColor, isCompleted, freshnessIndex, currentDate }: MealCardProps) {
@@ -988,6 +1109,19 @@ export default function MealPlanDayScreen() {
   }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
   
   const progressPercentage = allMeals.length > 0 ? (completedMealsCount / allMeals.length) * 100 : 0;
+
+  // Header macro progress. Each bar tracks its own metric against the day's
+  // planned total, so calories, protein, carbs and fat can (and will) sit at
+  // different percentages. Clamped so an over-target day doesn't overflow.
+  const macroPct = (eaten: number, target: number) =>
+    target > 0 ? Math.min(100, Math.max(0, (eaten / target) * 100)) : 0;
+
+  const caloriePct = macroPct(completedNutrition.calories, dailyTotals.calories);
+  const macroBars = [
+    { label: 'Protein', eaten: completedNutrition.protein, target: dailyTotals.protein },
+    { label: 'Carbs', eaten: completedNutrition.carbs, target: dailyTotals.carbs },
+    { label: 'Fat', eaten: completedNutrition.fat, target: dailyTotals.fat },
+  ];
   
   console.log('Progress summary:', {
     completedMealsCount,
@@ -1123,6 +1257,7 @@ export default function MealPlanDayScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={26} color="#ffffff" />
           </TouchableOpacity>
+          <Text style={styles.topBarDate}>{displayInfo.displayDate}</Text>
           <TouchableOpacity onPress={() => setShowAddMealModal(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="add" size={26} color={themeColor} />
           </TouchableOpacity>
@@ -1130,17 +1265,40 @@ export default function MealPlanDayScreen() {
 
         {/* Menu-style header (no outline) */}
         <View style={styles.menuHeader}>
-          <Text style={styles.menuOverline}>{displayInfo.displayDate}</Text>
           <Text style={styles.menuDay}>{displayInfo.dayName}</Text>
-          <Text style={styles.menuSub}>
-            <Text style={styles.menuSubAccent}>{Math.round(completedNutrition.protein)}</Text> / {Math.round(dailyTotals.protein)}g protein · <Text style={styles.menuSubAccent}>{Math.round(completedNutrition.calories).toLocaleString()}</Text> / {Math.round(dailyTotals.calories).toLocaleString()} kcal
-          </Text>
+          <View style={styles.calorieLine}>
+            <CountUpText
+              value={completedNutrition.calories}
+              style={styles.calorieFigure}
+              format={(n) => n.toLocaleString()}
+            />
+            <Text style={styles.calorieTarget}>
+              of {Math.round(dailyTotals.calories).toLocaleString()} kcal
+            </Text>
+          </View>
           {allMeals.length > 0 && (
             <>
-              <View style={styles.hairline} />
-              <View style={styles.dayProgressTrack}>
-                <View style={[styles.dayProgressFill, { width: `${progressPercentage}%`, backgroundColor: themeColor }]} />
+              <ProgressBar
+                pct={caloriePct}
+                color={themeColor}
+                trackStyle={styles.dayProgressTrack}
+                fillStyle={styles.dayProgressFill}
+              />
+
+              {/* Protein / carbs / fat, each against the day's planned total. */}
+              <View style={styles.macroRow}>
+                {macroBars.map(({ label, eaten, target }) => (
+                  <MacroStat
+                    key={label}
+                    label={label}
+                    eaten={eaten}
+                    target={target}
+                    pct={macroPct(eaten, target)}
+                    color={themeColor}
+                  />
+                ))}
               </View>
+
               <Text style={styles.loggedText}>{completedMealsCount} of {allMeals.length} eaten</Text>
             </>
           )}
@@ -1432,25 +1590,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   backBtn: { padding: 4 },
-
-  // ---- New: menu-style header (no outline) ----
-  menuHeader: {
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingTop: 10,
-    paddingBottom: 22,
-  },
-  menuOverline: {
+  // The date lives in the top bar's dead centre space, which lifts the whole
+  // header (and the first meal photo) up by a line.
+  topBarDate: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: 11,
     letterSpacing: 2.5,
     color: FAINT,
     fontWeight: '600',
     textTransform: 'uppercase',
-    marginBottom: 6,
+  },
+
+  // ---- New: menu-style header (no outline) ----
+  menuHeader: {
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 6,
+    paddingBottom: 20,
   },
   menuDay: {
     fontFamily: SERIF,
@@ -1459,23 +1620,22 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
   },
-  menuSub: {
-    fontSize: 15,
-    color: MUTED,
-    textAlign: 'center',
-    marginTop: 10,
+  calorieLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginTop: 12,
+    marginBottom: 12,
   },
-  menuSubAccent: {
+  calorieFigure: {
     fontFamily: SERIF,
-    fontSize: 16,
-    color: '#dcdce0',
+    fontSize: 30,
+    color: '#ffffff',
   },
-  hairline: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#2a2a30',
-    alignSelf: 'stretch',
-    marginTop: 18,
-    marginBottom: 14,
+  calorieTarget: {
+    fontSize: 14,
+    color: MUTED,
+    marginLeft: 7,
   },
   dayProgressTrack: {
     height: 4,
@@ -1483,10 +1643,47 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: 'stretch',
     overflow: 'hidden',
+    marginBottom: 10,
   },
   dayProgressFill: {
     height: '100%',
     borderRadius: 2,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    paddingTop: 20,
+    gap: 16,
+  },
+  macroCol: {
+    flex: 1,
+  },
+  macroLabel: {
+    fontSize: 10,
+    letterSpacing: 1.4,
+    color: MUTED,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 7,
+  },
+  macroFigure: {
+    fontFamily: SERIF,
+    fontSize: 17,
+    color: '#e8e8ea',
+    marginBottom: 9,
+  },
+  macroTarget: {
+    fontFamily: SERIF,
+    fontSize: 12,
+    color: MUTED,
+  },
+  macroTrack: {
+    height: 2,
+    backgroundColor: '#1c1c22',
+    overflow: 'hidden',
+  },
+  macroFill: {
+    height: '100%',
   },
   loggedText: {
     fontSize: 10,
@@ -1494,7 +1691,7 @@ const styles = StyleSheet.create({
     color: FAINT,
     fontWeight: '600',
     textTransform: 'uppercase',
-    marginTop: 9,
+    marginTop: 20,
   },
 
   // ---- New: photo meal timeline ----
@@ -1855,11 +2052,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#f59e0b',
-  },
-  macroRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 8,
   },
   macroItem: {
     fontSize: 12,

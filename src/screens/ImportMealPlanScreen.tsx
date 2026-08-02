@@ -31,7 +31,6 @@ import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningCon
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
 import { NUTRITION_STORAGE_KEYS, SimplifiedMealPlan, SimplifiedMealPlanDay, SimplifiedMeal } from '../types/nutrition';
-import NutritionGeneratorStep1New from '../components/NutritionGeneratorStep1New';
 import { Analytics } from '../services/analytics';
 
 type ImportMealPlanNavigationProp = StackNavigationProp<RootStackParamList, 'ImportMealPlan'>;
@@ -62,31 +61,26 @@ export default function ImportMealPlanScreen() {
   const [modalScale] = useState(new Animated.Value(0));
   const [modalOpacity] = useState(new Animated.Value(0));
 
-  // Handle the showStep1New parameter
-  const showStep1New = route.params?.showStep1New;
+  // showStep1New is GONE. The legacy two-step create flow is no longer rendered
+  // from this screen; the nutrition questionnaire owns prompt generation now.
+  // The route param stays in the type so old callers still compile, but it is
+  // deliberately ignored.
 
   // Handle prefilledJson parameter for shared meal plans
   const prefilledJson = route.params?.prefilledJson;
 
+  // TRUE when the screen was opened WITH a plan already in hand: an opened
+  // .json file, a share link, or a deep link. In that case the paste UI below
+  // is meaningless — there is nothing left for the user to paste — so every
+  // exit path has to LEAVE the screen rather than fall back to it.
+  const arrivedWithPlan = !!prefilledJson;
+
   // Auto-trigger import if prefilledJson is provided
   useEffect(() => {
-    if (prefilledJson && !showStep1New) {
+    if (prefilledJson) {
       processMealPlanData(prefilledJson);
     }
-  }, [prefilledJson, showStep1New]);
-
-  // Show NutritionGeneratorStep1New if showStep1New is true
-  if (showStep1New) {
-    return (
-      <NutritionGeneratorStep1New
-        onNext={() => {
-          // Navigate back to this screen without the showStep1New parameter
-          navigation.navigate('ImportMealPlan', {});
-        }}
-        onBack={() => navigation.goBack()}
-      />
-    );
-  }
+  }, [prefilledJson]);
 
   const getCurrentDate = (): string => {
     const today = new Date();
@@ -639,8 +633,15 @@ export default function ImportMealPlanScreen() {
     }
   };
 
+  // Cancel means LEAVE. It used to re-enter this same screen in legacy
+  // step-1 mode, which is how closing an import dropped people into a
+  // two-step create flow they never asked for.
   const handleCancel = () => {
-    navigation.navigate('ImportMealPlan', { showStep1New: true });
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('Main' as any);
   };
 
   const handleModalCancel = () => {
@@ -660,6 +661,20 @@ export default function ImportMealPlanScreen() {
       setParsedMealPlan(null);
       modalScale.setValue(0);
       modalOpacity.setValue(0);
+
+      // THE BUG THIS FIXES. Dismissing the confirmation used to just close the
+      // modal, which dropped the user onto this screen's default render: the
+      // big green "Paste Your Plan" card. When they arrived by opening a file
+      // that card is a dead end — the plan was already handed to us, there is
+      // nothing to paste, and it reads as a stray legacy screen. So a cancel on
+      // a file-driven import leaves entirely, exactly like the back chevron.
+      //
+      // A cancel on a MANUAL paste still falls back to the paste card, which is
+      // correct there: the user came to that screen on purpose and may want to
+      // try a different plan.
+      if (arrivedWithPlan) {
+        handleCancel();
+      }
     });
   };
 
@@ -905,7 +920,12 @@ export default function ImportMealPlanScreen() {
       <View style={styles.errorContainer}>
         <View style={styles.closeButtonWrapper}>
           <TouchableOpacity
-            onPress={() => setErrorMessage(null)}
+            onPress={() => {
+              setErrorMessage(null);
+              // Same dead end as the confirm modal: a bad file leaves nothing
+              // to retry on the paste card, so closing the error leaves too.
+              if (arrivedWithPlan) handleCancel();
+            }}
             style={styles.closeButtonInner}
           >
             <Ionicons name="close" size={28} color="#71717a" />
@@ -921,6 +941,7 @@ export default function ImportMealPlanScreen() {
               const debugMessage = `I got this error when trying to import my meal plan: "${errorMessage}". Please fix the JSON and make sure it follows the exact format.`;
               await Clipboard.setStringAsync(debugMessage);
               setErrorMessage(null);
+              if (arrivedWithPlan) handleCancel();
             }}
             activeOpacity={0.8}
           >

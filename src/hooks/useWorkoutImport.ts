@@ -21,6 +21,7 @@ import { WorkoutStorage, WorkoutRoutine } from '../utils/storage';
 import RobustStorage from '../utils/robustStorage';
 import { WorkoutProgram, Exercise } from '../types/workout';
 import { fetchShare } from '../services/shareService';
+import { useTimer } from '../contexts/TimerContext';
 
 // Types
 export interface UseWorkoutImportOptions {
@@ -93,6 +94,13 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
   const modalScale = useRef(new Animated.Value(0)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;
   const successScale = useRef(new Animated.Value(0)).current;
+
+  // The rest pace an imported plan was designed around is carried on the program root as
+  // `default_pace`. This is the only path by which the questionnaire's rest-style answer
+  // reaches the timer — without it, someone who asked for rest optimised for muscle growth
+  // reads that in their plan and then gets Balanced timings, because the timer's own default
+  // is 'moderate' and knows nothing about the questionnaire.
+  const { applyPlanDefaultPace } = useTimer();
 
   // HARDEST FUNCTIONS FIRST - verbatim relocation from ImportRoutineScreen
 
@@ -1353,6 +1361,11 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
       routine_name: combinedName,
       description: combinedDescription,
       days_per_week: firstDaysPerWeek,
+      // This rebuilds the program root from scratch, so anything not listed here is dropped.
+      // Take the first part that names a pace rather than programs[0] blindly: a user can
+      // legitimately hold a part 1 generated before default_pace existed alongside a part 2
+      // generated after it, and the pace should survive that mix.
+      default_pace: programs.find(p => p.default_pace)?.default_pace,
       blocks: mergedBlocks
     };
   };
@@ -1558,6 +1571,19 @@ export const useWorkoutImport = (options: UseWorkoutImportOptions = {}): UseWork
   const handleConfirmImport = async () => {
     if (parsedProgram) {
       try {
+        // Adopt the pace this plan was built for, before branching — the append path returns
+        // early below and would otherwise never see it. Placed here rather than after the
+        // storage writes because the program has already passed full validation and the user
+        // has already confirmed; the only thing that can still fail is persistence, and a
+        // rest preference is not state that needs rolling back with it.
+        //
+        // Safe to call unconditionally. It returns immediately when default_pace is absent
+        // (every plan generated before the field existed), when the value is not a pace it
+        // recognises, when the pace already matches, or when the user has picked a pace
+        // themselves — which is what stops re-importing part 3 of a cumulative program from
+        // undoing a deliberate switch to Quick.
+        applyPlanDefaultPace(parsedProgram.default_pace);
+
         // Check if this is append-block mode
         if (options.mode === 'append' && options.targetWorkoutId) {
           await handleAppendBlocks(parsedProgram, options.targetWorkoutId);

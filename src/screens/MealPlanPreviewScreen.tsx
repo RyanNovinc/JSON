@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -34,12 +34,15 @@ import { getMealImage } from '../assets/mealImages';
  *     our avatar scans for), carbs/fat neutral.
  *   - Sticky "Use this plan" CTA unchanged.
  *
- * Example mode (isExample route param): same screen, two changes only —
- * overline reads "EXAMPLE PLAN" and the CTA reads "Build my own plan" and
- * routes into the meal questionnaire instead of saving. There is NO save path
- * in example mode, so a previewed example can never land in the user's plan
- * list (open it with 0 plans or 50, it changes nothing). Real Library previews
- * pass no flag and behave exactly as before.
+ * Example mode (isExample route param): same screen, three changes —
+ *   - the overline reads "EXAMPLE PLAN" rather than "SAVED MEAL PLAN";
+ *   - the primary CTA reads "Build my own plan" and routes into the meal
+ *     questionnaire instead of saving;
+ *   - a secondary "Or just use this plan" link adopts the sample as the active
+ *     plan (handleUseExample), rebased to start today.
+ * Merely *previewing* an example still writes nothing — the adopt path is an
+ * explicit tap plus a confirm. Real Library previews pass no flag and behave
+ * exactly as before.
  *
  * Empty-data gate: if no days resolve, the hero/stats/chips are suppressed
  * entirely (no broken mosaic of fallback icons) — plain header + empty state
@@ -83,6 +86,65 @@ type PreviewDay = {
   key: string;
   label: string;
   meals: PreviewMeal[];
+};
+
+const WEEKDAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+/** Local date as YYYY-MM-DD (device timezone — NOT toISOString, which is UTC). */
+const localISO = (d: Date): string => {
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+
+/**
+ * Shift a SimplifiedMealPlan so its first day lands on today, preserving day
+ * order and meal contents. Used only when adopting the bundled example plan,
+ * whose dates are baked in at authoring time. Day 1 keeps its meals, it just
+ * gets today's date + weekday name.
+ *
+ * Meal `id`s are left as-authored (they embed the original date, e.g.
+ * `meal_20260616_breakfast_baked_oats`) — they only need to be unique within
+ * the plan, and rewriting them would break nothing but gain nothing.
+ */
+const rebasePlanToToday = (plan: any): any => {
+  const keys = Object.keys(plan.dailyMeals || {}).sort();
+  if (keys.length === 0) return plan;
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const dailyMeals: Record<string, any> = {};
+  keys.forEach((oldKey, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const newKey = localISO(d);
+    dailyMeals[newKey] = {
+      ...plan.dailyMeals[oldKey],
+      date: newKey,
+      dayName: WEEKDAY_NAMES[d.getDay()],
+    };
+  });
+
+  const endKey = Object.keys(dailyMeals).sort().pop()!;
+  console.log(
+    `🍽️ [EXAMPLE PLAN] Rebased ${keys.length} days: ${keys[0]} → ${localISO(start)}`
+  );
+
+  return {
+    ...plan,
+    startDate: localISO(start),
+    endDate: endKey,
+    dailyMeals,
+  };
 };
 
 // Fallback icon when a meal has no photo.
@@ -231,6 +293,9 @@ export default function MealPlanPreviewScreen() {
   const { plan, isExample } = route.params;
   const data = plan.data || {};
 
+  // Guards the alert's async onPress against a double-tap landing two saves.
+  const importingRef = useRef(false);
+
   const planName: string = data.name || plan.name || 'Untitled Plan';
 
   const days = useMemo(() => normalizeDays(data), [data]);
@@ -326,6 +391,38 @@ export default function MealPlanPreviewScreen() {
     navigation.navigate('N1Goal', { fromOnboarding: true });
   };
 
+  // Example mode, secondary path: adopt the sample as a real, active plan.
+  //
+  // The bundled example carries FIXED calendar dates (2026-06-16…), so saving
+  // it verbatim would drop a plan that "ran" in the past into the user's
+  // Nutrition tab. NutritionHomeScreen's getHeroToday would still render
+  // something (it falls back date → weekday → day 1), but MealPlanDayScreen
+  // keys straight off dailyMeals dates, so today would resolve to a day that
+  // isn't in the plan. Rebase to start today instead — that's what a
+  // freshly-generated plan looks like.
+  //
+  // The plan id is left alone on purpose: saveMealPlan upserts by id, so
+  // importing twice replaces rather than duplicates.
+  //
+  // No confirm step — one tap adopts it. Nothing is destroyed either way: any
+  // existing plan stays in the list, this one just becomes current.
+  const handleUseExample = async () => {
+    if (importingRef.current) return;
+    importingRef.current = true;
+    try {
+      if (!data || !data.dailyMeals || !data.id) {
+        throw new Error('Example plan has no usable data');
+      }
+      await saveMealPlan(rebasePlanToToday(data));
+      navigation.navigate('Main', { screen: 'Nutrition' });
+    } catch (error) {
+      console.error('❌ [EXAMPLE PLAN] Failed to adopt example plan:', error);
+      Alert.alert('Error', 'Could not set as active. Please try again.');
+    } finally {
+      importingRef.current = false;
+    }
+  };
+
   // Adaptive mosaic for 1–4 photos. gap:2 keeps the photo-grid feel.
   const renderMosaic = () => {
     const p = heroMeals;
@@ -378,7 +475,8 @@ export default function MealPlanPreviewScreen() {
         style={styles.scroll}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + 110 },
+          // +36 in example mode for the second CTA row's extra bar height.
+          { paddingBottom: insets.bottom + (isExample ? 146 : 110) },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -585,6 +683,22 @@ export default function MealPlanPreviewScreen() {
             {isExample ? 'Build my own plan' : 'Use this plan'}
           </Text>
         </GHTouchable>
+
+        {/* Example mode only: adopt the sample as-is instead of building one.
+            Secondary weight — building a calibrated plan stays the primary. */}
+        {isExample && (
+          <GHTouchable
+            style={styles.ctaSecondary}
+            onPress={handleUseExample}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Use this example plan as my meal plan"
+          >
+            <Text style={[styles.ctaSecondaryText, { color: themeColor }]}>
+              Or just use this plan →
+            </Text>
+          </GHTouchable>
+        )}
       </View>
     </View>
   );
@@ -881,5 +995,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#0a0a0b',
+  },
+  ctaSecondary: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 12,
+    paddingBottom: 2,
+  },
+  ctaSecondaryText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

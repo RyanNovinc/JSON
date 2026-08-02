@@ -178,6 +178,15 @@ import WorkoutHeatmapModal from '../components/WorkoutHeatmapModal';
 import DeleteSetModal from '../components/DeleteSetModal';
 import OneRMProgressionModal from '../components/OneRMProgressionModal';
 import HowItWorksModal from '../components/HowItWorksModal';
+import CountdownOverlay from '../components/CountdownOverlay';
+import PRToast, { PRToastData } from '../components/PRToast';
+import {
+  detectPersonalBest,
+  summarisePriorHistory,
+  PriorBests,
+  PRKind,
+} from '../utils/prDetection';
+import { useRestTimerDisplay } from '../utils/useRestTimerDisplay';
 import { Analytics } from '../services/analytics';
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -298,6 +307,35 @@ export interface WorkoutLogScreenProps {
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 const DEFAULT_THEME = '#22d3ee';
+
+// Overtime is deliberately AMBER, not red. Running past a rest is completely normal, and
+// red reads as an error the user caused. Warm enough to notice against the muted grey it
+// replaces, calm enough not to nag.
+const OVERTIME_COLOR = '#f0a33c';
+
+// ── Personal-best detection ────────────────────────────────────────
+// The logic lives in src/utils/prDetection.ts, pure and tested. It was inline here and got
+// three separate things wrong on device before being extracted, all of them assumptions
+// about the history format that were never checked. See that file's header.
+
+/**
+ * Distinct prior WORKOUTS an exercise needs before it can produce a record.
+ *
+ * Sessions, not stored entries: history holds one entry per SET, so four entries can be a
+ * single workout. Counting entries was one of the three original bugs, which is why this
+ * is named for sessions and the counting happens in prDetection.
+ *
+ * One is enough. The case being guarded against is the very first session, where there is
+ * nothing to beat and every working set would fire — a firework show that teaches people
+ * to ignore the toast. Beating your first session is a real improvement and should count.
+ */
+const PR_MIN_PRIOR_SESSIONS = 1;
+
+/**
+ * How much better a set has to be. A bare `>` fires on a 0.1kg estimated gain, which is
+ * inside the noise of the Epley formula rather than evidence of anything.
+ */
+const PR_MIN_IMPROVEMENT = 1.01;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 /**
@@ -342,7 +380,51 @@ const TICK_GAP = 5;         // styles.progressTicks gap
 // where it fit on 1 line, which switched it back to row... forever. Reserving the same width
 // in both modes makes the wrap a pure function of the string, so it cannot depend on the
 // mode it produces.
+//
+// That reserve is still only an APPROXIMATION of what row mode actually takes, though: it
+// assumes an Ionicons chevron-down at size 18 lays out exactly 18px wide. Icon-font advance
+// widths are not guaranteed to be one em, and the result is rounded to device pixels, so at
+// another screen density or font scale the two modes can still hand the Text widths that
+// differ by a fraction of a point — enough to flip a name whose wrap point falls between
+// them. The reserve alone therefore cannot close the loop; the hidden measurement Text in
+// ExerciseCard (see "MEASUREMENT vs DISPLAY" there) is what actually closes it. What remains
+// for this constant is the purely cosmetic job of keeping column mode's inline chevron from
+// sitting flush against the column edge.
 const TITLE_CHEVRON_RESERVE = 18 + 8;
+
+// What the HIDDEN measurement Text reserves. Deliberately two points more than
+// TITLE_CHEVRON_RESERVE. Do not merge these two back into one constant on the grounds that
+// they are nearly the same number — they are answering different questions, and only one of
+// them is allowed to be wrong in only one direction.
+//
+// The measurement Text and the visible row-mode title no longer feed back on each other, but
+// their widths are still only approximately equal: the measurement subtracts this flat
+// reserve, while the visible row-mode Text gets the column minus the chevron's REAL laid-out
+// width plus its 8px margin. Nothing guarantees that real width is 18 (see above).
+//
+// The error is not symmetric, so the tie must not be split:
+//
+//   reserve too LITTLE  the measurement under-reads. It says 1 line, the visible title wraps
+//                       to 2, cardHeights under-counts that card by CARD_TITLE_LINE_H — and
+//                       if that card is the tallest in the workout, stageMaxHeight is short
+//                       by the same amount and pagerStage's overflow:'hidden' CLIPS the
+//                       bottom of the Add set row.
+//   reserve too MUCH    the measurement over-reads. The card is computed taller than it
+//                       renders; the stage is fixed at the max anyway, so the surplus is a
+//                       few px of black under the Up Next list. Nobody can see it.
+//
+// One outcome is a visible bug and the other is invisible, so err high. Two points is enough
+// to absorb the icon-font advance and device-pixel rounding this is guarding against, and
+// small enough that it cannot on its own push a name onto a second line it would not
+// otherwise reach.
+const TITLE_MEASURE_RESERVE = TITLE_CHEVRON_RESERVE + 2;
+
+// How many times one (index, name) may change its mind about wrapping before we stop
+// trusting the measurement and pin the value. A settled title never changes its mind; one or
+// two changes are normal as a font finishes loading. Anything past this is a
+// measure→layout→measure loop that will not converge on its own, so we latch instead of
+// letting it resize the pager stage forever. See handleTitleMeasured.
+const TITLE_MEASURE_FLIP_BUDGET = 3;
 
 // ── Default Epley if not supplied ──────────────────────────────────
 const defaultCalc1RM = (weight: number, reps: number): number => {
@@ -978,6 +1060,26 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       if (!cancelled) {
         setPreviousByExercise(prevMap);
         setHistoryByExercise(histMap);
+
+        // One line per exercise, once per screen mount. This is the snapshot the personal
+        // best check compares against, and "0 prior sessions" from that check is
+        // indistinguishable from a key that never matched — this is what tells them apart.
+        // Storage writes one entry per SET (addWorkoutEntry pushes on every completion),
+        // so these counts are set counts, not workout counts. prDetection groups them by
+        // day to get sessions.
+        if (__DEV__) {
+          Object.entries(histMap).forEach(([name, entries]) => {
+            const dates = entries
+              .map((entry) => String(entry.date).slice(0, 10))
+              .slice(0, 6)
+              .join(', ');
+            console.log(
+              `📚 [HISTORY-MAP] "${name}": ${entries.length} entr${
+                entries.length === 1 ? 'y' : 'ies'
+              }${dates ? ` — ${dates}` : ''}`,
+            );
+          });
+        }
       }
     };
 
@@ -1004,24 +1106,12 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     };
   }, []);
 
-  // Format timer display for rest timer badge
-  const getRestTimerDisplay = (): string => {
-    if (!timer) return '0:00';
-
-    if (timer.isCountUp) {
-      // Count up mode - show elapsed time
-      const elapsed = timer.timeElapsed;
-      const minutes = Math.floor(elapsed / 60);
-      const seconds = elapsed % 60;
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    } else {
-      // Countdown mode - show remaining time
-      const remaining = Math.max(0, timer.targetTime - timer.timeElapsed);
-      const minutes = Math.floor(remaining / 60);
-      const seconds = remaining % 60;
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-  };
+  // Rest timer text, plus whether the rest has run past its deadline. Replaces the old
+  // local formatter, which clamped at zero and so could only ever report a dead "0:00"
+  // once a countdown finished. The hook derives from startTime + targetTime (both
+  // PRESERVED in the finished state) and carries its own 1s ticker for the overtime case,
+  // because TimerContext's interval stops the moment the countdown ends.
+  const restTimer = useRestTimerDisplay();
 
   // ── Keyboard "Log set" accessory state ───────────────────────────
   // Which set/field currently owns the keyboard (always within current exercise).
@@ -1109,11 +1199,59 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // current. No-ops when unchanged, so it cannot churn renders mid-drag.
   const [isMultiLine, setIsMultiLine] = useState<Map<number, boolean>>(new Map());
 
-  const handleTitleMeasured = useCallback((idx: number, multi: boolean) => {
+  // Backstop for the measure→layout→measure loop. isMultiLine is the ONLY measured value in
+  // this screen's layout (every other height comes from a pinned CARD_* constant) and it is
+  // also an input to the layout that produces it, so a card whose two modes disagree about
+  // the wrap point can flip forever. The hidden measurement Text in ExerciseCard removes the
+  // known cause by making the measurement independent of the mode; this counter is what
+  // catches any cause we have not thought of, on a device we do not have.
+  //
+  // Keyed by `${index}:${name}` rather than index alone: picking a different alternative for
+  // the same slot is a genuinely different string with a genuinely different wrap point, and
+  // it deserves a fresh budget. Keying that way means it gets one with no manual reset.
+  //
+  // It counts CHANGES of answer, not measurements. The cards are keyed by exercise index, so
+  // one leaves the three-card window and remounts when you swipe back to it, and every
+  // remount measures again. Those repeats all agree with each other; only a loop disagrees
+  // with itself. Counting raw measurements would let a user who swipes back and forth five
+  // times spend the budget on a title that never misbehaved, latch it, and — worse — report
+  // an oscillation that never happened, which is the one thing the event must not do.
+  const titleFlipCountRef = useRef<Map<string, { last: boolean | null; flips: number }>>(
+    new Map(),
+  );
+
+  const handleTitleMeasured = useCallback((idx: number, multi: boolean, name: string) => {
+    const key = `${idx}:${name}`;
+    const record = titleFlipCountRef.current.get(key) ?? { last: null, flips: 0 };
+    // The first measurement establishes the baseline and is never a flip.
+    if (record.last !== null && record.last !== multi) record.flips += 1;
+    record.last = multi;
+    titleFlipCountRef.current.set(key, record);
+
+    // Latch on TRUE, not false. Pinning the taller reading costs one line of computed card
+    // height that nobody can see — the stage is already fixed at the tallest card in the
+    // workout, so a card being 26px shorter than we think just moves the Up Next list down
+    // by 26px. Pinning the shorter reading would instead clip a title that really does wrap.
+    // Oscillation is visible; a spare line is not.
+    let value = multi;
+    if (record.flips > TITLE_MEASURE_FLIP_BUDGET) {
+      value = true;
+      if (record.flips === TITLE_MEASURE_FLIP_BUDGET + 1) {
+        // Exactly once per key, on the frame the budget is first exceeded — flips only ever
+        // climbs, so this equality can never come round twice. This is the only way to find
+        // out remotely whether the loop was ever real and which names trip it; it does not
+        // reproduce on any device we own.
+        Analytics.track('title_measure_oscillation', { exercise: name, index: idx });
+      }
+    }
+
+    // Still goes through the unchanged-guard below, latched or not: returning the same Map
+    // is what stops the re-render, and stopping the re-render is what stops the next
+    // onTextLayout. Forcing the value without this would pin the height but keep spinning.
     setIsMultiLine((prev) => {
-      if (prev.get(idx) === multi) return prev;
+      if (prev.get(idx) === value) return prev;
       const next = new Map(prev);
-      next.set(idx, multi);
+      next.set(idx, value);
       return next;
     });
   }, []);
@@ -1576,6 +1714,183 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     };
   }, [exercises, allSetsData, historyByExercise, calculate1RM, globalUnit]);
 
+  // ── Personal-best detection ──────────────────────────────────────
+  // Same arithmetic as prInfo above, which computes the session's single best PR for the
+  // finish summary. This is the live version: it fires the moment a set lands rather than
+  // at the end, and it fires per exercise rather than picking one winner.
+  const [prToast, setPrToast] = useState<PRToastData | null>(null);
+
+  /**
+   * Exercise indices already celebrated this session, and the id counter that keeps two
+   * consecutive toasts distinguishable.
+   *
+   * Refs, not state: writing them must not itself cause a render, and they carry across
+   * the effect's many no-op runs. The set is what makes this once per exercise per
+   * session — without it, sets 2, 3 and 4 each beat the one before as you work up, and a
+   * single exercise would fire three times on the way to its top set.
+   */
+  const firedPRRef = useRef<Set<number>>(new Set());
+  const prIdRef = useRef(0);
+
+  /**
+   * Each exercise's completed-set fingerprint as of the last check, so the next one can
+   * evaluate ONLY what actually changed.
+   *
+   * Two bugs live in the absence of this. Scanning every exercise means a set logged on
+   * exercise 0 can announce a record for exercise 3, which is baffling from the outside:
+   * you tap the tick on a deadlift and get told about a lat pulldown. And a workout
+   * resumed with sets already completed would fire retroactively for all of them the
+   * moment the next set landed, announcing news that is twenty minutes old.
+   *
+   * Null until the first pass, which deliberately seeds and fires nothing: whatever was
+   * already completed when this screen mounted happened before it existed.
+   */
+  const prevCompletedRef = useRef<string[] | null>(null);
+
+  /**
+   * A fingerprint of every COMPLETED set in the workout.
+   *
+   * This is what the detection effect keys on, instead of allSetsData itself. allSetsData
+   * changes on every character typed into a weight or reps field, and running the check
+   * there was both pointless and actively harmful: pointless because a completed set is
+   * uneditable (`editable={workoutStarted && !completed}`), so nothing that can affect a
+   * record changes while typing; harmful because the effect's dev logging then fired on
+   * every keystroke, and console.log in React Native dev is a synchronous bridge round
+   * trip. Enough of those in a row starve the JS thread badly enough to visibly break
+   * image loading elsewhere on the screen.
+   *
+   * With this, the check runs when a set is logged or un-logged, and at no other time.
+   */
+  const completedSignature = useMemo(
+    () =>
+      allSetsData
+        .map((sets) =>
+          (sets || [])
+            .filter((set) => set.completed)
+            .map((set) => `${set.weight}x${set.reps}`)
+            .join(','),
+        )
+        .join('|'),
+    [allSetsData],
+  );
+
+  /**
+   * Each exercise's records to beat, reduced to a handful of numbers.
+   *
+   * Computed ONCE per workout rather than once per logged set. History is stored one entry
+   * per set, so a long-standing user has thousands of rows per exercise, and rescanning all
+   * of them for every exercise on every completion is how Strong ended up shipping fixes
+   * for slow record calculation and background termination on large histories.
+   *
+   * None of the dependencies move during a workout: the history snapshot is read at mount,
+   * the start time is fixed, and the unit and formula are settings. So this runs about once.
+   */
+  const priorBestsByExercise = useMemo(() => {
+    const sessionStart = workoutStartTime
+      ? workoutStartTime.getTime()
+      : new Date().setHours(0, 0, 0, 0);
+
+    const map: Record<string, PriorBests> = {};
+    Object.entries(historyByExercise).forEach(([name, history]) => {
+      map[name] = summarisePriorHistory(history, sessionStart, globalUnit, calculate1RM);
+    });
+    return map;
+  }, [historyByExercise, workoutStartTime, globalUnit, calculate1RM]);
+
+  useEffect(() => {
+    // Built the same way as completedSignature, but per exercise rather than joined, so a
+    // change can be attributed to the exercise it happened on.
+    const current = exercises.map((_, idx) =>
+      (allSetsDataRef.current[idx] || EMPTY_SETS)
+        .filter((set) => set.completed)
+        .map((set) => `${set.weight}x${set.reps}`)
+        .join(','),
+    );
+    const previous = prevCompletedRef.current;
+    prevCompletedRef.current = current;
+
+    if (!workoutStarted) return;
+
+    // First pass seeds the baseline and announces nothing. See prevCompletedRef.
+    if (previous === null) return;
+
+    for (let idx = 0; idx < exercises.length; idx++) {
+      if (firedPRRef.current.has(idx)) continue;
+
+      // The heart of it: only the exercise whose completed sets just changed is a
+      // candidate. Everything else is either unchanged or was already judged.
+      if (current[idx] === previous[idx]) continue;
+
+      // Read through the ref: allSetsData is deliberately not a dependency (see
+      // completedSignature), so the captured prop could be a render behind.
+      const sets = allSetsDataRef.current[idx] || EMPTY_SETS;
+      if (sets.length === 0) continue;
+
+      // The resolved name, so a selected alternative is measured against ITS own history.
+      const name = effectiveExercises[idx]?.exercise || exercises[idx]?.exercise || '';
+      if (!name) continue;
+
+      // Absent means the history read has not landed yet, which is different from an
+      // exercise with no history — only the first will ever change.
+      const prior = priorBestsByExercise[name];
+      if (!prior) continue;
+
+      const result = detectPersonalBest({
+        sets,
+        prior,
+        globalUnit,
+        calculate1RM,
+        minPriorSessions: PR_MIN_PRIOR_SESSIONS,
+        minImprovement: PR_MIN_IMPROVEMENT,
+      });
+
+      if (__DEV__) {
+        console.log(`🏆 [PR] ${idx} "${name}" — ${result.reason}: ${result.detail}`);
+      }
+
+      if (!result.pr) continue;
+
+      firedPRRef.current.add(idx);
+      prIdRef.current += 1;
+      setPrToast({
+        exerciseName: name,
+        kind: result.pr.kind,
+        // Reps are a count and must not be run through a weight conversion.
+        value:
+          result.pr.kind === 'reps' ? result.pr.value : fromKg(result.pr.value, globalUnit),
+        improvement:
+          result.pr.kind === 'reps'
+            ? result.pr.improvement
+            : fromKg(result.pr.improvement, globalUnit),
+        unit: globalUnit,
+        id: prIdRef.current,
+      });
+      // One at a time: only one set was just logged.
+      break;
+    }
+  }, [
+    completedSignature,
+    exercises,
+    effectiveExercises,
+    priorBestsByExercise,
+    workoutStarted,
+    calculate1RM,
+    globalUnit,
+  ]);
+
+  const handlePRToastPress = useCallback((exerciseName: string, kind: PRKind) => {
+    setPrToast(null);
+    // A reps record belongs to a bodyweight exercise, which has no meaningful 1RM
+    // progression to show — send those to the session history instead.
+    if (kind === 'reps') {
+      setShowWorkoutHistory({ exerciseName, exerciseIndex: currentIndexRef.current });
+      return;
+    }
+    setShow1RMProgression({ exerciseName, exerciseIndex: currentIndexRef.current });
+  }, []);
+
+  const handlePRToastDismissed = useCallback(() => setPrToast(null), []);
+
   // ── Swipe gesture ──────────────────────────────────────────────────
   // activeOffsetX/failOffsetY ensure it only claims clearly-horizontal drags, so
   // vertical scrolling (Up Next) and taps into inputs still work.
@@ -2003,12 +2318,21 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       {!accessoryVisible && (
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
           <TouchableOpacity
-            style={styles.timerBadge}
+            style={[
+              styles.timerBadge,
+              restTimer.isOvertime && { borderColor: hexA(OVERTIME_COLOR, 0.35) },
+            ]}
             onPress={showTimerModal}
             activeOpacity={0.7}
           >
-            <Ionicons name="time-outline" size={16} color="#9898a4" />
-            <Text style={styles.timerText}>{getRestTimerDisplay()}</Text>
+            <Ionicons
+              name="time-outline"
+              size={16}
+              color={restTimer.isOvertime ? OVERTIME_COLOR : '#9898a4'}
+            />
+            <Text style={[styles.timerText, restTimer.isOvertime && { color: OVERTIME_COLOR }]}>
+              {restTimer.text}
+            </Text>
           </TouchableOpacity>
 
           <AnimatedTouchableOpacity
@@ -2052,17 +2376,29 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
               once — you are usually typing the next set while the previous set's
               rest counts down. */}
           <View style={styles.accessoryCenter}>
-            {/* A finished countdown leaves `timer` non-null with isRunning/isPaused
-                both false, so truthiness alone would strand a dead 0:00 here. */}
-            {timer && (timer.isRunning || timer.isPaused) && (
+            {/* Deliberately stays up past zero now: the overtime counter is the reason
+                this bar is worth looking at while you type the next set. The old guard
+                here existed only to hide a finished countdown's stranded 0:00, and that
+                value no longer exists — `visible` excludes the two cases that produced it
+                (no timer, and one that never started). */}
+            {restTimer.visible && (
               <TouchableOpacity
                 style={styles.accessoryTimer}
                 onPress={showTimerModal}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="time-outline" size={15} color={themeColor} />
-                <Text style={[styles.accessoryTimerText, { color: themeColor }]}>
-                  {getRestTimerDisplay()}
+                <Ionicons
+                  name="time-outline"
+                  size={15}
+                  color={restTimer.isOvertime ? OVERTIME_COLOR : themeColor}
+                />
+                <Text
+                  style={[
+                    styles.accessoryTimerText,
+                    { color: restTimer.isOvertime ? OVERTIME_COLOR : themeColor },
+                  ]}
+                >
+                  {restTimer.text}
                 </Text>
               </TouchableOpacity>
             )}
@@ -2087,6 +2423,23 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           </TouchableOpacity>
         </View>
       )}
+      {/* ── 3-2-1-0 COUNTDOWN OVERLAY ──
+          Last child of root, so it paints over the bottom bar and the keyboard accessory.
+          pointerEvents="none" inside, so it never eats a tap — a rest ending is exactly
+          when someone is reaching for the next set. It owns its own clock rather than
+          reading timer.timeElapsed, and imports the audio alert's lead so the numbers and
+          the beeps count the same four seconds by construction. See the component. */}
+      {/* Sits above the bottom bar rather than over the sets table: a record is worth
+          announcing, not worth hiding the thing that produced it. */}
+      <PRToast
+        data={prToast}
+        themeColor={themeColor}
+        onPress={handlePRToastPress}
+        onDismissed={handlePRToastDismissed}
+        bottom={insets.bottom + 72}
+      />
+
+      <CountdownOverlay themeColor={themeColor} />
     </View>
     </GestureDetector>
 
@@ -2326,7 +2679,12 @@ interface ExerciseCardProps {
   resolveExerciseImagePair?: (exercise: Exercise) => Promise<{ start: any; end: any } | null>;
   resolveExerciseImage?: (exercise: Exercise) => Promise<string | null>;
   isMultiLine: boolean;
-  onTitleMeasured: (index: number, multi: boolean) => void;
+  /**
+   * Reports the card's title wrap. `name` is the card's RESOLVED name (the selected
+   * alternative, not the primary), so the parent can budget measurements per string
+   * rather than per slot.
+   */
+  onTitleMeasured: (index: number, multi: boolean, name: string) => void;
   onSetUpdate: (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => void;
   onSetComplete: (exerciseIndex: number, setIndex: number) => void;
   onSetAdd: (exerciseIndex: number) => void;
@@ -2647,25 +3005,83 @@ const ExerciseCard = React.memo(function ExerciseCard({
         {/* Exercise title and info */}
         <View style={styles.titleRow}>
           <View style={{ flex: 1, marginRight: 16, minWidth: 0 }}>
+            {/* ── MEASUREMENT vs DISPLAY ──────────────────────────────────────
+                This Text exists ONLY to answer "does `name` wrap?". Do not fold its
+                onTextLayout back onto the visible title below, however redundant the
+                duplicate string looks — that is the bug this closes.
+
+                isMultiLine is the only measured value in this screen's layout, and it
+                is also an input to the layout that produces it: it picks the title's
+                mode, and each mode hands the visible Text a DIFFERENT available width
+                and a DIFFERENT content to lay out.
+
+                  row mode     the Text is a flex sibling of the chevron, so its width
+                               is the column minus the chevron's real measured width
+                               plus its 8px margin, and the content is `name` alone
+                  column mode  the Text gets the column minus the hardcoded
+                               TITLE_CHEVRON_RESERVE, and the content is `name`, a
+                               space, and an inline 18px Animated.View
+
+                TITLE_CHEVRON_RESERVE was an attempt to make those two widths equal,
+                but it only equalises them if the chevron glyph really does advance
+                exactly 18px, which an icon font does not promise and pixel rounding
+                can break anyway. Whenever the two widths differ by any amount, a name
+                whose wrap point falls between them measures 2 lines in row mode and 1
+                line in column mode — and since isMultiLine flows into cardHeights →
+                stageMaxHeight → upNextTranslate, every flip resizes the pager stage
+                and shoves the Up Next list. The whole screen judders, not just the
+                title, and it never settles.
+
+                Measuring here instead breaks the cycle at its source: this Text is
+                absolutely positioned so its own width comes from the wrapper and never
+                from the mode, it reserves the chevron in BOTH modes, and it never
+                contains the inline arrow. Its line count is therefore a pure function
+                of the string (and the font), so it cannot depend on the value it
+                produces. The visible title below is free to render however it likes.
+
+                Breaking the cycle does not by itself make this width EQUAL to the
+                visible row-mode Text's, only independent of it — so the reserve here is
+                TITLE_MEASURE_RESERVE, biased a little high on purpose. See that
+                constant for why the bias only goes one way.
+
+                It is inert in every other respect: absolute + top/left/right pins it
+                out of the flow so it contributes zero height, opacity 0 and no pointer
+                events keep it off screen and untouchable, and it is cut out of the
+                accessibility tree so a screen reader does not read the name twice. */}
+            <Text
+              style={[
+                styles.title,
+                styles.titleMeasure,
+                // TITLE_MEASURE_RESERVE, not TITLE_CHEVRON_RESERVE: a measurement that
+                // reserves slightly too much is invisible, one that reserves too little
+                // clips the card. Read the constant's comment before equalising them.
+                hasAlternatives && { paddingRight: TITLE_MEASURE_RESERVE },
+              ]}
+              numberOfLines={2}
+              pointerEvents="none"
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              onTextLayout={(event) =>
+                onTitleMeasured(index, event.nativeEvent.lines.length > 1, name)
+              }
+            >
+              {name}
+            </Text>
             <TouchableOpacity
               style={[
                 styles.titleButton,
                 isMultiLine && styles.titleButtonMultiline,
                 // Column mode puts the chevron inline, so reserve its width here to
                 // match what row mode's sibling chevron takes. See
-                // TITLE_CHEVRON_RESERVE.
+                // TITLE_CHEVRON_RESERVE. Purely cosmetic now — the wrap decision is
+                // made by the measurement Text above, not by this width.
                 isMultiLine && hasAlternatives && { paddingRight: TITLE_CHEVRON_RESERVE },
               ]}
               onPress={() => interactive && hasAlternatives && setSelectorOpen((o) => !o)}
               activeOpacity={interactive && hasAlternatives ? 0.7 : 1}
             >
-              <Text
-                style={styles.title}
-                numberOfLines={2}
-                onTextLayout={(event) =>
-                  onTitleMeasured(index, event.nativeEvent.lines.length > 1)
-                }
-              >
+              {/* No onTextLayout here, deliberately — see MEASUREMENT vs DISPLAY above. */}
+              <Text style={styles.title} numberOfLines={2}>
                 {name}
                 {hasAlternatives && isMultiLine && (
                   <Text style={styles.inlineArrow}>
@@ -3720,6 +4136,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit-Bold',
     lineHeight: 26,
     flexShrink: 1,
+  },
+  // Layered on top of styles.title for the hidden measurement Text. Absolute so it takes the
+  // title column's width without the mode getting a say and without adding any height of its
+  // own; invisible so the duplicated name never shows through the real title.
+  // See "MEASUREMENT vs DISPLAY" in ExerciseCard before touching either half.
+  titleMeasure: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    opacity: 0,
   },
   muscles: {
     color: '#55555f',

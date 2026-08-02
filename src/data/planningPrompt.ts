@@ -27,7 +27,7 @@ function getComplementarityRules(data: QuestionnaireData): string {
 }
 
 function getTimeFormula(data: QuestionnaireData): string {
-  return `**Session Duration:** Calculate session duration for each training day based on exercise count, sets, and the user's chosen rest style. Report this honestly. Do NOT compress rest periods to hit a time target — the user's volume and rest preferences drive session length.
+  return `**Session Duration:** Calculate session duration for each training day based on exercise count, sets, and the rest summary you state for the program (see Rest Periods). Report this honestly. Do NOT shorten rest to hit a time target — the user's volume drives session length, and they can pick a faster rest pace in the app at any time if a session runs long.
 
 If a session exceeds 2 hours (120 minutes), this is a sanity flag worth reviewing — most natural lifters can't sustain that productively. Sessions in the 60-100 minute range are typical for serious hypertrophy training. Inform the user of session duration in the program output so they know what to expect.`;
 }
@@ -89,7 +89,35 @@ function generateConstraintLayer(data: QuestionnaireData): string {
 // STATIC TEXT CONSTANTS
 // ================================
 
+// Cache-buster appended to every json.fit URL in the assembled prompt so that
+// updating a server file yields a URL nothing has cached. Bump on each edit.
+// Single definition lives in promptCacheVersion.ts — three hand-kept copies
+// is how one of them silently went stale.
+import { PROMPT_CACHE_VERSION } from './promptCacheVersion';
+
 const CAPABILITY_CHECK = `**FETCH REQUIRED:** This prompt requires fetching files from json.fit. Try to fetch them. If fetch fails for ANY reason (no fetch tool, network blocked, allowlist denied, 404, etc.):\n\nStop immediately. Respond ONLY with this exact text:\n\n"This prompt needs to fetch files from json.fit, but fetching isn't working in your AI. To use JSON.fit:\n- Use Claude.ai with web search enabled in the message composer\n- Or ChatGPT with browsing enabled\nThen paste this prompt again."\n\nDo not offer to proceed without the files. Do not list more alternatives. Do not explain.\n\n`;
+
+const REFERENCE_URLS = `## REFERENCE URLS
+
+These are every json.fit file this flow may fetch. They are listed here so they are all visible up front — a URL the AI only ever sees inside another fetched page cannot be reliably fetched.
+
+**Needed during this planning step.** Fetch each one when the instruction below tells you to:
+- https://json.fit/exercises.md?v=${PROMPT_CACHE_VERSION} (canonical exercise library — names and muscle tags)
+- https://json.fit/volume-landmarks.md?v=${PROMPT_CACHE_VERSION} (per-muscle MEV/MAV/MRV)
+- https://json.fit/rir-guidance.md?v=${PROMPT_CACHE_VERSION} (RIR matrix)
+- https://json.fit/rep-range-guidance.md?v=${PROMPT_CACHE_VERSION} (rep range guidelines)
+- https://json.fit/rest-guidance.md?v=${PROMPT_CACHE_VERSION} (rest guidelines — for the program's rest summary only)
+- https://json.fit/deload-guidance.md?v=${PROMPT_CACHE_VERSION} (deload frequency and structure)
+- https://json.fit/phase-selection.md?v=${PROMPT_CACHE_VERSION} (phase selection rationale)
+- https://json.fit/lean-mass-targets.md?v=${PROMPT_CACHE_VERSION} (lean mass targets)
+
+**Needed at later steps only. Do NOT fetch these now** — fetch each one when the flow reaches the step that needs it:
+- https://json.fit/prompts/review-prompt.md?v=${PROMPT_CACHE_VERSION} (quality audit prompt)
+- https://json.fit/prompts/json-prompt.md?v=${PROMPT_CACHE_VERSION} (JSON conversion prompt)
+
+Do not mention any of these URLs to the user.
+
+`;
 
 export const INSTRUCTIONS_HEADER = `# Create a Complete Workout Program
 
@@ -153,15 +181,16 @@ export const getVerificationStep3 = (goal: string): string => {
   return `3. **Look up this user's targets** — cross-reference their Training Approach (from the profile) against the Volume Targets table — these are the experience-adjusted ranges they must hit. Since this is a ${goalLabel} program, see Goal-Specific Quality Criteria for how volume verification applies to this goal.`;
 };
 
-export const VERIFICATION_STEPS_4_5 = `4. **If any muscle group is below target**, revise exercise selections and recount. Do not present the summary until all targets are met or explicitly flagged as constrained.
-5. **Check distribution balance** — avoid some muscles maxed out while others sit at the floor of their target range.`;
+export const VERIFICATION_STEPS_4_6 = `4. **If any muscle group is below target**, revise exercise selections and recount. Do not present the summary until all targets are met or explicitly flagged as constrained.
+5. **Revision is capped at three passes.** If a muscle is still outside its range after three rounds of revision, mark it ℹ️ CONSTRAINED, name the constraint blocking it in one line, and present the program. Never write a search, solver, or enumeration over exercise and set combinations, and never state or imply that you checked every possibility. Three honest attempts and a clear explanation is the required standard, not proof.
+6. **Check distribution balance** — avoid some muscles maxed out while others sit at the floor of their target range.`;
 
-export const VERIFICATION_STEP_6_WITH_CARDIO = `6. **Estimate session duration** for each day:
-   - **Strength days:** Calculate based on exercise count, sets, and the user's chosen rest style — do not compress rest to hit an arbitrary time target.
+export const VERIFICATION_STEP_7_WITH_CARDIO = `7. **Estimate session duration** for each day:
+   - **Strength days:** Calculate from exercise count, sets, and the program's rest summary. Do not shorten rest to hit an arbitrary time target.
    - **Cardio days:** Use the prescribed activity duration + 5 min warmup + 5 min cooldown.`;
 
-export const VERIFICATION_STEP_6_NO_CARDIO = `6. **Estimate session duration** for each day:
-   - **Strength days:** Calculate based on exercise count, sets, and the user's chosen rest style — do not compress rest to hit an arbitrary time target.`;
+export const VERIFICATION_STEP_7_NO_CARDIO = `7. **Estimate session duration** for each day:
+   - **Strength days:** Calculate from exercise count, sets, and the program's rest summary. Do not shorten rest to hit an arbitrary time target.`;
 
 export const PROGRAM_DOCUMENT_FORMAT = `---
 
@@ -171,7 +200,8 @@ Present the complete program clearly so the user can review and iterate before c
 
 - Program overview (duration, days per week, split, goal)
 - **Weekly layout across all 7 days** — present the training week as a full 7-day schedule. For each of the 7 days, state whether it is a training day (and its focus, e.g. "Push", "Upper", "Full Body A") or a rest day. The number of training days must equal the user's training days per week from the profile; the remaining days are rest days so the layout always totals 7 days. (The JSON conversion step will format these as training-day objects plus REST DAY entries padded to 7 — describing the full week here keeps the plan, review, and JSON consistent.)
-- All training sessions with exercises, sets, rep ranges (e.g. "8-12" or "10-15" — always a range, never a single number), rest periods, and muscle tags (Primary and Secondary). Exception: single-joint arm exercises (all curl variations, all triceps isolation) always use an isolation rep range of 10–15, regardless of the block's stated rep focus. These are never compound movements.
+- All training sessions with exercises, sets, rep ranges (e.g. "8-12" or "10-15" — always a range, never a single number), and muscle tags (Primary and Secondary). Exception: single-joint arm exercises (all curl variations, all triceps isolation) always use an isolation rep range of 10–15, regardless of the block's stated rep focus. These are never compound movements.
+- **No per-exercise rest periods.** Rest is stated once for the whole program — see the Rest Periods section.
 - Direct core work: if the profile says 'Direct Core Work: Yes' or is silent on this setting, include 2–3 sets distributed across 1–2 sessions (suitable exercises: Cable Crunch, Ab Wheel Rollout, Hanging Leg Raise, Plank variations). Core sets do not count toward any muscle group's volume target.
 - Alternative exercises for each movement
 - Weekly progression guidance
@@ -184,7 +214,7 @@ export const EXERCISE_LIBRARY = `---
 
 ## EXERCISE LIBRARY — CRITICAL TAGGING RULES
 
-You MUST select exercises ONLY from the JSON.fit exercise library at https://json.fit/exercises.md. **Fetch that file before generating this program.**
+You MUST select exercises ONLY from the JSON.fit exercise library at https://json.fit/exercises.md?v=${PROMPT_CACHE_VERSION}. **Fetch that file before generating this program.**
 
 ### Tag Faithfulness Is Non-Negotiable
 
@@ -214,6 +244,8 @@ Before finalizing the plan, do a tag audit: for every exercise in your program, 
 - Do NOT invent exercises not in the library
 - If a movement pattern you want to include has no suitable exercise in the library, omit that pattern rather than inventing one
 - When suggesting alternative exercises for a movement, only use exercises from the library
+
+Exercise names carry a second job beyond tagging: the JSON.fit app looks each one up by name to work out how long that exercise rests for. A renamed, abbreviated or invented exercise falls back to a generic default rest instead of the right one, so exact names matter to the user's experience, not just to this document.
 
 The library is the canonical source of truth for exercise names and muscle tagging. Your job is to select and program these exercises, not to redefine them.`;
 
@@ -271,7 +303,7 @@ export const getRule1 = (equipment: string[]): string => {
   }
 };
 
-export const STATIC_RULE_2 = `2. **Stay within rest style parameters** — use the rest periods defined by the user's Rest Style selection. Do not compress rest periods to hit a session time target. The rest style setting takes priority over session duration.`;
+export const STATIC_RULE_2 = `2. **Do not assign rest periods to individual exercises** — the app calculates rest itself, per exercise and per pace. State the program's rest summary once (see Rest Periods) and nothing more. A rest number written next to an exercise will disagree with what the app times, and a number the user can see but the timer ignores is worse than no number at all.`;
 
 // Rule 3 variants by secondary goals
 export const getRule3 = (hasActivityGoals: boolean): string => {
@@ -406,9 +438,10 @@ export const getRule15 = (expTier: string, duration: string): string => {
 
     **REQUIRED ACTION before finalizing the program:**
 
-    1. Fetch the canonical deload guidance file at https://json.fit/deload-guidance.md
+    1. Fetch the canonical deload guidance file at https://json.fit/deload-guidance.md?v=${PROMPT_CACHE_VERSION}
     2. Use its experience × block-length matrix to decide whether each block needs a deload, based on the user context above.
     3. When a deload is warranted, it is the FINAL week WITHIN that block's week range — not an appended extra week. Structure it per the file (volume cut, load, RIR).
+    4. State clearly which week number of which block is the deload. The app reads that structurally and lengthens rest automatically during deload weeks, so a deload that is only described in prose loses that behaviour.
 
     The deload-guidance.md file is the single source of truth — do not invent your own frequency or structure.`;
 };
@@ -423,9 +456,12 @@ export const STATIC_RULE_19 = `20. **Pull movement balance** — vertical pulls 
 export const RULE_20 = `21. **Complete block coverage** — the plan must explicitly cover every block (with the diff-based exception for 5+ block programs as described in the output format).`;
 
 // ================================
-// REST TIME DEFAULTS
+// REST PERIODS
 // ================================
 
+// Rest is resolved by the app at runtime — per exercise, per block, per pace.
+// This section's only job is to make the plan document honest about that and to
+// give the user (and the phase-2 duration estimate) one summary to work from.
 export const getRestGuidance = (restTier: string, goal: string): string => {
   const goalLabel = goal === 'gain_strength' ? 'Strength Building' :
                     goal === 'build_muscle' ? 'Hypertrophy' :
@@ -434,24 +470,29 @@ export const getRestGuidance = (restTier: string, goal: string): string => {
                     goal === 'general_fitness' ? 'General Fitness' :
                     'the primary goal';
 
-  const goalOverride = goal === 'gain_strength' 
-    ? 'heavy compounds use 3–5 minutes regardless of tier'
-    : 'apply goal-specific overrides as specified in the file';
+  return `**Rest Periods — The App Applies These, Not You**
 
-  return `**Rest Period Guidelines — Evidence-Based Timing**
+JSON.fit calculates rest itself. For every exercise it works out three durations — Full, Balanced and Quick — from the movement's category, how heavily it is loaded in the current block, whether the week is a deload, and whether it is part of a superset. The user picks a pace and can change it at any time, including part-way through a session.
+
+**Do NOT write a rest period next to any individual exercise.** A number in this document that differs from what the timer counts is worse than no number.
+
+**What to include instead:** one short rest summary for the whole program, stated once.
 
 **User Profile for Rest Targeting:**
 - Rest Tier: ${restTier}
 - Primary Goal: ${goalLabel}
 
-**REQUIRED ACTION before generating the program:**
+**REQUIRED ACTION:**
 
-1. Fetch the canonical rest guidance file at https://json.fit/rest-guidance.md
-2. Locate the ${restTier} tier column in the per-tier × exercise category matrix
-3. Apply the rest period for each exercise based on its category
-4. Apply goal-specific overrides from the file — for ${goalLabel}, ${goalOverride}
+1. Fetch the rest guidance file at https://json.fit/rest-guidance.md?v=${PROMPT_CACHE_VERSION}
+2. Read the ${restTier} column of the matrix
+3. Write a three or four line summary in the plan, in this shape:
 
-Use these rest periods consistently throughout the program. Rest periods are a critical programming variable — do not compress them to hit arbitrary session time targets.`;
+   Rest (${restTier} pace): around [X] on heavy compounds, [Y] on machine and cable compounds, [Z] on large-muscle isolation, [W] on small isolation. The app times these for you and you can switch to a faster or slower pace any time, including mid-session.
+
+4. Use the same figures when estimating session duration.
+
+That is the entire rest content of this document. Do not reproduce the matrix, do not tabulate rest by exercise, and do not add rest columns to the session listings.`;
 };
 
 // ================================
@@ -485,7 +526,7 @@ This program uses per-muscle volume landmarks rather than a single major/medium 
 
 **REQUIRED ACTION before generating the program:**
 
-1. Fetch the canonical volume landmarks file at https://json.fit/volume-landmarks.md
+1. Fetch the canonical volume landmarks file at https://json.fit/volume-landmarks.md?v=${PROMPT_CACHE_VERSION}
 2. Locate the tier × experience mapping table for the ${tierLabel} tier
 3. Find the position within MAV that corresponds to ${experience} experience (e.g., "MAV-low", "MAV-mid", "MAV-high to MRV")
 4. Build a per-muscle target table by applying that position to each muscle's MAV range from the file's Per-Muscle Volume Landmarks table
@@ -514,7 +555,7 @@ Use these per-muscle ranges as the targets when designing the program. Do NOT ap
 export const STATIC_VOLUME_DEFINITIONS = `
 **Volume Definitions**
 
-This system uses per-muscle volume landmarks (MEV/MAV/MRV) from https://json.fit/volume-landmarks.md rather than major/medium muscle categories. Each muscle has its own productive volume range based on recovery profile and indirect loading from compounds.
+This system uses per-muscle volume landmarks (MEV/MAV/MRV) from https://json.fit/volume-landmarks.md?v=${PROMPT_CACHE_VERSION} rather than major/medium muscle categories. Each muscle has its own productive volume range based on recovery profile and indirect loading from compounds.
 
 The per-muscle target ranges for this user are computed from the landmarks file and the tier × experience mapping. Reference the per-muscle target table you built above when designing the program.
 
@@ -523,7 +564,7 @@ For each muscle, the lower bound of the target range is the floor — no non-exe
 export const RIR_GUIDANCE = `
 ### RIR (Reps in Reserve) Guidance
 
-Fetch the canonical RIR guidance file at https://json.fit/rir-guidance.md before finalizing the program.
+Fetch the canonical RIR guidance file at https://json.fit/rir-guidance.md?v=${PROMPT_CACHE_VERSION} before finalizing the program.
 
 Apply the matrix to every exercise based on:
 - Exercise category (barbell_compound, machine_compound, isolation, unilateral_compound, high_skill)
@@ -532,6 +573,8 @@ Apply the matrix to every exercise based on:
 - Set count for the exercise
 
 Output RIR guidance as a separate specification for each exercise in the program document. Format per the user's experience tier as specified in the file.
+
+RIR carries a second job in JSON.fit beyond the training cue. The app combines an exercise's first-set reps with its first-set RIR to estimate the load, and that estimate decides whether a compound gets heavy-compound rest or moderate-compound rest. RIR that is missing, or pitched far from what the lifter will really do, changes how long they rest as well as how hard they train — so give every resistance exercise an accurate progression.
 `;
 
 export const getRepRangeGuidance = (goal: string): string => {
@@ -549,7 +592,7 @@ export const getRepRangeGuidance = (goal: string): string => {
 
 **REQUIRED ACTION before generating the program:**
 
-1. Fetch the canonical rep range guidance file at https://json.fit/rep-range-guidance.md
+1. Fetch the canonical rep range guidance file at https://json.fit/rep-range-guidance.md?v=${PROMPT_CACHE_VERSION}
 2. Map rep ranges to exercise category, not abstract goal labels — apply the per-category table from the file
 3. Apply goal-specific adjustments for ${goalLabel} per the file's Goal-Specific Rules section
 
@@ -560,7 +603,7 @@ Use these rep ranges consistently throughout the program. Rep ranges should matc
 export const STATIC_PRIORITY_MUSCLES = `
 ### Priority Muscle Groups
 
-If the profile specifies priority muscles, target the upper portion of MAV through MRV for each priority muscle (per the landmarks file at https://json.fit/volume-landmarks.md). This is roughly each muscle's MAV-high to MRV range — different per muscle, calibrated to that muscle's specific recovery capacity. Reduce non-priority muscles toward their MEV (the file's MEV column) to keep total stress recoverable.
+If the profile specifies priority muscles, target the upper portion of MAV through MRV for each priority muscle (per the landmarks file at https://json.fit/volume-landmarks.md?v=${PROMPT_CACHE_VERSION}). This is roughly each muscle's MAV-high to MRV range — different per muscle, calibrated to that muscle's specific recovery capacity. Reduce non-priority muscles toward their MEV (the file's MEV column) to keep total stress recoverable.
 
 If no priority muscles are specified, distribute volume so that all non-priority muscles land at similar positions within their respective MAV ranges. This produces balanced programs where no muscle is at its ceiling while another sits at its floor.
 
@@ -598,12 +641,12 @@ export const STATIC_STATUS_INDICATORS = `
 
 - ✅ = within target range for that specific muscle (per the per-muscle target table)
 - ⚠️ LOW = below the lower bound of that muscle's target range — **must fix before presenting**
-- ⚠️ HIGH = above the target range ceiling for that specific muscle (per the landmarks file at https://json.fit/volume-landmarks.md). For priority muscles, the ceiling is each muscle's MRV from the file — different per muscle. Exceeding the ceiling has diminishing returns — reduce before presenting.
+- ⚠️ HIGH = above the target range ceiling for that specific muscle (per the landmarks file at https://json.fit/volume-landmarks.md?v=${PROMPT_CACHE_VERSION}). For priority muscles, the ceiling is each muscle's MRV from the file — different per muscle. Exceeding the ceiling has diminishing returns — reduce before presenting.
 - ℹ️ CONSTRAINED = above minimum but below target due to split/schedule/equipment. Must explain in Recommendations.
 
 ### Volume Violation Handling
 
-For all HIGH, LOW, and MRV violations, follow the Volume Violation Handling rules in https://json.fit/volume-landmarks.md. The file specifies how to handle each violation type for non-priority, exempt-from-floor, priority, and auxiliary muscles. The file is the canonical source — do not invent your own handling rules.`;
+For all HIGH, LOW, and MRV violations, follow the Volume Violation Handling rules in https://json.fit/volume-landmarks.md?v=${PROMPT_CACHE_VERSION}. The file specifies how to handle each violation type for non-priority, exempt-from-floor, priority, and auxiliary muscles. The file is the canonical source — do not invent your own handling rules.`;
 
 // Quality standards with approach-specific additions
 export const getQualityStandards = (volumePreference: string): string => {
@@ -632,15 +675,15 @@ Adapt the plan based on the user's Primary Goal from their profile.`;
 
 export const BUILD_MUSCLE_GUIDANCE = `
 ### Build Muscle / Body Recomposition
-Volume is the primary driver. Apply per-category rep ranges from https://json.fit/rep-range-guidance.md and standard rest periods from https://json.fit/rest-guidance.md.`;
+Volume is the primary driver. Apply per-category rep ranges from https://json.fit/rep-range-guidance.md?v=${PROMPT_CACHE_VERSION}.`;
 
 export const BURN_FAT_GUIDANCE = `
 ### Burn Fat
-Include compound movements for caloric expenditure. Apply per-category rep ranges from https://json.fit/rep-range-guidance.md (slightly higher ranges acceptable for metabolic stress).`;
+Include compound movements for caloric expenditure. Apply per-category rep ranges from https://json.fit/rep-range-guidance.md?v=${PROMPT_CACHE_VERSION} (slightly higher ranges acceptable for metabolic stress). Create the deficit through diet and separate cardio, not by shortening rest.`;
 
 export const GAIN_STRENGTH_GUIDANCE = `
 ### Gain Strength
-Prioritize heavy compound work with longer rest. Fewer exercises per session, more sets on primary lifts. Apply strength-specific rep ranges and rest overrides from the hosted guidance files (heavy compounds: 1-6 reps, 3-5 min rest regardless of tier).`;
+Prioritize heavy compound work. Fewer exercises per session, more sets on primary lifts. Apply strength-specific rep ranges (heavy compounds: 1-6 reps) from the hosted rep range file. The app already gives heavy compounds their full 3-5 minutes on a strength program regardless of pace, so program the loading and let it handle the clock.`;
 
 export const SPORT_SPECIFIC_GUIDANCE = `
 ### Sport-Specific Training
@@ -656,7 +699,7 @@ Design according to the user's custom description. Use the most applicable frame
 
 export const CUSTOM_GOAL_FRAMEWORK_SUMMARY = `
 
-**Available frameworks:** Build Muscle (hypertrophy volume, per-category rep ranges from https://json.fit/rep-range-guidance.md), Burn Fat (metabolic + compounds, lower-end volume OK), Gain Strength (heavy compound focus, longer rest, fewer exercises), Sport-Specific (lifting supports the sport), General Fitness (balanced, circuits count for volume at rounds × exercises).`;
+**Available frameworks:** Build Muscle (hypertrophy volume, per-category rep ranges from https://json.fit/rep-range-guidance.md?v=${PROMPT_CACHE_VERSION}), Burn Fat (metabolic + compounds, lower-end volume OK), Gain Strength (heavy compound focus, fewer exercises), Sport-Specific (lifting supports the sport), General Fitness (balanced, circuits count for volume at rounds × exercises).`;
 
 // Goal guidance selection function
 export const getGoalGuidance = (goal: string): string => {
@@ -740,10 +783,11 @@ export function assemblePlanningPrompt(
   
   // === SECTION 1: Instructions ===
   prompt += CAPABILITY_CHECK;
+  prompt += REFERENCE_URLS;
   prompt += INSTRUCTIONS_HEADER;
   prompt += '\n' + getVerificationStep3(goal);
-  prompt += '\n' + VERIFICATION_STEPS_4_5;
-  prompt += '\n' + (hasCardio ? VERIFICATION_STEP_6_WITH_CARDIO : VERIFICATION_STEP_6_NO_CARDIO);
+  prompt += '\n' + VERIFICATION_STEPS_4_6;
+  prompt += '\n' + (hasCardio ? VERIFICATION_STEP_7_WITH_CARDIO : VERIFICATION_STEP_7_NO_CARDIO);
   
   // === SECTION 2: Program Document Format ===
   prompt += '\n\n' + getProgramDocumentFormat();
@@ -816,7 +860,7 @@ ${generateProgramSpecs(data)}`;
   prompt += '\n' + STATIC_RULE_19;
   if (!isShortProgram) prompt += '\n' + RULE_20;
   
-  // === SECTION 6: Rest Time Defaults ===
+  // === SECTION 6: Rest Periods ===
   prompt += '\n\n' + getRestGuidance(restTrigger, goal);
   
   // === SECTION 7: Volume Rules ===
@@ -832,9 +876,7 @@ ${generateProgramSpecs(data)}`;
   // === SECTION 8: Goal-Specific Guidance ===
   prompt += '\n\n' + getGoalGuidance(goal);
   
-  prompt += `\n\n---\n\n## END YOUR RESPONSE WITH THIS EXACT CALLOUT\n\nThe VERY LAST thing in your response must be this callout, formatted as a code block (triple backticks, no language identifier). Do not add anything after it. Reproduce it verbatim:\n\n\`\`\`\n✅ Your draft is ready.\n\n▶ Reply "happy" when you're done — I'll run a quality check on it.\n✏️ Want changes? Just tell me what to adjust.\n\`\`\`\n\nWhen the user confirms they're satisfied (any reasonable confirmation — "happy", "looks good", "yes", "done", "ready" — accept it), fetch https://json.fit/prompts/review-prompt.md and follow it. Do not mention the URL to the user.`;
-
-  prompt += `\n\n---\n\n## REFERENCE URLS\n\nThe following URLs may be fetched during the program creation flow. They are listed here so they are available for fetching when needed:\n- https://json.fit/prompts/review-prompt.md (quality audit prompt)\n- https://json.fit/prompts/json-prompt.md (JSON conversion prompt)\n- https://json.fit/rest-guidance.md (rest period guidelines)\n- https://json.fit/rep-range-guidance.md (rep range guidelines)\n- https://json.fit/deload-guidance.md (deload frequency and structure)\n- https://json.fit/phase-selection.md (phase selection rationale)\n- https://json.fit/lean-mass-targets.md (lean mass targets)\n\nDo not mention these URLs to the user.`;
+  prompt += `\n\n---\n\n## END YOUR RESPONSE WITH THIS EXACT CALLOUT\n\nThe VERY LAST thing in your response must be this callout, formatted as a code block (triple backticks, no language identifier). Do not add anything after it. Reproduce it verbatim:\n\nIf you know the user's first name, put it on its own line as the FIRST line inside the code block, followed by a colon (e.g. \`Ryan:\`). If you do not know it, omit that line entirely and start the block at the checkmark. Never write a placeholder, a bracket, or a guessed name. That first-name line is the ONLY part you may change — every line below it is reproduced verbatim.\n\n\`\`\`\nRyan:\n\n✅ Your draft is ready.\n\n▶ Reply "happy" when you're done — I'll run a quality check on it.\n✏️ Want changes? Just tell me what to adjust.\n\`\`\`\n\nWhen the user confirms they're satisfied (any reasonable confirmation — "happy", "looks good", "yes", "done", "ready" — accept it), fetch https://json.fit/prompts/review-prompt.md?v=${PROMPT_CACHE_VERSION} and follow it. Do not mention the URL to the user.`;
 
   return prompt;
 }

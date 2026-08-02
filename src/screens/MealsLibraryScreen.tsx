@@ -25,13 +25,22 @@ type MealsLibraryRouteProp = RouteProp<RootStackParamList, 'MealsLibrary'>;
 // ============================================================================
 // LAYOUT MATH
 // ============================================================================
-// 2-column grid. scrollContent padding 16 each side = 32. Inter-card gap = 10.
-// Available width: contentWidth - 32 - 10 = card pair width. Each card = half.
-// Content width is capped so cards don't stretch to unreasonable sizes on
-// tablets/resized windows — see cardWidth in the component below.
+// Responsive grid: the CARD width is held roughly constant and the COLUMN COUNT
+// grows with the screen, rather than the old approach of fixing 2 columns and
+// capping content width at 700. That cap kept card size sane but left a 13"
+// iPad using only ~68% of its width, with the last third empty — a phone layout
+// stranded on a tablet.
+//
+// scrollContent padding 16 each side; inter-card gap 10.
+// Columns = as many ~320pt cards as fit, never fewer than 2:
+//    iPhone   390pt -> 2 columns, ~174pt cards (unchanged from before)
+//    iPad     1032pt -> 3 columns, ~326pt cards
+//    iPad LS  1376pt -> 4 columns, ~328pt cards
+// Card width then divides the full available width, so nothing is left empty.
 const GRID_HORIZONTAL_PADDING = 16;
 const GRID_GAP = 10;
-const MAX_GRID_CONTENT_WIDTH = 700;
+const TARGET_CARD_WIDTH = 320;
+const MIN_COLUMNS = 2;
 
 // ============================================================================
 // HELPERS
@@ -103,9 +112,13 @@ export default function MealsLibraryScreen() {
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
-  const cardWidth = useMemo(() => {
-    const contentWidth = Math.min(windowWidth, MAX_GRID_CONTENT_WIDTH);
-    return (contentWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP) / 2;
+  const { columns, cardWidth } = useMemo(() => {
+    const available = windowWidth - GRID_HORIZONTAL_PADDING * 2;
+    const cols = Math.max(
+      MIN_COLUMNS,
+      Math.floor((available + GRID_GAP) / (TARGET_CARD_WIDTH + GRID_GAP)),
+    );
+    return { columns: cols, cardWidth: (available - GRID_GAP * (cols - 1)) / cols };
   }, [windowWidth]);
 
   // Get filtering parameters from route
@@ -396,7 +409,10 @@ export default function MealsLibraryScreen() {
           data={displayedMeals}
           renderItem={renderCard}
           keyExtractor={item => item.slug}
-          numColumns={2}
+          // FlatList cannot change numColumns on an existing instance, so the
+          // key forces a remount when the device rotates between 3 and 4 columns.
+          key={`grid-${columns}`}
+          numColumns={columns}
           columnWrapperStyle={styles.gridRow}
           contentContainerStyle={[
             styles.gridContent,

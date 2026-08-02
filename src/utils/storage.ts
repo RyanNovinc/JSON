@@ -9,6 +9,18 @@
 //   - Added WorkoutStorage.isAwaitingImport()
 //   - Added AWAITING_IMPORT to the clearAllData() multiRemove list
 //
+// Weight history data-loss fix:
+//   - loadWeightHistory NO LONGER WRITES. It previously called
+//     saveWeightHistory([]) from its catch block, so one transient
+//     AsyncStorage read failure permanently wiped the user's entire
+//     weight history. It also persisted its own validation filter,
+//     making dropped entries unrecoverable.
+//   - Added WEIGHT_HISTORY_BACKUP (written before every overwrite) and
+//     WEIGHT_HISTORY_QUARANTINE (raw bytes of anything unparseable).
+//   - Added loadWeightHistoryResult(), which reports whether the read
+//     actually succeeded. Callers that are about to write must use it.
+//   - saveWeightHistory now serializes writes through a queue.
+//
 // Everything else is unchanged.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -172,6 +184,12 @@ const STORAGE_KEYS = {
   FITNESS_GOALS: 'fitness_goals_questionnaire_results',
   FAVORITE_EXERCISES: 'favorite_exercises_results',
   WEIGHT_HISTORY: 'weight_tracking_history',
+  // Rolling copy of the last known-good weight history, written before
+  // every overwrite. Read only when the primary key is unreadable.
+  WEIGHT_HISTORY_BACKUP: 'weight_tracking_history_backup',
+  // Raw bytes of anything that failed validation, kept so a bad read is
+  // never unrecoverable. Never read by the app; for support only.
+  WEIGHT_HISTORY_QUARANTINE: 'weight_tracking_history_quarantine',
   // NEW: set when user copies the prompt from PromptReady, cleared after
   // successful workout import. Used by CreateChooserScreen to show a
   // "Continue your setup" banner on cold launch.
@@ -1156,60 +1174,205 @@ export class WorkoutStorage {
     }
   }
 
+  // ===========================================================================
   // Weight History Storage - Critical user progress data
-  static async saveWeightHistory(history: any[]): Promise<void> {
+  //
+  // Hard rule for this section: A READ NEVER WRITES.
+  //
+  // The previous implementation called saveWeightHistory([]) from
+  // loadWeightHistory's catch block, so a single transient AsyncStorage
+  // read failure permanently destroyed the user's entire weight history.
+  // It also persisted the result of its own validation filter, which
+  // turned any partially-written save into a permanent deletion of the
+  // entries that survived. Both are gone.
+  //
+  // What replaces them:
+  //   - saveWeightHistory copies the current value to a backup key before
+  //     overwriting, and serializes writes through a queue so two callers
+  //     doing read/modify/write cannot interleave.
+  //   - loadWeightHistory falls back to the backup when the primary key
+  //     is unreadable, and returns what it found WITHOUT writing.
+  //   - Entries that fail validation are excluded from the returned array
+  //     but the original raw bytes go to a quarantine key, so nothing is
+  //     unrecoverable.
+  //   - loadWeightHistoryResult exposes whether the read actually
+  //     succeeded. A bare [] cannot distinguish "no entries yet" from
+  //     "could not read", and callers that are about to WRITE need to
+  //     know the difference before they build a mutation on top of it.
+  // ===========================================================================
+
+  /**
+   * Serializes weight-history writes. Without this, two screens each
+   * doing load -> modify -> save can interleave and the later save wins
+   * with a value that never saw the other's change.
+   */
+  private static weightWriteQueue: Promise<any> = Promise.resolve();
+
+  private static async writeWeightHistoryNow(history: any[]): Promise<void> {
+    // Snapshot the current value as a backup before overwriting. Only
+    // promote a non-empty, well-formed array — an empty or corrupt
+    // backup is worse than no backup.
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.WEIGHT_HISTORY, JSON.stringify(history));
-      console.log('Weight history saved successfully');
+      const current = await AsyncStorage.getItem(STORAGE_KEYS.WEIGHT_HISTORY);
+      if (current) {
+        const parsed = JSON.parse(current);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          await AsyncStorage.setItem(STORAGE_KEYS.WEIGHT_HISTORY_BACKUP, current);
+        }
+      }
+    } catch (backupError) {
+      // A failed backup must not block the save.
+      console.warn('⚠️ [STORAGE] Could not back up weight history:', backupError);
+    }
+
+    await AsyncStorage.setItem(STORAGE_KEYS.WEIGHT_HISTORY, JSON.stringify(history));
+    console.log('Weight history saved successfully:', history.length, 'entries');
+  }
+
+  static async saveWeightHistory(history: any[]): Promise<void> {
+    if (!Array.isArray(history)) {
+      throw new Error('saveWeightHistory called with a non-array');
+    }
+
+    const run = this.weightWriteQueue.then(
+      () => this.writeWeightHistoryNow(history),
+      () => this.writeWeightHistoryNow(history)
+    );
+
+    // Keep the queue alive after a rejection so one failed write doesn't
+    // wedge every subsequent one.
+    this.weightWriteQueue = run.catch(() => {});
+
+    try {
+      await run;
     } catch (error) {
       console.error('Failed to save weight history:', error);
       throw error;
     }
   }
 
-  static async loadWeightHistory(): Promise<any[]> {
+  /**
+   * Full-fidelity read. `ok: false` means the primary key could not be
+   * read or understood — the entries returned may be a backup, or empty,
+   * but they are NOT authoritative. Anything about to write must check
+   * this and abort rather than mutate on top of an unreadable store.
+   */
+  static async loadWeightHistoryResult(): Promise<{
+    ok: boolean;
+    entries: any[];
+    reason?: 'read_failed' | 'corrupt_json' | 'not_an_array';
+    recoveredFromBackup?: boolean;
+  }> {
+    let raw: string | null = null;
+
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.WEIGHT_HISTORY);
-
-      if (!data) {
-        console.log('🔄 [STORAGE] No weight history data found, returning empty array');
-        return [];
-      }
-
-      const result = JSON.parse(data);
-
-      // Validate the parsed data structure
-      if (!Array.isArray(result)) {
-        console.warn('⚠️ [STORAGE] Weight history data is not an array, resetting to empty');
-        await this.saveWeightHistory([]);
-        return [];
-      }
-
-      // Validate each weight entry has required fields
-      const validEntries = result.filter(entry => {
-        if (!entry || typeof entry !== 'object' || !entry.weight || !entry.date) {
-          console.warn('⚠️ [STORAGE] Invalid weight entry found, skipping:', entry);
-          return false;
-        }
-        return true;
-      });
-
-      if (validEntries.length !== result.length) {
-        console.warn(`⚠️ [STORAGE] Found ${result.length - validEntries.length} corrupted weight entries, saving clean data`);
-        await this.saveWeightHistory(validEntries);
-      }
-
-      console.log('🔄 [STORAGE] Parsed weight history count:', validEntries.length, 'entries');
-      return validEntries;
+      raw = await AsyncStorage.getItem(STORAGE_KEYS.WEIGHT_HISTORY);
     } catch (error) {
-      console.error('❌ [STORAGE] Failed to load weight history, resetting data:', error);
-      // Reset corrupted data to prevent future crashes
-      try {
-        await this.saveWeightHistory([]);
-      } catch (resetError) {
-        console.error('❌ [STORAGE] Failed to reset corrupted weight history:', resetError);
+      console.error('❌ [STORAGE] Weight history read failed:', error);
+      const backup = await this.readWeightHistoryBackup();
+      return {
+        ok: false,
+        entries: backup ?? [],
+        reason: 'read_failed',
+        recoveredFromBackup: backup != null,
+      };
+    }
+
+    if (!raw) {
+      // Genuinely empty. This IS authoritative.
+      console.log('🔄 [STORAGE] No weight history data found, returning empty array');
+      return { ok: true, entries: [] };
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      console.error('❌ [STORAGE] Weight history is not valid JSON:', error);
+      await this.quarantineWeightHistory(raw);
+      const backup = await this.readWeightHistoryBackup();
+      return {
+        ok: false,
+        entries: backup ?? [],
+        reason: 'corrupt_json',
+        recoveredFromBackup: backup != null,
+      };
+    }
+
+    if (!Array.isArray(parsed)) {
+      console.error('⚠️ [STORAGE] Weight history data is not an array');
+      await this.quarantineWeightHistory(raw);
+      const backup = await this.readWeightHistoryBackup();
+      return {
+        ok: false,
+        entries: backup ?? [],
+        reason: 'not_an_array',
+        recoveredFromBackup: backup != null,
+      };
+    }
+
+    // Validate each entry. Note the weight check is an explicit numeric
+    // test, not a falsy test — a legitimately logged 0 is a number, and
+    // the old `!entry.weight` treated it as corruption.
+    const validEntries = parsed.filter((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      if (entry.weight == null || typeof entry.weight !== 'number' || Number.isNaN(entry.weight)) {
+        console.warn('⚠️ [STORAGE] Weight entry has no usable weight, skipping:', entry);
+        return false;
       }
-      return [];
+      if (!entry.date) {
+        console.warn('⚠️ [STORAGE] Weight entry has no date, skipping:', entry);
+        return false;
+      }
+      return true;
+    });
+
+    if (validEntries.length !== parsed.length) {
+      // Quarantine the ORIGINAL bytes and return the good entries. Do
+      // NOT persist the filtered list — that is what made validation
+      // failures permanent.
+      console.warn(
+        `⚠️ [STORAGE] ${parsed.length - validEntries.length} weight entries failed validation, quarantining raw copy`
+      );
+      await this.quarantineWeightHistory(raw);
+    }
+
+    console.log('🔄 [STORAGE] Parsed weight history count:', validEntries.length, 'entries');
+    return { ok: true, entries: validEntries };
+  }
+
+  /**
+   * Convenience wrapper preserving the original signature for read-only
+   * callers. Callers that are about to write should use
+   * loadWeightHistoryResult so they can tell failure from emptiness.
+   */
+  static async loadWeightHistory(): Promise<any[]> {
+    const result = await this.loadWeightHistoryResult();
+    return result.entries;
+  }
+
+  private static async readWeightHistoryBackup(): Promise<any[] | null> {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.WEIGHT_HISTORY_BACKUP);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return null;
+      console.warn('♻️ [STORAGE] Recovered weight history from backup:', parsed.length, 'entries');
+      return parsed;
+    } catch (error) {
+      console.error('❌ [STORAGE] Weight history backup unreadable:', error);
+      return null;
+    }
+  }
+
+  private static async quarantineWeightHistory(raw: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.WEIGHT_HISTORY_QUARANTINE,
+        JSON.stringify({ quarantinedAt: new Date().toISOString(), raw })
+      );
+    } catch (error) {
+      console.error('❌ [STORAGE] Could not quarantine weight history:', error);
     }
   }
 

@@ -552,6 +552,12 @@ export default function CookModeScreen() {
     setCurrentStepIdx(Math.max(currentStepIdx - 1, 0));
   };
 
+  // Completion screen → back to the steps. handleNext never advances past the
+  // last step, so currentStepIdx is still parked there; just drop the flag.
+  const handleBackToSteps = () => {
+    setCompleted(false);
+  };
+
   const toggleSubstep = (key: string) => {
     setCheckedSubsteps(prev => {
       const next = new Set(prev);
@@ -674,6 +680,18 @@ export default function CookModeScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Faint back affordance — returns to the final cooking step */}
+        <TouchableOpacity
+          style={styles.completionBackBtn}
+          onPress={handleBackToSteps}
+          activeOpacity={0.7}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          accessibilityRole="button"
+          accessibilityLabel="Back to cooking steps"
+        >
+          <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.65)" />
+        </TouchableOpacity>
 
         {/* Bottom content */}
         <View
@@ -1317,6 +1335,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completionBackBtn: {
+    position: 'absolute',
+    left: 12,
+    top: '50%',
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },

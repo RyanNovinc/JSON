@@ -82,7 +82,7 @@ export default function WorkoutLogScreenAdapter() {
   const route = useRoute<RouteProp<RootStackParamList, 'WorkoutLog'>>();
   const { themeColor, isPinkTheme } = useTheme();
   const { globalUnit } = useWeightUnit();
-  const { startTimer, stopTimerForSet, timerSettings } = useTimer();
+  const { startTimer, stopTimerForSet, timerSettings, setPreviewRestOptions } = useTimer();
   const { activeWorkout, setActiveWorkout } = useActiveWorkout();
   
   // Extract data from your existing route params
@@ -421,6 +421,57 @@ export default function WorkoutLogScreenAdapter() {
     setIndex,
   });
 
+  /**
+   * Is this exercise supersetted with the one after it?
+   *
+   * Completing a set on the FIRST leg of a pair gives the short transition rest rather than
+   * a full one, so the preview below and handleSetComplete have to agree on this. A preview
+   * that disagrees with what actually happens is worse than no preview at all — it teaches
+   * the user a number that turns out to be wrong. One definition, two callers.
+   */
+  const isSupersettedWithNext = (index: number): boolean => {
+    const current = exercises[index];
+    const next = exercises[index + 1];
+    return !!(
+      current?.superset_group &&
+      next?.superset_group &&
+      current.superset_group === next.superset_group &&
+      current.superset_group.trim() !== ''
+    );
+  };
+
+  /**
+   * Publish the rest durations for whichever exercise is on screen.
+   *
+   * TimerModal is rendered globally and has no idea which exercise the user is looking at,
+   * so without this it can only show durations for a rest already under way — which is too
+   * late to answer "what will this cost me?". A live timer's own restOptions still take
+   * precedence there; this is the fallback for everything else, including before the first
+   * set of an exercise and for a timer the user started by hand.
+   */
+  useEffect(() => {
+    const exercise = exercises[currentIndex];
+    if (!exercise) {
+      setPreviewRestOptions(null);
+      return;
+    }
+
+    setPreviewRestOptions(
+      resolveRest({
+        ...buildRestContext(exercise),
+        ...(isSupersettedWithNext(currentIndex) ? { supersetRole: 'transition' as const } : {}),
+      }),
+    );
+  }, [currentIndex, exercises, currentWeek, block]);
+
+  /**
+   * Deliberately a separate effect. Folding this in as the cleanup of the one above would
+   * clear and immediately re-set the preview on every swipe, flickering the numbers. This
+   * only needs to run when the screen goes away — otherwise a global modal would keep
+   * showing rest times for a workout the user has left.
+   */
+  useEffect(() => () => setPreviewRestOptions(null), []);
+
   const handleSetComplete = async (exerciseIndex: number, setIndex: number) => {
     // Deliberately reads allSetsData from the render closure, NOT a functional
     // update. The screen's deferred completion (pendingCompletion) is built around
@@ -455,11 +506,9 @@ export default function WorkoutLogScreenAdapter() {
       console.log('🔗 [SUPERSET CHECK] Current exercise:', currentExercise?.exercise, 'Group:', currentExercise?.superset_group);
       console.log('🔗 [SUPERSET CHECK] Next exercise:', nextExercise?.exercise, 'Group:', nextExercise?.superset_group);
       
-      // Check if this exercise is supersetted with the next one
-      const isSuperset = currentExercise?.superset_group && 
-                        nextExercise?.superset_group && 
-                        currentExercise.superset_group === nextExercise.superset_group &&
-                        currentExercise.superset_group.trim() !== '';
+      // Check if this exercise is supersetted with the next one. Shared with the preview
+      // effect above so the two can never drift apart.
+      const isSuperset = isSupersettedWithNext(exerciseIndex);
       
       if (isSuperset) {
         console.log('🔗 [SUPERSET] ✅ Superset detected! Switching immediately');

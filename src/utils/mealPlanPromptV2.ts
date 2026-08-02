@@ -44,6 +44,8 @@
 
 import { CuratedMeal, MealSlot, Plate } from '../types/curated_meals';
 import { CURATED_MEALS } from '../data/curated_meals';
+import { INGREDIENTS } from '../data/ingredients';
+import { resolveBaseIngredients } from './resolveMealIngredients';
 import {
   CuratedFavoritesV2,
   PlanSlot,
@@ -65,8 +67,15 @@ import type { DerivedPhase } from './goalsProfile';
 
 export const PROMPT_VERSION = 'v2';
 
-const INSTRUCTIONS_URL = 'https://json.fit/prompts/v2/instructions.md';
-const REVIEW_URL = 'https://json.fit/prompts/v2/meal-review-prompt.md';
+// Cache-buster appended to every json.fit URL in the assembled prompt so that
+// updating a server file yields a URL nothing has cached. Bump on each edit.
+// Single definition lives in ../data/promptCacheVersion.ts — three hand-kept
+// copies is how one of them silently went stale.
+import { PROMPT_CACHE_VERSION } from '../data/promptCacheVersion';
+
+const INSTRUCTIONS_URL = `https://json.fit/prompts/v2/instructions.md?v=${PROMPT_CACHE_VERSION}`;
+const REVIEW_URL = `https://json.fit/prompts/v2/meal-review-prompt.md?v=${PROMPT_CACHE_VERSION}`;
+const JSON_URL = `https://json.fit/prompts/v2/meal-json-prompt.md?v=${PROMPT_CACHE_VERSION}`;
 
 const FETCH_FAIL_MESSAGE =
   "This prompt needs to fetch files from json.fit, but fetching isn't working in your AI. To use JSON.fit:\n" +
@@ -534,7 +543,23 @@ function mealTimes(
   if (frames.some((f) => f.slot === 'pre_workout')) lines.push('Pre-workout: 45–60 min before training');
   if (frames.some((f) => f.slot === 'post_workout')) lines.push('Post-workout: within 60 min after training');
   if (frames.some((f) => f.slot === 'snack')) lines.push('Snacks: between the meals above');
-  if (frames.some((f) => f.slot === 'dessert')) lines.push('Dessert: after dinner');
+  // Dessert used to be emitted as "Dessert: after dinner", which the prompt
+  // then contradicted two lines earlier: the loop above places the LAST main
+  // meal exactly on `last`, and `last` is the stated "last meal finished by"
+  // cutoff. So the prompt asked for a meal after the final possible meal.
+  //
+  // Every observed run took the instruction literally, put dessert past the
+  // cutoff, and the review step caught it and pulled dinner earlier — the same
+  // repair, every time, for a contradiction generation was handed. Cheaper to
+  // state the resolution here than to keep paying for it downstream.
+  //
+  // Dessert is typically once a week, so the shift is scoped to the day it
+  // appears rather than moving dinner on all seven.
+  if (frames.some((f) => f.slot === 'dessert')) {
+    lines.push(
+      `Dessert ~${fmtClock(last)} on the day it appears, with that day's dinner pulled back to ~${fmtClock(last - 30)} so both finish inside the window (other days keep the dinner time above)`
+    );
+  }
   return { first: fmtClock(first), last: fmtClock(last), lines };
 }
 
@@ -557,7 +582,14 @@ function resolveStartDate(token?: string): Date {
   return isNaN(parsed.getTime()) ? tomorrow : parsed;
 }
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+// LOCAL date parts, not toISOString(). toISOString() converts to UTC first, so
+// for anyone east of UTC a local start date of Sat 1 Aug came out as
+// "2026-07-31" — a Friday — while pretty() (which IS local) said Saturday. The
+// prompt then handed the model two dates that disagreed, and following the ISO
+// one shifts every day name in the plan by a day. Same class of bug in reverse
+// for anyone west of UTC.
+const iso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const pretty = (d: Date) =>
   d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -587,12 +619,215 @@ function frameSection(f: SlotFrame): string {
     notes.push(
       `May borrow from ${SLOT_LABEL[f.borrowableWith]} when it helps reuse a batch or hit the day's targets.`
     );
-  const realOpts = f.options.filter((o) => !o.filler).length;
+  // Count distinct MEALS, not plate rows — a single multi-plate meal is one
+  // meal's worth of feasible options, and counting its plates would suppress
+  // the repetition-permission note exactly where it's most needed.
+  const realOpts = new Set(
+    f.options.filter((o) => !o.filler).map((o) => o.key.split(':')[0])
+  ).size;
   if (realOpts > 0 && realOpts * 2 <= f.occurrencesPerWeek)
     notes.push(
-      `With ${realOpts} option${realOpts === 1 ? '' : 's'} for ${f.occurrencesPerWeek} occurrences, repetition is expected and correct — vary the scale day to day rather than inventing variety.`
+      `With ${realOpts} meal${realOpts === 1 ? '' : 's'} for ${f.occurrencesPerWeek} occurrences, repetition is expected and correct — vary the scale day to day rather than inventing variety.`
     );
   return [head, table, ...notes.map((s) => `> ${s}`)].join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Ingredient tables
+// ---------------------------------------------------------------------------
+// WHY THIS EXISTS: the option tables carry macros only, so before this the
+// grocery-list instruction told the model to work from "your knowledge of
+// those recipes". It has no such knowledge — these 85 meals exist only in this
+// repo, shortcut-by-default with jar sauces and recipe-base pouches. The model
+// was reconstructing a plausible ingredient list from the meal's NAME, which
+// meant the list the user shopped from did not match the list RecipeDetail
+// showed them when they went to cook it, and every quantity was a guess.
+//
+// Ingredients are emitted GENERIC (no brands — `notes` in the ingredient
+// library names Australian products, which would anchor the model to one
+// market and defeat the localisation this is for). The model gets the
+// ingredient, the amount, the unit, the shopping category and the typical pack
+// size, and does the local part: find the equivalent product where the user
+// lives, round to a pack size sold there, and price it.
+//
+// Emitted once per SLUG, not per plate — plates of one meal share a base.
+
+interface PromptIngredientRow {
+  id: string;
+  name: string;
+  amount: number;
+  unit: string;
+  category: string;
+  packSize?: number;
+}
+
+function ingredientMeta(ingredientId: string) {
+  return (INGREDIENTS as any)[ingredientId];
+}
+
+/** Prettified fallback so an unknown id still reads as a shopping item. */
+function ingredientName(ingredientId: string): string {
+  const meta = ingredientMeta(ingredientId);
+  if (meta?.display_name) return meta.display_name;
+  const words = String(ingredientId).split('_').join(' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * `is_pantry_negligible` rows (salt, pepper, spray oil …) are excluded by the
+ * ingredient library's own contract: it hides them from shopping lists and
+ * macro totals while keeping them in cook steps. Nobody needs "buy salt" on a
+ * weekly list.
+ */
+function promptIngredientRows(list: any[]): PromptIngredientRow[] {
+  const rows: PromptIngredientRow[] = [];
+  // An ingredient can legitimately appear twice in a resolved list (a sauce
+  // variant re-listing something the base already has, e.g. brown sugar in the
+  // scratch pulled pork). Emitting it twice reads as a data error in the table,
+  // so amounts are summed onto the first row instead.
+  const seen = new Map<string, PromptIngredientRow>();
+  for (const ing of list ?? []) {
+    const meta = ingredientMeta(ing.ingredient_id);
+    if (meta?.is_pantry_negligible) continue;
+    const amount = Number(ing.base_amount);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const id = String(ing.ingredient_id);
+    const unit = String(ing.unit ?? meta?.canonical_unit ?? '');
+    const key = `${id}|${unit}`;
+    const existing = seen.get(key);
+    if (existing) {
+      existing.amount += amount;
+      continue;
+    }
+    const row: PromptIngredientRow = {
+      id,
+      name: ingredientName(ing.ingredient_id),
+      amount,
+      unit,
+      category: String(meta?.category ?? 'other'),
+      packSize: Number.isFinite(Number(meta?.typical_pack_size))
+        ? Number(meta.typical_pack_size)
+        : undefined,
+    };
+    seen.set(key, row);
+    rows.push(row);
+  }
+  return rows;
+}
+
+const amt = (x: number) => (Math.abs(x - Math.round(x)) < 0.005 ? String(Math.round(x)) : x.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
+
+function ingredientsSection(frames: SlotFrame[]): string {
+  // Distinct slugs across every option the model can choose from, plus the
+  // plate ids actually offered, so plate accompaniments are covered too.
+  const platesBySlug = new Map<string, Set<string>>();
+  const order: string[] = [];
+  const addSlug = (slug: string, plateId?: string) => {
+    if (!platesBySlug.has(slug)) {
+      platesBySlug.set(slug, new Set());
+      order.push(slug);
+    }
+    if (plateId) platesBySlug.get(slug)!.add(plateId);
+  };
+
+  for (const f of frames) {
+    for (const o of f.options) {
+      const [slug, plateId] = o.key.split(':');
+      addSlug(slug, plateId);
+    }
+  }
+
+  // Adjusters too. They live in their own table rather than in any slot frame,
+  // so they were missing here — and a tuna pouch that lands six days a week is
+  // a real line on the shop with no id for the app to match a price to.
+  for (const a of ADJUSTERS) {
+    if (a.curatedRef) addSlug(a.curatedRef, 'standard');
+  }
+
+  const blocks: string[] = [];
+  for (const slug of order) {
+    const meal: CuratedMeal | undefined = (CURATED_MEALS as any)[slug];
+    if (!meal) continue;
+
+    // Default (jar / shortcut) variant — what the app cooks unless the user
+    // flips to from-scratch, so it is what they need to buy.
+    const baseRows = promptIngredientRows(resolveBaseIngredients(meal));
+    if (baseRows.length === 0) continue;
+
+    const serves = meal.produces_servings ?? 1;
+    const lines: string[] = [
+      `#### ${meal.display_name} — \`${slug}\`  (base recipe makes ${serves} serving${serves === 1 ? '' : 's'})`,
+      '| ingredient | id | amount | unit | category | typical pack |',
+      '|---|---|---|---|---|---|',
+      ...baseRows.map(
+        (r) =>
+          `| ${r.name} | ${r.id} | ${amt(r.amount)} | ${r.unit} | ${r.category} | ${r.packSize ?? '—'} |`
+      ),
+    ];
+
+    // FROM-SCRATCH ALTERNATIVE.
+    // 21 of the 85 meals ship a second sauce_variant. The user picks between
+    // them IN THE APP, after import, so the plan is always built on the default
+    // (jar) version — but the app rebuilds the shopping list when they switch,
+    // and without these rows the swapped-in ingredients have no price at all.
+    // Only the DIFFERENCE is emitted: what scratch needs that the default
+    // didn't, which is a handful of pantry items per meal.
+    const variants = (meal as any).sauce_variants ?? [];
+    if (variants.length > 1) {
+      const alt = variants.find((v: any) => !v.is_default);
+      if (alt) {
+        const defaultIds = new Set(baseRows.map((r) => r.id));
+        const altRows = promptIngredientRows(
+          resolveBaseIngredients(meal, { variantId: alt.id })
+        ).filter((r) => !defaultIds.has(r.id));
+        if (altRows.length > 0) {
+          lines.push(
+            `From-scratch version ALSO needs: ` +
+              altRows
+                .map(
+                  (r) =>
+                    `${r.name} [${r.id}] ${amt(r.amount)} ${r.unit} (${r.category}${r.packSize ? `, pack ${r.packSize}` : ''})`
+                )
+                .join('; ')
+          );
+        }
+      }
+    }
+
+    for (const plateId of platesBySlug.get(slug) ?? []) {
+      const plate = (meal.plates ?? []).find((p) => p.id === plateId);
+      const addRows = promptIngredientRows(plate?.additional_ingredients ?? []);
+      if (!plate || addRows.length === 0) continue;
+      lines.push(
+        `Plate \`${plateId}\` adds PER SERVING: ` +
+          addRows
+            .map(
+              (r) =>
+                `${r.name} [${r.id}] ${amt(r.amount)} ${r.unit} (${r.category}${r.packSize ? `, pack ${r.packSize}` : ''})`
+            )
+            .join('; ')
+      );
+    }
+    blocks.push(lines.join('\n'));
+  }
+
+  if (blocks.length === 0) return '';
+
+  return [
+    '## Ingredients for the curated options',
+    'Generic on purpose — no brands. Find the local equivalent of each item where the user shops.',
+    '',
+    'How to read these tables:',
+    '- Base-recipe amounts are for the WHOLE base recipe, which makes the stated number of servings.',
+    '- One serving of an option = (base amount ÷ servings made) × scale_factor.',
+    '- "Plate adds PER SERVING" rows are already per serving — multiply by scale_factor only, never divide.',
+    '- "typical pack" is the size this item is usually sold in, as a rounding hint. Use the pack size actually sold where the user shops.',
+    '- "id" is the app\u2019s internal key for that ingredient. Carry it into the grocery list (see below) so the app can match your priced item to its own records.',
+    '- Everyday seasonings (salt, pepper, oil spray) are omitted deliberately — do not add them to the list.',
+    '- "From-scratch version ALSO needs" rows are the alternative the user can switch to in the app AFTER importing. They are NOT part of the plan you are building — the plan always uses the default version. Price them in the separate from-scratch section of the grocery list, never in the main list.',
+    '',
+    blocks.join('\n\n'),
+  ].join('\n');
 }
 
 function adjusterSection(): string {
@@ -676,11 +911,11 @@ function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number, h
   }
 
   lines.push('');
-  const fetchRefs = ['- https://json.fit/phase-selection.md (phase selection rationale)'];
+  const fetchRefs = [`- https://json.fit/phase-selection.md?v=${PROMPT_CACHE_VERSION} (phase selection rationale)`];
   if (hasLeanMassTargets) {
-    fetchRefs.push('- https://json.fit/lean-mass-targets.md (lean mass targets)');
+    fetchRefs.push(`- https://json.fit/lean-mass-targets.md?v=${PROMPT_CACHE_VERSION} (lean mass targets)`);
   }
-  lines.push('**Phase references (fetch for context — do not show these URLs to the user):**\n' + fetchRefs.join('\n'));
+  lines.push('**Phase references (OPTIONAL background — fetch only if you want the reasoning behind these numbers. Every figure you need is already stated above, so skipping them costs nothing. Do not show these URLs to the user):**\n' + fetchRefs.join('\n'));
 
   return lines.join('\n');
 }
@@ -728,6 +963,16 @@ export function buildMealPlanPrompt(
     `**FETCH CHECK:** Fetch ${INSTRUCTIONS_URL} now and follow it alongside this prompt. If the fetch fails for any reason, stop and reply only:\n"${FETCH_FAIL_MESSAGE}"`
   );
 
+  parts.push(
+    [
+      '## PIPELINE FILES (do not show these URLs to the user)',
+      '',
+      'This is a 3-step flow. The files for the later steps are listed here so they are available to you when the time comes. **Do not fetch them now.** Fetch each one only when the flow reaches that step:',
+      `- Step 2, quality check: ${REVIEW_URL}`,
+      `- Step 3, file conversion: ${JSON_URL}`,
+    ].join('\n')
+  );
+
   // Opener callout — fires after the fetch check passes. Sets expectations
   // for the whole three-step flow so users don't bounce thinking the AI's
   // first response is the final deliverable.
@@ -766,7 +1011,7 @@ export function buildMealPlanPrompt(
       '1. Each option below is an OPTION for its slot, not a promise of appearance. Fill every occurrence of a slot by choosing ONE option and a scale factor. Options may repeat across the week. If a slot has more options than occurrences, leave some out \u2014 that is correct, not an error.',
       '2. scale_factor multiplies that plate\u2019s macros uniformly. Use steps of 0.05 within the stated [min\u2013max]. Macros for a serving = plate macros \u00d7 scale_factor.',
       '3. Serve options in their listed slot by default. Lunch and dinner options MAY be swapped between those two slots when it helps reuse a batch or hit a day\u2019s targets. All other slots use only their own options.',
-      '4. Batch meals (serves > 1): if you schedule one, schedule its full batch within the week, or state "freeze N portions" in the prep notes. Place fridge-eaten servings on consecutive days starting at the cook; any serving more than 4 days after the cook must be a frozen portion with a thaw note ("freeze N portions; thaw overnight before day X"). Rotate its plates.',
+      '4. Batch meals (serves > 1): servings CONSUMED = the SUM OF THE SCALE FACTORS you schedule, not the number of placements. Six placements at 0.7 consume 4.2 servings, not 6. Cook ceil(sum \u00f7 serves) batches, and size the prep notes and every grocery quantity from the batches cooked \u2014 never from the placement count. State leftovers explicitly: (batches \u00d7 serves) \u2212 sum of scale factors. If you schedule a batch meal, consume it within the week or state "freeze N portions" in the prep notes. Place fridge-eaten servings on consecutive days starting at the cook; any serving more than 4 days after the cook must be a frozen portion with a thaw note ("freeze N portions; thaw overnight before day X"). Rotate its plates.',
       `5. Maximum ${STUNT_CAP} stunt plate this week. Dessert appears exactly ${dessertOcc} time(s) \u2014 never more, never as "optional".`,
       `6. Adjusters (table below) are standalone items used to close a day\u2019s gaps. Maximum ${MAX_ADJUSTERS_PER_DAY} per day.`,
       '7. Fallback order when a day misses target: rescale \u2192 adjusters \u2192 swap option within the slot \u2192 universal fillers (marked UF) for uncovered occurrences \u2192 only if all else fails, invent a simple meal and say so in the plan notes.',
@@ -775,13 +1020,17 @@ export function buildMealPlanPrompt(
   );
 
   const mealVariety: string = (a.mealVariety as string) ?? 'balanced';
-  const varietyDirective =
+  // Applies to every setting: variety never outranks the bands or the tables,
+  // and never justifies inventing a meal.
+  const varietyAlwaysApplies =
+    'Variety is a preference, not a target to force: the daily calorie, protein and fibre bands and the option tables above always take precedence over this setting. Never invent a meal to create variety — repetition is always the correct response to too few feasible options; invention exists only as the final fallback for closing macro gaps (rule 7).';
+  const varietySetting =
     mealVariety === 'convenience'
-      ? 'VARIETY — Convenience. Repeat meals aggressively to minimise cooking and shopping. Reuse the same mains across multiple days via batching, and keep adjusters consistent day to day. Repetition is desired here, not a flaw.'
+      ? 'VARIETY — Convenience. Repeat meals aggressively to minimise cooking and shopping. One meal per slot repeated all week is the ideal outcome, not a compromise. Reuse the same mains across multiple days via batching and keep adjusters consistent day to day.'
       : mealVariety === 'variety'
-      ? 'VARIETY — High. Maximise day to day variety: rotate the main options across more days and vary the adjusters and produce daily. Accept more cooking and shopping to avoid repetition.'
-      : 'VARIETY — Balanced. Use roughly two to three distinct mains per slot across the week, and rotate the adjusters and produce so the same top-up doesn’t appear every single day. Still batch where it genuinely helps.';
-  parts.push(varietyDirective);
+      ? 'VARIETY — High. Maximise day-to-day variety in every slot that has enough feasible options: rotate mains across more days and vary the adjusters and produce daily. Where a slot’s options can’t support rotation, repeat and say so in the Variety note rather than forcing it.'
+      : 'VARIETY — Balanced. This applies to main slots only (lunch, dinner, and any extra main slots): aim for 2–3 distinct meals per main slot across the week. Distinct means distinct meal (slug) — different plates of the same meal count as one. Breakfast, snacks and dessert have no quota: rotate them when the user’s picks support it, repeat them when they don’t. Repetition in these slots is never a shortfall. Rotate which adjusters you use so the same top-up doesn’t appear every single day. Still batch where it genuinely helps.';
+  parts.push(`${varietySetting} ${varietyAlwaysApplies}`);
 
   if (opts?.derivedPhase) {
     parts.push(phaseContextBlock(opts.derivedPhase, macros, duration, opts?.hasLeanMassTargets));
@@ -793,6 +1042,7 @@ export function buildMealPlanPrompt(
     `- Protein: ${targets.pLo}\u2013${targets.pHi} g EVERY day; every main meal \u2265 ${targets.pFloor} g`,
     `- Fibre: \u2265 ${targets.fibMin} g every day`,
     `- Weekly averages: carbs ${targets.cLo}\u2013${targets.cHi} g, fat ${targets.fLo}\u2013${targets.fHi} g`,
+    '- The weekly carb and fat averages are SECONDARY to the daily calorie, protein and fibre bands. If the option set makes one of them unreachable without breaking a daily band, name the binding constraint in one line in the plan notes and move on. See the effort limit in the build procedure.',
     `- Meal times: first meal ~${times.first}, last meal finished by ~${times.last}. Suggested: ${times.lines.join('; ')}`,
     `- Plan dates: ${duration} days starting ${pretty(start)} (${iso(start)}). Use actual calendar dates.`,
   ];
@@ -810,9 +1060,35 @@ export function buildMealPlanPrompt(
 
   parts.push(adjusterSection());
 
+  // The tables have to live HERE, in the generation prompt, because there is no
+  // second message: the user just replies "happy" and the model fetches the
+  // review file itself. Anything the app tries to hand over at step 2 never
+  // arrives. They are marked as step-2 material so they are not carried through
+  // the planning work — the grocery list is still BUILT at the review step,
+  // once the meals are settled.
+  const ingredientTables = ingredientsSection(frames);
+  if (ingredientTables) {
+    parts.push(
+      [
+        '## Ingredients \u2014 FOR STEP 2, NOT NOW',
+        'You do NOT need this section to build the plan. It exists so the grocery list can be built at the quality-check step, once the meals are final. Skim past it now; come back to it then.',
+        `Grocery context for step 2 \u2014 location & store: ${a.groceryStore ?? 'local supermarket'} in ${a.city ?? ''} ${a.country ?? ''}`.trim() +
+          `. Weekly budget: ${budget}.`,
+        '',
+        ingredientTables,
+      ].join('\n')
+    );
+  }
+
   parts.push(
     [
       '## Build procedure',
+      'EFFORT LIMIT (read this before you start). You are SCHEDULING, not solving. Work forward one day at a time and commit. Specifically:',
+      '  \u2022 Try at most THREE candidate shapes for a day. Take the best of the three and move on. Do not keep testing variants once one clears its bands.',
+      '  \u2022 Do NOT write a solver, an optimiser, a search, or a scripted enumeration over meal combinations, scales, or week layouts. A code tool is for ARITHMETIC \u2014 summing a day, multiplying a scale \u2014 never for searching the option space.',
+      '  \u2022 Do NOT try to prove a weekly average is unreachable. If two or three honest attempts cannot get carbs or fat into band without breaking a daily band, that IS the answer: name the constraint that blocks it in one line and move on. An exhaustive search costs the user minutes and tells them nothing the one line does not.',
+      '  \u2022 Repetition is not a problem to optimise away. A slot with one option repeating all week is a correct outcome.',
+      '',
       'Work one day at a time. For each day: place batch servings first, fill the remaining occurrences, then write the arithmetic line before moving on (compute with a code tool if available \u2014 never sum in your head):',
       '  Mon: baked_oats:standard 1.0 (520/38) + protein_shake:standard 1.0 (250/30) + butter_chicken:standard 0.9 (648/47) + pulled_pork:bowl 0.85 (1131/52) = 2549 kcal / 167 P',
       '(Illustrative format only \u2014 your options and numbers are in the tables above.)',
@@ -825,14 +1101,6 @@ export function buildMealPlanPrompt(
       '## Constraints — apply to UF rows and invented food only',
       `Allergies: ${allergies.length ? allergies.join(', ') : 'none'}. Avoid: ${avoid.length ? avoid.join(', ') : 'none'}.${challenges.length ? ` Eating challenges to accommodate: ${challenges.join(', ')}.` : ''}`,
       'Assume a standard kitchen; prefer no-cook or one-pan inventions, \u226420 min hands-on. The curated options above were chosen by the user \u2014 do not second-guess, equipment-check, or substitute them.',
-    ].join('\n')
-  );
-
-  parts.push(
-    [
-      '## Grocery list',
-      `Location & store: ${a.groceryStore ?? 'local supermarket'} in ${a.city ?? ''} ${a.country ?? ''}`.trim() + `. Weekly budget: ${budget}.`,
-      'Include every ingredient across the plan (curated meals included, from your knowledge of those recipes), organised by shopping category, with quantity, unit, and a realistic estimated price for that store. Notes only for items bought outside the main store. Give a total as a range: low = sum of items, high = low \u00d7 1.10 rounded up, with the currency symbol.',
     ].join('\n')
   );
 
@@ -852,13 +1120,18 @@ export function buildMealPlanPrompt(
   parts.push(
     [
       '## Output',
-      'Present the full plan in chat: each day with dates and times, the per-day arithmetic line, prep notes, then the grocery list. Present only the final clean version \u2014 no working, no drafts.',
+      'Present the full plan in chat: each day with dates and times, the per-day arithmetic line, and prep notes. Do NOT write a grocery list \u2014 that happens at the quality-check step, once the meals are settled. Present only the final clean version \u2014 no working, no drafts.',
+      'In the plan notes, include a short \u2018Variety\u2019 item: one line per main slot stating how many distinct meals were used against the variety setting. If a slot came in under the setting, name the binding constraint in that same line (e.g. \u2018Breakfast: 1 \u2014 other picks exceed the slot\u2019s calorie room; add a 500\u2013700 kcal breakfast pick to spread this\u2019). Report and move on \u2014 one line per slot maximum, no re-solving.',
       '',
       '## END YOUR RESPONSE WITH THIS EXACT CALLOUT',
       '',
       'The VERY LAST thing in your response must be this callout, formatted as a code block (triple backticks, no language identifier). Do not add anything after it. Reproduce it verbatim:',
       '',
+      'If you know the user\u2019s first name, put it on its own line as the FIRST line inside the code block, followed by a colon (e.g. `Ryan:`). If you do not know it, omit that line entirely and start the block at the checkmark. Never write a placeholder, a bracket, or a guessed name. That first-name line is the ONLY part you may change \u2014 every line below it is reproduced verbatim.',
+      '',
       '```',
+      'Ryan:',
+      '',
       '\u2705 Your meal plan draft is ready.',
       '',
       '\u25b6 Reply "happy" when you\u2019re done \u2014 I\u2019ll run a quality check on it.',
@@ -877,14 +1150,73 @@ export function buildMealPlanPrompt(
 // The fetched review file is the enforcement layer; this just points at it.
 // ---------------------------------------------------------------------------
 
-export function buildReviewLauncher(t: PromptTargets): string {
-  return `Review the meal plan above as a quality gate.
-Fetch ${REVIEW_URL} and follow it exactly.
-Verify against these targets (authoritative \u2014 use these, not numbers recalled from earlier):
-- Calories: ${t.kcalLo}\u2013${t.kcalHi} kcal every day
-- Protein: ${t.pLo}\u2013${t.pHi} g every day (each main meal \u2265 ${t.pFloor} g)
-- Fibre: \u2265 ${t.fibMin} g every day
-- Weekly averages: carbs ${t.cLo}\u2013${t.cHi} g, fat ${t.fLo}\u2013${t.fHi} g`;
+export interface ReviewLauncherExtras {
+  /** Ingredient tables, as produced by ingredientsSection(). */
+  ingredientTables?: string;
+  /** Store, city, country and budget line for the grocery instruction. */
+  groceryContext?: string;
+}
+
+/**
+ * WHY THE GROCERY LIST LIVES HERE AND NOT IN THE GENERATION PROMPT.
+ *
+ * The ingredient tables are used for exactly one thing: writing the shopping
+ * list. Nothing in meal SELECTION touches them — that runs entirely on the
+ * macro columns. Carrying several hundred lines of ingredient data through the
+ * whole planning-and-replanning grind, only to use it in the last step, is
+ * dead weight at the point the model is working hardest. A live run showed the
+ * cost: the model started confusing meals with each other partway through.
+ *
+ * By this step the plan is settled and sitting in the conversation, so the
+ * model knows exactly which meals it used, and the tables arrive fresh rather
+ * than thousands of tokens back. It also makes the review file's grocery check
+ * real: it is building the list, not re-reading someone else's.
+ */
+export function buildReviewLauncher(
+  t: PromptTargets,
+  mealVariety: string = 'balanced',
+  extras?: ReviewLauncherExtras
+): string {
+  const variety =
+    mealVariety === 'convenience' || mealVariety === 'variety' ? mealVariety : 'balanced';
+
+  const parts: string[] = [
+    `Review the meal plan above as a quality gate, then build the grocery list.`,
+    `Fetch ${REVIEW_URL} and follow it exactly.`,
+    `Verify against these targets (authoritative \u2014 use these, not numbers recalled from earlier):`,
+    `- Calories: ${t.kcalLo}\u2013${t.kcalHi} kcal every day`,
+    `- Protein: ${t.pLo}\u2013${t.pHi} g every day (each main meal \u2265 ${t.pFloor} g)`,
+    `- Fibre: \u2265 ${t.fibMin} g every day`,
+    `- Variety setting: ${variety} (main slots only; the plan notes must carry a Variety item)`,
+    `- Weekly averages: carbs ${t.cLo}\u2013${t.cHi} g, fat ${t.fLo}\u2013${t.fHi} g`,
+  ];
+
+  // Kept for callers that DO paste the launcher manually; the standard flow
+  // never reaches this branch, which is why the tables also live in the
+  // generation prompt.
+  if (extras?.ingredientTables) {
+    parts.push('');
+    parts.push(extras.ingredientTables);
+    parts.push('');
+    parts.push(
+      [
+        '## Grocery list (build it now, after the checks)',
+        extras.groceryContext ?? '',
+        'The plan above is settled, so you know exactly which meals and scale factors were used. Build the list from the ingredient tables \u2014 they are the authoritative recipes for every curated option. Do NOT reconstruct a curated meal\u2019s ingredients from its name or from your own knowledge of the dish; these are specific recipes and your version will not match what the app shows the user when they cook it.',
+        'Quantity arithmetic, per ingredient: for every occurrence in the FINAL plan, take (base amount \u00f7 servings the base recipe makes) \u00d7 that occurrence\u2019s scale_factor, and add plate PER-SERVING rows \u00d7 scale_factor. For multi-serving meals, size from the BATCHES cooked, not the placement count. Sum across the whole plan, then round UP to a pack size sold at their store. Compute with a code tool if available.',
+        'Meals that appear in the tables but NOT in the final plan are not bought \u2014 skip them entirely.',
+        'The items are generic so you can localise them: substitute the local equivalent product, use pack sizes actually sold there, and price in the local currency. Keep the ingredient recognisable \u2014 swap the product, not the recipe.',
+        'Every grocery item that came from an ingredient table must carry that table\u2019s id in square brackets after the item name \u2014 e.g. "Chicken thigh [chicken_thigh]" or, once localised, "Chicken thigh fillets [chicken_thigh]". Keep the id EXACTLY as written even when you change the product name; it is how the app matches your priced item to its own records. Items with no id in any table simply have no bracket.',
+        'Organise by the category given for each item (produce, meat_seafood, dairy_refrigerated, bakery, frozen, pantry_grains, condiments_supplements). Add ingredients for any invented meals or adjusters on top. Notes only for items bought outside the main store. Give a total as a range: low = sum of items, high = low \u00d7 1.10 rounded up, with the currency symbol.',
+        '',
+        'FROM-SCRATCH EXTRAS \u2014 a SECOND list, after the main one. Some meals have a from-scratch alternative the user can switch to in the app after importing. For every "From-scratch version ALSO needs" row belonging to a meal that IS in the final plan, give the item, its id in brackets, a pack size sold at their store, and a price \u2014 the same localising job as the main list. Head it "If you cook these from scratch" and give it its own subtotal. Do NOT add these to the main list or the main total: the user has not chosen to cook them that way and may never. This list exists so their shopping is still priced correctly if they do.',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    );
+  }
+
+  return parts.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -986,5 +1318,30 @@ export async function buildReviewLauncherFromStorage(): Promise<string> {
 
   const targets = deriveTargets(macros, profileWeightKg ?? (answers as any).weight);
   if (!targets) throw new Error('Macro targets are missing.');
-  return buildReviewLauncher(targets);
+
+  // The ingredient tables ride with the REVIEW step now, not generation.
+  // Same frames the generation prompt was built from, so the tables cover
+  // every option the plan could have used.
+  const favorites = await loadCuratedFavoritesV2();
+  const frames = buildFrames(
+    answers as NutritionAnswers,
+    favorites,
+    targets,
+    Object.values(CURATED_MEALS)
+  );
+  const a: any = answers;
+  const budget =
+    a.budgetMin != null && a.budgetMax != null
+      ? `$${a.budgetMin}\u2013$${a.budgetMax}/week`
+      : a.weeklyBudget
+      ? String(a.weeklyBudget)
+      : 'moderate';
+  const groceryContext =
+    `Location & store: ${a.groceryStore ?? 'local supermarket'} in ${a.city ?? ''} ${a.country ?? ''}`.trim() +
+    `. Weekly budget: ${budget}.`;
+
+  return buildReviewLauncher(targets, (answers as any).mealVariety ?? 'balanced', {
+    ingredientTables: ingredientsSection(frames),
+    groceryContext,
+  });
 }

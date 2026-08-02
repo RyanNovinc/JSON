@@ -6,6 +6,9 @@ import {
   ScrollView,
   Alert,
   Linking,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TouchableOpacity } from 'react-native-gesture-handler';
@@ -21,6 +24,11 @@ import { markRatingEngaged } from '../utils/reviewGate';
 import { FeedbackModal } from '../components/FeedbackTab';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
+import AppModal from '../components/AppModal';
+import {
+  CookbookCaptureCard,
+  getCookbookCaptureStatus,
+} from '../components/CookbookCaptureCard';
 
 // App version — read from your package.json or app config if you have it,
 // otherwise hard-code here. The Workouts redesign memory mentioned v1.2 in
@@ -36,7 +44,7 @@ const APP_VERSION = '1.2.0';
  *    home screen's week strip; hidden until the first logged workout)
  *  - Weight tracker quick access
  *  - App preferences (theme, weight units)
- *  - About: feedback, rate, json.fit website, privacy, terms
+ *  - About: feedback, free cookbook, rate, json.fit website, privacy, terms
  *  - Developer tools (only shown in __DEV__): reset onboarding, clear data
  *  - App version footer
  *
@@ -60,6 +68,26 @@ export default function ProfileScreen() {
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
+
+  // ===== Free cookbook — the row's subtitle reflects whether the user has
+  // already signed up, and the modal hosts the shared CookbookCaptureCard.
+  // The row deliberately IGNORES the promo banner's dismissed flag: tapping
+  // a settings row is intent, so dismissing the Nutrition banner never takes
+  // the offer away from someone who goes looking for it here.
+  const [cookbookModalVisible, setCookbookModalVisible] = useState(false);
+  const [cookbookSubscribed, setCookbookSubscribed] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getCookbookCaptureStatus().then(({ subscribed }) => {
+        if (!cancelled) setCookbookSubscribed(subscribed);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   // ===== Training stats — sessions this week / this month / all time.
   // Parses history entries exactly like HomeScreen.loadWeekHistory does
@@ -341,6 +369,29 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={14} color="#71717a" />
         </TouchableOpacity>
 
+        {/* Free cookbook — always reachable here, even if the Nutrition promo
+            banner was dismissed. Subtitle flips once the user has signed up. */}
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => setCookbookModalVisible(true)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Get the free cookbook"
+        >
+          <View style={styles.rowIcon}>
+            <Ionicons name="book-outline" size={20} color="#a1a1aa" />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Free cookbook</Text>
+            <Text style={styles.rowSub}>
+              {cookbookSubscribed
+                ? 'Sent. Check your inbox'
+                : 'All 81 meals as a printable PDF'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color="#71717a" />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.row}
           onPress={handleRateApp}
@@ -458,6 +509,46 @@ export default function ProfileScreen() {
         visible={termsModalVisible}
         onClose={() => setTermsModalVisible(false)}
       />
+
+      {/* Free cookbook modal — hosts the shared CookbookCaptureCard.
+          ignoreDismissed: a deliberate row tap always reaches the offer.
+          hideWhenSubscribed=false: subscribed users see the confirmation
+          state instead of the form. showDismiss=false: the modal has its
+          own close, so the card's X is redundant here. */}
+      <AppModal
+        visible={cookbookModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCookbookModalVisible(false)}
+      >
+        <View style={styles.cookbookModalOverlay}>
+          <Pressable
+            style={styles.cookbookModalBackdrop}
+            onPress={() => setCookbookModalVisible(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.cookbookModalContent}
+            pointerEvents="box-none"
+          >
+            <CookbookCaptureCard
+              ignoreDismissed
+              hideWhenSubscribed={false}
+              showDismiss={false}
+              onSubscribed={() => setCookbookSubscribed(true)}
+            />
+            <TouchableOpacity
+              style={styles.cookbookModalClose}
+              onPress={() => setCookbookModalVisible(false)}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Text style={styles.cookbookModalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </View>
+      </AppModal>
     </View>
   );
 }
@@ -633,6 +724,35 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
+  // ===== Free cookbook modal =====
+  cookbookModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  cookbookModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  cookbookModalContent: {
+    width: '100%',
+    maxWidth: 380,
+    alignSelf: 'center',
+  },
+  cookbookModalClose: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  cookbookModalCloseText: {
+    color: '#a1a1aa',
+    fontSize: 15,
+    fontWeight: '500',
+  },
 
   // Version footer
   versionText: {

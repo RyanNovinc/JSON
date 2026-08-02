@@ -22,9 +22,10 @@ import { OnboardingAnalytics } from '../services/onboardingAnalytics';
  *   {/* ...your existing Mains / Around your workout / etc. shelves... *\/}
  *
  * "Open the example" opens the bundled plan through MealPlanPreviewScreen in
- * read-only example mode (isExample), so NOTHING is ever written to the user's
- * plans — open it with 0 plans or 50, restart onboarding, it changes nothing.
- * "Build your own" routes into the meal questionnaire for a calibrated plan.
+ * example mode (isExample). Previewing writes nothing — but that screen does
+ * offer an explicit "Or just use this plan" link that adopts the sample as the
+ * user's active plan (rebased to start today). "Build your own" routes into
+ * the meal questionnaire for a calibrated plan.
  *
  * Colour comes from useTheme().themeColor, which is the nutrition green inside
  * the Nutrition tab's NutritionThemeProvider — so it matches the tab

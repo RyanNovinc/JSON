@@ -11,53 +11,80 @@
 //   confirm sheet, with certified one-tap fixes. Never while picking, never
 //   blocking, never red.
 //
-// What changed vs the previous shipped file:
-// - NEW WeekStrip HUD pinned above Save: live preview of the active slot
+// What changed in THIS revision:
+// - FEASIBILITY WIRING EXTRACTED to src/utils/basketCheck.ts. The tab/slot
+//   structure derivation, scoped-key format, target resolution and SlotSpec
+//   assembly now live in ONE pure module shared with the jest tests — the
+//   screen consumes it, so a passing test exercises exactly what this screen
+//   runs. Also folds morning/afternoon/evening_snack picks into the snack
+//   spec before assessing (mirrors buildFrames' SLOT_FOLD; previously those
+//   stored picks bound to no SlotSpec and were invisible to the check).
+// - CONFIRM SHEET SCROLLS. The recap + heads-up/fix section now lives in a
+//   ScrollView capped at ~52% of window height, with the two buttons pinned
+//   below it. Previously the sheet body rendered unclipped: with 6–7 tabs
+//   plus the heads-up block it extended off the TOP of the screen with no
+//   way to scroll (the bug Ryan hit). PlateSheet already did this with a
+//   hardcoded maxHeight; the confirm sheet's cap is responsive.
+// - VARIETY-AWARE SENTENCES. slotSentence/WeekStrip now read mealVariety
+//   (answered at N6, carried in answersSoFar / saved answers) and match the
+//   v2 prompt semantics: convenience multi-pick daily slots say "we'll keep
+//   the week simple and repeat what works", high variety says "we'll rotate
+//   through all of them", balanced keeps "on rotation — we'll set the
+//   order". Note: the 7-dot preview still cycles picks in order for every
+//   setting — the sentence carries the nuance; the dots preview possibility,
+//   not a promise.
+// - STACKED EFFORT TAGS on every card, bottom-right: an ingredient-count
+//   tag above a hands-on time tag ("No cook" / "N min"). Both derive from
+//   the meal's DEFAULT path (methods[0] active minutes; ingredients = base
+//   + default sauce variant + default method + hero plate, deduped by
+//   ingredient_id) — nothing hand-tagged, same call as the cookbook skim
+//   layer. A jar-sauce slow-cooker meal reads as the 10 minutes of work it
+//   actually is. At 11+ ingredients the tag tints amber (audit: flags 12
+//   of 85 meals; Dirty Eden, 12 ings at 4 min, is the poster child) so
+//   "fast blend, big shop" meals stay visible.
+// - QUICK CHIP + DEFAULT SORT run on ACTIVE minutes. "Quick" previously
+//   filtered on total ≤15, which matched 73/85 meals (near-useless) and
+//   excluded slow-cooker jar meals; now active ≤10 (22/53 mains). "No-cook"
+//   previously filtered on time_total === 0, which matches ZERO meals in
+//   the database — the chip has always shown an empty grid; it now means
+//   "no heat appliance" via equipment_required (37 meals: smoothies, bowls,
+//   no-bakes, grab-and-go snacks). Tabs default-sort easiest-first: active
+//   minutes, then ingredient count, then shelf order — at equal minutes a
+//   3-ingredient shake outranks a 12-ingredient smoothie.
+//
+// Carried over from the WeekStrip build (unchanged):
+// - WeekStrip HUD pinned above Save: live preview of the active slot
 //   (7 circles for daily slots, cluster for snacks/dessert) + one sentence.
-//   The subtitle shrinks to one line; the strip now teaches the model.
-// - Tap toggles the MEAL: no picks → picks the hero plate (the one in the
-//   photo); any picks — one plate or five — → clears them all in one tap.
-//   A full-width FOOTER BAR on multi-plate cards is the door to the
-//   PlateSheet and reads plate state ("2 ways ›" / "Berry & Yoghurt Bowl ›"
-//   / "2 of 2 ways ›"). The old inline PlatePanel (hero image + macro strip
-//   + horizontal mini-cards injected into the grid) is gone — plate choice
-//   is a bottom sheet with full-width rows: thumbnail, name, kcal/protein,
-//   treat + "in the photo" tags, big tap targets, all plates visible at
-//   once, no grid reflow.
-// - buildSkipSentence DELETED. The confirm sheet now shows a row for EVERY
-//   tab — picked rows mirror the strip; empty rows read as delegation
-//   ("We'll pick your lunches for you.").
-// - Confirm sheet runs the feasibility engine (src/utils/mealFeasibility).
-//   Infeasible → quiet "Heads-up" row + up to 3 certified fix cards
-//   (tap = real pick, verdict recomputes live) + primary button relabels
-//   "Save anyway". Feasible / engine unavailable → identical to before.
-// - Taste section UI REMOVED. avoid/likedDishes are loaded and written back
-//   unchanged (same pass-through pattern as cuisines) so the storage payload
-//   and prompt-builder contract are untouched.
-// - Header "N selected" count removed; per-slot meaning lives in the strip.
+// - Tap toggles the MEAL: no picks → picks the hero plate; any picks →
+//   clears them all in one tap. Full-width FOOTER BAR on multi-plate cards
+//   opens the PlateSheet and reads plate state.
+// - Confirm sheet shows a row for EVERY tab — picked rows mirror the strip;
+//   empty rows read as delegation. It runs the feasibility engine
+//   (src/utils/mealFeasibility): infeasible → quiet "Heads-up" row + up to
+//   3 certified fix cards (tap = real pick, verdict recomputes live) +
+//   primary button relabels "Save anyway".
+// - Taste section UI removed; avoid/likedDishes are loaded and written back
+//   unchanged (same pass-through pattern as cuisines).
 // - Filter chips: All / Quick / No-cook / Big batch (produces_servings > 1).
-//   The equipment-flavoured "Oven" chip is gone.
-// - Tab dot stays binary but is now ring (empty) vs filled (has picks) —
-//   shape + colour, colourblind-safe.
-// - Questionnaire-step mode: pass fromQuestionnaire: true to run this screen
-//   as the step between N9 and the summary — back chevron hidden, top-right
-//   "Choose for me" skip shown. N9 wiring snippet documented above ParamList.
+// - Tab dot: ring (empty) vs filled (has picks) — shape + colour.
+// - Questionnaire-step mode: fromQuestionnaire: true runs this screen as
+//   the step between N9 and the summary — back chevron hidden, top-right
+//   "Choose for me" skip shown.
 // - V2 SLOT-SCOPED PICKS: selection keys are `${slot}|${key}` — the tab you
-//   pick on IS the slot. Lunch picks no longer mirror into Dinner (nor
-//   dessert into Snacks); the Brunch-dot eligibility quirk dies with it.
-//   Storage writes picks[] plus a base-slug legacy mirror so the live prompt
-//   builder keeps working; legacy slug-only saves hydrate into every
-//   eligible tab once. Lunch↔dinner stay interchangeable at SCHEDULING time
-//   (engine borrow group + prompt rule) — that's a different layer.
+//   pick on IS the slot. Storage writes picks[] plus a base-slug legacy
+//   mirror; legacy slug-only saves hydrate into every eligible tab once.
+//   Lunch↔dinner stay interchangeable at SCHEDULING time (engine borrow
+//   group + prompt rule).
 //
 // Contracts preserved: SHELF_SLOTS / EXOTIC_SLOTS / mealsForSlots /
 // loadCuratedFavorites / saveCuratedFavorites payload (slugs, cuisines,
 // avoid, likedDishes), selection key format (slug or `slug:plateId`),
 // MealDetail navigation from the ⓘ button.
 //
-// TODO(ryan): resolveTargets() below sniffs computeMacros()'s return shape
-// tolerantly because the exact MacroResults field names weren't in front of
-// me. Replace the key-sniffing with the real fields and delete the comment.
+// TODO(ryan): resolveBasketTargets() in src/utils/basketCheck.ts sniffs
+// computeMacros()'s return shape tolerantly because the exact MacroResults
+// field names weren't in front of me. Replace the key-sniffing with the real
+// fields there and delete this comment.
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
@@ -99,14 +126,9 @@ import {
   PlanSlot,
 } from '../../utils/curatedFavoritesStorage';
 import { resolveNutritionAnswers } from '../../utils/nutritionQuestionnaireStorage';
-import { computeMacros } from '../../utils/nutritionMacros';
-import {
-  CoreShelf,
-  MealSlot,
-  SHELF_SLOTS,
-  emptyFilter,
-  mealsForSlots,
-} from '../../utils/curatedShelves';
+import { loadGoalsProfile } from '../../utils/goalsProfileStorage';
+import type { GoalsProfile } from '../../utils/goalsProfile';
+import { emptyFilter, mealsForSlots } from '../../utils/curatedShelves';
 import {
   assessBasket,
   BasketVerdict,
@@ -114,6 +136,20 @@ import {
   SlotSpec,
   Targets,
 } from '../../utils/mealFeasibility';
+import {
+  TabKey,
+  buildTabs,
+  tabId,
+  tabLabel,
+  tabSlot,
+  slotsForTab,
+  scopeKey,
+  unscopeKey,
+  resolveBasketTargets,
+  buildSlotSpecs,
+  normalizeSelectedKeys,
+  hydrateSelection,
+} from '../../utils/basketCheck';
 import { Analytics } from '../../services/analytics';
 
 type NavProp = StackNavigationProp<any>;
@@ -163,9 +199,15 @@ type ParamList = {
 
 // Content width is capped so cards don't stretch to unreasonable sizes on
 // tablets/resized windows — see cardWidth in the component below.
+// Responsive: hold the card near TARGET_CARD_WIDTH and let the column count
+// grow with the screen, instead of fixing 2 columns and capping content width.
+// Driven by available width rather than a Platform.isPad check, so an iPad in
+// Split View correctly falls back to the phone's 2-column layout.
+//    iPhone 393pt -> 2 cols · iPad 1032pt -> 3 cols · iPad landscape -> 4 cols
 const GRID_H_PADDING = 18;
 const GRID_GAP = 12;
-const MAX_GRID_CONTENT_WIDTH = 700;
+const TARGET_CARD_WIDTH = 320;
+const MIN_COLUMNS = 2;
 const FOOTER_HEIGHT = 34;
 
 const TITLE_BLOCK_HEIGHT = 78; // serif title + one-line subtitle
@@ -174,6 +216,33 @@ const STRIP_HEIGHT = 78; // week strip block inside the footer
 
 const isMultiPlate = (m: CuratedMeal) => (m.plates?.length ?? 0) > 1;
 const plateKey = (slug: string, plateId: string) => `${slug}:${plateId}`;
+
+/** Hands-on minutes for a meal — the effort metric everywhere on this
+ *  screen (time pill, Quick chip, default sort). Active minutes preferred;
+ *  falls back to total for data that predates the active field. A jar-sauce
+ *  slow-cooker meal is judged by its 10 minutes of work, not its 4 hours in
+ *  the pot. */
+function effortMinutes(m: CuratedMeal): number {
+  const method: any = (m as any).methods?.[0];
+  return method?.time_active_minutes ?? method?.time_total_minutes ?? 0;
+}
+
+/** Ingredient count for the meal's DEFAULT path: base ingredients + the
+ *  default sauce variant + the default method's ingredients + the hero
+ *  plate's additions, deduped by ingredient_id. Data-derived — flags the
+ *  "fast blend, 12-jar shop" meals the time tag can't see. */
+function ingredientCount(m: CuratedMeal): number {
+  const ids = new Set<string>();
+  const add = (arr: any[] | undefined) =>
+    (arr ?? []).forEach((i: any) => i?.ingredient_id && ids.add(i.ingredient_id));
+  add((m as any).base_ingredients);
+  const variants: any[] = (m as any).sauce_variants ?? [];
+  const dv = variants.find((v) => v.is_default) ?? variants[0];
+  if (dv) add(dv.ingredients);
+  add((m as any).methods?.[0]?.ingredients);
+  add((m as any).plates?.[0]?.additional_ingredients);
+  return ids.size;
+}
 
 /** Footer-bar label: door to the plates + readout of which way you're set to. */
 function plateFooterLabel(meal: CuratedMeal, selected: Set<string>): string {
@@ -186,112 +255,11 @@ function plateFooterLabel(meal: CuratedMeal, selected: Set<string>): string {
 }
 
 // =============================================================================
-// Tab model — unchanged derivation from questionnaire answers
+// Tab model + scoped keys — moved to src/utils/basketCheck.ts
 // =============================================================================
-
-type TabKey =
-  | { kind: 'core'; shelf: CoreShelf }
-  | { kind: 'exotic'; slot: MealSlot };
-
-const SHELF_LABEL: Record<CoreShelf, string> = {
-  breakfast: 'Breakfast',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  snacks: 'Snacks',
-  dessert: 'Dessert',
-};
-const SLOT_LABEL: Partial<Record<MealSlot, string>> = {
-  brunch: 'Brunch',
-  second_lunch: 'Second lunch',
-  early_dinner: 'Early dinner',
-  morning_snack: 'Morning snack',
-  afternoon_snack: 'Afternoon snack',
-  evening_snack: 'Evening snack',
-  pre_workout: 'Pre-workout',
-  post_workout: 'Post-workout',
-};
-
-const EXOTIC_FILL_ORDER: MealSlot[] = [
-  'brunch',
-  'second_lunch',
-  'early_dinner',
-  'pre_workout',
-  'post_workout',
-];
-
-function tabLabel(t: TabKey): string {
-  if (t.kind === 'core') return SHELF_LABEL[t.shelf];
-  return SLOT_LABEL[t.slot] ?? String(t.slot);
-}
-function tabId(t: TabKey): string {
-  return t.kind === 'core' ? `core:${t.shelf}` : `exotic:${t.slot}`;
-}
-
-/** Canonical PlanSlot for a tab — the scope picks are stored under, and the
- *  SlotSpec.id the feasibility engine matches scoped keys against. */
-function tabSlot(t: TabKey): PlanSlot {
-  if (t.kind === 'core') return (t.shelf === 'snacks' ? 'snack' : t.shelf) as PlanSlot;
-  return t.slot as PlanSlot;
-}
-
-/** Selection-state keys are slot-scoped: `${slot}|${slug}` or
- *  `${slot}|${slug}:${plateId}`. Same format the engine consumes. */
-const scopeKey = (slot: PlanSlot, key: string) => `${slot}|${key}`;
-function unscopeKey(scoped: string): { slot: PlanSlot; key: string } {
-  const i = scoped.indexOf('|');
-  return { slot: scoped.slice(0, i) as PlanSlot, key: scoped.slice(i + 1) };
-}
-
-function buildTabs(
-  mealsPerDay: number | undefined,
-  snackFrequency: string | undefined,
-  dessertFrequency: string | undefined,
-  allMeals: CuratedMeal[]
-): TabKey[] {
-  if (mealsPerDay == null) {
-    const tabs: TabKey[] = [
-      { kind: 'core', shelf: 'breakfast' },
-      { kind: 'core', shelf: 'lunch' },
-      { kind: 'core', shelf: 'dinner' },
-    ];
-    if (snackFrequency !== '0') tabs.push({ kind: 'core', shelf: 'snacks' });
-    return tabs;
-  }
-  const coreByCount: Record<number, CoreShelf[]> = {
-    1: ['dinner'],
-    2: ['lunch', 'dinner'],
-    3: ['breakfast', 'lunch', 'dinner'],
-    4: ['breakfast', 'lunch', 'dinner'],
-    5: ['breakfast', 'lunch', 'dinner'],
-    6: ['breakfast', 'lunch', 'dinner'],
-  };
-  const coreShelves = coreByCount[mealsPerDay] ?? ['breakfast', 'lunch', 'dinner'];
-  const tabs: TabKey[] = coreShelves.map((shelf) => ({ kind: 'core', shelf }));
-
-  const extraNeeded = Math.max(0, mealsPerDay - 3);
-  if (extraNeeded > 0) {
-    let added = 0;
-    for (const slot of EXOTIC_FILL_ORDER) {
-      if (added >= extraNeeded) break;
-      const eligible = mealsForSlots([slot], allMeals, emptyFilter(), 'default');
-      if (eligible.length > 0) {
-        tabs.push({ kind: 'exotic', slot });
-        added += 1;
-      }
-    }
-  }
-  if (snackFrequency && snackFrequency !== '0') {
-    tabs.push({ kind: 'core', shelf: 'snacks' });
-  }
-  if (dessertFrequency && dessertFrequency !== '0') {
-    tabs.push({ kind: 'core', shelf: 'dessert' });
-  }
-  return tabs;
-}
-
-function slotsForTab(tab: TabKey): MealSlot[] {
-  return tab.kind === 'core' ? SHELF_SLOTS[tab.shelf] : [tab.slot];
-}
+// buildTabs / tabId / tabLabel / tabSlot / slotsForTab / scopeKey / unscopeKey
+// now live in basketCheck.ts so the feasibility tests exercise the exact
+// derivation this screen runs. Nothing about their behaviour changed.
 
 // 'daily' slots speak in rotation ("every morning"); 'mix' slots speak in
 // mix-ins. Dessert at every_night is behaviourally daily.
@@ -390,10 +358,16 @@ function unitsForTab(
 
 // One sentence per tab. The strip and the confirm sheet share these so the
 // sheet never says anything the user hasn't already watched form.
+//
+// VARIETY-AWARE: the multi-pick daily branch reads mealVariety (from N6) so
+// the promise matches what the v2 prompt will actually do. Picks are
+// availability, not a quota — the setting decides how much rotation the
+// week gets. Balanced keeps the original wording.
 function slotSentence(
   tab: TabKey,
   units: PickUnit[],
   dessertFrequency: string | undefined,
+  mealVariety: string | undefined,
   inSheet: boolean
 ): string {
   const n = units.length;
@@ -427,8 +401,13 @@ function slotSentence(
       ? `${units[0].name}, ${n} ways — we'll rotate them.`
       : `${units[0].name}, ${n} ways — we'll mix them in.`;
   }
-  if (rhythm === 'daily')
+  if (rhythm === 'daily') {
+    if (mealVariety === 'convenience')
+      return `${n} ${noun} picked — we'll keep the week simple and repeat what works.`;
+    if (mealVariety === 'variety')
+      return `${n} ${noun} — we'll rotate through all of them.`;
     return `${n} ${noun} on rotation — we'll set the order.`;
+  }
   return `${n} ${noun} to mix in.`;
 }
 
@@ -440,11 +419,13 @@ function WeekStrip({
   tab,
   units,
   dessertFrequency,
+  mealVariety,
   themeColor,
 }: {
   tab: TabKey;
   units: PickUnit[];
   dessertFrequency?: string;
+  mealVariety?: string;
   themeColor: string;
 }) {
   const rhythm = tabRhythm(tab, dessertFrequency);
@@ -505,7 +486,7 @@ function WeekStrip({
     <Animated.View style={{ transform: [{ scale }] }}>
       {dots}
       <Text style={styles.stripLine} numberOfLines={2}>
-        {slotSentence(tab, units, dessertFrequency, false)}
+        {slotSentence(tab, units, dessertFrequency, mealVariety, false)}
       </Text>
     </Animated.View>
   );
@@ -546,6 +527,12 @@ const MealCard = React.memo(function MealCard({
   });
   const isSel = picks > 0;
 
+  // Stacked effort tags — bottom-right of the photo, opposite the title.
+  // Ingredient tag above (amber at 11+), hands-on time tag below.
+  const effort = effortMinutes(meal);
+  const ings = ingredientCount(meal);
+  const bigShop = ings >= 11;
+
   return (
     <View style={[styles.card, { width, height }]}>
       <TouchableOpacity
@@ -554,7 +541,7 @@ const MealCard = React.memo(function MealCard({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityState={{ selected: isSel }}
-        accessibilityLabel={meal.display_name}
+        accessibilityLabel={`${meal.display_name}, ${effort === 0 ? 'no cooking' : `${effort} minutes hands-on`}, ${ings} ingredients`}
         accessibilityHint={
           isSel
             ? 'Tap to clear all picks for this meal'
@@ -603,6 +590,31 @@ const MealCard = React.memo(function MealCard({
           <Text style={styles.cardTitle} numberOfLines={2}>
             {meal.display_name}
           </Text>
+
+          <View style={styles.pillStack} pointerEvents="none">
+            <View style={[styles.metaPill, bigShop && styles.metaPillWarn]}>
+              <Ionicons
+                name="list-outline"
+                size={10}
+                color={bigShop ? '#FAC775' : '#a1a1aa'}
+              />
+              <Text
+                style={[styles.metaPillText, { color: bigShop ? '#FAC775' : '#a1a1aa' }]}
+              >
+                {ings} ings
+              </Text>
+            </View>
+            <View style={styles.metaPill}>
+              <Ionicons
+                name={effort === 0 ? 'snow-outline' : 'time-outline'}
+                size={10}
+                color="#e4e4e7"
+              />
+              <Text style={styles.metaPillText}>
+                {effort === 0 ? 'No cook' : `${effort} min`}
+              </Text>
+            </View>
+          </View>
         </View>
       </TouchableOpacity>
 
@@ -843,10 +855,14 @@ export default function CuratedFavoritesScreen() {
   const route = useRoute<RouteProp<ParamList, 'CuratedFavorites'>>();
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
-  const { width: windowWidth } = useWindowDimensions();
-  const cardWidth = useMemo(() => {
-    const contentWidth = Math.min(windowWidth, MAX_GRID_CONTENT_WIDTH);
-    return (contentWidth - GRID_H_PADDING * 2 - GRID_GAP) / 2;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { columns, cardWidth } = useMemo(() => {
+    const available = windowWidth - GRID_H_PADDING * 2;
+    const cols = Math.max(
+      MIN_COLUMNS,
+      Math.floor((available + GRID_GAP) / (TARGET_CARD_WIDTH + GRID_GAP)),
+    );
+    return { columns: cols, cardWidth: (available - GRID_GAP * (cols - 1)) / cols };
   }, [windowWidth]);
 
   const allMeals = useMemo(() => Object.values(CURATED_MEALS) as CuratedMeal[], []);
@@ -875,10 +891,32 @@ export default function CuratedFavoritesScreen() {
     };
   }, [paramAnswers]);
 
+  // GoalsProfile drives the phase-aware macro path. The prompt builder uses it
+  // whenever a goal weight is present, so the feasibility check has to as well
+  // — otherwise this screen tests the basket against a different calorie (and
+  // therefore carb and fat) target than the plan is ever built to, and a
+  // basket that can't hit the real numbers sails through Save.
+  const [goalsProfile, setGoalsProfile] = useState<GoalsProfile | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const p = await loadGoalsProfile();
+        if (!cancelled) setGoalsProfile(p ?? null);
+      } catch (err) {
+        console.warn('[CuratedFavorites] Failed to load goals profile:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const effectiveAnswers: any = paramAnswers ?? loadedAnswers ?? {};
   const mealsPerDay = effectiveAnswers.mealsPerDay;
   const snackFrequency = effectiveAnswers.snackFrequency;
   const dessertFrequency = effectiveAnswers.dessertFrequency;
+  const mealVariety = effectiveAnswers.mealVariety;
 
   const tabs = useMemo(
     () => buildTabs(mealsPerDay, snackFrequency, dessertFrequency, allMeals),
@@ -935,28 +973,9 @@ export default function CuratedFavoritesScreen() {
   useEffect(() => {
     if (hydratedRef.current || !loadedFav || tabs.length === 0) return;
     hydratedRef.current = true;
-    const next = new Set<string>();
-    const pickedSlugs = new Set<string>();
-    for (const p of loadedFav.picks) {
-      pickedSlugs.add(p.slug);
-      next.add(
-        scopeKey(p.slot, p.plate_id ? plateKey(p.slug, p.plate_id) : p.slug)
-      );
-    }
-    for (const slug of loadedFav.slugs) {
-      if (pickedSlugs.has(slug)) continue;
-      for (const t of tabs) {
-        const eligible = mealsForSlots(
-          slotsForTab(t),
-          allMeals,
-          emptyFilter(),
-          'default'
-        );
-        if (eligible.some((m) => m.slug === slug)) {
-          next.add(scopeKey(tabSlot(t), slug));
-        }
-      }
-    }
+    // Shared with the repro test via basketCheck — same picks + mirror-slug
+    // hydration buildFrames applies, so the check sees what the plan gets.
+    const next = hydrateSelection(loadedFav.picks, loadedFav.slugs, tabs, allMeals);
     if (next.size > 0) setSelected(next);
   }, [loadedFav, tabs, allMeals]);
 
@@ -1032,14 +1051,23 @@ export default function CuratedFavoritesScreen() {
     (meals: CuratedMeal[], qf: QuickFilter): CuratedMeal[] => {
       if (qf === 'all') return meals;
       if (qf === 'quick')
+        // Hands-on minutes, not total: a jar-sauce slow-cooker meal with 10
+        // active minutes IS quick for the person cooking it. ≤10 because
+        // ≤15 matched 73/85 meals and filtered almost nothing.
         return meals.filter((m) => {
-          const t = (m as any).methods?.[0]?.time_total_minutes ?? 0;
-          return t > 0 && t <= 15;
+          const e = effortMinutes(m);
+          return e > 0 && e <= 10;
         });
-      if (qf === 'no_cook')
+      if (qf === 'no_cook') {
+        // "No heat appliance" — the old total===0 check matched ZERO meals.
+        const HEAT = ['stovetop', 'oven', 'slow_cooker', 'microwave'];
         return meals.filter(
-          (m) => ((m as any).methods?.[0]?.time_total_minutes ?? 0) === 0
+          (m) =>
+            !((((m as any).methods?.[0]?.equipment_required ?? []) as string[]).some(
+              (e) => HEAT.includes(e)
+            ))
         );
+      }
       return meals.filter((m) => ((m as any).produces_servings ?? 1) > 1);
     },
     []
@@ -1048,7 +1076,13 @@ export default function CuratedFavoritesScreen() {
   const activeMeals = useMemo(() => {
     if (!activeTab) return [] as CuratedMeal[];
     const baseMeals = mealsForSlots(slotsForTab(activeTab), allMeals, emptyFilter(), 'default');
-    return applyQuickFilter(baseMeals, quickFilter);
+    // Easiest-first: stable sort by hands-on minutes ascending, so the busy
+    // avatar's first screenful is the low-effort stuff without touching a
+    // filter. Ties keep the shelf's default order.
+    return applyQuickFilter(baseMeals, quickFilter)
+      .map((m, i) => ({ m, i, e: effortMinutes(m), n: ingredientCount(m) }))
+      .sort((a, b) => a.e - b.e || a.n - b.n || a.i - b.i)
+      .map((x) => x.m);
   }, [activeTab, allMeals, quickFilter, applyQuickFilter]);
 
   const unitsByTabId = useMemo(() => {
@@ -1074,56 +1108,20 @@ export default function CuratedFavoritesScreen() {
   }, [selected, activeSlot]);
 
   // ---- targets + feasibility ----
-  // TODO(ryan): replace key-sniffing with the real MacroResults field names.
-  const targets = useMemo<Targets | null>(() => {
-    try {
-      const r: any = computeMacros(effectiveAnswers);
-      if (!r) return null;
-      const kcal = r.calories ?? r.targetCalories ?? r.kcal ?? r.dailyCalories;
-      const protein = r.protein ?? r.proteinTarget ?? r.protein_g ?? r.proteinGrams;
-      if (!kcal || !protein) return null;
-      return {
-        kcal,
-        protein_g: protein,
-        carbs_g: r.carbs ?? r.carbsTarget ?? r.carbs_g,
-        fat_g: r.fat ?? r.fatTarget ?? r.fat_g,
-        fiber_g: r.fiber ?? r.fiberTarget ?? r.fiber_g ?? Math.round((kcal * 14) / 1000),
-      };
-    } catch {
-      return null; // no targets → feasibility check silently skipped
-    }
-  }, [effectiveAnswers]);
+  // Shared with the jest tests via basketCheck: SAME resolution order as
+  // assembleMealPlanPromptV2 (phase-aware when the profile has a goal
+  // weight, questionnaire-derived otherwise).
+  const targets = useMemo<Targets | null>(
+    () => resolveBasketTargets(effectiveAnswers, goalsProfile),
+    [effectiveAnswers, goalsProfile]
+  );
 
-  const slotSpecs = useMemo<SlotSpec[]>(() => {
-    const snackPerDay =
-      snackFrequency === '2' ? 2
-      : snackFrequency === '3+' ? 3
-      : snackFrequency === 'ai_decide' ? (targets && targets.kcal >= 2800 ? 2 : 1)
-      : 1;
-    const dessertWeekly =
-      dessertFrequency === 'every_night' ? 7
-      : dessertFrequency === 'most_nights' ? 5
-      : dessertFrequency === 'few_per_week' ? 3
-      : dessertFrequency === 'once_per_week' ? 1
-      : dessertFrequency === 'ai_decide' ? 3
-      : 0;
-    return tabs.map((t) => {
-      const isSnacks = t.kind === 'core' && t.shelf === 'snacks';
-      const isDessert = t.kind === 'core' && t.shelf === 'dessert';
-      const isMain =
-        t.kind === 'core' && (t.shelf === 'lunch' || t.shelf === 'dinner');
-      return {
-        // tabSlot, not tabId: the engine matches scoped keys (`slot|key`)
-        // against SlotSpec.id, and CertifiedFix.slot round-trips through it.
-        id: tabSlot(t),
-        label: tabLabel(t),
-        mealSlots: slotsForTab(t),
-        perDay: isSnacks ? snackPerDay : 1,
-        weeklyOccurrences: isSnacks ? snackPerDay * 7 : isDessert ? dessertWeekly : 7,
-        borrowGroup: isMain ? ('main' as const) : undefined,
-      };
-    });
-  }, [tabs, snackFrequency, dessertFrequency, targets]);
+  // Shared with the jest tests via basketCheck — the exact day shape the
+  // engine models, derived from the same tabs the user is looking at.
+  const slotSpecs = useMemo<SlotSpec[]>(
+    () => buildSlotSpecs(tabs, snackFrequency, dessertFrequency, targets?.kcal ?? null),
+    [tabs, snackFrequency, dessertFrequency, targets]
+  );
 
   const [verdict, setVerdict] = useState<BasketVerdict | null>(null);
 
@@ -1138,7 +1136,9 @@ export default function CuratedFavoritesScreen() {
     setVerdict(
       assessBasket({
         slots: slotSpecs,
-        selectedKeys: Array.from(selected),
+        // Folds morning/afternoon/evening_snack picks into `snack|` so they
+        // count, mirroring buildFrames' SLOT_FOLD — see basketCheck.ts.
+        selectedKeys: normalizeSelectedKeys(Array.from(selected)),
         allMeals,
         targets,
         allergies: effectiveAnswers.allergies,
@@ -1245,11 +1245,15 @@ export default function CuratedFavoritesScreen() {
   const plateSheetMeal = allMeals.find((m) => m.slug === plateSheetSlug) ?? null;
 
   const rows: CuratedMeal[][] = [];
-  for (let i = 0; i < activeMeals.length; i += 2) {
-    rows.push(activeMeals.slice(i, i + 2));
+  for (let i = 0; i < activeMeals.length; i += columns) {
+    rows.push(activeMeals.slice(i, i + columns));
   }
 
   const sheetPaddingBottom = Math.max(insets.bottom, 14) + 10;
+  // The confirm sheet's scrollable region: recap + heads-up must never push
+  // the buttons (or themselves) off-screen. Title, grabber, buttons and
+  // padding take roughly the rest of the sheet's height budget.
+  const confirmScrollMax = Math.max(200, Math.round(windowHeight * 0.52));
 
   return (
     <View style={styles.container}>
@@ -1433,7 +1437,12 @@ export default function CuratedFavoritesScreen() {
                     }}
                   />
                 ))}
-                {pair.length === 1 && <View style={{ width: cardWidth }} />}
+                {/* Pad the last row so its cards keep the grid's alignment
+                    instead of stretching. With a variable column count a short
+                    row can be missing more than one slot, not just one. */}
+                {Array.from({ length: columns - pair.length }, (_, k) => (
+                  <View key={`pad-${k}`} style={{ width: cardWidth }} />
+                ))}
               </View>
             ))}
           </View>
@@ -1462,6 +1471,7 @@ export default function CuratedFavoritesScreen() {
               tab={activeTab}
               units={activeUnits}
               dessertFrequency={dessertFrequency}
+              mealVariety={mealVariety}
               themeColor={themeColor}
             />
           </View>
@@ -1500,99 +1510,105 @@ export default function CuratedFavoritesScreen() {
       >
         <Text style={styles.sheetTitle}>Your week, then.</Text>
 
-        <View style={styles.sheetRecap}>
-          {tabs.map((tab) => {
-            const units = unitsByTabId.get(tabId(tab)) ?? [];
-            const rhythm = tabRhythm(tab, dessertFrequency);
-            const mini =
-              rhythm === 'daily'
-                ? Array.from({ length: 7 }).map((_, i) =>
-                    units.length ? units[i % units.length] : null
-                  )
-                : units.length
-                ? units.slice(0, 5)
-                : [null, null, null];
-            return (
-              <View key={tabId(tab)} style={styles.recapRow}>
-                <Text style={styles.recapLabel}>{tabLabel(tab)}</Text>
-                <View style={{ flex: 1 }}>
-                  <View style={[styles.miniDots, rhythm === 'mix' && { gap: 0 }]}>
-                    {mini.map((u, i) => {
-                      const img = u ? getMealImage(u.imageFilename) : null;
-                      return (
-                        <View
-                          key={i}
-                          style={[
-                            styles.miniDot,
-                            rhythm === 'mix' && i > 0 && { marginLeft: -5 },
-                            u
-                              ? { borderStyle: 'solid', borderColor: '#26262b', backgroundColor: '#1c1c1f', overflow: 'hidden' }
-                              : { borderStyle: 'dashed', borderColor: '#3f3f46' },
-                          ]}
-                        >
-                          {u && img ? (
-                            <Image source={img} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-                          ) : null}
-                        </View>
-                      );
-                    })}
-                  </View>
-                  <Text style={styles.recapSentence}>
-                    {slotSentence(tab, units, dessertFrequency, true)}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* Heads-up — only on hard infeasibility. Same row grammar, slightly
-            brighter text, no icon, no red, never blocks. */}
-        {infeasible && verdict && (
-          <>
-            <View style={styles.headsUpRow}>
-              <Text style={styles.recapLabel}>Heads-up</Text>
-              <Text style={styles.headsUpText}>{headsUpSentence(verdict)}</Text>
-            </View>
-            {verdict.fixes.length > 0 && (
-              <View style={styles.fixRow}>
-                {verdict.fixes.map((fix: CertifiedFix) => {
-                  const img = getMealImage(fix.imageFilename);
-                  return (
-                    <TouchableOpacity
-                      key={`${fix.slug}:${fix.plateId}`}
-                      style={styles.fixCard}
-                      activeOpacity={0.8}
-                      onPress={() => togglePlate(fix.slot as PlanSlot, fix.slug, fix.plateId)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Add ${fix.name} to ${fix.slotLabel}`}
-                    >
-                      <View style={styles.fixThumbWrap}>
-                        {img ? (
-                          <Image source={img} style={styles.fixThumb} contentFit="cover" />
-                        ) : (
-                          <View style={[styles.fixThumb, styles.cardImagePlaceholder]}>
-                            <Ionicons name="restaurant-outline" size={16} color="#52525b" />
+        {/* The recap + heads-up section scrolls; the buttons below never
+            leave the screen. Without this cap, 6–7 tab rows plus the
+            heads-up block pushed the sheet's content off the TOP of the
+            screen with no way to reach it. */}
+        <ScrollView style={{ maxHeight: confirmScrollMax }}>
+          <View style={styles.sheetRecap}>
+            {tabs.map((tab) => {
+              const units = unitsByTabId.get(tabId(tab)) ?? [];
+              const rhythm = tabRhythm(tab, dessertFrequency);
+              const mini =
+                rhythm === 'daily'
+                  ? Array.from({ length: 7 }).map((_, i) =>
+                      units.length ? units[i % units.length] : null
+                    )
+                  : units.length
+                  ? units.slice(0, 5)
+                  : [null, null, null];
+              return (
+                <View key={tabId(tab)} style={styles.recapRow}>
+                  <Text style={styles.recapLabel}>{tabLabel(tab)}</Text>
+                  <View style={{ flex: 1 }}>
+                    <View style={[styles.miniDots, rhythm === 'mix' && { gap: 0 }]}>
+                      {mini.map((u, i) => {
+                        const img = u ? getMealImage(u.imageFilename) : null;
+                        return (
+                          <View
+                            key={i}
+                            style={[
+                              styles.miniDot,
+                              rhythm === 'mix' && i > 0 && { marginLeft: -5 },
+                              u
+                                ? { borderStyle: 'solid', borderColor: '#26262b', backgroundColor: '#1c1c1f', overflow: 'hidden' }
+                                : { borderStyle: 'dashed', borderColor: '#3f3f46' },
+                            ]}
+                          >
+                            {u && img ? (
+                              <Image source={img} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                            ) : null}
                           </View>
-                        )}
-                      </View>
-                      <Text style={styles.fixName} numberOfLines={2}>
-                        {fix.name}
-                      </Text>
-                      <Text style={styles.fixSlot}>{fix.slotLabel}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.recapSentence}>
+                      {slotSentence(tab, units, dessertFrequency, mealVariety, true)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Heads-up — only on hard infeasibility. Same row grammar, slightly
+              brighter text, no icon, no red, never blocks. */}
+          {infeasible && verdict && (
+            <>
+              <View style={styles.headsUpRow}>
+                <Text style={styles.recapLabel}>Heads-up</Text>
+                <Text style={styles.headsUpText}>{headsUpSentence(verdict)}</Text>
               </View>
-            )}
-          </>
-        )}
+              {verdict.fixes.length > 0 && (
+                <View style={styles.fixRow}>
+                  {verdict.fixes.map((fix: CertifiedFix) => {
+                    const img = getMealImage(fix.imageFilename);
+                    return (
+                      <TouchableOpacity
+                        key={`${fix.slug}:${fix.plateId}`}
+                        style={styles.fixCard}
+                        activeOpacity={0.8}
+                        onPress={() => togglePlate(fix.slot as PlanSlot, fix.slug, fix.plateId)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Add ${fix.name} to ${fix.slotLabel}`}
+                      >
+                        <View style={styles.fixThumbWrap}>
+                          {img ? (
+                            <Image source={img} style={styles.fixThumb} contentFit="cover" />
+                          ) : (
+                            <View style={[styles.fixThumb, styles.cardImagePlaceholder]}>
+                              <Ionicons name="restaurant-outline" size={16} color="#52525b" />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.fixName} numberOfLines={2}>
+                          {fix.name}
+                        </Text>
+                        <Text style={styles.fixSlot}>{fix.slotLabel}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
 
         <TouchableOpacity
           activeOpacity={0.88}
           disabled={saving}
           onPress={handleConfirm}
-          style={[styles.confirmBtn, { backgroundColor: themeColor }]}
+          style={[styles.confirmBtn, { backgroundColor: themeColor, marginTop: 14 }]}
           accessibilityRole="button"
           accessibilityLabel={infeasible ? 'Save anyway' : 'Looks good, confirm'}
         >
@@ -1763,7 +1779,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     position: 'absolute',
     left: 12,
-    right: 12,
+    right: 84,
     bottom: 12,
     fontSize: 15,
     color: '#ffffff',
@@ -1774,6 +1790,24 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
+  pillStack: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  metaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(10,10,11,0.72)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  metaPillWarn: { backgroundColor: 'rgba(239,159,39,0.22)' },
+  metaPillText: { fontSize: 10.5, fontWeight: '600', color: '#e4e4e7', letterSpacing: -0.1 },
   infoBadge: {
     position: 'absolute',
     top: 10,

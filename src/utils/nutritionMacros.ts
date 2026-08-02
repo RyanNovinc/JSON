@@ -98,6 +98,21 @@ export function computeTargetRate(a: NutritionAnswers): number {
 export async function finalizeNutrition(
   a: NutritionAnswers
 ): Promise<MacroResults | null> {
+  // computeMacros does not need `goal` (BMR/TDEE do not depend on it), so a
+  // missing goal used to sail straight through and get persisted as
+  // `String(a.goal || '')` = ''. That empty string is falsy, so the summary's
+  // `!answers.goal` gate then rendered "No saved questionnaire" for a user who
+  // had just answered everything, with nothing logged anywhere. Refuse instead:
+  // callers already handle null by showing "Missing details".
+  if (!a?.goal) {
+    console.error(
+      '[finalizeNutrition] refusing to persist: no goal in answers. ' +
+        'Keys present:',
+      a ? Object.keys(a).join(', ') : String(a)
+    );
+    return null;
+  }
+
   const macros = computeMacros(a);
   if (!macros) return null;
 

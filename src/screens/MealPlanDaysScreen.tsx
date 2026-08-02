@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMealPlanning } from '../contexts/MealPlanningContext';
@@ -32,6 +33,43 @@ const SERIF = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Geor
 const CANVAS = '#0a0a0b';
 const MUTED = '#7a7a80';
 const FAINT = '#6a6a70';
+
+// ---- Meal completion interop with MealPlanDayScreen ----------------------
+// That screen stores completions in AsyncStorage under
+// `meal_completions_<YYYY-MM-DD>` as a map of `<index>_<id|name>` -> boolean,
+// where <index> is the meal's position in the CHRONOLOGICALLY SORTED day.
+// The two screens have to agree on that ordering or the keys won't line up,
+// so the comparator below mirrors MealPlanDayScreen's sort exactly.
+const MEAL_TYPE_ORDER: Record<string, number> = { breakfast: 0, snack: 1, lunch: 2, dinner: 3, dessert: 4 };
+
+const completionTimeToMinutes = (timeStr?: string): number => {
+  if (!timeStr) return 0;
+  try {
+    const [time, period] = timeStr.split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+    if (period === 'AM') return hours === 12 ? minutes : hours * 60 + minutes;
+    return hours === 12 ? 12 * 60 + minutes : (hours + 12) * 60 + minutes;
+  } catch {
+    return 0;
+  }
+};
+
+const sortMealsChronologically = (list: any[]): any[] =>
+  [...list].sort((a, b) => {
+    const ta = a.time ? completionTimeToMinutes(a.time) : (MEAL_TYPE_ORDER[a.type] || 0) * 360;
+    const tb = b.time ? completionTimeToMinutes(b.time) : (MEAL_TYPE_ORDER[b.type] || 0) * 360;
+    return ta - tb;
+  });
+
+const mealCompletionKey = (meal: any, index: number): string => `${index}_${meal.id || meal.name}`;
+
+/**
+ * Slot labels arrive as raw enum values (`afternoon_snack`), and the row's
+ * style uppercases them, so they were rendering as "AFTERNOON_SNACK".
+ * Matches MealPlanDayScreen, which already does this.
+ */
+const slotLabel = (slot?: string): string =>
+  String(slot || '').replace(/_/g, ' ').trim();
 
 const parseTimeToMinutes = (t?: string): number | null => {
   if (!t || typeof t !== 'string') return null;
@@ -173,6 +211,47 @@ export default function MealPlanDaysScreen() {
     setViewIndex(i);
   };
 
+  // ---- Meal completion ----------------------------------------------------
+  // Same storage MealPlanDayScreen writes, so ticking a meal off here and
+  // ticking it off in there are the same action.
+  const completionDateKey =
+    currentPlan && viewIndex >= 0 && viewIndex < orderedDates.length ? orderedDates[viewIndex] : null;
+
+  const [completedMeals, setCompletedMeals] = useState<Record<string, boolean>>({});
+
+  const loadMealCompletions = useCallback(async (date: string | null) => {
+    if (!date) { setCompletedMeals({}); return; }
+    try {
+      const stored = await AsyncStorage.getItem(`meal_completions_${date}`);
+      setCompletedMeals(stored ? JSON.parse(stored) : {});
+    } catch (e) {
+      console.error('Failed to load meal completions:', e);
+      setCompletedMeals({});
+    }
+  }, []);
+
+  useEffect(() => { loadMealCompletions(completionDateKey); }, [completionDateKey, loadMealCompletions]);
+
+  // Re-read on focus so anything completed on the meal detail screen is
+  // reflected when you come back here.
+  useFocusEffect(
+    useCallback(() => { loadMealCompletions(completionDateKey); }, [completionDateKey, loadMealCompletions])
+  );
+
+  const toggleMealCompletion = async (meal: any, index: number) => {
+    if (!completionDateKey) return;
+    const key = mealCompletionKey(meal, index);
+    const previous = completedMeals;
+    const next = { ...previous, [key]: !previous[key] };
+    setCompletedMeals(next);
+    try {
+      await AsyncStorage.setItem(`meal_completions_${completionDateKey}`, JSON.stringify(next));
+    } catch (e) {
+      console.error('Failed to save meal completions:', e);
+      setCompletedMeals(previous);
+    }
+  };
+
   // ---- Shift start --------------------------------------------------------
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -272,17 +351,24 @@ export default function MealPlanDaysScreen() {
   }
 
   // ---- Viewed day ---------------------------------------------------------
-  const meals = rawMealsForIndex(viewIndex);
+  // Sorted so row indices match the completion keys MealPlanDayScreen writes.
+  const meals = sortMealsChronologically(rawMealsForIndex(viewIndex));
   const isTodayView = todayInRange && viewIndex === activeIndex;
   const viewDate = dateForIndex(viewIndex);
   const totalCalories = Math.round(meals.reduce((s, m) => s + (m.nutrition?.calories || m.calories || 0), 0));
   const totalProtein = Math.round(meals.reduce((s, m) => s + ((m.nutrition || m.macros || {}).protein || 0), 0));
+
+  const doneCount = meals.reduce(
+    (n, m, i) => n + (completedMeals[mealCompletionKey(m, i)] ? 1 : 0),
+    0
+  );
 
   let upNextIdx = -1;
   if (isTodayView) {
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     for (let i = 0; i < meals.length; i++) {
+      if (completedMeals[mealCompletionKey(meals[i], i)]) continue;
       const tm = parseTimeToMinutes(meals[i].time || meals[i].recommended_time);
       if (tm != null && tm >= nowMin) { upNextIdx = i; break; }
     }
@@ -348,6 +434,7 @@ export default function MealPlanDaysScreen() {
             <Text style={styles.dayHeadline}>{viewDate.toLocaleDateString('en-US', { weekday: 'long' })}</Text>
             <Text style={styles.daySubline}>
               <Text style={styles.daySublineNum}>{totalProtein}g</Text> protein · {totalCalories.toLocaleString()} kcal
+              {doneCount > 0 ? ` · ${doneCount} of ${meals.length} eaten` : ''}
             </Text>
           </View>
 
@@ -358,22 +445,54 @@ export default function MealPlanDaysScreen() {
               {meals.map((m: any, i: number) => {
                 const name = m.name || m.meal_name || 'Meal';
                 const time = m.time || m.recommended_time;
-                const slot = m.type || m.meal_type;
-                const isUpNext = i === upNextIdx;
+                const slot = slotLabel(m.type || m.meal_type);
+                const isDone = !!completedMeals[mealCompletionKey(m, i)];
+                const isUpNext = i === upNextIdx && !isDone;
                 const isLast = i === meals.length - 1;
-                const sub = [time, isUpNext ? 'up next' : slot].filter(Boolean).join(' · ');
+                const sub = [time, isDone ? 'eaten' : isUpNext ? 'up next' : slot].filter(Boolean).join(' · ');
                 return (
                   <TouchableOpacity
                     key={i}
                     activeOpacity={0.7}
                     onPress={() => openDay(viewIndex)}
-                    style={[styles.mealRow, isLast && styles.mealRowLast, isUpNext && { backgroundColor: `${themeColor}0D`, borderLeftColor: themeColor }]}
+                    onLongPress={() => toggleMealCompletion(m, i)}
+                    delayLongPress={400}
+                    style={[
+                      styles.mealRow,
+                      isLast && styles.mealRowLast,
+                      isDone && { borderLeftColor: themeColor },
+                      isUpNext && { backgroundColor: `${themeColor}0D`, borderLeftColor: themeColor },
+                    ]}
                   >
+                    <Ionicons
+                      name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={17}
+                      color={isDone ? themeColor : '#2e2e34'}
+                      style={styles.mealTick}
+                    />
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.mealName, isUpNext && { color: '#ffffff' }]}>{name}</Text>
-                      {!!sub && <Text style={[styles.mealMeta, isUpNext && { color: themeColor }]}>{sub}</Text>}
+                      <Text
+                        style={[
+                          styles.mealName,
+                          isUpNext && { color: '#ffffff' },
+                          isDone && styles.mealNameDone,
+                        ]}
+                      >
+                        {name}
+                      </Text>
+                      {!!sub && (
+                        <Text
+                          style={[
+                            styles.mealMeta,
+                            isUpNext && { color: themeColor },
+                            isDone && { color: themeColor },
+                          ]}
+                        >
+                          {sub}
+                        </Text>
+                      )}
                     </View>
-                    <Text style={[styles.mealChev, isUpNext && { color: themeColor }]}>›</Text>
+                    <Text style={[styles.mealChev, isUpNext && { color: themeColor }, isDone && styles.mealChevDone]}>›</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -490,6 +609,9 @@ const styles = StyleSheet.create({
   mealName: { fontFamily: SERIF, fontSize: 16, color: '#e8e8ea' },
   mealMeta: { fontSize: 10, letterSpacing: 1, color: MUTED, textTransform: 'uppercase', marginTop: 4 },
   mealChev: { fontFamily: SERIF, fontSize: 18, color: '#5a5a60', marginLeft: 10 },
+  mealTick: { marginRight: 11, marginTop: 3 },
+  mealNameDone: { color: '#6f6f76', textDecorationLine: 'line-through' },
+  mealChevDone: { color: '#3a3a40' },
 
   // THIS WEEK — the bill
   sectionLabel: { fontSize: 10, letterSpacing: 2, color: FAINT, fontWeight: '600', textTransform: 'uppercase', paddingHorizontal: 22, marginTop: 26, marginBottom: 6 },

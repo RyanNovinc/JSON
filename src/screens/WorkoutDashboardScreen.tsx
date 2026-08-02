@@ -109,8 +109,13 @@ export default function WorkoutDashboardScreen() {
   const totalQuestionnaires = 2;
   const allQuestionnairesCompleted = completedCount === totalQuestionnaires;
 
+  // Was: ImportRoutine with showStep1New, which rendered the legacy two-step
+  // create flow. That flow is gone, so this now goes to the questionnaire's own
+  // prompt screen — the modern equivalent, and the only one still maintained.
+  // The button is only rendered once both questionnaires are complete, which is
+  // exactly what PromptReady needs in order to build a prompt.
   const handleGeneratePrompt = () => {
-    navigation.navigate('ImportRoutine', { showStep1New: true });
+    navigation.navigate('PromptReady');
   };
 
   const renderGroupCard = (group: GroupCard) => {

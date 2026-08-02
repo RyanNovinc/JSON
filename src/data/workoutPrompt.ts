@@ -1,3 +1,5 @@
+import { PROMPT_CACHE_VERSION } from './promptCacheVersion';
+
 // Muscle group taxonomy - expanded granular list
 export const MUSCLE_GROUPS = [
   'Chest', 'Front Delts', 'Side Delts', 'Rear Delts', 'Lats', 'Upper Back', 
@@ -204,7 +206,7 @@ export const generateProgramSpecs = (data?: QuestionnaireData): string => {
                       data.volumePreference === '16-20' ? 'High Volume' :
                       'Moderate'; // '12-16' and 'not_sure' both default to Moderate
     specs += `**Volume Tier:** ${tierLabel}\n`;
-    specs += `(Per-muscle target ranges are built from the volume landmarks file at https://json.fit/volume-landmarks.md?v=3 using this tier × experience mapping. All volume is measured in EFFECTIVE sets — Primary × 1.0 + Secondary × 0.5.)\n`;
+    specs += `(Per-muscle target ranges are built from the volume landmarks file at https://json.fit/volume-landmarks.md?v=${PROMPT_CACHE_VERSION} using this tier × experience mapping. All volume is measured in EFFECTIVE sets — Primary × 1.0 + Secondary × 0.5.)\n`;
   }
 
   // Gender (for volume context)
@@ -397,7 +399,7 @@ The plan is fully self-contained: it lists all exercise pools, block structures,
 
 ## Translation Principles
 
-1. **The plan is authoritative for structure; the exercise library is authoritative for tags** — use the exercise names, sets, superset pairings, and day structure exactly as specified from the plan. However, before finalizing any JSON, verify every exercise's primaryMuscles and secondaryMuscles tags against the canonical exercise library at https://json.fit/exercises.md. If the plan's tags differ from the library, use the library's tags (the library is authoritative). Do not add, remove, or rename exercises. If the plan declares a mesocycle structure, append the mesocycle name to routine_name in every JSON file. The reviewed plan's set counts are final — do not adjust them based on your own volume recalculation.
+1. **The plan is authoritative for structure; the exercise library is authoritative for tags** — use the exercise names, sets, superset pairings, and day structure exactly as specified from the plan. However, before finalizing any JSON, verify every exercise's primaryMuscles and secondaryMuscles tags against the canonical exercise library at https://json.fit/exercises.md?v=${PROMPT_CACHE_VERSION}. If the plan's tags differ from the library, use the library's tags (the library is authoritative). Do not add, remove, or rename exercises. If the plan declares a mesocycle structure, append the mesocycle name to routine_name in every JSON file. The reviewed plan's set counts are final — do not adjust them based on your own volume recalculation.
 2. **Treat exercise names as identifiers** — use the exact same string for the same exercise across all blocks, days, notes, and superset references. Never vary naming.
 3. **Design what the plan doesn't specify** — you are responsible for rest periods and alternative exercises. For rep progressions: follow the plan's scheme if stated, otherwise use the defaults below.
 4. **Only program working sets** — do not include warm-up sets.
@@ -472,7 +474,7 @@ Place superset exercises adjacent in the exercises array. Add "superset_group": 
 
 ## Muscle Taxonomy
 
-Before generating JSON, read the canonical exercise library at https://json.fit/exercises.md to get authoritative muscle tags. Every exercise in your JSON must use primaryMuscles and secondaryMuscles tags that exactly match what's in that library. Do not use generic terms like "Shoulders", "Back", "Arms", or "Legs". If an exercise is not found in the library, do not include it in the JSON — flag it as an error requiring replacement.
+Before generating JSON, read the canonical exercise library at https://json.fit/exercises.md?v=${PROMPT_CACHE_VERSION} to get authoritative muscle tags. Every exercise in your JSON must use primaryMuscles and secondaryMuscles tags that exactly match what's in that library. Do not use generic terms like "Shoulders", "Back", "Arms", or "Legs". If an exercise is not found in the library, do not include it in the JSON — flag it as an error requiring replacement.
 
 ---
 
@@ -574,7 +576,7 @@ Before presenting each block, silently verify:
 - [ ] rir_weekly field populated for every exercise that has reps_weekly (matching structure and set counts)
 - [ ] Deload weeks show reduced sets_weekly (~40-50%) and increased reps
 - [ ] restQuick ≈ 65% of rest for every exercise
-- [ ] Every exercise's muscle tags verified against canonical library at https://json.fit/exercises.md (library tags override plan tags)
+- [ ] Every exercise's muscle tags verified against canonical library at https://json.fit/exercises.md?v=${PROMPT_CACHE_VERSION} (library tags override plan tags)
 - [ ] Block-relative week keys start from "1"
 - [ ] Session durations are recalculated using the duration formula
 

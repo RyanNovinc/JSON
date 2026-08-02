@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { INGREDIENTS } from '../data/ingredients';
 import {
@@ -138,10 +139,77 @@ export default function RecipeDetailScreen() {
   // kcal plate). We multiply the macro panel and ingredient amounts by this so
   // the screen matches the day card. Absent / invalid → 1.0, so favourites,
   // shared links, and meal-prep opens show the base recipe unchanged.
-  const planScale = (() => {
+  const routeScale = (() => {
     const s = Number((route.params as any).scaleFactor);
     return Number.isFinite(s) && s > 0 ? s : 1;
   })();
+
+  // ---- Is this meal in the user's active plan? -----------------------------
+  // The scale used to depend entirely on which door the user came through:
+  // arriving from a plan day passed scaleFactor, arriving from the Nutrition
+  // home, the Cook feed, favourites or a shared link did not. Same screen,
+  // different numbers, nothing on screen saying which. So the screen now looks
+  // the meal up in the active plan itself and can say so either way.
+  const { currentPlan } = useSimplifiedMealPlanning();
+
+  const planOccurrence = useMemo(() => {
+    const dailyMeals = (currentPlan as any)?.dailyMeals;
+    if (!dailyMeals || !mealSlug) return null;
+
+    const todayKey = (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+
+    const hits: { date: string; dayName: string; scale: number; plateId?: string }[] = [];
+    Object.keys(dailyMeals).forEach((date) => {
+      const day = dailyMeals[date];
+      (day?.meals || []).forEach((m: any) => {
+        if ((m?.curated_meal_slug || m?.slug) !== mealSlug) return;
+        const raw = Number(m?.scale_factor);
+        hits.push({
+          date,
+          dayName:
+            day?.dayName ||
+            new Date(date).toLocaleDateString('en-US', { weekday: 'long' }),
+          scale: Number.isFinite(raw) && raw > 0 ? raw : 1,
+          plateId: m?.plate_id,
+        });
+      });
+    });
+
+    if (hits.length === 0) return null;
+
+    // A meal can sit in the plan several times at different scales (a small
+    // breakfast portion and a big dinner one). Prefer today's occurrence, then
+    // the next upcoming day, then the first — and always name the day, so a
+    // bare "0.85x" is never floating free of the serving it belongs to.
+    hits.sort((a, b) => a.date.localeCompare(b.date));
+    return (
+      hits.find((h) => h.date === todayKey) ||
+      hits.find((h) => h.date >= todayKey) ||
+      hits[0]
+    );
+  }, [currentPlan, mealSlug]);
+
+  const occurrenceScale = planOccurrence?.scale ?? 1;
+
+  // viewBase: the user asked to see the unscaled recipe.
+  // adoptPlan: the user arrived unscaled and asked for their plan's version.
+  const [viewBase, setViewBase] = useState(false);
+  const [adoptPlan, setAdoptPlan] = useState(false);
+
+  const planScale = viewBase
+    ? 1
+    : routeScale !== 1
+    ? routeScale
+    : adoptPlan
+    ? occurrenceScale
+    : 1;
+
+  // Shown when the screen is displaying the base recipe while the plan holds a
+  // scaled version of the same meal — the case the user could not previously
+  // detect.
 
   // Optional plate to pre-select — e.g. when opened from a logged "Burger"
   // plating, land on that plate rather than the recipe's default.
@@ -155,6 +223,19 @@ export default function RecipeDetailScreen() {
   })();
 
   const [selectedPlateIndex, setSelectedPlateIndex] = useState(initialPlateIndex);
+
+  // Switching to the plan's version in place, rather than sending the user off
+  // to their meal plan day to re-tap the same meal. Also lands on the plate the
+  // plan specified, since that is part of "their version".
+  const showPlanVersion = () => {
+    setViewBase(false);
+    setAdoptPlan(true);
+    const pid = planOccurrence?.plateId;
+    if (pid && meal?.plates) {
+      const idx = meal.plates.findIndex((p) => p.id === pid);
+      if (idx >= 0) setSelectedPlateIndex(idx);
+    }
+  };
   const [selectedMethodIndex, setSelectedMethodIndex] = useState(0);
 
   // Sauce-variant selection (template meals only). Every template meal has
@@ -176,6 +257,21 @@ export default function RecipeDetailScreen() {
   const [servings, setServings] = useState(() =>
     clampCookPortions((route.params as any).servings)
   );
+
+  // Shown when the screen is displaying the base recipe while the plan holds a
+  // scaled version of the same meal — the case the user could not previously
+  // detect.
+  //
+  // NOT offered when the screen was deep-linked with a batch serving count (the
+  // Meal Prep session's "cook 3 servings" card). That flow already folds the
+  // plan's scale into its servings number, so adopting the scale on top of it
+  // would apply the same factor twice AND hide the Portions stepper the batch
+  // depends on.
+  //
+  // Declared HERE, after `servings`, not up with planScale: reading `servings`
+  // before its useState is a temporal-dead-zone crash, not just a type error.
+  const planVersionAvailable =
+    planScale === 1 && occurrenceScale !== 1 && servings === 1;
   const [ingredientsExpanded, setIngredientsExpanded] = useState(true);
   // Instructions collapsed by default. This screen is decide + shop; the
   // CookMode flow ("Start cooking") owns the step-by-step execution, so the
@@ -325,7 +421,9 @@ export default function RecipeDetailScreen() {
       // Static per-plate page — it carries a real og: card, so the link previews
       // properly in iMessage/WhatsApp. The old ?meal=&plate= form redirects here.
       const url = `https://json.fit/r/${meal.slug}/${plate.id}/`;
-      const caption = `${plate.display_name} — ${macros.kcal} cal, ${macros.protein_g}g protein`;
+      // Must use the DISPLAYED macros. Sharing a 680 kcal serving with an 800
+      // kcal caption is the panel contradicting itself.
+      const caption = `${plate.display_name} — ${dispKcal} cal, ${dispProtein}g protein`;
       await Share.share(
         Platform.OS === 'ios'
           ? { message: caption, url }
@@ -443,6 +541,53 @@ export default function RecipeDetailScreen() {
 
         {/* PER PORTION label */}
         <Text style={[styles.macroEyebrow, { color: themeColor }]}>PER PORTION</Text>
+
+        {/* SCALE BANNER — says out loud which version of the numbers is on
+            screen. Without this the only difference between a plan serving and
+            the base recipe is a missing Portions stepper, which no user is
+            going to read as "these amounts were resized for me". */}
+        {planScale !== 1 && (
+          <View style={[styles.scaleChip, { borderColor: themeColor }]}>
+            <Ionicons name="person" size={12} color={themeColor} />
+            <Text style={[styles.scaleChipText, { color: themeColor }]}>
+              Your plan
+              {planOccurrence && !viewBase && routeScale === 1
+                ? ` · ${planOccurrence.dayName}`
+                : ''}
+              {` · ×${Number(planScale.toFixed(2))}`}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setViewBase(true);
+                setAdoptPlan(false);
+              }}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <Text style={styles.scaleChipAction}>Base recipe</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {planVersionAvailable && (
+          <TouchableOpacity
+            style={styles.scaleOfferRow}
+            onPress={showPlanVersion}
+            activeOpacity={0.7}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.scaleOfferTitle}>
+                Base recipe · your plan resizes this one
+              </Text>
+              <Text style={styles.scaleOfferMeta}>
+                {planOccurrence?.dayName} · ×{Number(occurrenceScale.toFixed(2))} to hit your macros
+              </Text>
+            </View>
+            <Text style={[styles.scaleOfferAction, { color: themeColor }]}>
+              Show mine
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={themeColor} />
+          </TouchableOpacity>
+        )}
 
         {/* MACRO GRID */}
         <View style={styles.macroGrid}>
@@ -641,6 +786,16 @@ export default function RecipeDetailScreen() {
               />
             </TouchableOpacity>
           </View>
+
+          {/* Batch meals list ingredients PER SERVING while cook mode narrates
+              the whole pot ("add 1000g beef mince" for a 106g serving). Nothing
+              used to explain that jump, so the list looked wrong. */}
+          {ingredientsExpanded && meal.produces_servings > 1 && (
+            <Text style={styles.batchNote}>
+              Amounts are per serving · this recipe makes {meal.produces_servings}.
+              Cook mode walks you through the full batch.
+            </Text>
+          )}
 
           {ingredientsExpanded && (
             <>
@@ -850,6 +1005,60 @@ const styles = StyleSheet.create({
   sectionPad: { paddingHorizontal: 18, marginBottom: 22 },
 
   eyebrow: { fontSize: 10, fontWeight: '600', letterSpacing: 1.2, marginBottom: 10 },
+  scaleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  scaleChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  scaleChipAction: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#a1a1aa',
+    marginLeft: 4,
+  },
+  scaleOfferRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#141417',
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  scaleOfferTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#e8e8ea',
+  },
+  scaleOfferMeta: {
+    fontSize: 11,
+    color: '#8a8a90',
+    marginTop: 2,
+  },
+  scaleOfferAction: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  batchNote: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#8a8a90',
+    marginTop: 2,
+    marginBottom: 10,
+  },
   subEyebrow: {
     color: '#52525b',
     fontSize: 10,

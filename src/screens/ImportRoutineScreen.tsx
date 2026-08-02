@@ -35,7 +35,6 @@ import RobustStorage from '../utils/robustStorage';
 // import * as Crypto from 'expo-crypto';
 import { useTheme } from '../contexts/ThemeContext';
 import { WorkoutProgram, Exercise } from '../types/workout';
-import WorkoutGeneratorStep1New from '../components/WorkoutGeneratorStep1New';
 import { fetchShare } from '../services/shareService';
 import { Analytics } from '../services/analytics';
 
@@ -69,9 +68,11 @@ export default function ImportRoutineScreen() {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [outputPreference, setOutputPreference] = useState<'copy_paste' | 'save_import'>('copy_paste');
   const [uploadMode, setUploadMode] = useState(false);
-  const [showStep1New, setShowStep1New] = useState(
-    (route?.params?.mode === 'append-block') ? false : (route?.params?.showStep1New || false)
-  );
+  // showStep1New is GONE. The legacy two-step create flow ("Your Prompt is
+  // Ready!" → "Paste Your Plan") is no longer rendered from this screen; the
+  // questionnaire flow owns prompt generation now. The route param is still
+  // accepted by the type so old callers don't break at compile time, but it is
+  // deliberately ignored.
   const [showInfo, setShowInfo] = useState(false);
 
   // Mesocycle state
@@ -986,8 +987,50 @@ export default function ImportRoutineScreen() {
   // setErrorMessage renders, leaving the user on Home with no feedback — so it
   // surfaces the failure via an Alert instead, which the OS draws over whatever is
   // on screen.
+  /**
+   * Meal plans arrive HERE, not at ImportMealPlanScreen.
+   *
+   * Every opened file deep-links to /import-file → ImportRoutine (see the
+   * routing note in AppNavigator), so this screen is the single front door for
+   * both kinds of export. It had no idea meal plans existed, so a meal plan was
+   * handed to the workout validator, which requires `routine_name` and threw
+   * "Invalid routine name" — surfacing to the user as "This file isn't a valid
+   * JSON.fit program".
+   *
+   * Detection is on SHAPE, not filename: a meal plan has `dailyMeals` and no
+   * `routine_name`. Anything ambiguous or unparseable falls through to the
+   * workout path exactly as before, so this can only ever rescue a file the
+   * old code was going to reject.
+   */
+  const looksLikeMealPlan = (text: string): boolean => {
+    try {
+      const parsed = JSON.parse(text);
+      return (
+        !!parsed &&
+        typeof parsed === 'object' &&
+        !!parsed.dailyMeals &&
+        typeof parsed.dailyMeals === 'object' &&
+        !parsed.routine_name
+      );
+    } catch {
+      // Not parseable here — let the workout path run its repair/validation,
+      // which handles smart quotes and reports proper errors.
+      return false;
+    }
+  };
+
   const processWorkoutData = async (text: string, onFailure?: () => void) => {
     console.log('⚙️ [PROCESS WORKOUT] Starting processWorkoutData');
+
+    if (looksLikeMealPlan(text)) {
+      console.log('🍽️ [IMPORT ROUTINE] Meal plan detected — handing to ImportMealPlan');
+      // replace, not navigate: the user opened a file, they should land on the
+      // meal importer rather than stacking it over a workout screen they never
+      // asked for and can back into.
+      navigation.replace('ImportMealPlan', { prefilledJson: text });
+      return;
+    }
+
     console.log('⚙️ [PROCESS WORKOUT] Text length:', text.length);
     console.log('⚙️ [PROCESS WORKOUT] Text sample:', text.substring(0, 200) + '...');
     console.log('⚙️ [PROCESS WORKOUT] Current state:', { isLoading, showAddMoreMode, accumulatedProgramsCount: accumulatedPrograms.length });
@@ -2195,31 +2238,18 @@ export default function ImportRoutineScreen() {
   // Build dynamic profile text from questionnaire data
 
 
+  // Cancel means LEAVE. It used to drop the user into the legacy two-step
+  // create flow instead of dismissing, which is why closing an import landed
+  // people on "Your Prompt is Ready!" — a screen they never asked for and that
+  // has no place on an import path.
   const handleCancel = () => {
-    // append-block mode or new questionnaire flow: just go back
-    if (route?.params?.mode === 'append-block' || (route?.params as any)?.fromNewFlow) {
+    if (navigation.canGoBack()) {
       navigation.goBack();
       return;
     }
-    // Legacy entry point: fall back to old Step1New screen
-    setShowStep1New(true);
+    // Opened cold from a file / share link, so there is nothing to go back to.
+    navigation.navigate('Main' as any);
   };
-
-  // Show WorkoutGeneratorStep1New if requested
-  if (showStep1New) {
-    return (
-      <WorkoutGeneratorStep1New
-        onNext={() => setShowStep1New(false)}
-        onBack={() => {
-          if (navigation.canGoBack()) {
-            navigation.goBack();
-          } else {
-            navigation.navigate('Main' as any);
-          }
-        }}
-      />
-    );
-  }
 
   // Render the loader (not the paste UI) as soon as we land here with a prefilled
   // routine to auto-import. isLoading starts false on mount for shared/curated

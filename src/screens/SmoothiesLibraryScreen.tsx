@@ -26,9 +26,16 @@ type SmoothiesLibraryNavigationProp = StackNavigationProp<
 
 // Content width is capped so cards don't stretch to unreasonable sizes on
 // tablets/resized windows — see cardWidth in the component below.
+// Responsive: hold the card near TARGET_CARD_WIDTH and let the column count
+// grow with the screen, instead of fixing 2 columns and capping content width.
+// The old cap kept card size sane but left a 13" iPad using ~68% of its width.
+// Driven by available width rather than a Platform.isPad check, so an iPad in
+// Split View correctly falls back to the phone's 2-column layout.
+//    iPhone 393pt -> 2 cols · iPad 1032pt -> 3 cols · iPad landscape -> 4 cols
 const GRID_HORIZONTAL_PADDING = 16;
 const GRID_GAP = 10;
-const MAX_GRID_CONTENT_WIDTH = 700;
+const TARGET_CARD_WIDTH = 320;
+const MIN_COLUMNS = 2;
 
 // ============================================================================
 // HELPERS
@@ -55,9 +62,13 @@ export default function SmoothiesLibraryScreen() {
   const insets = useSafeAreaInsets();
   const { themeColor } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
-  const cardWidth = useMemo(() => {
-    const contentWidth = Math.min(windowWidth, MAX_GRID_CONTENT_WIDTH);
-    return (contentWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP) / 2;
+  const { columns, cardWidth } = useMemo(() => {
+    const available = windowWidth - GRID_HORIZONTAL_PADDING * 2;
+    const cols = Math.max(
+      MIN_COLUMNS,
+      Math.floor((available + GRID_GAP) / (TARGET_CARD_WIDTH + GRID_GAP)),
+    );
+    return { columns: cols, cardWidth: (available - GRID_GAP * (cols - 1)) / cols };
   }, [windowWidth]);
 
   const allSmoothies = useMemo(
@@ -176,7 +187,10 @@ export default function SmoothiesLibraryScreen() {
         data={allSmoothies}
         renderItem={renderCard}
         keyExtractor={item => item.slug}
-        numColumns={2}
+        // FlatList cannot change numColumns on a live instance — the key forces
+        // a remount when rotation moves us between 3 and 4 columns.
+        key={`grid-${columns}`}
+        numColumns={columns}
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={[
           styles.gridContent,

@@ -11,12 +11,15 @@ import {
   Platform,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useWeightUnit } from '../../contexts/WeightUnitContext';
 import { WorkoutStorage } from '../../utils/storage';
+import { loadGoalsProfile, saveGoalsProfile } from '../../utils/goalsProfileStorage';
+import type { GoalsProfile } from '../../utils/goalsProfile';
 import {
   resolveNutritionAnswers,
   updateNutritionField,
@@ -58,6 +61,23 @@ import { finalizeNutrition } from '../../utils/nutritionMacros';
  *
  * Photos are deliberately NOT in this entry flow. They're a per-entry
  * add-on accessed from the history detail view in WeightTracker.
+ *
+ * Save-path hardening:
+ *   - The save used to do `loadWeightHistory()` then save
+ *     `[entry, ...history]`. When the read failed it returned [], so the
+ *     save wrote a single-entry array over the user's entire history and
+ *     the loss looked like a legitimate new state. It now uses
+ *     loadWeightHistoryResult() and ABORTS when the read did not
+ *     succeed.
+ *   - The write is verified by reading back and checking the new entry's
+ *     id is present, before onSaved fires or the sheet closes.
+ *   - A failed save used to only flip `saving` back to false, leaving
+ *     the user staring at an unchanged sheet with no idea why. It now
+ *     surfaces an alert.
+ *   - Entry ids carry a random suffix; Date.now() alone collides when
+ *     two saves land in the same millisecond, and duplicate ids make
+ *     later deletes remove the wrong row.
+ *   - Macro recalc runs only after the weight is confirmed saved.
  */
 
 interface WeightEntry {
@@ -67,7 +87,20 @@ interface WeightEntry {
   date: string;
   notes?: string;
   photos?: any[];
+  /** Optional body composition reading taken at the same time as the
+   * weight. Stored per entry so it's trackable over time, and mirrored
+   * to GoalsProfile.currentBodyFatPct so the questionnaire and macro
+   * calc read the same number. */
+  bodyFatPct?: number;
 }
+
+// GoalsProfile carries currentWeightKg / currentBodyFatPct. Declared
+// loosely here for the same reason GoalEntrySheet does: the profile
+// round-trips through storage as-is.
+type GoalsProfileLoose = GoalsProfile & {
+  currentWeightKg?: number | null;
+  currentBodyFatPct?: number | null;
+};
 
 interface Props {
   visible: boolean;
@@ -102,6 +135,14 @@ export default function WeightEntrySheet({
   const [saving, setSaving] = useState(false);
   const [latestEntry, setLatestEntry] = useState<WeightEntry | null>(null);
 
+  // Body fat %. Optional, and deliberately NOT prefilled with the last
+  // value — carrying it forward would stamp a stale reading onto every
+  // weigh-in and draw a flat BF line that looks like measured data. The
+  // previous reading shows as a hint instead, same as the weight.
+  const [bodyFat, setBodyFat] = useState('');
+  const [bfFocused, setBfFocused] = useState(false);
+  const [lastBodyFatPct, setLastBodyFatPct] = useState<number | null>(null);
+
   // ---------- Animation state ----------
   // Keep the modal mounted through the exit animation; unmount after.
   const [mounted, setMounted] = useState(false);
@@ -117,6 +158,7 @@ export default function WeightEntrySheet({
       setMounted(true);
       setWeight('');
       setNotes('');
+      setBodyFat('');
       setShowNotes(false);
       setSaving(false);
       Animated.timing(progress, {
@@ -182,6 +224,13 @@ export default function WeightEntrySheet({
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         );
         setLatestEntry(sorted[0]);
+
+        // BF% is logged less often than weight, so the most recent
+        // reading usually isn't on the most recent entry.
+        const lastWithBf = sorted.find(
+          (e: WeightEntry) => typeof e.bodyFatPct === 'number'
+        );
+        setLastBodyFatPct(lastWithBf?.bodyFatPct ?? null);
       } catch (e) {
         console.error('WeightEntrySheet prefill failed', e);
       }
@@ -201,29 +250,103 @@ export default function WeightEntrySheet({
   // Parse and validate. Allow decimal (81.5) but block negative, zero,
   // and absurd values that suggest a typo.
   const parsedWeight = parseFloat(weight.replace(',', '.'));
-  const valid =
+  const weightValid =
     Number.isFinite(parsedWeight) &&
     parsedWeight > 20 && // anything under 20kg/lbs is almost certainly a typo
     parsedWeight < 500;
+
+  // Body fat is optional: blank is valid. Bounds match GoalEntrySheet's
+  // BF% target so the two fields accept the same range.
+  const bfRaw = bodyFat.trim();
+  const parsedBf = bfRaw === '' ? null : parseFloat(bfRaw.replace(',', '.'));
+  const bfValid =
+    parsedBf == null ||
+    (Number.isFinite(parsedBf) && parsedBf >= 3 && parsedBf <= 60);
+  const bfInvalidVisible = bfRaw !== '' && !bfValid;
+
+  const valid = weightValid && bfValid;
 
   const handleSave = async () => {
     if (!valid || saving) return;
     setSaving(true);
     try {
       const entry: WeightEntry = {
-        id: Date.now().toString(),
+        // Date.now() alone collides if two saves land in the same
+        // millisecond, and a duplicate id makes deletes remove the wrong
+        // row later. Suffix keeps ids unique without a uuid dependency.
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         weight: Math.round(parsedWeight * 10) / 10, // 1 decimal place
         unit,
         date: new Date().toISOString(),
         notes: notes.trim() || undefined,
+        bodyFatPct:
+          parsedBf == null ? undefined : Math.round(parsedBf * 10) / 10,
       };
 
-      const history = await WorkoutStorage.loadWeightHistory();
+      // Read the CURRENT history before prepending. loadWeightHistoryResult
+      // reports whether the read actually succeeded — a plain [] cannot
+      // distinguish "no entries yet" from "could not read", and writing
+      // [entry, ...[]] on a failed read replaces the user's entire history
+      // with a single entry. That is the data-loss path this guards.
+      const read = await WorkoutStorage.loadWeightHistoryResult();
+      if (!read.ok) {
+        console.error('WeightEntrySheet: refusing to save, store unreadable', read.reason);
+        Alert.alert(
+          'Could not read your history',
+          'Your saved weights could not be read, so nothing was changed. Close and reopen the app, then try again.'
+        );
+        setSaving(false);
+        return;
+      }
+
+      const history = read.entries || [];
       await WorkoutStorage.saveWeightHistory([entry, ...history]);
+
+      // Confirm the entry actually landed before telling the parent it
+      // did. A silently dropped write used to surface weeks later as a
+      // missing weigh-in.
+      const confirmed = await WorkoutStorage.loadWeightHistoryResult();
+      if (!confirmed.ok || !confirmed.entries.some((e: any) => e?.id === entry.id)) {
+        console.error('WeightEntrySheet: save could not be verified', confirmed.reason);
+        Alert.alert(
+          'Could not save',
+          'That weight could not be saved. Please try again.'
+        );
+        setSaving(false);
+        return;
+      }
+
+      // Mirror the reading into GoalsProfile, the store the
+      // questionnaire and ConfirmStatsScreen both read. Without this,
+      // logging a weigh-in here left the questionnaire showing whatever
+      // was captured the last time the user walked the flow, and there
+      // was no path at all for current BF% — it could only be set once
+      // on ConfirmStatsScreen. Runs after the entry is confirmed saved
+      // and is non-fatal: the weight is already safely stored.
+      try {
+        const weightKgForProfile =
+          entry.unit === 'lbs' ? entry.weight * 0.453592 : entry.weight;
+        const prev = (await loadGoalsProfile()) as GoalsProfileLoose | null;
+        const nextProfile: GoalsProfileLoose = {
+          ...(prev ?? ({} as GoalsProfileLoose)),
+          currentWeightKg: weightKgForProfile,
+          // Only overwrite BF% when one was actually entered. A blank
+          // field means "not measured today", not "reset to unknown".
+          ...(entry.bodyFatPct != null
+            ? { currentBodyFatPct: entry.bodyFatPct }
+            : {}),
+        };
+        await saveGoalsProfile(nextProfile);
+      } catch (e) {
+        console.error('WeightEntrySheet profile sync failed', e);
+      }
 
       // If the nutrition questionnaire has been completed, push the new
       // weight through finalizeNutrition() so calories/macros stay in
       // sync. This replaces the old inline BMR recalc in WeightTracker.
+      // Runs only AFTER the weight is confirmed saved — recalculating
+      // macros against a weight that was never persisted would leave the
+      // two stores disagreeing.
       try {
         const answers = await resolveNutritionAnswers();
         const hasQuestionnaire =
@@ -248,6 +371,9 @@ export default function WeightEntrySheet({
       handleClose();
     } catch (e) {
       console.error('WeightEntrySheet save failed', e);
+      // The old version failed silently here: the sheet stayed open with
+      // no explanation and the user assumed it had saved.
+      Alert.alert('Could not save', 'That weight could not be saved. Please try again.');
       setSaving(false);
     }
   };
@@ -351,6 +477,48 @@ export default function WeightEntrySheet({
               <Text style={styles.unitSubtext}>Applies across the app</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Body fat % — optional, sits directly under the weight so
+              the two read as one reading taken at the same time. */}
+          <View
+            style={[
+              styles.bfRow,
+              {
+                borderColor: bfFocused ? themeColor : '#27272a',
+                borderWidth: bfFocused ? 1.5 : StyleSheet.hairlineWidth,
+              },
+            ]}
+          >
+            <View style={styles.bfLabelWrap}>
+              <Text style={styles.bfLabel}>Body fat</Text>
+              <Text style={styles.bfOptional}>
+                {lastBodyFatPct != null
+                  ? `optional · last ${lastBodyFatPct}%`
+                  : 'optional'}
+              </Text>
+            </View>
+            <TextInput
+              style={styles.bfInput}
+              value={bodyFat}
+              onChangeText={setBodyFat}
+              onFocus={() => setBfFocused(true)}
+              onBlur={() => setBfFocused(false)}
+              placeholder="—"
+              placeholderTextColor="#3f3f46"
+              keyboardType="decimal-pad"
+              returnKeyType="done"
+              maxLength={4}
+              selectionColor={themeColor}
+              accessibilityLabel="Current body fat percentage, optional"
+            />
+            <Text style={styles.bfPercent}>%</Text>
+          </View>
+
+          {bfInvalidVisible && (
+            <Text style={styles.errorText}>
+              Body fat should be between 3 and 60, or left blank.
+            </Text>
+          )}
 
           {/* Notes toggle — collapsed by default to keep the sheet short.
               Tapping reveals a small text area. */}
@@ -499,6 +667,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#71717a',
     marginTop: 2,
+  },
+  bfRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0a0a0b',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  bfLabelWrap: {
+    flex: 1,
+  },
+  bfLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#ffffff',
+  },
+  bfOptional: {
+    fontSize: 11,
+    color: '#71717a',
+    marginTop: 2,
+  },
+  bfInput: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'right',
+    minWidth: 56,
+    paddingVertical: 2,
+  },
+  bfPercent: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#71717a',
+    marginLeft: 4,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#f87171',
+    marginBottom: 10,
   },
   notesToggle: {
     flexDirection: 'row',

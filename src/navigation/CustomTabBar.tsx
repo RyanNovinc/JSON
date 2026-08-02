@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { BottomTabBarProps, BottomTabBarHeightCallbackContext } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 
@@ -19,6 +19,20 @@ import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
  * - The sparkle icon inside the Create button has a slow breathing pulse.
  *
  * Tapping Create fires `navigation.getParent()?.navigate('CreateFlow')`.
+ *
+ * Per-route `tabBarStyle` handling (the built-in bar does all of this for
+ * free; we replace it wholesale, so we reimplement the parts we use):
+ * - `{ display: 'none' }`   → bar unmounts for that route.
+ * - `{ position: 'absolute' }` → OVERLAY mode: the bar floats over the
+ *   screen (left/right/bottom 0) instead of taking layout space, and the
+ *   rest of the route's tabBarStyle (backgroundColor, borderTopWidth, …) is
+ *   merged over the defaults. Used by Cook, whose full-bleed cards run
+ *   edge-to-edge under a translucent bar.
+ * - The bar reports its real height (0 when hidden) through
+ *   BottomTabBarHeightCallbackContext, so useBottomTabBarHeight /
+ *   BottomTabBarHeightContext are accurate. Without this, React Navigation
+ *   serves a mount-time estimate based on the DEFAULT bar's metrics, which
+ *   is what screens were silently reading before.
  */
 
 const TAB_CONFIG: Record<
@@ -79,21 +93,48 @@ export function CustomTabBar({ state, navigation, descriptors }: BottomTabBarPro
 
   const bottomPad = Math.max(insets.bottom, 8);
 
-  // Honour `options.tabBarStyle: { display: 'none' }` on the focused route.
-  // The built-in tab bar does this for free, but we replace it wholesale — so
-  // without this check the option is silently ignored. Read from the FOCUSED
-  // route only, so hiding is per-route: switching back to any other tab
-  // re-renders the bar normally. Must stay below the hooks above.
+  // React Navigation provides this setter so a custom bar can report its real
+  // height into BottomTabBarHeightContext. The default bar does it via
+  // onLayout; if we never call it, every screen reads a stale mount-time
+  // estimate instead of our actual 56 + safe-area height.
+  const onHeightChange = useContext(BottomTabBarHeightCallbackContext);
+
+  // Honour per-route `options.tabBarStyle` on the focused route. The built-in
+  // tab bar does this for free, but we replace it wholesale — so without
+  // these checks the option is silently ignored. Read from the FOCUSED route
+  // only, so both behaviours are per-route: switching to any other tab
+  // renders the bar normally again. Must stay below the hooks above.
   const focusedRoute = state.routes[state.index];
   const focusedTabBarStyle = StyleSheet.flatten(
     descriptors[focusedRoute.key]?.options?.tabBarStyle as ViewStyle | undefined
   );
-  if (focusedTabBarStyle?.display === 'none') {
+  const hidden = focusedTabBarStyle?.display === 'none';
+  // Overlay mode: float over the screen instead of taking layout space.
+  const overlay = focusedTabBarStyle?.position === 'absolute';
+
+  // A hidden bar renders nothing, so no onLayout fires — report 0 explicitly
+  // or the height context keeps whatever value it last had.
+  useEffect(() => {
+    if (hidden) {
+      onHeightChange?.(0);
+    }
+  }, [hidden, onHeightChange]);
+
+  if (hidden) {
     return null;
   }
 
   return (
-    <View style={[styles.container, { paddingBottom: bottomPad }]}>
+    <View
+      style={[
+        styles.container,
+        { paddingBottom: bottomPad },
+        overlay && styles.overlay,
+        // Route-supplied styles win (backgroundColor, borderTopWidth, …).
+        focusedTabBarStyle,
+      ]}
+      onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}
+    >
       <View style={styles.row}>
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
@@ -192,6 +233,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f0f10',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#27272a',
+  },
+  // Overlay mode: anchored over the screen content. position itself comes
+  // from the route's tabBarStyle; this pins the edges.
+  overlay: {
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   row: {
     flexDirection: 'row',

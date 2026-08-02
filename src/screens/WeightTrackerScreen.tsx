@@ -33,47 +33,54 @@ import WeightEntrySheet from '../components/nutrition/WeightEntrySheet';
 import GoalEntrySheet from '../components/nutrition/GoalEntrySheet';
 
 /**
- * WeightTrackerScreen — v3.
+ * WeightTrackerScreen — v4.
+ *
+ * v4: progress photos are durable and removable.
+ *   1. Photo grid is one row of five equal cells (was 18% width with
+ *      flexWrap, which broke as 4 + 1 orphan). Slots now flex: 1 with an
+ *      8pt gap so the row reads as a deliberate grid at any width.
+ *   2. The photo section sits in its own card matching the entry list,
+ *      so the detail screen is two balanced blocks instead of one card
+ *      floating above loose content.
+ *   3. Photos can be REMOVED. Filled slots carry a corner badge that
+ *      deletes (with confirm); the fullscreen viewer has a trash action
+ *      too. Long press on a filled slot replaces in one gesture.
+ *   4. Tapping a filled slot opens the fullscreen viewer, swipe-free
+ *      arrows + dots as before. Viewer photos are DERIVED from
+ *      detailEntry rather than snapshotted into state, so a delete
+ *      inside the viewer is reflected immediately and the index can't
+ *      dangle past the end of the array.
+ *   5. PERSISTENCE HARDENING — the real fix for "photos randomly
+ *      disappear":
+ *        a. ImagePicker hands back a URI inside the app's cache
+ *           directory. iOS purges that directory under storage
+ *           pressure, so the entry kept a path to a file that no longer
+ *           existed. Picked images are now COPIED into
+ *           documentDirectory/progress-photos/ (which is never purged,
+ *           and is included in device backups) and the entry stores the
+ *           copy's path. Falls back to the original URI if the copy
+ *           fails so a filesystem hiccup can't block the save.
+ *        b. Every write goes through mutateHistory(), which re-reads
+ *           storage first, applies the change to what's actually on
+ *           disk, saves, then reads back to confirm. Previously a stale
+ *           in-memory `history` could overwrite an entry logged from
+ *           another screen while this one sat open.
+ *        c. State is only updated AFTER the write is confirmed. A
+ *           failed save now surfaces an alert instead of silently
+ *           showing a photo that was never persisted.
+ *        d. Removing a photo also deletes the copied file, so the
+ *           photos directory doesn't grow forever.
  *
  * v3: goal-centric hero.
- *   1. Goal moved into the hero card. Current + goal read as a pair, with
- *      a start → goal progress track between them: % complete rides the
- *      marker, remaining distance sits on the right (reuses goalGap).
+ *   1. Goal moved into the hero card. Current + goal read as a pair,
+ *      with a start → goal progress track between them.
  *   2. Pace / ETA / 7-day avg folded into the hero as a mini-stat row.
- *      The standalone stats row is gone. Entries count only shows in the
- *      no-goal state (the Recent list already communicates it).
- *   3. The goal block (and the "Set a goal" pill) opens GoalEntrySheet:
- *      goal weight + BF% get edited in place — no bounce out to the
- *      questionnaire. The sheet writes GoalsProfile, the same store the
- *      questionnaire reads, so the two stay in sync with zero extra
- *      plumbing.
- *   4. The track's start anchor prefers goalProfile.startWeightKg, which
- *      GoalEntrySheet snapshots whenever the goal weight is set or
- *      changed. Falls back to the oldest logged entry for goals that
- *      predate the snapshot.
- *   5. Recomp-style targets (start ≈ goal) get the gap pill instead of a
- *      meaningless track.
+ *   3. The goal block opens GoalEntrySheet, which writes GoalsProfile —
+ *      the same store the questionnaire reads.
+ *   4. The track's start anchor prefers goalProfile.startWeightKg.
+ *   5. Recomp-style targets (start ≈ goal) get the gap pill instead of
+ *      a meaningless track.
  *   6. Sparkline gained a small "GOAL <x>" label on the dashed line.
- *
- * What changed vs. v1 (the v2 pass):
- *   1. Hero number replaced with current weight + delta + sparkline chart
- *      and three stat cards (7-day avg / weekly pace / change since start).
- *   2. Entry flow extracted into WeightEntrySheet — same component used
- *      by N3 during the questionnaire. One UI to maintain.
- *   3. Macro recalc on weight save now goes through finalizeNutrition()
- *      inside the sheet — kills the duplicate BMR/TDEE formula that lived
- *      inline in the old WeightTracker (~120 lines of bug-prone math).
- *   4. Testimonial flow REMOVED. It was ~700 lines that conflated daily
- *      weigh-ins with one-time transformation sharing. If/when we add
- *      sharing back it'll be triggered contextually on milestones, not
- *      buried behind a star icon in the tracker.
- *   5. Photos demoted from "five empty slots on every weigh-in" to an
- *      optional add-on on the history detail screen. Existing photos
- *      from old entries still render. Users can still add photos to any
- *      historical entry.
- *   6. AI info banner removed from the always-visible screen. The text
- *      "Your weight helps the AI..." doesn't need to be on a screen the
- *      user opens repeatedly.
  *
  * What stayed:
  *   - Centralized storage via WorkoutStorage (`saveWeightHistory` etc.)
@@ -81,6 +88,30 @@ import GoalEntrySheet from '../components/nutrition/GoalEntrySheet';
  *   - Empty state when no entries
  *   - The screen as a route destination (Profile still navigates here)
  */
+
+// expo-file-system moved its classic API behind /legacy in newer SDKs.
+// Resolve whichever is present at runtime; if neither is installed the
+// screen still works, it just stores the picker's own URI (the old
+// pre-v4 behaviour) rather than a durable copy.
+let FileSystem: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  FileSystem = require('expo-file-system/legacy');
+} catch (e) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    FileSystem = require('expo-file-system');
+  } catch (e2) {
+    FileSystem = null;
+  }
+}
+
+// MediaTypeOptions is deprecated in current expo-image-picker in favour
+// of a string array. Pick whichever the installed version understands.
+const PICKER_MEDIA_TYPES: any =
+  (ImagePicker as any).MediaType != null
+    ? ['images']
+    : (ImagePicker as any).MediaTypeOptions?.Images;
 
 // ---------- Types ----------
 
@@ -97,6 +128,8 @@ interface WeightEntry {
   date: string;
   notes?: string;
   photos?: ProgressPhoto[];
+  /** Optional body composition reading logged alongside the weight. */
+  bodyFatPct?: number;
 }
 
 // GoalsProfile doesn't declare startWeightKg yet (add it to the type when
@@ -105,6 +138,86 @@ interface WeightEntry {
 // goalWeightKg. This screen reads the field defensively and falls back
 // to the oldest logged entry for goals that predate the snapshot.
 type GoalsProfileMaybeStart = GoalsProfile & { startWeightKg?: number | null };
+
+const PHOTO_TYPES = [
+  'front',
+  'side_left',
+  'back',
+  'side_right',
+  'extra',
+] as const;
+
+function photoTypeLabel(type: ProgressPhoto['type']): string {
+  switch (type) {
+    case 'side_left':
+      return 'Side L';
+    case 'side_right':
+      return 'Side R';
+    default:
+      return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+}
+
+// ---------- Photo file persistence ----------
+
+// Photos live in documentDirectory, NOT cacheDirectory. The picker
+// returns a cache path that iOS is free to delete whenever it wants
+// storage back — that is what makes photos "randomly disappear" weeks
+// after they were added.
+const PHOTO_DIR = FileSystem?.documentDirectory
+  ? `${FileSystem.documentDirectory}progress-photos/`
+  : null;
+
+async function ensurePhotoDir(): Promise<boolean> {
+  if (!FileSystem || !PHOTO_DIR) return false;
+  try {
+    const info = await FileSystem.getInfoAsync(PHOTO_DIR);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(PHOTO_DIR, { intermediates: true });
+    }
+    return true;
+  } catch (e) {
+    console.warn('WeightTracker: could not create photo dir', e);
+    return false;
+  }
+}
+
+/**
+ * Copy a picked image into permanent storage and return the new URI.
+ * Returns the original URI unchanged if anything goes wrong — a failed
+ * copy should degrade to the old behaviour, never block the save.
+ */
+async function persistPickedPhoto(
+  sourceUri: string,
+  entryId: string,
+  type: ProgressPhoto['type']
+): Promise<string> {
+  if (!(await ensurePhotoDir())) return sourceUri;
+  try {
+    const extMatch = /\.([a-zA-Z0-9]+)(?:\?.*)?$/.exec(sourceUri);
+    const ext = extMatch ? extMatch[1].toLowerCase() : 'jpg';
+    const target = `${PHOTO_DIR}${entryId}_${type}_${Date.now()}.${ext}`;
+    await FileSystem.copyAsync({ from: sourceUri, to: target });
+    const info = await FileSystem.getInfoAsync(target);
+    if (!info.exists || info.size === 0) return sourceUri;
+    return target;
+  } catch (e) {
+    console.warn('WeightTracker: photo copy failed, using source uri', e);
+    return sourceUri;
+  }
+}
+
+// Best-effort cleanup. Only touches files we created inside PHOTO_DIR —
+// never deletes a URI that points at the user's photo library.
+async function deletePhotoFile(uri: string): Promise<void> {
+  if (!FileSystem || !PHOTO_DIR) return;
+  if (!uri.startsWith(PHOTO_DIR)) return;
+  try {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch (e) {
+    console.warn('WeightTracker: photo file delete failed', e);
+  }
+}
 
 // ---------- Helpers ----------
 
@@ -117,6 +230,12 @@ function toKg(weight: number, unit: 'kg' | 'lbs'): number {
 // Within this margin, "current" and "goal" read as the same weight —
 // avoids showing "0.1 kg to go" as if it were a meaningful gap.
 const AT_GOAL_THRESHOLD_KG = 0.5;
+
+function sortNewestFirst(entries: WeightEntry[]): WeightEntry[] {
+  return [...entries].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+}
 
 function formatDate(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date;
@@ -301,12 +420,21 @@ function Sparkline({ entries, color, width, height, goalWeightKg, goalLabel }: S
 
 interface PhotoViewerProps {
   visible: boolean;
+  /** Live array from the entry — NOT a snapshot. Deleting inside the
+   * viewer shrinks this, which the index effect below clamps against. */
   photos: ProgressPhoto[];
   startIndex: number;
   onClose: () => void;
+  onDelete?: (photo: ProgressPhoto) => void;
 }
 
-function PhotoViewer({ visible, photos, startIndex, onClose }: PhotoViewerProps) {
+function PhotoViewer({
+  visible,
+  photos,
+  startIndex,
+  onClose,
+  onDelete,
+}: PhotoViewerProps) {
   const [index, setIndex] = useState(startIndex);
   const { themeColor } = useTheme();
 
@@ -314,22 +442,55 @@ function PhotoViewer({ visible, photos, startIndex, onClose }: PhotoViewerProps)
     if (visible) setIndex(startIndex);
   }, [visible, startIndex]);
 
+  // Deleting the last photo empties the array; deleting any photo can
+  // leave `index` past the end. Clamp before the render below reads it.
+  useEffect(() => {
+    if (!visible) return;
+    if (photos.length === 0) {
+      onClose();
+      return;
+    }
+    if (index > photos.length - 1) {
+      setIndex(photos.length - 1);
+    }
+  }, [photos.length, index, visible, onClose]);
+
   if (!visible || photos.length === 0) return null;
-  const photo = photos[index];
+  const photo = photos[Math.min(index, photos.length - 1)];
+  if (!photo) return null;
 
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.viewerContainer}>
         <View style={styles.viewerHeader}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            onPress={onClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Close photo"
+          >
             <Ionicons name="arrow-back" size={24} color="#ffffff" />
           </TouchableOpacity>
-          <Text style={styles.viewerTitle}>
-            {photo.type.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-          </Text>
-          <Text style={styles.viewerCount}>
-            {index + 1} / {photos.length}
-          </Text>
+
+          <View style={styles.viewerTitleWrap}>
+            <Text style={styles.viewerTitle}>{photoTypeLabel(photo.type)}</Text>
+            <Text style={styles.viewerCount}>
+              {index + 1} / {photos.length}
+            </Text>
+          </View>
+
+          {onDelete ? (
+            <TouchableOpacity
+              onPress={() => onDelete(photo)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete photo"
+            >
+              <Ionicons name="trash-outline" size={22} color="#ffffff" />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 22 }} />
+          )}
         </View>
 
         <View style={styles.viewerContent}>
@@ -341,6 +502,8 @@ function PhotoViewer({ visible, photos, startIndex, onClose }: PhotoViewerProps)
             <TouchableOpacity
               onPress={() => setIndex((i) => (i - 1 + photos.length) % photos.length)}
               style={styles.viewerNavBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Previous photo"
             >
               <Ionicons name="chevron-back" size={32} color="#ffffff" />
             </TouchableOpacity>
@@ -361,6 +524,8 @@ function PhotoViewer({ visible, photos, startIndex, onClose }: PhotoViewerProps)
             <TouchableOpacity
               onPress={() => setIndex((i) => (i + 1) % photos.length)}
               style={styles.viewerNavBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Next photo"
             >
               <Ionicons name="chevron-forward" size={32} color="#ffffff" />
             </TouchableOpacity>
@@ -387,28 +552,104 @@ export default function WeightTrackerScreen() {
   const [goalProfile, setGoalProfile] = useState<GoalsProfile | null>(null);
 
   // History detail view (replaces the old standalone history screen)
-  const [detailEntry, setDetailEntry] = useState<WeightEntry | null>(null);
+  const [detailEntryId, setDetailEntryId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
   // Photo viewer
-  const [viewerPhotos, setViewerPhotos] = useState<ProgressPhoto[]>([]);
   const [viewerStart, setViewerStart] = useState(0);
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  // The detail entry is DERIVED from history by id rather than held as
+  // its own copy. Any save that updates `history` updates the detail
+  // view for free, and the two can't drift out of sync.
+  const detailEntry = useMemo(
+    () => (detailEntryId ? history.find((e) => e.id === detailEntryId) ?? null : null),
+    [history, detailEntryId]
+  );
+
+  const detailPhotos = useMemo(
+    () => detailEntry?.photos ?? [],
+    [detailEntry]
+  );
 
   const loadHistory = useCallback(async () => {
     try {
       const data = await WorkoutStorage.loadWeightHistory();
-      const sorted = (data || []).sort(
-        (a: WeightEntry, b: WeightEntry) =>
-          new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      setHistory(sorted);
+      setHistory(sortNewestFirst(data || []));
     } catch (e) {
       console.error('WeightTracker load failed', e);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  /**
+   * The single write path for this screen. Every mutation:
+   *   1. re-reads what's actually on disk (so a stale in-memory copy
+   *      can't clobber an entry saved elsewhere while we sat open),
+   *   2. ABORTS if that read failed — building a mutation on top of an
+   *      unreadable store is how the whole history gets replaced by a
+   *      fragment. An empty array from a failed read looks identical to
+   *      a genuinely empty history, which is why this uses the Result
+   *      form rather than loadWeightHistory(),
+   *   3. applies the change to what was actually there,
+   *   4. saves,
+   *   5. reads back to confirm the save landed,
+   *   6. only then updates component state.
+   * Returns the confirmed list, or null if the write did not happen.
+   */
+  const mutateHistory = useCallback(
+    async (
+      mutator: (entries: WeightEntry[]) => WeightEntry[],
+      failureMessage: string
+    ): Promise<WeightEntry[] | null> => {
+      try {
+        const read = await WorkoutStorage.loadWeightHistoryResult();
+        if (!read.ok) {
+          console.error('WeightTracker: refusing to write, store unreadable', read.reason);
+          Alert.alert(
+            'Could not read your history',
+            'Your saved weight history could not be read, so nothing was changed. Close and reopen the app, then try again.'
+          );
+          return null;
+        }
+
+        const base = sortNewestFirst(read.entries || []);
+        const next = sortNewestFirst(mutator(base));
+
+        await WorkoutStorage.saveWeightHistory(next);
+
+        // Read-back verification. If storage silently dropped the write
+        // we want to know here, not three weeks later.
+        const confirmed = await WorkoutStorage.loadWeightHistoryResult();
+        if (!confirmed.ok) {
+          // The write may well have landed; we just can't prove it.
+          // Don't claim success, and don't overwrite state with a value
+          // we don't trust.
+          console.warn('WeightTracker: write could not be verified', confirmed.reason);
+          Alert.alert(
+            'Saved, but not verified',
+            'The change was written but could not be read back. Please reopen the screen to check it.'
+          );
+          loadHistory();
+          return null;
+        }
+
+        const sorted = sortNewestFirst(confirmed.entries);
+        setHistory(sorted);
+        return sorted;
+      } catch (e) {
+        console.error('WeightTracker write failed', e);
+        Alert.alert('Could not save', failureMessage);
+        // Resync from disk so the UI shows the truth, not the change we
+        // failed to make.
+        loadHistory();
+        return null;
+      }
+    },
+    [loadHistory]
+  );
 
   // GoalsProfile is the single source of truth for the goal. This screen
   // reads it for display; edits go through GoalEntrySheet below, which
@@ -429,6 +670,16 @@ export default function WeightTrackerScreen() {
     }, [loadHistory, loadGoal])
   );
 
+  // If the entry being viewed disappears (deleted here or elsewhere),
+  // back out of the detail view rather than rendering a blank screen.
+  useEffect(() => {
+    if (showHistory && detailEntryId && !loading && !detailEntry) {
+      setShowHistory(false);
+      setDetailEntryId(null);
+      setViewerVisible(false);
+    }
+  }, [showHistory, detailEntryId, detailEntry, loading]);
+
   // ---------- Derived stats ----------
 
   const latest = history[0];
@@ -445,6 +696,23 @@ export default function WeightTrackerScreen() {
     if (goalWeightKg == null) return null;
     return displayUnit === 'lbs' ? goalWeightKg / 0.453592 : goalWeightKg;
   }, [goalWeightKg, displayUnit]);
+
+  // Most recent BF% reading, plus the change since the one before it.
+  // BF% is logged less often than weight, so this walks the history for
+  // entries that actually carry a reading rather than assuming the
+  // latest entry has one.
+  const bodyFat = useMemo(() => {
+    const withBf = history.filter((e) => typeof e.bodyFatPct === 'number');
+    if (withBf.length === 0) return null;
+    const current = withBf[0].bodyFatPct as number;
+    const previous =
+      withBf.length > 1 ? (withBf[1].bodyFatPct as number) : null;
+    return {
+      current,
+      delta: previous != null ? current - previous : null,
+      date: withBf[0].date,
+    };
+  }, [history]);
 
   // Start anchor for the progress track. Prefers the snapshot that
   // GoalEntrySheet writes when a goal is set/changed; falls back to the
@@ -611,16 +879,20 @@ export default function WeightTrackerScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            try {
-              const next = history.filter((e) => e.id !== entry.id);
-              await WorkoutStorage.saveWeightHistory(next);
-              setHistory(next);
-              if (detailEntry?.id === entry.id) {
-                setDetailEntry(null);
+            const result = await mutateHistory(
+              (entries) => entries.filter((e) => e.id !== entry.id),
+              'That entry could not be deleted. Try again.'
+            );
+            if (result) {
+              // Clean up any photo files that belonged to the entry.
+              for (const p of entry.photos ?? []) {
+                await deletePhotoFile(p.uri);
+              }
+              if (detailEntryId === entry.id) {
+                setViewerVisible(false);
+                setDetailEntryId(null);
                 setShowHistory(false);
               }
-            } catch (e) {
-              console.error('Delete failed', e);
             }
           },
         },
@@ -640,36 +912,128 @@ export default function WeightTrackerScreen() {
     return true;
   };
 
-  // Add or replace a photo of a given type on an entry. Photos are
-  // attached to specific historical entries — we don't expose photos in
-  // the new daily entry flow because the empty-grid pattern was the
-  // worst-of-both-worlds (see top-of-file).
+  /**
+   * Add or replace a photo of a given type on an entry. The picked file
+   * is copied into permanent storage first — see persistPickedPhoto —
+   * and only written to the entry once the copy exists.
+   */
   const addPhotoToEntry = async (
     entryId: string,
     type: ProgressPhoto['type']
   ) => {
+    if (photoBusy) return;
     if (!(await requestPhotoPermission())) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
+
+    let result;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: PICKER_MEDIA_TYPES,
+        quality: 0.8,
+      });
+    } catch (e) {
+      console.error('WeightTracker: picker failed', e);
+      Alert.alert('Could not open photos', 'Please try again.');
+      return;
+    }
     if (result.canceled || !result.assets?.[0]) return;
 
-    const newPhoto: ProgressPhoto = {
-      uri: result.assets[0].uri,
-      type,
-      timestamp: new Date().toISOString(),
-    };
+    setPhotoBusy(true);
+    try {
+      const sourceUri = result.assets[0].uri;
+      const storedUri = await persistPickedPhoto(sourceUri, entryId, type);
 
-    const next = history.map((e) => {
-      if (e.id !== entryId) return e;
-      const existing = (e.photos ?? []).filter((p) => p.type !== type);
-      return { ...e, photos: [...existing, newPhoto] };
-    });
-    await WorkoutStorage.saveWeightHistory(next);
-    setHistory(next);
-    const updated = next.find((e) => e.id === entryId) ?? null;
-    setDetailEntry(updated);
+      const newPhoto: ProgressPhoto = {
+        uri: storedUri,
+        type,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Capture whatever this slot held before, so a successful replace
+      // can bin the old file afterwards.
+      const replaced = (
+        history.find((e) => e.id === entryId)?.photos ?? []
+      ).find((p) => p.type === type);
+
+      const saved = await mutateHistory(
+        (entries) =>
+          entries.map((e) => {
+            if (e.id !== entryId) return e;
+            const existing = (e.photos ?? []).filter((p) => p.type !== type);
+            return { ...e, photos: [...existing, newPhoto] };
+          }),
+        'That photo could not be saved. Try again.'
+      );
+
+      if (saved && replaced && replaced.uri !== storedUri) {
+        await deletePhotoFile(replaced.uri);
+      }
+      if (!saved) {
+        // The write failed, so nothing references the copy we just made.
+        await deletePhotoFile(storedUri);
+      }
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  /** Remove a photo from an entry and bin the underlying file. */
+  const removePhotoFromEntry = (
+    entryId: string,
+    type: ProgressPhoto['type']
+  ) => {
+    const target = (history.find((e) => e.id === entryId)?.photos ?? []).find(
+      (p) => p.type === type
+    );
+    if (!target) return;
+
+    Alert.alert(
+      'Remove photo',
+      `This will remove the ${photoTypeLabel(type)} photo from this entry.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            const saved = await mutateHistory(
+              (entries) =>
+                entries.map((e) =>
+                  e.id === entryId
+                    ? { ...e, photos: (e.photos ?? []).filter((p) => p.type !== type) }
+                    : e
+                ),
+              'That photo could not be removed. Try again.'
+            );
+            if (saved) {
+              await deletePhotoFile(target.uri);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /** Long press on a filled slot: swap it out in one gesture. */
+  const handlePhotoLongPress = (
+    entryId: string,
+    type: ProgressPhoto['type']
+  ) => {
+    Alert.alert(photoTypeLabel(type), undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Replace photo', onPress: () => addPhotoToEntry(entryId, type) },
+      {
+        text: 'Remove photo',
+        style: 'destructive',
+        onPress: () => removePhotoFromEntry(entryId, type),
+      },
+    ]);
+  };
+
+  const openViewer = (type: ProgressPhoto['type']) => {
+    const idx = detailPhotos.findIndex((p) => p.type === type);
+    if (idx < 0) return;
+    setViewerStart(idx);
+    setViewerVisible(true);
   };
 
   // ---------- Render: history detail view ----------
@@ -681,7 +1045,7 @@ export default function WeightTrackerScreen() {
           <TouchableOpacity
             onPress={() => {
               setShowHistory(false);
-              setDetailEntry(null);
+              setDetailEntryId(null);
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -703,6 +1067,18 @@ export default function WeightTrackerScreen() {
               <Text style={styles.detailUnit}> {detailEntry.unit}</Text>
             </Text>
             <Text style={styles.detailDate}>{formatDate(detailEntry.date)}</Text>
+            {detailEntry.bodyFatPct != null && (
+              <View
+                style={[
+                  styles.bfChip,
+                  { borderColor: hexToRgba(themeColor, 0.3), marginTop: 10 },
+                ]}
+              >
+                <Text style={[styles.bfChipText, { color: themeColor }]}>
+                  {detailEntry.bodyFatPct}% body fat
+                </Text>
+              </View>
+            )}
             {detailEntry.notes && (
               <View style={styles.notesBlock}>
                 <Text style={styles.notesLabel}>Notes</Text>
@@ -711,67 +1087,90 @@ export default function WeightTrackerScreen() {
             )}
           </View>
 
-          <Text style={styles.sectionLabel}>Progress photos</Text>
-          <Text style={styles.sectionHint}>
-            Optional. Add any angle you want to track.
-          </Text>
-          <View style={styles.photoGrid}>
-            {(['front', 'side_left', 'back', 'side_right', 'extra'] as const).map(
-              (type) => {
-                const photo = (detailEntry.photos ?? []).find(
-                  (p) => p.type === type
-                );
+          {/* Photos live in their own card so the screen reads as two
+              balanced blocks rather than a card floating above loose
+              content. */}
+          <View style={styles.photoCard}>
+            <View style={styles.photoCardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionLabel}>Progress photos</Text>
+                <Text style={styles.sectionHint}>
+                  Optional. Add any angle you want to track.
+                </Text>
+              </View>
+              {photoBusy && <ActivityIndicator size="small" color={themeColor} />}
+            </View>
+
+            <View style={styles.photoGrid}>
+              {PHOTO_TYPES.map((type) => {
+                const photo = detailPhotos.find((p) => p.type === type);
                 return (
                   <View key={type} style={styles.photoSlot}>
-                    <TouchableOpacity
-                      style={styles.photoBtn}
-                      onPress={() => {
-                        if (photo) {
-                          const photos = detailEntry.photos ?? [];
-                          const idx = photos.indexOf(photo);
-                          setViewerPhotos(photos);
-                          setViewerStart(idx);
-                          setViewerVisible(true);
-                        } else {
-                          addPhotoToEntry(detailEntry.id, type);
+                    <View style={styles.photoBtnWrap}>
+                      <TouchableOpacity
+                        style={[
+                          styles.photoBtn,
+                          photo
+                            ? { borderColor: hexToRgba(themeColor, 0.35) }
+                            : null,
+                        ]}
+                        onPress={() =>
+                          photo ? openViewer(type) : addPhotoToEntry(detailEntry.id, type)
                         }
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      {photo ? (
-                        <Image
-                          source={{ uri: photo.uri }}
-                          style={styles.photoImg}
-                        />
-                      ) : (
-                        <View style={styles.photoEmpty}>
-                          <Ionicons
-                            name="add"
-                            size={20}
-                            color="#52525b"
+                        onLongPress={() =>
+                          photo ? handlePhotoLongPress(detailEntry.id, type) : undefined
+                        }
+                        disabled={photoBusy}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          photo
+                            ? `View ${photoTypeLabel(type)} photo`
+                            : `Add ${photoTypeLabel(type)} photo`
+                        }
+                      >
+                        {photo ? (
+                          <Image
+                            source={{ uri: photo.uri }}
+                            style={styles.photoImg}
                           />
-                        </View>
+                        ) : (
+                          <View style={styles.photoEmpty}>
+                            <Ionicons name="add" size={18} color="#3f3f46" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+
+                      {photo && (
+                        <TouchableOpacity
+                          style={styles.photoRemoveBadge}
+                          onPress={() => removePhotoFromEntry(detailEntry.id, type)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          disabled={photoBusy}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${photoTypeLabel(type)} photo`}
+                        >
+                          <Ionicons name="close" size={12} color="#ffffff" />
+                        </TouchableOpacity>
                       )}
-                    </TouchableOpacity>
-                    <Text style={styles.photoLabel}>
-                      {type === 'side_left'
-                        ? 'Side L'
-                        : type === 'side_right'
-                          ? 'Side R'
-                          : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </View>
+
+                    <Text style={styles.photoLabel} numberOfLines={1}>
+                      {photoTypeLabel(type)}
                     </Text>
                   </View>
                 );
-              }
-            )}
+              })}
+            </View>
           </View>
         </ScrollView>
 
         <PhotoViewer
           visible={viewerVisible}
-          photos={viewerPhotos}
+          photos={detailPhotos}
           startIndex={viewerStart}
           onClose={() => setViewerVisible(false)}
+          onDelete={(photo) => removePhotoFromEntry(detailEntry.id, photo.type)}
         />
       </View>
     );
@@ -854,6 +1253,25 @@ export default function WeightTrackerScreen() {
                     )}
                     <Text style={styles.heroSub}>{formatRelative(latest.date)}</Text>
                   </View>
+
+                  {/* Current BF% mirrors the goal's BF target chip on
+                      the right, so the two read as a pair. */}
+                  {bodyFat && (
+                    <View
+                      style={[
+                        styles.bfChip,
+                        styles.bfChipLeft,
+                        { borderColor: hexToRgba(themeColor, 0.3) },
+                      ]}
+                    >
+                      <Text style={[styles.bfChipText, { color: themeColor }]}>
+                        {bodyFat.current}% BF
+                        {bodyFat.delta != null && Math.abs(bodyFat.delta) >= 0.1
+                          ? ` (${bodyFat.delta > 0 ? '+' : ''}${bodyFat.delta.toFixed(1)})`
+                          : ''}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Goal — tap to edit in place via GoalEntrySheet. */}
@@ -1124,7 +1542,7 @@ export default function WeightTrackerScreen() {
                       i === Math.min(history.length, 8) - 1 && { borderBottomWidth: 0 },
                     ]}
                     onPress={() => {
-                      setDetailEntry(entry);
+                      setDetailEntryId(entry.id);
                       setShowHistory(true);
                     }}
                     onLongPress={() => handleDelete(entry)}
@@ -1136,6 +1554,7 @@ export default function WeightTrackerScreen() {
                       </Text>
                       <Text style={styles.entrySub}>
                         {formatRelative(entry.date)}
+                        {entry.bodyFatPct != null ? ` · ${entry.bodyFatPct}% BF` : ''}
                         {entry.notes ? ` · ${entry.notes}` : ''}
                       </Text>
                     </View>
@@ -1317,7 +1736,7 @@ const styles = StyleSheet.create({
     color: '#71717a',
   },
 
-  // Goal side of the hero — display only, taps through to Goals & Stats
+  // Goal side of the hero — taps through to GoalEntrySheet
   goalSide: {
     alignItems: 'flex-end',
   },
@@ -1352,6 +1771,12 @@ const styles = StyleSheet.create({
   bfChipText: {
     fontSize: 10,
     fontWeight: '600',
+  },
+  // Same chip, aligned to the hero's left column rather than the goal
+  // column's right edge.
+  bfChipLeft: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
   },
 
   // Progress track
@@ -1622,7 +2047,7 @@ const styles = StyleSheet.create({
   // Detail view
   detailScroll: {
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 16,
     paddingBottom: 40,
   },
   detailCard: {
@@ -1632,7 +2057,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 22,
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 12,
   },
   detailValue: {
     fontSize: 40,
@@ -1670,32 +2095,50 @@ const styles = StyleSheet.create({
     color: '#d4d4d8',
     lineHeight: 20,
   },
+
+  // Photo card
+  photoCard: {
+    backgroundColor: '#131316',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    borderRadius: 14,
+    padding: 14,
+  },
+  photoCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
   sectionLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   sectionHint: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#71717a',
-    marginBottom: 14,
   },
   photoGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   photoSlot: {
-    width: '18%',
+    flex: 1,
+    minWidth: 0,
     alignItems: 'center',
+  },
+  photoBtnWrap: {
+    width: '100%',
+    position: 'relative',
   },
   photoBtn: {
     width: '100%',
-    aspectRatio: 0.75,
-    borderRadius: 10,
+    aspectRatio: 0.72,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   photoImg: {
     width: '100%',
@@ -1703,18 +2146,31 @@ const styles = StyleSheet.create({
   },
   photoEmpty: {
     flex: 1,
-    backgroundColor: '#131316',
+    backgroundColor: '#101013',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 11,
+  },
+  photoRemoveBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
     borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   photoLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#a1a1aa',
     fontWeight: '500',
+    marginTop: 6,
+    textAlign: 'center',
   },
 
   // Photo viewer
@@ -1730,6 +2186,9 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 24,
     paddingBottom: 16,
   },
+  viewerTitleWrap: {
+    alignItems: 'center',
+  },
   viewerTitle: {
     fontSize: 16,
     fontWeight: '500',
@@ -1738,6 +2197,7 @@ const styles = StyleSheet.create({
   viewerCount: {
     fontSize: 12,
     color: '#a1a1aa',
+    marginTop: 2,
   },
   viewerContent: {
     flex: 1,

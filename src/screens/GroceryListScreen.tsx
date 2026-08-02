@@ -26,6 +26,7 @@ import { useMealPlanning } from '../contexts/MealPlanningContext';
 import { GroceryItem, FoodCategory } from '../types/nutrition';
 import { buildNativeGroceryList, NativeGroceryBuild, CuratedPlanMeal } from '../utils/groceryEngine';
 import { getVariantChoices, setVariantChoice, VariantChoices } from '../utils/variantChoices';
+import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'GroceryList'>;
 type GroceryListRouteProp = RouteProp<RootStackParamList, 'GroceryList'>;
@@ -155,6 +156,18 @@ const convertSimplifiedGroceryList = (simplifiedGroceryList: any) => {
   };
 };
 
+/**
+ * The stated total of a plan's grocery list. AI-generated plans emit
+ * total_estimated_cost_low/_high; older ones may emit a single
+ * total_estimated_cost; some emit neither. Reading only the single field and
+ * defaulting to 0 rendered a complete list with a $0 budget, and made adding
+ * one manual item overwrite the whole total with that item's price.
+ */
+const statedGroceryTotal = (groceryList: any): number =>
+  Number(groceryList?.total_estimated_cost) ||
+  Number(groceryList?.total_estimated_cost_low) ||
+  0;
+
 // Convert meal plan grocery list format to internal format
 const convertMealPlanGroceryList = (mealPlanGroceryList: any) => {
   if (!mealPlanGroceryList?.categories) return null;
@@ -183,9 +196,17 @@ const convertMealPlanGroceryList = (mealPlanGroceryList: any) => {
     });
   });
 
+  // Total resolution, in order: the single field, then the low bound of a
+  // range, then the sum of the items. AI-generated plans emit
+  // total_estimated_cost_low/_high and older ones may emit neither, so falling
+  // back to 0 (as this did) rendered the budget as $0 on an otherwise complete
+  // list. convertSimplifiedGroceryList already summed items; this now matches.
+  const statedTotal = statedGroceryTotal(mealPlanGroceryList);
+
   return {
     items,
-    totalEstimatedCost: mealPlanGroceryList.total_estimated_cost || 0,
+    totalEstimatedCost:
+      statedTotal > 0 ? statedTotal : items.reduce((sum, item) => sum + item.estimatedCost, 0),
     currency: mealPlanGroceryList.currency || 'USD',
   };
 };
@@ -195,6 +216,22 @@ export default function GroceryListScreen() {
   const route = useRoute<GroceryListRouteProp>();
   const { themeColor, themeColorLight } = useTheme();
   const { getGroceryList, updateGroceryItem, addGroceryItem, currentMealPlan, saveMealPlan, simplifiedMealPlan } = useMealPlanning();
+
+  // The plan the native engine builds from.
+  //
+  // This screen read `simplifiedMealPlan` off the LEGACY MealPlanningContext,
+  // where it is initialised to null and only ever set by that context's own
+  // code. An AI-imported plan is stored by SimplifiedMealPlanningContext as
+  // `currentPlan` — the same object MealPlanDaysScreen, buildPrepSession and
+  // groceryEngine all use. So on an imported plan the legacy field was null,
+  // buildNativeGroceryList never ran, nativeBuild stayed null, and the MAKE IT
+  // chooser had nothing to render: the from-scratch toggle simply never
+  // appeared, on any plan.
+  //
+  // Prefer currentPlan, fall back to the legacy field so nothing that DID work
+  // through the old context regresses.
+  const { currentPlan: simplifiedCurrentPlan } = useSimplifiedMealPlanning();
+  const nativePlan = simplifiedCurrentPlan ?? simplifiedMealPlan;
 
   console.log('🛒 GroceryListScreen route params:', route.params);
   const { groceryList: routeGroceryList } = route.params || {};
@@ -311,8 +348,8 @@ export default function GroceryListScreen() {
   // from the defaults — or the absence of an imported list — switches the
   // list source to the native engine, so amounts always match what will
   // actually be cooked.
-  const nativeKey = simplifiedMealPlan
-    ? `grocery_native_purchased_${simplifiedMealPlan.fingerprint || simplifiedMealPlan.id}`
+  const nativeKey = nativePlan
+    ? `grocery_native_purchased_${(nativePlan as any).fingerprint || (nativePlan as any).id}`
     : null;
   useFocusEffect(
     React.useCallback(() => {
@@ -321,8 +358,8 @@ export default function GroceryListScreen() {
         const choices = await getVariantChoices();
         if (!active) return;
         setVariantChoicesState(choices);
-        if (simplifiedMealPlan) {
-          setNativeBuild(buildNativeGroceryList(simplifiedMealPlan, choices));
+        if (nativePlan) {
+          setNativeBuild(buildNativeGroceryList(nativePlan as any, choices));
           if (nativeKey) {
             try {
               const stored = await AsyncStorage.getItem(nativeKey);
@@ -332,7 +369,7 @@ export default function GroceryListScreen() {
         }
       })();
       return () => { active = false; };
-    }, [simplifiedMealPlan])
+    }, [nativePlan])
   );
   const curatedChoices: CuratedPlanMeal[] = (nativeBuild?.curatedMeals ?? []).filter(m => m.hasAlt);
   const useNative = !!nativeBuild && curatedChoices.some(m => m.chosenVariantId !== m.defaultId);
@@ -343,7 +380,7 @@ export default function GroceryListScreen() {
   const handleChooseVariant = async (cm: CuratedPlanMeal, variantId: string | null) => {
     const next = await setVariantChoice(cm.slug, variantId);
     setVariantChoicesState(next);
-    if (simplifiedMealPlan) setNativeBuild(buildNativeGroceryList(simplifiedMealPlan, next));
+    if (nativePlan) setNativeBuild(buildNativeGroceryList(nativePlan as any, next));
   };
   const toggleNativePurchased = async (item: GroceryItem) => {
     const next = { ...nativePurchased, [item.id]: !nativePurchased[item.id] };
@@ -582,7 +619,7 @@ export default function GroceryListScreen() {
         const updatedPassedList = {
           ...passedGroceryList,
           categories: updatedCategories,
-          total_estimated_cost: (passedGroceryList.total_estimated_cost || 0) + newItem.estimatedCost
+          total_estimated_cost: statedGroceryTotal(passedGroceryList) + newItem.estimatedCost
         };
 
         if (route.params) {
@@ -638,7 +675,7 @@ export default function GroceryListScreen() {
             }
 
             contextUpdatedMealPlan.data.grocery_list.total_estimated_cost =
-              (contextUpdatedMealPlan.data.grocery_list.total_estimated_cost || 0) + newItem.estimatedCost;
+              statedGroceryTotal(contextUpdatedMealPlan.data.grocery_list) + newItem.estimatedCost;
           }
 
           try {
@@ -695,7 +732,7 @@ export default function GroceryListScreen() {
           const updatedPassedList = {
             ...passedGroceryList,
             categories: updatedCategories,
-            total_estimated_cost: Math.max(0, (passedGroceryList.total_estimated_cost || 0) - item.estimatedCost)
+            total_estimated_cost: Math.max(0, statedGroceryTotal(passedGroceryList) - item.estimatedCost)
           };
 
           if (route.params) {
@@ -725,7 +762,7 @@ export default function GroceryListScreen() {
                 grocery_list: {
                   ...currentMealPlan.data.grocery_list,
                   categories: exportUpdatedCategories,
-                  total_estimated_cost: Math.max(0, (currentMealPlan.data.grocery_list.total_estimated_cost || 0) - item.estimatedCost)
+                  total_estimated_cost: Math.max(0, statedGroceryTotal(currentMealPlan.data.grocery_list) - item.estimatedCost)
                 }
               },
               totalCost: Math.max(0, (currentMealPlan.totalCost || 0) - item.estimatedCost)
@@ -882,6 +919,17 @@ export default function GroceryListScreen() {
               <Text style={styles.miniMuted}>{purchasedItems} of {totalItems} checked</Text>
               <Text style={styles.miniMuted}>{money(remainingCost)} left</Text>
             </View>
+            {/* The native list prices what it can by matching the imported
+                list's ingredient ids. Scratch-only ingredients were never
+                costed by the AI, so the total is partial and says so rather
+                than quietly under-reporting. */}
+            {showingNative && (nativeBuild?.unpricedItemCount ?? 0) > 0 && (
+              <Text style={styles.partialNote}>
+                {nativeBuild?.unpricedItemCount} item
+                {nativeBuild?.unpricedItemCount === 1 ? '' : 's'} not priced — your
+                from-scratch swaps use ingredients the estimate didn't cover
+              </Text>
+            )}
           </View>
 
           {/* Filter pills */}
@@ -1118,6 +1166,7 @@ const styles = StyleSheet.create({
   fillBar: { height: '100%', borderRadius: 3 },
   totalBotRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   miniMuted: { fontSize: 11, color: MUTED },
+  partialNote: { fontSize: 11, lineHeight: 15, color: MUTED, marginTop: 10 },
 
   // Filter pills
   filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 18, marginBottom: 10 },
