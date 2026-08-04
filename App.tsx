@@ -18,6 +18,16 @@ import { preloadCriticalImages } from './src/utils/imagePreloader';
 import { runMigrations } from './src/utils/migrationFramework';
 import { Analytics } from './src/services/analytics';
 import Constants from 'expo-constants';
+import { useFonts } from 'expo-font';
+import {
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+} from '@expo-google-fonts/outfit';
+import {
+  DMMono_400Regular,
+  DMMono_500Medium,
+} from '@expo-google-fonts/dm-mono';
 
 // Keep the native splash screen visible while loading
 ExpoSplashScreen.preventAutoHideAsync();
@@ -34,6 +44,31 @@ const queryClient = new QueryClient({
 function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [migrationsComplete, setMigrationsComplete] = useState(false);
+
+  /* Registered under the names the codebase ALREADY asks for. WorkoutLogScreen
+   * and ExerciseHistoryScreen have specified 'Outfit-Bold' and 'DMMono-Regular'
+   * in their styles since they were written, but nothing ever loaded a font
+   * file — React Native silently falls back when a fontFamily does not resolve,
+   * so both screens have been rendering in the system face the whole time.
+   * Mapping the Google Fonts exports onto those exact keys switches them on
+   * without editing a single style rule.
+   *
+   * This is also why useFonts is used rather than the expo-font config plugin:
+   * the plugin embeds files under their own names (Outfit_700Bold), which would
+   * mean rewriting every fontFamily in two screens to match. */
+  const [fontsLoaded, fontError] = useFonts({
+    'Outfit-Medium': Outfit_500Medium,
+    'Outfit-SemiBold': Outfit_600SemiBold,
+    'Outfit-Bold': Outfit_700Bold,
+    'DMMono-Regular': DMMono_400Regular,
+    'DMMono-Medium': DMMono_500Medium,
+  });
+
+  useEffect(() => {
+    if (fontError) {
+      console.warn('⚠️ [APP] Font loading failed, using system face:', fontError);
+    }
+  }, [fontError]);
 
   useEffect(() => {
     Analytics.init({
@@ -102,7 +137,10 @@ function AppContent() {
     setShowSplash(false);
   };
 
-  if (showSplash || !migrationsComplete) {
+  /* fontError counts as done, not as a reason to wait. A font that cannot load
+   * degrades to the system face — exactly what shipped before today — and that
+   * is never worth holding the app on the splash screen for. */
+  if (showSplash || !migrationsComplete || !(fontsLoaded || fontError)) {
     return <SplashScreen onFinish={handleSplashFinish} />;
   }
 

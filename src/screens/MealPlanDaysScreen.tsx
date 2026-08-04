@@ -445,7 +445,16 @@ export default function MealPlanDaysScreen() {
               {meals.map((m: any, i: number) => {
                 const name = m.name || m.meal_name || 'Meal';
                 const time = m.time || m.recommended_time;
-                const slot = slotLabel(m.type || m.meal_type);
+                // Adjusters are macro top-ups from the app's fixed adjuster
+                // table, NOT snacks the user picked — the generation prompt
+                // states they're independent of snack preferences. They arrive
+                // typed as `snack` because that's the closest slot in the
+                // schema, so without this a day with 2 snacks and 3 adjusters
+                // reads as 5 snacks the user never chose. MealPlanDayScreen
+                // already does exactly this.
+                const slot = m.tags?.includes('adjuster')
+                  ? 'top-up'
+                  : slotLabel(m.type || m.meal_type);
                 const isDone = !!completedMeals[mealCompletionKey(m, i)];
                 const isUpNext = i === upNextIdx && !isDone;
                 const isLast = i === meals.length - 1;

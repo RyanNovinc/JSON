@@ -35,6 +35,7 @@ import MealPlanDaysScreen from '../screens/MealPlanDaysScreen';
 import MealPlanDayScreen from '../screens/MealPlanDayScreen';
 import MealPlanMealDetailScreen from '../screens/MealPlanMealDetailScreen';
 import MealPrepSessionScreen from '../screens/MealPrepSessionScreen';
+import PrepModeScreen from '../screens/PrepModeScreen';
 import MealPrepDetailScreen from '../screens/MealPrepDetailScreen';
 import DaysScreen from '../screens/DaysScreen';
 import WorkoutLogScreenAdapter from '../screens/WorkoutLogScreenAdapter';
@@ -256,6 +257,16 @@ export type RootStackParamList = {
     sessionIndex?: number; // Which session to display (0, 1, 2...)
     allSessions?: any[]; // All meal prep sessions for navigation
   } | undefined;
+  // Prep-day step walker for one dish, launched from MealPrepSession.
+  // doneKey/planId let it mark the session task done on Batch done.
+  PrepMode: {
+    mealSlug: string;
+    plateId: string;
+    servings: number;
+    planId: string;
+    doneKey: string;
+    title?: string;
+  };
   MealPrepDetail: {
     meal: any;
     sessionName: string;
@@ -929,6 +940,17 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 children={() => (
                   <NutritionThemeProvider>
                     <MealPrepSessionScreen />
+                  </NutritionThemeProvider>
+                )}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen
+                name="PrepMode"
+                children={() => (
+                  <NutritionThemeProvider>
+                    <PrepModeScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{

@@ -82,11 +82,19 @@ const buildPriceIndex = (plan: any): PriceIndex => {
   const byName: Record<string, number> = {};
   const list = plan?.grocery_list;
 
+  // FIRST WRITE WINS, on both indexes.
+  //
+  // An ingredient can legitimately appear in the main list AND in
+  // scratch_extras — a from-scratch chilli needs an extra onion on top of the
+  // 300 g the base recipe already buys. The main-list entry is the one priced
+  // against the fuller quantity, and it is indexed first, so an unconditional
+  // assignment here let the scratch entry's smaller price (one onion, not
+  // three) overwrite it.
   const index = (item: any) => {
     const price = Number(item?.estimated_price);
     if (!Number.isFinite(price) || price <= 0) return;
     const id = item?.ingredient_id;
-    if (id) byId[String(id)] = price;
+    if (id && byId[String(id)] === undefined) byId[String(id)] = price;
     const name = normaliseName(item?.item_name);
     if (name && byName[name] === undefined) byName[name] = price;
   };
@@ -104,10 +112,41 @@ const buildPriceIndex = (plan: any): PriceIndex => {
   return { byId, byName, currency: list?.currency };
 };
 
-const roundAmount = (amount: number, unit: string): number => {
+/**
+ * What to BUY, not what the recipe needs.
+ *
+ * The engine sums per-serving amounts, which is the right number for cooking
+ * and the wrong one for a shopping list: it produced "Bacon 42 g", "Salted
+ * butter 15 g" and — worst — "Egg (whole) 13.8 count", none of which you can
+ * pick off a shelf. The AI-built list gets this right because the prompt tells
+ * it to round up to a pack size sold at the store; this is the same rule,
+ * applied locally.
+ *
+ * `typical_pack_size` in the ingredient library is the unit of purchase. Where
+ * it exists, round the need UP to a whole number of packs. Where it doesn't
+ * (bananas, potatoes, pork shoulder, spring onions — things sold loose by
+ * weight or by the piece), the computed amount IS the buy amount, so leave it.
+ *
+ * Whole-item units can never be fractional regardless of pack size: 13.8 eggs
+ * is 14 eggs, and if they come by the dozen it is two boxes.
+ */
+const WHOLE_UNITS = new Set(['count', 'cloves', 'bulb', 'each']);
+
+const buyAmount = (need: number, unit: string, packSize?: number): number => {
   const u = String(unit || '').toLowerCase();
-  if (u === 'g' || u === 'ml') return Math.round(amount);
-  return Math.round(amount * 100) / 100;
+  const whole = WHOLE_UNITS.has(u);
+
+  // 1e-9 guards float drift, so 4.0000000001 servings isn't 5 packs.
+  const rounded = whole ? Math.ceil(need - 1e-9) : need;
+
+  if (packSize && packSize > 0) {
+    const packs = Math.ceil(rounded / packSize - 1e-9);
+    return Math.max(packSize, packs * packSize);
+  }
+
+  if (whole) return rounded;
+  if (u === 'g' || u === 'ml') return Math.round(rounded);
+  return Math.round(rounded * 100) / 100;
 };
 
 export function buildNativeGroceryList(
@@ -239,7 +278,14 @@ export function buildNativeGroceryList(
         0;
       if (price > 0) pricedItemCount += 1;
       else unpricedItemCount += 1;
-      return { ...i, amount: roundAmount(i.amount, i.unit), estimatedCost: price };
+      const packSize = ingredientId
+        ? Number(INGS[ingredientId]?.typical_pack_size) || undefined
+        : undefined;
+      return {
+        ...i,
+        amount: buyAmount(i.amount, i.unit, packSize),
+        estimatedCost: price,
+      };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 

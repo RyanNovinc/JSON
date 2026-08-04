@@ -835,7 +835,14 @@ export default function GroceryListScreen() {
         </Text>
       </View>
       <Text style={[styles.linePrice, item.isPurchased && styles.linePriceDone]}>
-        {item.isFromInventory ? 'Free' : money(item.estimatedCost || (item as any).estimated_price || 0)}
+        {/* An unpriced item is UNKNOWN, not free. On the native list the AI
+            never costed scratch-only ingredients, and rendering those as
+            "AU$ 0" reads as free and drags the total down with it. */}
+        {item.isFromInventory
+          ? 'Free'
+          : (item.estimatedCost || (item as any).estimated_price || 0) > 0
+          ? money(item.estimatedCost || (item as any).estimated_price || 0)
+          : '—'}
       </Text>
     </TouchableOpacity>
   );
@@ -853,12 +860,18 @@ export default function GroceryListScreen() {
     if (filteredItems.length === 0) return null;
 
     const categoryTotal = filteredItems.reduce((sum, item) => sum + (item.estimatedCost || item.estimated_price || 0), 0);
+    const categoryUnpriced = filteredItems.filter(
+      (item: any) => !((item.estimatedCost || item.estimated_price || 0) > 0)
+    ).length;
 
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionLabel}>{CATEGORY_NAMES[category]}</Text>
-          <Text style={styles.sectionTotal}>{money(categoryTotal)}</Text>
+          <Text style={styles.sectionTotal}>
+            {money(categoryTotal)}
+            {categoryUnpriced > 0 ? '+' : ''}
+          </Text>
         </View>
         {filteredItems.map((item, index) => (
           <GroceryItemRow key={`${item.id || 'no_id'}_${index}`} item={item} />
@@ -909,7 +922,10 @@ export default function GroceryListScreen() {
                 adjustsFontSizeToFit
                 minimumFontScale={0.6}
               >
-                {estimateDisplay || money(totalCost)}
+                {estimateDisplay ||
+                  `${money(totalCost)}${
+                    showingNative && (nativeBuild?.unpricedItemCount ?? 0) > 0 ? '+' : ''
+                  }`}
               </Text>
             </View>
             <View style={styles.trackBar}>
@@ -953,19 +969,14 @@ export default function GroceryListScreen() {
 
             <View style={styles.section}>
 
-              {showingNative && (
-
-                <View style={{ backgroundColor: themeColor + '14', borderColor: themeColor + '40', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 10, marginBottom: 10 }}>
-
-                  <Text style={{ color: themeColor, fontSize: 12, lineHeight: 17 }}>
-
-                    List rebuilt from your cooking choices — imported prices no longer apply.
-
-                  </Text>
-
-                </View>
-
-              )}
+              {/* The "List rebuilt from your cooking choices — imported prices no
+                  longer apply" banner used to sit here. Removed on two counts:
+                  it stated the obvious (the toggles are right below it and the
+                  list visibly changes), and it stopped being true once
+                  groceryEngine started carrying prices across from the imported
+                  list by ingredient_id. The partial-total note under the
+                  estimate still fires when items genuinely can't be priced,
+                  which is the only case worth saying out loud. */}
 
               <TouchableOpacity onPress={() => setChoicesExpanded(!choicesExpanded)} activeOpacity={0.7} style={styles.sectionHeader}>
 

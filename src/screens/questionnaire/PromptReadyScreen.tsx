@@ -604,7 +604,7 @@ const ReturnState: React.FC<ReturnStateProps> = ({
     <View style={styles.returnTitleBlock}>
       <Text style={styles.title}>Almost done.</Text>
       <Text style={styles.returnSubtitle}>
-        Add the workout file your AI gave you.
+        Sharing didn&apos;t work? Paste or upload your plan here.
       </Text>
     </View>
 
@@ -659,16 +659,16 @@ interface HelpSheetProps {
 
 const HELP_STEPS: { title: string; body: string }[] = [
   {
-    title: 'Open your AI & paste',
-    body: 'Your prompt is on the clipboard. Open Claude or ChatGPT and paste it into the chat.',
+    title: 'Copy the prompt',
+    body: 'Then open Claude, ChatGPT, or any AI you want and paste it in.',
   },
   {
-    title: 'Follow what it tells you',
-    body: "The AI builds your plan and hands back a file. It'll guide you to download or copy it.",
+    title: 'Follow along',
+    body: 'The AI builds your plan and hands you a file. It tells you what to do at each step.',
   },
   {
-    title: 'Come back & import',
-    body: 'Return here, paste or import the file, and your plan loads into the app.',
+    title: 'Share it back',
+    body: 'Share the file to JSON.fit.',
   },
 ];
 
@@ -730,33 +730,39 @@ const HelpSheet: React.FC<HelpSheetProps> = ({
         >
           <View style={styles.sheetGrabber} />
 
+          <Text style={[styles.sheetEyebrow, { color: themeColor }]}>3 STEPS</Text>
           <Text style={styles.sheetTitle}>How this works</Text>
           <Text style={styles.sheetIntro}>
-            JSON.fit builds you a prompt from your answers, but an AI you
-            already use designs the actual plan. Here&apos;s the round trip:
+            JSON.fit writes the prompt. An AI you already use builds the plan.
           </Text>
 
-          {HELP_STEPS.map((step, i) => (
-            <View key={step.title} style={styles.sheetStep}>
-              <View
-                style={[
-                  styles.sheetStepNum,
-                  {
-                    backgroundColor: hexToRgba(themeColor, 0.15),
-                    borderColor: hexToRgba(themeColor, 0.35),
-                  },
-                ]}
-              >
-                <Text style={[styles.sheetStepNumText, { color: themeColor }]}>
-                  {i + 1}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sheetStepTitle}>{step.title}</Text>
-                <Text style={styles.sheetStepBody}>{step.body}</Text>
-              </View>
-            </View>
-          ))}
+          <View style={styles.sheetSteps}>
+            {HELP_STEPS.map((step, i) => {
+              const isLast = i === HELP_STEPS.length - 1;
+              return (
+                <View
+                  key={step.title}
+                  style={[styles.sheetStep, isLast && styles.sheetStepLast]}
+                >
+                  {!isLast && <View style={styles.sheetStepRail} />}
+                  <View
+                    style={[
+                      styles.sheetStepNum,
+                      { borderColor: hexToRgba(themeColor, 0.4) },
+                    ]}
+                  >
+                    <Text style={[styles.sheetStepNumText, { color: themeColor }]}>
+                      {i + 1}
+                    </Text>
+                  </View>
+                  <View style={styles.sheetStepBodyCol}>
+                    <Text style={styles.sheetStepTitle}>{step.title}</Text>
+                    <Text style={styles.sheetStepBody}>{step.body}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
 
           <TouchableOpacity
             style={[styles.sheetCta, { backgroundColor: themeColor }]}
@@ -1193,6 +1199,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 18,
   },
+  sheetEyebrow: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
   sheetTitle: {
     fontSize: 19,
     fontWeight: '700',
@@ -1203,18 +1215,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#a1a1aa',
     lineHeight: 19,
-    marginBottom: 24,
+    marginBottom: 22,
+  },
+  sheetSteps: {
+    marginBottom: 22,
   },
   sheetStep: {
     flexDirection: 'row',
     gap: 14,
-    marginBottom: 20,
+    paddingBottom: 20,
+  },
+  sheetStepLast: {
+    paddingBottom: 0,
+  },
+  sheetStepRail: {
+    position: 'absolute',
+    left: 12.75,
+    top: 30,
+    bottom: 0,
+    width: 1,
+    backgroundColor: '#27272a',
+  },
+  sheetStepBodyCol: {
+    flex: 1,
   },
   sheetStepNum: {
     width: 26,
     height: 26,
     borderRadius: 13,
     borderWidth: 0.5,
+    backgroundColor: '#0a0a0b',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1226,7 +1256,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   sheetStepBody: {
     fontSize: 12.5,
@@ -1237,7 +1267,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 6,
   },
   sheetCtaText: {
     fontSize: 15,

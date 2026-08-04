@@ -208,7 +208,22 @@ Present the complete program clearly so the user can review and iterate before c
 - Deload protocol
 - Volume distribution summary by muscle group
 
-Write naturally — this is a planning conversation, not a final document. The user will request changes before moving to JSON conversion.`;
+Write naturally — this is a planning conversation, not a final document. The user will request changes before moving to JSON conversion.
+
+### Finish with "What I decided"
+
+After the program, before the closing callout, write a short section headed "What I decided". Five or six bullets, no more.
+
+This exists because the user is being asked to review something they did not watch you build. The program itself reads as finished work — what they actually need to see are the JUDGEMENT CALLS you made on their behalf, because those are the only things they might want changed. Do not restate the program or list its exercises back.
+
+Cover, in plain language and only where it applies:
+- Why this split, in one line — what about their days per week, schedule or experience led there rather than an obvious alternative.
+- Any muscle group deliberately under- or over-weighted against the standard landmarks, and why.
+- Equipment or exercise choices you had to work around — anything they don't have that shaped a substitution.
+- Anything their profile asked for that you could not fit, with the constraint that blocked it. One line, no re-derivation.
+- Where the hardest sessions land in the week, so they can say if that clashes with their life.
+
+End it with one sentence telling them what they can change and that saying so is enough — they do not need to understand programming to ask for a different day layout or to drop an exercise they hate.`;
 
 export const EXERCISE_LIBRARY = `---
 

@@ -1918,11 +1918,12 @@ function MealCard(props: MealCardProps): React.JSX.Element {
         ]}
         onAccessibilityAction={onA11yAction}
       >
-        <Text style={styles.title} numberOfLines={2}>
+        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
           {meal.display_name}
         </Text>
-        {/* Site-hero stat treatment: bold numbers, muted units, middots.
-            Numbers ROLL to new values when plate/variant/portions change. */}
+        {/* Site-hero stat treatment: bold numbers, muted units, dimmer
+            middots. Numbers ROLL to new values when plate/variant/portions
+            change. */}
         <Text style={styles.macroLine}>
           <CountText
             style={styles.macroNum}
@@ -1930,21 +1931,24 @@ function MealCard(props: MealCardProps): React.JSX.Element {
           />
           <Text style={styles.macroUnit}> kcal</Text>
           {portions > 1 ? (
-            <Text style={styles.macroUnit}> · {portions}×</Text>
+            <>
+              <Text style={styles.macroSep}> · </Text>
+              <Text style={styles.macroUnit}>{portions}×</Text>
+            </>
           ) : null}
-          <Text style={styles.macroUnit}>  ·  </Text>
+          <Text style={styles.macroSep}>  ·  </Text>
           <CountText
             style={styles.macroNum}
             value={Math.round(macros.protein_g * portions)}
           />
           <Text style={styles.macroUnit}>P</Text>
-          <Text style={styles.macroUnit}>  ·  </Text>
+          <Text style={styles.macroSep}>  ·  </Text>
           <CountText
             style={styles.macroNum}
             value={Math.round(macros.carbs_g * portions)}
           />
           <Text style={styles.macroUnit}>C</Text>
-          <Text style={styles.macroUnit}>  ·  </Text>
+          <Text style={styles.macroSep}>  ·  </Text>
           <CountText
             style={styles.macroNum}
             value={Math.round(macros.fat_g * portions)}
@@ -3047,25 +3051,56 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: TITLE_SIDE_INSET,
     right: TITLE_SIDE_INSET,
-    alignItems: 'center',
+    /* Stretch rather than centre, even though the text below is centred:
+     * the children need the full inset width to centre WITHIN, otherwise they
+     * shrink-wrap and a wrapped title centres against its own ragged box
+     * instead of against the card. */
+    alignItems: 'stretch',
   },
+  /* Centred display treatment. Left alignment was tried and rejected on
+   * device: it avoids the orphan on the 11 of 85 meal names that wrap to two
+   * lines, but centred reads better on the 74 that don't, which is the case
+   * that actually shows up while scrolling.
+   *
+   * Tracking goes NEGATIVE at this size: the old +0.2 was tuned for 20pt and
+   * works against a 26pt face.
+   *
+   * Outfit rather than the system face, matching the type already specified
+   * across WorkoutLogScreen and ExerciseHistoryScreen — a geometric sans that
+   * also sits close to the marketing headline face, so the app and its
+   * promotion read as one thing. lineHeight went 28 → 30 for it: Outfit
+   * carries a larger x-height than SF Pro and two-line names were touching.
+   *
+   * The macro line below deliberately stays on the system face. DMMono is
+   * loaded and tempting for the numerals, but a mono line directly under a
+   * geometric display line competes with it instead of sitting beneath it. */
   title: {
     color: C.text,
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontFamily: 'Outfit-Bold',
+    fontSize: 26,
+    /* No fontWeight beside a weight-specific family. The file IS the bold cut,
+     * and asking for 700 on top of it makes Android synthesise a second layer
+     * of bolding — the classic smeared-title bug. iOS ignores the extra
+     * request, which is exactly why it survives review and only appears on one
+     * platform. */
+    letterSpacing: -0.5,
     textAlign: 'center',
-    lineHeight: 25,
+    lineHeight: 30,
     ...TEXT_SHADOW,
   },
   macroLine: {
-    marginTop: 6,
-    fontSize: 13,
+    marginTop: 10,
+    fontSize: 12,
+    letterSpacing: 0.3,
     textAlign: 'center',
     ...TEXT_SHADOW,
   },
-  macroNum: { color: C.text, fontWeight: '700' },
-  macroUnit: { color: C.sub, fontWeight: '400' },
+  /* Three distinct weights, loudest to quietest: number, unit, separator.
+   * The numbers dropped 700 → 600 because at 700 under a bold title they were
+   * competing with the meal name rather than supporting it. */
+  macroNum: { color: C.text, fontWeight: '600' },
+  macroUnit: { color: 'rgba(245,243,238,0.55)', fontWeight: '400' },
+  macroSep: { color: 'rgba(245,243,238,0.3)', fontWeight: '400' },
 
   edgeTabWrap: {
     position: 'absolute',

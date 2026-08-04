@@ -27,10 +27,12 @@ import { finalizeNutrition } from '../../../utils/nutritionMacros';
  * ('today' | 'tomorrow' | 'next_monday'), both read by the prompt builder.
  *
  * Completion routing: finalize, then reset to CuratedFavorites (the "Foods
- * you like" step) with NutritionSummary underneath in the stack — picking is
- * the last step of the flow, and both Save and "Choose for me" on that
- * screen land on the summary via goBack(). Edit mode is untouched: it still
- * goBack()s, so later edits never re-force the picks step.
+ * you like" step) with NutritionSummary underneath it and Main below that —
+ * picking is the last step of the flow, and both Save and "Choose for me" on
+ * that screen land on the summary via goBack(). Main stays at index 0 so
+ * popToTop() still means "back to the tabs" everywhere in the app. Edit mode
+ * is untouched: it still goBack()s, so later edits never re-force the picks
+ * step.
  */
 
 const DURATIONS = [
@@ -101,10 +103,18 @@ export default function N9PlanLengthScreen() {
       // Picks are the final step. Reset with the summary UNDERNEATH the
       // picks screen so both Save and "Choose for me" land there via
       // goBack() — no navigation changes needed inside CuratedFavorites.
+      //
+      // Main STAYS at index 0. Every close button in both questionnaires
+      // calls popToTop(), which means "go to the bottom of the stack", so
+      // dropping Main here left the workout PromptReady X landing on
+      // NutritionSummary instead of the tabs. Keeping Main underneath costs
+      // nothing (the user still cannot go back into N1-N9) and restores the
+      // invariant the rest of the app assumes.
       navigation.dispatch(
         CommonActions.reset({
-          index: 1,
+          index: 2,
           routes: [
+            { name: 'Main' },
             { name: 'NutritionSummary' },
             {
               name: 'CuratedFavorites',

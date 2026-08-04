@@ -280,12 +280,31 @@ export default function NutritionSummaryScreen() {
     }, [])
   );
 
+  // Both of these have to cope with this screen being the ONLY thing on the
+  // stack. It is reachable that way — the questionnaire flow can land here via
+  // a navigate/reset rather than a push, and an edit row returns here too. When
+  // there is nothing beneath it, goBack() and popToTop() are unhandled actions:
+  // React Navigation logs "The action 'POP_TO_TOP' was not handled by any
+  // navigator" in dev and the button silently does nothing in production, which
+  // is worse — the user taps the X and stays put with no explanation.
+  const leaveToMain = () => {
+    navigation.navigate('Main' as never);
+  };
+
   const handleBack = () => {
-    navigation.goBack();
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    leaveToMain();
   };
 
   const handleClose = () => {
-    navigation.popToTop();
+    if (navigation.canGoBack()) {
+      navigation.popToTop();
+      return;
+    }
+    leaveToMain();
   };
 
   const handleOpenFavorites = () => {

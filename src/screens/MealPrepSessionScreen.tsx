@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   ImageSourcePropType,
+  Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,16 +30,27 @@ import {
   PrepSessionItem,
 } from '../utils/buildPrepSession';
 import { clampCookPortions } from '../utils/cookPortions';
+import { isSeasoning, isDiscrete } from '../utils/ingredientScaling';
 import { getMealImage } from '../assets/mealImages';
 import { CURATED_MEALS } from '../data/curated_meals';
+import { INGREDIENTS } from '../data/ingredients';
 
 type MealPrepNav = StackNavigationProp<RootStackParamList, 'MealPrepSession'>;
 
 // ============================================================================
-// The screen is a *guided worklist*, not a catalog. The user is never asked to
-// decide what to do next — they're handed one active task at a time, in the
-// order that finishes the whole session fastest. All the intelligence lives in
-// buildWorklist(): everything else just renders the front of that queue.
+// FOCUS MODE, poster edition. One task on screen as a full-photo poster card —
+// and the BANKED state gets the exact same poster treatment (badge + eyebrow
+// swap), so a completed dish looks as good as a pending one.
+//
+// Chrome: X exits the session; a pinned bottom bar carries all interaction in
+// thumb reach — [‹ previous dish] [Let's go / Undo] [next dish ›]. The arrows
+// walk strict QUEUE ORDER (left = the dish before this one, right = the one
+// after), matching what arrows visually promise; segments remain tappable for
+// jumps. Completing a batch (PrepMode's Batch done or the mark-done link)
+// shows a short celebration beat before the next dish.
+//
+// All scheduling logic (buildWorklist, plate merging, passive-first ordering,
+// per-plan done persistence) is unchanged.
 // ============================================================================
 
 // ---------------------------------------------------------------------------
@@ -52,33 +65,9 @@ function formatTime(minutes: number): string {
   return `${hours}h ${remainder}m`;
 }
 
-function storageLine(storage?: { fridge_days?: number; freeze_months?: number }): string | null {
-  if (!storage) return null;
-  const parts: string[] = [];
-  if (typeof storage.fridge_days === 'number' && storage.fridge_days > 0) {
-    parts.push(`Fridge ${storage.fridge_days}d`);
-  }
-  if (typeof storage.freeze_months === 'number' && storage.freeze_months > 0) {
-    parts.push(`Freezer ${storage.freeze_months}mo`);
-  }
-  return parts.length ? parts.join('  ·  ') : null;
-}
-
-function humanizeEquipment(e: string): string {
-  return String(e).replace(/_/g, ' ');
-}
-
 // ---------------------------------------------------------------------------
-// Prep-ahead copy. A prep-ahead meal is "cook the storable part now, finish one
-// fresh thing at mealtime" — meatballs + sauce store, spaghetti is boiled fresh.
-// That split is NOT reliably encoded in the recipe steps: for many partial meals
-// the day-of element lives inside the method, not plate.additional_instructions,
-// so there's no structured boundary to derive. We therefore render two SHORT
-// authored fields, surfaced by buildPrepSession (plate meal_prep overrides meal):
-//   prepAheadSummary  e.g. "Turkey meatballs + tomato sauce"
-//   dayOfSummary      e.g. "Boil fresh spaghetti"
-// No derivation from steps, no `prep_note` — both reintroduce long/ambiguous
-// prose. A meal without summaries falls back to a clean generic label.
+// Prep-ahead copy. The poster no longer renders these (PrepMode does), but the
+// worklist still carries them for PrepMode and any future use.
 // ---------------------------------------------------------------------------
 function prepNowText(g: PrepGroup): string {
   const v = g.prepAheadSummary?.trim();
@@ -94,9 +83,7 @@ function dayOfText(g: PrepGroup): string {
 // ----------------------------------------------------------------------------
 // A WorkItem is a cook-ahead or prep-ahead batch the user has to actively get
 // going. make-fresh items never enter the queue — they're cooked to order, so
-// they have no place on prep day. This function is pure and could move into
-// buildPrepSession.ts (the order is a deterministic property of the plan); it
-// lives here for now to keep the prep-session builder untouched.
+// they have no place on prep day.
 //
 // Ordering model — minimise makespan for ONE cook:
 //   passive = total − hands-on  ("set it and walk away" time)
@@ -161,6 +148,89 @@ function humanizeSlug(slug: string): string {
     .join(' ');
 }
 
+function ingredientName(id: string): string {
+  const entry = (INGREDIENTS as any)[id];
+  if (entry?.display_name) return entry.display_name as string;
+  return id.split('_').filter(Boolean).join(' ');
+}
+
+// ---------------------------------------------------------------------------
+// Ingredients view: every ingredient a set of dishes calls for, summed and
+// scaled to each dish's serving count. Assumes each dish's DEFAULT variant and
+// first method (the exact per-dish list, for the method actually chosen,
+// appears on PrepMode's gather screen). Seasonings (tsp/tbsp) are collected as
+// names only — you season per recipe, and summing "1/2 tsp cumin" across three
+// dishes is noise. Pot-level batch aromatics (sub-1-per-serving discrete
+// items) contribute their batch amount, mirroring displayIngredient's rule.
+// ---------------------------------------------------------------------------
+interface NeedRef {
+  slug: string;
+  servings: number;
+}
+
+function buildNeedList(refs: NeedRef[]): {
+  rows: { name: string; qty: string }[];
+  seasonings: string[];
+} {
+  const totals = new Map<string, { raw: number; unit: string }>();
+  const seasonings = new Set<string>();
+  for (const ref of refs) {
+    const meal = Object.values(CURATED_MEALS).find(
+      (m: any) => m.slug === ref.slug
+    ) as any;
+    if (!meal) continue;
+    const produces =
+      typeof meal.produces_servings === 'number' && meal.produces_servings > 0
+        ? meal.produces_servings
+        : 1;
+    const variants = meal.sauce_variants ?? null;
+    const variant =
+      variants && variants.length > 0
+        ? variants.find((v: any) => v.is_default) ?? variants[0]
+        : null;
+    const method = meal.methods?.[0] ?? null;
+    const rows = [
+      ...(meal.base_ingredients ?? []),
+      ...(variant?.ingredients ?? []),
+      ...(method?.ingredients ?? []),
+    ] as { ingredient_id: string; base_amount: number; unit: string }[];
+    for (const row of rows) {
+      if (isSeasoning(row.unit)) {
+        seasonings.add(ingredientName(row.ingredient_id));
+        continue;
+      }
+      const perServing = row.base_amount / produces;
+      const add =
+        isDiscrete(row.unit) && produces > 1 && perServing < 1
+          ? row.base_amount // pot-level batch aromatic: one batch's worth
+          : perServing * ref.servings;
+      const prev = totals.get(row.ingredient_id);
+      if (prev) prev.raw += add;
+      else totals.set(row.ingredient_id, { raw: add, unit: row.unit });
+    }
+  }
+  const rows = [...totals.entries()]
+    .map(([id, t]) => {
+      let qty: string;
+      if (t.unit === 'kg' || t.unit === 'l') {
+        qty = `${`${Math.round(t.raw * 100) / 100}`.replace(/\.?0+$/, '')} ${t.unit}`;
+      } else if (isDiscrete(t.unit)) {
+        const n = Math.max(1, Math.round(t.raw));
+        qty =
+          t.unit === 'cloves'
+            ? `${n} clove${n === 1 ? '' : 's'}`
+            : t.unit === 'bulb'
+            ? `${n} bulb${n === 1 ? '' : 's'}`
+            : `${n}`;
+      } else {
+        qty = `${Math.round(t.raw)} ${t.unit}`;
+      }
+      return { name: ingredientName(id), qty };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { rows, seasonings: [...seasonings].sort() };
+}
+
 // Per-plate view, before plates of the same meal are merged into one task.
 interface RawItem {
   group: PrepGroup;
@@ -213,8 +283,7 @@ function buildWorklist(session: PrepSession): WorkItem[] {
     const coverage = plates.reduce((s, i) => s + (i.group.occurrences ?? 0), 0);
 
     // Day-of finishes: collapse to one line when every plate finishes the same
-    // way (lamb kofta bowl + wrap both "salad, sauce, warm rice/wrap"); label
-    // each by plate name when they differ (schnitzel plate vs roll vs parma).
+    // way; label each by plate name when they differ.
     let dayOfLines: string[] = [];
     if (rep.strategy === 'prep') {
       const seen = new Set<string>();
@@ -257,7 +326,54 @@ function buildWorklist(session: PrepSession): WorkItem[] {
 }
 
 // ============================================================================
-// Make-fresh row — quiet, names-only. Not in the queue; shown as a heads-up.
+// Segment strip — one tappable segment per queue item, in queue order:
+// filled = done, outlined = the focused task, dim = still to do.
+// ============================================================================
+function SegmentStrip({
+  queue,
+  doneKeys,
+  currentKey,
+  themeColor,
+  onSelect,
+}: {
+  queue: WorkItem[];
+  doneKeys: Record<string, boolean>;
+  currentKey: string | null;
+  themeColor: string;
+  onSelect: (key: string) => void;
+}) {
+  return (
+    <View style={styles.strip}>
+      {queue.map((item) => {
+        const done = !!doneKeys[item.doneKey];
+        const isCurrent = item.doneKey === currentKey;
+        return (
+          <TouchableOpacity
+            key={item.doneKey}
+            style={styles.stripTouch}
+            activeOpacity={0.6}
+            onPress={() => onSelect(item.doneKey)}
+            accessibilityLabel={`${item.title}${done ? ', done' : isCurrent ? ', current task' : ''}`}
+          >
+            <View
+              style={[
+                styles.stripSeg,
+                done
+                  ? { backgroundColor: themeColor }
+                  : isCurrent
+                  ? { backgroundColor: '#18181b', borderWidth: 1, borderColor: themeColor }
+                  : { backgroundColor: '#27272a' },
+              ]}
+            />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ============================================================================
+// Make-fresh row — quiet, names-only. Never queued; shown only on the finale.
 // ============================================================================
 function MakeFreshRow({ item }: { item: MakeFreshItem }) {
   return (
@@ -277,65 +393,26 @@ function MakeFreshRow({ item }: { item: MakeFreshItem }) {
   );
 }
 
-// ============================================================================
-// Up-next row — a name, a one-word treatment tag, and the wall-clock time.
-// Tappable so a user who wants to work out of order isn't trapped by the queue.
-// ============================================================================
-function UpNextRow({
-  item,
-  onOpen,
-  opacity,
+function MakeFreshCard({
+  makeFresh,
+  blurb,
 }: {
-  item: WorkItem;
-  onOpen: (g: PrepGroup, servings: number) => void;
-  opacity: number;
+  makeFresh: MakeFreshItem[];
+  blurb: string;
 }) {
-  const tag = item.setAndForget ? 'set & forget' : item.strategy === 'prep' ? 'prep ahead' : 'hands-on';
   return (
-    <TouchableOpacity
-      style={[styles.upNextRow, { opacity }]}
-      activeOpacity={0.6}
-      onPress={() => onOpen(item.group, item.cookServings)}
-    >
-      {item.image ? (
-        <Image source={item.image} style={styles.upNextThumb} contentFit="cover" transition={150} />
-      ) : (
-        <View style={[styles.upNextThumb, styles.thumbPlaceholder]}>
-          <Ionicons name="image-outline" size={16} color="#52525b" />
-        </View>
-      )}
-      <View style={styles.upNextTextCol}>
-        <Text style={styles.upNextName} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.upNextTag}>{tag}</Text>
+    <View style={styles.freshCardBlock}>
+      <Text style={styles.eyebrowMuted}>MADE FRESH AT MEALTIME</Text>
+      <Text style={styles.sectionBlurb}>{blurb}</Text>
+      <View style={styles.freshCard}>
+        {makeFresh.map((item, idx) => (
+          <View key={item.key}>
+            {idx > 0 ? <View style={styles.freshDivider} /> : null}
+            <MakeFreshRow item={item} />
+          </View>
+        ))}
       </View>
-      <Text style={styles.upNextTime}>{formatTime(item.total)}</Text>
-    </TouchableOpacity>
-  );
-}
-
-// ============================================================================
-// Done row — struck through, tappable to restore (un-complete).
-// ============================================================================
-function DoneRow({
-  item,
-  onToggle,
-}: {
-  item: WorkItem;
-  onToggle: (key: string) => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={styles.doneRow}
-      activeOpacity={0.6}
-      onPress={() => onToggle(item.doneKey)}
-    >
-      <Ionicons name="checkmark-circle" size={16} color="#52525b" />
-      <Text style={styles.doneName} numberOfLines={1}>
-        {item.title}
-      </Text>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -367,13 +444,71 @@ export default function MealPrepSessionScreen() {
   );
 
   // Per-item completion, scoped to this plan. Stored as an array of done keys
-  // under @mealprep_done_<planId>; loaded into a lookup map on mount.
+  // under @mealprep_done_<planId>; loaded into a lookup map on mount and
+  // re-read on every focus (PrepMode writes the same key on Batch done).
   const storageKey = currentPlan ? `@mealprep_done_${currentPlan.id}` : null;
   const [doneKeys, setDoneKeys] = useState<Record<string, boolean>>({});
-  const [showDone, setShowDone] = useState(false);
+
+  // Manual focus override. null = "front of the remaining queue" (the default,
+  // and what reopening mid-week lands on). Set by the nav arrows or a strip
+  // segment; cleared when a task completes so the screen auto-advances.
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+
+  // Lobby-first: the screen opens on the session overview; Start/Continue
+  // enters the focus flow, and the focus X returns HERE rather than exiting.
+  const [inFocus, setInFocus] = useState(false);
+  const [showNeed, setShowNeed] = useState(false);
+
+  // Celebration beat shown after a batch completes, before the next dish.
+  const [celebration, setCelebration] = useState<WorkItem | null>(null);
+  const celebrationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const celebScale = useRef(new Animated.Value(0.4)).current;
+
+  // Refs for detecting EXTERNAL completions (PrepMode's Batch done) on focus:
+  // compare the freshly-read done set with the last one we knew about.
+  const doneKeysRef = useRef<Record<string, boolean>>({});
+  const doneLoadedRef = useRef(false);
+
+  useEffect(() => {
+    doneKeysRef.current = doneKeys;
+  }, [doneKeys]);
+
+  const dismissCelebration = useCallback(() => {
+    if (celebrationTimer.current) clearTimeout(celebrationTimer.current);
+    celebrationTimer.current = null;
+    setCelebration(null);
+  }, []);
+
+  const startCelebration = useCallback(
+    (item: WorkItem) => {
+      if (celebrationTimer.current) clearTimeout(celebrationTimer.current);
+      setCelebration(item);
+      celebScale.setValue(0.4);
+      Animated.spring(celebScale, {
+        toValue: 1,
+        friction: 5,
+        tension: 120,
+        useNativeDriver: true,
+      }).start();
+      // The beat holds ~2.5s, then the next dish takes over. Tapping skips it.
+      celebrationTimer.current = setTimeout(() => setCelebration(null), 2500);
+    },
+    [celebScale]
+  );
+
+  useEffect(
+    () => () => {
+      if (celebrationTimer.current) clearTimeout(celebrationTimer.current);
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
+    setFocusKey(null);
+    setInFocus(false);
+    setShowNeed(false);
+    doneLoadedRef.current = false;
     (async () => {
       if (!storageKey) {
         setDoneKeys({});
@@ -386,6 +521,8 @@ export default function MealPrepSessionScreen() {
           const map: Record<string, boolean> = {};
           for (const k of arr) map[k] = true;
           setDoneKeys(map);
+          doneKeysRef.current = map;
+          doneLoadedRef.current = true;
         }
       } catch {
         if (!cancelled) setDoneKeys({});
@@ -395,6 +532,39 @@ export default function MealPrepSessionScreen() {
       cancelled = true;
     };
   }, [storageKey]);
+
+  // Reload done-state whenever the screen regains focus. A key that's newly
+  // done and wasn't marked here means PrepMode finished a batch — celebrate it.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        if (!storageKey) return;
+        try {
+          const raw = await AsyncStorage.getItem(storageKey);
+          const arr: string[] = raw ? JSON.parse(raw) : [];
+          if (cancelled) return;
+          const map: Record<string, boolean> = {};
+          for (const k of arr) map[k] = true;
+          if (doneLoadedRef.current) {
+            const fresh = Object.keys(map).find((k) => !doneKeysRef.current[k]);
+            if (fresh) {
+              const item = queue.find((i) => i.doneKey === fresh);
+              if (item) startCelebration(item);
+            }
+          }
+          setDoneKeys(map);
+          doneKeysRef.current = map;
+          doneLoadedRef.current = true;
+        } catch {
+          // keep whatever we had
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [storageKey, queue, startCelebration])
+  );
 
   const toggleDone = useCallback(
     (key: string) => {
@@ -414,8 +584,8 @@ export default function MealPrepSessionScreen() {
     [storageKey]
   );
 
-  // Deep-link into the cook flow at the batch's serving count. Clamp on the
-  // send side too (RecipeDetail clamps on receive) via the shared util.
+  // Deep-link into the recipe at the batch's serving count (used from the
+  // banked view's link). Clamp on the send side too via the shared util.
   const openRecipe = useCallback(
     (group: PrepGroup, servings?: number) => {
       navigation.navigate('RecipeDetail', {
@@ -427,11 +597,29 @@ export default function MealPrepSessionScreen() {
     [navigation]
   );
 
+  // The "technical level": walk this task's prep-day steps in PrepMode, which
+  // marks the task done itself on Batch done. Focus is cleared first so the
+  // return (via the focus reload above) lands on the next undone task.
+  const openPrepMode = useCallback(
+    (item: WorkItem) => {
+      if (!currentPlan) return;
+      setFocusKey(null);
+      navigation.navigate('PrepMode', {
+        mealSlug: item.group.slug,
+        plateId: item.group.plateId,
+        servings: clampCookPortions(item.cookServings),
+        planId: currentPlan.id,
+        doneKey: item.doneKey,
+        title: item.title,
+      });
+    },
+    [navigation, currentPlan]
+  );
+
   const openGroceryList = useCallback(() => {
     // Mirror MealPlanDaysScreen's working "Shopping list" link. The real source
     // is the simplified plan's own grocery_list (priced + already categorised);
-    // fall back to the legacy context, then to no param. This passes the exact
-    // same object that screen does, so GroceryListScreen renders it identically.
+    // fall back to the legacy context, then to no param.
     const groceryList =
       (currentPlan as any)?.grocery_list ||
       (currentMealPlan as any)?.data?.grocery_list ||
@@ -444,35 +632,141 @@ export default function MealPrepSessionScreen() {
     () => queue.filter((i) => !doneKeys[i.doneKey]),
     [queue, doneKeys]
   );
-  const completed = useMemo(
-    () => queue.filter((i) => doneKeys[i.doneKey]),
+
+  const doneCount = queue.length - remaining.length;
+  const totalCount = queue.length;
+
+  // The one task on screen: an explicit focus if set (and still in the plan),
+  // otherwise the front of the remaining queue. A focused DONE task renders
+  // as the banked poster with Undo — that's how un-completing works.
+  const focused = useMemo(
+    () => (focusKey ? queue.find((i) => i.doneKey === focusKey) ?? null : null),
+    [focusKey, queue]
+  );
+  const current: WorkItem | null = focused ?? remaining[0] ?? null;
+  const currentIsDone = !!(current && doneKeys[current.doneKey]);
+
+  // Position = which task the screen is showing, by queue order, so it always
+  // matches the outlined/selected segment.
+  const currentIdx = current ? queue.findIndex((i) => i.doneKey === current.doneKey) : -1;
+  const position = currentIdx >= 0 ? currentIdx + 1 : totalCount;
+
+  // Bottom-bar arrows walk strict queue order, whatever each dish's done-state
+  // (a done neighbour shows its banked poster).
+  const prevTask = currentIdx > 0 ? queue[currentIdx - 1] : null;
+  const nextTask =
+    currentIdx >= 0 && currentIdx < queue.length - 1 ? queue[currentIdx + 1] : null;
+
+  // Ingredients view data: prep = what's still to cook today; fresh = what the
+  // week's make-fresh meals will need (one serving per plan occurrence —
+  // plan scaling is ignored here, this is a gather list not a macro panel).
+  const needList = useMemo(
+    () =>
+      buildNeedList(
+        remaining.map((i) => ({ slug: i.group.slug, servings: i.cookServings }))
+      ),
+    [remaining]
+  );
+  const freshNeed = useMemo(() => {
+    const fresh = session?.makeFresh ?? [];
+    const linked = fresh.filter((f) => f.linked && f.slug);
+    const unlinked = fresh.filter((f) => !f.linked || !f.slug);
+    return {
+      ...buildNeedList(
+        linked.map((f) => ({
+          slug: f.slug as string,
+          servings: Math.max(1, f.occurrences ?? 1),
+        }))
+      ),
+      unlinked: unlinked.map(
+        (f) => `${f.displayName}${f.occurrences > 1 ? ` ×${f.occurrences}` : ''}`
+      ),
+    };
+  }, [session]);
+  const freshMealCount = useMemo(
+    () => (session?.makeFresh ?? []).reduce((s, i) => s + (i.occurrences ?? 1), 0),
+    [session]
+  );
+
+  // The payoff metric: meals ready to eat, not tasks ticked.
+  const bankedTotal = useMemo(() => queue.reduce((s, i) => s + i.coverage, 0), [queue]);
+  const bankedDone = useMemo(
+    () => queue.reduce((s, i) => s + (doneKeys[i.doneKey] ? i.coverage : 0), 0),
     [queue, doneKeys]
   );
 
-  const current = remaining[0] ?? null;
-  const upNext = remaining.slice(1, 4);
-  const restCount = Math.max(0, remaining.length - 1 - upNext.length);
-
-  const doneCount = completed.length;
-  const totalCount = queue.length;
-  const progress = totalCount > 0 ? doneCount / totalCount : 0;
-
-  // Finish estimate only makes sense when hands-on is known for every item.
-  const handsOnKnown = queue.length > 0 && queue.every((i) => i.handsOnKnown);
-  const makespan = useMemo(() => {
-    if (!handsOnKnown) return null;
-    const sumHandsOn = queue.reduce((s, i) => s + i.handsOn, 0);
-    const maxTotal = queue.reduce((m, i) => Math.max(m, i.total), 0);
+  // Finish estimate over what's LEFT, so it counts down as tasks complete.
+  const remainingMakespan = useMemo(() => {
+    if (remaining.length === 0) return null;
+    if (!remaining.every((i) => i.handsOnKnown)) return null;
+    const sumHandsOn = remaining.reduce((s, i) => s + i.handsOn, 0);
+    const maxTotal = remaining.reduce((m, i) => Math.max(m, i.total), 0);
     return Math.max(maxTotal, sumHandsOn);
-  }, [queue, handsOnKnown]);
+  }, [remaining]);
 
-  const header = (
+  const timeLeftLine =
+    remaining.length === 0
+      ? null
+      : remainingMakespan != null
+      ? `~${formatTime(remainingMakespan)} left`
+      : `longest cook ~${formatTime(remaining.reduce((m, i) => Math.max(m, i.total), 0))}`;
+
+  const markCurrentDone = useCallback(() => {
+    if (!current) return;
+    toggleDone(current.doneKey);
+    setFocusKey(null);
+    startCelebration(current);
+  }, [current, toggleDone, startCelebration]);
+
+  const undoCurrent = useCallback(() => {
+    if (!current) return;
+    toggleDone(current.doneKey);
+    // Keep focus so the user stays on the task they just restored.
+    setFocusKey(current.doneKey);
+  }, [current, toggleDone]);
+
+  // ----- Headers -------------------------------------------------------------
+  const plainHeader = (
     <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
       <TouchableOpacity style={styles.backBtn} hitSlop={10} onPress={() => navigation.goBack()}>
-        <Ionicons name="chevron-back" size={22} color="#fff" />
+        <Ionicons name="close" size={20} color="#fff" />
       </TouchableOpacity>
       <Text style={styles.topBarTitle}>Meal Prep</Text>
       <View style={styles.backBtn} />
+    </View>
+  );
+
+  // The X in focus mode returns to the LOBBY (the lobby's own X exits). Task
+  // movement lives in the bottom bar and the strip segments, so nothing up
+  // here can be misread as "back one meal".
+  const stripHeader = (
+    <View style={{ paddingTop: insets.top + 8 }}>
+      <View style={styles.stripBar}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          hitSlop={10}
+          onPress={() => {
+            setInFocus(false);
+            setFocusKey(null);
+          }}
+        >
+          <Ionicons name="close" size={20} color="#fff" />
+        </TouchableOpacity>
+        <SegmentStrip
+          queue={queue}
+          doneKeys={doneKeys}
+          currentKey={current ? current.doneKey : null}
+          themeColor={themeColor}
+          onSelect={(key) => setFocusKey(key)}
+        />
+        <Text style={styles.stripCount}>
+          {position}/{totalCount}
+        </Text>
+      </View>
+      <Text style={styles.headerMetric}>
+        {bankedDone} of {bankedTotal} meals banked
+        {timeLeftLine ? ` · ${timeLeftLine}` : ''}
+      </Text>
     </View>
   );
 
@@ -480,7 +774,7 @@ export default function MealPrepSessionScreen() {
   if (!session) {
     return (
       <View style={styles.container}>
-        {header}
+        {plainHeader}
         <View style={styles.emptyWrap}>
           <Ionicons name="restaurant-outline" size={28} color="#3f3f46" />
           <Text style={styles.emptyText}>No active meal plan yet.</Text>
@@ -495,7 +789,7 @@ export default function MealPrepSessionScreen() {
   if (session.totals.isLegacyPlan) {
     return (
       <View style={styles.container}>
-        {header}
+        {plainHeader}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
@@ -520,236 +814,482 @@ export default function MealPrepSessionScreen() {
   }
 
   const { totals, makeFresh } = session;
-  const allDone = totalCount > 0 && remaining.length === 0;
+
+  // ----- Everything-is-fresh plan: no queue at all --------------------------
+  if (totalCount === 0) {
+    return (
+      <View style={styles.container}>
+        {plainHeader}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+        >
+          <View style={styles.titleBlock}>
+            <Text style={[styles.eyebrow, { color: themeColor }]}>MEAL PREP</Text>
+            <Text style={styles.payoffSub}>
+              Nothing to batch ahead — everything on this plan is made fresh.
+            </Text>
+          </View>
+          {makeFresh.length > 0 ? (
+            <MakeFreshCard
+              makeFresh={makeFresh}
+              blurb="Cook these on the day — no prep session needed."
+            />
+          ) : null}
+          <TouchableOpacity style={styles.groceryLink} activeOpacity={0.7} onPress={openGroceryList}>
+            <Ionicons name="cart-outline" size={16} color={themeColor} />
+            <Text style={[styles.groceryLinkText, { color: themeColor }]}>View grocery list</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ----- Lobby: the session overview, always the first face of the screen ---
+  if (!inFocus) {
+    // Basket tap: the ingredients view — meal prep vs make fresh, with the
+    // shopping list still reachable at the bottom.
+    if (showNeed) {
+      return (
+        <View style={styles.container}>
+          <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              hitSlop={10}
+              onPress={() => setShowNeed(false)}
+            >
+              <Ionicons name="chevron-back" size={22} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.topBarTitle}>Ingredients</Text>
+            <View style={styles.backBtn} />
+          </View>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 30 }}
+          >
+            {needList.rows.length > 0 || needList.seasonings.length > 0 ? (
+              <View style={styles.needBlock}>
+                <Text style={[styles.needSectionEyebrow, { color: themeColor }]}>
+                  FOR MEAL PREP · TODAY
+                </Text>
+                <View style={styles.needList}>
+                  {needList.rows.map((row, i) => (
+                    <View key={row.name}>
+                      {i > 0 ? <View style={styles.freshDivider} /> : null}
+                      <View style={styles.needRow}>
+                        <Text style={styles.needName} numberOfLines={1}>
+                          {row.name}
+                        </Text>
+                        <Text style={styles.needQty}>{row.qty}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  {needList.seasonings.length > 0 ? (
+                    <Text style={styles.needSeasonings}>
+                      Plus pantry: {needList.seasonings.join(', ')}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
+            {freshNeed.rows.length > 0 ||
+            freshNeed.seasonings.length > 0 ||
+            freshNeed.unlinked.length > 0 ? (
+              <View style={styles.needBlock}>
+                <Text style={styles.needSectionEyebrowMuted}>
+                  FOR MAKE FRESH · DURING THE WEEK
+                </Text>
+                <View style={styles.needList}>
+                  {freshNeed.rows.map((row, i) => (
+                    <View key={row.name}>
+                      {i > 0 ? <View style={styles.freshDivider} /> : null}
+                      <View style={styles.needRow}>
+                        <Text style={styles.needName} numberOfLines={1}>
+                          {row.name}
+                        </Text>
+                        <Text style={styles.needQty}>{row.qty}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  {freshNeed.seasonings.length > 0 ? (
+                    <Text style={styles.needSeasonings}>
+                      Plus pantry: {freshNeed.seasonings.join(', ')}
+                    </Text>
+                  ) : null}
+                  {freshNeed.unlinked.length > 0 ? (
+                    <Text style={styles.needSeasonings}>
+                      Also: {freshNeed.unlinked.join(' · ')}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={styles.groceryLink}
+              activeOpacity={0.7}
+              onPress={openGroceryList}
+            >
+              <Ionicons name="cart-outline" size={16} color={themeColor} />
+              <Text style={[styles.groceryLinkText, { color: themeColor }]}>
+                Open shopping list
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      );
+    }
+
+    const allDone = remaining.length === 0;
+    const startedAlready = doneCount > 0;
+    const workLine =
+      allDone
+        ? null
+        : remainingMakespan != null
+        ? `~${formatTime(remainingMakespan)} ${startedAlready ? 'to finish' : 'of work'}`
+        : `longest cook ~${formatTime(
+            remaining.reduce((m, i) => Math.max(m, i.total), 0)
+          )}`;
+    return (
+      <View style={styles.container}>
+        <View style={[styles.lobbyBar, { paddingTop: insets.top + 8 }]}>
+          <TouchableOpacity style={styles.backBtn} hitSlop={10} onPress={() => navigation.goBack()}>
+            <Ionicons name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backBtn} hitSlop={10} onPress={() => setShowNeed(true)}>
+            <Ionicons name="basket-outline" size={20} color="#a1a1aa" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: 16 }}
+        >
+          <View style={styles.lobbyHead}>
+            <Text style={[styles.eyebrow, { color: themeColor }]}>MEAL PREP</Text>
+            <Text style={styles.lobbyTitle}>
+              {allDone
+                ? `All ${bankedTotal} meals banked`
+                : startedAlready
+                ? `${bankedDone} of ${bankedTotal} meals banked`
+                : `${totalCount} ${totalCount === 1 ? 'dish' : 'dishes'} → ${bankedTotal} meals`}
+            </Text>
+            <Text style={styles.lobbySub}>
+              {startedAlready
+                ? `${doneCount} of ${totalCount} dishes done${workLine ? ` · ${workLine}` : ''}`
+                : `${workLine ?? ''}${
+                    freshMealCount > 0
+                      ? `${workLine ? ' · ' : ''}${freshMealCount} more made fresh in the week`
+                      : ''
+                  }`}
+            </Text>
+          </View>
+
+          {/* Dish list — tap any row to jump straight to that dish */}
+          <View style={styles.lobbyList}>
+            {queue.map((item, idx) => {
+              const done = !!doneKeys[item.doneKey];
+              return (
+                <View key={item.doneKey}>
+                  {idx > 0 ? <View style={styles.freshDivider} /> : null}
+                  <TouchableOpacity
+                    style={styles.lobbyRow}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setFocusKey(item.doneKey);
+                      setInFocus(true);
+                    }}
+                  >
+                    {done ? (
+                      <View style={styles.lobbyCheckWrap}>
+                        <Ionicons name="checkmark-circle" size={20} color={themeColor} />
+                      </View>
+                    ) : item.image ? (
+                      <Image source={item.image} style={styles.lobbyThumb} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.lobbyThumb, styles.thumbPlaceholder]}>
+                        <Ionicons name="image-outline" size={14} color="#52525b" />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[styles.lobbyRowName, done && styles.lobbyRowNameDone]}
+                        numberOfLines={1}
+                      >
+                        {item.title}
+                      </Text>
+                      {!done ? (
+                        <Text style={styles.lobbyRowSub} numberOfLines={1}>
+                          {item.coverage} {item.coverage === 1 ? 'meal' : 'meals'}
+                          {item.setAndForget ? ' · set & forget' : ''}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {!done ? (
+                      <Text style={styles.lobbyRowTime}>{formatTime(item.total)}</Text>
+                    ) : null}
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Made fresh — context only, cooked on the day */}
+          {makeFresh.length > 0 ? (
+            <View style={styles.lobbyFreshBlock}>
+              <Text style={styles.lobbyFreshEyebrow}>MADE FRESH · NOT TODAY</Text>
+              <Text style={styles.lobbyFreshText}>
+                {makeFresh
+                  .map(
+                    (f) => `${f.displayName}${f.occurrences > 1 ? ` ×${f.occurrences}` : ''}`
+                  )
+                  .join(' · ')}
+              </Text>
+            </View>
+          ) : null}
+        </ScrollView>
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 14 }]}>
+          <TouchableOpacity
+            style={[styles.ctaBtn, { backgroundColor: themeColor }]}
+            activeOpacity={0.85}
+            onPress={() => {
+              setFocusKey(null);
+              setInFocus(true);
+            }}
+          >
+            <Text style={styles.ctaBtnText} numberOfLines={1}>
+              {allDone
+                ? 'View summary'
+                : startedAlready
+                ? `Continue — ${remaining[0].title} is next`
+                : 'Start prepping'}
+            </Text>
+            <Ionicons name="arrow-forward" size={16} color="#000" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ----- Finale: everything batched is done ---------------------------------
+  const showFinale = remaining.length === 0 && !focused && !celebration;
+  const showBottomBar = !showFinale && !celebration && !!current;
 
   return (
     <View style={styles.container}>
-      {header}
-      <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        {/* ---- Progress + finish estimate ---- */}
-        <View style={styles.titleBlock}>
-          <View style={styles.progressTopRow}>
-            <Text style={styles.eyebrowMuted}>PREP SESSION</Text>
-            <Text style={styles.progressCount}>
-              {doneCount} of {totalCount} done
-            </Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${Math.round(progress * 100)}%`, backgroundColor: themeColor },
-              ]}
-            />
-          </View>
-          <Text style={styles.progressSub}>
-            {makespan != null
-              ? `Done in ~${formatTime(makespan)}`
-              : `Longest cook ~${formatTime(queue.reduce((m, i) => Math.max(m, i.total), 0))}`}
-            {' · '}
-            <Text style={{ color: themeColor }}>ordered to finish fastest</Text>
-          </Text>
-        </View>
-
-        {/* ---- Session complete ---- */}
-        {allDone ? (
-          <View style={styles.completeCard}>
-            <Ionicons name="checkmark-done-circle-outline" size={26} color={themeColor} />
-            <Text style={styles.completeTitle}>All prepped.</Text>
-            <Text style={styles.completeSub}>
-              {totals.mealCount} {totals.mealCount === 1 ? 'meal' : 'meals'} ready for the week.
-            </Text>
-          </View>
-        ) : null}
-
-        {/* ---- DO NOW ---- */}
-        {current ? (
-          <View style={styles.nowCard}>
-            {current.image ? (
-              <Image source={current.image} style={styles.nowImage} contentFit="cover" transition={200} priority="high" />
-            ) : (
-              <View style={[styles.nowImage, styles.thumbPlaceholder]}>
-                <Ionicons name="image-outline" size={28} color="#52525b" />
-              </View>
-            )}
-            <View style={styles.nowBody}>
-            <View style={styles.nowHeader}>
-              <Text style={[styles.nowEyebrow, { color: themeColor }]}>DO NOW</Text>
-              <Text style={styles.nowStrategy}>
-                {current.strategy === 'prep' ? 'PREP AHEAD' : 'COOK AHEAD'}
+      {stripHeader}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{
+          paddingBottom: showBottomBar ? 16 : insets.bottom + 40,
+        }}
+      >
+        {showFinale ? (
+          <>
+            <View style={styles.completeBlock}>
+              <Ionicons name="checkmark-done-circle-outline" size={30} color={themeColor} />
+              <Text style={styles.completeTitle}>All prepped.</Text>
+              <Text style={styles.completeSub}>
+                {bankedTotal} {bankedTotal === 1 ? 'meal' : 'meals'} banked for the week.
               </Text>
             </View>
-
-            <Text style={styles.nowTitle}>{current.title}</Text>
-
-            {/* Prep-ahead is two actions at two times: headline the shared
-                prep-now job, then the day-of finish(es) — one line when every
-                plate finishes the same way, one per plate when they differ.
-                Cook-ahead gets a single adaptive treatment line instead. */}
-            {current.strategy === 'prep' ? (
-              <View style={styles.splitBlock}>
-                <View style={styles.splitRow}>
-                  <Text style={[styles.splitLabel, { color: themeColor }]}>PREP NOW</Text>
-                  <Text style={styles.splitText} numberOfLines={2}>
-                    {current.prepAheadSummary}
+            {makeFresh.length > 0 ? (
+              <MakeFreshCard
+                makeFresh={makeFresh}
+                blurb="Nothing else to prep — cook these on the day."
+              />
+            ) : null}
+            <TouchableOpacity
+              style={styles.groceryLink}
+              activeOpacity={0.7}
+              onPress={openGroceryList}
+            >
+              <Ionicons name="cart-outline" size={16} color={themeColor} />
+              <Text style={[styles.groceryLinkText, { color: themeColor }]}>View grocery list</Text>
+            </TouchableOpacity>
+          </>
+        ) : celebration ? (
+          // ---- The win. Holds ~2.5s, or tap anything to move on. ----
+          <TouchableOpacity activeOpacity={1} onPress={dismissCelebration}>
+            <View style={styles.celebrateBlock}>
+              <Animated.View
+                style={[
+                  styles.celebrateCheck,
+                  {
+                    backgroundColor: `${themeColor}24`,
+                    transform: [{ scale: celebScale }],
+                  },
+                ]}
+              >
+                <Ionicons name="checkmark" size={32} color={themeColor} />
+              </Animated.View>
+              <Text style={styles.celebrateTitle}>{celebration.title} banked</Text>
+              <Text style={[styles.celebrateGain, { color: themeColor }]}>
+                +{celebration.coverage} {celebration.coverage === 1 ? 'meal' : 'meals'} ready to eat
+              </Text>
+              <Text style={styles.celebrateSub}>
+                {doneCount} down · {remaining.length} to go
+                {timeLeftLine ? ` · ${timeLeftLine}` : ''}
+              </Text>
+            </View>
+            {remaining[0] ? (
+              <TouchableOpacity
+                style={styles.nextUpCard}
+                activeOpacity={0.75}
+                onPress={dismissCelebration}
+              >
+                {remaining[0].image ? (
+                  <Image source={remaining[0].image} style={styles.nextUpThumb} contentFit="cover" />
+                ) : (
+                  <View style={[styles.nextUpThumb, styles.thumbPlaceholder]}>
+                    <Ionicons name="image-outline" size={16} color="#52525b" />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.nextUpEyebrow}>UP NEXT</Text>
+                  <Text style={styles.nextUpTitle} numberOfLines={1}>
+                    {remaining[0].title} ·{' '}
+                    {remaining[0].handsOnKnown
+                      ? formatTime(remaining[0].handsOn)
+                      : formatTime(remaining[0].total)}
                   </Text>
                 </View>
-                {(current.dayOfLines.length > 0
-                  ? current.dayOfLines
-                  : ['Finish fresh at mealtime']
-                ).map((line, idx) => (
-                  <View style={styles.splitRow} key={idx}>
-                    <Text style={styles.splitLabelMuted}>{idx === 0 ? 'DAY-OF' : ''}</Text>
-                    <Text style={styles.splitTextMuted} numberOfLines={2}>
-                      {line}
+                <Ionicons name="chevron-forward" size={15} color="#3f3f46" />
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.celebrateWrap}>That's everything — wrapping up…</Text>
+            )}
+          </TouchableOpacity>
+        ) : current ? (
+          // ---- The poster. Banked dishes get the SAME poster, with a badge
+          //      and swapped copy — a finished dish should look just as good.
+          <>
+            <View style={styles.posterCard}>
+              {current.image ? (
+                <Image
+                  source={current.image}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  transition={200}
+                  priority="high"
+                />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, styles.thumbPlaceholder]}>
+                  <Ionicons name="image-outline" size={32} color="#52525b" />
+                </View>
+              )}
+              {currentIsDone ? (
+                <View style={[styles.bankedBadge, { backgroundColor: themeColor }]}>
+                  <Ionicons name="checkmark" size={18} color="#000" />
+                </View>
+              ) : null}
+              <LinearGradient
+                colors={['transparent', 'rgba(11,11,13,0.55)', 'rgba(11,11,13,0.94)']}
+                locations={[0, 0.55, 1]}
+                style={styles.posterOverlay}
+              >
+                <Text style={[styles.posterEyebrow, { color: themeColor }]}>
+                  {currentIsDone ? 'BANKED' : 'PREP NOW'}
+                </Text>
+                <Text style={styles.posterTitle} numberOfLines={2}>
+                  {current.title}
+                </Text>
+                <Text style={styles.posterMeta}>
+                  {currentIsDone
+                    ? `${current.coverage} ${
+                        current.coverage === 1 ? 'meal' : 'meals'
+                      } ready to eat · nice work`
+                    : `${current.cookServings} ${
+                        current.cookServings === 1 ? 'serving' : 'servings'
+                      } · feeds ${current.coverage} ${
+                        current.coverage === 1 ? 'meal' : 'meals'
+                      }${
+                        current.handsOnKnown
+                          ? ` · ${formatTime(current.handsOn)} of work`
+                          : ` · ${formatTime(current.total)}`
+                      }`}
+                </Text>
+                {!currentIsDone && current.setAndForget ? (
+                  <View style={[styles.posterChip, { backgroundColor: `${themeColor}1f` }]}>
+                    <Ionicons name="flame" size={12} color={themeColor} />
+                    <Text style={[styles.posterChipText, { color: themeColor }]}>
+                      set &amp; forget — {formatTime(current.passive)} on its own
                     </Text>
                   </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.nowInstruction}>
-                {current.setAndForget
-                  ? `Start it now, then walk away — it cooks for ${formatTime(
-                      current.passive
-                    )} on its own.`
-                  : current.handsOnKnown
-                  ? `Stays hands-on — about ${formatTime(current.handsOn)} of work.`
-                  : 'Get this going next.'}
-              </Text>
-            )}
+                ) : !currentIsDone && current.strategy === 'prep' ? (
+                  <View style={styles.posterChipMuted}>
+                    <Ionicons name="leaf-outline" size={12} color="#a1a1aa" />
+                    <Text style={styles.posterChipMutedText}>finish fresh on the day</Text>
+                  </View>
+                ) : null}
+              </LinearGradient>
+            </View>
 
-            <Text style={styles.nowMeta}>
-              {current.strategy === 'prep' ? 'Prep' : 'Cook'} {current.cookServings}{' '}
-              {current.cookServings === 1 ? 'serving' : 'servings'} · covers{' '}
-              {current.coverage} {current.coverage === 1 ? 'meal' : 'meals'} ·{' '}
-              {current.strategy === 'prep' && current.handsOnKnown
-                ? `~${formatTime(current.handsOn)} now`
-                : formatTime(current.total)}
-            </Text>
-
-            {storageLine(current.group.storage) ? (
-              <Text style={styles.nowStorage}>{storageLine(current.group.storage)}</Text>
-            ) : null}
-
-            {/* Freezer note from freshness data */}
-            {(() => {
-              const freshnessItem = freshnessSession?.items.find(
-                item => item.curated_meal_slug === current.group.slug && item.plate_id === current.group.plateId
-              );
-              return freshnessItem?.freshness?.freeze_note ? (
-                <View style={styles.freezerNote}>
-                  <Ionicons name="snow-outline" size={14} color="#3b82f6" />
-                  <Text style={styles.freezerNoteText}>{freshnessItem.freshness.freeze_note}</Text>
-                </View>
-              ) : null;
-            })()}
-
-            <View style={styles.nowActions}>
+            {currentIsDone ? (
               <TouchableOpacity
-                style={[styles.primaryBtn, { backgroundColor: themeColor }]}
-                activeOpacity={0.85}
-                onPress={() => toggleDone(current.doneKey)}
-              >
-                <Ionicons name="checkmark" size={16} color="#000" />
-                <Text style={styles.primaryBtnText}>
-                  {current.strategy === 'prep' ? 'Mark prep done' : 'Mark done'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.secondaryBtn}
-                activeOpacity={0.7}
+                hitSlop={8}
                 onPress={() => openRecipe(current.group, current.cookServings)}
               >
-                <Text style={styles.secondaryBtnText}>Recipe</Text>
-                <Ionicons name="chevron-forward" size={15} color="#fff" />
+                <Text style={styles.underCardLink}>View recipe</Text>
               </TouchableOpacity>
-            </View>
-            </View>
-          </View>
-        ) : null}
-
-        {/* ---- UP NEXT ---- */}
-        {upNext.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.eyebrowMuted}>UP NEXT</Text>
-            {upNext.map((item, idx) => (
-              <UpNextRow
-                key={item.doneKey}
-                item={item}
-                onOpen={openRecipe}
-                opacity={[0.85, 0.62, 0.45][idx] ?? 0.4}
-              />
-            ))}
-            {restCount > 0 ? (
-              <Text style={styles.restNote}>
-                {restCount} more · then {makeFresh.length}{' '}
-                {makeFresh.length === 1 ? 'make-fresh item' : 'make-fresh items'}
+            ) : (
+              <TouchableOpacity hitSlop={8} onPress={markCurrentDone}>
+                <Text style={styles.underCardLink}>Already made it? Mark done</Text>
+              </TouchableOpacity>
+            )}
+            {!currentIsDone && !nextTask && makeFresh.length > 0 ? (
+              <Text style={styles.lastOneNote}>
+                Last one · then {makeFresh.length} made fresh
               </Text>
             ) : null}
-          </View>
+          </>
         ) : null}
-
-        {/* ---- DONE (collapsible) ---- */}
-        {doneCount > 0 ? (
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.doneHeader}
-              activeOpacity={0.7}
-              onPress={() => setShowDone((s) => !s)}
-            >
-              <Text style={styles.eyebrowMuted}>DONE · {doneCount}</Text>
-              <Ionicons
-                name={showDone ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color="#3f3f46"
-              />
-            </TouchableOpacity>
-            {showDone ? (
-              <View style={styles.doneList}>
-                {completed.map((item) => (
-                  <DoneRow key={item.doneKey} item={item} onToggle={toggleDone} />
-                ))}
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* ---- MAKE FRESH — heads-up only, never queued ---- */}
-        {makeFresh.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.eyebrowMuted}>MAKE FRESH</Text>
-            <Text style={styles.sectionBlurb}>Cook these to order — not part of the prep run.</Text>
-            <View style={styles.freshCard}>
-              {makeFresh.map((item, idx) => (
-                <View key={item.key}>
-                  {idx > 0 ? <View style={styles.freshDivider} /> : null}
-                  <MakeFreshRow item={item} />
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {/* ---- Equipment — quiet, lowest priority ---- */}
-        {totals.equipment.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.eyebrowMuted}>EQUIPMENT</Text>
-            <View style={styles.chipRow}>
-              {totals.equipment.map((e) => (
-                <View key={String(e)} style={styles.chip}>
-                  <Text style={styles.chipText}>{humanizeEquipment(e)}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {/* ---- Grocery list ---- */}
-        <TouchableOpacity style={styles.groceryLink} activeOpacity={0.7} onPress={openGroceryList}>
-          <Ionicons name="cart-outline" size={16} color={themeColor} />
-          <Text style={[styles.groceryLinkText, { color: themeColor }]}>View grocery list</Text>
-        </TouchableOpacity>
       </ScrollView>
+
+      {/* ---- Pinned bottom bar: [‹ prev] [Let's go / Undo] [next ›].
+           Arrows move through the queue in order; the middle button is the
+           action for THIS dish. All of it in thumb reach. ---- */}
+      {showBottomBar && current ? (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 14 }]}>
+          <TouchableOpacity
+            style={[styles.navBtn, !prevTask && styles.navBtnDisabled]}
+            activeOpacity={0.7}
+            disabled={!prevTask}
+            onPress={() => prevTask && setFocusKey(prevTask.doneKey)}
+          >
+            <Ionicons name="chevron-back" size={18} color={prevTask ? '#fff' : '#3f3f46'} />
+          </TouchableOpacity>
+
+          {currentIsDone ? (
+            <TouchableOpacity
+              style={styles.undoBtn}
+              activeOpacity={0.8}
+              onPress={undoCurrent}
+            >
+              <Ionicons name="arrow-undo-outline" size={15} color="#fff" />
+              <Text style={styles.undoBtnText}>Undo</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.ctaBtn, { backgroundColor: themeColor }]}
+              activeOpacity={0.85}
+              onPress={() => openPrepMode(current)}
+            >
+              <Text style={styles.ctaBtnText}>Let's go</Text>
+              <Ionicons name="arrow-forward" size={16} color="#000" />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.navBtn, !nextTask && styles.navBtnDisabled]}
+            activeOpacity={0.7}
+            disabled={!nextTask}
+            onPress={() => nextTask && setFocusKey(nextTask.doneKey)}
+          >
+            <Ionicons name="chevron-forward" size={18} color={nextTask ? '#fff' : '#3f3f46'} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -770,149 +1310,281 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   topBarTitle: { color: '#fff', fontSize: 16, fontWeight: '600', letterSpacing: -0.2 },
 
-  titleBlock: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 6 },
-  progressTopRow: {
+  // Strip header
+  stripBar: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingBottom: 2,
+    gap: 6,
   },
-  progressCount: { color: '#71717a', fontSize: 11 },
-  progressTrack: { height: 6, borderRadius: 4, backgroundColor: '#27272a', overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 4 },
-  progressSub: { color: '#71717a', fontSize: 12, marginTop: 9 },
-  payoffSub: { color: '#a1a1aa', fontSize: 13, lineHeight: 18, marginTop: 6 },
+  strip: { flex: 1, flexDirection: 'row', gap: 4, alignItems: 'center' },
+  stripTouch: { flex: 1, paddingVertical: 10 },
+  stripSeg: { height: 4, borderRadius: 2 },
+  stripCount: { color: '#71717a', fontSize: 11, width: 34, textAlign: 'right' },
+  headerMetric: {
+    color: '#52525b',
+    fontSize: 11,
+    textAlign: 'right',
+    paddingHorizontal: 18,
+    paddingBottom: 6,
+  },
 
-  section: { paddingHorizontal: 18, marginTop: 22 },
+  titleBlock: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 6 },
   eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
   eyebrowMuted: { color: '#71717a', fontSize: 11, fontWeight: '600', letterSpacing: 1.2 },
   sectionBlurb: { color: '#52525b', fontSize: 11, lineHeight: 15, marginTop: 4, marginBottom: 10 },
+  payoffSub: { color: '#a1a1aa', fontSize: 13, lineHeight: 18, marginTop: 6 },
 
-  // DO NOW card
-  nowCard: {
-    marginHorizontal: 18,
+  // Poster card (shared by PREP NOW and BANKED states)
+  posterCard: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    height: 340,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#18181b',
+    justifyContent: 'flex-end',
+  },
+  posterOverlay: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 48,
+  },
+  posterEyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
+  posterTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    marginTop: 6,
+  },
+  posterMeta: { color: '#a1a1aa', fontSize: 12, marginTop: 7 },
+  posterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 10,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  posterChipText: { fontSize: 11, fontWeight: '500' },
+  posterChipMuted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 10,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  posterChipMutedText: { color: '#a1a1aa', fontSize: 11 },
+  bankedBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  thumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#202023' },
+
+  underCardLink: {
+    color: '#52525b',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 13,
+    textDecorationLine: 'underline',
+  },
+  lastOneNote: { color: '#3f3f46', fontSize: 11, textAlign: 'center', marginTop: 10 },
+
+  // Lobby
+  lobbyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 2,
+  },
+  lobbyHead: { paddingHorizontal: 18, paddingTop: 10 },
+  lobbyTitle: {
+    color: '#fff',
+    fontSize: 23,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    marginTop: 7,
+  },
+  lobbySub: { color: '#71717a', fontSize: 12, marginTop: 6 },
+  lobbyList: {
+    marginHorizontal: 14,
     marginTop: 16,
     backgroundColor: '#18181b',
-    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
-    overflow: 'hidden',
+    borderRadius: 15,
+    paddingHorizontal: 12,
   },
-  nowImage: { width: '100%', height: 120, backgroundColor: '#202023' },
-  nowBody: { padding: 16 },
-  thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  nowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  nowEyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
-  nowStrategy: { color: '#52525b', fontSize: 11, fontWeight: '600', letterSpacing: 0.6 },
-  nowTitle: { color: '#fff', fontSize: 20, fontWeight: '600', letterSpacing: -0.4, marginTop: 11 },
-  nowInstruction: { color: '#fff', fontSize: 13, lineHeight: 19, marginTop: 9 },
-  nowMeta: { color: '#a1a1aa', fontSize: 12, marginTop: 13 },
-  nowStorage: { color: '#52525b', fontSize: 11, letterSpacing: 0.3, marginTop: 8 },
-  freezerNote: {
+  lobbyRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    marginTop: 8,
-    paddingLeft: 2,
+    alignItems: 'center',
+    gap: 11,
+    paddingVertical: 10,
   },
-  freezerNoteText: {
-    flex: 1,
-    color: '#3b82f6',
-    fontSize: 11,
-    lineHeight: 15,
-    letterSpacing: 0.2,
-  },
-
-  // Prep-ahead now/day-of split
-  splitBlock: {
-    marginTop: 14,
-    borderLeftWidth: 2,
-    borderLeftColor: '#27272a',
-    paddingLeft: 12,
-    gap: 9,
-  },
-  splitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  splitLabel: { width: 58, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginTop: 1 },
-  splitLabelMuted: {
-    width: 58,
+  lobbyThumb: { width: 36, height: 36, borderRadius: 9 },
+  lobbyCheckWrap: { width: 36, alignItems: 'center' },
+  lobbyRowName: { color: '#fff', fontSize: 13, fontWeight: '500' },
+  lobbyRowNameDone: { color: '#52525b', textDecorationLine: 'line-through', fontWeight: '400' },
+  lobbyRowSub: { color: '#52525b', fontSize: 10, marginTop: 2 },
+  lobbyRowTime: { color: '#3f3f46', fontSize: 11 },
+  needBlock: { marginHorizontal: 14, marginTop: 16 },
+  needSectionEyebrow: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.8,
-    color: '#52525b',
-    marginTop: 1,
+    letterSpacing: 1.3,
+    paddingHorizontal: 4,
+    marginBottom: 8,
   },
-  splitText: { flex: 1, color: '#fff', fontSize: 13, lineHeight: 18 },
-  splitTextMuted: { flex: 1, color: '#71717a', fontSize: 12, lineHeight: 17 },
-
-  nowActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  primaryBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 12,
-    paddingVertical: 12,
+  needSectionEyebrowMuted: {
+    color: '#71717a',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.3,
+    paddingHorizontal: 4,
+    marginBottom: 8,
   },
-  primaryBtnText: { color: '#000', fontSize: 14, fontWeight: '600' },
-  secondaryBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    borderRadius: 12,
-    paddingVertical: 12,
+  needList: {
+    backgroundColor: '#18181b',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 6,
+    marginTop: 4,
   },
-  secondaryBtnText: { color: '#fff', fontSize: 14, fontWeight: '500' },
-
-  // Up next
-  upNextRow: {
+  needRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    paddingVertical: 11,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#1f1f23',
+    paddingVertical: 9,
   },
-  upNextThumb: { width: 42, height: 42, borderRadius: 8, backgroundColor: '#202023' },
-  upNextTextCol: { flex: 1, paddingRight: 10 },
-  upNextName: { color: '#d4d4d8', fontSize: 14, fontWeight: '500' },
-  upNextTag: { color: '#52525b', fontSize: 11, marginTop: 2, textTransform: 'lowercase' },
-  upNextTime: { color: '#71717a', fontSize: 12 },
-  restNote: { color: '#52525b', fontSize: 11, paddingTop: 10 },
-
-  // Done
-  doneHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  doneList: { marginTop: 8 },
-  doneRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
-  doneName: {
-    flex: 1,
-    color: '#52525b',
-    fontSize: 13,
-    textDecorationLine: 'line-through',
-  },
-
-  // Complete
-  completeCard: {
+  needName: { flex: 1, color: '#d1d5db', fontSize: 13 },
+  needQty: { color: '#a1a1aa', fontSize: 13 },
+  needSeasonings: { color: '#52525b', fontSize: 11, lineHeight: 16, paddingVertical: 8 },
+  lobbyFreshBlock: {
     marginHorizontal: 18,
     marginTop: 16,
+    borderLeftWidth: 2,
+    borderLeftColor: '#27272a',
+    paddingLeft: 11,
+  },
+  lobbyFreshEyebrow: { color: '#52525b', fontSize: 10, fontWeight: '700', letterSpacing: 1.1 },
+  lobbyFreshText: { color: '#71717a', fontSize: 11, lineHeight: 16, marginTop: 5 },
+
+  // Bottom bar
+  bottomBar: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#1f1f23',
+    backgroundColor: '#000',
+  },
+  navBtn: {
+    width: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#3f3f46',
+    paddingVertical: 15,
+  },
+  navBtnDisabled: { borderColor: '#1f1f23' },
+  ctaBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderRadius: 13,
+    paddingVertical: 15,
+  },
+  ctaBtnText: { color: '#000', fontSize: 15, fontWeight: '600' },
+  undoBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
+    borderRadius: 13,
+    paddingVertical: 15,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#3f3f46',
+  },
+  undoBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+
+  // Celebration
+  celebrateBlock: {
+    alignItems: 'center',
+    paddingTop: 46,
+    paddingHorizontal: 24,
+  },
+  celebrateCheck: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  celebrateTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '600',
+    letterSpacing: -0.4,
+    marginTop: 14,
+    textAlign: 'center',
+  },
+  celebrateGain: { fontSize: 14, fontWeight: '500', marginTop: 6 },
+  celebrateSub: { color: '#71717a', fontSize: 12, marginTop: 10 },
+  celebrateWrap: { color: '#3f3f46', fontSize: 11, textAlign: 'center', marginTop: 40 },
+  nextUpCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    marginHorizontal: 14,
+    marginTop: 40,
     backgroundColor: '#18181b',
-    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
-    paddingVertical: 22,
+    borderRadius: 14,
+    padding: 12,
+  },
+  nextUpThumb: { width: 40, height: 40, borderRadius: 10 },
+  nextUpEyebrow: { color: '#52525b', fontSize: 10, fontWeight: '600', letterSpacing: 1.2 },
+  nextUpTitle: { color: '#fff', fontSize: 14, fontWeight: '500', marginTop: 3 },
+
+  // Finale
+  completeBlock: {
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 26,
+    paddingBottom: 8,
     paddingHorizontal: 18,
   },
-  completeTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 2 },
+  completeTitle: { color: '#fff', fontSize: 17, fontWeight: '600', marginTop: 2 },
   completeSub: { color: '#a1a1aa', fontSize: 12, textAlign: 'center' },
 
-  // Make fresh
+  // Make fresh (finale + fresh-only plan)
+  freshCardBlock: { paddingHorizontal: 18, marginTop: 18 },
   freshCard: {
     backgroundColor: '#18181b',
     borderRadius: 14,
@@ -932,18 +1604,6 @@ const styles = StyleSheet.create({
   freshReason: { color: '#52525b', fontSize: 10, marginTop: 2 },
   freshMeta: { color: '#71717a', fontSize: 12 },
   freshDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#1f1f23' },
-
-  // Equipment
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    backgroundColor: 'transparent',
-  },
-  chipText: { color: '#a1a1aa', fontSize: 11, textTransform: 'capitalize' },
 
   // Notice (legacy)
   noticeCard: {
