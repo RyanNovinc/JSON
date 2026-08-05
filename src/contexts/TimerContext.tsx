@@ -179,6 +179,15 @@ const RESTORE_AUDIO_MODE = {
 export const COUNTDOWN_ALERT_LEAD_MS = 3000;
 
 /**
+ * How long a finished rest's Live Activity is held open past its deadline before the
+ * widget is torn down. Mirrors the in-app overtime counter's cap so the Dynamic Island
+ * and the workout screen stop agreeing to disagree: previously the widget was killed the
+ * instant `isFinished` flipped, which is exactly when overtime becomes worth reading.
+ * Keep this in step with the cap in useRestTimerDisplay.
+ */
+export const LIVE_ACTIVITY_OVERTIME_HOLD_MS = 3 * 60 * 1000;
+
+/**
  * A timer is in exactly one of four states. Read them from the flags; never infer
  * "finished" from `targetTime <= 0`, which cannot tell a completed countdown apart
  * from one that never started.
@@ -417,6 +426,9 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const soundRef = useRef<Audio.Sound | null>(null);
   const getExerciseContextRef = useRef<((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null>(null);
   const backgroundLiveActivityId = useRef<string | null>(null); // Store Live Activity ID when going to background
+  // Pending teardown of a finished rest's Live Activity. A ref for the same reason as
+  // countdownTimeoutRef: a timer handle is not serialisable into TimerState.
+  const overtimeStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevTimerRef = useRef<TimerState | null>(null); // Track previous timer state to avoid excessive Live Activity updates
   // Always-current timer, so control functions never read a stale render closure.
   // startTimer/stopTimer previously read `timer` from the closure, which meant two
@@ -835,6 +847,19 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('Attempting to play countdown sound...');
 
+      // Do not even ATTEMPT playback from the background. iOS refuses to activate the
+      // session and the play call throws — but the sound object has already been told to
+      // play by then, and nothing unsets that. The OS honours it the moment the app
+      // foregrounds and the session activates, which is how a rest that ended while you
+      // were in another app beeps at you the instant you come back. The catch below
+      // logged "skipping sound" and returned, so JS believed it had skipped; it had only
+      // deferred. 'inactive' is deliberately still attempted — that state covers the
+      // notification shade and the app switcher, where playback usually succeeds.
+      if (AppState.currentState === 'background') {
+        console.log('\u23ed\ufe0f App backgrounded - not attempting countdown sound');
+        return;
+      }
+
       if (!soundRef.current) {
         await reloadAndPlayOnce('soundRef.current is null');
         return;
@@ -896,6 +921,13 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       // now, and reloading would not change that.
       if (error.code === 'E_AV_PLAY' && error.message?.includes('audio session not activated')) {
         console.log('⚠️ Audio session not active (app in background) - skipping sound');
+        // Belt and braces for the same deferral the pre-check above prevents: the throw
+        // does not unset shouldPlay, so without an explicit stop the queued playback still
+        // fires when the session activates. Detach the status handler FIRST, or the stop
+        // reads as a natural finish and runs the unduck/session cycle for a beep that
+        // never sounded.
+        soundRef.current?.setOnPlaybackStatusUpdate(null);
+        soundRef.current?.stopAsync().catch(() => {});
         return;
       }
 
@@ -1117,6 +1149,17 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     timer?.targetTime,
   ]);
 
+  // Mount-scoped. The overtime hold is the only timeout that deliberately outlives the
+  // timer that created it, so it needs a teardown that is not keyed to timer state.
+  useEffect(() => {
+    return () => {
+      if (overtimeStopTimeoutRef.current) {
+        clearTimeout(overtimeStopTimeoutRef.current);
+        overtimeStopTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const startInterval = () => {
     if (intervalRef.current) return;
     
@@ -1189,6 +1232,40 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
           DebugLogger.log(`⚠️ [LIVE-ACTIVITY] Failed to stop ${activityId}, continuing: ${message}`, 'warn');
         }
       });
+  };
+
+  /**
+   * Hold a finished rest's Live Activity open through the overtime window, then dispose it.
+   *
+   * The instant is ABSOLUTE (deadline + hold), so the repeated syncs a finished timer
+   * produces all converge on the same teardown rather than pushing it further out.
+   *
+   * The captured id is re-checked when the timeout fires. Every other path that ends an
+   * activity — startTimer claiming a new one, resetTimer, stopTimer — already disposes by
+   * id, so a stale hold simply finds the slot reassigned and does nothing. That is the
+   * whole guard: no bookkeeping in the other paths, no double-dispose.
+   */
+  const scheduleLiveActivityOvertimeStop = (activityId: string, deadlineMs: number) => {
+    if (overtimeStopTimeoutRef.current) {
+      clearTimeout(overtimeStopTimeoutRef.current);
+      overtimeStopTimeoutRef.current = null;
+    }
+
+    const delay = Math.max(0, deadlineMs + LIVE_ACTIVITY_OVERTIME_HOLD_MS - Date.now());
+    DebugLogger.log(
+      `\u23f3 [LIVE-ACTIVITY] holding ${activityId} through overtime, teardown in ${Math.round(delay / 1000)}s`,
+      'log',
+    );
+
+    overtimeStopTimeoutRef.current = setTimeout(() => {
+      overtimeStopTimeoutRef.current = null;
+      if (timerRef.current?.liveActivityId !== activityId) {
+        DebugLogger.log(`\u23ed\ufe0f [LIVE-ACTIVITY] overtime hold expired but ${activityId} was already replaced`, 'log');
+        return;
+      }
+      disposeLiveActivity(activityId, 'Rest Over');
+      setTimer(prev => (prev?.liveActivityId === activityId ? { ...prev, liveActivityId: undefined } : prev));
+    }, delay);
   };
 
   const startTimer = (targetSeconds = 0, exerciseIndex?: number, setIndex?: number, themeColor?: string, restOptions?: RestTriple) => {
@@ -1525,7 +1602,19 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
                      timer.isPaused ? 'timer paused' :
                      !timer.startTime ? 'no start time' :
                      timer.targetTime <= 0 ? 'target time <= 0' : 'unknown';
-        
+
+        // A finished countdown is NOT a reason to tear the widget down. The workout screen
+        // keeps counting past 0:00 (useRestTimerDisplay); the Dynamic Island going blank at
+        // that exact moment is the inconsistency, not the overtime. Hold, then dispose.
+        // No state push happens while held, so the widget keeps its last-sent end date.
+        if (reason === 'countdown finished' && timer?.liveActivityId && timer.startTime) {
+          scheduleLiveActivityOvertimeStop(
+            timer.liveActivityId,
+            timer.startTime.getTime() + timer.targetTime * 1000,
+          );
+          return;
+        }
+
         console.log('⚠️ Stopping Live Activity - conditions not met');
         DebugLogger.log(`Stopping Live Activity - reason: ${reason}`);
         
@@ -1626,7 +1715,11 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
             DebugLogger.log(`✅ Live Activity started successfully with ID: ${activityId}`);
 
             if (activityId) {
-              setTimer(prev => prev ? { ...prev, liveActivityId: activityId } : null);
+              // Seed lastSentRemaining here, not just on updates. The update gate below
+              // compares against it, and an unseeded value made that comparison compare
+              // `remaining` with itself — a guaranteed zero difference, so the widget was
+              // written once at start and never updated again.
+              setTimer(prev => prev ? { ...prev, liveActivityId: activityId, lastSentRemaining: remaining } : null);
             }
           } catch (error) {
             DebugLogger.log(`⚠️ [LIVE-ACTIVITY] startActivity unavailable, continuing without it: ${error?.message ?? error}`, 'warn');
@@ -1637,8 +1730,15 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         // Don't update every second - let iOS handle native countdown for accuracy.
         // Only push when the remaining time has drifted from what iOS last received.
+        // An unknown last-sent value means the widget's end date is unverified, so push.
+        // The old form was `remaining - (lastSentRemaining || remaining)`, which on an
+        // undefined value substituted `remaining` and compared it to itself: always 0,
+        // never above the threshold, so the only line that assigns lastSentRemaining sat
+        // inside a branch that could not be entered. Self-locking, and the reason a
+        // +15s tap never reached the Dynamic Island.
+        const lastSent = timer.lastSentRemaining;
         const hasSignificantChange =
-          Math.abs(remaining - (timer.lastSentRemaining || remaining)) > 5;
+          lastSent === undefined || Math.abs(remaining - lastSent) > 5;
 
 
         if (hasSignificantChange) {
