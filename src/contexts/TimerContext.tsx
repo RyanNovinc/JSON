@@ -131,6 +131,38 @@ const COUNTDOWN_AUDIO_MODE = {
 } as const;
 
 /**
+ * Applied AFTER playback to hand background music its volume back on iOS. Identical to
+ * COUNTDOWN_AUDIO_MODE except interruptionModeIOS, and that one difference is the whole
+ * mechanism: in expo-av 16.0.8 nothing JS-reachable ever issues [session setActive:NO]
+ * (dead code upstream, expo/expo#15873), so ducking cannot end by releasing the session
+ * — confirmed by a full node_modules trace (4 Aug 2026): every "deactivate" path,
+ * including expo-av's own demoteAudioSessionIfPossible on didJustFinish, bottoms out in
+ * EXAudioSessionManager.m's flag-only branch. What IS reachable is a category re-issue
+ * on the still-active session: _setAudioMode re-runs setCategory:withOptions: whenever
+ * the settings differ, and re-issuing WITHOUT the duck option is what restores other
+ * apps' volume. The play path re-applies COUNTDOWN_AUDIO_MODE before every playback, so
+ * the next alert ducks again.
+ *
+ * Android keys are identical to COUNTDOWN_AUDIO_MODE (the un-duck there is the focus
+ * abandon in the post-playback cycle, not a mode write), and the only call site is
+ * iOS-gated so Android never pays an extra per-rest setMode/setSpeakerphoneOn poke.
+ * Known side effect: the Cook contexts' PARTIAL mode writes now inherit MixWithOthers
+ * between alerts instead of DuckOthers, so the cook ding plays over music without
+ * ducking it — a different cosmetic, arguably the right one for a kitchen ding.
+ * All seven keys present, and spread at the call site, for the _populateMissingKeys
+ * mutation reasons above.
+ */
+const RESTORE_AUDIO_MODE = {
+  allowsRecordingIOS: false,
+  staysActiveInBackground: false,
+  interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+  playsInSilentModeIOS: true,
+  shouldDuckAndroid: true,
+  interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+  playThroughEarpieceAndroid: false,
+} as const;
+
+/**
  * How far before the end of a rest the alert must START.
  *
  * json_fit_timer_v3.wav is ONE fixed ~3s asset containing four beeps laid out at 3/2/1/0,
@@ -773,6 +805,20 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
    * next rest plays normally. At worst one beep is lost to a window a few milliseconds
    * wide. The fix for that would be to stop disabling Audio, not to add a flag here.
    */
+  /**
+   * iOS-only duck release. See RESTORE_AUDIO_MODE for the mechanism and why session
+   * deactivation is not an option in this expo-av version. Fire and forget: the failure
+   * mode of a lost write is "music stays quiet until the next alert", and the next
+   * alert's own mode write corrects it.
+   */
+  const restoreDuckedAudio = () => {
+    if (Platform.OS !== 'ios') return;
+    // Spread, never the constant itself — see COUNTDOWN_AUDIO_MODE.
+    Audio.setAudioModeAsync({ ...RESTORE_AUDIO_MODE })
+      .then(() => console.log('🔊 iOS duck released (MixWithOthers re-issued)'))
+      .catch((error) => console.error('Failed to release iOS duck:', error));
+  };
+
   const playCountdownSound = async (isRetry = false, fromPositionMs = 0) => {
     // Reload once, then play. Never more than once: loadCountdownSound swallows its own
     // failures, so without this latch a permanently unloadable asset would recurse.
@@ -812,20 +858,21 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
           // Clear the status update handler to prevent repeated calls
           soundRef.current?.setOnPlaybackStatusUpdate(null);
 
-          // Properly deactivate and reactivate audio session to restore background music.
+          // Give the music its volume back — one mechanism per platform.
           //
-          // UNVERIFIED, and left exactly as it is on purpose. Reading expo-av 16.0.8,
-          // EXAudioSessionManager.m's _updateSessionConfiguration has its [session
-          // setActive:NO] path commented out (see expo/expo#15873) and replaced with a
-          // bookkeeping flag, so on iOS this pair appears to issue no AVAudioSession calls
-          // at all — which would mean whatever restores background music on iOS is
-          // something else we have not identified. On Android it does real work:
+          // Android: the setIsEnabledAsync(false/true) cycle below is the real lever.
           // setAudioIsEnabled(false) abandons audio focus, and abandoning focus is what
-          // un-ducks the music.
+          // un-ducks other apps. Kept exactly as it was.
           //
-          // That is a source reading, not a measurement. Do not delete, shorten or
-          // platform-gate this cycle on the strength of it — it needs device evidence
-          // first, on a phone with music playing.
+          // iOS: the cycle is a no-op at the OS level — previously marked UNVERIFIED,
+          // now CONFIRMED by a full node_modules trace (4 Aug 2026) plus device
+          // evidence (music stayed ducked indefinitely). Every "deactivate" path,
+          // including the demoteAudioSessionIfPossible expo-av itself runs on
+          // didJustFinish, bottoms out in EXAudioSessionManager.m's flag-only branch
+          // ([session setActive:NO] is dead code upstream, expo/expo#15873). The one
+          // JS-reachable lever is the category re-issue in restoreDuckedAudio(),
+          // called independently of the cycle so a cycle failure cannot strand iOS.
+          restoreDuckedAudio();
           Audio.setIsEnabledAsync(false)
             .then(() => Audio.setIsEnabledAsync(true))
             .then(() => {
@@ -879,6 +926,12 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     // Fire and forget, and swallow: a sound that is not playing, or not loaded, throws here
     // and there is nothing to do about it — the goal is silence and silence is what we have.
     sound.stopAsync().catch(() => undefined);
+    // A cut-short playback never reaches didJustFinish, so nothing above will un-duck.
+    // Android self-heals at the next natural finish (focus stays held until then, as
+    // documented below); iOS would stay ducked until the next alert — e.g. stopping a
+    // timer during the beeps — so release it here too. Harmless when already released:
+    // expo-av no-ops a mode write whose category and options match the current ones.
+    restoreDuckedAudio();
   };
 
   /**
@@ -1018,7 +1071,18 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
 
     countdownTimeoutRef.current = setTimeout(() => {
       countdownTimeoutRef.current = null;
-      dispatch(0);
+      // Re-derive lateness at fire time. An iOS timeout suspended with the app resumes
+      // with its REMAINING delay intact, so it can fire arbitrarily late — and it can win
+      // the race against the foreground handler's reschedule, because elapsed timers are
+      // flushed on resume and AppState's 'active' event has no ordering guarantee against
+      // them. Dispatching 0 blindly here is how a set that finished half a minute ago
+      // still beeped on re-entry. Same rules as the overdue branch above: past the lead
+      // there is nothing worth playing; inside it, seek by exactly how late we are; and
+      // the ref guard stops a double-fire when the foreground reschedule got there first.
+      const lateness = Date.now() - fireAt;
+      if (lateness > COUNTDOWN_ALERT_LEAD_MS) return;
+      if (lateness > 0 && dispatchedAlertFireAtRef.current === fireAt) return;
+      dispatch(Math.max(0, lateness));
     }, delay);
   };
 
@@ -1527,9 +1591,11 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         timerEndDateInMilliseconds: endTime,
         // Remove remainingSeconds - let iOS calculate natively to prevent jumping
         progressBar: { date: endTime },
-        // Remove custom icons - let iOS use default app icon
-        // imageName: 'icon_transparent',
-        // dynamicIslandImageName: 'icon_transparent',
+        // iOS does NOT supply a default app icon for the Dynamic Island. The widget's
+        // compactLeading closure is `if let dynamicIslandImageName` — nil renders nothing.
+        // Both names resolve against the widget target's own ios/LiveActivity/Assets.xcassets.
+        imageName: 'icon_transparent',
+        dynamicIslandImageName: 'icon_transparent',
       };
 
       // Log the exact state being sent to Live Activity for lock screen debugging
